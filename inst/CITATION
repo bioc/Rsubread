@@ -1,0 +1,10 @@
+citEntry(entry="article",
+         title = "Subread: a superfast read aligner with high sensitivity and accuracy",
+         author = personList( as.person("Yang Liao" ),
+                              as.person("Wei Shi" ) ),
+         year = 2011,
+         journal = In_Preparation,
+         volume = ,
+         pages = ,
+         doi = ,
+)
