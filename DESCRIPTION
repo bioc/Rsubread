@@ -1,7 +1,7 @@
 Package: Rsubread
 Type: Package
 Title:  Rsubread: a super fast, sensitive and accurate read aligner for mapping next-generation sequencing reads 
-Version: 0.99.1
+Version: 0.99.2
 Author: Wei Shi and Yang Liao
 Maintainer: Wei Shi <shi@wehi.edu.au>
 Description: This package provides an R interface to the Subread aligner (http://sourceforge.net/projects/subread/) for mapping next-gen sequencing reads. Subread aligns reads to the referenc genome by using a set of substrings(subreads) extracted from each read. The consensus location mapped by subreads directly determines the mapping location of the read. Therefore, there is no costly extension step as in the "seed-and-extend" mapping paradig. Subread achieves much higher mapping speed and mapping sensitivity than "seed-and-extend" aligners at no cost to the accuracy. Subread aligner can align reads from all the major platforms inculding Illumina GA/HiSeq, ABI SOLiD, Roche 454 and HeliScope. It supports the mapping of paired-end reads and it also allows a large number of indels in the mapping. It can be used to align long reads (>200bp) as well.
