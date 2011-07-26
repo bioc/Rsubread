@@ -1,8 +1,22 @@
-featureCounts <- function(SAMfiles,type="gene",species="mm")
+featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 {
-	if(species != "mm")
-	  stop("Only mouse data are supported at this stage.") 
-	ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
+	if(is.null(annot)){
+	  if(species == "mm"){
+	    ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
+	    cat("Mouse annotation from NCBI Build 37.2 is used.\n")
+	  }
+	  else{
+	    if(species == "hg"){
+	      ann <- system.file("annot","hg19_NCBI_exon.txt",package="Rsubread")
+	      cat("Human annotation from NCBI Build 37.2 is used.\n")
+	    }
+	    else
+	      stop("In-built annotation for species", species, "is not available. Please make sure the species name is correct or provide an annotation file for it.\n")
+	  }
+	}
+	else{
+	  ann <- annot
+	}
 
 	fout <- system.file("extdata",package="Rsubread")
 	fout <- file.path(fout,paste(".Rsubread_pid",Sys.getpid(),sep=""))

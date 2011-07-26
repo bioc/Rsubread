@@ -1,6 +1,8 @@
+July 26, 2011 - 1.1.1
+featureCounts function now supports human data and allows users to provide their annotation data.
 
 July 22, 2011 - 1.1.0
-(1) Add featureCounts function, which counts number of mapped reads for each feature.
+Add featureCounts function, which counts number of mapped reads for each feature.
 
 1.0.0
 Package release.
