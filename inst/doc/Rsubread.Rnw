@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread: An R package for aligning next-generation sequencing reads}
 \author{Wei Shi}
-\date{30 March 2011}
+\date{27 July 2011}
 \maketitle
 
 \section{Introduction}
@@ -29,6 +29,8 @@ This new algorithm has been found to be much faster, more sensitive and accurate
 
 Read mapping functions in this package are R wrapper functions which call the underlying \C{C} functions to perform the alignment.
 A standalone C implementation of this new algorithm, which is called Subread, can be downloaded from \url{http://subread.sourceforge.net}.
+
+In addition to the read mapping functions, this package provides other useful functions for processing next-gen sequencing data such as summarization of read counts to genomic features, quality assessment and so on.
 
 \section{Read alignment}
 There are two steps for mapping reads using Rsubread: \\
@@ -86,6 +88,13 @@ This function supports the read mapping for all major platforms including Illumi
 It can map reads of both fixed length and variable length.
 It is capable for mapping long reads (>200bp) as well.
 When mapping long reads, the default setting for \R{nsubreads} and \R{TH1} are still recommended.
+
+\section{Counting mapped reads for genomic features}
+The \R{featureCounts} function summarizes read counts to genomic features.
+It uses the in-built annotation files or annotation provided by users to count the number of mapped reads for each feature.
+The in-built annotation files include annotation information for each exon in the mouse and human genomes (using NCBI build 37.2 annotation).
+Read counts can be summarized to gene level or exon level.
+This function can be used for general-purpose read summarization as well (for both DNA-seq reads and RNA-seq reads).
 
 \section{Quality assessment}
 {\noindent\bf Quality scores\\}
