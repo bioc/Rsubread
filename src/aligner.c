@@ -232,7 +232,7 @@ void print_res(gene_allvote_t *av, gene_input_t* ginp,gene_input_t * ginp2, FILE
 				else
 				{
 					gene_quality_score_t mapping_quality = av->max_quality[Curr_position];
-					fprintf (out_fp, "%s\t%d\t%s\t%d\t%f\t%s\t*\t0\t0\t%s\t",  nameb, flags, read_name, read_pos+1, mapping_quality, cigar_str, inb);
+					fprintf (out_fp, "%s\t%d\t%s\t%d\t%0.1f\t%s\t*\t0\t0\t%s\t",  nameb, flags, read_name, read_pos+1, mapping_quality, cigar_str, inb);
 				}
 				if(qualityb[0])
 					fputs(qualityb, out_fp);
@@ -909,7 +909,8 @@ int main_align(int argc,char ** argv)
 				break;
 			case 'I':
 				INDEL_TOLERANCE = atoi(optarg);
-				if( INDEL_TOLERANCE > MAX_INDEL_TOLERANCE )INDEL_TOLERANCE=MAX_INDEL_TOLERANCE;
+				if( INDEL_TOLERANCE >= MAX_INDEL_TOLERANCE )INDEL_TOLERANCE=MAX_INDEL_TOLERANCE-1;
+				INDEL_TOLERANCE ++;
 				break ;
 			case 'Q':
 				QUALITY_SCALE = QUALITY_SCALE_LINEAR;
@@ -1001,7 +1002,7 @@ int main_align(int argc,char ** argv)
 	printf("Number of selected subreads = %d\n", TOTAL_SUBREADS);
 	printf("Consensus threshold = %d\n", ACCEPT_SUBREADS);
 	printf("Number of threads=%d\n", ALL_THREADS);
-	printf("Number of indels allowed=%d\n", INDEL_TOLERANCE);
+	printf("Number of indels allowed=%d\n", INDEL_TOLERANCE-1);
 	if (QUALITY_SCALE==QUALITY_SCALE_LINEAR)
 		puts("Quality scale=linear\n\n");
 	else if (QUALITY_SCALE==QUALITY_SCALE_LOG)

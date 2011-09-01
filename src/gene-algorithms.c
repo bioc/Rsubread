@@ -22,8 +22,10 @@ int MAX_CIGAR_LEN = 30;
 
 #ifdef indel_debug
 #define ddprintf printf
+#define ddfflush fflush
 #else
-#define ddprintf non_func 
+#define ddprintf non_func
+#define ddfflush(a) 
 #endif
 
 #define get_base_quality_score(quality_chr, quality_scale)  ((quality_scale)==QUALITY_SCALE_NONE?-0.01: ((quality_scale) == QUALITY_SCALE_LINEAR?(	(quality_chr) - '@')*0.01-0.03: correct_rate_table[(quality_chr) - '@']))
@@ -147,7 +149,7 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 		putchar(' ');
 	printf("]\r");
 	
-	fflush(stdout);
+	ddfflush(stdout);
 }
 
 
@@ -450,15 +452,19 @@ void explain_indel(gene_allvote_t* allvote, int qid , int pos, char * max_indel_
 
 	tmp_cigar[0]=0;
 
+	ddprintf ("R=%s; REC[8]=%d [9]=%d\n", read_txt, max_indel_recorder[8], max_indel_recorder[9]);
+
 	for (i=3; max_indel_recorder[i]; i+=3)
 	{
+		if (i >= max_indel*3) break;
+
 		int last_dist = max_indel_recorder[i-1];
 		int black_subread_start = max_indel_recorder[i-2]-1;
 		int black_subread_end = max_indel_recorder[i]-1;
 		if (black_subread_end < black_subread_start+1) black_subread_end = black_subread_start+1;
 		while(max_indel_recorder[i+3])
 		{
-			if (max_indel_recorder[i+3]- black_subread_end>2) break;
+			if (max_indel_recorder[i+3]- black_subread_end>2 || i >= max_indel*3-3) break;
 			black_subread_end = max_indel_recorder[i+3]-1;
 			i+=3;
 		}
@@ -479,7 +485,6 @@ void explain_indel(gene_allvote_t* allvote, int qid , int pos, char * max_indel_
 
 		int exp_indel = last_dist - max_indel_recorder[i+2];
 
-	//	int moves = window_indel_align (read_txt + black_base_start, black_base_end-black_base_start , array_index, pos + blackref_base_start, max_indel, indel_operations, exp_indel,  -10, black_base_end - black_base_start+5);
 		int moves = dynamic_align (read_txt + black_base_start, black_base_end-black_base_start , array_index, pos + blackref_base_start, max_indel, indel_operations, exp_indel,  -10, black_base_end - black_base_start+5);
 
 #ifdef indel_debug
@@ -489,6 +494,7 @@ void explain_indel(gene_allvote_t* allvote, int qid , int pos, char * max_indel_
 		read_txt [black_base_end] = tt;
 		ddprintf("\n TESTING SUBR %d to %d BASE %d to %d CHRO %d to %d exp offset %d\n",black_subread_start, black_subread_end, black_base_start, black_base_end, blackref_base_start, -max(0,exp_indel)+blackref_base_start +(black_base_end-black_base_start), exp_indel);
 		ddprintf(" moves %d\n", moves);
+		ddfflush(stdout) ;
 #endif
 
 		last_operation = 0;
@@ -523,34 +529,6 @@ void explain_indel(gene_allvote_t* allvote, int qid , int pos, char * max_indel_
 				else if (indel_operations[xx]==3) current_pos ++;
 
 				if (current_pos >= gap_end_read)break;
-
-/*
-				if (indel_operations[xx]==1 && exp_indel <0 || indel_operations[xx]==2 && exp_indel >0)
-				{
-					int vpos = strlen(tmp_cigar);
-					if (vpos>MAX_CIGAR_LEN-13) break;
-					sprintf(tmp_cigar + vpos, "%dM", current_pos-explain_cursor);
-					vpos = strlen(tmp_cigar);
-					if (vpos>MAX_CIGAR_LEN-10) break;
-
-					if (indel_operations[xx]==1)
-					{
-						sprintf(tmp_cigar + vpos, "%dD", -exp_indel);
-						explain_cursor = current_pos;
-					}
-					else
-					{
-						sprintf(tmp_cigar + vpos, "%dI", exp_indel);
-						explain_cursor = current_pos+exp_indel	;
-					}
-					del_number = 0;
-					break;
-				}
-				else if (indel_operations[xx]==0) current_pos ++;
-				else if (indel_operations[xx]==1) {del_number++; dynamic_delta++;}//"D"
-				else if (indel_operations[xx]==2) {current_pos ++; dynamic_delta--;} //"I"
-				else if (indel_operations[xx]==3) current_pos ++;
-*/
 			} 
 		}
 		else
@@ -575,7 +553,7 @@ void explain_indel(gene_allvote_t* allvote, int qid , int pos, char * max_indel_
 //		if (!moves)
 //			strcat(tmp_cigar,"X");
 		//	printf("Wrong explaination! dist=%d   dyn=%d\n", max_indel_recorder[i+2], dynamic_delta);
-
+		
 	}
 
 	int vpos = strlen(tmp_cigar);
@@ -1175,8 +1153,7 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 
 	if (1499 - out_pos > (read_len << 2) || (*all_steps) > 3000 + (read_len << 5) || (*all_steps) > 57000){
 		ddprintf("\nTOO MANY STEPS: rl = %d    len=%d    steps=%d\n", read_len, 1499 - out_pos, *all_steps);
-//		if ((*all_steps) > 199999)
-//			exit(0);
+		ddfflush(stdout) ;
 		return 0;
 	}
 	if(path_j < 0 || path_i < 0)
@@ -1204,7 +1181,6 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 	char is_matched_ij =  gvindex_get(index, begin_position + path_j) == read[path_i]?DPALIGN_MATCH_SCORE :DPALIGN_MISMATCH_PENALTY;
 
 	int found = 0;
-	ddprintf ("CS = %d ; ", current_score);
 	if (is_matched_ij + (upperleft_score - current_score) == 0)
 	{
 		movement_buffer[out_pos] = is_matched_ij==2?0:3;
@@ -1217,6 +1193,7 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 		movement_buffer[out_pos] = 1;
 		(*all_steps) ++;
 		ddprintf ("Path_i = %d ; Path_j = %d ; Offset = %d => 1\n", path_i, path_j, current_offset);
+		ddfflush(stdout) ;
 		found =search_DP_branch (read, read_len, index, begin_position, path_i , path_j -1, table  , table_mask, max_indel, movement_buffer, expected_offset, left_score, out_pos -1, current_offset - ((path_i >= init_read_offset && path_i <= shutdown_read_offset)?1:0),  init_read_offset, shutdown_read_offset, all_steps); 
 	}
 	if ((!found ) && (upper_score + (table_mask[path_i-1][path_j]? DPALIGN_EXTENDGAP_PENALTY: DPALIGN_CREATEGAP_PENALTY) == current_score || (current_score == 0 && upper_score + (table_mask[path_i-1][path_j]? DPALIGN_EXTENDGAP_PENALTY: DPALIGN_CREATEGAP_PENALTY) < 0 )))
@@ -1224,6 +1201,7 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 		movement_buffer[out_pos] = 2;
 		(*all_steps) ++;
 		ddprintf ("Path_i = %d ; Path_j = %d ; Offset = %d => 2\n", path_i, path_j, current_offset);
+		ddfflush(stdout) ;
 		found =search_DP_branch (read, read_len, index, begin_position, path_i -1 , path_j , table , table_mask , max_indel, movement_buffer, expected_offset, upper_score, out_pos -1, current_offset + ((path_i >= init_read_offset && path_i <= shutdown_read_offset)?1:0),  init_read_offset, shutdown_read_offset, all_steps); 
 	}
 
@@ -1243,6 +1221,7 @@ int window_indel_align(char * read, int read_len, gene_value_index_t * index, un
 
 	windows_number = abs(expected_offset)+1;
 	ddprintf ("\nWindow size = %d ; ExpOffset = %d\n", windows_number , expected_offset);
+	ddfflush(stdout) ;
 	for (i=0; i< read_len; i++)
 		for (j=0; j< windows_number; j++)
 		{
@@ -1350,6 +1329,7 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 	short table[MAX_READ_LENGTH][MAX_READ_LENGTH];
 	char table_mask[MAX_READ_LENGTH][MAX_READ_LENGTH];
 	int i,j;
+
 	for (i=0; i<read_len; i++)
 		for(j=0; j<read_len - expected_offset; j++)
 		{

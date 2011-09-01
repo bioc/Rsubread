@@ -19,18 +19,19 @@
 \begin{document}
 \title{Rsubread: An R package for aligning next-generation sequencing reads}
 \author{Wei Shi}
-\date{27 July 2011}
+\date{1 September 2011}
 \maketitle
 
 \section{Introduction}
-This package provides functions for aligning next-generation sequencing reads to the reference genome using a novel mapping algorithm which is entirely different from the ``seed-and-extend'' algorithm.
-The new algorithm uses a number of 16bp substrings extracted from each read to find the candidate mapping locations and then use the consensus mapping location to determine the final location of each read without using the costly extension step.
-This new algorithm has been found to be much faster, more sensitive and accurate than the ``seed-and-extend'' aligners.
+This package can be used to align next-generation sequencing reads to the reference genome and find exon junctions using RNA-seq read data.
+The read alignment uses a novel mapping paradigm called ``seed-and-vote'', which has been demonstrated to be much more efficient and sensitive than  the ``seed-and-extend'' algorithm.
+The exon junction algorithm implemented in this package employs the similar idea.
+This package also implements an algorithm which is designed for calling absolutely expressed genes (each gene is assigned a detection p value).
 
-Read mapping functions in this package are R wrapper functions which call the underlying \C{C} functions to perform the alignment.
-A standalone C implementation of this new algorithm, which is called Subread, can be downloaded from \url{http://subread.sourceforge.net}.
+Read mapping and exon junction detection functions in this package are R wrapper functions which call the underlying \C{C} functions to perform the alignment.
+The C programs, which implements these novel algorithms, can be freely downloaded from \url{http://subread.sourceforge.net}.
 
-In addition to the read mapping functions, this package provides other useful functions for processing next-gen sequencing data such as summarization of read counts to genomic features, quality assessment and so on.
+In addition to the read mapping and exon junction detection functions, this package provides other useful functions such as summarization of read counts to genomic features, quality assessment and so on.
 
 \section{Read alignment}
 There are two steps for mapping reads using Rsubread: \\
@@ -69,7 +70,7 @@ In a comparison with six ``seed-and-extend'' aligner, Subread was found to to be
 When less memory is used, running time will increase accordingly.\\
 
 {\noindent\bf Step 2: Map reads to the reference genome\\}
-Mapping reads using the 1000 reads included in this package and the index built in the last step:
+Mapping reads using the read data included in this package and also the index built in the last step:
 
 <<>>=
 reads <- system.file("extdata","reads.txt",package="Rsubread")
@@ -95,6 +96,9 @@ It uses the in-built annotation files or annotation provided by users to count t
 The in-built annotation files include annotation information for each exon in the mouse and human genomes (using NCBI build 37.2 annotation).
 Read counts can be summarized to gene level or exon level.
 This function can be used for general-purpose read summarization as well (for both DNA-seq reads and RNA-seq reads).
+
+\section{Finding exon junctions}
+The \R{subjunc} function takes as input FASTQ/FASTA files and outputs the exon junction locations found in the reference genome and also the numbers of reads supporting the discovered junctions.
 
 \section{Quality assessment}
 {\noindent\bf Quality scores\\}
@@ -133,7 +137,7 @@ propmapped(results)
 @
 
 \section{Citation}
-Yang Liao and Wei Shi. ``Subread: a superfast read aligner with high sensitivity and accuracy.'' In preparation.
+Yang Liao and Wei Shi. ``Seed-and-vote: the next-generation read mapping paradigm'', submitted.
 
 \section{Authors}
 Wei Shi (maintainer of Rsubread), Bioinformatics Division, The Walter and Eliza Hall Institute of Medical Research, Australia \\
@@ -141,6 +145,6 @@ Yang Liao (maintainer of Subread), Department of Computer Science and Software E
 Jenny Zhiying Dai, Department of Computer Science and Software Engineering, The University of Melbourne, Australia
 
 \section{Contact}
-Please contact Wei Shi (shi@wehi.edu.au) if you have any questions or comments.
+Please contact Wei Shi (shi@wehi.edu.au) if you have any inquires.
 
 \end{document}

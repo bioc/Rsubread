@@ -1168,7 +1168,7 @@ unsigned long pointerHashFunction_forpos(const void *pointer)
 	return (unsigned long) pointer & 0xffffffff;
 }
 
-void print_bed_table(HashTable * bed_table, char * out_fn)
+void print_bed_table(HashTable * bed_table, char * out_fn, unsigned long long int * junction_number , unsigned long long int * support_number)
 {
 	int bucket;
 	char fn2 [310];
@@ -1190,6 +1190,8 @@ void print_bed_table(HashTable * bed_table, char * out_fn)
 
 			locate_gene_position( p->small_key , &_global_offsets, &chro_name, &chro_pos);
 			locate_gene_position( p->big_key , &_global_offsets, &chro_name, &chro_pos_big);
+			(*junction_number)++;
+			(*support_number)+= *counter;
 			fprintf(ofp,"%s\t%u\t%u\t%d\n", chro_name, chro_pos, chro_pos_big, *counter);
 			cursor = cursor->next;
 		}
@@ -1214,6 +1216,7 @@ int main_junction(int argc,char ** argv)
 
 	int c;
 	int option_index = 0;
+	unsigned long long int junction_number=0, support_number=0; 
 
 	TOTAL_SUBREADS = 20;
 	ACCEPT_SUBREADS = 3;
@@ -1273,6 +1276,7 @@ int main_junction(int argc,char ** argv)
 			case 'I':
 				EXON_INDEL_TOLERANCE = atoi(optarg);
 				if( EXON_INDEL_TOLERANCE >5)EXON_INDEL_TOLERANCE=5;
+				EXON_INDEL_TOLERANCE ++;
 				break ;
 			case 'Q':
 				if(optarg[0]=='l')
@@ -1335,7 +1339,7 @@ int main_junction(int argc,char ** argv)
 	printf("Number of subreads selected for each read=%d\n", TOTAL_SUBREADS);
 	printf("Threshold on number of subreads for a successful mapping=%d\n", ACCEPT_SUBREADS);
 	printf("Number of threads=%d\n", EXON_ALL_THREADS);
-	printf("Tolerance for Indel=%d\n", EXON_INDEL_TOLERANCE);
+	printf("Tolerance for Indel=%d\n", EXON_INDEL_TOLERANCE-1);
 	if (EXON_QUALITY_SCALE==QUALITY_SCALE_LINEAR)
 		puts("Quality scale=linear\n\n");
 	else if (EXON_QUALITY_SCALE==QUALITY_SCALE_LOG)
@@ -1406,7 +1410,7 @@ int main_junction(int argc,char ** argv)
 	}
 
 	geinput_close(&ginp);
-	print_bed_table(bed_index, output_file);
+	print_bed_table(bed_index, output_file, &junction_number, &support_number);
 	HashTableDestroy(bed_index);
 	HashTableDestroy(pos_index);
 
@@ -1414,7 +1418,7 @@ int main_junction(int argc,char ** argv)
 	if(IS_DEBUG)
 		printf("@LOG THE END. \n");
 	else
-		printf("\n\n %llu reads were processed in %.1f seconds.\nPercentage of successfully mapped reads is %0.2f%%.\n\n", processed_reads, miltime()-begin_ftime, succeed_reads*100.0/processed_reads/(read2_file[0]?2:1));
+		printf("\n\n %llu reads were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, miltime()-begin_ftime, junction_number, support_number );
 
 	printf("\n\nCompleted successfully.\n");
 

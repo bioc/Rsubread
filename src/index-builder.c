@@ -34,7 +34,7 @@ void print_build_log(double finished_rate, double read_per_second, double expect
         printf("\r");
 }
 
-#define MAX_BASES_IN_INDEX 4294900000
+#define MAX_BASES_IN_INDEX 4294900000.0
 
 int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold)
 {
@@ -80,7 +80,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	gehash_create(& table, segment_size, 0);
 //	gehash_prealloc(& table);
 
-	unsigned int size_of_array_index = min(MAX_BASES_IN_INDEX, segment_size*4.35 + MIN_READ_SPLICING);
+	unsigned int size_of_array_index = (unsigned int)(min(MAX_BASES_IN_INDEX, segment_size*4.35 + MIN_READ_SPLICING));
 
 	if(VALUE_ARRAY_INDEX)
 		gvindex_init(&value_array_index, 0, size_of_array_index);
@@ -279,7 +279,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 //				gehash_prealloc(& table);
 				gehash_create(&huge_table,segment_size/100 , 0);
 				if(VALUE_ARRAY_INDEX)
-					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?1:0),min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index ));
+					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?1:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )));
 			}
 	
 			status = 0;
