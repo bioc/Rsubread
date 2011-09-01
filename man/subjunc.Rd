@@ -25,7 +25,7 @@ The C program can be run on its own as well, which is included in the subread so
 To use this function, the index has to built with \code{-b} option enabled (\code{\link{buildindex}}).
 }
 \value{ 
-A text file including the chromosomal coordinates of discovered junction locations and the number of supporting reads.
+This function ouputs two files: one is a BED format file which inlcudes the discovered junction locations and numbers of supporting reads, and the other is a SAM format file which includes the mapping result for each read.
 }
 \references{
 }
