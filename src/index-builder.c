@@ -10,11 +10,11 @@
 
 #define NO_GENE_DEBUG_
 #define _GENE_DEBUG_SIZE_ 40000
+#define MIN_READ_SPLICING 2000000
 
 
 #define MAX_KEY_MATCH GENE_VOTE_SPACE 
 
-int IS_DEBUG_INDEX = 0;
 int IS_COLOR_SPACE = 0;
 int VALUE_ARRAY_INDEX = 0;
 int QUICK_BUILD = 0;
@@ -28,19 +28,20 @@ void print_build_log(double finished_rate, double read_per_second, double expect
 {
         char outbuff[81]; int i;
         snprintf(outbuff, 80,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum bps", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
-        printf(outbuff);
+        fputs(outbuff, stdout);
         for(i=strlen(outbuff); i<105; i++)
                 printf(" ");
         printf("\r");
 }
 
+#define MAX_BASES_IN_INDEX 4294900000
 
 int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold)
 {
 	int file_number, table_no;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
-	unsigned int segment_size = (int)(memory_megabytes * 1024.0 / 9.5) * 1024 ;
+	unsigned int segment_size = (int)(memory_megabytes * 1024.0 / 9.15) * 1024 ;
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 	char fn[300];
 	double local_begin_ftime = 0.;
@@ -53,7 +54,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	gene_input_t ginp;
 
-	printf ("INDEX ITEMS PER PARTITION = %u\n\n", segment_size);
+	printf ("Index items per partition = %u\n\n", segment_size);
 
 
 
@@ -75,11 +76,14 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		return -1;
 	}
 
-	gehash_create(& huge_table, segment_size/20, 1);
+	gehash_create(& huge_table, segment_size/100, 0);
 	gehash_create(& table, segment_size, 0);
+//	gehash_prealloc(& table);
+
+	unsigned int size_of_array_index = min(MAX_BASES_IN_INDEX, segment_size*4.35 + MIN_READ_SPLICING);
 
 	if(VALUE_ARRAY_INDEX)
-		gvindex_init(&value_array_index, 0, segment_size*4.2 + 16);
+		gvindex_init(&value_array_index, 0, size_of_array_index);
 
 	file_number = 0;
 	offset = 0;
@@ -113,12 +117,12 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 					geinput_close(&ginp);
 
-					if(!IS_DEBUG_INDEX)
-						printf ("\n All the chromosome files are processed.\n");
+					if(!IS_DEBUG)
+						printf ("\n Processing chromosome files ...\n");
 
 					sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-					if(IS_DEBUG_INDEX)
-						printf ("@LOG Dumping the index into %s\n", fn);
+					if(IS_DEBUG)
+						printf ("@LOG Saving the index into %s\n", fn);
 					fflush(stdout);
 
 					remove_repeated_reads(&table, &huge_table, threshold);
@@ -153,7 +157,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 					fclose(fp);
 
-					if(IS_DEBUG_INDEX)
+					if(IS_DEBUG)
 						printf ("@LOG FIN %s\n", index_prefix);
 					break;
 				}
@@ -191,7 +195,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				fclose(fname_fp);
 				
 
-				if(IS_DEBUG_INDEX)
+				if(IS_DEBUG)
 					printf ("@LOG new read '%s' at %u\n", read_names[read_no], offset);
 
 				for (i=0; i<16; i++)
@@ -219,11 +223,11 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			}
 			if (status == FULL_PARTITION) 
 			{
-				int seek_back_reads = min(read_len, 200);
+				int seek_back_reads = min(read_len, MIN_READ_SPLICING);
 
 				sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-				if(IS_DEBUG_INDEX)
-					printf ("@LOG Dumping the index into %s\n", fn);
+				if(IS_DEBUG)
+					printf ("@LOG Saving the index into %s\n", fn);
 				fflush(stdout) ;
 				remove_repeated_reads(&table, &huge_table, threshold);
 
@@ -272,9 +276,10 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					int_key = genekey2int(window, GENE_SPACE_BASE);
 				
 				gehash_create(&table, segment_size, 0);
-				gehash_create(&huge_table,segment_size/20 , 1);
+//				gehash_prealloc(& table);
+				gehash_create(&huge_table,segment_size/100 , 0);
 				if(VALUE_ARRAY_INDEX)
-					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?1:0), segment_size*4.2 + 16);
+					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?1:0),min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index ));
 			}
 	
 			status = 0;
@@ -283,7 +288,9 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				all_skips ++;
 			else
 			{
-				gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0));
+				//if (offset > 2606000 && offset < 2606999)
+				if(!gehash_exist(&huge_table, int_key))
+					gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0));
 				if(VALUE_ARRAY_INDEX)
 				{
 //					if(offset >= 700000 && offset <= 700020)
@@ -292,7 +299,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				}
 			}
 
-			if(table.current_items >= segment_size)
+			if(table.current_items >= segment_size && (read_len > MIN_READ_SPLICING || read_len < 32))
 			{
 				status = FULL_PARTITION;
 				continue;
@@ -340,7 +347,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					fflush(stdout) ;
 					if(
 						(((offset % 300000000 == 0) ||  (offset % 60000000 == 0 && segment_size - table.current_items < 50000000 )) && (!QUICK_BUILD)) ||
-						(offset % 500000000 == 0 && QUICK_BUILD)
+						(offset % 1200000000 == 0 && QUICK_BUILD) ||
+						(offset > 100000000 && huge_table.current_items <1 )
 					)
 						if(offset>1)
 							remove_repeated_reads(&table, &huge_table, threshold);
@@ -364,6 +372,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 }
 
 
+
 int main_buildindex(int argc,char ** argv)
 {
 	int threshold = 12;
@@ -372,7 +381,7 @@ int main_buildindex(int argc,char ** argv)
 	output_file[0] = 0;
 
 	printf("\n");
-	while ((c = getopt (argc, argv, "acqM:o:f:D?")) != -1)
+	while ((c = getopt (argc, argv, "bcqM:o:f:D?")) != -1)
 		switch(c)
 		{
 			case 'q':
@@ -381,11 +390,8 @@ int main_buildindex(int argc,char ** argv)
 			case 'c':
 				IS_COLOR_SPACE = 1;
 				break;
-			case 'a':
+			case 'b':
 				VALUE_ARRAY_INDEX = 1;
-				break;
-			case 'D':
-				IS_DEBUG_INDEX=1;
 				break;
 			case 'M':
 				memory_limit = atoi(optarg);
@@ -403,26 +409,27 @@ int main_buildindex(int argc,char ** argv)
 	if (argc == optind || !output_file[0])
 	{
 
-                printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of created index files\n    -M <int>\t\t optional, size of requested memory(RAM) in megabytes(MB), 3700 by default.\n    -a      \t\t optional, building the value array index for improving the accuracy, disabled by default.\n    -c      \t\t optional, building the color-space index, disabled by default.\n    -q      \t\t optional, accelerating by infrequently removing redundancy but using more memory. \n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\nDescription:\n  This program will build an index using the provided reference sequences, which will then be used by the subread-align program. Users can specify the size of memory to be requested by this program. Building an index for human genome will take about 1 hour.\n  To map reads using a laptop, you might have to specify a smaller memory size (e.g. -M 2048), if your laptop does not have enough memory.\n  The subread-align program will use memory no more than the amount of memory requested here when mapping reads to the reference sequences.\n\n", argv[0], argv[0]);
+                //printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
+                printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -b      \t\t add the actual reference sequences into the index (the default index only includes chromosal coordinates of 16 mers)\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
 
 		return -1 ;
 	}
 
 
 	if(IS_COLOR_SPACE)
-		printf("Building the index in the color space.\n");
+		printf("Building a color-space index.\n");
 	else
-		printf("Building the index in the base space.\n");
+		printf("Building a base-space index.\n");
 
-	printf("Size of memory requested=%d MB\n",memory_limit);
-	printf("Index base name = %s\n",output_file);
+	printf("Size of memory used=%d MB\n",memory_limit);
+	printf("Base name of the built index = %s\n",output_file);
 	//printf("REPEATED THRESHOLD = %d\n", threshold);
 	//printf("CHROMOSOME FILES = %d\n", argc - optind);
 
 	fflush(stdout);
 	begin_ftime = miltime();
 	build_gene_index(output_file, argv+optind , argc - optind, memory_limit, threshold);
-	printf("\nIndex %s is successfully built.\n", output_file);
+	printf("\nIndex %s was successfully built.\n", output_file);
 
 /*
 	dispc = offsets;

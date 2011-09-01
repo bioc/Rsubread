@@ -219,7 +219,6 @@ int find_best_edges(short read_len, char * read_str, struct gene_exon_arena * ar
 }
 
 
-
 int test_read_conjunction(char * read_str,  int read_len, gene_vote_t * vote, gene_value_index_t * my_array_index,  int indel_tolerance, gene_exon_allrecords_t * arena, int queries, char is_reversed, gene_value_index_t * index)
 {
 	int i, j, from_end;

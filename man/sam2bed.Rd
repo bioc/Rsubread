@@ -24,9 +24,6 @@ A BED format file.
 %\note{}
 %\seealso{}
 \examples{
-library(Rsubread)
-results <- system.file("extdata","alignResults.SAM",package="Rsubread")
-sam2bed(samfile=results,bedfile="alignResults.bed",readlen=100)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.

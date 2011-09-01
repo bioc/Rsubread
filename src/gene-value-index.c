@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include<assert.h>
 #include <stdlib.h>
 #include "gene-value-index.h"
 
@@ -104,8 +105,10 @@ void gvindex_dump(gene_value_index_t * index, const char filename [])
 void gvindex_load(gene_value_index_t * index, const char filename [])
 {
 	FILE * fp = fopen(filename, "rb");
-	fread(&index->start_point,4,1, fp);
-	fread(&index->length,4,1, fp);
+	assert(0<fread(&index->start_point,4,1, fp));
+	assert(0<fread(&index->length,4,1, fp));
+
+	//printf ("\nBINDEX %s : %u ~ +%u\n",filename, index->start_point, index->length );
 
 	int useful_bytes, useful_bits;
 	index -> start_base_offset = index -> start_point - index -> start_point%4;
@@ -113,7 +116,7 @@ void gvindex_load(gene_value_index_t * index, const char filename [])
 	index -> values = malloc(useful_bytes);
 	index -> values_bytes = useful_bytes;
 
-	fread(index->values, 1, useful_bytes, fp);
+	assert(0<fread(index->values, 1, useful_bytes, fp));
 
 	fclose(fp);
 

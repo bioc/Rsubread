@@ -31,9 +31,7 @@ size_t gehash_get(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_r
 // Return 1 if exist, 0 if not.
 int gehash_exist(gehash_t * the_table, gehash_key_t key);
 
-size_t gehash_go(gehash_t * the_table, gehash_key_t key, int offset, gene_vote_t * vote,int is_add, int weight, int max_match_number, int indel_tolerance);
-
-size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote_t * vote,int is_add, gene_vote_number_t weight, int max_match_number, int indel_tolerance);
+size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number);
 
 // This function performs the same functionality, but runs only on AMD-64 cpus, and the length of each key must be 4 bytes.
 size_t gehash_get_hpc(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_result, size_t max_result_space);
@@ -53,6 +51,6 @@ int gehash_dump(gehash_t * the_table, const char fname []);
 // It returns 0 if success, otherwise -1.
 int gehash_load(gehash_t * the_table, const char fname []);
 
-extern int IS_DEBUG ;
+void gehash_prealloc(gehash_t * the_table);
 
 #endif

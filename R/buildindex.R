@@ -1,6 +1,7 @@
-buildindex <- function(basename,reference,colorspace=FALSE,memory=3700)
+buildindex <- function(basename,reference,seqinfo=FALSE,colorspace=FALSE,memory=3700)
 {
 opt <- paste("-o",basename,"-M",memory,reference,sep=",")
+if(seqinfo) opt <- paste("-b",opt,sep=",")
 if(colorspace) opt <- paste("-c",opt,sep=",")
 cmd <- paste("subread-buildindex",opt,sep=",")
 n <- length(unlist(strsplit(cmd,",")))

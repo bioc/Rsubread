@@ -3,11 +3,12 @@
 \title{Build index for a reference genome for read mapping}
 \description{This is an R wrapper function for building index for a reference genome. This function calls the underlying C function.}
 \usage{
-buildindex(basename,reference,colorspace=FALSE,memory=3700)
+buildindex(basename,reference,seqinfo=FALSE,colorspace=FALSE,memory=3700)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of the file containing all the refernece sequences.}
+  \item{seqinfo}{ logical. If \code{TRUE}, the reference sequences will be included in the built index. \code{FALSE} by default.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
   \item{memory}{ numeric value specifying the amount of memory to be requested in gigabytes}
   }
@@ -31,10 +32,11 @@ These files are saved in the current directory.
 %\note{}
 %\seealso{}
 \examples{
+# build an index using the sample reference sequence provided in the package
+# and save it to the current directory
 library(Rsubread)
 ref <- system.file("extdata","reference.fa",package="Rsubread")
-path <- system.file("extdata",package="Rsubread")
-buildindex(basename=file.path(path,"reference_index"),reference=ref)
+buildindex(basename="./reference_index",reference=ref)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.

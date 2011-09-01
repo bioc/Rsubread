@@ -20,9 +20,19 @@ Fraction of mapped reads is printed on the screen.
 %\note{}
 %\seealso{}
 \examples{
+# build an index using the sample reference sequence provided in the package
+# and save it to the current directory
 library(Rsubread)
-results <- system.file("extdata","alignResults.SAM",package="Rsubread")
-propmapped(results)
+ref <- system.file("extdata","reference.fa",package="Rsubread")
+buildindex(basename="./reference_index",reference=ref)
+
+# align the sample read data provided in this packge to the sample reference
+# and save the mapping results to the current directory
+reads <- system.file("extdata","reads.txt",package="Rsubread")
+align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.SAM")
+
+# get the percentage of successfully mapped reads
+propmapped("./Rsubread_alignment.SAM")
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.

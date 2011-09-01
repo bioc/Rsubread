@@ -60,4 +60,8 @@ void reverse_read(char * ReadString, int Length, int space_type);
 
 void reverse_quality(char * QualtyString, int Length);
 
+
+#define reverse_char(c)	((c)=='A'?'T':((c)=='G'?'C':((c)=='C'?'G':'A')))
+
+int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
 #endif

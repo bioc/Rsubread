@@ -18,8 +18,7 @@ featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 	  ann <- annot
 	}
 
-	fout <- system.file("extdata",package="Rsubread")
-	fout <- file.path(fout,paste(".Rsubread_pid",Sys.getpid(),sep=""))
+	fout <- file.path("/tmp",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
 
 	for(i in 1:length(SAMfiles)){
 	  cat("Processing", SAMfiles[i], " ...\n")

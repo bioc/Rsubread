@@ -5,8 +5,8 @@ qualityScores <- function(filename, offset=64, nreads = 10000)
 	} 
 	else
 	{
-		score_file = ".__Rsubread_score_Rsubread__000000" 
-		temp_file = ".__Rsubread_temp_Rsubread__000000"
+		score_file = paste("/tmp/.Rsubread_qualityScores_score_pid",Sys.getpid(),sep="") 
+		temp_file = paste("/tmp/.Rsubread_qualityScores_temp_pid",Sys.getpid(),sep="")
 		.C("retrieve_scores", as.character(filename), as.integer(offset), as.integer(nreads), as.character(temp_file), as.character(score_file), PACKAGE="Rsubread")
 	if (file.exists(score_file)) {
 		scores = as.matrix(read.csv(score_file,header=F));

@@ -1,8 +1,10 @@
 #include "sorted-hashtable.h"
 #include "gene-algorithms.h"
+#include<assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
+#include<math.h>
 
 #define _gehash_hash(k) ((unsigned int)(k))
 
@@ -42,45 +44,140 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
 			);
 
 	for(i=0; i<expected_bucket_number; i++){
+		the_table -> buckets [i].item_keys = NULL;
 		the_table -> buckets [i].current_items = 0;
 		the_table -> buckets [i].space_size = 0;
 	}
 
 	return 0;
 }
-void _gehash_resize_bucket(struct gehash_bucket * current_bucket, char is_small_table)
+
+void _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_table)
 {
 	int new_bucket_length;
+	struct gehash_bucket * current_bucket = &(the_table -> buckets [bucket_no]);
 	gehash_key_t * new_item_keys;
 	gehash_data_t * new_item_values;
 
-	if(is_small_table)
-		new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+	if (current_bucket->space_size<1)
+	{
+		if(is_small_table)
+			new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+		else
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.+3.*pow((rand()*1./RAND_MAX),30)));
+
+
+		new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
+		new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
+		bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+		bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+
+	//printf("REALLOCATE %d\n", new_bucket_length);
+
+		if(!new_item_values || !new_item_keys)
+		{
+			printf("\nThe system cannot allocate virtual memory for the index. It seems that you specified a too large memory limit on a 32-bit computer. You may reduce the limit and try again.\n");
+			exit(1);
+		}
+
+		current_bucket->item_keys = new_item_keys;
+		current_bucket->item_values = new_item_values;
+		current_bucket->space_size = new_bucket_length;
+
+	}
 	else
-		new_bucket_length = (int)max(GEHASH_BUCKET_LENGTH*1.1,current_bucket->space_size*1.5);
+	{
+		int test_start = rand() % the_table-> buckets_number;
+		int i;
+		int need_allowc = 1;
+		for (i =test_start; i<test_start+10000; i++)
+		{
+			if (i==bucket_no)continue;
+			if (i>=the_table-> buckets_number)
+			{
+				test_start = rand() % the_table-> buckets_number;
+				i = test_start;
+				continue;
+			} 
+
+			if(the_table-> buckets[i].space_size > current_bucket->current_items+1 && current_bucket->space_size > the_table-> buckets[i].current_items+1 && current_bucket->current_items > the_table-> buckets[i].current_items)
+			{
+				int j;
+				gehash_key_t t_key;
+				gehash_data_t t_d;
+
+				for (j=0; j<current_bucket->current_items; j++)
+				{
+					if (j< the_table -> buckets[i].current_items)
+					{
+						t_key = current_bucket->item_keys[j];
+						current_bucket->item_keys[j] = the_table-> buckets[i].item_keys[j];
+						the_table-> buckets[i].item_keys[j] = t_key;
+
+
+						t_d = current_bucket->item_values[j];
+						current_bucket->item_values[j] = the_table-> buckets[i].item_values[j];
+						the_table-> buckets[i].item_values[j] = t_d;
+					}
+					else
+					{
+						the_table-> buckets[i].item_keys[j] = current_bucket->item_keys[j];
+						the_table-> buckets[i].item_values[j] = current_bucket->item_values[j];
+					}
+				}
+
+				gehash_key_t * p_key;
+				gehash_data_t * p_d;
+				int i_size;
+
+				p_key = the_table-> buckets[i].item_keys ;
+				the_table-> buckets[i].item_keys = current_bucket->item_keys;
+				current_bucket->item_keys = p_key;
+
+				p_d = the_table-> buckets[i].item_values ;
+				the_table-> buckets[i].item_values = current_bucket->item_values;
+				current_bucket->item_values = p_d;
+
+				i_size = the_table-> buckets[i].space_size;
+				the_table-> buckets[i].space_size =current_bucket->space_size;
+				current_bucket->space_size=i_size;
+				
+				need_allowc = 0;
+				break;
+			}
+		} 
+		if(need_allowc)
+		{
+			if(is_small_table)
+				new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+			else
+				new_bucket_length = (int)(current_bucket->space_size*1.5);
+			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
+			new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
+			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+			bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+
+			if(!new_item_values || !new_item_keys)
+			{
+				printf("\nThe system cannot allocate virtual memory for the index. It seems that you specified a too large memory limit on a 32-bit computer. You may reduce the limit and try again.\n");
+				exit(1);
+			}
+
+			memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
+			memcpy(new_item_values, current_bucket->item_values, current_bucket->current_items*sizeof(gehash_data_t));
+
+			free(current_bucket->item_keys);
+			free(current_bucket->item_values);
+
+			current_bucket->item_keys = new_item_keys;
+			current_bucket->item_values = new_item_values;
+			current_bucket->space_size = new_bucket_length;
+
+
+		}
+	}
 	//printf ("New length = %d\n", new_bucket_length);
 
-	new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
-	new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
-
-	if(!new_item_values || !new_item_keys)
-	{
-		printf("\nThe system cannot allocate virtual memory for the index. It seems that you specified a too large memory limit on a 32-bit computer. You may reduce the limit and try again.\n");
-		exit(1);
-	}
-
-	memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
-	memcpy(new_item_values, current_bucket->item_values, current_bucket->current_items*sizeof(gehash_data_t));
-
-	if (current_bucket->space_size >0)
-	{
-		free(current_bucket->item_keys);
-		free(current_bucket->item_values);
-	}
-
-	current_bucket->item_keys = new_item_keys;
-	current_bucket->item_values = new_item_values;
-	current_bucket->space_size = new_bucket_length;
 }
 
 struct gehash_bucket * _gehash_get_bucket(gehash_t * the_table, gehash_key_t key)
@@ -95,8 +192,15 @@ void gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 	struct gehash_bucket * current_bucket;
 
 	current_bucket = _gehash_get_bucket (the_table, key);
+	//printf("P=%lld\n",(long long)(the_table->mem_keys - current_bucket->item_keys));
 	if (current_bucket->current_items >= current_bucket->space_size)
-		_gehash_resize_bucket(current_bucket, the_table->is_small_table);
+	{
+
+	        int bucket_number;
+        	bucket_number = _gehash_hash(key) % the_table -> buckets_number;
+
+		_gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
+	}
 	current_bucket->item_keys[current_bucket->current_items] = key;
 	current_bucket->item_values[current_bucket->current_items] = data;
 	current_bucket->current_items ++;
@@ -106,11 +210,11 @@ void gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 #define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
 #define _index_vote_tol(key) (((unsigned int)(key)/16)%GENE_VOTE_TABLE_SIZE)
 
-#define JUMP_GAP 6 
+#define JUMP_GAP 3
 
 #define is_quality_subread(scr)	((scr)>15?1:0)
 
-size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote_t * vote, int is_add, gene_vote_number_t weight ,int max_match_number, int indel_tolerance)
+size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int is_add, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number)
 {
 	struct gehash_bucket * current_bucket;
 	int i, items;
@@ -120,11 +224,13 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 	current_bucket = _gehash_get_bucket (the_table, key);
 	items = current_bucket -> current_items;
 
+
+	if(1)
 	{
 		int citems = items/4;
 		keyp = current_bucket -> item_keys + items/2;
 		endkp = keyp;
-		for(i=0; i<3; i++)
+		for(i=0; i<5; i++)
 		{
 			if(*(keyp+citems) < key)
 				keyp += citems;
@@ -133,11 +239,14 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 
 			citems = citems/2;
 		}
+	//	if(*(keyp) >= key || keyp < current_bucket -> item_keys || keyp >= current_bucket -> item_keys + items)
 		if(*(keyp) >= key)
 			keyp = current_bucket -> item_keys;
 	}
+	else
+		keyp = current_bucket -> item_keys;
 
-	endkp = keyp + items;
+	endkp = current_bucket -> item_keys  + items;
 	endp12 = endkp - JUMP_GAP;
 
 	while(keyp < endp12 && *(keyp+JUMP_GAP) < key)
@@ -151,14 +260,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 	match_start = keyp - current_bucket -> item_keys;
 
 	gehash_key_t * tk = keyp;
-
-	if(max_match_number > 50)
-		while(keyp < endp12 && *(keyp+JUMP_GAP) == key)
-		{
-			keyp += JUMP_GAP;
-			if(keyp - tk > max_match_number)
-				return 0;
-		}
 
 	while(*keyp == key && keyp < endkp)
 	{
@@ -179,11 +280,13 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 			int offsetX = _index_vote(kv);
 			int datalen = vote -> items[offsetX];
 			unsigned int * dat = vote -> pos[offsetX];
+			#ifdef MAKE_FOR_EXON
+			short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
+			#endif
+		
 
 			if ((*keyp ) < offset)
 				continue;
-
-//		printf ("KV=%u, OF=%d\n", kv, offset);
 
 			for (i=0;i<datalen;i++)
 			{
@@ -192,10 +295,26 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 					gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 					test_max += weight;
 					vote->votes[offsetX][i] = test_max;
+					vote->quality[offsetX][i] += quality;
+					#ifdef MAKE_FOR_EXON
+					if (offset_from_5 <  vote->coverage_start [offsetX][i])
+						vote->coverage_start [offsetX][i] = offset_from_5;
+					if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
+						vote->coverage_end [offsetX][i] = offset_from_5+16;
+					#endif
 
-					if(test_max > vote->max_vote){
+					//printf("RAW0 %f\n", test_max);
+
+					if((test_max > vote->max_vote) || (test_max == vote->max_vote && vote->quality[offsetX][i] > vote->max_quality))
+					{
 						vote->max_vote = test_max;
 						vote->max_position = kv;
+						vote->max_quality = vote->quality[offsetX][i];
+						#ifdef MAKE_FOR_EXON
+						vote->max_coverage_start = vote->coverage_start [offsetX][i];
+						vote->max_coverage_end = vote->coverage_end [offsetX][i];
+						#endif
+
 					}
 					i = 9999999;
 				}
@@ -206,21 +325,34 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 				vote -> items[offsetX] ++;
 				dat[i] = kv;
 				vote->votes[offsetX][i]=weight;
-				if(vote->max_vote<0.001)
+				vote->quality[offsetX][i]=quality;
+				#ifdef MAKE_FOR_EXON
+				vote->coverage_start [offsetX][i] = offset_from_5;
+				vote->coverage_end [offsetX][i] = offset_from_5+16;
+				#endif
+
+				if(vote->max_vote==0)
 				{
+					#ifdef MAKE_FOR_EXON
+					vote->max_coverage_start = offset_from_5;
+					vote->max_coverage_end = offset_from_5+16;
+					#endif
 					vote->max_mask = 0;
 					vote->max_vote = weight;
 					vote->max_position = kv;
+					vote->max_quality = quality;
 				}
 			}
 		}
 	else
-		// We duplicated all codes for indel_tolerance == 1 for the minimal impact to performance.
+		// We duplicated all codes for indel_tolerance >= 1 for the minimal impact to performance.
 		for (keyp = current_bucket -> item_values+match_start; keyp < endkp ; keyp++)
 		{
-		//add_gene_vote_weighted(vote, (*keyp) - offset, is_add, weight);
 			unsigned int kv = (*keyp) - offset;
 			int ii;
+			#ifdef MAKE_FOR_EXON
+			short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
+			#endif
 
 			if ((*keyp ) < offset)
 				continue;
@@ -228,31 +360,64 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 			for(ii = -1; ii<=1; ii++)
 			{
 				int offsetX = _index_vote_tol(kv+16*ii);
+				//printf("X=%d\tii=%d\n", offsetX, ii);
 				int datalen = vote -> items[offsetX];
 				unsigned int * dat = vote -> pos[offsetX];
 
 				for (i=0;i<datalen;i++)
 				{
-					if (abs(dat[i] - kv) <= indel_tolerance)
+					long long int dist0 = kv;
+					dist0 -= dat[i];
+					if (abs(dist0) <= indel_tolerance)
 					{
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 						test_max += weight;
-						vote->votes[offsetX][i] = test_max;
+						vote -> votes[offsetX][i] = test_max;
+						vote -> quality[offsetX][i] += quality;
+						vote -> last_offset[offsetX][i]=offset;
 
-						if ((kv > dat[i] && offset > vote -> last_offset[offsetX][i]) || (kv < dat[i] && offset < vote -> last_offset[offsetX][i]) ){
-							vote->masks[offsetX][i] |= IS_DELETION;
-						}
-						else if (kv != dat[i]){
-							vote->masks[offsetX][i] |= IS_INSERTION;
-						}
-						else 
+						#ifdef MAKE_FOR_EXON
+						if (offset_from_5 <  vote->coverage_start [offsetX][i])
+							vote->coverage_start [offsetX][i] = offset_from_5;
+						if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
+							vote->coverage_end [offsetX][i] = offset_from_5+16;
+						#endif
+
+						int toli;
+						for(toli=0; toli<indel_tolerance*3-3; toli+=3)
 						{
-							if((vote->masks[offsetX][i] & IS_DELETION) || (vote->masks[offsetX][i] & IS_INSERTION))
-								vote->masks[offsetX][i] |= IS_DELETION | IS_INSERTION;
+							if (! vote -> indel_recorder[offsetX][i][toli+3])break;
 						}
+	
+						if (dist0!=0 || vote->current_indel_cursor[offsetX][i] !=0)
+						{
+							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+							{
+								toli +=3;
+								//printf("NEW TOLI=%d  DIST=%d  SUBR=%d\n", toli, dist0, subread_number);
+								if (toli < indel_tolerance*3)
+								{
+									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+									
+									if (toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+								}
+								vote->current_indel_cursor [offsetX][i] = (char)dist0;
+							}
+						}
+						//printf("OLD TOLI=%d  DIST=%d  SUBR=%d\n", toli, dist0, subread_number);
+						vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 
-						if(test_max > vote->max_vote){
+						if(test_max > vote->max_vote || (test_max == vote->max_vote && vote -> quality[offsetX][i] > vote->max_quality))
+						{
+							#ifdef MAKE_FOR_EXON
+							vote->max_coverage_start = vote->coverage_start [offsetX][i];
+							vote->max_coverage_end = vote->coverage_end [offsetX][i];
+							#endif
+
+							memcpy(vote->max_indel_recorder, vote->indel_recorder[offsetX][i], sizeof(char)*3 * MAX_INDEL_TOLERANCE);
 							vote->max_vote = test_max;
+							vote->max_quality = vote -> quality[offsetX][i];
 							vote->max_position = dat[i];
 							vote->max_mask = vote->masks[offsetX][i];
 							//printf ("SETMAX %d\n", test_max);
@@ -260,7 +425,9 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 						i = 9999999;
 					}
 				}
-				if (i==9999999)break;
+				if (i==9999999){
+					break;
+				}
 			}
 
 			if (i < 9999999)
@@ -274,13 +441,35 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, gene_vote
 					vote -> items[offsetX2] ++;
 					dat2[datalen2] = kv;
 					vote -> masks[offsetX2][datalen2]=0;
+					vote -> quality[offsetX2][datalen2]=quality;
 					vote -> votes[offsetX2][datalen2]=weight;
 					vote -> last_offset[offsetX2][datalen2]=offset;
-					if (vote->max_vote<0.001)
+
+					// data structure of recorder:
+					// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
+					// All subread numbers are added with 1 for not being 0.
+
+					vote -> indel_recorder[offsetX2][datalen2][0] = subread_number+1;
+					vote -> indel_recorder[offsetX2][datalen2][1] = subread_number+1;
+					vote -> indel_recorder[offsetX2][datalen2][2] = 0;
+					vote -> indel_recorder[offsetX2][datalen2][3] = 0;
+					vote->current_indel_cursor [offsetX2][datalen2] = 0;
+					#ifdef MAKE_FOR_EXON
+					vote->coverage_start [offsetX2][datalen2] = offset_from_5;
+					vote->coverage_end [offsetX2][datalen2] = offset_from_5+16;
+					#endif
+
+					if (vote->max_vote==0)
 					{
+						#ifdef MAKE_FOR_EXON
+						vote->max_coverage_start = offset_from_5;
+						vote->max_coverage_end = offset_from_5+16;
+						#endif
+	
 						vote->max_vote = weight;
 						vote->max_position = kv;
 						vote->max_mask = 0;
+						vote->max_quality = quality;
 					}
 				}
 			}
@@ -330,11 +519,8 @@ size_t gehash_get(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_r
 	keyp = current_bucket -> item_keys;
 	endkp = keyp + items;
 
-	//key = key & 0xfffffff0;
-
 	while(1)
 	{
-	//	if((*keyp & 0xfffffff0) == key)
 		if(*keyp == key)
 		{
 			data_result [matched] = current_bucket -> item_values[keyp-current_bucket -> item_keys];
@@ -414,18 +600,20 @@ size_t gehash_get_hpc(gehash_t * the_table, gehash_key_t key, gehash_data_t * da
 
 void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 {
+/*
         struct gehash_bucket * current_bucket;
         int search_start = 0, search_end;
 
         current_bucket = _gehash_get_bucket (the_table, key);
         if (current_bucket->current_items >= current_bucket->space_size)
-                _gehash_resize_bucket(current_bucket, the_table->is_small_table);
+                _gehash_resize_bucket(current_bucket, , the_table->is_small_table);
 
         for (;search_start<current_bucket->current_items;search_start++)
         {
                 if(current_bucket->item_keys[search_start] >= key)
                         break;
         }
+
 
 
         for (search_end = current_bucket->current_items;search_end>search_start;search_start--)
@@ -435,6 +623,8 @@ void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t 
         current_bucket->item_values[search_start] = data;
 
         current_bucket->current_items ++;
+*/
+	printf("UNIMPLEMENTED! gehash_insert_sorted \n");
 }
 
 
@@ -456,14 +646,14 @@ void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 inline unsigned int load_int32(FILE * fp)
 {
 	int ret;
-	fread(&ret, sizeof(int), 1, fp);
+	assert(fread(&ret, sizeof(int), 1, fp)>0);
 	return ret;
 }
 
 inline long long int load_int64(FILE * fp)
 {
 	long long int ret;
-	fread(&ret, sizeof(long long int), 1, fp);
+	assert(fread(&ret, sizeof(long long int), 1, fp)>0);
 	return ret;
 }
 
@@ -496,8 +686,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 		//printf("IKV=%d\n", (int)current_bucket -> space_size);
 
-		fread(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
-		fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
+		assert(current_bucket -> current_items == 0 || fread(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp)>0);
+		assert(current_bucket -> current_items == 0 || fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp)>0);
 /*
 		int j;
 		for (j=0; j<current_bucket -> current_items; j++)
@@ -509,7 +699,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		}
 */	}
 
-	fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
+	assert(fread(&(the_table -> is_small_table), sizeof(char), 1, fp)>0);
 	fclose(fp);
 	return 0;
 }
@@ -537,10 +727,10 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 
 
                 if(i % 200 == 0)
-			print_text_scrolling_bar("Dumping index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
+			print_text_scrolling_bar("Saving index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 
-		if(current_bucket -> current_items>1)
+		if(current_bucket -> current_items>=1)
 		{
 			for(ii=0;ii<current_bucket -> current_items -1; ii++)
 			{

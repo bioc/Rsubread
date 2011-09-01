@@ -1,1 +1,2 @@
-PKG_LIBS+=-lpthread 
+PKG_CFLAGS+=-DMAKE_FOR_EXON
+PKG_LIBS+=-lpthread -DMAKE_FOR_EXON 

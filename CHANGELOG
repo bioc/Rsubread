@@ -1,3 +1,6 @@
+August 30, 2011 - 1.2.0
+(1) Add subjunc function which can be used to find exon junctions.
+
 July 26, 2011 - 1.1.1
 featureCounts function now supports human data and allows users to provide their annotation data.
 

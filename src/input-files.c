@@ -168,8 +168,9 @@ int geinput_next_char(gene_input_t * input)
 		while (1)
 		{
 			char nch = fgetc(input->input_fp);
-			if (nch <0)
+			if (nch <0 && feof(input->input_fp))
 				return -2;
+			else if (nch < 0 || nch > 126)printf("\nUnrecognised char = #%d\n", nch);
 
 			if (nch == '\r' || nch == '\n')
 			{
@@ -191,8 +192,8 @@ int geinput_next_char(gene_input_t * input)
 				return toupper(nch);
 			else
 			{
-				printf ("Unknown character in the chromosome data: %d\n", nch);
-				return -3;
+				printf ("\nUnknown character in the chromosome data: %d, ignored!\n", nch);
+				return 'N';
 			}		
 			last_br = 0;
 		}
@@ -280,11 +281,12 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 			if(!is_gene_char(nch)) 
 				break;
 		}
-		if(quality_string)
+		if(1)
 		{
 			int qret = 0;
 			char nch;
-
+			char fake_q_string [1200];
+			if (!quality_string) quality_string = fake_q_string;
 			// skip the line starting with '+'
 			read_line(input->input_fp, quality_string+qret, 0);
 
@@ -442,3 +444,12 @@ int chars2color(char c1, char c2)
 
 
 }
+
+int find_subread_end(int len, int TOTAL_SUBREADS, int subread)
+{
+	float step = max(3.00001, (len-16-GENE_SLIDING_STEP)*1.0/(TOTAL_SUBREADS-1)+0.00001);
+	return (int) (step * subread) + 15;
+	//return (int)((1.*len-16.)/TOTAL_SUBREADS * subread+15);
+}
+
+

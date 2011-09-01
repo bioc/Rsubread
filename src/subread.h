@@ -13,11 +13,16 @@
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
 #define SAM_FLAG_UNMAPPED 0x04
 
+
+
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
-typedef double gene_vote_number_t;
+typedef float gene_quality_score_t;
+typedef char gene_vote_number_t;
 
 #define GENE_TABLE_SIZE 500000000
+
+#define ANCHORS_NUMBER 259
 
 #define GENE_SLIDING_STEP 3
 #define BEXT_RESULT_LIMIT 16
@@ -26,12 +31,21 @@ typedef double gene_vote_number_t;
 #define IS_INSERTION 2
 #define IS_PAIRED_MATCH 128
 
-#define GENE_VOTE_SPACE 64
+#define GENE_VOTE_SPACE 64 
 #define GENE_VOTE_TABLE_SIZE 91
+
+#define MAX_INDEL_TOLERANCE 16
+
 
 #define base2int(c) ((c)=='G'?1:((c)=='A'?0:((c)=='C'?2:3)))
 #define int2base(c) ((c)==1?'G':((c)==0?'A':((c)==2?'C':'T')))
 #define color2int(c) ((c) - '0')
+
+
+#define FASTQ_PHRED33 1
+#define FASTQ_PHRED64 0
+
+#define IS_DEBUG 0
 
 typedef struct{
 	unsigned int start_base_offset;
@@ -61,14 +75,26 @@ typedef struct {
 typedef struct {
 	gene_vote_number_t max_vote;
 	gehash_data_t max_position;
+	gene_quality_score_t max_quality;
+	char max_indel_recorder[MAX_INDEL_TOLERANCE*3];
 	char max_mask;
 
         unsigned char items[GENE_VOTE_TABLE_SIZE];
         unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+        gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-//	unsigned char last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	char indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
+	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+
+	#ifdef MAKE_FOR_EXON
+	short coverage_start [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	short coverage_end [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	short max_coverage_start;
+	short max_coverage_end;
+	//#warning Switch "MAKE_FOR_EXON" is turned on. It may cost more time. Do not turn it on unless you want to detect junction reads.
+	#endif
 } gene_vote_t ;
 
 
@@ -85,10 +111,14 @@ typedef struct{
 	unsigned int * max_positions;
 	unsigned char * is_counterpart;
 	gene_vote_number_t * max_votes;
+	gene_quality_score_t * max_quality;
 	unsigned char * masks;
+	char * max_indel_recorder;
 #ifdef REPORT_ALL_THE_BEST
 	gene_best_record_t * best_records;
 #endif
+	char max_indel_tolerance;
+	short indel_recorder_length;
 
 } gene_allvote_t;
 
