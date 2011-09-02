@@ -1,22 +1,22 @@
 \name{processExons}
 \alias{processExons}
-\title{Calculate position of exons from (.md) file}
-\description{Calculate position of exons from (.md) file
-}
+\title{Obtain chromosomal coordiates of each exon using NCBI annotation}
+\description{This is for internal use.}
 \usage{
 processExons(filename="human_seq_gene.md", species="hg")
 }
 \arguments{
-  \item{filename}{ character string giving the name of input .md file}
-  \item{species}{ character string specifying the species of given data}
+  \item{filename}{a character string giving the name of input .md file (NCBI annotation file)}
+  \item{species}{a character string specifying the species}
 }
 \details{
-From the given human_seq_gene.md file, we get position of utr and cds
-position of exons are then derived for future study
+The NCBI annotation file gives the chromosomal coordinates of UTR (Untranslated region) and CDS (Coding sequence).
+This function uses these information to derive the chromosomal coordinates of exons.
+The first and last exons of genes usually contain both UTR sequence and CDS sequence.
 }
 
 \value{ 
-An output file is generated  
+A text file containing chromosomal coordinates of each exon.  
 }
 %\references{}
 \author{Zhiyin Dai and Wei Shi}
