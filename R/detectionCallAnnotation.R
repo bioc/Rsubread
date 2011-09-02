@@ -1,1 +1,0 @@
-detectionCallAnnotation <- function(exonfile = "exon.txt", irfile="integenic_region.txt", binsize=2000){	if ((file.exists(exonfile) == FALSE) || (file.exists(irfile) == FALSE)){		print("Source files specified doesn't exist!")	} 	else 	{			.C("detectionCallAnnotation", as.character(exonfile), as.character(irfile), as.integer(binsize), PACKAGE="Rsubread")		}}

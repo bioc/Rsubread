@@ -1,1 +1,0 @@
-detectionCall <- function(dataset){	samfile <- paste(dataset,".sam",sep="")	path <- paste(system.file(package="Rsubread"),"/extdata/", sep="")		if (file.exists(samfile) == FALSE) {		print("SAM file for the given dataset doesn't exist!\n")	} else {			.C("detectionCall", as.character(dataset), as.character(path), PACKAGE="Rsubread")	}}
