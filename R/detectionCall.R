@@ -1,6 +1,7 @@
 detectionCall <- function(dataset, species="hg", plot=FALSE)
 
 {
+	
 	if (tolower(substring(dataset, nchar(dataset)-3, nchar(dataset))) == ".sam"){
 		dataset <- substring(dataset, 1, nchar(dataset)-4)
 	}
@@ -36,8 +37,9 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 	
 	temp_header <- paste(temp_header, dataset,sep="")
 	
+	
 	.C("detectionCall", as.character(dataset), as.character(exon_file), as.character(ir_file), as.character(temp_header), PACKAGE="Rsubread")
-
+	
 	##########################################################
 	### After processing SAM file and Annotation file in C####
 	###  The result will be processed here for statistics ####
@@ -69,28 +71,8 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 		bg$percent <- bg$gcnum / (bg$chr_stop - bg$chr_start + 1 - bg$nnum)
 		bg <- bg[((bg$chr_stop - bg$chr_start +1) == 2000),]
 		bg <- bg[(bg$nnum + bg$gcnum + bg$atnum) >= 1990,]
-		bg$gccontent = round(bg$percent*100)
 
-
-		######	MEAN VS GC CONTENT CALCULATION
-
-		mean_nreads <- rep(0,101)
-		corrected_mean_nreads <- rep(0,101)
-		sd <- rep(0,101)
-		num_entries <- rep(0,101)
-
-		for (i in 0:100){
-			bg_percent <- bg[bg$gccontent == i, ]
-			mean_nreads[i+1] <- mean(bg_percent$nreads)
-			sd[i+1] <- sd(bg_percent$nreads)	
-			selected_bg_percent <- bg_percent[bg_percent$nreads >= (mean_nreads[i] - 2*sd[i]),]	
-			selected_bg_percent <- selected_bg_percent[selected_bg_percent$nreads <= (mean_nreads[i] + 2*sd[i]),]
-			corrected_mean_nreads[i+1] <- mean(selected_bg_percent$nreads)
-			num_entries[i+1] <- nrow(bg_percent)
-		}	
-
-		bg_intensities <- corrected_mean_nreads
-		### bg_intensities is an array of 101 elements, recording the mean n reads for each GC content(outliers removed)
+		lowessfit <- lowess(x=bg$percent, y=bg$nreads)
 
 		##########################################
 		########## GENE EXPRESSION DATA ########## 
@@ -99,7 +81,6 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 		exon <- read.delim(signal_file, header=TRUE)
 		exon <- exon[exon$chr %in% chrs, ]
 		exon$length <- exon$chr_stop - exon$chr_start + 1
-
 
 		gene_id <- sort(unique(exon$entrezid))
 		gene_nreads <- tapply(exon$nreads, factor(exon$entrezid), sum)
@@ -116,19 +97,32 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 
 		### For each gene, get the read intensity of same GC content, then calculate its p_values
 
-		gene$gccontent <- round(gene$GC*100)
-		gene_bg <- rep(0, nrow(gene))
+		gene$background <- rep(0,nrow(gene))
 
-		for (i in 1:nrow(gene)){
-			this_gccontent <- gene$gccontent[i]
-			this_bg_intensity <- bg_intensities[this_gccontent+1]
-			if (is.na(this_bg_intensity)) {this_bg_intensity <- 0}
-			gene_bg[i] <- this_bg_intensity
+		bg_percent <- lowessfit$x
+		bg_nreads <- lowessfit$y
+		n_bins <- length(bg_percent)
+		threhold <- 0.0001
+
+		### Using binary search to find the background intensity with closest GC content
+		for (i in 1 : nrow(gene)){
+			target_percent <- gene[i, 3]
+			left <- 1
+			right <- n_bins
+			middle <- ceiling((left + right) / 2)
+			while ((abs(bg_percent[middle] - target_percent) > threhold) && (left < right)) {
+				if (bg_percent[middle] > target_percent){
+					right <- middle-1
+				} else {
+					left <- middle+1
+				}
+				middle <- ceiling((left + right) / 2)
+			}
+			gene[i,5] <- bg_nreads[middle]
 		}
-		gene$gccontent <- NULL
-		gene$background <- gene_bg
 
 		gene$p_value <- ppois(gene$background, gene$signal)
+
 
 		###########################################################
 		########## DENSITY PLOT OF P_VALUE FOR EACH GENE ########## 
@@ -146,6 +140,7 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 		
 		file.remove(bg_file)
 		file.remove(signal_file)
+		
 		return(gene)
 		
 	}
