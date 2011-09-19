@@ -18,7 +18,7 @@
 
 int chars2color(char c1, char c2);
 
-int genekey2color(char * key);
+int genekey2color(char last_base,char * key);
 
 // Convert a string key into an integer key
 int genekey2int(char key [], int space_type);
@@ -59,7 +59,6 @@ long long int guess_gene_bases(char ** files, int file_number);
 void reverse_read(char * ReadString, int Length, int space_type);
 
 void reverse_quality(char * QualtyString, int Length);
-
 
 #define reverse_char(c)	((c)=='A'?'T':((c)=='G'?'C':((c)=='C'?'G':'A')))
 

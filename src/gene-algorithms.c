@@ -149,7 +149,7 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 		putchar(' ');
 	printf("]\r");
 	
-	ddfflush(stdout);
+	fflush(stdout);
 }
 
 
@@ -336,7 +336,7 @@ void init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 	allvote -> max_positions = (unsigned int *) malloc(sizeof(int)*expected_len);
 	allvote -> max_votes = (gene_vote_number_t *) calloc(sizeof(gene_vote_number_t), expected_len);
 	allvote -> max_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
-	allvote -> masks = (unsigned char *) calloc(1, expected_len);
+	allvote -> masks = (short *) calloc(2, expected_len);
 #ifdef REPORT_ALL_THE_BEST
 	allvote -> best_records = (gene_best_record_t *) malloc(sizeof(gene_best_record_t)* expected_len);
 #endif
@@ -978,7 +978,7 @@ float match_read(const char read_str[], int read_len, unsigned int potential_pos
 }
 
 
-void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, char *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale)
+void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale)
 {
 	int i, j;
 	gene_quality_score_t max_matching = -1.0;

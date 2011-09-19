@@ -100,7 +100,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	{
 		char window [16], last_color_base=-1, last_last_color_base=-1;
 		int i, read_len = 0;
-		unsigned int int_key = 0;
+		unsigned int int_key = 0, array_int_key = 0;
 		int skips=0, all_skips = 0;
 
 		//Pre-fill
@@ -211,12 +211,14 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				if(IS_COLOR_SPACE)
 				{
-					int_key = genekey2color(window);
+					int_key = genekey2color('A',window);
+					if(VALUE_ARRAY_INDEX)
+						array_int_key = genekey2int(window,GENE_SPACE_BASE);
 					last_last_color_base = -1;
 					last_color_base = window[15];
 				}
 				else
-					int_key = genekey2int(window,GENE_SPACE_BASE);
+					array_int_key = int_key = genekey2int(window,GENE_SPACE_BASE);
 	
 				if(offset==0)
 					local_begin_ftime = miltime();
@@ -268,18 +270,20 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			
 				if(IS_COLOR_SPACE)
 				{
-					int_key = genekey2color(window);
+					int_key = genekey2color('A',window);
+					if(VALUE_ARRAY_INDEX)
+						array_int_key = genekey2int(window,GENE_SPACE_BASE);
 					last_last_color_base = -1;
 					last_color_base = window[15];
 				}
 				else
-					int_key = genekey2int(window, GENE_SPACE_BASE);
+					array_int_key = int_key = genekey2int(window, GENE_SPACE_BASE);
 				
 				gehash_create(&table, segment_size, 0);
 //				gehash_prealloc(& table);
 				gehash_create(&huge_table,segment_size/100 , 0);
 				if(VALUE_ARRAY_INDEX)
-					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?1:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )));
+					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?0:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )));
 			}
 	
 			status = 0;
@@ -295,7 +299,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				{
 //					if(offset >= 700000 && offset <= 700020)
 //						printf("%d %d\n", offset, int_key&3);
-					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?1:0), int_key);
+					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key);
 				}
 			}
 
@@ -324,16 +328,25 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				int_key = int_key << 2;
 
+
 				if (IS_COLOR_SPACE)
 				{
 					if(last_color_base>0)
 						int_key += chars2color(last_color_base, next_char);
+					if(VALUE_ARRAY_INDEX)
+					{
+						array_int_key = array_int_key << 2;
+						array_int_key += base2int (next_char);
+					}
 
 					last_last_color_base = last_color_base;
 					last_color_base = next_char;
 				}
 				else
+				{
 					int_key += base2int (next_char); 
+					array_int_key = int_key;
+				}
 
 				if (offset % 5000000 == 0)
 				{
@@ -347,7 +360,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					fflush(stdout) ;
 					if(
 						(((offset % 300000000 == 0) ||  (offset % 60000000 == 0 && segment_size - table.current_items < 50000000 )) && (!QUICK_BUILD)) ||
-						(offset % 1200000000 == 0 && QUICK_BUILD) ||
+						(offset % 1650000000 == 0 && QUICK_BUILD) ||
 						(offset > 100000000 && huge_table.current_items <1 )
 					)
 						if(offset>1)

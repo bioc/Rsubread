@@ -7,7 +7,7 @@ int main_junction(int argc,char ** argv);
 int main_align(int argc,char ** argv);
 int main_buildindex(int argc,char ** argv);
 int sam2bed(int argc,char *argv[]);
-int unmapped(int argc,char *argv[]);
+int propmapped(int argc,char *argv[]);
 int readSummary(int argc,char *argv[]);
 
 void R_buildindex_wrapper(int * nargs, char ** argv)
@@ -108,7 +108,7 @@ void R_sam2bed_wrapper(int * nargs, char ** argv)
 }
 
 
-void R_unmapped_wrapper(int * nargs, char ** argv)
+void R_propmapped_wrapper(int * nargs, char ** argv)
 {
         optind = 1;
 
@@ -124,7 +124,7 @@ void R_unmapped_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        unmapped(n,c_argv);
+        propmapped(n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);

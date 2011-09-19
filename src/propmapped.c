@@ -3,15 +3,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-int unmapped(int argc,char *argv[]){
+int propmapped(int argc,char *argv[]){
 
   if(argc == 1){
-    printf("Usage: unmapped sam_file\n");
+    printf("Usage: propmapped sam_file\n");
     exit(0);
   }
 
-  FILE *fp;
-  fp=fopen(argv[1],"r");
+  FILE *fp, *fp_out;
+  fp = fopen(argv[1],"r");
+  fp_out = fopen(argv[2],"a+");
+
   char * line = NULL;
   size_t len = 0;
   ssize_t z;
@@ -35,4 +37,8 @@ int unmapped(int argc,char *argv[]){
 
   printf("Total number of reads is: %d\n", totalreads);
   printf("Proportion of mapped reads is %f\n\n",1-(float)unmapped/totalreads);
+
+  fprintf(fp_out,"%s,%d,%d,%f\n",argv[1],totalreads,totalreads-unmapped,1-(float)unmapped/totalreads);
+
+  fclose(fp_out);
 }

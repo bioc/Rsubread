@@ -307,6 +307,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 
 					if((test_max > vote->max_vote) || (test_max == vote->max_vote && vote->quality[offsetX][i] > vote->max_quality))
 					{
+						vote->max_mask = vote->masks[offsetX][i];
 						vote->max_vote = test_max;
 						vote->max_position = kv;
 						vote->max_quality = vote->quality[offsetX][i];
@@ -326,6 +327,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 				dat[i] = kv;
 				vote->votes[offsetX][i]=weight;
 				vote->quality[offsetX][i]=quality;
+				vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
 				#ifdef MAKE_FOR_EXON
 				vote->coverage_start [offsetX][i] = offset_from_5;
 				vote->coverage_end [offsetX][i] = offset_from_5+16;
@@ -337,7 +339,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 					vote->max_coverage_start = offset_from_5;
 					vote->max_coverage_end = offset_from_5+16;
 					#endif
-					vote->max_mask = 0;
+					vote->max_mask =  (is_reversed?IS_NEGATIVE_STRAND:0);
 					vote->max_vote = weight;
 					vote->max_position = kv;
 					vote->max_quality = quality;
@@ -356,6 +358,9 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 
 			if ((*keyp ) < offset)
 				continue;
+
+			//if (kv == 2720480913)
+			//printf ("kv=%u ; OFF=%d\n", kv, offset);
 
 			for(ii = -1; ii<=1; ii++)
 			{
@@ -420,7 +425,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 							vote->max_quality = vote -> quality[offsetX][i];
 							vote->max_position = dat[i];
 							vote->max_mask = vote->masks[offsetX][i];
-							//printf ("SETMAX %d\n", test_max);
+						//	printf ("SETMAX %d  %d~%d @%u\n", test_max, vote->max_coverage_start, vote->max_coverage_end, vote->max_position);
 						}
 						i = 9999999;
 					}
@@ -440,7 +445,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 				{
 					vote -> items[offsetX2] ++;
 					dat2[datalen2] = kv;
-					vote -> masks[offsetX2][datalen2]=0;
+					vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
 					vote -> quality[offsetX2][datalen2]=quality;
 					vote -> votes[offsetX2][datalen2]=weight;
 					vote -> last_offset[offsetX2][datalen2]=offset;
@@ -468,7 +473,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 	
 						vote->max_vote = weight;
 						vote->max_position = kv;
-						vote->max_mask = 0;
+						vote->max_mask = (is_reversed?IS_NEGATIVE_STRAND:0);
 						vote->max_quality = quality;
 					}
 				}

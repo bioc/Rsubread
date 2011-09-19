@@ -22,4 +22,6 @@ int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 int gvindex_match_base(gene_value_index_t * index, gehash_data_t offset, const char base_int_value);
 
 int gvindex_get(gene_value_index_t * index, gehash_data_t offset);
+
+void gvindex_get_string(char *buf, gene_value_index_t * index, unsigned int pos, int len, int is_negative_strand);
 #endif

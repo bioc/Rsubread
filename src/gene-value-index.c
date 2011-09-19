@@ -145,3 +145,24 @@ void gvindex_destory(gene_value_index_t * index)
 }
 
 
+void gvindex_get_string(char *buf, gene_value_index_t * index, unsigned int pos, int len, int is_negative_strand)
+{
+	int i;
+	if (is_negative_strand)
+		for (i=len-1;i>=0;i--)
+		{
+			buf[i] = gvindex_get (index, pos + len - 1 - i);
+			switch(buf[i])
+			{
+				case 'A': buf[i] = 'T'; break;
+				case 'T': buf[i] = 'A'; break;
+				case 'G': buf[i] = 'C'; break;
+				case 'C': buf[i] = 'G'; break;
+			}
+		}
+	else
+		for (i=0;i<len;i++)
+			buf[i] = gvindex_get (index, pos +i);
+}
+
+

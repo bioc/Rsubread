@@ -3,16 +3,16 @@
 \title{Obtain the proportion of mapped reads}
 \description{Use mapping information stored in a SAM format file to count the number of mapped reads}
 \usage{
-propmapped(samfile)
+propmapped(samfiles)
 }
 \arguments{
-  \item{samfile}{ character string giving the name of a SAM format file.}
+  \item{samfiles}{ a character vector giving the names of SAM format files.}
   }
 \details{
-This function uses the mapping information included in a SAM format file get the proportion mapped reads out of all the reads. 
+This function counts of number of mapped reads using the mapping informtion stored in SAM format files. 
 }
 \value{ 
-Fraction of mapped reads is printed on the screen.
+A data frame containing the total number of reads, number of mapped reads and proportion of mapped reads for each library.
 }
 %\references{
 %}

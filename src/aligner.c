@@ -586,7 +586,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 					gehash_data_t max_position;
 					gene_vote_number_t max_vote;
 					gene_quality_score_t max_quality;
-					char max_mask;
+					short max_mask;
 					char max_indel_recorder [MAX_INDEL_TOLERANCE*3];
 					max_indel_recorder[0]=0;
 
@@ -1002,7 +1002,8 @@ int main_align(int argc,char ** argv)
 	printf("Number of selected subreads = %d\n", TOTAL_SUBREADS);
 	printf("Consensus threshold = %d\n", ACCEPT_SUBREADS);
 	printf("Number of threads=%d\n", ALL_THREADS);
-	printf("Number of indels allowed=%d\n", INDEL_TOLERANCE-1);
+	if(INDEL_TOLERANCE)
+		printf("Number of indels allowed=%d\n", INDEL_TOLERANCE-1);
 	if (QUALITY_SCALE==QUALITY_SCALE_LINEAR)
 		puts("Quality scale=linear\n\n");
 	else if (QUALITY_SCALE==QUALITY_SCALE_LOG)
@@ -1071,5 +1072,6 @@ int main_align(int argc,char ** argv)
 
 	printf("Done.\n");
 
+	fclose(out_fp);
 	return 0;
 }

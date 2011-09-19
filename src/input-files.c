@@ -393,12 +393,12 @@ int genekey2int(char key [],int space_type)
 	return ret;
 }
 
-int genekey2color(char key [])
+int genekey2color(char last_base, char key [])
 {
 	int i, ret = 0;
-	char last_char = key[0];
+	char last_char = last_base;
 
-	for (i=1; i<16; i++)
+	for (i=0; i<16; i++)
 	{
 		char next_char = key[i];
 
@@ -451,5 +451,4 @@ int find_subread_end(int len, int TOTAL_SUBREADS, int subread)
 	return (int) (step * subread) + 15;
 	//return (int)((1.*len-16.)/TOTAL_SUBREADS * subread+15);
 }
-
 

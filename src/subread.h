@@ -14,6 +14,20 @@
 #define SAM_FLAG_UNMAPPED 0x04
 
 
+#define IS_LONG_OVERLAP 4
+#define IS_SHORT_OVERLAP 8
+#define IS_PAIRED_HINTED 16
+#define IS_R1_CLOSE_TO_5 1
+#define IS_REVERSED_HALVES 2
+#define	IS_PROCESSED_READ 32
+#define	IS_PROCESSED_READ_R2 64
+#define IS_NEGATIVE_STRAND 128
+#define IS_NEGATIVE_STRAND_R1 256 
+#define IS_NEGATIVE_STRAND_R2 512 
+#define IS_FUSION 1024 
+
+
+
 
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
@@ -38,8 +52,10 @@ typedef char gene_vote_number_t;
 
 
 #define base2int(c) ((c)=='G'?1:((c)=='A'?0:((c)=='C'?2:3)))
-#define int2base(c) ((c)==1?'G':((c)==0?'A':((c)==2?'C':'T')))
+//#define int2base(c) ((c)==1?'G':((c)==0?'A':((c)==2?'C':'T')))
+#define int2base(c) ("AGCT"[(c)]) 
 #define color2int(c) ((c) - '0')
+#define int2color(c) ("0123"[(c)])
 
 
 #define FASTQ_PHRED33 1
@@ -77,13 +93,13 @@ typedef struct {
 	gehash_data_t max_position;
 	gene_quality_score_t max_quality;
 	char max_indel_recorder[MAX_INDEL_TOLERANCE*3];
-	char max_mask;
+	short max_mask;
 
         unsigned char items[GENE_VOTE_TABLE_SIZE];
         unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-	char masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
@@ -112,7 +128,7 @@ typedef struct{
 	unsigned char * is_counterpart;
 	gene_vote_number_t * max_votes;
 	gene_quality_score_t * max_quality;
-	unsigned char * masks;
+	short * masks;
 	char * max_indel_recorder;
 #ifdef REPORT_ALL_THE_BEST
 	gene_best_record_t * best_records;
@@ -136,6 +152,12 @@ typedef struct {
 	int file_type ;
 	FILE * input_fp;
 } gene_input_t;
+
+
+typedef struct{
+	unsigned int small_key;
+	unsigned int big_key;
+} paired_exon_key;
 
 
 double miltime();

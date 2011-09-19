@@ -68,7 +68,7 @@ gene_vote_number_t calculate_penalty_score(const char * quality_str, const char 
 
 int is_valid_subread(const char * read_str);
 
-void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len,  gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, char *max_mask, gene_quality_score_t * max_quality , gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int quality_scale);
+void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len,  gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality , gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int quality_scale);
 
 float match_read(const char read_str[], int read_len, unsigned int potential_position,  gene_value_index_t * my_array_index, int space_type, int indel_tolerance, const char quality_str [], int quality_scale) ;
 
