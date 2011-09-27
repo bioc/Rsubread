@@ -36,11 +36,14 @@ featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 	file.remove(fout)
 	if(type == "gene"){
 	  y <- rowsum(x[,-c(1:4)],x$EntrezID)
-	  y <- data.frame(EntrezID=rownames(y),y,stringsAsFactors=FALSE)
-	  colnames(y)[-1] <- SAMfiles
-	  return(y)
+	  gene_length <- rowsum(x$End-x$Start+1,x$EntrezID)
+	  z <- list(counts=as.matrix(y),annotation=data.frame(EntrezID=rownames(y),GeneLength=gene_length,stringsAsFactors=FALSE),targets=SAMfiles)
 	}
-	else
-	  return(x)
+	else{
+	  y <- as.matrix(x[,-c(1:4)]) 
+	  rownames(y) <- x$EntrezID
+	  z <- list(counts=y,annotation=data.frame(x[,1:4],ExonLength=x$End-x$Start+1,stringsAsFactors=FALSE),targets=SAMfiles)
+	}
+	z	
 }
 

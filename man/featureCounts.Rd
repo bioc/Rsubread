@@ -39,7 +39,12 @@ Although this function is designed for summarizing reads from RNA-seq experiment
 Simply by setting \code{type} to \code{exon} and providing an annotation, this function will yield numbers of mapped reads for each feature. 
 }
 \value{ 
-A data frame containing read counts for each feature.
+A list with the following components:
+\tabular{ll}{
+  \code{counts}:\tab a data matrix containing read counts for each gene or exon.\cr
+  \code{annotation}:\tab a data frame containing Entrez gene identifers, gene/exon length etc.\cr
+  \code{targets}:\tab a character vector giving sample information.
+}
 }
 %\references{
 %}

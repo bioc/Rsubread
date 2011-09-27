@@ -2,15 +2,9 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 
 {
 	
-	if (tolower(substring(dataset, nchar(dataset)-3, nchar(dataset))) == ".sam"){
-		dataset <- substring(dataset, 1, nchar(dataset)-4)
-	}
-	
-	samfile <- paste(dataset,".sam",sep="")
-	
-	if (file.exists(samfile) == FALSE) {
+	if (file.exists(dataset) == FALSE) {
 
-		stop("SAM file for the given dataset doesn't exist!\n")
+		stop("File for the given dataset doesn't exist!\n")
 
 	} 
 	
@@ -37,6 +31,8 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 	
 	temp_header <- paste(temp_header, dataset,sep="")
 	
+	##temp_header <- dataset
+	
 	
 	.C("detectionCall", as.character(dataset), as.character(exon_file), as.character(ir_file), as.character(temp_header), PACKAGE="Rsubread")
 	
@@ -52,27 +48,25 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 	bg_file <- paste(temp_header, "_mapping_binned_integenic_region_GC.txt", sep="")
 	signal_file <- paste(temp_header, "_mapping_exon_GC.txt", sep="")
 
-	plot_output_file <- paste(dataset, "_p_value_density_plot.pdf", sep="")
-
-
 	if ((file.exists(bg_file) == FALSE) || (file.exists(signal_file) == FALSE)) {
 
 		print("Mapping results for this dataset are not available.\n")
-		print("Please execute detectionCall(dataset) first. \n")
 		
 	} else {
-
 
 		######################################################
 		########## INTEGENIC REGION EXPRESSION DATA ########## 
 		######################################################
 
 		bg <- read.delim(bg_file, header=TRUE)
+		
 		bg$percent <- bg$gcnum / (bg$chr_stop - bg$chr_start + 1 - bg$nnum)
-		bg <- bg[((bg$chr_stop - bg$chr_start +1) == 2000),]
-		bg <- bg[(bg$nnum + bg$gcnum + bg$atnum) >= 1990,]
-
-		lowessfit <- lowess(x=bg$percent, y=bg$nreads)
+		
+		bg$sqrtnreads <- sqrt(bg$nreads)
+		
+		lowessfit <- lowess(x=bg$percent, y=bg$sqrtnreads)
+		
+		lowessfun <- approxfun(x=lowessfit$x, y=lowessfit$y)
 
 		##########################################
 		########## GENE EXPRESSION DATA ########## 
@@ -81,66 +75,58 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 		exon <- read.delim(signal_file, header=TRUE)
 		exon <- exon[exon$chr %in% chrs, ]
 		exon$length <- exon$chr_stop - exon$chr_start + 1
-
+		
+		# filter out exons which are covered by other exons
+		exon <- exon[exon$nnum + exon$gcnum + exon$atnum >= 0.9*exon$length, ]
+		
+		# group data into gene level
 		gene_id <- sort(unique(exon$entrezid))
+		
 		gene_nreads <- tapply(exon$nreads, factor(exon$entrezid), sum)
-		gene_gcnum <- tapply(exon$gcnum, factor(exon$entrezid), sum)
+		
 		gene_length <- tapply(exon$length, factor(exon$entrezid), sum)
+		
+		gene_gcnum <- tapply(exon$gcnum, factor(exon$entrezid), sum)
 		gene_nnum <- tapply(exon$nnum, factor(exon$entrezid), sum)
+		
 		gene_percent <- gene_gcnum / (gene_length - gene_nnum)
-		### gene_signal is the adjusted gene nreads per 2000 base
-		gene_signal <- gene_nreads / gene_length * 2000
 
-		gene <- cbind(matrix(gene_id), matrix(gene_length),matrix(gene_percent),  matrix(gene_signal))
+		gene <- cbind(matrix(gene_id), matrix(gene_length),matrix(gene_percent), matrix(gene_nreads))
 		gene <- as.data.frame(gene)
-		colnames(gene) <- c("entrezid", "length","GC", "signal")
+		
+		colnames(gene) <- c("entrezid", "length","GC","nreads")
 
 		### For each gene, get the read intensity of same GC content, then calculate its p_values
 
-		gene$background <- rep(0,nrow(gene))
-
-		bg_percent <- lowessfit$x
-		bg_nreads <- lowessfit$y
-		n_bins <- length(bg_percent)
-		threhold <- 0.0001
-
-		### Using binary search to find the background intensity with closest GC content
-		for (i in 1 : nrow(gene)){
-			target_percent <- gene[i, 3]
-			left <- 1
-			right <- n_bins
-			middle <- ceiling((left + right) / 2)
-			while ((abs(bg_percent[middle] - target_percent) > threhold) && (left < right)) {
-				if (bg_percent[middle] > target_percent){
-					right <- middle-1
-				} else {
-					left <- middle+1
-				}
-				middle <- ceiling((left + right) / 2)
-			}
-			gene[i,5] <- bg_nreads[middle]
-		}
-
-		gene$p_value <- ppois(gene$background, gene$signal)
-
-
+		# predict the background intensity of a gene using previously fitted lowess function
+		# and translate it back from sqrt scale to normal scale
+		gene$background <- (lowessfun(gene$GC))^2
+		
+		gene$background[is.na(gene$background)] <- 0
+		
+		# calculate the expected nreads under null hypothesis for each gene
+		gene$expected_nreads <- gene$background*gene$length / 2000
+		
+		gene$p_value <- ppois(gene$nreads, gene$expected_nreads, lower.tail=FALSE) + runif(nrow(gene))*dpois(gene$nreads, gene$expected_nreads)
+	
 		###########################################################
 		########## DENSITY PLOT OF P_VALUE FOR EACH GENE ########## 
 		###########################################################
 
 		if (plot){
-			pdf(plot_output_file )
+			plot_output_file <- paste(dataset, "_p_value_density_plot.pdf", sep="")
+			pdf(plot_output_file)
 			plot(density(gene$p_value), xlab = "p_value", ylab = "density", main="Density Plot of P_values for Each Gene(Binsize=2000)", col=1)
 			dev.off()
 		}
+
 
 		##############################################
 		########## CLEAN UP AND DATA EXPORT ########## 
 		##############################################
 		
-		file.remove(bg_file)
-		file.remove(signal_file)
-		
+		unlink(bg_file)
+		unlink(sgianl_file)
 		return(gene)
 		
 	}

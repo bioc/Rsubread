@@ -1,5 +1,8 @@
-September 19, 2011 - 1.2.1
+September 28, 2011 - 1.2.1
 (1) propmapped function now returns a data frame.
+(2) remove file name restraint in detectionCall function.
+(3) output of featureCounts function was changed to a list.
+(4) fixed the incorrect use of ppois function in detectionCall function
 
 August 30, 2011 - 1.2.0
 (1) Add subjunc function which can be used to find exon junctions.

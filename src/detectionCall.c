@@ -80,7 +80,6 @@ generate_filenames(char *dataset, char *exon_file, char *ir_file, char *temp_hea
 	mapping_result_ir = (char *)malloc(STR);
 
 	strcpy(SAM_file, dataset);
-	strcat(SAM_file,".sam");
 
 	strcpy(simplified_SAM_file, temp_header);
 	strcat(simplified_SAM_file,"_simplified.txt");
