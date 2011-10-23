@@ -1,0 +1,11 @@
+CHANGES IN VERSION 1.4.0
+------------------------
+
+NEW FEATURES
+
+    o Detect exon junctions (subjunc function). 
+
+    o Make detection calls for each genes to tell whether or not  they are expressed (detectionCall function). 
+
+    o Count number of reads falling into each gene or each exon (featureCounts function). 
+

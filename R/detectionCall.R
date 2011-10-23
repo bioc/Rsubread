@@ -126,7 +126,7 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 		##############################################
 		
 		unlink(bg_file)
-		unlink(sgianl_file)
+		unlink(signal_file)
 		return(gene)
 		
 	}
