@@ -17,9 +17,9 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
 #ifdef __MAX_ACCURACY_
- 	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE*2); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0;
+ 	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE*2); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_mask = 0;
 #else
-	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE);  (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0;
+	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE);  (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0;  (a)->max_mask = 0;
 #endif
 // return current votes for a given position
 // if create_new_pos == 0 then do not take this position if it does not exist in the vote array

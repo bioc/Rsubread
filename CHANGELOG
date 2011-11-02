@@ -1,3 +1,6 @@
+November 2, 2011 - 1.4.1
+(1) Bug fix to the flag field in SAM output.
+
 September 28, 2011 - 1.2.1
 (1) propmapped function now returns a data frame.
 (2) remove file name restraint in detectionCall function.

@@ -17,6 +17,7 @@
 gene_offset_t _global_offsets;
 float accepted_support_rate = 0.300000;
 int EXON_ALL_THREADS=1;
+int REPORT_SAM_FILE = 1;
 int TOTAL_SUBREADS;
 int ACCEPT_SUBREADS;
 int ACCEPT_MINOR_SUBREADS;
@@ -346,8 +347,12 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 	char last_char='A';
 	if (is_negative_strand)
 	{
+
 		if (space_type == GENE_SPACE_COLOR)
+		{
+			pos++;
 			last_char = (pos+test_len>= index -> length + index -> start_point)?'A': gvindex_get(index,pos+test_len);
+		}
 		for (i=test_len -1;i>=0;i--)
 		{
 			char tt = gvindex_get (index, pos+test_len-1-i);
@@ -444,7 +449,7 @@ int test_donar(char *read, int read_len, unsigned int pos1, unsigned int pos2, i
 					//x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end-DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed);
 					//x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start , DONAR_CONFIRM_SIZE , is_reversed);
 				}
-		//		printf("M1=%d M2=%d X1=%d X2=%d\n", m1,m2,x1,x2);
+				//printf("M1=%d M2=%d X1=%d X2=%d\n", m1,m2,x1,x2);
 				if (m1 >= DONAR_CONFIRM_SIZE - 1  && m2>=DONAR_CONFIRM_SIZE - 1)
 					if(x1<=DONAR_CONFIRM_SIZE - 5 && x2<=DONAR_CONFIRM_SIZE - 5)
 					{
@@ -498,11 +503,11 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
-		if(i >= processed_reads*2)break;
+		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Second Iteration", i*1./processed_reads, 80, &ic);
+			print_text_scrolling_bar("Second Iteration", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		unsigned int pos = halves_record -> best_pos1_list[i];
 
@@ -670,10 +675,10 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
-		if(i >= processed_reads*2)break;
+		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("First Iteration", i*1./processed_reads, 80, &ic);
+			print_text_scrolling_bar("First Iteration", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
 		unsigned int pos2 = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos2_list[i]:halves_record -> best_pos1_list[i];
@@ -805,11 +810,11 @@ void print_exon_res(halves_record_t * halves_record,  gene_input_t* ginp,gene_in
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
-		if(i >= processed_reads*2)break;
+		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Saving results", i*1./processed_reads, 80, &ic);
+			print_text_scrolling_bar("Saving results", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		if (ginp2 && (i % 2))
 			rl = geinput_next_read(ginp2, nameb, inb, qualityb);
@@ -1383,7 +1388,8 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 
 
-	print_exon_res(halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads);
+	if (out_fp)
+		print_exon_res(halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads);
 
 	fseeko(ginp -> input_fp, last_fp_pos, SEEK_SET);
 	if (ginp2)
@@ -1405,6 +1411,7 @@ void exon_usage(char * execname)
 	puts("    -r --read      <input>\t name of an input file(FASTQ/FASTA format), either in the base-space or in the color-space.");
 	puts("    -o --output    <output>\t name of the output file(SAM format)");
 	puts("    -x --fusion           \t allow fusion detection, disabled by default");
+	puts("    -A --nosam           \t do not report results for individual reads, report them by default");
 	puts("");
 	puts("Optional arguments:");
 //	puts("    -n --subreads  <int>\t optional, number of subreads selected from each read for mapping, 10 by default");
@@ -1439,6 +1446,7 @@ static struct option long_options[] =
 	{"read",  required_argument, 0, 'r'},
 	{"read2", required_argument, 0, 'R'},
 	{"indel", required_argument, 0, 'I'},
+	{"nosam", required_argument, 0, 'A'},
 	{"mindist", required_argument, 0, 'd'},
 	{"maxdist", required_argument, 0, 'D'},
 	{"minhalf", required_argument, 0, 'H'},
@@ -1547,9 +1555,12 @@ int main_junction(int argc,char ** argv)
 
 
 
-	while ((c = getopt_long (argc, argv, "xbSL:H:d:D:n:m:p:f:R:r:i:l:o:T:Q:I:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "xbSL:AH:d:D:n:m:p:f:R:r:i:l:o:T:Q:I:?", long_options, &option_index)) != -1)
 		switch(c)
 		{
+			case 'A':
+				REPORT_SAM_FILE = 0;
+				break;
 			case 'x':
 				EXON_FUSION_DETECTION=1;
 				break;
@@ -1655,8 +1666,10 @@ int main_junction(int argc,char ** argv)
 		return -1;
 	}
 
-	FILE * out_fp = fopen(output_file, "w");
-	if (!out_fp)
+	FILE * out_fp = NULL;
+	if(REPORT_SAM_FILE)
+		out_fp= fopen(output_file, "w");
+	if (REPORT_SAM_FILE && !out_fp)
 	{
 		printf("Unable to open the output file at '%s'.\n", output_file);
 		return -1;
@@ -1754,7 +1767,8 @@ int main_junction(int argc,char ** argv)
 	else
 		printf("\n\n %llu reads were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, miltime()-begin_ftime, junction_number, support_number );
 
-	fclose(out_fp);
+	if(out_fp)
+		fclose(out_fp);
 	printf("\n\nCompleted successfully.\n");
 
 	return 0;

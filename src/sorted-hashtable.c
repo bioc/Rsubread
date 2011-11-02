@@ -351,7 +351,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 		for (keyp = current_bucket -> item_values+match_start; keyp < endkp ; keyp++)
 		{
 			unsigned int kv = (*keyp) - offset;
-			int ii;
+			int iix;
 			#ifdef MAKE_FOR_EXON
 			short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
 			#endif
@@ -362,8 +362,12 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 			//if (kv == 2720480913)
 			//printf ("kv=%u ; OFF=%d\n", kv, offset);
 
-			for(ii = -1; ii<=1; ii++)
+			for(iix = 0; iix<=3; iix++)
 			{
+				int ii;
+				if (iix) ii = iix*2 - 3;
+				else ii = 0;
+
 				int offsetX = _index_vote_tol(kv+16*ii);
 				//printf("X=%d\tii=%d\n", offsetX, ii);
 				int datalen = vote -> items[offsetX];
@@ -475,6 +479,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 						vote->max_position = kv;
 						vote->max_mask = (is_reversed?IS_NEGATIVE_STRAND:0);
 						vote->max_quality = quality;
+						memcpy(vote->max_indel_recorder, vote->indel_recorder[offsetX2][datalen2], sizeof(char)*4);
 					}
 				}
 			}
