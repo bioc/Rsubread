@@ -21,11 +21,11 @@
 #define IS_REVERSED_HALVES 2
 #define	IS_PROCESSED_READ 32
 #define	IS_PROCESSED_READ_R2 64
-#define IS_NEGATIVE_STRAND 128
+#define IS_PAIRED_MATCH 128
 #define IS_NEGATIVE_STRAND_R1 256 
 #define IS_NEGATIVE_STRAND_R2 512 
 #define IS_FUSION 1024 
-
+#define IS_NEGATIVE_STRAND 2048
 
 
 
@@ -41,9 +41,6 @@ typedef char gene_vote_number_t;
 #define GENE_SLIDING_STEP 3
 #define BEXT_RESULT_LIMIT 16
 
-#define IS_DELETION 1
-#define IS_INSERTION 2
-#define IS_PAIRED_MATCH 128
 
 #define GENE_VOTE_SPACE 64 
 #define GENE_VOTE_TABLE_SIZE 91

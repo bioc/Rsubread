@@ -17,7 +17,6 @@
 gene_offset_t _global_offsets;
 float accepted_support_rate = 0.300000;
 int EXON_ALL_THREADS=1;
-int REPORT_SAM_FILE = 1;
 int TOTAL_SUBREADS;
 int ACCEPT_SUBREADS;
 int ACCEPT_MINOR_SUBREADS;
@@ -36,18 +35,19 @@ int EXON_MIN_HALF_LENGTH = 4;
 float EXON_HALF_MATCH_PERCENTAGE =.7f;
 double reads_density;
 
-int EXON_FUSION_DETECTION = 0;
+
+#define IS_LONG_OVERLAP 4
+#define IS_SHORT_OVERLAP 8
+#define IS_PAIRED_HINTED 16
+#define IS_R1_CLOSE_TO_5 1
+#define IS_REVERSED_HALVES 2
+#define	IS_PROCESSED_READ 32
+#define	IS_PROCESSED_READ_R2 64
 
 #define DONAR_CONFIRM_SIZE 13
 #define EXON_GROUPING_SIZE 12
 
 #define MAX_EXON_CONNECTIONS 8
-
-typedef struct {
-	char i_am_reversed;
-	unsigned int connect_to [MAX_EXON_CONNECTIONS];
-	char is_opposite_reversed [MAX_EXON_CONNECTIONS];
-} connect_to_t;
 
 typedef struct {
 	int max_len;
@@ -58,7 +58,7 @@ typedef struct {
 	unsigned char * best_vote2_list;
 	char * is_abnormal_list;
 	char * is_reversed_list;
-	short * half_marks_list;
+	char * half_marks_list;
 	short * splice_point_list;
 }halves_record_t;
 
@@ -71,7 +71,7 @@ void init_halves_record(halves_record_t* halves_record, int items)
 	halves_record -> best_vote2_list = (unsigned char * )malloc(sizeof(unsigned char)*items);
 	halves_record -> is_abnormal_list = (char * )malloc(sizeof(char)*items);
 	halves_record -> is_reversed_list = (char * )malloc(sizeof(char)*items);
-	halves_record -> half_marks_list = (short * )malloc(sizeof(short)*items);
+	halves_record -> half_marks_list = (char * )malloc(sizeof(char)*items);
 	halves_record -> splice_point_list = (short * )malloc(sizeof(short)*items);
 
 	memset(halves_record -> best_vote1_list, 0, sizeof(char)*halves_record -> max_len);
@@ -82,10 +82,10 @@ void clear_halve_record(halves_record_t* halves_record)
 {
 	memset(halves_record -> best_vote1_list, 0, sizeof(char)*halves_record -> max_len);
 	memset(halves_record -> best_vote2_list, 0, sizeof(char)*halves_record -> max_len);
-	memset(halves_record -> half_marks_list, 0, sizeof(short)*halves_record -> max_len);
+	memset(halves_record -> half_marks_list, 0, sizeof(char)*halves_record -> max_len);
 }
 
-void add_best_matching_halves(halves_record_t * halves_record, unsigned int best_pos1, unsigned int best_pos2, unsigned char best_vote1 , unsigned char best_vote2, char is_abnormal, char is_reversed, short splice_point, short half_marks, int read_number)
+void add_best_matching_halves(halves_record_t * halves_record, unsigned int best_pos1, unsigned int best_pos2, unsigned char best_vote1 , unsigned char best_vote2, char is_abnormal, char is_reversed, short splice_point, char half_marks, int read_number)
 {
 	if (halves_record -> best_vote1_list[read_number] < best_vote1)
 	{
@@ -169,32 +169,26 @@ int match_last_bases(int * masks, int is_correct)
 	return ret; 
 }
 
-int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, unsigned int * best_pos2, int * best_vote1, int * best_vote2, char * is_abnormal, short * half_marks, int * is_reversed_halves, float accept_rate, int read_len, long long int hint_pos)
+int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, unsigned int * best_pos2, int * best_vote1, int * best_vote2, char * is_abnormal, char * half_marks, char is_reversed, float accept_rate, int read_len, long long int hint_pos)
 {
 	int best_splicing_point = -1, i,j;
-	char * best_chro_name, is_reversed;
+	char * best_chro_name;
 	unsigned int best_chro_pos;
 	int selected_max_votes = -1;
 
-
-	is_reversed = (vote -> max_mask & IS_NEGATIVE_STRAND)?1:0;
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< vote->items[i]; j++)
 		{
 			int n1, n2;
 			char * chro_name;
-			char is_partner_reversed;
 			int long_overlap = 0;
 			unsigned int chro_pos;
 
-			int overlapped_len, overlap_start, overlap_end;
 			// All logical conditions
-			is_partner_reversed = (vote->masks [i][j] & IS_NEGATIVE_STRAND) ? 1:0;
-			overlap_start = max(vote->max_coverage_start , vote->coverage_start[i][j]);
-			overlap_end   = min(vote->max_coverage_end   , vote->coverage_end[i][j]  );
-			overlapped_len =overlap_end - overlap_start;
-			
-
+			int overlap_start = max(vote->max_coverage_start , vote->coverage_start[i][j]);
+			int overlap_end   = min(vote->max_coverage_end   , vote->coverage_end[i][j]  );
+			int overlapped_len = overlap_end - overlap_start;
+		//	printf("\nTest Cov : %d ~ %d vs %d ~ %d = %d", vote->max_coverage_start, vote->max_coverage_end ,  vote->coverage_start[i][j],  vote->coverage_end[i][j] , overlapped_len);
 
 			if(overlapped_len >=14)
 				continue;
@@ -226,6 +220,7 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 			if (vote->max_vote < support_r1 || vote->votes[i][j]<support_r2)
 				continue;
 
+			#ifndef EXON_FUSION_DETECTION
 
 			// Same chromosome
 			if ((vote->coverage_start[i][j] < vote->max_coverage_start) + is_reversed == 1)
@@ -237,17 +232,14 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 				locate_gene_position(vote->max_position , &_global_offsets, &best_chro_name, &best_chro_pos);
 				locate_gene_position(vote->pos[i][j] +read_len, &_global_offsets, &chro_name, &chro_pos);
 			}
-
-			if (!(EXON_FUSION_DETECTION || chro_name == best_chro_name))	// The pointers can be compared because they can be the same.
+			if (chro_name != best_chro_name)	// The pointers can be compared because they can be the same.
 				continue;
 
-			int is_fusion = 0;
-			if(abs(dist) > 2000000 || chro_name != best_chro_name)
-				is_fusion = 1;
-
-			if (is_fusion && !EXON_FUSION_DETECTION) continue;
+			#endif
 
 			int test_vote_value = vote->votes[i][j];
+
+			#ifndef EXON_FUSION_DETECTION
 			if (hint_pos>=0)
 			{
 				long long int hint_dist = hint_pos;
@@ -255,6 +247,9 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 				if (abs (hint_dist) < 1000000)
 					test_vote_value += 100;
 			}
+			#endif
+
+
 			if (test_vote_value<=selected_max_votes)continue;
 			// Conditions of order of R3 and R5
 			*half_marks &= ~IS_REVERSED_HALVES;
@@ -264,51 +259,27 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 				*half_marks |= IS_REVERSED_HALVES;
 
 			if (vote->coverage_start[i][j] < vote->max_coverage_start)
-			{
 				*half_marks = (*half_marks) & ~IS_R1_CLOSE_TO_5;
-			}
 			else
-			{
 				*half_marks |= IS_R1_CLOSE_TO_5;
-			}
-
-			if(vote->max_mask & IS_NEGATIVE_STRAND)
-				*half_marks = (*half_marks) |   IS_NEGATIVE_STRAND_R1;
-			else
-				*half_marks = (*half_marks) &  ~IS_NEGATIVE_STRAND_R1;
-
-			if(vote->masks[i][j] & IS_NEGATIVE_STRAND)
-				*half_marks = (*half_marks) |   IS_NEGATIVE_STRAND_R2;
-			else
-				*half_marks = (*half_marks) &  ~IS_NEGATIVE_STRAND_R2;
-	
-
 			
 			best_splicing_point = ((vote->coverage_start[i][j] < vote->max_coverage_start)? (vote->coverage_end[i][j]):(vote->max_coverage_end)) + ((vote->coverage_start[i][j] < vote->max_coverage_start)? (vote->max_coverage_start):(vote->coverage_start[i][j]));
 			best_splicing_point /=2;
-
+			/*printf("B %u, %u\n", vote->max_coverage_start, vote->max_coverage_end);
+			printf("S %u, %u\n", vote->coverage_start[i][j], vote->coverage_end[i][j]);
+			printf("SP = %d\n\n", best_splicing_point);
+*/
 			* best_pos1 = vote->max_position ;
 			* best_pos2 = vote->pos[i][j] ;
 			* best_vote1 = vote->max_vote ;
 			* best_vote2 = vote->votes[i][j] ;
 
-			* is_reversed_halves = is_reversed;
-
+			*half_marks = (*half_marks) & ~(IS_PAIRED_HINTED);
 			if (test_vote_value >=100)
 				*half_marks = (*half_marks) | IS_PAIRED_HINTED;
-			else
-				*half_marks = (*half_marks) & ~(IS_PAIRED_HINTED);
-
 			*half_marks = (*half_marks) & ~(IS_LONG_OVERLAP|IS_SHORT_OVERLAP);
 			if (long_overlap)
 				*half_marks |= long_overlap;
-
-			if (is_fusion)
-				*half_marks = (*half_marks)    | IS_FUSION;
-			else
-				*half_marks = (*half_marks) & ~( IS_FUSION);
-	
-
 			selected_max_votes = test_vote_value; 
 
 		}
@@ -340,63 +311,55 @@ int paired_chars(char * ch1, char * ch2, int is_reverse)
 			    ((cc)[0]=='A' && (cc)[1]=='T') || \
 			    ((cc)[0]=='A' && (cc)[1]=='C') ) 
 
-int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type)
+int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand)
 {
 	int ret = 0;
 	int i;
-	char last_char='A';
 	if (is_negative_strand)
-	{
-
-		if (space_type == GENE_SPACE_COLOR)
-		{
-			pos++;
-			last_char = (pos+test_len>= index -> length + index -> start_point)?'A': gvindex_get(index,pos+test_len);
-		}
 		for (i=test_len -1;i>=0;i--)
 		{
 			char tt = gvindex_get (index, pos+test_len-1-i);
-			if(space_type == GENE_SPACE_COLOR)
+			switch(tt)
 			{
-				ret += read[i] == '0'+chars2color(tt, last_char); 
-				last_char = tt;
+				case 'A': ret += read[i] == 'T'; break;
+				case 'T': ret += read[i] == 'A'; break;
+				case 'G': ret += read[i] == 'C'; break;
+				case 'C': ret += read[i] == 'G'; break;
 			}
-			else
-				switch(tt)
-				{
-					case 'A': ret += read[i] == 'T'; break;
-					case 'T': ret += read[i] == 'A'; break;
-					case 'G': ret += read[i] == 'C'; break;
-					case 'C': ret += read[i] == 'G'; break;
-				}
 		}
-	}
 	else
-	{
-		if (space_type == GENE_SPACE_COLOR)
-			last_char = (pos <= index -> start_point)?'A': gvindex_get(index,pos-1);
 		for (i=0;i<test_len;i++)
-		{
-			char tt = gvindex_get (index, pos +i);
-			if(space_type == GENE_SPACE_COLOR)
-			{
-				ret += read[i] == '0'+chars2color(last_char, tt);
-				last_char = tt;
-			}
-			else
-				ret +=read[i] == tt; 
-		}
-	}
+			ret +=read[i] == gvindex_get (index, pos +i);
 	return ret;
 }
 
 
-void get_chro_2base(char *buf, gene_value_index_t * index, unsigned int pos, int is_negative_strand)
+
+void get_chro_str(char *buf, gene_value_index_t * index, unsigned int pos, int len, int is_negative_strand)
 {
-	gvindex_get_string (buf, index, pos, 2, is_negative_strand);
+	int i;
+	if (is_negative_strand)
+		for (i=len-1;i>=0;i--)
+		{
+			buf[i] = gvindex_get (index, pos + len - 1 - i);
+			switch(buf[i])
+			{
+				case 'A': buf[i] = 'T'; break;
+				case 'T': buf[i] = 'A'; break;
+				case 'G': buf[i] = 'C'; break;
+				case 'C': buf[i] = 'G'; break;
+			}
+		}
+	else
+		for (i=0;i<len;i++)
+			buf[i] = gvindex_get (index, pos +i);
 }
 
-int test_donar(char *read, int read_len, unsigned int pos1, unsigned int pos2, int guess_break_point, char negative_strand, int test_range, char is_soft_condition, int EXON_INDEL_TOLERANCE, int* real_break_point, gene_value_index_t * my_value_array_index, int indel_offset, int is_reversed, int space_type)
+void get_chro_2base(char *buf, gene_value_index_t * index, unsigned int pos, int is_negative_strand)
+{
+	get_chro_str (buf, index, pos, 2, is_negative_strand);
+}
+int test_donar(char *read, int read_len, unsigned int pos1, unsigned int pos2, int guess_break_point, char negative_strand, int test_range, char is_soft_condition, int EXON_INDEL_TOLERANCE, int* real_break_point, gene_value_index_t * my_value_array_index, int indel_offset, int is_reversed)
 {
 	int bps_pos_x;
 	int search_start = guess_break_point - test_range ;
@@ -430,26 +393,26 @@ int test_donar(char *read, int read_len, unsigned int pos1, unsigned int pos2, i
 					first_exon_end = pos2 + bps_pos_x + indel_offset;
 					second_half_start = pos1 + bps_pos_x;
 
-					m1 = match_chro(read + break_point_half - DONAR_CONFIRM_SIZE -3, my_value_array_index, first_exon_end, DONAR_CONFIRM_SIZE +3, is_reversed, space_type);
-					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start-DONAR_CONFIRM_SIZE -3, DONAR_CONFIRM_SIZE +3, is_reversed, space_type);
+					m1 = match_chro(read + break_point_half - DONAR_CONFIRM_SIZE -3, my_value_array_index, first_exon_end, DONAR_CONFIRM_SIZE +3, is_reversed);
+					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start-DONAR_CONFIRM_SIZE -3, DONAR_CONFIRM_SIZE +3, is_reversed);
 
-					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end - DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed, space_type);
-					x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start , DONAR_CONFIRM_SIZE , is_reversed, space_type);
+					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end - DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed);
+					x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start , DONAR_CONFIRM_SIZE , is_reversed);
 				}
 				else
 				{
 					first_exon_end = pos1 + bps_pos_x + indel_offset;
 					second_half_start = pos2 + bps_pos_x;
 
-					m1 = match_chro(read + break_point_half - DONAR_CONFIRM_SIZE -3, my_value_array_index, first_exon_end-DONAR_CONFIRM_SIZE -3, DONAR_CONFIRM_SIZE +3, is_reversed, space_type);
-					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start, DONAR_CONFIRM_SIZE +3 , is_reversed, space_type);
+					m1 = match_chro(read + break_point_half - DONAR_CONFIRM_SIZE -3, my_value_array_index, first_exon_end-DONAR_CONFIRM_SIZE -3, DONAR_CONFIRM_SIZE +3, is_reversed);
+					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start, DONAR_CONFIRM_SIZE +3 , is_reversed);
 
-					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end, DONAR_CONFIRM_SIZE , is_reversed,space_type);
-					x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start - DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed,space_type);
+					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end, DONAR_CONFIRM_SIZE , is_reversed);
+					x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start - DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed);
 					//x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end-DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed);
 					//x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start , DONAR_CONFIRM_SIZE , is_reversed);
 				}
-				//printf("M1=%d M2=%d X1=%d X2=%d\n", m1,m2,x1,x2);
+		//		printf("M1=%d M2=%d X1=%d X2=%d\n", m1,m2,x1,x2);
 				if (m1 >= DONAR_CONFIRM_SIZE - 1  && m2>=DONAR_CONFIRM_SIZE - 1)
 					if(x1<=DONAR_CONFIRM_SIZE - 5 && x2<=DONAR_CONFIRM_SIZE - 5)
 					{
@@ -503,11 +466,11 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
-		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
+		if(i >= processed_reads*2)break;
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Second Iteration", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("Second Iteration", i*1./processed_reads, 80, &ic);
 
 		unsigned int pos = halves_record -> best_pos1_list[i];
 
@@ -566,12 +529,10 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 			long long int dist = grouped_pos;
 			dist -= pos;
 
-			connect_to_t * connect_to = (connect_to_t *)HashTableGet(connection_table, NULL+grouped_pos );
+			unsigned int * connect_to = (unsigned int *)HashTableGet(connection_table, NULL+grouped_pos );
 			if (!connect_to)
 				printf( "WHY???\n");
-			if (EXON_FUSION_DETECTION)
-				if (!(connect_to->i_am_reversed) ^ !(negative_strand))
-					continue;
+
 
 			/*char * chro_name;
 			unsigned int chro_pos;
@@ -582,24 +543,20 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 			for (iii=0; iii<MAX_EXON_CONNECTIONS;iii++)
 			{
 				float is_match=0;
-				unsigned int connect_to_iii = connect_to -> connect_to[iii];
-				if (! connect_to_iii)break;
 
-				int opposite_negative_strand;
+				if (!connect_to[iii])break;
 
-				opposite_negative_strand = EXON_FUSION_DETECTION? connect_to -> is_opposite_reversed[iii]: negative_strand; 
+				if ((!negative_strand) && connect_to[iii] > grouped_pos)
+					is_match   =  match_chro(inb+dist, my_value_array_index, connect_to[iii], rl-dist, negative_strand)*1./(rl-dist);
 
-				if ((!negative_strand) && connect_to_iii > grouped_pos)
-					is_match   =  match_chro(inb+dist, my_value_array_index, connect_to_iii, rl-dist, opposite_negative_strand, ginp->space_type)*1./(rl-dist);
+				if ((!negative_strand) && connect_to[iii] < grouped_pos)
+					is_match   =  match_chro(inb, my_value_array_index, connect_to[iii] - dist, dist, negative_strand)*1./(dist);
 
-				if ((!negative_strand) && connect_to_iii < grouped_pos)
-					is_match   =  match_chro(inb, my_value_array_index, connect_to_iii - dist, dist, opposite_negative_strand, ginp->space_type)*1./(dist);
+				if (  negative_strand  && connect_to[iii] > grouped_pos)
+					is_match   =  match_chro(inb, my_value_array_index, connect_to[iii], rl-dist, negative_strand)*1./(rl-dist);
 
-				if (  negative_strand  && connect_to_iii > grouped_pos)
-					is_match   =  match_chro(inb, my_value_array_index, connect_to_iii, rl-dist, opposite_negative_strand, ginp->space_type)*1./(rl-dist);
-
-				if (  negative_strand  && connect_to_iii < grouped_pos)
-					is_match   =  match_chro(inb + rl-dist, my_value_array_index, connect_to_iii - dist, dist, opposite_negative_strand, ginp->space_type)*1./(dist);
+				if (  negative_strand  && connect_to[iii] < grouped_pos)
+					is_match   =  match_chro(inb + rl-dist, my_value_array_index, connect_to[iii] - dist, dist, negative_strand)*1./(dist);
 
 
 //				locate_gene_position(connect_to[iii] - dist, &_global_offsets, &chro_name, &chro_pos);
@@ -608,7 +565,7 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 				if (is_match >max_match)
 				{
 					max_match=is_match;
-					pos2 = connect_to_iii;
+					pos2 = connect_to[iii];
 				}
 			}
 			if (max_match>EXON_HALF_MATCH_PERCENTAGE - 0.0001)
@@ -634,38 +591,35 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 	}
 }
 
-void put_connection_table(HashTable *connection_table, unsigned int p1, unsigned int p2, int is_p1_reversed, int is_p2_reversed)
+void put_connection_table(HashTable *connection_table, unsigned int p1, unsigned int p2)
 {
-	connect_to_t * connect_to ;
+	unsigned int * connect_to ;
 	int i;
 
-	connect_to = (connect_to_t *)HashTableGet(connection_table, NULL + p1);
+	connect_to = (unsigned int *)HashTableGet(connection_table, NULL + p1);
 	if (!connect_to)
 	{
-		connect_to = (connect_to_t * ) malloc(sizeof(connect_to_t));
-		connect_to-> connect_to[0] = 0;
-		connect_to-> i_am_reversed = is_p1_reversed;
+		connect_to = (unsigned int * ) malloc(MAX_EXON_CONNECTIONS * sizeof(unsigned int));
+		connect_to[0]=0;
 		HashTablePut(connection_table, NULL + p1, connect_to);
 	}
 
 	for (i=0; i<MAX_EXON_CONNECTIONS;)
 	{
-		if (connect_to ->connect_to[i] == p2)
+		if (connect_to[i] == p2)
 		{
 			i = -1;
 			break;
 		}
-		if (!connect_to-> connect_to[i])break;
+		if (!connect_to[i])break;
 		i++;
 	}
 
 	if (i<0)return;	// exists
 	if (i == MAX_EXON_CONNECTIONS)return;	// too many connections
 
-	connect_to ->connect_to[i] = p2;
-	connect_to ->is_opposite_reversed[i] = is_p2_reversed;
-
-	if (i<MAX_EXON_CONNECTIONS-1) connect_to -> connect_to[1+i]=0;
+	connect_to[i] = p2;
+	if (i<MAX_EXON_CONNECTIONS-1) connect_to[1+i]=0;
 	
 }
 void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table,  halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads, gene_value_index_t * my_value_array_index, int first_index, int last_index)
@@ -675,10 +629,10 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
-		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
+		if(i >= processed_reads*2)break;
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("First Iteration", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("First Iteration", i*1./processed_reads, 80, &ic);
 
 		unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
 		unsigned int pos2 = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos2_list[i]:halves_record -> best_pos1_list[i];
@@ -733,49 +687,26 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 				for(indel_x = 0; indel_x < 2*EXON_INDEL_TOLERANCE +1 ; indel_x ++)
 				{
 					int indel_offset = ((indel_x %2)?1:-1) * ((indel_x+1)>>1);
-					is_accepted = test_donar(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index, indel_offset, negative_strand, ginp->space_type);
+					is_accepted = test_donar(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index, indel_offset, negative_strand);
 					if (is_accepted) break;
 				}
 			}
 			else
-				is_accepted = test_donar(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index,0, negative_strand, ginp->space_type);
-
-			//printf ("PRE-ACCEPT=%d\n", is_accepted);
-
-			if((! is_accepted) && EXON_FUSION_DETECTION && (halves_record -> half_marks_list[i] & IS_FUSION))
-			{
-				int p1_offset = (halves_record ->half_marks_list[i] & IS_R1_CLOSE_TO_5)? 20:0; 
-				int p2_offset = (halves_record ->half_marks_list[i] & IS_R1_CLOSE_TO_5)? 0:20;
-				int c1_offset = (!(halves_record ->half_marks_list[i] & IS_R1_CLOSE_TO_5) ^ !(halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R1))? 20:0; 
-				int c2_offset = (!(halves_record ->half_marks_list[i] & IS_R1_CLOSE_TO_5) ^ !(halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R2))? 0:20; 
-				int m1 = match_chro(inb+p1_offset, my_value_array_index, halves_record -> best_pos1_list[i]+c1_offset , rl -20, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?1:0, ginp->space_type);
-				int m2 = match_chro(inb+p2_offset, my_value_array_index, halves_record -> best_pos2_list[i]+c2_offset , rl -20, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?1:0, ginp->space_type);
-				//printf ("M1=%d   M2=%d    H=%f\n", m1, m2, rl * .85);
-				if ((m1 < (rl-20) *.85) && (m2 < (rl-20) *.85))
-				{
-					is_accepted=1;
-					real_break_point = guess_break_point;
-				}
-			}
-	
+				is_accepted = test_donar(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index,0, negative_strand);
 
 			if (is_accepted)
 			{
 				// real_break_point is on chromosome: pos+real_break_point / pos2 + real_break_point are end/start of exons
-				unsigned int pos_R1 = real_break_point+ halves_record -> best_pos1_list[i];
-				unsigned int pos_R2 = real_break_point+ halves_record -> best_pos2_list[i];
-
-				pos_R1 = get_grouped_position(pos_table, pos_R1);
-				pos_R2 = get_grouped_position(pos_table, pos_R2);
-
-				unsigned int pos_small = min(pos_R1, pos_R2);
-				unsigned int pos_big   = max(pos_R1, pos_R2);
+				unsigned int pos_small = min(pos, pos2) + real_break_point;
+				unsigned int pos_big   = max(pos, pos2) + real_break_point;
+				pos_small = get_grouped_position(pos_table, pos_small);
+				pos_big = get_grouped_position(pos_table, pos_big);
 
 				paired_exon_key search_key; 
 				search_key.small_key = pos_small;
 				search_key.big_key = pos_big;
-				put_connection_table(connection_table, pos_R1, pos_R2, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?1:0, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?1:0);
-				put_connection_table(connection_table, pos_R2, pos_R1, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?1:0, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?1:0);
+				put_connection_table(connection_table, pos_small, pos_big);
+				put_connection_table(connection_table, pos_big, pos_small);
 
 				int *search_res = (int*) HashTableGet(bed_table, &search_key);
 				if(!search_res)
@@ -790,10 +721,6 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 				
 				(*search_res)++;
 				
-			}
-			else
-			{
-				halves_record -> best_vote2_list [i]=0;
 			}
 		}
 		halves_record -> half_marks_list[i] |= IS_PROCESSED_READ;
@@ -810,11 +737,11 @@ void print_exon_res(halves_record_t * halves_record,  gene_input_t* ginp,gene_in
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
-		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
+		if(i >= processed_reads*2)break;
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Saving results", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("Saving results", i*1./processed_reads, 80, &ic);
 
 		if (ginp2 && (i % 2))
 			rl = geinput_next_read(ginp2, nameb, inb, qualityb);
@@ -847,27 +774,16 @@ void print_exon_res(halves_record_t * halves_record,  gene_input_t* ginp,gene_in
 			pos = halves_record -> is_reversed_list[i]? (pos + rl):(pos);
 			pos2 = halves_record -> is_reversed_list[i]? (pos2):(pos2+rl);
 
-			if (halves_record -> half_marks_list[i] & IS_FUSION)
-			{
-				long_overlap = "FS4";
-				if ( !(halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R1) ^ !(halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R2) )
-					negative_strand = "MX5";
-			}
-			
+			locate_gene_position(pos, &_global_offsets, &chro_name, &chro_pos_small) ;
+			locate_gene_position(pos2, &_global_offsets, &chro_name2, &chro_pos_large) ;
+			long_overlap = (chro_name==chro_name2)?long_overlap:"FS4";
 
 			int h1_len = (halves_record -> is_reversed_list[i]) ? (rl - halves_record ->splice_point_list[i]) : halves_record ->splice_point_list[i];
 
 			fprintf(out_fp,"%s\t%d\t%s\t%u\t%d\t%dM%dN%dM\t*\t0\t0\t%s\t%s\t%s,%s,%s,%s,%s,JN6,%s\t%u\t%u",  nameb, halves_record -> is_reversed_list[i]?16:0 , chro_name_min, chro_pos, min(halves_record ->best_vote1_list[i],halves_record ->best_vote2_list[i]) , h1_len , (int)abs(dist), rl - h1_len , inb, qualityb, diststr,reversed_halves,strong_votes,long_overlap,negative_strand, pair_info_refed, chro_pos_small, chro_pos_large);
 
-			if(halves_record -> half_marks_list[i] & IS_FUSION)
-			{
-				unsigned int pos_R1 = halves_record -> best_pos1_list[i];
-				unsigned int pos_R2 = halves_record -> best_pos2_list[i];
-				locate_gene_position(pos_R1, &_global_offsets, &chro_name, &chro_pos_small) ;
-				locate_gene_position(pos_R2, &_global_offsets, &chro_name2, &chro_pos_large) ;
-				
-				fprintf(out_fp,"\t%c%s,%d:%c%s,%d", (halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?'~':'@' ,chro_name, chro_pos_small, (halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?'~':'@' ,chro_name2,chro_pos_large);
-			}
+			if(chro_name!=chro_name2)
+				fprintf(out_fp,"\t%s,%d %s,%d",chro_name, chro_pos_small,chro_name2,chro_pos_large);
 
 			fprintf(out_fp,"\n");
 
@@ -949,8 +865,6 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 		all_reads /=2;
 
 //	printf ("I'm the %d-th thread\n", my_thread_no);
-	gene_vote_t vote_p1, vote_p2;
-
 
 
 	while (1)
@@ -968,18 +882,12 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 				reverse_read(InBuff2, read2_len, ginp->space_type);
 				reverse_quality(QualityBuff2, read2_len);
 			}
-
-			if(!EXON_FUSION_DETECTION)
-			{
-				init_gene_vote(&vote_p1);
-				if(ginp2)
-					init_gene_vote(&vote_p2);
-			}
 		}
 		else
 		{
 			if(input_lock!=NULL)
 				pthread_spin_lock(input_lock);
+			
 
 			if(*processed_reads < all_reads)
 			{
@@ -1041,10 +949,7 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 
 			if (read_len<0)
 				break;
-
-			init_gene_vote(&vote_p1);
-			if(ginp2)
-				init_gene_vote(&vote_p2);
+//			subread_step = max(3.00001, (read_len-16-GENE_SLIDING_STEP)*1.0/(TOTAL_SUBREADS-1)+0.00001); 
 		}
 		if (ginp2)
 		{
@@ -1052,7 +957,11 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 			int i;
 			int subread_no;
 			int is_second_read;
+			gene_vote_t vote_p1, vote_p2;
 			long long int hint_pos;
+			init_gene_vote(&vote_p1);
+			init_gene_vote(&vote_p2);
+
 			for (is_second_read = 0; is_second_read <2; is_second_read ++)
 			{
 				gene_vote_t * current_vote = is_second_read?&vote_p2: &vote_p1;
@@ -1085,49 +994,45 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 			gene_quality_score_t sum_quality, qual_r1, qual_r2;
 			char record_index1[48], record_index2[48];
 
-
-			if((!EXON_FUSION_DETECTION) || is_reversed)
+			int is_paired_match = select_positions(&vote_p1, &vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE);
+			for (is_second_read = 0; is_second_read <2; is_second_read ++)
 			{
-				int is_paired_match = select_positions(&vote_p1, &vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE);
-				for (is_second_read = 0; is_second_read <2; is_second_read ++)
-				{
-					gene_vote_t * current_vote = is_second_read?&vote_p2: &vote_p1;
-					unsigned int best_pos1=0;
-					unsigned int best_pos2=0;
-					hint_pos = is_second_read?pos_read2:pos_read1;
-					if (!is_paired_match ) hint_pos = -1;
-					int best_vote1=0;
-					int best_vote2=0;
-					char is_abnormal=0;
-					short half_marks=0;
-					int is_reversed_halves;
+				gene_vote_t * current_vote = is_second_read?&vote_p2: &vote_p1;
+				unsigned int best_pos1=0;
+				unsigned int best_pos2=0;
+				hint_pos = is_second_read?pos_read2:pos_read1;
+				if (!is_paired_match ) hint_pos = -1;
+				int best_vote1=0;
+				int best_vote2=0;
+				char is_abnormal=0;
+				char half_marks=0;
 		
-					int splice_point = select_best_matching_halves(current_vote, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, &is_reversed_halves, accepted_support_rate, read_len, hint_pos);
-					if (splice_point>0)
-						add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed_halves, splice_point, half_marks, 2*queries+is_second_read);
-					else 
+				int splice_point = select_best_matching_halves(current_vote, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, is_reversed, accepted_support_rate, read_len, hint_pos);
+				if (splice_point>0)
+					add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed, splice_point, half_marks, 2*queries+is_second_read);
+				else 
+				{
+					if (current_vote->max_vote > (halves_record -> best_vote1_list[queries*2+is_second_read] + halves_record -> best_vote2_list[queries*2+is_second_read]))
 					{
-						is_reversed_halves = (current_vote -> max_mask & IS_NEGATIVE_STRAND)?1:0;
-						if (current_vote->max_vote > (halves_record -> best_vote1_list[queries*2+is_second_read] + halves_record -> best_vote2_list[queries*2+is_second_read]))
-						{
-							halves_record -> best_vote1_list[queries*2+is_second_read] = current_vote->max_vote ;
-							halves_record -> best_vote2_list[queries*2+is_second_read] = 0 ;
-							halves_record -> best_pos1_list[queries*2+is_second_read] = current_vote->max_position;
-							halves_record -> is_reversed_list[queries*2+is_second_read] = is_reversed_halves;
-							halves_record -> half_marks_list[queries*2+is_second_read] = (halves_record -> half_marks_list[queries*2+is_second_read]) & ~(IS_PAIRED_HINTED);
-							if (is_paired_match)
-								halves_record -> half_marks_list[queries*2+is_second_read] = (halves_record -> half_marks_list[queries*2+is_second_read]) | IS_PAIRED_HINTED;
+						halves_record -> best_vote1_list[queries*2+is_second_read] = current_vote->max_vote ;
+						halves_record -> best_pos1_list[queries*2+is_second_read] = current_vote->max_position;
+						halves_record -> is_reversed_list[queries*2+is_second_read] = is_reversed;
+						halves_record -> half_marks_list[queries*2+is_second_read] = (halves_record -> half_marks_list[queries*2+is_second_read]) & ~(IS_PAIRED_HINTED);
+						if (is_paired_match)
+							halves_record -> half_marks_list[queries*2+is_second_read] = (halves_record -> half_marks_list[queries*2+is_second_read]) | IS_PAIRED_HINTED;
 	
-						}
 					}
 				}
 			}
+		
 		}
 		else
 		{
 
 			int i;
 			int subread_no;
+			gene_vote_t vote;
+			init_gene_vote(&vote);
 		
 			for(subread_no=0; ; subread_no++)
 			{
@@ -1144,40 +1049,34 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 
 					gehash_key_t subread_integer = genekey2int(subread_string, ginp->space_type);
 
-					gehash_go_q(my_table, subread_integer , subread_offset, read_len, is_reversed, &vote_p1, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no);
+					gehash_go_q(my_table, subread_integer , subread_offset, read_len, is_reversed, &vote, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no);
 				}
 				if(subread_offset1 >= read_len -16)
 					break;
 			}
 
-			if((!EXON_FUSION_DETECTION) || is_reversed)
-			{
-				unsigned int best_pos1=0;
-				unsigned int best_pos2=0;
-				int best_vote1=0;
-				int best_vote2=0;
-				char is_abnormal=0;
-				short half_marks=0;
-				int is_reversed_halves;
+			unsigned int best_pos1=0;
+			unsigned int best_pos2=0;
+			int best_vote1=0;
+			int best_vote2=0;
+			char is_abnormal=0;
+			char half_marks=0;
 	
-				int splice_point = select_best_matching_halves(&vote_p1, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, &is_reversed_halves, accepted_support_rate, read_len, -1);
-				if (splice_point>0)
+			int splice_point = select_best_matching_halves(&vote, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, is_reversed, accepted_support_rate, read_len, -1);
+			if (splice_point>0)
+			{
+				add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed, splice_point, half_marks, queries);
+			}
+			else 
+			{
+				if (vote.max_vote > (halves_record -> best_vote1_list[queries] + halves_record -> best_vote2_list[queries]))
 				{
-					add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed_halves, splice_point, half_marks, queries);
-				}
-				else 
-				{
-					is_reversed_halves = (vote_p1.max_mask & IS_NEGATIVE_STRAND)?1:0;
-					if (vote_p1.max_vote > (halves_record -> best_vote1_list[queries] + halves_record -> best_vote2_list[queries]))
-					{
-						halves_record -> best_vote1_list[queries] = vote_p1.max_vote ;
-						halves_record -> best_vote2_list[queries] = 0 ;
-						halves_record -> best_pos1_list[queries] = vote_p1.max_position;
-						halves_record -> is_reversed_list[queries] = is_reversed_halves;
-						halves_record -> half_marks_list[queries] = vote_p1.max_mask;
-					}
+					halves_record -> best_vote1_list[queries] = vote.max_vote ;
+					halves_record -> best_pos1_list[queries] = vote.max_position;
+					halves_record -> is_reversed_list[queries] = is_reversed;
 				}
 			}
+		
 		}
 		if (my_thread_no==0 && queries % 10000 == 0 && !is_reversed)
 		{
@@ -1344,6 +1243,11 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 	}
 
+	print_exon_res(halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads);
+	fseeko(ginp -> input_fp, current_fp, SEEK_SET);
+	if (ginp2)
+		fseeko(ginp2 -> input_fp, current_fp2, SEEK_SET);
+
 	if (tabno == 1)
 	{
 		feed_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, 1,1);
@@ -1382,20 +1286,10 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 	}
 	if (tabno>0)gvindex_destory(&value_array_index);
 
-	fseeko(ginp -> input_fp, current_fp, SEEK_SET);
-	if (ginp2)
-		fseeko(ginp2 -> input_fp, current_fp2, SEEK_SET);
-
-
-
-	if (out_fp)
-		print_exon_res(halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads);
 
 	fseeko(ginp -> input_fp, last_fp_pos, SEEK_SET);
 	if (ginp2)
 		fseeko(ginp2 -> input_fp, last_fp2_pos, SEEK_SET);
-
-
 
 	return processed_reads;
 	
@@ -1410,8 +1304,6 @@ void exon_usage(char * execname)
 	puts("    -i --index     <index>\t name of the index, same as that of the index builder.");
 	puts("    -r --read      <input>\t name of an input file(FASTQ/FASTA format), either in the base-space or in the color-space.");
 	puts("    -o --output    <output>\t name of the output file(SAM format)");
-	puts("    -x --fusion           \t allow fusion detection, disabled by default");
-	puts("    -A --nosam           \t do not report results for individual reads, report them by default");
 	puts("");
 	puts("Optional arguments:");
 //	puts("    -n --subreads  <int>\t optional, number of subreads selected from each read for mapping, 10 by default");
@@ -1441,12 +1333,10 @@ void exon_usage(char * execname)
 static struct option long_options[] =
 {
 	{"basewise", no_argument, &EXON_USE_VALUE_ARRAY_INDEX, 1},
-	{"fusion", no_argument, &EXON_FUSION_DETECTION, 1},
 	{"index", required_argument, 0, 'i'},
 	{"read",  required_argument, 0, 'r'},
 	{"read2", required_argument, 0, 'R'},
 	{"indel", required_argument, 0, 'I'},
-	{"nosam", required_argument, 0, 'A'},
 	{"mindist", required_argument, 0, 'd'},
 	{"maxdist", required_argument, 0, 'D'},
 	{"minhalf", required_argument, 0, 'H'},
@@ -1521,7 +1411,7 @@ void print_bed_table(HashTable * bed_table, char * out_fn, unsigned long long in
 	fclose(ofp);
 }
 
-int main_junction(int argc,char ** argv)
+int main(int argc,char ** argv)
 {
 	char read_file [300], read2_file [300];
 	char output_file [300];
@@ -1555,18 +1445,11 @@ int main_junction(int argc,char ** argv)
 
 
 
-	while ((c = getopt_long (argc, argv, "xbSL:AH:d:D:n:m:p:f:R:r:i:l:o:T:Q:I:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "bSL:H:d:D:n:m:p:f:R:r:i:l:o:T:Q:I:?", long_options, &option_index)) != -1)
 		switch(c)
 		{
-			case 'A':
-				REPORT_SAM_FILE = 0;
-				break;
-			case 'x':
-				EXON_FUSION_DETECTION=1;
-				break;
 			case 'H':
 				EXON_MIN_HALF_VOTES = atoi(optarg);
-				break;
 			case 'S':
 				EXON_FIRST_READ_REVERSE = optarg[0]=='r'?1:0;
 				EXON_SECOND_READ_REVERSE = optarg[1]=='f'?0:1;
@@ -1666,10 +1549,8 @@ int main_junction(int argc,char ** argv)
 		return -1;
 	}
 
-	FILE * out_fp = NULL;
-	if(REPORT_SAM_FILE)
-		out_fp= fopen(output_file, "w");
-	if (REPORT_SAM_FILE && !out_fp)
+	FILE * out_fp = fopen(output_file, "w");
+	if (!out_fp)
 	{
 		printf("Unable to open the output file at '%s'.\n", output_file);
 		return -1;
@@ -1767,8 +1648,6 @@ int main_junction(int argc,char ** argv)
 	else
 		printf("\n\n %llu reads were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, miltime()-begin_ftime, junction_number, support_number );
 
-	if(out_fp)
-		fclose(out_fp);
 	printf("\n\nCompleted successfully.\n");
 
 	return 0;

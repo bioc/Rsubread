@@ -336,14 +336,14 @@ void init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 	allvote -> max_positions = (unsigned int *) malloc(sizeof(int)*expected_len);
 	allvote -> max_votes = (gene_vote_number_t *) calloc(sizeof(gene_vote_number_t), expected_len);
 	allvote -> max_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
-	allvote -> masks = (short *) calloc(2, expected_len);
+	allvote -> masks = (short *) calloc(sizeof(short), expected_len);
 #ifdef REPORT_ALL_THE_BEST
 	allvote -> best_records = (gene_best_record_t *) malloc(sizeof(gene_best_record_t)* expected_len);
 #endif
 	allvote -> is_counterpart = (unsigned char *) malloc(expected_len);
 
 	allvote -> max_indel_tolerance = allowed_indels;
-	allvote	-> indel_recorder_length = max(3*allowed_indels+1 , MAX_CIGAR_LEN+2);
+	allvote	-> indel_recorder_length = max(3*(allowed_indels+1)+1, MAX_CIGAR_LEN+2);
 
 	if(allowed_indels)
 		allvote -> max_indel_recorder = (char *)malloc( allvote -> indel_recorder_length *expected_len);
@@ -390,7 +390,7 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 			}
 
 
-			if(max_indel_recorder[3] && array_index && 0)
+			if(0 && max_indel_recorder[3] && array_index && 0)
 			{
 				
 				char indel_operations[1500];
