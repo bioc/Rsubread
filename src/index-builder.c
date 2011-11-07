@@ -257,7 +257,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				{
 					fseek(ginp.input_fp, -2, SEEK_CUR);
 					char bnch = fgetc(ginp.input_fp);
-					if (bnch >='A' && bnch <= 'Z')seek_back_reads--;
+					if ((bnch >='A' && bnch <= 'Z' ) || (bnch >='a' && bnch <= 'z' ) || bnch=='.')seek_back_reads--;
 				}
 
 				for (i=0; i<16; i++)
