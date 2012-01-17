@@ -10,11 +10,17 @@
 #define GENE_INPUT_FASTQ 1
 #define GENE_INPUT_FASTA 2
 
+#define GENE_INPUT_SAM_SINGLE   93
+#define GENE_INPUT_SAM_PAIR_1   94
+#define GENE_INPUT_SAM_PAIR_2   95
+
 #include <stdlib.h>
 #include <stdio.h>
 
 
 
+
+void fastq_64_to_33(char * qs);
 
 int chars2color(char c1, char c2);
 
@@ -26,6 +32,14 @@ int genekey2int(char key [], int space_type);
 // Open a read file. This function automatically decides its type.
 // Return 0 if successfully opened, or 1 if error occurred
 int geinput_open(const char * filename, gene_input_t * input);
+
+// Open a sam file. Parameter half_no indicates which read of the pair is concerned.
+// half_no = 1: the first read; half_no = 2: the last read; half_no = 0: single-end
+// Return 0 if successfully opened, or 1 if error occurred
+int geinput_open_sam(const char * filename, gene_input_t * input, int half_no);
+
+// Read a line from the input and reward the pointer to the last position.
+int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 
 // Get the next read from the input file
 // Return the length of this read or -1 if EOF. 
@@ -43,13 +57,15 @@ int geinput_next_char(gene_input_t * input);
 // it returns the length of reading
 int geinput_readline(gene_input_t * input, char * linebuffer, int conv_to_upper) ;
 
+
+
 // read a line into the buff,
 // the line should not be longer than 300 chars or the remaining part will be discarded.
 // therefore the buff has to be at least 300 chars.
-int read_line(FILE * fp, char * buff, int conv_to_upper);
+int read_line(int max_len, FILE * fp, char * buff, int conv_to_upper);
 
 // count the number of reads in a flie
-double guess_reads_density(char * fname) ;
+double guess_reads_density(char * fname, int is_sam) ;
 
 // guess the size of the chromosome lib
 // return the number of bases, or (-index-1) if the file at the index is not found.

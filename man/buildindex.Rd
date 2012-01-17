@@ -3,12 +3,11 @@
 \title{Build index for a reference genome for read mapping}
 \description{This is an R wrapper function for building index for a reference genome. This function calls the underlying C function.}
 \usage{
-buildindex(basename,reference,seqinfo=FALSE,colorspace=FALSE,memory=3700)
+buildindex(basename,reference,colorspace=FALSE,memory=3700)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of the file containing all the refernece sequences.}
-  \item{seqinfo}{ logical. If \code{TRUE}, the reference sequences will be included in the built index. \code{FALSE} by default.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
   \item{memory}{ numeric value specifying the amount of memory to be requested in gigabytes}
   }

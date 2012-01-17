@@ -8,26 +8,45 @@
 #include <stdio.h>
 #include "input-files.h"
 
-double guess_reads_density(char * fname)
+
+void fastq_64_to_33(char * qs)
+{
+	int i=0;
+	while(qs[i])
+		qs[i++] -= 31;
+}
+
+double guess_reads_density(char * fname, int is_sam)
 {
 	gene_input_t ginp;
-	long long int fpos =0;
+	long long int fpos =0, fpos2 = 0;
 	int i;
 	char buff[1200] ;
 
-	if(geinput_open(fname, &ginp))return -1.0;
+	if(is_sam == 0)
+	{
+		if(geinput_open(fname, &ginp))return -1.0;
+	}else if(is_sam == 1)
+	{
+		if(geinput_open_sam(fname, &ginp,0))return -1.0;
+	}else if(is_sam == 2)
+	{
+		if(geinput_open_sam(fname, &ginp,1))return -1.0;
+	}
+
 	geinput_next_read(&ginp, NULL, buff, NULL);
 
 	fpos = ftello(ginp.input_fp);
 
 	for(i=0; i<1000; i++)
 	{
-		if(geinput_next_read(&ginp, NULL, buff, NULL)) break;
+		if(geinput_next_read(&ginp, NULL, buff, NULL)<0) break;
 	}
-	fpos = ftello(ginp.input_fp) - fpos;
+	fpos2 = ftello(ginp.input_fp) - fpos;
 	geinput_close(&ginp);
 
-	return fpos*1.0/i;
+	//printf("T0=%llu T1=%llu DENS=%.5f\n", fpos, fpos2+ fpos, fpos2*1.0/i);
+	return fpos2*1.0/i;
 }
 
 int is_gene_char(char c)
@@ -62,7 +81,7 @@ long long int guess_gene_bases(char ** files, int file_number)
 	return ret * 70 / 71;
 }
 
-int read_line(FILE * fp, char * buff, int must_upper)
+int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 {
 	int ret =0;
 	int started = 0;
@@ -81,7 +100,7 @@ int read_line(FILE * fp, char * buff, int must_upper)
 		}
 
 		started = 1;
-		if(ret <1199 && ch != '\r')
+		if(ret <max_read_len && ch != '\r')
 			if ((ch!=' ' && ch != '\t') || !must_upper)
 				buff[ret++] = must_upper?toupper(ch):ch;
 	}
@@ -91,7 +110,7 @@ int read_line(FILE * fp, char * buff, int must_upper)
 
 int geinput_readline(gene_input_t * input, char * buff, int conv_to_upper)
 {
-	return read_line(input -> input_fp, buff, conv_to_upper);
+	return read_line(1200, input -> input_fp, buff, conv_to_upper);
 }
 
 int is_read(char * in_buff)
@@ -110,6 +129,45 @@ int is_read(char * in_buff)
 	return space_type;
 }
 
+int geinput_open_sam(const char * filename, gene_input_t * input, int half_number)
+{
+	input->input_fp = fopen(filename, "r");
+
+	strcpy(input->filename, filename);
+
+	if(input->input_fp == NULL)	
+		return 1;
+	input -> file_type = half_number + GENE_INPUT_SAM_SINGLE;
+	while(1){
+		char in_buff[3001];
+		long long int current_pos = ftello(input -> input_fp);
+		int rlen = read_line(3000, input->input_fp, in_buff, 0);
+		if(rlen < 1) return 1;
+
+		if(in_buff[0] != '@')
+		{
+			int x, tab_no = 0;
+			char *read_buf=NULL;
+			for(x=0; x<rlen; x++)
+			{
+				if(in_buff[x]=='\t')
+				{
+					tab_no ++;
+					if(tab_no ==9) read_buf = in_buff+x+1;
+					if(tab_no ==10) in_buff[x]=0;
+					continue;
+				}
+			}
+			if (tab_no<10)return 1;
+			input->space_type = is_read(read_buf);
+			if (GENE_INPUT_SAM_PAIR_2 != input -> file_type) fseeko(input -> input_fp , current_pos, SEEK_SET);
+			break;
+		}
+	}	
+
+	return 0;	
+}
+
 int geinput_open(const char * filename, gene_input_t * input)
 {
 	char in_buff[1201];
@@ -124,7 +182,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 		return 1;
 
 	while (1){
-		int rlen = read_line(input->input_fp, in_buff, 0);
+		int rlen = read_line(1200, input->input_fp, in_buff, 0);
 		if (rlen<=0)
 			return 1;
 
@@ -138,7 +196,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 		if(in_buff[0]=='>')
 		{
 			input->file_type = GENE_INPUT_FASTA;
-			rlen += read_line(input->input_fp, in_buff, 0);
+			rlen += read_line(1200, input->input_fp, in_buff, 0);
 			input->space_type = is_read(in_buff);
 
 			fseek(input->input_fp,-rlen-2,SEEK_CUR);
@@ -148,7 +206,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 		{
 			input->file_type = GENE_INPUT_FASTQ;
 
-			rlen += read_line(input->input_fp, in_buff, 0);
+			rlen += read_line(1200, input->input_fp, in_buff, 0);
 			input->space_type = is_read(in_buff);
 
 			fseek(input->input_fp,-rlen-2,SEEK_CUR);
@@ -206,14 +264,86 @@ int geinput_next_char(gene_input_t * input)
 
 }
 
+
+int geinput_readline_back(gene_input_t * input, char * linebuffer_3000) 
+{
+	long long int last_pos = ftello(input -> input_fp);
+	int ret = read_line(3000, input->input_fp, linebuffer_3000, 0);
+	if(ret<1) return -1;
+	fseeko(input -> input_fp, last_pos, SEEK_SET);
+	return ret;
+}
+
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string)
 {
 	if(input->file_type == GENE_INPUT_PLAIN)
 	{
-		int ret = read_line(input->input_fp, read_string, 1);
+		int ret = read_line(1200, input->input_fp, read_string, 0);
 		if(quality_string) *quality_string=0;
 
 		if(ret <3)return -1;
+		return ret;
+	}
+	else if(input->file_type >= GENE_INPUT_SAM_SINGLE)
+	{
+		char in_buff [3001];
+		int tabs = 0;
+		int current_str_pos = 0;
+		int i;
+		int ret = -1;
+		int linelen = read_line(3000, input->input_fp, in_buff, 0);
+		int need_reverse = 0;
+		char mask_buf[5];
+		if(linelen <1)return -1;
+		if(read_name)
+			*read_name = 0;
+		if(quality_string)
+			*quality_string = 0;
+		*read_string = 0;
+
+		for(i=0; i<linelen+1; i++)
+		{
+			if(in_buff[i]=='\t'|| i ==linelen)
+			{
+				if(tabs == 0 && read_name)read_name[current_str_pos] = 0;
+				if(tabs == 1)
+				{
+					mask_buf[current_str_pos] = 0;
+					need_reverse = (atoi(mask_buf) & 16 )?1:0;
+				}
+				if(tabs == 9){
+					read_string[current_str_pos] = 0;
+					ret = current_str_pos;
+				}
+				if(tabs == 10 && quality_string){
+					quality_string[current_str_pos] = 0;
+					break;
+				}
+
+				current_str_pos = 0 ;
+				tabs +=1;
+			}
+			else
+			{
+				if(tabs == 9)// read
+					read_string[current_str_pos++] = in_buff[i];
+				else if(tabs == 10 && quality_string)// quality string
+					quality_string[current_str_pos++] = in_buff[i];
+				else if(tabs == 0 && read_name)// name
+					read_name[current_str_pos++] = in_buff[i];
+				else if(tabs == 1)
+					mask_buf[current_str_pos++] = in_buff[i];
+			}
+		}
+		if(need_reverse)
+		{
+			if(quality_string)
+				reverse_quality(quality_string, ret);
+			reverse_read(read_string, ret, input->space_type);
+		}
+		if(input->file_type != GENE_INPUT_SAM_SINGLE)
+			// skip a line if not single-end
+			read_line(1, input->input_fp, in_buff, 0);
 		return ret;
 	}
 	else if(input->file_type == GENE_INPUT_FASTA)
@@ -221,7 +351,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		int ret;
 		while(1)
 		{
-			ret = read_line(input->input_fp, read_string, 0);
+			ret = read_line(1200, input->input_fp, read_string, 0);
 			if(ret <1)return -1;
 			if(read_string[0]=='>'){
 				if (read_name != NULL)
@@ -233,7 +363,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		while(1)
 		{
 			char nch;
-			ret += read_line(input->input_fp, read_string+ret, 1);
+			ret += read_line(1200, input->input_fp, read_string+ret, 1);
 
 			while(1){
 				nch = fgetc(input->input_fp);
@@ -257,7 +387,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		int ret;
 		while(1)
 		{
-			ret = read_line(input->input_fp, read_string, 0);
+			ret = read_line(1200, input->input_fp, read_string, 0);
 			if(ret <1)return -1;
 			if(read_string[0]=='@'){
 				if (read_name != NULL)
@@ -269,7 +399,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		while(1)
 		{
 			char nch;
-			ret += read_line(input->input_fp, read_string+ret, 1);
+			ret += read_line(1200, input->input_fp, read_string+ret, 1);
 
 
 			// test if the next line is the continued line of this read
@@ -288,11 +418,11 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 			char fake_q_string [1200];
 			if (!quality_string) quality_string = fake_q_string;
 			// skip the line starting with '+'
-			read_line(input->input_fp, quality_string+qret, 0);
+			read_line(1200, input->input_fp, quality_string+qret, 0);
 
 			while(1)
 			{
-				qret += read_line(input->input_fp, quality_string+qret, 0);
+				qret += read_line(1200, input->input_fp, quality_string+qret, 0);
 
 				// test if the next line is the continued line of this read
 				nch = fgetc(input->input_fp);
@@ -362,6 +492,7 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 void reverse_quality(char * InBuff, int read_len)
 {
 	int i;
+	if(!InBuff[0]) return;
 	for (i=0; i<read_len/2; i++)
 	{
 		char tmp;

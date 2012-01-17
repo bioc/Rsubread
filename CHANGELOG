@@ -1,3 +1,9 @@
+Junuary 17, 2011 - 1.5.3
+(1) Align function can now report uniquely mapped reads only.
+(2) Buildindex function now includes the reference sequences in the built index by default.
+(3) Subjunc now supports up to 16bp INDELs.
+(4) Subjunc supports extra splicing donor/receptor sites (GC-AG and GT-AT), in addition to the canonical one(GT-AG).
+
 November 7, 2011 - 1.5.2
 (1) Bug fix to chr3 length issue.
 

@@ -16,7 +16,7 @@
 #define MAX_KEY_MATCH GENE_VOTE_SPACE 
 
 int IS_COLOR_SPACE = 0;
-int VALUE_ARRAY_INDEX = 0;
+int VALUE_ARRAY_INDEX = 1;
 int QUICK_BUILD = 0;
 
 #define NEXT_READ 1
@@ -394,7 +394,7 @@ int main_buildindex(int argc,char ** argv)
 	output_file[0] = 0;
 
 	printf("\n");
-	while ((c = getopt (argc, argv, "bcqM:o:f:D?")) != -1)
+	while ((c = getopt (argc, argv, "cqM:o:f:D?")) != -1)
 		switch(c)
 		{
 			case 'q':
@@ -402,9 +402,6 @@ int main_buildindex(int argc,char ** argv)
 				break;
 			case 'c':
 				IS_COLOR_SPACE = 1;
-				break;
-			case 'b':
-				VALUE_ARRAY_INDEX = 1;
 				break;
 			case 'M':
 				memory_limit = atoi(optarg);
@@ -423,7 +420,7 @@ int main_buildindex(int argc,char ** argv)
 	{
 
                 //printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
-                printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -b      \t\t add the actual reference sequences into the index (the default index only includes chromosal coordinates of 16 mers)\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
+                printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
 
 		return -1 ;
 	}

@@ -13,6 +13,7 @@
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
 #define SAM_FLAG_UNMAPPED 0x04
 
+#define MAX_PIECE_JUNCTION_READ 7
 
 #define IS_LONG_OVERLAP 4
 #define IS_SHORT_OVERLAP 8
@@ -26,7 +27,12 @@
 #define IS_NEGATIVE_STRAND_R2 512 
 #define IS_FUSION 1024 
 #define IS_NEGATIVE_STRAND 2048
+#define IS_RECOVERED_JUNCTION_READ 4096
+#define IS_FINALISED_PROCESSING 8192
+#define IS_RECOVERED_JUNCTION_READ_STEP4 (8192*2)
+#define	IS_BREAKEVEN_READ (8192*4)
 
+//#define TEST_TARGET "GTGGTGGCTTCAATAAA"
 
 
 typedef unsigned int gehash_key_t;
@@ -125,6 +131,7 @@ typedef struct{
 	unsigned char * is_counterpart;
 	gene_vote_number_t * max_votes;
 	gene_quality_score_t * max_quality;
+	gene_quality_score_t * max_final_quality;
 	short * masks;
 	char * max_indel_recorder;
 #ifdef REPORT_ALL_THE_BEST
