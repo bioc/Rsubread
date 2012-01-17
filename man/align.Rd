@@ -3,7 +3,7 @@
 \title{Align next-gen sequencing reads to reference genome}
 \description{This is a R wrapper function for aligning reads. This function calls the underlying C function}
 \usage{
-align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=64,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,min_distance=50,max_distance=600,PE_orientation="fr")
+align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,min_distance=50,max_distance=600,PE_orientation="fr")
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -15,7 +15,7 @@ align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthrea
   \item{TH2}{ numeric value giving the consensus threhold for the second read in a pair. 1 by default.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. 1 by default.} 
   \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}
-  \item{phredOffset}{ numeric value added to the phred score of each base in each read. \code{64} by default.}
+  \item{phredOffset}{ numeric value added to the phred score of each base in each read. \code{33} by default.}
   \item{tieBreakQS}{logical. If \code{TRUE}, use quality scores to break ties when more than one best locations were found. \code{FALSE} by default. }
   \item{tieBreakHamming}{ logical. If \code{TRUE}, use Hamming distance to break ties when more than one best locations were found (to use this option, the index must be built with reference sequence included).}
   \item{unique}{ logical. If \code{TRUE}, only uniquely mapped reads will be reported (reads mapped to multiple locations in the reference genome will not be reported). This option can be used together with option \code{tieBreakQS} or \code{tieBreakHamming}.}
