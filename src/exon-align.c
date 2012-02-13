@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include <assert.h>
 #include <getopt.h>
 #include <ctype.h>
@@ -15,8 +16,9 @@
 #include "sorted-hashtable.h"
 
 gene_offset_t _global_offsets;
-float accepted_support_rate = 0.300000;
+float accepted_support_rate = 0.3;
 int EXON_ALL_THREADS=1;
+int EXON_EXTENDING_SCAN=0;
 int REPORT_SAM_FILE = 1;
 int TOTAL_SUBREADS;
 int ACCEPT_SUBREADS;
@@ -30,18 +32,40 @@ int EXON_USE_VALUE_ARRAY_INDEX = 1;
 int EXON_FIRST_READ_REVERSE = 0;
 int EXON_SECOND_READ_REVERSE = 1;
 int EXON_NUMBER_OF_ANCHORS_PAIRED = 50;
+int EXON_DIRECT_READS = 0;
+int EXON_NO_TOLERABLE_SCAN = 0;
+int EXON_MAX_CIGAR_LEN = 48;
+
+int EXON_FASTQ_FORMAT = FASTQ_PHRED33;
 
 int EXON_MIN_HALF_VOTES = 1;
+int IS_SAM_INPUT = 0;
 int EXON_MIN_HALF_LENGTH = 4;
 float EXON_HALF_MATCH_PERCENTAGE =.7f;
 double reads_density;
 
 int EXON_FUSION_DETECTION = 0;
 
-#define DONAR_CONFIRM_SIZE 13
-#define EXON_GROUPING_SIZE 12
+#define EXON_DONOR_TEST_WINDOW 17
+#define EXON_GROUPING_SIZE 1
+#define MAX_EXON_CONNECTIONS 10
+//#define DEBUG
 
-#define MAX_EXON_CONNECTIONS 8
+#define is_donar_chars_full(cc) (((cc)[0]=='G' && (cc)[1]=='T') || \
+			    ((cc)[0]=='A' && (cc)[1]=='G') || \
+			    ((cc)[0]=='A' && (cc)[1]=='C') || \
+			    ((cc)[0]=='C' && (cc)[1]=='T') || \
+			    ((cc)[0]=='G' && (cc)[1]=='C') || \
+			    ((cc)[0]=='A' && (cc)[1]=='T') || \
+			    ((cc)[0]=='A' && (cc)[1]=='C') ) 
+
+
+#define is_donar_chars_part(cc) (((cc)[0]=='G' && (cc)[1]=='T') || \
+			    ((cc)[0]=='A' && (cc)[1]=='G') || \
+			    ((cc)[0]=='A' && (cc)[1]=='C') || \
+			    ((cc)[0]=='C' && (cc)[1]=='T')) 
+
+#define is_donar_chars is_donar_chars_full
 
 typedef struct {
 	char i_am_reversed;
@@ -60,10 +84,23 @@ typedef struct {
 	char * is_reversed_list;
 	short * half_marks_list;
 	short * splice_point_list;
+	short * best1_read_start_pos;
+	short * best1_read_end_pos;
+	float * final_quality;
+	char * cigar_string_buffer;
+	short * read_coverage_start;
+	short * read_coverage_end;
+	char * splice_point_offset_1;
+	char * splice_point_offset_2;
+	char * indel_in_piece1;
+	char * indel_in_piece2;
+
+
 }halves_record_t;
 
 void init_halves_record(halves_record_t* halves_record, int items)
 {
+
 	halves_record -> max_len = items;
 	halves_record -> best_pos1_list = (unsigned int * )malloc(sizeof(unsigned int)*items);
 	halves_record -> best_pos2_list = (unsigned int * )malloc(sizeof(unsigned int)*items);
@@ -73,9 +110,42 @@ void init_halves_record(halves_record_t* halves_record, int items)
 	halves_record -> is_reversed_list = (char * )malloc(sizeof(char)*items);
 	halves_record -> half_marks_list = (short * )malloc(sizeof(short)*items);
 	halves_record -> splice_point_list = (short * )malloc(sizeof(short)*items);
+	halves_record -> splice_point_offset_1 = (char * )malloc(sizeof(char)*items);
+	halves_record -> splice_point_offset_2 = (char * )malloc(sizeof(char)*items);
+	halves_record -> indel_in_piece1 = (char * )malloc(sizeof(char)*items);
+	halves_record -> indel_in_piece2 = (char * )malloc(sizeof(char)*items);
+
+	halves_record -> best1_read_start_pos = (short * )malloc(sizeof(short)*items);
+	halves_record -> best1_read_end_pos = (short * )malloc(sizeof(short)*items);
+	halves_record -> final_quality = (float *)malloc(sizeof(float)*items);
+	halves_record -> read_coverage_start = (short *)malloc(sizeof(short)*items);
+	halves_record -> read_coverage_end = (short *)malloc(sizeof(short)*items);
+
+
+
+	#define CIGAR_STRING_
+	halves_record -> cigar_string_buffer = (char * )malloc(sizeof(char)*items*EXON_MAX_CIGAR_LEN);
 
 	memset(halves_record -> best_vote1_list, 0, sizeof(char)*halves_record -> max_len);
 	memset(halves_record -> best_vote2_list, 0, sizeof(char)*halves_record -> max_len);
+	memset(halves_record -> cigar_string_buffer , 0 , sizeof(char)*items*EXON_MAX_CIGAR_LEN);
+	memset(halves_record -> half_marks_list, 0, sizeof(short)*halves_record -> max_len);
+}
+
+
+
+void clear_processed_marks(halves_record_t* halves_record)
+{	int i;
+	for (i = 0; i < halves_record -> max_len; i++)
+	{
+		halves_record -> half_marks_list[i] &= ~(IS_PROCESSED_READ | IS_PROCESSED_READ_R2);
+		if (!(halves_record -> half_marks_list[i] & IS_FINALISED_PROCESSING))
+		{
+			halves_record -> best_vote1_list[i] =0;
+			halves_record -> best_vote2_list[i]=0;
+//			if (i<10)printf ("\nmCLR MARK %d\n", i);
+		}
+	}
 }
 
 void clear_halve_record(halves_record_t* halves_record)
@@ -83,11 +153,13 @@ void clear_halve_record(halves_record_t* halves_record)
 	memset(halves_record -> best_vote1_list, 0, sizeof(char)*halves_record -> max_len);
 	memset(halves_record -> best_vote2_list, 0, sizeof(char)*halves_record -> max_len);
 	memset(halves_record -> half_marks_list, 0, sizeof(short)*halves_record -> max_len);
+	memset(halves_record -> cigar_string_buffer , 0 , sizeof(char)*halves_record -> max_len*EXON_MAX_CIGAR_LEN);
 }
 
-void add_best_matching_halves(halves_record_t * halves_record, unsigned int best_pos1, unsigned int best_pos2, unsigned char best_vote1 , unsigned char best_vote2, char is_abnormal, char is_reversed, short splice_point, short half_marks, int read_number)
+void add_best_matching_halves(halves_record_t * halves_record, unsigned int best_pos1, unsigned int best_pos2, unsigned char best_vote1 , unsigned char best_vote2, char is_abnormal, char is_reversed, short splice_point, short half_marks, int read_number, int best_pos_start, int best_pos_end, short read_coverage_start, short read_coverage_end, char indel_in_p1, char indel_in_p2)
 {
-	if (halves_record -> best_vote1_list[read_number] < best_vote1)
+	//printf ("\nADDED_BEST_HALVES #%d V1=%d  V2=%d;  oldv = %d\n", read_number, best_vote1, best_vote2, halves_record -> best_vote1_list[read_number] );
+	if ((halves_record -> best_vote2_list[read_number] == 0 && best_vote2>0) || (halves_record -> best_vote1_list[read_number] < best_vote1))
 	{
 		halves_record -> best_pos1_list[read_number] = best_pos1;
 		halves_record -> best_pos2_list[read_number] = best_pos2;
@@ -97,6 +169,14 @@ void add_best_matching_halves(halves_record_t * halves_record, unsigned int best
 		halves_record -> is_reversed_list[read_number] = is_reversed;
 		halves_record -> half_marks_list[read_number] = half_marks;
 		halves_record -> splice_point_list[read_number] = splice_point;
+		halves_record -> best1_read_start_pos[read_number] = best_pos_start;
+		halves_record -> best1_read_end_pos[read_number] = best_pos_end;
+		halves_record -> read_coverage_start[read_number] = read_coverage_start;
+		halves_record -> read_coverage_end[read_number] = read_coverage_end;
+		halves_record -> indel_in_piece1[read_number] = indel_in_p1;
+		halves_record -> indel_in_piece2[read_number] = indel_in_p2;
+
+		//printf("ADD_BEST=%d, v1=%d, v2=%d\n", splice_point, best_vote1, best_vote2);
 	}
 }
 
@@ -169,7 +249,9 @@ int match_last_bases(int * masks, int is_correct)
 	return ret; 
 }
 
-int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, unsigned int * best_pos2, int * best_vote1, int * best_vote2, char * is_abnormal, short * half_marks, int * is_reversed_halves, float accept_rate, int read_len, long long int hint_pos)
+
+
+int select_best_matching_halves_maxone(gene_vote_t * vote, unsigned int * best_pos1, unsigned int * best_pos2, int * best_vote1, int * best_vote2, char * is_abnormal, short * half_marks, int * is_reversed_halves, float accept_rate, int read_len, long long int hint_pos, int tolerable_bases, short * read_coverage_start, short * read_coverage_end, char * indel_in_p1, char * indel_in_p2, gehash_data_t max_pos, gene_vote_number_t max_votes, short max_start, short max_end, short max_mask, char * max_indel_recorder, int* best_select_max_votes, int rl)
 {
 	int best_splicing_point = -1, i,j;
 	char * best_chro_name, is_reversed;
@@ -177,7 +259,7 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 	int selected_max_votes = -1;
 
 
-	is_reversed = (vote -> max_mask & IS_NEGATIVE_STRAND)?1:0;
+	is_reversed = (max_mask & IS_NEGATIVE_STRAND)?1:0;
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< vote->items[i]; j++)
 		{
@@ -189,9 +271,12 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 
 			int overlapped_len, overlap_start, overlap_end;
 			// All logical conditions
+
+			//if( (vote->votes[i][j] < vote-> coverage_start[i][j]) < 12 && (vote-> coverage_end[i][j] > rl - 12 )) continue;
+
 			is_partner_reversed = (vote->masks [i][j] & IS_NEGATIVE_STRAND) ? 1:0;
-			overlap_start = max(vote->max_coverage_start , vote->coverage_start[i][j]);
-			overlap_end   = min(vote->max_coverage_end   , vote->coverage_end[i][j]  );
+			overlap_start = max(max_start , vote->coverage_start[i][j]);
+			overlap_end   = min(max_end , vote->coverage_end[i][j]);
 			overlapped_len =overlap_end - overlap_start;
 			
 
@@ -205,36 +290,34 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 
 
 			long long int dist = vote->pos[i][j];
-			dist -= vote->max_position;
+			dist -= max_pos;
 
 			//printf ("D=%lld\n", abs(dist));
 			if (abs(dist)<6)
 				continue;
 
 			// All quality conditions 
-			if (vote->coverage_start[i][j] < vote->max_coverage_start)
-				n1 = read_len - vote->max_coverage_start;
+			if (vote->coverage_start[i][j] < max_start)
+				n1 = read_len - max_start;
 			else
-				n1 = vote->max_coverage_end;
+				n1 = max_end;
 			n2 = read_len - n1;
 
 			int support_r1 = (int)(max(EXON_MIN_HALF_VOTES+0.01, (n1*1.-15)/3*accept_rate*1.0001));
 			int support_r2 = (int)(max(EXON_MIN_HALF_VOTES+0.01, (n2*1.-15)/3*accept_rate*1.0001));
 
-			//printf ("%u and %u : V1 %d >= S1 %d\t\tV2 %d >= S2 %d\n", vote->max_position, vote->pos[i][j] , vote->max_vote, support_r1,  vote->votes[i][j], support_r2);
 
-			if (vote->max_vote < support_r1 || vote->votes[i][j]<support_r2)
+			if (max_votes < support_r1 || vote->votes[i][j]<support_r2)
 				continue;
 
-
 			// Same chromosome
-			if ((vote->coverage_start[i][j] < vote->max_coverage_start) + is_reversed == 1)
+			if ((vote->coverage_start[i][j] < max_start) + is_reversed == 1)
 			{
-				locate_gene_position(vote->max_position + read_len, &_global_offsets, &best_chro_name, &best_chro_pos);
+				locate_gene_position(max_pos + read_len, &_global_offsets, &best_chro_name, &best_chro_pos);
 				locate_gene_position(vote->pos[i][j] , &_global_offsets, &chro_name, &chro_pos);
 			}else
 			{
-				locate_gene_position(vote->max_position , &_global_offsets, &best_chro_name, &best_chro_pos);
+				locate_gene_position(max_pos , &_global_offsets, &best_chro_name, &best_chro_pos);
 				locate_gene_position(vote->pos[i][j] +read_len, &_global_offsets, &chro_name, &chro_pos);
 			}
 
@@ -242,28 +325,40 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 				continue;
 
 			int is_fusion = 0;
-			if(abs(dist) > 2000000 || chro_name != best_chro_name)
+			if( is_reversed && ((max_pos > vote->pos[i][j]) + (vote->coverage_start[i][j] < max_start) != 1))is_fusion = 1;
+			if((! is_reversed) && ((max_pos > vote->pos[i][j]) + (vote->coverage_start[i][j] > max_start) != 1)) is_fusion = 1;
+
+			if(abs(dist) > 500000 || chro_name != best_chro_name)
+				is_fusion = 1;
+			if(abs(dist) > 50000  && vote->votes[i][j]<7)
 				is_fusion = 1;
 
 			if (is_fusion && !EXON_FUSION_DETECTION) continue;
 
 			int test_vote_value = vote->votes[i][j];
+			if (tolerable_bases)test_vote_value = 9999999 - abs(dist);
+			test_vote_value = 8888888+ vote->votes[i][j] *3000 - abs(dist);
 			if (hint_pos>=0)
 			{
 				long long int hint_dist = hint_pos;
 				hint_dist -= vote->pos[i][j];
 				if (abs (hint_dist) < 1000000)
 					test_vote_value += 100;
+				if (abs (hint_dist) < 10000)
+					test_vote_value += 100;
 			}
-			if (test_vote_value<=selected_max_votes)continue;
+
+			//printf ("\n%u and %u : V1 %d >= S1 %d\t\tV2 %d >= S2 %d  ;  TVV=%d <=SEL=%d; BRK=%d\n", vote->max_position, vote->pos[i][j] , vote->max_vote, support_r1,  vote->votes[i][j], support_r2, test_vote_value , selected_max_votes, ((vote->coverage_start[i][j] < vote->max_coverage_start)? (vote->coverage_end[i][j]):(vote->max_coverage_end)) + ((vote->coverage_start[i][j] < vote->max_coverage_start)? (vote->max_coverage_start):(vote->coverage_start[i][j]))/2);
+
+			if (test_vote_value<selected_max_votes)continue;
 			// Conditions of order of R3 and R5
 			*half_marks &= ~IS_REVERSED_HALVES;
-			if (vote->coverage_start[i][j] < vote->max_coverage_start && (((vote->max_position < vote->pos[i][j]) && !is_reversed) || ((vote->max_position > vote->pos[i][j]) && is_reversed) ) )
+			if (vote->coverage_start[i][j] < max_start && (((max_pos < vote->pos[i][j]) && !is_reversed) || ((max_pos > vote->pos[i][j]) && is_reversed) ) )
 				*half_marks |= IS_REVERSED_HALVES;
-			if (vote->coverage_start[i][j] >= vote->max_coverage_end  &&  (((vote->max_position > vote->pos[i][j]) && !is_reversed) || ((vote->max_position < vote->pos[i][j]) && is_reversed) ) )
+			if (vote->coverage_start[i][j] >= max_end  &&  (((max_pos > vote->pos[i][j]) && !is_reversed) || ((max_pos < vote->pos[i][j]) && is_reversed) ) )
 				*half_marks |= IS_REVERSED_HALVES;
 
-			if (vote->coverage_start[i][j] < vote->max_coverage_start)
+			if (vote->coverage_start[i][j] < max_start)
 			{
 				*half_marks = (*half_marks) & ~IS_R1_CLOSE_TO_5;
 			}
@@ -272,7 +367,7 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 				*half_marks |= IS_R1_CLOSE_TO_5;
 			}
 
-			if(vote->max_mask & IS_NEGATIVE_STRAND)
+			if(max_mask & IS_NEGATIVE_STRAND)
 				*half_marks = (*half_marks) |   IS_NEGATIVE_STRAND_R1;
 			else
 				*half_marks = (*half_marks) &  ~IS_NEGATIVE_STRAND_R1;
@@ -284,13 +379,30 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 	
 
 			
-			best_splicing_point = ((vote->coverage_start[i][j] < vote->max_coverage_start)? (vote->coverage_end[i][j]):(vote->max_coverage_end)) + ((vote->coverage_start[i][j] < vote->max_coverage_start)? (vote->max_coverage_start):(vote->coverage_start[i][j]));
+			best_splicing_point = ((vote->coverage_start[i][j] < max_start)? (vote->coverage_end[i][j]):(max_end)) + ((vote->coverage_start[i][j] < max_start)? (max_start):(vote->coverage_start[i][j]));
+
+
 			best_splicing_point /=2;
 
-			* best_pos1 = vote->max_position ;
+			* best_pos1 = max_pos ;
 			* best_pos2 = vote->pos[i][j] ;
-			* best_vote1 = vote->max_vote ;
+			* best_vote1 = max_votes ;
 			* best_vote2 = vote->votes[i][j] ;
+			* read_coverage_start = min(vote->coverage_start[i][j] , max_start);
+			* read_coverage_end = max(vote->coverage_end[i][j] , max_end);
+
+			* read_coverage_start = max_start;
+			* read_coverage_end = max_end;
+			
+			int k;
+			for(k=0; k<MAX_INDEL_TOLERANCE ; k+=3)
+				if(!max_indel_recorder[k+3])break;
+			* indel_in_p1 = max_indel_recorder[k+2];
+
+			for(k=0; k<MAX_INDEL_TOLERANCE ; k+=3)
+				if(!vote->indel_recorder[i][j][k+3])break;
+			* indel_in_p2 = vote->indel_recorder[i][j][k+2];
+
 
 			* is_reversed_halves = is_reversed;
 
@@ -312,83 +424,89 @@ int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, un
 			selected_max_votes = test_vote_value; 
 
 		}
-
+	*best_select_max_votes = selected_max_votes ;
 	return best_splicing_point;
+}
 
 
+
+int select_best_matching_halves(gene_vote_t * vote, unsigned int * best_pos1, unsigned int * best_pos2, int * best_vote1, int * best_vote2, char * is_abnormal, short * half_marks, int * is_reversed_halves, float accept_rate, int read_len, long long int hint_pos, int tolerable_bases, short * read_coverage_start, short * read_coverage_end, char * indel_in_p1, char * indel_in_p2 , int * max_cover_start, int * max_cover_end, int rl)
+{
+	unsigned int tmp_best_pos1=0, tmp_best_pos2=0;
+	int tmp_best_vote1=0, tmp_best_vote2=0, tmp_is_reversed_halves=0;
+	char tmp_is_abnormal=0, tmp_indel_in_p1=0, tmp_indel_in_p2=0;
+	short tmp_half_marks=0, tmp_read_coverage_start=0, tmp_read_coverage_end=0;
+	int ret = 0, best_ret = 0;	
+
+	int i,j;
+	int test_select_votes=-1, best_select_votes = 1000000;
+	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+		for(j=0; j< vote->items[i]; j++)
+		{
+			test_select_votes = 0;
+			if(vote->votes[i][j] < vote->max_vote -2.5) continue;
+			//if(( vote-> coverage_start[i][j] <15 )&& (vote-> coverage_end[i][j] > rl -15 )) continue;
+			//if(vote->pos[i][j] != vote->max_position) continue;
+
+			ret = select_best_matching_halves_maxone(vote, &tmp_best_pos1, &tmp_best_pos2, &tmp_best_vote1, &tmp_best_vote2,  &tmp_is_abnormal,half_marks, &tmp_is_reversed_halves, accept_rate, read_len, hint_pos,  tolerable_bases, &tmp_read_coverage_start, &tmp_read_coverage_end, &tmp_indel_in_p1, &tmp_indel_in_p2, vote -> pos[i][j],  vote->votes[i][j], vote-> coverage_start[i][j], vote-> coverage_end[i][j],  vote-> masks[i][j], vote->indel_recorder[i][j], &test_select_votes, rl);
+			test_select_votes += vote->votes[i][j]*5000;
+			//printf("TSV=%d\n",test_select_votes);
+
+			if(test_select_votes > best_select_votes)
+			{
+				best_select_votes = test_select_votes;
+				*best_pos1 = tmp_best_pos1;
+				*best_pos2 = tmp_best_pos2;
+				*is_reversed_halves= tmp_is_reversed_halves;
+				
+				*best_vote1 = tmp_best_vote1;
+				*best_vote2 = tmp_best_vote2;
+				*is_abnormal = tmp_is_abnormal;
+				*indel_in_p1 = tmp_indel_in_p1;
+				*indel_in_p2 = tmp_indel_in_p2;
+				
+				*half_marks = tmp_half_marks;
+				*read_coverage_start = tmp_read_coverage_start;
+				*read_coverage_end = tmp_read_coverage_end;
+
+				* max_cover_start = vote-> coverage_start[i][j];
+				* max_cover_end = vote-> coverage_end[i][j];
+				best_ret = ret;
+			}
+		}
+	return best_ret;
 }
 
 
 #define ceq(c,t) ((c)[0]==(t)[0] && (c)[1]==(t)[1])
 #define c2eq(ch1, ch2, tg1, tg2) ((ceq(ch1, tg1) && ceq(ch2, tg2)) || (ceq(ch1, tg2) && ceq(ch2, tg1)) )
 
-int paired_chars(char * ch1, char * ch2, int is_reverse)
+int paired_chars_full(char * ch1, char * ch2, int is_reverse)
 {
-	if (c2eq(ch1, ch2, "GT", "AG") || c2eq(ch1, ch2, "CT", "AC")|| c2eq(ch1, ch2,"GC","AG") || c2eq(ch1, ch2,"GC","CT") || c2eq(ch1, ch2,"AT","AC") || c2eq(ch1, ch2,"GT","AT"))
+	if (c2eq(ch1, ch2, "GT", "AG") || c2eq(ch1, ch2, "CT", "AC"))
 	{
-		if (is_reverse) if (ceq(ch1, "AG") || ceq(ch1, "AC") ||  ceq(ch1, "GC") || ceq(ch1, "AT")) return 1;
-		if (!is_reverse) if (ceq(ch1, "CT") || ceq(ch1, "GT") || ceq(ch1, "GC") || ceq(ch1, "AT")) return 1;
+		if (is_reverse) if (ceq(ch1, "AG") || ceq(ch1, "AC")) return 2;
+		if (!is_reverse) if (ceq(ch1, "CT") || ceq(ch1, "GT")) return 2;
+	}
+	else if ( c2eq(ch1, ch2,"GC","AG") || c2eq(ch1, ch2,"GC","CT") || c2eq(ch1, ch2,"AT","AC") || c2eq(ch1, ch2,"GT","AT"))
+	{
+		if (is_reverse) if (ceq(ch1, "GC") || ceq(ch1, "AT")  || ceq(ch1, "AG") || ceq(ch1, "AC")) return 1;
+		if (!is_reverse) if (ceq(ch1, "GC") || ceq(ch1, "AT") ||ceq(ch1, "GT") || ceq(ch1, "CT")) return 1;
 	}
 	return 0;
 }
 
-#define is_donar_chars(cc) (((cc)[0]=='G' && (cc)[1]=='T') || \
-			    ((cc)[0]=='A' && (cc)[1]=='G') || \
-			    ((cc)[0]=='A' && (cc)[1]=='C') || \
-			    ((cc)[0]=='C' && (cc)[1]=='T') || \
-			    ((cc)[0]=='G' && (cc)[1]=='C') || \
-			    ((cc)[0]=='A' && (cc)[1]=='T') || \
-			    ((cc)[0]=='A' && (cc)[1]=='C') ) 
-
-int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type)
+int paired_chars_part(char * ch1, char * ch2, int is_reverse)
 {
-	int ret = 0;
-	int i;
-	char last_char='A';
-	if (is_negative_strand)
+	if (c2eq(ch1, ch2, "GT", "AG") || c2eq(ch1, ch2, "CT", "AC"))
 	{
-
-		if (space_type == GENE_SPACE_COLOR)
-		{
-			pos++;
-			last_char = (pos+test_len>= index -> length + index -> start_point)?'A': gvindex_get(index,pos+test_len);
-		}
-		for (i=test_len -1;i>=0;i--)
-		{
-			char tt = gvindex_get (index, pos+test_len-1-i);
-			if(space_type == GENE_SPACE_COLOR)
-			{
-				ret += read[i] == '0'+chars2color(tt, last_char); 
-				last_char = tt;
-			}
-			else
-				switch(tt)
-				{
-					case 'A': ret += read[i] == 'T'; break;
-					case 'T': ret += read[i] == 'A'; break;
-					case 'G': ret += read[i] == 'C'; break;
-					case 'C': ret += read[i] == 'G'; break;
-				}
-		}
+		if (is_reverse) if (ceq(ch1, "AG") || ceq(ch1, "AC")) return 1;
+		if (!is_reverse) if (ceq(ch1, "CT") || ceq(ch1, "GT")) return 1;
 	}
-	else
-	{
-		if (space_type == GENE_SPACE_COLOR)
-			last_char = (pos <= index -> start_point)?'A': gvindex_get(index,pos-1);
-		for (i=0;i<test_len;i++)
-		{
-			char tt = gvindex_get (index, pos +i);
-			if(space_type == GENE_SPACE_COLOR)
-			{
-				ret += read[i] == '0'+chars2color(last_char, tt);
-				last_char = tt;
-			}
-			else
-				ret +=read[i] == tt; 
-		}
-	}
-	return ret;
+	return 0;
 }
+
+#define  paired_chars paired_chars_full
 
 
 void get_chro_2base(char *buf, gene_value_index_t * index, unsigned int pos, int is_negative_strand)
@@ -396,7 +514,9 @@ void get_chro_2base(char *buf, gene_value_index_t * index, unsigned int pos, int
 	gvindex_get_string (buf, index, pos, 2, is_negative_strand);
 }
 
-int test_donar(char *read, int read_len, unsigned int pos1, unsigned int pos2, int guess_break_point, char negative_strand, int test_range, char is_soft_condition, int EXON_INDEL_TOLERANCE, int* real_break_point, gene_value_index_t * my_value_array_index, int indel_offset, int is_reversed, int space_type)
+
+// pos1 must be small than pos2.
+int test_donor(char *read, int read_len, unsigned int pos1, unsigned int pos2, int guess_break_point, char negative_strand, int test_range, char is_soft_condition, int EXON_INDEL_TOLERANCE, int* real_break_point, gene_value_index_t * my_value_array_index, int indel_offset1, int indel_offset2, int is_reversed, int space_type, int confidence, int * best_donor_score)
 {
 	int bps_pos_x;
 	int search_start = guess_break_point - test_range ;
@@ -404,82 +524,118 @@ int test_donar(char *read, int read_len, unsigned int pos1, unsigned int pos2, i
 	char h1_2ch[3], h2_2ch[3];
 
 	h1_2ch[2] = h2_2ch[2]=0;
-	search_start=max(16, search_start);
-	search_end = min(read_len-16, search_end);
+	search_start=max(10, search_start);
+	search_end = min(read_len-10, search_end);
 	int best_break = -1;
 	int min_x = -9099;
 
 	for (bps_pos_x = search_start; bps_pos_x < search_end ; bps_pos_x ++)
 	{
-		get_chro_2base(h1_2ch, my_value_array_index, pos1 + bps_pos_x, is_reversed);
-		get_chro_2base(h2_2ch, my_value_array_index, pos2 - 2 + indel_offset + bps_pos_x, is_reversed);
+		int paired_score = 0;
+		get_chro_2base(h1_2ch, my_value_array_index, pos1 - indel_offset1+ bps_pos_x , is_reversed);
+		get_chro_2base(h2_2ch, my_value_array_index, pos2 - 2 - indel_offset2 + bps_pos_x, is_reversed);
+
 
 		//if(!is_reversed)
 		//printf("C1=%s @%u, C2=%s @%u\n",h1_2ch, pos1 + bps_pos_x, h2_2ch,pos2 - 2 + indel_offset + bps_pos_x);
 		if(h1_2ch[0]==h2_2ch[0] && h1_2ch[1]==h2_2ch[1]) continue;
 
 		if(is_donar_chars(h1_2ch) && is_donar_chars(h2_2ch))
-			if(paired_chars(h1_2ch, h2_2ch, is_reversed))
+		{
+
+			paired_score = paired_chars(h1_2ch, h2_2ch, is_reversed);
+
+			if(paired_score)
 			{
 				int m1, m2, x1, x2;
 				int break_point_half = is_reversed?(read_len - bps_pos_x):bps_pos_x;
 				int first_exon_end,second_half_start;
+				int donar_conf_len = 0;
+
+				donar_conf_len = min(break_point_half , EXON_DONOR_TEST_WINDOW);
+				donar_conf_len = min(read_len - break_point_half, donar_conf_len);
+				//printf("DONOR_CONF_LEN=%d\n", donar_conf_len);
 
 				if (is_reversed)
 				{
-					first_exon_end = pos2 + bps_pos_x + indel_offset;
-					second_half_start = pos1 + bps_pos_x;
+					first_exon_end = pos2 + bps_pos_x - indel_offset2;
+					second_half_start = pos1 + bps_pos_x- indel_offset1;
 
-					m1 = match_chro(read + break_point_half - DONAR_CONFIRM_SIZE -3, my_value_array_index, first_exon_end, DONAR_CONFIRM_SIZE +3, is_reversed, space_type);
-					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start-DONAR_CONFIRM_SIZE -3, DONAR_CONFIRM_SIZE +3, is_reversed, space_type);
+					m1 = match_chro(read + break_point_half - donar_conf_len , my_value_array_index, first_exon_end, donar_conf_len, is_reversed, space_type);
+					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start-donar_conf_len , donar_conf_len, is_reversed, space_type);
 
-					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end - DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed, space_type);
-					x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start , DONAR_CONFIRM_SIZE , is_reversed, space_type);
+					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end - donar_conf_len, donar_conf_len , is_reversed, space_type);
+					x2 = match_chro(read + break_point_half - donar_conf_len ,  my_value_array_index, second_half_start , donar_conf_len, is_reversed, space_type);
 				}
 				else
 				{
-					first_exon_end = pos1 + bps_pos_x + indel_offset;
-					second_half_start = pos2 + bps_pos_x;
+					first_exon_end = pos1 + bps_pos_x - indel_offset1;
+					second_half_start = pos2 + bps_pos_x - indel_offset2;
 
-					m1 = match_chro(read + break_point_half - DONAR_CONFIRM_SIZE -3, my_value_array_index, first_exon_end-DONAR_CONFIRM_SIZE -3, DONAR_CONFIRM_SIZE +3, is_reversed, space_type);
-					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start, DONAR_CONFIRM_SIZE +3 , is_reversed, space_type);
+					m1 = match_chro(read + break_point_half - donar_conf_len, my_value_array_index, first_exon_end-donar_conf_len , donar_conf_len, is_reversed, space_type);
+					m2 = match_chro(read + break_point_half , my_value_array_index, second_half_start, donar_conf_len, is_reversed, space_type);
 
-					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end, DONAR_CONFIRM_SIZE , is_reversed,space_type);
-					x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start - DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed,space_type);
-					//x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end-DONAR_CONFIRM_SIZE, DONAR_CONFIRM_SIZE , is_reversed);
-					//x2 = match_chro(read + break_point_half -DONAR_CONFIRM_SIZE ,  my_value_array_index, second_half_start , DONAR_CONFIRM_SIZE , is_reversed);
+					x1 = match_chro(read + break_point_half ,  my_value_array_index, first_exon_end, donar_conf_len , is_reversed,space_type);
+					x2 = match_chro(read + break_point_half - donar_conf_len,  my_value_array_index, second_half_start - donar_conf_len, donar_conf_len , is_reversed,space_type);
 				}
-				//printf("M1=%d M2=%d X1=%d X2=%d\n", m1,m2,x1,x2);
-				if (m1 >= DONAR_CONFIRM_SIZE - 1  && m2>=DONAR_CONFIRM_SIZE - 1)
-					if(x1<=DONAR_CONFIRM_SIZE - 5 && x2<=DONAR_CONFIRM_SIZE - 5)
+
+				#ifdef TEST_TARGET
+				if(memcmp(read, TEST_TARGET, 15)==0)
+				{
+					printf("DONOR TEST STR=%s, %s ; pos=%d    %d %d ; M=%d %d ; X=%d %d\n", h1_2ch, h2_2ch, bps_pos_x, indel_offset1, indel_offset2, m1, m2, x1, x2);
+				}
+				#endif
+	
+				int threshold = 4;
+				if (paired_score == 1)
+					threshold = 4;
+
+				if (m1 >= donar_conf_len - 4 && m2>=donar_conf_len - 4)
+					if(x1<donar_conf_len - threshold && x2<donar_conf_len - threshold)
 					{
-						int score = 40 - max(x1, x2) + min(m1, m2);
+						int score = 1000 * paired_score - (x1 + x2) + (m1+ m2) ;
 						if (min_x < score)
 						{
 							min_x = score;
 							best_break = bps_pos_x;
+							*best_donor_score = score;
 						}
 					}
 
 			}
-
+		}
 	}
+
 	if (best_break>0)
 	{
+				#ifdef TEST_TARGET
+				if(memcmp(read, TEST_TARGET, 15)==0)
+					printf("SELECRED!!!_BREAKPOINT=%d, RAW POS=%u,%u, R=%s\n",  best_break, pos1 , pos2, read);
+				#endif
 		//printf ("FINAL BREAK: %d   ; REV = %d\n ", best_break, is_reversed);
 		*real_break_point = best_break;
 		return 1;
 	}
+	else
+	{
+				#ifdef TEST_TARGET
+				if(memcmp(read, TEST_TARGET, 15)==0)
+					printf("KILLED!!!_BREAKPOINT=%d, R=%s\n",  best_break+ pos1, read);
+				#endif
+	}
 	return 0;
 }
+
+
+
 
 unsigned int get_grouped_position(HashTable * pos_table, unsigned int pos)
 {
 
 	int delta_pos;
-	int group_anchor = pos / EXON_GROUPING_SIZE - 1;
+	unsigned int group_anchor = pos / EXON_GROUPING_SIZE;
 	unsigned int grouped_pos = 0;
-	for (delta_pos = 0 ; delta_pos < 3; delta_pos ++)
+	for (delta_pos = 0 ; delta_pos < 1; delta_pos ++)
 	{
 		grouped_pos = (unsigned int) (HashTableGet(pos_table, (NULL + group_anchor)) - NULL);
 		if(grouped_pos) break;
@@ -494,15 +650,307 @@ unsigned int get_grouped_position(HashTable * pos_table, unsigned int pos)
 	return grouped_pos;
 }
 
+#define EXON_EXPLAIN_DEPTH 5
+//#define DEBUG
 
-void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table, halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads, gene_value_index_t * my_value_array_index, int first_index, int last_index)
+void junction_tree_b_explorer(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table, char * read , int rl, int full_rl ,unsigned int read_tail_pos, int number_of_piece, unsigned int * cigar_recorder, int total_matched_bases, int * result_total_matched_bases,unsigned int * result_cigar_recorder, int *result_number_pieces, gene_value_index_t * my_value_array_index, gene_input_t * ginp,int subread_votes_cover_start, char * quality_str, int quality_format, float match_score)
 {
-	int i=0, ic=0;
+	unsigned int delta_pos;
+	unsigned int iii,group_anchor = read_tail_pos / EXON_GROUPING_SIZE-1;
+	float max_matched_bases_rate = -1;
+	int max_matched_bases = -1;
+	int indels=0, max_indels=0, indel_point = 0, max_indel_point=0;
+	connect_to_t * next_jump = NULL;
+	int max_piece_len = rl, max_grouped_pos=read_tail_pos;
+	max_matched_bases = -1.;//*match_chro(read, my_value_array_index, read_tail_pos - rl, rl, 0, ginp->space_type)/rl;
+	int max_piece_quality_good = 0;
+
+
+	int matched_bases =  match_indel_chro_to_back(read, my_value_array_index, read_tail_pos, rl,&indels, &indel_point, EXON_INDEL_TOLERANCE);
+	int effect_tested_len = rl -  max(0, indels);
+
+	max_matched_bases_rate =  (matched_bases)*1./effect_tested_len ;
+	max_indels = indels;
+	max_indel_point = indel_point;
+	max_piece_quality_good = 1;
+	
+
+	//if (max_matched_bases *1. / rl < EXON_HALF_MATCH_PERCENTAGE)max_matched_bases =-1;
+
+	unsigned int low_border = my_value_array_index -> start_base_offset;
+	unsigned int high_border = my_value_array_index -> start_base_offset + my_value_array_index -> length; 
+
+
+	for (delta_pos = 0 ; delta_pos < (rl / EXON_GROUPING_SIZE)+1 ; delta_pos ++)
+	{
+		unsigned int grouped_pos = (unsigned int) (HashTableGet(pos_table, (NULL + group_anchor)) - NULL);
+
+		if (grouped_pos && grouped_pos <= read_tail_pos)
+		{
+			int test_piece_len = read_tail_pos - grouped_pos;
+			if(test_piece_len < 8) continue;
+			
+			matched_bases = match_indel_chro_to_back(read+rl-test_piece_len, my_value_array_index, read_tail_pos - test_piece_len, test_piece_len,&indels, &indel_point, EXON_INDEL_TOLERANCE);
+
+			#ifdef DEBUG
+			printf("BSEARCH: INDEL=%d\n",indels);
+			#endif
+
+			effect_tested_len = (test_piece_len- max(0, indels));
+
+			float test_matched_bases_rate = (matched_bases)*1./effect_tested_len ;
+			if ( test_matched_bases_rate > max_matched_bases_rate)
+			{
+				connect_to_t * connect_to = (connect_to_t *)HashTableGet(connection_table, NULL+grouped_pos);
+				int accepted = 0;
+				for (iii=0; iii<MAX_EXON_CONNECTIONS;iii++)
+				{
+					unsigned int connect_to_iii = connect_to -> connect_to[iii];
+					if (! connect_to_iii)break;
+					if (connect_to_iii < grouped_pos)
+					{
+						if(connect_to_iii - (rl-test_piece_len) >= low_border && connect_to_iii < high_border)
+						{
+							accepted=1;
+							break;
+						}
+					}
+				}
+				if (accepted && (grouped_pos > read_tail_pos - rl +  EXON_MIN_HALF_LENGTH)){
+					max_matched_bases_rate = test_matched_bases_rate;
+					max_matched_bases = matched_bases;
+					next_jump = connect_to;
+					max_piece_len = test_piece_len;
+					max_grouped_pos = grouped_pos;
+					max_indels = indels;
+					max_indel_point = indel_point;
+					max_piece_quality_good = 1;
+				}
+			}
+
+		}
+
+		group_anchor--;
+	}
+
+	int digged = 0;
+	if(next_jump && EXON_EXPLAIN_DEPTH > number_of_piece)
+	{
+		cigar_recorder [number_of_piece * 4+1] = rl - max_piece_len + max_indels;
+		cigar_recorder [number_of_piece * 4+3] = ((max_indel_point + cigar_recorder [number_of_piece*4+1]) << 16) + (0xffff&( max_indels << 4)) + (max_piece_quality_good << 3);
+		#ifdef DEBUG
+		printf("KKK1: %d, %d, %u\n", max_indel_point + cigar_recorder [number_of_piece*4+1], max_indels, cigar_recorder [number_of_piece * 4+3] );
+		#endif
+		for (iii=0; iii<MAX_EXON_CONNECTIONS;iii++)
+		{
+			unsigned int connect_to_iii = next_jump -> connect_to[iii];
+			if (! connect_to_iii)break;
+
+			if (connect_to_iii > max_grouped_pos)
+				continue;
+			if (max_grouped_pos - connect_to_iii < 10)
+				continue;
+			if(!(connect_to_iii - (rl-max_piece_len) >= low_border && connect_to_iii < high_border))
+				continue;
+
+			cigar_recorder [number_of_piece * 4+4] = connect_to_iii;
+			cigar_recorder [number_of_piece * 4+6] = rl + max_indels - max_piece_len;
+
+			#ifdef DEBUG
+			printf ("DIG-IN B-SEARCH REMAIN_LEN=%d, POS_TAIL=%u\n", rl + max_indels- max_piece_len, connect_to_iii);
+			#endif
+			junction_tree_b_explorer(bed_table, pos_table, connection_table, read, rl + max_indels - max_piece_len, full_rl, connect_to_iii , 1+number_of_piece , cigar_recorder, total_matched_bases + max_matched_bases, result_total_matched_bases , result_cigar_recorder, result_number_pieces,  my_value_array_index, ginp, subread_votes_cover_start, quality_str , quality_format, match_score);
+			digged = 1;
+		}
+	}
+		// the "read_tail_pos" is the exon that matches through this read; it has to be well matched to accept the read.
+	if (!digged)
+	{
+		indels = 0;
+		indel_point =0;
+
+
+		int max_piece_quality_good = 1;
+
+		int matched_bases = match_indel_chro_to_back(read, my_value_array_index, read_tail_pos - rl, rl, &indels, &indel_point, EXON_INDEL_TOLERANCE);
+		if ( 1 )
+		{
+			//put this explaination to the result, if the matched bases is the max.
+			if (matched_bases +total_matched_bases > (*result_total_matched_bases))
+			{
+				cigar_recorder [number_of_piece * 4 + 1] = 0;
+				cigar_recorder [number_of_piece * 4 + 3] = ((indel_point + cigar_recorder [number_of_piece*4+1]) << 16) + (0xffff&(indels << 4)) + (max_piece_quality_good << 3);
+
+				memcpy(result_cigar_recorder, cigar_recorder, 138);
+				(*result_total_matched_bases) = matched_bases + total_matched_bases;
+				(*result_number_pieces) = number_of_piece+1;
+			}
+		}
+	}
+}
+
+
+void junction_tree_f_explorer(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table, char * read , int rl, int full_rl ,unsigned int read_head_pos, int number_of_piece, unsigned int * cigar_recorder, int total_matched_bases, int * result_total_matched_bases,unsigned int * result_cigar_recorder, int *result_number_pieces, gene_value_index_t * my_value_array_index, gene_input_t * ginp, int next_head_modify, char * quality_str, int quality_format, float match_score)
+{
+	unsigned int delta_pos;
+	unsigned int iii,group_anchor = read_head_pos / EXON_GROUPING_SIZE-1;
+	float max_matched_bases_rate = -1;
+	int max_matched_bases = -1;
+	connect_to_t * next_jump = NULL;
+	int max_piece_len = 0;
+	int max_grouped_pos = read_head_pos;
+	max_matched_bases = -1.;//match_chro(read, my_value_array_index, read_head_pos, rl, 0, ginp->space_type)*1./rl;
+	int indels = 0, max_indels=0, indel_point = 0, max_indel_point = 0;
+	int max_piece_quality_good = 0;
+
+
+
+	int matched_bases =  match_indel_chro_to_front(read, my_value_array_index, read_head_pos, rl,&indels, &indel_point, EXON_INDEL_TOLERANCE);
+	int effect_tested_len = rl -  max(0, indels);
+
+	max_matched_bases_rate =  (matched_bases)*1./effect_tested_len;
+	max_indels = indels;
+	max_indel_point = indel_point;
+	max_piece_quality_good = 1;
+	
+
+
+	//if (max_matched_bases *1. / rl < EXON_HALF_MATCH_PERCENTAGE)max_matched_bases =-1;
+
+	unsigned int low_border = my_value_array_index -> start_base_offset;
+	unsigned int high_border = my_value_array_index -> start_base_offset + my_value_array_index -> length; 
+
+	for (delta_pos = 0 ; delta_pos < (rl / EXON_GROUPING_SIZE)+1 ; delta_pos ++)
+	{
+		unsigned int grouped_pos = (unsigned int) (HashTableGet(pos_table, (NULL + group_anchor)) - NULL);
+
+		if (grouped_pos && grouped_pos >= read_head_pos)
+		{
+			int test_piece_len = grouped_pos - read_head_pos;
+			if(test_piece_len < 8) continue;
+			int matched_bases;
+
+			matched_bases = match_indel_chro_to_front(read, my_value_array_index, read_head_pos, test_piece_len, &indels, &indel_point, EXON_INDEL_TOLERANCE);
+
+
+			#ifdef DEBUG
+			printf ("TEST match = %d ; piece_len = %d; GRP_POS=%u; \n", matched_bases, test_piece_len, grouped_pos);
+			printf("FSEARCH: INDEL=%d\n",indels);
+			#endif
+
+			int effect_tested_len = (test_piece_len- max(0, indels));
+
+			float test_matched_bases_rate = (matched_bases)*1./effect_tested_len;
+
+			if (test_matched_bases_rate > max_matched_bases_rate)
+			{
+				connect_to_t * connect_to = (connect_to_t *)HashTableGet(connection_table, NULL+grouped_pos);
+				int accepted = 0;
+				for (iii=0; iii<MAX_EXON_CONNECTIONS;iii++)
+				{
+					unsigned int connect_to_iii = connect_to -> connect_to[iii];
+					if (! connect_to_iii)break;
+					if (connect_to_iii > grouped_pos)
+					{
+						if(connect_to_iii >= low_border && connect_to_iii + rl < high_border)
+						{
+							accepted=1; 
+							break;
+						}
+					}
+				}
+				if (accepted && (grouped_pos < read_head_pos + rl - EXON_MIN_HALF_LENGTH)){
+					max_matched_bases_rate = test_matched_bases_rate;
+					max_matched_bases = matched_bases  + test_piece_len;
+					next_jump = connect_to;
+					max_piece_len = test_piece_len;
+					max_grouped_pos = grouped_pos;
+					max_indels = indels;
+					max_indel_point = indel_point;
+					max_piece_quality_good = 1;
+				}
+			}
+
+		}
+
+		group_anchor++;
+	}
+	
+	int digged = 0;
+	if(next_jump && EXON_EXPLAIN_DEPTH > number_of_piece)
+	{
+		cigar_recorder [number_of_piece * 4+2] = full_rl - rl + max_piece_len - max_indels;
+		cigar_recorder [number_of_piece * 4+3] = ((max_indel_point + cigar_recorder [number_of_piece*4+1]) << 16) + (0xffff&( max_indels << 4))  + (max_piece_quality_good << 3);
+
+#ifdef DEBUG
+		printf("KKK3: %d, %d, %u\n", max_indel_point + cigar_recorder [number_of_piece*4+1], max_indels, cigar_recorder [number_of_piece * 4+3] );
+#endif
+
+		for (iii=0; iii<MAX_EXON_CONNECTIONS;iii++)
+		{
+			unsigned int connect_to_iii = next_jump -> connect_to[iii];
+			if (! connect_to_iii)break;
+
+			if (connect_to_iii < max_grouped_pos)
+				continue;
+			if (connect_to_iii - max_grouped_pos < 10)
+				continue;
+			if(!(connect_to_iii >= low_border && connect_to_iii + rl < high_border))
+				continue;
+
+			cigar_recorder [number_of_piece * 4+4] = connect_to_iii;
+			cigar_recorder [number_of_piece * 4+5] = full_rl - rl - max_indels + max_piece_len;
+			next_head_modify = 0;
+#ifdef DEBUG
+			printf ("DIG-IN:match/piece_len = %d/%d, rl=%d head_pos=%u  READ=%s\n", max_matched_bases, max_piece_len, rl - max_piece_len, connect_to_iii, read+max_piece_len);
+#endif
+			//printf("F-MAXINDEL=%d ; NEXT_HEAD_MODIFY=%d ; #PIECES=%d\n", max_indels, next_head_modify, number_of_piece );
+			junction_tree_f_explorer(bed_table, pos_table, connection_table, read+max_piece_len-max_indels, rl - max_piece_len + max_indels, full_rl , connect_to_iii , 1+number_of_piece , cigar_recorder, total_matched_bases + max_matched_bases, result_total_matched_bases , result_cigar_recorder,result_number_pieces, my_value_array_index, ginp, 0 , quality_str + max_piece_len-max_indels , quality_format, match_score);
+			digged = 1;
+		}
+	}
+		// the "read_head_pos" is the exon that matches through this read; it has to be well matched to accept the read.
+	if(!digged)
+	{
+		indels = 0;
+		indel_point =0;
+
+
+
+		int max_piece_quality_good = 1;
+
+		int matched_bases = match_indel_chro_to_front(read, my_value_array_index, read_head_pos, rl, &indels, &indel_point, EXON_INDEL_TOLERANCE);
+
+
+		if ( 1 )
+		{
+			//put this explaination to the result, if the matched bases is the max.
+			if (matched_bases + total_matched_bases > (*result_total_matched_bases))
+			{
+				cigar_recorder [number_of_piece * 4 + 2] = full_rl;
+				cigar_recorder [number_of_piece * 4 + 3] = ((indel_point + cigar_recorder [number_of_piece*4+1]) << 16) +  ((0xfff&indels) << 4)  + (max_piece_quality_good << 3);
+
+#ifdef DEBUG
+				printf("KKK4: %d+%d, %d, %u\n", indel_point,cigar_recorder [number_of_piece*4+1], indels, cigar_recorder [number_of_piece * 4+3] );
+#endif
+
+				memcpy(result_cigar_recorder, cigar_recorder, 138);
+				(*result_total_matched_bases) = matched_bases + total_matched_bases;
+				(*result_number_pieces) = number_of_piece+1;
+			}
+		}
+	}
+}
+
+void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table, halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads, gene_value_index_t * my_value_array_index, int first_index, int last_index, int tolerable_scan)
+{
+	int i=0, ic=0, j, result_head_modify=-1;
 	//return;
-        while (1)
+	while (1)
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
 		int rl;
+		int is_settle = 1;
 		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
 
 
@@ -513,122 +961,427 @@ void force_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable 
 
 		if (ginp2 && (i % 2))
 			rl = geinput_next_read(ginp2, nameb, inb, qualityb);
-                else
+		else
 			rl = geinput_next_read(ginp, nameb, inb, qualityb);
 		if (rl<0){
 			break;
 		}
 
-		if(halves_record -> best_vote1_list[i]>=2 && halves_record -> best_vote2_list[i]>=1){
-			i++; continue;
+		char negative_strand = halves_record -> is_reversed_list[i];
+
+		if ((ginp2 && (i % 2)) + negative_strand == 1)
+		{
+			reverse_read(inb, rl, ginp->space_type);
+			reverse_quality(qualityb, rl);
 		}
-		if(halves_record -> best_vote1_list[i]<(int)((rl-16) / 15+1))
+		//printf("INPUT=%d , %s\n", ginp->file_type, nameb);
+
+#ifdef TEST_TARGET
+		if(memcmp(inb, TEST_TARGET, 15)==0)
+			printf("P0=%u, P1=%d, P1_INDEL=%d, P2_INDEL=%d, BPOINT=%d\n", pos, halves_record -> best_pos2_list[i] , halves_record -> splice_point_offset_1[i], halves_record -> splice_point_offset_2[i],  halves_record -> splice_point_list[i]);
+#endif
+
+
+		if(halves_record -> best_vote1_list[i]<1)
 		{
 			i++; continue;
 		}
 
 		if (!first_index)
-		if (pos< my_value_array_index -> start_base_offset + 1000)
-		{
-			i++;
-			continue;
-		}
+			if (pos< my_value_array_index -> start_base_offset + 1000)
+			{
+				i++;
+				continue;
+			}
 		if (!last_index)
-		if (pos > my_value_array_index -> start_base_offset+ my_value_array_index ->length - 1000)
-		{
-			i++; continue;
-		}
+			if (pos > my_value_array_index -> start_base_offset+ my_value_array_index ->length - 1000)
+			{
+				i++; continue;
+			}
 		if (IS_PROCESSED_READ_R2 & halves_record -> half_marks_list[i])
 		{
 			i++; continue;
 		}
 
+		unsigned int explain_buff[138], explain_result[138];
+		int result_number_pieces = 0,  result_total_matched_bases = 0, total_pieces = 0, total_total_matched_bases;
+		float match_score = EXON_HALF_MATCH_PERCENTAGE;
 
-		char negative_strand = halves_record -> is_reversed_list[i];
+		//int before_best_offset = (pos >   halves_record -> best_pos2_list[i])? halves_record -> splice_point_offset_2[i] : halves_record ->splice_point_offset_1[i];
 
-		// test if the position of this read is recorded.
-	        int delta_pos;
-        	int group_anchor = pos / EXON_GROUPING_SIZE ;
-        	unsigned int grouped_pos = 0;
-	        for (delta_pos = 0 ; delta_pos < (rl / EXON_GROUPING_SIZE)+1 ; delta_pos ++)
-        	{
-	                grouped_pos = (unsigned int) (HashTableGet(pos_table, (NULL + group_anchor)) - NULL);
-                	if(grouped_pos) break;
-        	        group_anchor ++;
-	        }
-
-		float max_match = -1;
-		unsigned int pos2 = 0;
-
-		if (grouped_pos >= pos + EXON_MIN_HALF_LENGTH && grouped_pos <= pos+rl-EXON_MIN_HALF_LENGTH-1)
-		{
-			int iii;
-			long long int dist = grouped_pos;
-			dist -= pos;
-
-			connect_to_t * connect_to = (connect_to_t *)HashTableGet(connection_table, NULL+grouped_pos );
-			if (!connect_to)
-				printf( "WHY???\n");
-			if (EXON_FUSION_DETECTION)
-				if (!(connect_to->i_am_reversed) ^ !(negative_strand))
-					continue;
-
-			/*char * chro_name;
-			unsigned int chro_pos;
-			printf("\n%s\n", inb);
-			locate_gene_position(pos, &_global_offsets, &chro_name, &chro_pos);
-			printf("RELIEF : %s: pos=%s,%u; breakpnt=%d\n", nameb, chro_name,chro_pos ,(int) dist);*/
-
-			for (iii=0; iii<MAX_EXON_CONNECTIONS;iii++)
-			{
-				float is_match=0;
-				unsigned int connect_to_iii = connect_to -> connect_to[iii];
-				if (! connect_to_iii)break;
-
-				int opposite_negative_strand;
-
-				opposite_negative_strand = EXON_FUSION_DETECTION? connect_to -> is_opposite_reversed[iii]: negative_strand; 
-
-				if ((!negative_strand) && connect_to_iii > grouped_pos)
-					is_match   =  match_chro(inb+dist, my_value_array_index, connect_to_iii, rl-dist, opposite_negative_strand, ginp->space_type)*1./(rl-dist);
-
-				if ((!negative_strand) && connect_to_iii < grouped_pos)
-					is_match   =  match_chro(inb, my_value_array_index, connect_to_iii - dist, dist, opposite_negative_strand, ginp->space_type)*1./(dist);
-
-				if (  negative_strand  && connect_to_iii > grouped_pos)
-					is_match   =  match_chro(inb, my_value_array_index, connect_to_iii, rl-dist, opposite_negative_strand, ginp->space_type)*1./(rl-dist);
-
-				if (  negative_strand  && connect_to_iii < grouped_pos)
-					is_match   =  match_chro(inb + rl-dist, my_value_array_index, connect_to_iii - dist, dist, opposite_negative_strand, ginp->space_type)*1./(dist);
+		int b_search_tail = halves_record -> best1_read_end_pos[i] - 5 ;
+		int f_search_head = halves_record -> best1_read_start_pos[i] + 5 ;
 
 
-//				locate_gene_position(connect_to[iii] - dist, &_global_offsets, &chro_name, &chro_pos);
-//				printf( "    => %s,%u \tmatch=%.4f   neg=%d; con %c grp\n", chro_name,chro_pos, is_match, negative_strand,  connect_to[iii] > grouped_pos?'>':'<' );
-
-				if (is_match >max_match)
-				{
-					max_match=is_match;
-					pos2 = connect_to_iii;
-				}
-			}
-			if (max_match>EXON_HALF_MATCH_PERCENTAGE - 0.0001)
-			{
-				paired_exon_key search_key;
-	
-				unsigned int pos_small = min(grouped_pos, pos2);
-				unsigned int pos_big   = max(grouped_pos, pos2);
-				search_key.small_key = pos_small;
-				search_key.big_key = pos_big;
-	
-				int *search_res = (int*) HashTableGet(bed_table, &search_key);
-				assert(search_res);
-				(*search_res)++;
-				
-			}
-	
+		if (((ginp2 && (i % 2)) + negative_strand) == 1){
+			int tmp_btail = b_search_tail;
+			b_search_tail = rl -  f_search_head ;
+			f_search_head = rl -  tmp_btail ;
 		}
 
+		explain_buff [0] = pos + b_search_tail;
+		explain_buff [2] = b_search_tail;
+
+#ifdef DEBUG
+		printf ("\n%s %s\nB-SEARCH RANGE [%d - %d] ; POS=%u ; P1_Indel=%d ; P2_Indel = %d\n",nameb, inb ,f_search_head , b_search_tail,pos + b_search_tail ,  halves_record ->indel_in_piece1[i],  halves_record ->indel_in_piece2[i]);
+#endif
+
+		junction_tree_b_explorer(bed_table, pos_table, connection_table, inb , b_search_tail, rl , pos + b_search_tail + halves_record ->indel_in_piece1[i] , 0, explain_buff, 0, &result_total_matched_bases , explain_result,  &result_number_pieces, my_value_array_index, ginp, f_search_head, qualityb, EXON_FASTQ_FORMAT, match_score);
+
+
+		/*if (result_total_matched_bases < 0.8 * (b_search_tail))
+		{
+			is_settle=0;
+			result_number_pieces = 0;
+			total_pieces = 0;
+		}*/
+
+#ifdef DEBUG
+
+		int xx;
+		printf("BSEARCH MATCH BASES=%d/%d; PIECES=%d\n", result_total_matched_bases,b_search_tail, result_number_pieces );
+		for (xx=0; xx<result_number_pieces;xx++)
+		{
+
+			char * chro_name;
+			unsigned int chro_pos;
+
+			unsigned int piece_end_pos = explain_result[xx*4];
+			int piece_start = explain_result[xx*4+1];
+			int piece_end = explain_result[xx*4+2];
+
+			int indels_in_section = (explain_result[4*xx+3] & 0xffff)>>4;
+			if(indels_in_section > 0x800)indels_in_section -= 0x1000;
+			int indels_point = explain_result[4*xx+3]>>16;
+
+			if(indels_point > f_search_head && indels_point < b_search_tail) indels_in_section=0;
+
+
+			locate_gene_position(piece_end_pos, &_global_offsets, &chro_name, &chro_pos);
+			chro_pos -= piece_end+indels_in_section;
+
+			printf ("BS-RES: [%d ~ %d  %c %s,%d] \n", piece_start, piece_end, ((ginp2 && (i % 2)) + negative_strand == 1)?'~':'@', chro_name , chro_pos);
+		}
+
+#endif
+
+
+
+
+
+
+
+		if(result_number_pieces>0)
+		{
+			total_pieces = result_number_pieces;
+			if (result_number_pieces<1)is_settle=0;
+			for (j = 0; j < total_pieces/2; j++)
+			{
+				unsigned int tmp;
+				tmp = explain_result[4*(total_pieces - j-1)];
+				explain_result[4*(total_pieces - j-1)] = explain_result[4*j];
+				explain_result[4*j] = tmp;
+
+				tmp = explain_result[4*(total_pieces - j-1)+1];
+				explain_result[4*(total_pieces - j-1)+1] = explain_result[4*j+1];
+				explain_result[4*j+1] = tmp;
+
+				tmp = explain_result[4*(total_pieces - j-1)+2];
+				explain_result[4*(total_pieces - j-1)+2] = explain_result[4*j+2];
+				explain_result[4*j+2] = tmp;
+
+				tmp = explain_result[4*(total_pieces - j-1)+3];
+				explain_result[4*(total_pieces - j-1)+3] = explain_result[4*j+3];
+				explain_result[4*j+3] = tmp;
+			}
+			for (j = 0; j < total_pieces; j++)
+			{
+				int indels_in_section = (explain_result[4*j+3] & 0xffff)>>4;
+				if(indels_in_section > 0x800)indels_in_section -= 0x1000;
+				int indels_point = explain_result[4*j+3]>>16;
+				//			printf("indels_in_section=%d\n",indels_in_section);
+				int good_quality = explain_result[4*j+3] & 0x8;
+				if(indels_point > f_search_head && indels_point < b_search_tail) indels_in_section=0;
+				if(j >0 || good_quality)
+					explain_result[4*j] -= (explain_result[4*j+2]-explain_result[4*j+1] + indels_in_section);
+				else
+					explain_result[4*j] -= (explain_result[4*j+2]-explain_result[4*j+1]);
+			}
+
+			if (total_pieces >0)f_search_head = explain_result[(total_pieces-1)*4 + 1];
+
+			explain_buff [0] = explain_result[4*(total_pieces-1)];
+			explain_buff [1] = f_search_head;
+
+			//printf("VVV=%d\n", result_head_modify);
+			//halves_record -> best_pos1_list[i] += result_head_modify;
+
+
+#ifdef DEBUG
+			printf ("\n%s %s\nF-SEARCH RANGE [%d - END] ; POS=%u ; P1_Indel=%d ; P2_Indel = %d\n",nameb, inb ,f_search_head ,explain_result[(total_pieces-1)*4],  halves_record ->indel_in_piece1[i],  halves_record ->indel_in_piece2[i]);
+#endif
+
+			result_number_pieces = 0,  result_total_matched_bases = 0;
+			junction_tree_f_explorer(bed_table, pos_table, connection_table, inb + f_search_head , rl - f_search_head, rl , explain_result[(total_pieces-1)*4], 0, explain_buff, 0, &result_total_matched_bases , explain_result+ 4 * (total_pieces>0?(total_pieces-1):0),  &result_number_pieces, my_value_array_index, ginp, result_head_modify, qualityb+ f_search_head,  EXON_FASTQ_FORMAT, match_score);
+
+			total_total_matched_bases = result_total_matched_bases;
+
+		}
+
+		/*
+		if (total_total_matched_bases < 0.8 * (rl - f_search_head))
+		{
+			is_settle=0;
+			result_number_pieces = 0;
+			total_pieces = 0;
+		}*/
+
+		if (result_number_pieces >0)
+			total_pieces += result_number_pieces -1;
+		else{	
+			total_pieces=0;
+			is_settle=0;
+		}
+
+
+
+#ifdef DEBUG
+
+
+
+		printf ("\nFSEARCH FROM %d MATCH BASES=%d/%d; PIECES=%d\n" , f_search_head, result_total_matched_bases, rl - f_search_head, result_number_pieces );
+		for (xx=0; xx<total_pieces;xx++)
+		{
+			char * chro_name;
+			unsigned int chro_pos;
+
+			unsigned int piece_start_pos = explain_result[xx*4];
+			int piece_start = explain_result[xx*4+1];
+			int piece_end = explain_result[xx*4+2];
+
+			locate_gene_position(piece_start_pos, &_global_offsets, &chro_name, &chro_pos);
+			chro_pos -= piece_start ;
+
+			printf ("FS-RES(ALL): [%d ~ %d  %c %s,%d] \n", piece_start, piece_end, ((ginp2 && (i % 2)) + negative_strand == 1)?'~':'@', chro_name , chro_pos);
+		}
+
+#endif
+
+
+		if (total_pieces>4)
+			is_settle = 0;
+
+		char cigar_buf[100];
+
+		if (total_pieces>=2)
+		{
+
+
+			if(halves_record -> best_vote2_list[i]<1 || halves_record -> best_vote1_list[i]<2) 
+			{
+				if (!((halves_record -> half_marks_list[i] & IS_RECOVERED_JUNCTION_READ_STEP4) || (halves_record -> half_marks_list[i] & IS_RECOVERED_JUNCTION_READ)))
+				{
+					if (tolerable_scan)
+						halves_record -> half_marks_list[i] |= IS_RECOVERED_JUNCTION_READ_STEP4;
+					else
+						halves_record -> half_marks_list[i] |= IS_RECOVERED_JUNCTION_READ;
+				}
+				halves_record -> best_vote2_list[i]= max(1, halves_record -> best_vote2_list[i]);
+				halves_record -> best_vote1_list[i]= max(2, halves_record -> best_vote1_list[i]);
+				halves_record -> best_pos2_list[i] = explain_result[0];
+				halves_record -> splice_point_list[i] = 0;
+			}
+
+
+			cigar_buf[0]=0;
+			if (is_settle)
+			{
+				int last_indel = 0;
+				for (j = 0; j < total_pieces; j++)
+				{
+					char cigar_piece[100];
+
+					int indel_pos, indel_length;
+					int is_good_piece = explain_result[ 4*j+3] & 0x8;
+					indel_length = (explain_result[ 4*j+3] & 0xffff)>>4;
+					if(indel_length > 0x800)indel_length -= 0x1000; 					
+					indel_pos = explain_result[ 4*j+3]>>16;
+
+					if(indel_length && is_good_piece)
+					{
+						int len_p1 =  indel_pos - explain_result[ 4*j+1] , len_p2 = explain_result[ 4*j+2] - indel_pos +min(0, indel_length);
+
+						if( ( len_p1>0)  && (len_p2 > 0))
+							sprintf (cigar_piece, "%dM%d%c%dM", len_p1,  abs(indel_length), indel_length>0?'D':'I', len_p2);
+						else
+						{
+							halves_record -> best_vote1_list[i]=0;
+							halves_record -> best_vote2_list[i]=0;
+						}
+					}
+					else{
+						if(explain_result[ 4*j+2]- explain_result[ 4*j+1] >0)
+							sprintf (cigar_piece, "%dM", explain_result[ 4*j+2]- explain_result[ 4*j+1] );
+						else
+						{
+							halves_record -> best_vote1_list[i]=0;
+							halves_record -> best_vote2_list[i]=0;
+						}
+					}
+					strcat(cigar_buf, cigar_piece);
+					if (j<total_pieces-1)
+					{
+#ifdef TEST_TARGET
+						if(memcmp(inb, TEST_TARGET, 15)==0)
+							printf("CIGAR- %dN p1=%u p2=%u pos_def=%d, half1=%d, indel=%d\n", explain_result[4*j+4]- (explain_result[ 4*j] + explain_result[ 4*j+2] - explain_result[4*j+1] + indel_length), explain_result[4*j+4]  , explain_result[4*j]  , explain_result[4*j+4] - explain_result[4*j],  explain_result[ 4*j+2] - explain_result[4*j+1] + indel_length,  indel_length);
+#endif
+						sprintf (cigar_piece, "%dN",explain_result[4*j+4]- (explain_result[ 4*j] + explain_result[ 4*j+2] - explain_result[4*j+1] + indel_length));
+						strcat(cigar_buf, cigar_piece);
+						last_indel = indel_length;
+
+					}
+
+
+				}
+			}/*
+			    else
+			    {
+			    unsigned int pos_small = min(halves_record -> best_pos1_list[i], halves_record -> best_pos2_list[i]);
+			    int h1_len = (halves_record -> is_reversed_list[i]) ? (rl - halves_record ->splice_point_list[i]) : halves_record ->splice_point_list[i];
+			    long long int dist =  pos_small;
+			    dist -= pos_small;
+			    sprintf (cigar_buf, "%dM%dN%dM",  h1_len , (int)abs(dist), rl - h1_len);
+			    }*/
+			strncpy(halves_record -> cigar_string_buffer + i * EXON_MAX_CIGAR_LEN, cigar_buf, EXON_MAX_CIGAR_LEN-1);
+
+
+			if (tolerable_scan)
+			{
+				for(j=0 ; j < total_pieces -1; j++)
+				{
+					paired_exon_key search_key;
+
+					int this_step_indels = (explain_result[4*j+3]&0xffff)>>4;
+					if(this_step_indels > 0x800) this_step_indels -= 0x1000;
+					int is_good_piece = (explain_result[4*j+3]&0xf)>>3;
+
+					if(!is_good_piece)continue;
+
+					unsigned int pos_small = min(explain_result[4*j] + explain_result[4*j+2] - explain_result[4*j+1] + this_step_indels, explain_result[4*j+4]);
+					unsigned int pos_big   = max(explain_result[4*j] + explain_result[4*j+2] - explain_result[4*j+1] + this_step_indels, explain_result[4*j+4]);
+					search_key.small_key = pos_small;
+					search_key.big_key = pos_big;
+
+					int *search_res = (int*) HashTableGet(bed_table, &search_key);
+					//assert(search_res);
+					if(search_res)
+						(*search_res)++;
+#ifdef DEBUG
+					printf("FINAL RECOVERED-IS-FINISH\n");
+#endif
+
+				}
+				if(is_settle)
+					halves_record -> best_pos1_list[i] = explain_result[0];
+			}
+
+			compress_cigar(cigar_buf, rl, inb);
+			halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, explain_result[0], inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT);
+			if(halves_record -> final_quality [i] < 10)	
+				printf("QUAL=%.4f POS=%u READ=%s", halves_record -> final_quality [i] ,  explain_result[0] , inb);
+		}
+		else if(is_settle)
+		{
+			halves_record -> best_vote1_list[i] = max(9, halves_record -> best_vote1_list[i]);
+			halves_record -> best_vote2_list[i] = 0;
+			halves_record -> best_pos1_list[i] = explain_result[0];
+
+			if (!((halves_record -> half_marks_list[i] & IS_RECOVERED_JUNCTION_READ_STEP4) || (halves_record -> half_marks_list[i] & IS_RECOVERED_JUNCTION_READ)))
+			{
+				if (tolerable_scan)
+					halves_record -> half_marks_list[i] |= IS_RECOVERED_JUNCTION_READ_STEP4;
+				else
+					halves_record -> half_marks_list[i] |= IS_RECOVERED_JUNCTION_READ;
+			}
+		}
 		halves_record -> half_marks_list[i] |= IS_PROCESSED_READ_R2;
+
+		if (is_settle)
+			halves_record -> half_marks_list[i] |= IS_FINALISED_PROCESSING;
+		else if (0&&qualityb[0])
+		{
+			int good_read=0, all_read=0;
+			for(j = 0; j < rl; j+=16)
+			{
+				char * quality_str = qualityb + j;
+				char * read_str = inb + j;
+				gene_quality_score_t read_qual = get_subread_quality(quality_str, read_str, 1, EXON_FASTQ_FORMAT);
+				if (read_qual > 0.95)good_read ++; 
+				//		printf("POS=%d ; QR=%.6f\n", j, read_qual);
+				all_read++;
+			}
+
+
+			if (good_read < all_read * 0.5){
+
+				if(halves_record -> best_vote2_list[i]>=1 && halves_record -> best_vote1_list[i]>=2)
+				{
+					paired_exon_key search_key;
+					unsigned int pos_small = halves_record -> splice_point_list[i] + min(halves_record -> best_pos1_list[i] + halves_record -> splice_point_offset_1[i], halves_record -> best_pos2_list[i]+ halves_record -> splice_point_offset_2[i]);
+					unsigned int pos_big   = halves_record -> splice_point_list[i] + max(halves_record -> best_pos1_list[i] + halves_record -> splice_point_offset_1[i], halves_record -> best_pos2_list[i]+ halves_record -> splice_point_offset_2[i]);
+					search_key.small_key = pos_small;
+					search_key.big_key = pos_big;
+
+					int *search_res = (int*) HashTableGet(bed_table, &search_key);
+					if(search_res)
+						(*search_res)++;
+				}
+
+				halves_record -> half_marks_list[i] |= IS_FINALISED_PROCESSING;
+			}
+		}
+
+		if(0)if(11111)if ( tolerable_scan && !(halves_record -> half_marks_list[i] & IS_FINALISED_PROCESSING))
+		{
+			if(halves_record -> best_vote2_list[i]>=EXON_MIN_HALF_VOTES + 6 && halves_record -> best_vote1_list[i]>=EXON_MIN_HALF_VOTES + 6)
+			{
+				paired_exon_key search_key;
+
+
+				unsigned int pos_R1 = halves_record -> splice_point_list[i]+ halves_record -> best_pos1_list[i] - (halves_record -> best_pos1_list[i] < halves_record -> best_pos2_list[i]?  halves_record -> splice_point_offset_1[i]: halves_record ->  splice_point_offset_2[i]);
+				unsigned int pos_R2 = halves_record -> splice_point_list[i]+ halves_record -> best_pos2_list[i] - (halves_record -> best_pos1_list[i] > halves_record -> best_pos2_list[i]?  halves_record -> splice_point_offset_1[i]: halves_record -> splice_point_offset_2[i]);
+				search_key.small_key = min(pos_R1 , pos_R2);
+				search_key.big_key = max(pos_R1, pos_R2);
+
+#ifdef DEBUG
+				printf("FINAL SUPPORT: %u, %u\nRAW: %u, %u\n BP:%d\n", pos_R1, pos_R2, halves_record -> best_pos1_list[i] , halves_record -> best_pos2_list[i], halves_record -> splice_point_list[i]);
+#endif
+				int *search_res = (int*) HashTableGet(bed_table, &search_key);
+
+				//assert(search_res);
+				if(search_res)
+					(*search_res)++;
+				//else
+				//	printf("TEST i=%d JUNCTION %u %u RAW %u %u    offset1,2 = %d %d\n\"%s\"\n",i, pos_R1, pos_R2, halves_record -> best_pos1_list[i], halves_record -> best_pos2_list[i] , halves_record -> splice_point_offset_1[i],  halves_record -> splice_point_offset_2[i], inb);
+
+				int h1_len =halves_record ->splice_point_list[i] ; // (halves_record -> is_reversed_list[i]) ? (rl - halves_record ->splice_point_list[i]) : halves_record ->splice_point_list[i];
+				long long int dist =  pos_R1;
+				dist -= pos_R2;
+				dist = abs(dist);
+				sprintf (cigar_buf, "%dM%dN%dM",  h1_len , (int)(dist), rl - h1_len);
+				strncpy(halves_record -> cigar_string_buffer + i * EXON_MAX_CIGAR_LEN, cigar_buf, EXON_MAX_CIGAR_LEN-1);
+
+
+				compress_cigar(cigar_buf, rl, inb);
+				halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, min(pos_R1, pos_R2), inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT);
+
+#ifdef DEBUG
+				printf("FINAL RECOVERED-NO-FINISH QUAL=%f READ=%s\n", halves_record -> final_quality [i], inb);
+#endif
+			}
+
+		}
+
 		i++;
 
 	}
@@ -666,9 +1419,474 @@ void put_connection_table(HashTable *connection_table, unsigned int p1, unsigned
 	connect_to ->is_opposite_reversed[i] = is_p2_reversed;
 
 	if (i<MAX_EXON_CONNECTIONS-1) connect_to -> connect_to[1+i]=0;
-	
+
 }
-void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table,  halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads, gene_value_index_t * my_value_array_index, int first_index, int last_index)
+
+
+#define SHORT_EXON_MIN_LENGTH 13
+#define SHORT_EXON_WINDOW 6
+#define SHORT_EXON_EXTEND 9500
+
+
+
+void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * connection_table, HashTable * bed_table, HashTable * pos_table, unsigned int P1_Pos, unsigned int P2_Pos, short read_coverage_start, short read_coverage_end,  gene_value_index_t *base_index, int space_type, int is_negative, int tolerable_scan)
+{
+	char inb[1201], qualityb[1201];
+	if (!EXON_EXTENDING_SCAN) return;
+
+	strcpy(inb, inb0);
+	strcpy(qualityb, qualityb0);
+	if (is_negative)
+	{
+		short tmps;
+		tmps = read_coverage_end;
+		read_coverage_end = read_coverage_start;
+		read_coverage_start = tmps;
+
+		reverse_read(inb, rl, space_type);
+		if(qualityb[0])reverse_quality(qualityb, rl);
+	}
+	unsigned int pos_small=min(P1_Pos, P2_Pos), pos_big = max(P1_Pos, P2_Pos);
+
+	int max_score , test_score;
+	unsigned int best_j1_edge=0 , best_j2_edge=0;
+	int need_to_test = 0;
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+// SCAN TO THE HEAD  /////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+
+	if (read_coverage_start  > SHORT_EXON_MIN_LENGTH)
+	{
+		max_score = -1;
+		if(SHORT_EXON_MIN_LENGTH *0.75 > match_chro(inb, base_index, pos_small, SHORT_EXON_MIN_LENGTH , 0, space_type))
+		{
+
+			int delta_pos, is_indel = 0;
+			for(delta_pos=-3; delta_pos <=3; delta_pos ++)
+			{
+				if(match_chro(inb, base_index, pos_small + delta_pos, SHORT_EXON_MIN_LENGTH , 0, space_type) >= SHORT_EXON_MIN_LENGTH-1)
+				{
+					is_indel = 1;
+					break;
+				}
+			}
+			// The head of the read is incorrect. Do we need to search a long way?
+			// See if there is a donor in the head area.
+			int test_donor_pos;
+			char cc[3];
+			cc[2]=0;
+
+			if(!is_indel)
+				for(test_donor_pos = SHORT_EXON_MIN_LENGTH ; test_donor_pos < read_coverage_start ; test_donor_pos ++)
+				{
+					get_chro_2base(cc, base_index, pos_small + test_donor_pos, 0);
+					if(is_donar_chars_part(cc))
+					{
+						need_to_test = 1;
+						break;
+					}
+				}
+		}
+	}
+
+	max_score = -999;
+
+	if(need_to_test)
+	{
+		unsigned int test_end = pos_small - SHORT_EXON_EXTEND;
+		if(SHORT_EXON_EXTEND > pos_small) test_end = 0;
+
+		unsigned int new_pos = pos_small-16;
+		while(1)
+		{
+			new_pos = match_chro_range(inb,  base_index, new_pos, SHORT_EXON_MIN_LENGTH , new_pos - test_end , SEARCH_BACK);
+			if(new_pos==0xffffffff) break;
+			// There is an exact match. See if the donor/receptors are matched.
+			// new_pos is the new head position of the read.
+			int splice_point;
+			for(splice_point = SHORT_EXON_MIN_LENGTH; splice_point < read_coverage_start +5; splice_point ++)
+			{
+				char cc[3];
+				cc[2]=0;
+				char cc2[3];
+				cc2[2]=0;
+
+				get_chro_2base(cc, base_index, pos_small + splice_point -2, 0);
+				if(is_donar_chars_part(cc))
+				{
+					get_chro_2base(cc2, base_index, new_pos + splice_point, 0);
+					if(is_donar_chars_part(cc2) && paired_chars_part(cc2 , cc, 0)) 
+					{
+						int matched_in_exon_old = match_chro(inb + splice_point, base_index, pos_small + splice_point , SHORT_EXON_WINDOW , 0, space_type);
+						int matched_in_exon_new = match_chro(inb, base_index, new_pos , splice_point, 0, space_type);
+
+						if(matched_in_exon_new < splice_point || matched_in_exon_old < SHORT_EXON_WINDOW ) 
+							continue;
+
+						test_score = 1000000+ (matched_in_exon_new )*10000  + matched_in_exon_old * 1000 + new_pos - test_end;
+						if(test_score > max_score)
+						{
+							max_score = test_score;
+							best_j1_edge = new_pos + splice_point;
+							best_j2_edge = pos_small + splice_point;
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+	if(max_score>0)
+	{
+
+		unsigned int pos_small_x, pos_big_x;
+		pos_small_x = get_grouped_position(pos_table, best_j1_edge);
+		pos_big_x = get_grouped_position(pos_table, best_j2_edge);
+
+		paired_exon_key search_key; 
+		search_key.small_key = pos_small_x;
+		search_key.big_key = pos_big_x;
+
+		put_connection_table(connection_table, pos_small_x, pos_big_x, is_negative, is_negative);
+		put_connection_table(connection_table, pos_big_x, pos_small_x, is_negative, is_negative);
+
+		//if (tolerable_scan && !(halves_record ->half_marks_list[i] & IS_FINALISED_PROCESSING))
+		//	printf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
+		int *search_res = (int*) HashTableGet(bed_table, &search_key);
+		if(!search_res)
+		{
+			search_res = (int *)malloc(sizeof(int));
+			*search_res = tolerable_scan? 0x80000000 : 0;
+			paired_exon_key * new_key = (paired_exon_key *) malloc(sizeof(paired_exon_key));
+			new_key->small_key = pos_small_x;
+			new_key->big_key = pos_big_x;
+			HashTablePut(bed_table, new_key, search_res);
+		}
+	}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+// SCAN TO THE TAIL  /////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+	need_to_test = 0;
+	max_score = -999;
+
+
+	if (read_coverage_end< rl - SHORT_EXON_MIN_LENGTH)
+	{
+
+		if(SHORT_EXON_MIN_LENGTH *0.75 > match_chro(inb + rl - SHORT_EXON_MIN_LENGTH, base_index, pos_big + rl - SHORT_EXON_MIN_LENGTH, SHORT_EXON_MIN_LENGTH , 0, space_type))
+		{
+
+
+			int delta_pos, is_indel = 0;
+			for(delta_pos=-3; delta_pos <=3; delta_pos ++)
+			{
+				if(match_chro(inb + rl - SHORT_EXON_MIN_LENGTH, base_index, pos_big + rl - SHORT_EXON_MIN_LENGTH + delta_pos, SHORT_EXON_MIN_LENGTH , 0, space_type) >= SHORT_EXON_MIN_LENGTH-1)
+				{
+					is_indel = 1;
+					break;
+				}
+			}
+			// The head of the read is incorrect. Do we need to search a long way?
+			// See if there is a donor in the head area.
+			int test_donor_pos;
+			char cc[3];
+			cc[2]=0;
+
+			if(!is_indel)
+				for(test_donor_pos = read_coverage_end  ; test_donor_pos < rl ; test_donor_pos ++)
+				{
+					get_chro_2base(cc, base_index, pos_big + test_donor_pos, 0);
+					if(is_donar_chars_part(cc))
+					{
+						need_to_test = 1;
+						break;
+					}
+				}
+		}
+	}
+
+
+	if(need_to_test)
+	{
+		unsigned int test_end = pos_big + SHORT_EXON_EXTEND;
+		if(test_end > base_index -> length + base_index -> start_point) test_end = base_index -> length + base_index -> start_point;
+
+		unsigned int new_pos = pos_big +rl - SHORT_EXON_MIN_LENGTH +16;
+
+		while(1)
+		{
+			new_pos = match_chro_range(inb + rl - SHORT_EXON_MIN_LENGTH,  base_index, new_pos, SHORT_EXON_MIN_LENGTH , test_end - new_pos , SEARCH_FRONT);
+			if(new_pos==0xffffffff) break;
+			// There is an exact match. See if the donor/receptors are matched.
+			// (new_pos + SHORT_EXON_MIN_LENGTH -rl + splice_point) is the new exon start.
+
+			int splice_point;
+			for(splice_point = read_coverage_end -5 ; splice_point < rl -  SHORT_EXON_MIN_LENGTH; splice_point ++)
+			{
+				char cc[3];
+				cc[2]=0;
+				char cc2[3];
+				cc2[2]=0;
+
+				unsigned int new_pos_tail = (new_pos + SHORT_EXON_MIN_LENGTH -rl + splice_point);
+
+				get_chro_2base(cc, base_index, pos_big + splice_point, 0);
+				if(is_donar_chars_part(cc))
+				{
+					get_chro_2base(cc2, base_index, new_pos_tail -2, 0);
+					if(is_donar_chars_part(cc2) && paired_chars_part(cc , cc2, 0)) 
+					{
+						int matched_in_exon_new = match_chro(inb + splice_point, base_index, new_pos_tail , rl - splice_point , 0, space_type);
+						int matched_in_exon_old = match_chro(inb + splice_point - SHORT_EXON_WINDOW , base_index, pos_big + splice_point - SHORT_EXON_WINDOW , SHORT_EXON_WINDOW, 0, space_type);
+
+						if(matched_in_exon_new < (rl - splice_point) || matched_in_exon_old < SHORT_EXON_WINDOW)
+							continue;
+
+						test_score = 1000000+ (matched_in_exon_new)*10000 + matched_in_exon_old * 1000  + test_end - new_pos;
+						if(test_score > max_score)
+						{
+							max_score = test_score;
+							best_j1_edge = pos_big + splice_point;
+							best_j2_edge = new_pos_tail;
+						}
+					}
+				}
+			}
+
+		}
+	}
+
+
+	if(max_score>0)
+	{
+
+		unsigned int pos_small_x, pos_big_x;
+		pos_small_x = get_grouped_position(pos_table, best_j1_edge);
+		pos_big_x = get_grouped_position(pos_table, best_j2_edge);
+
+		paired_exon_key search_key; 
+		search_key.small_key = pos_small_x;
+		search_key.big_key = pos_big_x;
+
+		put_connection_table(connection_table, pos_small_x, pos_big_x, is_negative, is_negative);
+		put_connection_table(connection_table, pos_big_x, pos_small_x, is_negative, is_negative);
+
+		//if (tolerable_scan && !(halves_record ->half_marks_list[i] & IS_FINALISED_PROCESSING))
+		//	printf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
+		int *search_res = (int*) HashTableGet(bed_table, &search_key);
+		if(!search_res)
+		{
+			search_res = (int *)malloc(sizeof(int));
+			*search_res = tolerable_scan? 0x80000000 : 0;
+			paired_exon_key * new_key = (paired_exon_key *) malloc(sizeof(paired_exon_key));
+			new_key->small_key = pos_small_x;
+			new_key->big_key = pos_big_x;
+			HashTablePut(bed_table, new_key, search_res);
+		}
+	}
+}
+
+void search_short_exons_old(char * inb0, char * qualityb0, int rl, HashTable * connection_table, HashTable * bed_table, HashTable * pos_table, unsigned int P1_Pos, unsigned int P2_Pos, short read_coverage_start, short read_coverage_end,  gene_value_index_t *base_index, int space_type, int is_negative, int tolerable_scan)
+{
+	int i;
+	char inb[1201], qualityb[1201];
+	if (!EXON_EXTENDING_SCAN) return;
+
+	strcpy(inb, inb0);
+	strcpy(qualityb, qualityb0);
+	if (is_negative)
+	{
+		short tmps;
+		tmps = read_coverage_end;
+		read_coverage_end = read_coverage_start;
+		read_coverage_start = tmps;
+
+		reverse_read(inb, rl, space_type);
+		if(qualityb[0])reverse_quality(qualityb, rl);
+	}
+	unsigned int pos_small=min(P1_Pos, P2_Pos), pos_big = max(P1_Pos, P2_Pos);
+
+	float max_score , test_score;
+	unsigned int best_j1_edge=0 , best_j2_edge=0;
+	if (read_coverage_start > SHORT_EXON_MIN_LENGTH)// && bad_quality_base_number(qualityb, read_coverage_start, EXON_FASTQ_FORMAT)< 2)
+	{
+		max_score = -1;
+		int window_end = read_coverage_start + SHORT_EXON_WINDOW + 3;
+		if(8 > match_chro(inb, base_index, pos_small, SHORT_EXON_MIN_LENGTH , 0, space_type))
+		{
+			for(; window_end>=SHORT_EXON_WINDOW+SHORT_EXON_MIN_LENGTH; window_end --)
+			{
+				int matched_in_exon , matched_out_exon;
+				matched_in_exon = match_chro(inb + window_end - SHORT_EXON_WINDOW, base_index, pos_small + window_end - SHORT_EXON_WINDOW , SHORT_EXON_WINDOW , 0, space_type);
+				matched_out_exon = match_chro(inb + window_end - SHORT_EXON_WINDOW*2, base_index, pos_small + window_end - 2*SHORT_EXON_WINDOW , SHORT_EXON_WINDOW , 0, space_type);
+				//		printf("\n MAT_IN=%d  MAT_OUT=%d\n",matched_in_exon,matched_out_exon );
+				test_score = 100000 + matched_in_exon - matched_out_exon;
+				if(matched_in_exon >= SHORT_EXON_WINDOW && matched_out_exon <= SHORT_EXON_WINDOW -1 )
+				{
+					// test donor
+					char cc[3];
+					cc[2]=0;
+					get_chro_2base(cc, base_index, pos_small + window_end - SHORT_EXON_WINDOW-2, 0);
+					if(is_donar_chars_part(cc))
+					{
+						//				printf("%s FOUND!\n", cc);
+						unsigned int new_pos = pos_small + window_end - SHORT_EXON_WINDOW-3;
+						while(1)
+						{
+							new_pos = match_chro_range(inb,  base_index, new_pos, window_end - SHORT_EXON_WINDOW , SHORT_EXON_EXTEND - ( pos_small + window_end - SHORT_EXON_WINDOW-3 - new_pos), SEARCH_BACK);
+							//printf("%s BBT=%u\n", inb , new_pos);
+							if(new_pos==0xffffffff) break;
+							char cc2[3];
+							cc2[2]=0;
+								//						printf("%u FOUND!\n", i);
+							get_chro_2base(cc2, base_index, new_pos + window_end - SHORT_EXON_WINDOW, 0);
+							if(is_donar_chars_part(cc2) && paired_chars_part(cc2 , cc, 0)) 
+							{
+								if(test_score > max_score + 0.0001)
+								{
+			//						printf("%s ACCBBT=%u ; S=%.5f\n", inb , new_pos , test_score);
+									best_j1_edge = new_pos + window_end - SHORT_EXON_WINDOW;
+									best_j2_edge = pos_small + window_end - SHORT_EXON_WINDOW;
+									max_score = test_score;
+								}
+							}
+							//new_pos-=4;
+						}
+					}
+				}
+			}
+		}
+		if(max_score>0)
+		{
+
+			unsigned int pos_small_x, pos_big_x;
+			pos_small_x = get_grouped_position(pos_table, best_j1_edge);
+			pos_big_x = get_grouped_position(pos_table, best_j2_edge);
+
+			paired_exon_key search_key; 
+			search_key.small_key = pos_small_x;
+			search_key.big_key = pos_big_x;
+
+			put_connection_table(connection_table, pos_small_x, pos_big_x, is_negative, is_negative);
+			put_connection_table(connection_table, pos_big_x, pos_small_x, is_negative, is_negative);
+
+			//if (tolerable_scan && !(halves_record ->half_marks_list[i] & IS_FINALISED_PROCESSING))
+			//	printf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
+			int *search_res = (int*) HashTableGet(bed_table, &search_key);
+			if(!search_res)
+			{
+				search_res = (int *)malloc(sizeof(int));
+				*search_res = tolerable_scan? 0x80000000 : 0;
+				paired_exon_key * new_key = (paired_exon_key *) malloc(sizeof(paired_exon_key));
+				new_key->small_key = pos_small_x;
+				new_key->big_key = pos_big_x;
+				HashTablePut(bed_table, new_key, search_res);
+			}
+		}
+	}
+
+	if (read_coverage_end < rl - SHORT_EXON_MIN_LENGTH)// && bad_quality_base_number(qualityb + read_coverage_end, rl - read_coverage_start, EXON_FASTQ_FORMAT )< 2)
+	{
+		max_score = -1;
+		int window_start = read_coverage_end - SHORT_EXON_WINDOW - 3;
+		if(8 > match_chro(inb + rl - SHORT_EXON_MIN_LENGTH, base_index, pos_big + rl - SHORT_EXON_MIN_LENGTH, SHORT_EXON_MIN_LENGTH , 0, space_type))
+		{
+
+			for(; window_start<= rl -SHORT_EXON_WINDOW - SHORT_EXON_MIN_LENGTH; window_start++)
+			{
+				int matched_in_exon , matched_out_exon;
+				matched_in_exon = match_chro(inb + window_start, base_index, pos_big + window_start , SHORT_EXON_WINDOW , 0, space_type);
+				matched_out_exon = match_chro(inb + window_start + SHORT_EXON_WINDOW, base_index, pos_big + window_start +SHORT_EXON_WINDOW , SHORT_EXON_WINDOW , 0, space_type);
+				test_score = 100000 + matched_in_exon - matched_out_exon;
+				//		printf("\n MAT_IN=%d  MAT_OUT=%d\n",matched_in_exon,matched_out_exon );
+				if(matched_in_exon >= SHORT_EXON_WINDOW  && matched_out_exon <= SHORT_EXON_WINDOW - 1)
+				{
+					// test donor
+					char cc[3];
+					cc[2]=0;
+					get_chro_2base(cc, base_index, pos_big + window_start + SHORT_EXON_WINDOW, 0);
+					if(is_donar_chars_part(cc))
+					{
+
+						//				printf("%s FOUND!\n", cc);
+
+						unsigned int new_pos = pos_big + window_start + SHORT_EXON_WINDOW ;
+						while(1)
+						{
+
+							//printf("%s FFT=%u\n", inb , new_pos);
+							new_pos = match_chro_range(inb +  window_start + SHORT_EXON_WINDOW,  base_index, new_pos, rl - window_start - SHORT_EXON_WINDOW , SHORT_EXON_EXTEND - (new_pos - pos_big + window_start), SEARCH_FRONT);
+							if(new_pos==0xffffffff) break;
+
+							//printf("%s FFT=%u\n", inb , new_pos);
+							char cc2[3];
+							cc2[2]=0;
+							//						printf("%u FOUND!\n", pos_small- new_pos);
+							get_chro_2base(cc2, base_index, new_pos -2, 0);
+							if(is_donar_chars_part(cc2) && paired_chars_part(cc , cc2, 0))
+							{
+
+								if(test_score > max_score+0.0001)
+								{
+		//							printf("%s ACCFFT=%u ; S=%.5f\n", inb , new_pos , test_score);
+									best_j1_edge = pos_big + window_start + SHORT_EXON_WINDOW;
+									best_j2_edge = new_pos;
+									max_score = test_score;
+								}
+							}
+							//new_pos+=4;
+						}
+					}
+				}
+			}
+		}
+
+		if(max_score>0)
+		{
+
+
+			pos_small = get_grouped_position(pos_table, best_j1_edge);
+			pos_big = get_grouped_position(pos_table, best_j2_edge);
+
+			paired_exon_key search_key; 
+			search_key.small_key = pos_small;
+			search_key.big_key = pos_big;
+
+
+
+			put_connection_table(connection_table, pos_small, pos_big, is_negative, is_negative);
+			put_connection_table(connection_table, pos_big, pos_small, is_negative, is_negative);
+
+			//if (tolerable_scan && !(halves_record ->half_marks_list[i] & IS_FINALISED_PROCESSING))
+			//	printf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
+
+			int *search_res = (int*) HashTableGet(bed_table, &search_key);
+			if(!search_res)
+			{
+				search_res = (int *)malloc(sizeof(int));
+				*search_res = tolerable_scan? 0x80000000 : 0;
+				paired_exon_key * new_key = (paired_exon_key *) malloc(sizeof(paired_exon_key));
+				new_key->small_key = pos_small;
+				new_key->big_key = pos_big;
+				HashTablePut(bed_table, new_key, search_res);
+			}
+		}
+	}
+
+}
+
+
+void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * connection_table,  halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads, gene_value_index_t * my_value_array_index, int first_index, int last_index, int tolerable_scan)
 {
 	int i=0, ic=0;
 	while (1)
@@ -683,26 +1901,44 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 		unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
 		unsigned int pos2 = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos2_list[i]:halves_record -> best_pos1_list[i];
 
-
 		if (ginp2 && (i % 2))
 			rl = geinput_next_read(ginp2, nameb, inb, qualityb);
 		else
 			rl = geinput_next_read(ginp, nameb, inb, qualityb);
+
+		if (ginp2 && (i % 2))
+			reverse_read(inb, rl, ginp2->space_type);
+
 		if (rl<0){
 			break;
 		}
 
-		if (!first_index)
-		if (min(pos, pos2) < my_value_array_index -> start_base_offset + 1000)
+#ifdef TEST_TARGET
+		if(memcmp(TEST_TARGET, inb,15)==0)
 		{
-			i++; continue;
+			printf("RAW i=%d PRE TEST DONOR = %u, %u\n", i, halves_record -> best_pos1_list[i] ,halves_record -> best_pos2_list[i]);
 		}
+#endif
+
+		/*
+		   if (tolerable_scan && (halves_record -> half_marks_list[i] & IS_FINALISED_PROCESSING))
+		   {
+		   i++;
+		   continue;
+		   }
+		 */
+
+		if (!first_index)
+			if (min(pos, pos2) < my_value_array_index -> start_base_offset + 1000)
+			{
+				i++; continue;
+			}
 
 		if (!last_index)
-		if (max(pos, pos2)  > my_value_array_index -> start_base_offset+ my_value_array_index ->length - 1000)
-		{
-			i++; continue;
-		}
+			if (max(pos, pos2)  > my_value_array_index -> start_base_offset+ my_value_array_index ->length - 1000)
+			{
+				i++; continue;
+			}
 
 		if (IS_PROCESSED_READ & halves_record -> half_marks_list[i])
 		{
@@ -710,37 +1946,80 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 			continue;
 		}
 
+		//printf("FEED-P2 v1=%d, v2=%d\n", halves_record -> best_vote1_list[i] ,halves_record -> best_vote2_list[i] );
 		long long int dist = halves_record -> best_pos1_list[i] ;
 		dist-= halves_record -> best_pos2_list[i];
 
-		if(halves_record -> best_vote1_list[i]>=2 && halves_record -> best_vote2_list[i]>=1 )
+
+		if(halves_record -> best_vote1_list[i]>= (1+(tolerable_scan==0)) && halves_record -> best_vote2_list[i]>=1 )
 		{
+			//printf("FEED-P3\n");
 			//char * chro_name;
 			//unsigned int chro_pos, chro_pos_small, chro_pos_large;
 			//char is_strong = (min(halves_record ->best_vote1_list[i],halves_record ->best_vote2_list[i])>5);
-			char short_overlap = !(halves_record -> half_marks_list[i] & IS_LONG_OVERLAP);
+
+			search_short_exons(inb, qualityb, rl, connection_table, bed_table, pos_table, halves_record -> best_pos1_list[i], halves_record -> best_pos2_list[i], halves_record -> read_coverage_start[i], halves_record -> read_coverage_end[i], my_value_array_index, ginp->space_type, halves_record -> is_reversed_list[i], tolerable_scan);
+			//char short_overlap = !(halves_record -> half_marks_list[i] & IS_LONG_OVERLAP);
 			char negative_strand = halves_record -> is_reversed_list[i];
 			int real_break_point;
 			char is_soft_condition = 0;
 			int test_range = rl / 4;
 			char is_accepted = 0;
+			int indel_offset_pos1=0, indel_offset_pos2=0;
 			int guess_break_point = (halves_record -> is_reversed_list[i]) ? (rl - halves_record ->splice_point_list[i]) : halves_record ->splice_point_list[i];
+			int best_donor_score =-1;
 
-
-			if (min(halves_record ->best_vote1_list[i],halves_record ->best_vote2_list[i]) >=4 && short_overlap)
+			if (min(halves_record ->best_vote1_list[i],halves_record ->best_vote2_list[i]) >=1)// && short_overlap)
 			{
-				int indel_x;
-				for(indel_x = 0; indel_x < 2*EXON_INDEL_TOLERANCE +1 ; indel_x ++)
+				int best_indel_p1 = -9999, best_indel_p2 = -9999;
+				int indel_x1;
+				for(indel_x1 = 0; indel_x1 < 2*EXON_INDEL_TOLERANCE +1 ; indel_x1 ++)
 				{
-					int indel_offset = ((indel_x %2)?1:-1) * ((indel_x+1)>>1);
-					is_accepted = test_donar(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index, indel_offset, negative_strand, ginp->space_type);
-					if (is_accepted) break;
+					int indel_offset1 = ((indel_x1 %2)?1:-1) * ((indel_x1+1)>>1);
+
+					int indel_x2;
+					for(indel_x2 = 0; indel_x2 < 2*EXON_INDEL_TOLERANCE +1 ; indel_x2 ++)
+					{
+
+						int indel_offset2 = ((indel_x2 %2)?1:-1) * ((indel_x2+1)>>1);
+						int test_donor_score=-1;
+						int test_real_break_point;
+
+						is_accepted = test_donor(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &test_real_break_point, my_value_array_index, indel_offset1, indel_offset2, negative_strand, ginp->space_type, halves_record ->best_vote2_list[i], &test_donor_score);
+
+						test_donor_score -= abs(indel_offset2)*1 + abs(indel_offset1)*1;
+
+						if (is_accepted  && (test_donor_score > best_donor_score)){
+							//if(best_donor_score >0)
+							//	printf("TEST SCORE=%d MAX=%d O1=%d O2=%d\n", test_donor_score , best_donor_score , indel_offset1, indel_offset2);
+							best_indel_p1 = indel_offset1;
+							best_indel_p2 = indel_offset2;
+							best_donor_score = test_donor_score;
+							real_break_point = test_real_break_point;
+						}
+					}
+				}
+
+				if(best_donor_score >0)
+				{
+					//printf("FINAL BEST SCORE=%d\n", best_donor_score);
+					indel_offset_pos1 = best_indel_p1;
+					indel_offset_pos2 = best_indel_p2;
+					halves_record ->splice_point_offset_1[i] = best_indel_p1;
+					halves_record ->splice_point_offset_2[i] = best_indel_p2;
+					is_accepted =1;
 				}
 			}
 			else
-				is_accepted = test_donar(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index,0, negative_strand, ginp->space_type);
+			{
+				is_accepted = test_donor(inb, rl, min(pos, pos2), max(pos,pos2), guess_break_point, negative_strand, test_range, is_soft_condition, EXON_INDEL_TOLERANCE, &real_break_point, my_value_array_index,0,0, negative_strand, ginp->space_type, halves_record ->best_vote2_list[i], &best_donor_score);
+				halves_record ->splice_point_offset_2[i]=0;
+				halves_record ->splice_point_offset_1[i]=0;
+			}
 
-			//printf ("PRE-ACCEPT=%d\n", is_accepted);
+			//if ((i % 2) && is_accepted)printf ("22 SECOND!\n");
+
+			//printf ("\nPRE-ACCEPT=%d\n", is_accepted);
 
 			if((! is_accepted) && EXON_FUSION_DETECTION && (halves_record -> half_marks_list[i] & IS_FUSION))
 			{
@@ -757,13 +2036,17 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 					real_break_point = guess_break_point;
 				}
 			}
-	
+
 
 			if (is_accepted)
 			{
 				// real_break_point is on chromosome: pos+real_break_point / pos2 + real_break_point are end/start of exons
-				unsigned int pos_R1 = real_break_point+ halves_record -> best_pos1_list[i];
-				unsigned int pos_R2 = real_break_point+ halves_record -> best_pos2_list[i];
+				unsigned int pos_R1 = real_break_point+ halves_record -> best_pos1_list[i] - ((  halves_record -> best_pos1_list[i] < halves_record -> best_pos2_list[i]  )?indel_offset_pos1:indel_offset_pos2);
+				unsigned int pos_R2 = real_break_point+ halves_record -> best_pos2_list[i] - ((  halves_record -> best_pos1_list[i] < halves_record -> best_pos2_list[i]  )?indel_offset_pos2:indel_offset_pos1);
+
+				//printf("ACCP: %u, %u / indel = %d, %d?\n", pos_R1, pos_R2, indel_offset_pos1, indel_offset_pos2);
+
+				halves_record -> splice_point_list[i] = real_break_point;
 
 				pos_R1 = get_grouped_position(pos_table, pos_R1);
 				pos_R2 = get_grouped_position(pos_table, pos_R2);
@@ -771,44 +2054,72 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 				unsigned int pos_small = min(pos_R1, pos_R2);
 				unsigned int pos_big   = max(pos_R1, pos_R2);
 
+#ifdef TEST_TARGET
+				if(memcmp(TEST_TARGET, inb, 15)==0) 
+					printf("ACCEPTED: %u, %u\nRAW: %u, %u\nBP:%d\tOFFSETS=%d %d\n", pos_small, pos_big, halves_record -> best_pos1_list[i] , halves_record -> best_pos2_list[i], real_break_point, indel_offset_pos1, indel_offset_pos2);
+#endif
+
 				paired_exon_key search_key; 
 				search_key.small_key = pos_small;
 				search_key.big_key = pos_big;
 				put_connection_table(connection_table, pos_R1, pos_R2, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?1:0, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?1:0);
 				put_connection_table(connection_table, pos_R2, pos_R1, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?1:0, (halves_record ->half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?1:0);
 
+				//if (tolerable_scan && !(halves_record ->half_marks_list[i] & IS_FINALISED_PROCESSING))
+				//	printf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
+
 				int *search_res = (int*) HashTableGet(bed_table, &search_key);
 				if(!search_res)
 				{
 					search_res = (int *)malloc(sizeof(int));
-					*search_res = 0;
+					*search_res = tolerable_scan? 0x80000000 : 0;
 					paired_exon_key * new_key = (paired_exon_key *) malloc(sizeof(paired_exon_key));
 					new_key->small_key = pos_small;
 					new_key->big_key = pos_big;
+					//printf("INSERT0: POS=%u , %u\n",  pos_small, pos_big);
 					HashTablePut(bed_table, new_key, search_res);
 				}
-				
-				(*search_res)++;
-				
+
+				//(*search_res)++;
+
 			}
 			else
 			{
 				halves_record -> best_vote2_list [i]=0;
 			}
 		}
+		else if (halves_record -> best_vote1_list[i]> 0)
+			search_short_exons(inb, qualityb, rl, connection_table, bed_table, pos_table, halves_record -> best_pos1_list[i], halves_record -> best_pos1_list[i], halves_record -> read_coverage_start[i], halves_record -> read_coverage_end[i], my_value_array_index, ginp->space_type, halves_record -> is_reversed_list[i], tolerable_scan);
+
+
 		halves_record -> half_marks_list[i] |= IS_PROCESSED_READ;
 		i++;
+
 	}
 }
 
-void print_exon_res(halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads)
+void print_exon_res(gene_value_index_t *array_index , halves_record_t * halves_record,  gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads)
 {
 	int i=0, ic=0 ;
 
+	if(ftello(out_fp)<1)
+	{
+		unsigned int last_offset = 0;
+		i=0;
+		while(_global_offsets.read_offset[i])
+		{
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_name[i], _global_offsets.read_offset[i] - last_offset+16);
+			last_offset = _global_offsets.read_offset[i];
+			i++;
+		}
+	}
+
+	i=0;
 
 	while (1)
 	{
 		char nameb[1201], inb[1201], qualityb[1201];
+		char old_line[3001];
 		int rl;
 		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
 
@@ -816,28 +2127,72 @@ void print_exon_res(halves_record_t * halves_record,  gene_input_t* ginp,gene_in
 		if(i % 10000 ==0 && i>1)
 			print_text_scrolling_bar("Saving results", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
+		old_line[0]=0;
+
 		if (ginp2 && (i % 2))
+		{
+			if(ginp->file_type >= GENE_INPUT_SAM_SINGLE)
+				geinput_readline_back(ginp2, old_line);
 			rl = geinput_next_read(ginp2, nameb, inb, qualityb);
+
+			if(!halves_record -> is_reversed_list[i])
+			{
+				int rev_offset = (ginp->space_type==GENE_SPACE_COLOR && inb[0]>='A' && inb[0]<='Z')?1:0;
+				reverse_read(inb+ rev_offset, rl- rev_offset, ginp->space_type);
+				if(qualityb[0])
+					reverse_quality(qualityb, rl- rev_offset);
+			}
+
+		}
 		else
+		{
+			if(ginp->file_type >= GENE_INPUT_SAM_SINGLE)
+				geinput_readline_back(ginp, old_line);
 			rl = geinput_next_read(ginp, nameb, inb, qualityb);
+
+			if(halves_record -> is_reversed_list[i])
+			{
+				int rev_offset = (ginp->space_type==GENE_SPACE_COLOR && inb[0]>='A' && inb[0]<='Z')?1:0;
+				reverse_read(inb+ rev_offset, rl- rev_offset, ginp->space_type);
+				if(qualityb[0])
+					reverse_quality(qualityb, rl- rev_offset);
+			}
+
+		}
+
+
+
 		if (rl<0){
 			break;
 		}
+
+		if(!qualityb[0])
+		{
+			int xx;
+			EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+			for (xx=0; xx<rl; xx++) qualityb[xx]='J';
+			qualityb[xx]='\0';
+		}
+
+		if(EXON_FASTQ_FORMAT == FASTQ_PHRED64)
+			fastq_64_to_33(qualityb);
+
+		if (ginp->file_type == GENE_INPUT_PLAIN)
+			sprintf (nameb, "Raw-%d", ginp2?(i/2):i);
+
+
+
+
 
 
 		long long int dist = halves_record -> best_pos1_list[i] ;
 		dist-= halves_record -> best_pos2_list[i];
 
-		if(halves_record -> best_vote1_list[i]>=2 && halves_record -> best_vote2_list[i]>=1 )
+		if((halves_record -> best_vote1_list[i]>=2 && halves_record -> best_vote2_list[i]>=1 ))
 		{
 			char * chro_name, * chro_name2, *chro_name_min;
 			unsigned int chro_pos, chro_pos_small, chro_pos_large;
-			char * diststr =  abs(dist)<1000000?(abs(dist)<200000?(abs(dist)<5000?"NN1":"NM1"):"NF1"):"FF1"; 
-			char * reversed_halves = (IS_REVERSED_HALVES &  halves_record -> half_marks_list[i] )? "RE2":"NM2";
-			char * strong_votes = (min(halves_record ->best_vote1_list[i],halves_record ->best_vote2_list[i])>5)?"ST3":"WK3";
-			char * long_overlap = (halves_record -> half_marks_list[i] & IS_SHORT_OVERLAP) ? ((halves_record -> half_marks_list[i] & IS_LONG_OVERLAP)?"LO4":"SO4"):"NO4";
-			char * negative_strand = halves_record -> is_reversed_list[i]? "NE5":"PO5";
-			char * pair_info_refed = (IS_PAIRED_HINTED & halves_record -> half_marks_list[i]) ? ((i % 2)?"PB7" : "PA7"):"SG7";
+			char cigar_buf[100], *cigar_print;
 
 			unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
 			unsigned int pos2 = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos2_list[i]:halves_record -> best_pos1_list[i];
@@ -847,47 +2202,58 @@ void print_exon_res(halves_record_t * halves_record,  gene_input_t* ginp,gene_in
 			pos = halves_record -> is_reversed_list[i]? (pos + rl):(pos);
 			pos2 = halves_record -> is_reversed_list[i]? (pos2):(pos2+rl);
 
-			if (halves_record -> half_marks_list[i] & IS_FUSION)
-			{
-				long_overlap = "FS4";
-				if ( !(halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R1) ^ !(halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R2) )
-					negative_strand = "MX5";
-			}
-			
-
 			int h1_len = (halves_record -> is_reversed_list[i]) ? (rl - halves_record ->splice_point_list[i]) : halves_record ->splice_point_list[i];
 
-			fprintf(out_fp,"%s\t%d\t%s\t%u\t%d\t%dM%dN%dM\t*\t0\t0\t%s\t%s\t%s,%s,%s,%s,%s,JN6,%s\t%u\t%u",  nameb, halves_record -> is_reversed_list[i]?16:0 , chro_name_min, chro_pos, min(halves_record ->best_vote1_list[i],halves_record ->best_vote2_list[i]) , h1_len , (int)abs(dist), rl - h1_len , inb, qualityb, diststr,reversed_halves,strong_votes,long_overlap,negative_strand, pair_info_refed, chro_pos_small, chro_pos_large);
+			gene_quality_score_t mapping_quality;
 
-			if(halves_record -> half_marks_list[i] & IS_FUSION)
+			if (halves_record -> cigar_string_buffer[i * EXON_MAX_CIGAR_LEN])
+			{
+				cigar_print = halves_record -> cigar_string_buffer + i * EXON_MAX_CIGAR_LEN;
+			}else
+			{
+				sprintf (cigar_buf, "%dM%dN%dM",  h1_len , (int)abs(dist), rl - h1_len);
+				cigar_print = cigar_buf;
+			}
+			mapping_quality = halves_record -> final_quality[i] ;
+
+
+			fprintf(out_fp,"%s\t%d\t%s\t%u\t%d\t%s\t*\t0\t0\t%s\t%s",  nameb, halves_record -> is_reversed_list[i]?16:0 , chro_name_min, chro_pos+1, (int)(0.5+mapping_quality) , cigar_print , inb, qualityb);
+
+			if(0 && halves_record -> half_marks_list[i] & IS_FUSION)
 			{
 				unsigned int pos_R1 = halves_record -> best_pos1_list[i];
 				unsigned int pos_R2 = halves_record -> best_pos2_list[i];
 				locate_gene_position(pos_R1, &_global_offsets, &chro_name, &chro_pos_small) ;
 				locate_gene_position(pos_R2, &_global_offsets, &chro_name2, &chro_pos_large) ;
-				
+
 				fprintf(out_fp,"\t%c%s,%d:%c%s,%d", (halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R1)?'~':'@' ,chro_name, chro_pos_small, (halves_record -> half_marks_list[i] & IS_NEGATIVE_STRAND_R2)?'~':'@' ,chro_name2,chro_pos_large);
 			}
 
 			fprintf(out_fp,"\n");
 
 		}
-		else if (halves_record -> best_vote1_list[i]>=8)
+		else if(!old_line[0])
 		{
-			char * chro_name;
-			unsigned int chro_pos;
-			unsigned int pos = halves_record -> best_pos1_list[i];
-			locate_gene_position(pos, &_global_offsets, &chro_name, &chro_pos);
-			//fprintf(out_fp,"%s\t%s\t%u\t%s\tEXONIC\n", nameb, chro_name, chro_pos, halves_record -> is_reversed_list[i]?"NEG":"POS");
-			char * pair_info_refed = (IS_PAIRED_HINTED & halves_record -> half_marks_list[i]) ? "PA7":"SG7";
-			fprintf(out_fp,"%s\t%d\t%s\t%u\t%d\t%dM\t*\t0\t0\t%s\t%s\tEX6,%s\n",  nameb, halves_record -> is_reversed_list[i]?16:0 , chro_name, chro_pos, halves_record -> best_vote1_list[i] , rl, inb, qualityb, pair_info_refed);
+			if (halves_record -> best_vote1_list[i]>=8)
+			{
+				char * chro_name;
+				unsigned int chro_pos;
+				unsigned int pos = halves_record -> best_pos1_list[i];
+
+				locate_gene_position(pos, &_global_offsets, &chro_name, &chro_pos);
+				char * pair_info_refed = (IS_PAIRED_HINTED & halves_record -> half_marks_list[i]) ? "PA7":"SG7";
+				if (IS_RECOVERED_JUNCTION_READ & halves_record -> half_marks_list[i] ) pair_info_refed = "RC7";
+				if (IS_RECOVERED_JUNCTION_READ_STEP4 & halves_record -> half_marks_list[i] ) pair_info_refed = "RF7";
+
+				fprintf(out_fp,"%s\t%d\t%s\t%u\t%d\t%dM\t*\t0\t0\t%s\t%s\n",  nameb, halves_record -> is_reversed_list[i]?16:0 , chro_name, chro_pos, halves_record -> best_vote1_list[i] , rl, inb, qualityb);
+			}
+			else
+			{
+				fprintf(out_fp,"%s\t4\t*\t*\t0\t*\t*\t0\t0\t%s\t%s\n",  nameb,inb, qualityb);
+			}
 		}
 		else
-		{
-			//fprintf(out_fp,"%s\tUNMAPPED\n",nameb);
-
-			fprintf(out_fp,"%s\t4\t*\t*\t0\t*\t*\t0\t0\t%s\t%s\tNM6\n",  nameb,inb, qualityb);
-		}
+			fprintf(out_fp, "%s\n",old_line);
 		i++;
 
 	}
@@ -917,14 +2283,15 @@ struct gene_thread_data_transport
 	unsigned int section_length;
 	int all_threads;
 	int this_thread;
+	int tolerable_scan;
 
 	pthread_spinlock_t * input_data_lock;
 	pthread_spinlock_t * init_lock;
 };
 
-int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , int table_no,  halves_record_t * halves_record, gene_input_t * ginp,gene_input_t * ginp2, char * index_prefix, unsigned int * processed_reads, long long int base_number, int all_tables, pthread_spinlock_t * input_lock, int my_thread_no, unsigned int section_length)
+int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , int table_no,  halves_record_t * halves_record, gene_input_t * ginp,gene_input_t * ginp2, char * index_prefix, unsigned int * processed_reads, long long int base_number, int all_tables, pthread_spinlock_t * input_lock, int my_thread_no, unsigned int section_length, int tolerable_scan)
 {
-//	FILE * fp;
+	//	FILE * fp;
 	char BuffMemory [2500];
 	char * InBuff = NULL , * InBuff2 = NULL;
 	char BuffMemory2 [2500];
@@ -939,7 +2306,7 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 	struct stat read_fstat;
 	stat (ginp->filename, &read_fstat);
 	long long int read_fsize = read_fstat.st_size;
-	
+
 	double local_begin_ftime = miltime();
 	int read_len = 0, read2_len = 0;
 	is_reversed = 0;
@@ -948,9 +2315,11 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 	if (ginp2)
 		all_reads /=2;
 
-//	printf ("I'm the %d-th thread\n", my_thread_no);
+	//	printf ("I'm the %d-th thread\n", my_thread_no);
 	gene_vote_t vote_p1, vote_p2;
 
+	unsigned int low_border = my_value_array_index -> start_base_offset;
+	unsigned int high_border = my_value_array_index -> start_base_offset + my_value_array_index -> length; 
 
 
 	while (1)
@@ -958,9 +2327,37 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 
 		char namebuf[200];
 
+
+		if (my_thread_no==0 && queries % 10000 == 0 && !is_reversed)
+		{
+			if(table_no == 0)
+			{
+				long long int current_reads = base_number + queries;
+				long long int fpos = ftello(ginp->input_fp);
+				reads_density = fpos*1.0/current_reads; 
+				//printf ("\nDENS=%.5f, POS=%llu, fsize=%llu\n", reads_density, fpos, read_fsize);
+			}
+			if(IS_DEBUG && queries % 100000==0)
+				printf("@LOG Done %d/%d, good %d, last time %f\n",queries, table_no, good_match, miltime() - t0);
+			else
+			{
+				long long int all_steps = (read_fsize*1.0/reads_density) * all_tables;
+				int remaining_load_libs = (all_tables - table_no);
+				remaining_load_libs +=  all_tables * (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads);
+				long long int finished_steps =  ((section_length)*table_no + base_number*all_tables+queries);
+				double finished_rate = finished_steps*1.0 / all_steps;
+				double reads_per_second =  queries*1.0 / all_tables / (miltime()- local_begin_ftime);
+				double expected_seconds = ((1.-finished_rate) * all_steps)/all_tables / reads_per_second + remaining_load_libs * 50 + (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads)*100;
+				if(queries>1)
+					print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2 != NULL);
+			}
+			fflush(stdout);
+			t0 = miltime();
+		}
+
 		if (is_reversed)
 		{
-			
+
 			reverse_read(InBuff, read_len, ginp->space_type);	
 			reverse_quality(QualityBuff, read_len);
 			if (ginp2)
@@ -1020,13 +2417,13 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 							QualityBuff2++;
 						read2_len --;
 					}
-	
+
 					if(EXON_SECOND_READ_REVERSE)
 					{
 						reverse_quality(QualityBuff2, read2_len);
 						reverse_read(InBuff2, read2_len, ginp->space_type);
 					}
-				
+
 				}
 
 				if(input_lock!=NULL)
@@ -1046,6 +2443,26 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 			if(ginp2)
 				init_gene_vote(&vote_p2);
 		}
+
+
+
+
+		if (tolerable_scan )
+		{
+			if (ginp2 && ( (halves_record->half_marks_list[queries*2] & IS_FINALISED_PROCESSING) && (halves_record->half_marks_list[queries*2+1] & IS_FINALISED_PROCESSING)))
+			{
+				is_reversed = 0;
+				continue;
+			}
+			if (!ginp2 && ( (halves_record->half_marks_list[queries] & IS_FINALISED_PROCESSING)))
+			{
+				is_reversed = 0;
+				continue;
+			}
+			subread_step = 3.00001;
+		}
+
+
 		if (ginp2)
 		{
 
@@ -1073,7 +2490,10 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 
 						gehash_key_t subread_integer = genekey2int(subread_string, ginp->space_type);
 
-						gehash_go_q(my_table, subread_integer , subread_offset, read_len, is_reversed, current_vote, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no);
+						if (tolerable_scan && (!EXON_NO_TOLERABLE_SCAN))
+							gehash_go_q_tolerable(my_table, subread_integer , subread_offset, read_len, is_reversed, current_vote, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no, tolerable_scan, low_border, high_border - read_len);
+						else
+							gehash_go_q(my_table, subread_integer , subread_offset, read_len, is_reversed, current_vote, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no,  low_border, high_border - read_len);
 					}
 					if(subread_offset1 >= current_rlen -16)
 						break;
@@ -1084,11 +2504,12 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 			gehash_data_t pos_read1, pos_read2;
 			gene_quality_score_t sum_quality, qual_r1, qual_r2;
 			char record_index1[48], record_index2[48];
+			int is_breakeven = 0;
 
 
 			if((!EXON_FUSION_DETECTION) || is_reversed)
 			{
-				int is_paired_match = select_positions(&vote_p1, &vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE);
+				int is_paired_match = select_positions(&vote_p1, &vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven);
 				for (is_second_read = 0; is_second_read <2; is_second_read ++)
 				{
 					gene_vote_t * current_vote = is_second_read?&vote_p2: &vote_p1;
@@ -1100,11 +2521,16 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 					int best_vote2=0;
 					char is_abnormal=0;
 					short half_marks=0;
-					int is_reversed_halves;
-		
-					int splice_point = select_best_matching_halves(current_vote, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, &is_reversed_halves, accepted_support_rate, read_len, hint_pos);
+					char indel_in_p1=0, indel_in_p2=0;
+					int is_reversed_halves=0, max_cover_start=0, max_cover_end=0;
+					short read_coverage_start = 0, read_coverage_end = 0;
+
+					int splice_point = select_best_matching_halves(current_vote, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, &is_reversed_halves, accepted_support_rate, read_len, hint_pos, tolerable_scan, &read_coverage_start, &read_coverage_end, &indel_in_p1, &indel_in_p2, &max_cover_start, &max_cover_end, read_len);
 					if (splice_point>0)
-						add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed_halves, splice_point, half_marks, 2*queries+is_second_read);
+					{
+					//	if (is_second_read)printf ("SECOND!\n");
+						add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed_halves, splice_point, half_marks, 2*queries+is_second_read, max_cover_start, max_cover_end, read_coverage_start, read_coverage_end, indel_in_p1, indel_in_p2);
+					}
 					else 
 					{
 						is_reversed_halves = (current_vote -> max_mask & IS_NEGATIVE_STRAND)?1:0;
@@ -1115,6 +2541,11 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 							halves_record -> best_pos1_list[queries*2+is_second_read] = current_vote->max_position;
 							halves_record -> is_reversed_list[queries*2+is_second_read] = is_reversed_halves;
 							halves_record -> half_marks_list[queries*2+is_second_read] = (halves_record -> half_marks_list[queries*2+is_second_read]) & ~(IS_PAIRED_HINTED);
+
+							halves_record -> best1_read_start_pos[queries*2+is_second_read] = current_vote -> max_coverage_start;
+							halves_record -> best1_read_end_pos[queries*2+is_second_read] = current_vote -> max_coverage_end;
+							halves_record -> read_coverage_start[queries*2+is_second_read] = current_vote -> max_coverage_start;
+							halves_record -> read_coverage_end[queries*2+is_second_read] = current_vote -> max_coverage_end;
 							if (is_paired_match)
 								halves_record -> half_marks_list[queries*2+is_second_read] = (halves_record -> half_marks_list[queries*2+is_second_read]) | IS_PAIRED_HINTED;
 	
@@ -1144,7 +2575,12 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 
 					gehash_key_t subread_integer = genekey2int(subread_string, ginp->space_type);
 
-					gehash_go_q(my_table, subread_integer , subread_offset, read_len, is_reversed, &vote_p1, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no);
+					//printf("TQ: POS=%d, TOL=%d, INT=%u, SR=%s\n", subread_offset  , tolerable_scan , subread_integer, subread_string);
+
+					if (tolerable_scan && (!EXON_NO_TOLERABLE_SCAN))
+						gehash_go_q_tolerable(my_table, subread_integer , subread_offset, read_len, is_reversed, &vote_p1, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no, tolerable_scan,  low_border, high_border - read_len);
+					else
+						gehash_go_q(my_table, subread_integer , subread_offset, read_len, is_reversed, &vote_p1, 1, 1, 21.9, INDEX_THRESHOLD, EXON_INDEL_TOLERANCE, subread_no,  low_border, high_border - read_len);
 				}
 				if(subread_offset1 >= read_len -16)
 					break;
@@ -1158,15 +2594,22 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 				int best_vote2=0;
 				char is_abnormal=0;
 				short half_marks=0;
-				int is_reversed_halves;
-	
-				int splice_point = select_best_matching_halves(&vote_p1, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, &is_reversed_halves, accepted_support_rate, read_len, -1);
+				int is_reversed_halves=0, max_cover_start=0, max_cover_end=0;
+				char indel_in_p1=0, indel_in_p2=0;
+				short read_coverage_start =0, read_coverage_end=0;
+
+				int splice_point = select_best_matching_halves(&vote_p1, &best_pos1, &best_pos2, &best_vote1, &best_vote2, &is_abnormal ,&half_marks, &is_reversed_halves, accepted_support_rate, read_len, -1,  tolerable_scan, &read_coverage_start, &read_coverage_end, &indel_in_p1, &indel_in_p2, &max_cover_start, &max_cover_end, read_len);
 				if (splice_point>0)
 				{
-					add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed_halves, splice_point, half_marks, queries);
+					#ifdef DEBUG
+					printf("SPP=%d, v1=%d, v2=%d, POS=%u, %%=%s\nRead_Start=%d, Read_End=%d\n", splice_point, best_vote1, best_vote2, best_pos1, InBuff, read_coverage_start, read_coverage_end);
+					#endif
+
+					add_best_matching_halves(halves_record, best_pos1, best_pos2, best_vote1, best_vote2,is_abnormal, is_reversed_halves, splice_point, half_marks, queries, max_cover_start, max_cover_end, read_coverage_start, read_coverage_end, indel_in_p1, indel_in_p2);
 				}
 				else 
 				{
+					//printf("EDD=%d, v1=%d, v2=%d, R=%s, RL=%d, MM=%d, SPS=%.5f\n", splice_point, best_vote1, best_vote2, InBuff, read_len, vote_p1.max_vote, subread_step);
 					is_reversed_halves = (vote_p1.max_mask & IS_NEGATIVE_STRAND)?1:0;
 					if (vote_p1.max_vote > (halves_record -> best_vote1_list[queries] + halves_record -> best_vote2_list[queries]))
 					{
@@ -1175,35 +2618,16 @@ int run_exon_search(gehash_t * my_table, gene_value_index_t * my_value_array_ind
 						halves_record -> best_pos1_list[queries] = vote_p1.max_position;
 						halves_record -> is_reversed_list[queries] = is_reversed_halves;
 						halves_record -> half_marks_list[queries] = vote_p1.max_mask;
+						halves_record -> best1_read_start_pos[queries] = vote_p1.max_coverage_start;
+						halves_record -> best1_read_end_pos[queries] = vote_p1.max_coverage_end;
+
+						halves_record -> read_coverage_start[queries] = vote_p1.max_coverage_start;
+						halves_record -> read_coverage_end[queries] = vote_p1.max_coverage_end;
 					}
 				}
 			}
 		}
-		if (my_thread_no==0 && queries % 10000 == 0 && !is_reversed)
-		{
-			if(table_no == 0)
-			{
-				long long int current_reads = base_number + queries;
-				long long int fpos = ftello(ginp->input_fp);
-				reads_density = fpos*1.0/current_reads; 
-			}
-			if(IS_DEBUG && queries % 100000==0)
-				printf("@LOG Done %d/%d, good %d, last time %f\n",queries, table_no, good_match, miltime() - t0);
-			else
-			{
-				long long int all_steps = (read_fsize*1.0/reads_density) * all_tables;
-				int remaining_load_libs = (all_tables - table_no);
-				remaining_load_libs +=  all_tables * (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads);
-				long long int finished_steps =  ((section_length)*table_no + base_number*all_tables+queries);
-				double finished_rate = finished_steps*1.0 / all_steps;
-				double reads_per_second =  queries*1.0 / all_tables / (miltime()- local_begin_ftime);
-				double expected_seconds = ((1.-finished_rate) * all_steps)/all_tables / reads_per_second + remaining_load_libs * 50 + (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads)*100;
-				if(queries>1)
-					print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2 != NULL);
-			}
-			fflush(stdout);
-			t0 = miltime();
-		}
+
 	
 		if (is_reversed)
 		{
@@ -1225,7 +2649,7 @@ void * run_exon_search_thread(void * parameters)
 
 	pthread_spin_unlock(data_param -> init_lock);
 
-	run_exon_search(data_param->my_table, data_param->my_value_array_index, data_param->table_no, data_param->halves_record, data_param->ginp , data_param->ginp2, data_param->index_prefix, data_param->processed_reads, data_param->base_number, data_param->all_tables, data_param->input_data_lock, thid, data_param-> section_length);
+	run_exon_search(data_param->my_table, data_param->my_value_array_index, data_param->table_no, data_param->halves_record, data_param->ginp , data_param->ginp2, data_param->index_prefix, data_param->processed_reads, data_param->base_number, data_param->all_tables, data_param->input_data_lock, thid, data_param-> section_length, data_param -> tolerable_scan);
 	return NULL;
 }
 
@@ -1233,7 +2657,7 @@ void * run_exon_search_thread(void * parameters)
 
 // This function search a segment of reads (length = read_number) 
 // It returns the number of reads that were really processed;
-int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_prefix, halves_record_t * halves_record, FILE * out_fp, unsigned long long int base_number, int all_tables, unsigned long long int *succeed_reads, HashTable * overall_exon_bed, HashTable * pos_table, HashTable * connection_table)
+int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, char * index_prefix, halves_record_t * halves_record, FILE * out_fp, unsigned long long int base_number, int all_tables, unsigned long long int *succeed_reads, HashTable * overall_exon_bed, HashTable * pos_table, HashTable * connection_table, int tolerable_scan)
 {
 	unsigned int tabno=0;
 	unsigned int processed_reads = 0, section_length = 0;
@@ -1285,7 +2709,7 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 // Run the search algorithm on a part of the index
 		if(EXON_ALL_THREADS <2)
-			run_exon_search(my_table, &value_array_index, tabno, halves_record, ginp , ginp2, index_prefix, &processed_reads, base_number, all_tables, NULL /*the data lock is null*/, 0  /*I'm the 0-th thread*/, section_length);
+			run_exon_search(my_table, &value_array_index, tabno, halves_record, ginp , ginp2, index_prefix, &processed_reads, base_number, all_tables, NULL /*the data lock is null*/, 0  /*I'm the 0-th thread*/, section_length, tolerable_scan);
 		else
 		{
 			int i; 
@@ -1307,6 +2731,7 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 			data_param.processed_reads = &processed_reads;
 			data_param.section_length = section_length;
 			data_param.ginp = ginp;
+			data_param.tolerable_scan = tolerable_scan;
 			data_param.ginp2 = ginp2;
 
 			pthread_spin_init(&data_lock, PTHREAD_PROCESS_PRIVATE);
@@ -1346,15 +2771,18 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 	if (tabno == 1)
 	{
-		feed_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, 1,1);
+		feed_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, 1,1, tolerable_scan);
+
 		fseeko(ginp -> input_fp, current_fp, SEEK_SET);
+
 		if (ginp2)
 			fseeko(ginp2 -> input_fp, current_fp2, SEEK_SET);
-		force_junc_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, 1,1);
+
+		explorer_junc_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, 1,1, tolerable_scan);
 	}
 	else
 	{
-		gvindex_destory(&value_array_index);
+		//gvindex_destory(&value_array_index);
 		tabno = 0;
 		while (1)
 		{
@@ -1364,23 +2792,23 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 			if (stat_ret !=0)
 				break;
 
+			gvindex_destory(&value_array_index);
 			gvindex_load(&value_array_index,table_fn);
-			feed_exonbed(overall_exon_bed, pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, tabno==0, tabno== last_table);
+			feed_exonbed(overall_exon_bed, pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index, tabno==0, tabno== last_table, tolerable_scan);
 
 			fseeko(ginp -> input_fp, current_fp, SEEK_SET);
 			if (ginp2)
 				fseeko(ginp2 -> input_fp, current_fp2, SEEK_SET);
 
-			force_junc_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index,tabno==0, tabno== last_table );
+			explorer_junc_exonbed(overall_exon_bed,pos_table, connection_table, halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads, &value_array_index,tabno==0, tabno== last_table , tolerable_scan);
 			tabno ++;
 
 			fseeko(ginp -> input_fp, current_fp, SEEK_SET);
 			if (ginp2)
 				fseeko(ginp2 -> input_fp, current_fp2, SEEK_SET);
-
+			
 		}
 	}
-	if (tabno>0)gvindex_destory(&value_array_index);
 
 	fseeko(ginp -> input_fp, current_fp, SEEK_SET);
 	if (ginp2)
@@ -1388,8 +2816,9 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 
 
-	if (out_fp)
-		print_exon_res(halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads);
+	if (out_fp  && tolerable_scan)
+		print_exon_res(NULL , halves_record, ginp, ginp2, out_fp, index_prefix, processed_reads, processed_reads,  succeed_reads);
+	gvindex_destory(&value_array_index);
 
 	fseeko(ginp -> input_fp, last_fp_pos, SEEK_SET);
 	if (ginp2)
@@ -1401,40 +2830,71 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 	
 }
 
+
+int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_prefix, halves_record_t * halves_record, FILE * out_fp, unsigned long long int base_number, int all_tables, unsigned long long int *succeed_reads, HashTable * overall_exon_bed, HashTable * pos_table, HashTable * connection_table)
+{
+
+	long long int tmp_pos, tmp_pos2 = 0;
+	int ret = 0;
+
+	
+	if(!EXON_NO_TOLERABLE_SCAN)
+	{
+		tmp_pos = ftello(ginp -> input_fp);
+		if (ginp2)
+			tmp_pos2 = ftello(ginp2 -> input_fp);
+
+		ret =run_exon_search_index_tolerable(ginp, ginp2, index_prefix, halves_record, out_fp, base_number, all_tables, succeed_reads,  overall_exon_bed, pos_table,  connection_table,0);
+		clear_processed_marks(halves_record);
+
+		fseeko(ginp -> input_fp, tmp_pos, SEEK_SET);
+		if (ginp2)
+			fseeko(ginp2 -> input_fp, tmp_pos2, SEEK_SET);
+	}
+	ret = run_exon_search_index_tolerable(ginp, ginp2, index_prefix, halves_record, out_fp, base_number, all_tables, succeed_reads,  overall_exon_bed, pos_table,  connection_table,1);
+	return ret;
+}
+
+
 void exon_usage(char * execname)
 {
 	puts("Usage:");
 	puts(" ./subjunc [options] -i <index_name> -r <input> -o <output>");
 	puts("");
-	puts("Basic arguments:");
-	puts("    -i --index     <index>\t name of the index, same as that of the index builder.");
-	puts("    -r --read      <input>\t name of an input file(FASTQ/FASTA format), either in the base-space or in the color-space.");
-	puts("    -o --output    <output>\t name of the output file(SAM format)");
-	puts("    -x --fusion           \t allow fusion detection, disabled by default");
-	puts("    -A --nosam           \t do not report results for individual reads, report them by default");
+	puts("Required arguments:");
+	puts("    -i --index     <index>\t base name of the index.");
+	puts("    -r --read      <input>\t name of the input file(FASTQ/FASTA format). Both base-space and color-space read data are supported. For paired-end reads, this gives the first read file and the other read file should be specified using the -R option.");
+	puts("    -o --output    <output>\t name of the output file(SAM format).");
 	puts("");
 	puts("Optional arguments:");
-//	puts("    -n --subreads  <int>\t optional, number of subreads selected from each read for mapping, 10 by default");
-//	puts("    -m --minmatch  <int>\t optional, minimal number of subreads which have the consensus mapping location, 3 by default");
-	puts("    -H --minhalf   <int>\t optional, number of votes for the low-support read, 1 by default");
-	puts("    -L --halflen   <int>\t optional, minimal number of bases in a half of a read, 4 by default");
-	puts("    -l --halfmatch <int>\t optional, minimal portion of reads matched in a half, 0.7 by default");
-	puts("    -T --threads   <int>\t optional, number of threads/CPUs used for mapping the reads, 1 by default");
-	puts("    -I --indel     <int>\t optional, the maximum number of bases for insertion/deletion, 0 by default");
-//	puts("    -Q --quality   <l:e:n>\t optional, quality scale: l for linear, e for exponential, n for none.");
-//	puts("    -a --basewise       \t optional, using the base-wise quality index; the index must be built with a -a option.");
+        puts("       --singleSAM <input>\t using as input file a SAM file which includes mapping results for single-end reads (e.g. 'subread-align' output).");
+        puts("       --pairedSAM <input>\t using as input file a SAM file which includes mapping results for paired-end reads.");
+	puts("    -x --fusion           \t enabling the detection of fusion events.");
+	puts("    -A --nosam           \t disabling the SAM output for the reads. Only discovered exon junction locations will be reported (BED file).");
+//	puts("    -n --subreads  <int>\t number of subreads selected from each read for mapping, 10 by default.");
+//	puts("    -m --minmatch  <int>\t minimal number of subreads which have the consensus mapping location, 3 by default.");
+	puts("    -H --minhalf   <int>\t minimal number of consensus subreads required for identifying candidate spliced exons, 1 by default.");
+	puts("    -L --halflen   <int>\t minimal distance between the junction location and the end base (first or last) of the read or the segment, 4 by default.");
+//	puts("    -l --halfmatch <int>\t minimal portion of reads matched in a half, 0.7 by default.");
+	puts("    -T --threads   <int>\t number of threads/CPUs used, 1 by default.");
+	puts("    -I --indel     <int>\t number of INDEL bases allowed, 0 by default.");
+        puts("    -P --phred     <3:6>\t the format of Phred scores used in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
+//	puts("    -Q --quality   <l:e:n>\t quality scale: l for linear, e for exponential, n for none.");
+//	puts("    -a --basewise       \t using the base-wise quality index; the index must be built with a -a option.");
 	puts("");
-	puts("Paired-end alignment arguments:");
-	puts("    -R --read2     <input>\t optional, the second input file; using this argument to activate paired-end alignment");
-//	puts("    -p --minmatch2 <int>\t optional, the `-m' option for the read receiving less votes in a pair to be accepted, 1 by default");
-	puts("    -d --mindist   <int>\t optional, the minimum distance between two reads in a pair, 50 by default");
-	puts("    -D --maxdist   <int>\t optional, the maximum distance between two reads in a pair, 600 by default");
-	puts("    -S --order     <ff:fr:rf> \t optional, specifying if the first/second reads are forward or reversed, 'fr' by default.");
+	puts("Arguments for paired-end reads:");
+	puts("    -R --read2     <input>\t name of the second input file from paired-end data. The program will then be switched to paired-end read mapping mode.");
+//	puts("    -p --minmatch2 <int>\t consensus threshold for the read which receives less votes than the other read from the same pair, 1 by default.");
+	puts("    -d --mindist   <int>\t the minimum distance between two reads in a pair, 50 by default");
+	puts("    -D --maxdist   <int>\t the maximum distance between two reads in a pair, 600 by default");
+	puts("    -S --order     <ff:fr:rf> \t specifying if the first/second reads are forward or reversed, 'fr' by default.");
 	puts("");
 	puts("Example:");
 	puts(" ./subjunc -i my_index -r reads.fastq -o my_result.sam ");
 	puts("");
 	puts("");
+	puts("Version: 1.0.2");
+	puts("For more information about these arguments, please refer to the User Manual.\n");
 
 }
 
@@ -1460,6 +2920,11 @@ static struct option long_options[] =
 	{"order",  required_argument,0, 'S'},
 	{"halflen",  required_argument,0, 'L'},
 	{"halfmatch",  required_argument,0, 'l'},
+	{"singleSAM",  required_argument,0, '1'},
+	{"pairedSAM",  required_argument,0, '2'},
+	{"nofull",  no_argument, &EXON_NO_TOLERABLE_SCAN, 1},
+	{"extending",  no_argument, &EXON_EXTENDING_SCAN, 1},
+	{"direct",  no_argument, &EXON_DIRECT_READS, 1},
 	{0, 0, 0, 0}
 };
 
@@ -1510,11 +2975,13 @@ void print_bed_table(HashTable * bed_table, char * out_fn, unsigned long long in
 			locate_gene_position( p->small_key , &_global_offsets, &chro_name, &chro_pos);
 			locate_gene_position( p->big_key , &_global_offsets, &chro_name2, &chro_pos_big);
 			char * is_fusion =(chro_name2 == chro_name)?"SP0":"FS0";
-
-
-			(*junction_number)++;
-			(*support_number)+= *counter;
-			fprintf(ofp,"%s\t%u\t%s\t%u\t%d\t%s,\n", chro_name, chro_pos, chro_name2, chro_pos_big, *counter, is_fusion);
+			char * is_recovered = (*counter & 0x80000000)?"RC1":"NM1";
+			if ((*counter& 0x7fffffff) >0 ) 
+			{
+				(*junction_number)++;
+				(*support_number)+= (*counter& 0x7fffffff);
+				fprintf(ofp,"%s\t%u\t%s\t%u\t%d\t%s,%s,\n", chro_name, chro_pos, chro_name2, chro_pos_big, (*counter& 0x7fffffff), is_fusion, is_recovered);
+			}
 			cursor = cursor->next;
 		}
 	}
@@ -1525,6 +2992,9 @@ int main_junction(int argc,char ** argv)
 {
 	char read_file [300], read2_file [300];
 	char output_file [300];
+
+	char tmpfile[100];
+	strcpy(tmpfile, "./subjunc-sam-XXXXXX");
 
 	char index_prefix [300];
 	unsigned int all_reads, all_tables;
@@ -1555,7 +3025,7 @@ int main_junction(int argc,char ** argv)
 
 
 
-	while ((c = getopt_long (argc, argv, "xbSL:AH:d:D:n:m:p:f:R:r:i:l:o:T:Q:I:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "xbSL:AH:d:D:n:m:p:f:P:R:r:i:l:o:T:Q:I:1:2:t:?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'A':
@@ -1590,10 +3060,16 @@ int main_junction(int argc,char ** argv)
 			case 'm':
 				ACCEPT_SUBREADS = atoi(optarg);
 				break;
+				
 			case 'T':
 				EXON_ALL_THREADS = atoi(optarg);
 				break;
 			case 'r':
+				if(IS_SAM_INPUT)
+				{
+					puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input");
+					return -1;
+				}
 				strncpy(read_file, optarg, 299);
 				break;
 			case 'R':
@@ -1618,6 +3094,12 @@ int main_junction(int argc,char ** argv)
 				if(optarg[0]=='n')
 					EXON_QUALITY_SCALE = QUALITY_SCALE_NONE;
 				break;
+			case 'P':
+				if (optarg[0]=='3')
+					EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+				else
+					EXON_FASTQ_FORMAT = FASTQ_PHRED64;
+				break;
 			case 'p':
 				ACCEPT_MINOR_SUBREADS = atoi(optarg);
 				break;
@@ -1627,10 +3109,33 @@ int main_junction(int argc,char ** argv)
 			case 'l':
 				EXON_HALF_MATCH_PERCENTAGE = atof(optarg);
 				break;
+			case '1':
+				if(read_file[0] || IS_SAM_INPUT)
+				{
+					puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input.");
+					return -1;
+				}
+				strncpy(read_file, optarg, 299);
+				IS_SAM_INPUT=1;
+				EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+				break;
+			case '2':
+				if(read_file[0]|| IS_SAM_INPUT)
+				{
+					puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input");
+					return -1;
+				}
+				IS_SAM_INPUT=2;
+				strncpy(read_file, optarg, 299);
+				EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+				strncpy(read2_file, optarg, 299);
+				break;
+			case 't':
+				sprintf(tmpfile, "%s/XXXXXX", optarg);
+				break;
 			case '?':
 				return -1 ;
 		}
-
 	if (!read_file[0] || !index_prefix[0] || !output_file[0])
 	{
 		exon_usage(argv[0]);
@@ -1638,18 +3143,79 @@ int main_junction(int argc,char ** argv)
 		return -1 ;
 	}
 
+	if((!EXON_DIRECT_READS) && (!IS_SAM_INPUT))
+	{
+		int xx=0;
+		char command[1000];
+		char cwd[300];
+		int is_successful = 0;
+
+
+		is_successful = mkstemp(tmpfile);
+		strcpy(cwd, argv[0]);
+		for(xx=strlen(cwd);xx>=0; xx--)
+		{
+			if(cwd[xx]=='/')
+			{
+				cwd[xx]=0;
+				break;
+			}
+		}
+
+		if(xx>=0) strcat(cwd,"/");
+		else cwd[0]=0;
+
+
+		if(read2_file[0])
+			sprintf(command, "%ssubread-align -J -T %d -i '%s' -r '%s' -R '%s' -o '%s' -P %d -d %d -D %d ",cwd, EXON_ALL_THREADS, index_prefix, read_file, read2_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6, EXON_MIN_PAIRED_DISTANCE, EXON_MAX_PAIRED_DISTANCE);
+		else
+			sprintf(command, "%ssubread-align -J -T %d -i '%s' -r '%s' -o '%s' -P %d",cwd, EXON_ALL_THREADS, index_prefix, read_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6);
+		puts(command);
+		is_successful = system(command);
+
+		strcpy(read_file, tmpfile);
+		IS_SAM_INPUT=1;
+
+		if(read2_file[0])
+		{
+			strcpy(read2_file, tmpfile);
+			IS_SAM_INPUT=2;
+		}
+		EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+	}
+	else
+		tmpfile[0]=0;
+
+
+
 	if(!EXON_USE_VALUE_ARRAY_INDEX)
 	{
 		printf("Detecting junction reads must reference to the base-wise indel. Please enable the '-b' option while building the index.\n");
 		return -1;
 	}
   
-	reads_density = guess_reads_density(read_file);
+	reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
 	if(reads_density<0)
 		printf("Input file '%s' is not found or is in an incorrect format.\n", read_file);
 
-	if(geinput_open(read_file, &ginp))
-		return -1;
+	if(IS_SAM_INPUT==0)
+	{
+		if(geinput_open(read_file, &ginp))
+			return -1;
+	}
+	else if(IS_SAM_INPUT==1)
+	{
+		if(geinput_open_sam(read_file, &ginp,0))
+			return -1;
+	}
+	else if(IS_SAM_INPUT==2)
+	{
+		if(geinput_open_sam(read_file, &ginp,1))
+			return -1;
+		if(geinput_open_sam(read_file, &ginp2,2))
+			return -1;
+	}
+
 
 	for(all_tables=0; ; all_tables++)
 	{
@@ -1687,7 +3253,7 @@ int main_junction(int argc,char ** argv)
 		puts("Quality scale=exponential\n\n");
 	else 	puts("\n");
 
-	if (read2_file[0])
+	if (read2_file[0] || IS_SAM_INPUT==2)
 	{
 		if (EXON_MAX_PAIRED_DISTANCE <= EXON_MIN_PAIRED_DISTANCE)
 		{
@@ -1710,7 +3276,7 @@ int main_junction(int argc,char ** argv)
 	if(read2_file[0])
 		all_reads/=2;
 		
-	if(read2_file[0] && geinput_open(read2_file, &ginp2))
+	if((!IS_SAM_INPUT) && read2_file[0] && geinput_open(read2_file, &ginp2))
 	{
 		printf("Input file '%s' is not found or is in an incorrect format.\n", read2_file);
 		return -1;
@@ -1750,10 +3316,12 @@ int main_junction(int argc,char ** argv)
 		// test if there no anyreads remaining
 		unsigned long long int current_fp = ftello(ginp.input_fp);
 		int rl = geinput_next_read(&ginp, NULL, inbuff, NULL);
+		//printf("RL=%d\nfp=%llu\npr=%u",rl, current_fp, processed_reads);
 		if (rl<0)
 			break;
 		fseeko(ginp.input_fp, current_fp, SEEK_SET);
 	}
+
 
 	geinput_close(&ginp);
 	print_bed_table(bed_index, output_file, &junction_number, &support_number);
@@ -1771,5 +3339,7 @@ int main_junction(int argc,char ** argv)
 		fclose(out_fp);
 	printf("\n\nCompleted successfully.\n");
 
+	if(tmpfile[0])
+		unlink(tmpfile);
 	return 0;
 }

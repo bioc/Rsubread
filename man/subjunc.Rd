@@ -3,7 +3,7 @@
 \title{Finding exon junctions}
 \description{This function uses RNA-seq reads to discover exon junction locations}
 \usage{
-subjunc(index,readfile1,readfile2=NULL,output_file,nthreads=1,indels=0,min_distance=50,max_distance=600,PE_orientation="fr")
+subjunc(index,readfile1,readfile2=NULL,output_file,nthreads=1,indels=5,min_distance=50,max_distance=600,PE_orientation="fr")
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -11,7 +11,7 @@ subjunc(index,readfile1,readfile2=NULL,output_file,nthreads=1,indels=0,min_dista
   \item{readfile2}{ character string giving the name of second file when paired-end read data are provided. \code{NULL} by default.}
   \item{output_file}{ character string giving the name of output file which includes the mapping results.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. 1 by default.} 
-  \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 0 by default.}
+  \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}
   \item{min_distance}{ numeric value giving the minimal distance between the pair of reads. 50 by default.}
   \item{max_distance}{ numeric value giving the maximal distance between the pair of reads. 600 by default.}
   \item{PE_orientation}{ character string giving the orientation of the two reads in a pair. "fr" by default, which means the first read is on the forward strand and the second read is on the reverse strand.}

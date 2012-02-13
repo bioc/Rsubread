@@ -13,6 +13,7 @@
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
 #define SAM_FLAG_UNMAPPED 0x04
 
+#define MAX_PIECE_JUNCTION_READ 7
 
 #define IS_LONG_OVERLAP 4
 #define IS_SHORT_OVERLAP 8
@@ -26,7 +27,12 @@
 #define IS_NEGATIVE_STRAND_R2 512 
 #define IS_FUSION 1024 
 #define IS_NEGATIVE_STRAND 2048
+#define IS_RECOVERED_JUNCTION_READ 4096
+#define IS_FINALISED_PROCESSING 8192
+#define IS_RECOVERED_JUNCTION_READ_STEP4 (8192*2)
+#define	IS_BREAKEVEN_READ (8192*4)
 
+//#define TEST_TARGET "GCAGGCCGAAGCCGACAAGAA"
 
 
 typedef unsigned int gehash_key_t;
@@ -41,6 +47,8 @@ typedef char gene_vote_number_t;
 #define GENE_SLIDING_STEP 3
 #define BEXT_RESULT_LIMIT 16
 
+#define SEARCH_BACK 0
+#define SEARCH_FRONT 1
 
 #define GENE_VOTE_SPACE 64 
 #define GENE_VOTE_TABLE_SIZE 91
@@ -53,6 +61,10 @@ typedef char gene_vote_number_t;
 #define int2base(c) ("AGCT"[(c)]) 
 #define color2int(c) ((c) - '0')
 #define int2color(c) ("0123"[(c)])
+
+#define get_base_error_prob64(a) ((a) < '@'-1?1:pow(10., -0.1*((a)-'@')))
+#define get_base_error_prob33(a) ((a) < '!'-1?1:pow(10., -0.1*((a)-'!'))) 
+
 
 
 #define FASTQ_PHRED33 1
@@ -125,6 +137,7 @@ typedef struct{
 	unsigned char * is_counterpart;
 	gene_vote_number_t * max_votes;
 	gene_quality_score_t * max_quality;
+	gene_quality_score_t * max_final_quality;
 	short * masks;
 	char * max_indel_recorder;
 #ifdef REPORT_ALL_THE_BEST
