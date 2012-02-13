@@ -460,13 +460,16 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 						vote -> quality[offsetX][i] += quality;
 						vote -> last_offset[offsetX][i]=offset;
 
+
 						//printf("\nFOUND-OLD! %u, V=%d\n", kv, test_max);
-						#ifdef MAKE_FOR_EXON
 						if (offset_from_5 <  vote->coverage_start [offsetX][i])
+						{
 							vote->coverage_start [offsetX][i] = offset_from_5;
+						}
 						if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
+						{
 							vote->coverage_end [offsetX][i] = offset_from_5+16;
-						#endif
+						}
 
 						int toli;
 						for(toli=0; toli<indel_tolerance*3-3; toli+=3)
@@ -479,7 +482,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
 							{
 								toli +=3;
-								//printf("NEW TOLI=%d  DIST=%d  SUBR=%d\n", toli, dist0, subread_number);
+								//printf("NEW (%d, %d) TOLI=%d  DIST=%d  SUBR=%d\n", offsetX , i, toli, dist0, subread_number);
 								if (toli < indel_tolerance*3)
 								{
 									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
@@ -508,6 +511,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 							vote->max_position = dat[i];
 							vote->max_mask = vote->masks[offsetX][i];
 						//	printf ("SETMAX %d  %d~%d @%u\n", test_max, vote->max_coverage_start, vote->max_coverage_end, vote->max_position);
+						//	printf("NEW MAX(%d, %d) TOLI=%d  DIST=%d  SUBR=%d\n", offsetX , i, toli, dist0, subread_number);
 						}
 						else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality)
 						{

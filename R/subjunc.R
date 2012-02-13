@@ -1,6 +1,6 @@
 subjunc <- function(index,readfile1,readfile2=NULL,output_file,nthreads=1,indels=5,min_distance=50,max_distance=600,PE_orientation="fr")
 {
-	opt <- paste("-i",index,"-r",readfile1,"-o",output_file,"-T",nthreads,"-I",indels,sep=",")
+	opt <- paste("-i",index,"-r",readfile1,"-o",output_file,"-T",nthreads,"-I",indels,"--nofull","--extending","-H",2,sep=",")
 	if(!is.null(readfile2)) opt <- paste(opt,"-R",readfile2,"-d",min_distance,"-D",max_distance,"-S",PE_orientation,sep=",")
 	cmd <- paste("subjunc",opt,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))

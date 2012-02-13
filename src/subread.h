@@ -32,7 +32,7 @@
 #define IS_RECOVERED_JUNCTION_READ_STEP4 (8192*2)
 #define	IS_BREAKEVEN_READ (8192*4)
 
-//#define TEST_TARGET "GTGGTGGCTTCAATAAA"
+//#define TEST_TARGET "GCAGGCCGAAGCCGACAAGAA"
 
 
 typedef unsigned int gehash_key_t;
@@ -47,6 +47,8 @@ typedef char gene_vote_number_t;
 #define GENE_SLIDING_STEP 3
 #define BEXT_RESULT_LIMIT 16
 
+#define SEARCH_BACK 0
+#define SEARCH_FRONT 1
 
 #define GENE_VOTE_SPACE 64 
 #define GENE_VOTE_TABLE_SIZE 91
@@ -59,6 +61,10 @@ typedef char gene_vote_number_t;
 #define int2base(c) ("AGCT"[(c)]) 
 #define color2int(c) ((c) - '0')
 #define int2color(c) ("0123"[(c)])
+
+#define get_base_error_prob64(a) ((a) < '@'-1?1:pow(10., -0.1*((a)-'@')))
+#define get_base_error_prob33(a) ((a) < '!'-1?1:pow(10., -0.1*((a)-'!'))) 
+
 
 
 #define FASTQ_PHRED33 1

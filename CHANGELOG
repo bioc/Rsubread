@@ -1,4 +1,7 @@
-Junuary 17, 2011 - 1.5.3
+February 14, 2012 - 1.5.4
+(1) Fixed the bug of mapping reads out of chromosome boundary.
+
+Junuary 17, 2012 - 1.5.3
 (1) Align function can now report uniquely mapped reads only.
 (2) Buildindex function now includes the reference sequences in the built index by default.
 (3) Subjunc now supports up to 16bp INDELs.

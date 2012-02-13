@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -184,7 +185,7 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 	{
 		char tt = gvindex_get (index, pos + i + max(0, offset));
 
-		if(read[i-min(0,offset)]==tt) ret++;
+		if(read[i-min(0,offset)]==tt)ret++;
 		else if(i + offset < test_len - INDEL_TEST_WINDOW - 3 && i >0)
 		{
 			// if there is a base unmatched, it is potentially an indel from here.
@@ -231,7 +232,9 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 					ret += read[i] == tt;
 				}
 				else
+				{
 					ret += read[i - offset] == tt;
+				}
 				*indel_point  = i;
 				
 			}
@@ -261,7 +264,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 			printf("%c=?=%c OFF=%d\n",read[i+min(0,offset)], tt, offset);
 		#endif
 
-		if(read[i+min(0,offset)]==tt) ret++;
+		if(read[i+min(0,offset)]==tt)ret++;
 		else if(i + offset >INDEL_TEST_WINDOW +3 && i < test_len-1)
 		{
 			// if there is a base unmatched, it is potentially an indel from here.
@@ -314,7 +317,9 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 					printf("PIECE_LEN=%d ; INDEL AT %d ; INDEL=%d\n", test_len , i + min(0, offset) , offset);
 				#endif
 				if(offset > 0)//insertion
+				{
 					ret += read[i-offset] == tt;
+				}
 				else	//deletion
 				{
 					tt = gvindex_get (index, pos + i - offset);
@@ -329,6 +334,83 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 	*indels = offset;
 	return ret;
 }
+
+
+
+float match_chro_support(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, char * qual_txt, int qual_format)
+{
+	int i;
+	float all_qual = 0.0000;
+	float supported_qual = 0.0000; 
+				
+
+	if (is_negative_strand)
+	{
+
+		for (i=test_len -1;i>=0;i--)
+		{
+			char tt = gvindex_get (index, pos+test_len-1-i);
+			int is_correct ;
+			switch(tt)
+			{
+				case 'A': is_correct = read[i] == 'T'; break;
+				case 'T': is_correct = read[i] == 'A'; break;
+				case 'G': is_correct = read[i] == 'C'; break;
+				case 'C': is_correct = read[i] == 'G'; break;
+			}
+
+			float base_p;
+			if(FASTQ_PHRED64 == qual_format)
+			{
+				base_p = get_base_error_prob64(qual_txt[i]);
+			}
+			else
+			{
+				base_p = get_base_error_prob33(qual_txt[i]);
+			}
+
+			if(base_p > 0.3) continue;
+			base_p=0;
+			all_qual += (1-base_p);
+
+			if(is_correct)
+				supported_qual += (1-base_p);
+		}
+	}
+	else
+	{
+		for (i=0;i<test_len;i++)
+		{
+			char tt = gvindex_get (index, pos +i);
+			int is_correct =read[i] == tt; 
+			float base_p;
+			if(FASTQ_PHRED64 == qual_format)
+			{
+				base_p = get_base_error_prob64(qual_txt[i]);
+			}
+			else
+			{
+				base_p = get_base_error_prob33(qual_txt[i]);
+			}
+
+
+			if(base_p > 0.3) continue;
+			base_p=0;
+
+			all_qual += (1-base_p);
+
+			if(is_correct)
+				supported_qual += (1-base_p);
+		}
+	}
+
+	//printf("%d\n", test_len);
+	if(all_qual < 6.1) return 0;
+	return supported_qual / all_qual * test_len;
+}
+
+
+
 
 int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type)
 {
@@ -382,6 +464,64 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 	return ret;
 }
 
+
+
+unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned int pos, int read_len, int search_length, int search_to_back)
+{
+	char key[4];
+	int i, j;
+	for(i = 0; i < 4; i++)
+	{
+		key[i]=0;
+		for(j = i+3; j >= i; j--)
+		{
+			key[i] = key[i] << 2 | base2int(read[j]);
+		}
+	}
+
+
+	int offset_byte, offset_bit, search_dist;
+
+	gvindex_baseno2offset(pos, index , &offset_byte, &offset_bit);
+
+	//printf("POS=%u, OFFBYTE=%d\n" , pos, offset_byte);
+
+	
+	search_dist = search_length /4;
+	if(search_to_back == SEARCH_BACK)
+	{
+		if(search_dist > offset_byte - 500)search_dist = offset_byte- 500;
+	}
+	else
+	{
+		if(search_dist + offset_byte >=  index -> values_bytes - 500) search_dist = index -> values_bytes - offset_byte -501;
+	}
+
+
+	for (i=2; i<search_dist; i++)
+	{
+		unsigned long test_offset = offset_byte;
+		test_offset += (search_to_back == SEARCH_BACK)?-i:i;
+		char tv = index->values [test_offset];
+
+		for(j=0; j<4; j++)
+		{
+			if(tv == key[j])
+			{
+				//test the whole read
+				unsigned int hit_pos = test_offset*4;
+				hit_pos += index -> start_base_offset - j;// + index -> start_point; 
+				int retv = match_chro_maxerror(read, index, hit_pos, read_len, 0, 0, 0);
+				if(retv >0)
+				{
+					//printf("POS=%u, TOFF=%u, STARTBASE=%d, j=%d , RETV=%d\n" , test_offset*4 + index -> start_base_offset - j , test_offset , index -> start_base_offset , j , retv);
+					return hit_pos; 
+				}
+			}
+		}
+	}
+	return 0xffffffff;
+}
 
 int match_chro_maxerror(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int max_error)
 {

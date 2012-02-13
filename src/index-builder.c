@@ -361,7 +361,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					if(
 						(((offset % 300000000 == 0) ||  (offset % 60000000 == 0 && segment_size - table.current_items < 50000000 )) && (!QUICK_BUILD)) ||
 						(offset % 1650000000 == 0 && QUICK_BUILD) ||
-						(offset > 100000000 && huge_table.current_items <1 )
+						(offset > 100000000 && huge_table.current_items <1  && (!QUICK_BUILD))
 					)
 						if(offset>1)
 							remove_repeated_reads(&table, &huge_table, threshold);

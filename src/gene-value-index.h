@@ -24,6 +24,7 @@ int gvindex_match_base(gene_value_index_t * index, gehash_data_t offset, const c
 int gvindex_get(gene_value_index_t * index, gehash_data_t offset);
 
 int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type);
+float match_chro_support(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, char * qual_str, int qual_format);
 
 
 int match_chro_maxerror(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int maxerror);
@@ -35,4 +36,5 @@ int match_chro_wronglen(char * read, gene_value_index_t * index, unsigned int po
 int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point,int max_indel_number);
 int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point,int max_indel_number);
 
+unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned int pos, int read_len, int search_length, int search_to_back);
 #endif

@@ -73,7 +73,7 @@ void final_matchingness_scoring(const char read_str[], const char quality_str[],
 
 float match_read(const char read_str[], int read_len, unsigned int potential_position,  gene_value_index_t * my_array_index, int space_type, int indel_tolerance, const char quality_str [], int quality_scale) ;
 
-void show_cigar(char * info, int len, int is_reversed_map, char * buf, int max_indel, int total_subreads);
+void show_cigar(char * info, int len, int is_reversed_map, char * buf, int max_indel, int total_subreads, char * read);
 
 int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigned int begin_position, int max_indel, char * movement_buffer, int expected_offset,int begin_read_offset, int end_read_offset);
 
@@ -83,7 +83,7 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 
 void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type,int find_junctions, int is_head_high_quality, char * qual_txt, int phred_version);
 
-int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int match_req_5end, int match_req_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality);
+int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int match_req_5end, int match_req_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_str, int qual_format);
 
 float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version);
 
@@ -92,6 +92,8 @@ int bad_quality_base_number(char * qualityb, int rl , int format);
 int min_matched_bases(char * qualityb, int rl , int format, float match_score);
 
 float read_quality_score(char * qualityb, int rl , int format);
+
+void compress_cigar(char * cigar,  int read_len, char *read);
 
 #endif
 

@@ -65,10 +65,6 @@ int is_valid_subread(const char * read_str)
 	return 1;
 }
 
-#define get_base_error_prob64(a) ((a) < '@'-1?1:pow(10., -0.1*((a)-'@')))
-#define get_base_error_prob33(a) ((a) < '!'-1?1:pow(10., -0.1*((a)-'!'))) 
-
-
 float read_quality_score(char * qualityb, int rl , int format)
 {
 	int i;
@@ -97,7 +93,6 @@ int min_matched_bases(char * qualityb, int rl , int format, float match_score)
 {
 	if(!(qualityb) || !qualityb[0]) return 0;
 	int i;
-	int qual = 0;
 
 	char base;
 	int ret = 0;
@@ -415,7 +410,7 @@ void init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 }
 
 
-void compress_cigar(char *cigar)
+void compress_cigar(char *cigar, int total_length, char * read)
 {
 	char tmp[200];
 	char cigar_piece [10];
@@ -429,6 +424,7 @@ void compress_cigar(char *cigar)
 	char last_operation = 'X';
 	int last_tmpv = 0;
 	tmp[0]=0;
+	int cigar_length=0;
 	
 	for(i=0; i < cigar_len; i++)
 	{
@@ -442,6 +438,8 @@ void compress_cigar(char *cigar)
 			if((cc!=last_operation) && (last_operation!='X'))
 			{
 				sprintf(cigar_piece,"%d%c", last_tmpv, last_operation); 
+				if(last_operation == 'M' || last_operation == 'S' || last_operation == 'I')
+					cigar_length += last_tmpv;
 				strcat(tmp, cigar_piece);
 				last_tmpv = 0;
 			}
@@ -458,13 +456,20 @@ void compress_cigar(char *cigar)
 	{
 		sprintf(cigar_piece,"%d%c", tmpv+last_tmpv, last_operation); 
 		strcat(tmp, cigar_piece);
+		if(last_operation == 'M' || last_operation == 'S' || last_operation == 'I')
+			cigar_length += tmpv+last_tmpv;
 	}
 	//printf("\nCIG=%s\n", cigar);
-	strcpy(cigar, tmp);
-	//printf("CIG=%s\n", cigar);
+	if(cigar_length == total_length)
+		strcpy(cigar, tmp);
+	else
+	{
+		//printf("CIG=%s; read=%s\n", cigar, read);
+		sprintf(cigar, "%dM", total_length);
+	}
 }
 
-void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads)
+void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read)
 {
 	int i, is_error = 0;
 	int last_end=0, last_offset = 0, cursor = 0;
@@ -480,7 +485,7 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		else
 		{
 			strncpy(buf, info+1, 98);
-			compress_cigar(buf);
+			compress_cigar(buf, len, read);
 		}
 		return;
 	}
@@ -553,13 +558,14 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 		else printf("NOADD3\n");*/
 	
 
+
 		find_and_explain_indel(allvote, qid, pos, votes, quality, is_counterpart, mask, max_indel_recorder, array_index, read_txt, read_len, max_indel, total_subreads, space_type, report_junction, is_head_high_quality, qual_txt, phred_version);
 
 		if(allvote -> max_indel_recorder)
 		{
 			char cigar_str [100];
 			cigar_str[0]=0;
-			show_cigar(allvote->max_indel_recorder + qid * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, max_indel, total_subreads);
+			show_cigar(allvote->max_indel_recorder + qid * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, max_indel, total_subreads, read_txt);
 			allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version);
 		}
 
@@ -598,7 +604,7 @@ void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote
 				float head_qual = is_head_high_quality?999:0, tail_qual = is_head_high_quality?0:999;
 
 
-				if(qual_txt)
+				if(qual_txt && qual_txt[0])
 				{
 					int j;
 					head_qual = 0;
@@ -634,7 +640,7 @@ void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote
 					EXON_INDEL_MATCHING_RATE_HEAD = 0.85;
 					head_must_correct =3;
 				}
-				if (head_qual / cover_start < 0.85 )
+				if (head_qual / cover_start < 0.85)
 				{
 					EXON_INDEL_MATCHING_RATE_HEAD = 0.75;
 					head_must_correct =2;
@@ -653,9 +659,12 @@ void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote
 					tail_must_correct =2;
 				}
 
-				//printf("HQ=%.4f ; TQ=%.4f\n", head_qual, tail_qual);
+				//printf("HQ=%.4f in %d ; TQ=%.4f in %d\n%s\n", head_qual, cover_start, tail_qual, (read_len-cover_end), qual_txt);
 
-				int is_full_covered = extend_covered_region(array_index, pos, read_txt, read_len, cover_start, cover_end, 4, head_must_correct, tail_must_correct,  max_indel, space_type, max_indel_recorder[k-1], &head_indel_pos, &head_indel_movement, &tail_indel_pos, &tail_indel_movement, is_head_high_quality);
+				
+
+				int is_full_covered = 0;
+				is_full_covered = extend_covered_region(array_index, pos, read_txt, read_len, cover_start, cover_end, 4, head_must_correct, tail_must_correct,  max_indel, space_type, max_indel_recorder[k-1], &head_indel_pos, &head_indel_movement, &tail_indel_pos, &tail_indel_movement, is_head_high_quality, qual_txt, phred_version);
 				if(head_indel_movement)
 				{
 					pos += head_indel_movement;
@@ -771,25 +780,19 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 			for (; xx<moves; xx++)
 			{
 				int current_operation = indel_operations[xx];
-				if (current_operation == 3) current_operation = 0;
+				if(current_operation == 3) current_operation = 0;
 
-				if(current_operation != last_operation && ( current_pos < gap_end_read-1+1 || current_operation == 0) && current_pos!=explain_cursor)
+				if(current_operation != last_operation && (current_pos < gap_end_read-1+1 || current_operation == 0))// && current_pos!=explain_cursor)
 				{
 					int vpos = strlen(tmp_cigar);
 					if (vpos>MAX_CIGAR_LEN-6) break;
 					sprintf(tmp_cigar + vpos, "%d%c", last_operation==1?del_number:(current_pos - explain_cursor), last_operation==0?'M':(last_operation==1?'D':'I'));
 					explain_cursor = current_pos ;
-					//printf("EXP=%d of %d;  XX=%d of %d;  MOV=%d->%d\n", explain_cursor, gap_end_read , xx , moves, last_operation,current_operation);
+					//printf("EXP=%d of %d;  XX=%d of %d;  MOV=%d->%d ; vpos=%d>%d cpos=%d > gapend=%d\nS=%s\n", explain_cursor, gap_end_read , xx , moves, last_operation,current_operation, vpos, MAX_CIGAR_LEN-6, current_pos, gap_end_read-1, tmp_cigar);
 					del_number = 0;
 				}
-
-				if (indel_operations[xx]==0) current_pos ++;
-				else if (indel_operations[xx]==1) {del_number++; dynamic_delta++;}//"D"
-				else if (indel_operations[xx]==2) {current_pos ++; dynamic_delta--;} //"I"
-				else if (indel_operations[xx]==3) current_pos ++;
-
-				if (current_pos >= gap_end_read || xx == moves - 1){
-					if (current_operation != 0 && current_pos!=explain_cursor)
+				if(current_pos >= gap_end_read-1 || xx == moves - 1){
+					if(current_operation != 0 && current_pos!=explain_cursor)
 					{
 						int vpos = strlen(tmp_cigar);
 						sprintf(tmp_cigar + vpos, "%d%c", current_operation==1?del_number:(current_pos - explain_cursor), current_operation==1?'D':'I');
@@ -798,6 +801,13 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 					}
 					break;
 				}
+
+				if (indel_operations[xx]==0) current_pos ++;
+				else if (indel_operations[xx]==1) {del_number++; dynamic_delta++;}//"D"
+				else if (indel_operations[xx]==2) {current_pos ++; dynamic_delta--;} //"I"
+				else if (indel_operations[xx]==3) current_pos ++;
+
+
 				last_operation = current_operation; 
 			} 
 		}
@@ -1777,12 +1787,12 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 
 }
 
-int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int req_match_5end , int req_match_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality)
+int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int req_match_5end , int req_match_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_txt, int qual_format)
 {
 	int ret = 0;
 	*head_indel_pos = -1;
 	*tail_indel_pos = -1;
-	if (cover_start >= window_size) 
+	if (cover_start >= window_size && EXON_INDEL_MATCHING_RATE_HEAD < 1.0001) 
 	{
 		int head_test_len =  cover_start;
 		int roughly_mapped = match_chro(read, array_index, read_start_pos, head_test_len , 0, space_type);
@@ -1824,12 +1834,13 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							int test_length = window_end_pos /*- 1*/ - max(0, indel_movement) -  right_match_number;
 
 							if (test_length <= 1+ abs(indel_movement)/4) continue;
-							test_length = min(10, test_length);
+							//test_length = min(10, test_length);
 							if (abs(indel_movement) > indel_tolerance) continue;
 
 							int test_start = window_end_pos - max(0, indel_movement) -  right_match_number - test_length;
 
-							int matched_bases_after_indel = match_chro(read +test_start, array_index, read_start_pos + indel_movement +test_start, test_length,0, space_type);
+							int matched_bases_after_indel = match_chro_support(read +test_start, array_index, read_start_pos + indel_movement +test_start, test_length,0, space_type, qual_txt, qual_format);
+							//printf("MOV=%d ; MATCH=%d ; TLEN=%d\n", indel_movement , matched_bases_after_indel, test_length);
 							float test_rate = EXON_INDEL_MATCHING_RATE_HEAD;
 							
 							if(test_length < 3) test_rate = 1;
@@ -1866,7 +1877,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 
 
 
-	if (cover_end <= read_len - window_size) 
+	if (cover_end <= read_len - window_size && EXON_INDEL_MATCHING_RATE_TAIL < 1.0001) 
 	{
 		int tail_test_len = read_len - cover_end;
 		int roughly_mapped = match_chro(read + cover_end, array_index, read_start_pos + cover_end + tail_indel, tail_test_len , 0, space_type);
@@ -1893,7 +1904,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 				else
 				{
 					roughly_mapped = match_chro(read+window_start_pos + left_match_number, array_index, read_start_pos + window_start_pos + tail_indel + left_match_number, read_len - window_start_pos - left_match_number , 0, space_type);
-					//printf("\nMATCH2: %d in %d\n", roughly_mapped , (int)(0.5+(read_len - window_start_pos -left_match_number )  * EXON_INDEL_MATCHING_RATE));
+					//printf("\nMATCH2: %d in %d\n", roughly_mapped , (int)(0.5+(read_len - window_start_pos -left_match_number )  * EXON_RECOVER_MATCHING_RATE));
 
 					if (roughly_mapped < (int)(0.5+(read_len - window_start_pos -left_match_number )  * EXON_RECOVER_MATCHING_RATE))
 					{
@@ -1907,14 +1918,14 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							int indel_adjustment = (indel_movement_i+1)/2 * (indel_movement_i %2?1:-1);
 							int indel_movement = tail_indel + indel_adjustment;
 							int test_length = read_len - window_start_pos  - left_match_number + min(0, indel_adjustment);
-							test_length = min(10, test_length);
+							//test_length = min(10, test_length);
 
 							//printf("TAIL: RECOVERING0 : indel_adjustment=%d;   indel_movement=%d;  %d\n",indel_adjustment ,indel_movement,test_length);
 
 							if (test_length <= 1 + abs(indel_movement)/4) continue;
 							if (abs(indel_movement) > indel_tolerance) continue;
 
-							int matched_bases_after_indel = match_chro(read + window_start_pos - min(0, indel_adjustment) + left_match_number, array_index, read_start_pos + window_start_pos  + max(0,indel_movement) +left_match_number , test_length,0, space_type);
+							int matched_bases_after_indel = match_chro_support(read + window_start_pos - min(0, indel_adjustment) + left_match_number, array_index, read_start_pos + window_start_pos  + max(0,indel_movement) +left_match_number , test_length,0, space_type, qual_txt +  window_start_pos - min(0, indel_adjustment) + left_match_number , qual_format);
 
 							float test_rate = EXON_INDEL_MATCHING_RATE_TAIL;
 							
@@ -1925,7 +1936,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 								not_too_bad = 1;
 								best_matched_bases_after_indel = matched_bases_after_indel;
 								best_indel_movement = indel_movement;
-			//					printf ("WSP=%d, LFT_MAT=%d\n", window_start_pos, left_match_number);
+								//printf ("WSP=%d, LFT_MAT=%d\n", window_start_pos, left_match_number);
 								best_indel_pos = window_start_pos + left_match_number ;//-1;
 								*tail_indel_movement = best_indel_movement ;
 							}
@@ -2237,10 +2248,10 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 			}
 			else if(cigar_txt[cigar_cursor] == 'I')
 			{
+				read_cursor +=x;
 				if(!qual_txt)
 				{
 					ret += x;
-					read_cursor +=x;
 				}
 				else if(FASTQ_PHRED64 == phred_version)
 				{
