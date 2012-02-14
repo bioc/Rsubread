@@ -1,3 +1,6 @@
+Feb 15, 2012 - 1.4.4
+(1) Bug fix to subjunc parameters passed to the underlying C program.
+
 February 14, 2012 - 1.4.3
 (1) Bug fix to read mapping out of chromosomal boundary.
 
