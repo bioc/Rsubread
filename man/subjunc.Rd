@@ -3,13 +3,13 @@
 \title{Finding exon junctions}
 \description{This function uses RNA-seq reads to discover exon junction locations}
 \usage{
-subjunc(index,readfile1,readfile2=NULL,output_file,nthreads=1,indels=5,min_distance=50,max_distance=600,PE_orientation="fr")
+subjunc(index,samfile,output_file,paired_end=FALSE,nthreads=1,indels=5,min_distance=50,max_distance=600,PE_orientation="fr")
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
-  \item{readfile1}{ character string giving the name of file which includes sequencing reads. This will be the name of first file of paired-end data are provided. The read file should be in FASTQ or FASTA format.}
-  \item{readfile2}{ character string giving the name of second file when paired-end read data are provided. \code{NULL} by default.}
+  \item{samfile}{ character string giving the name of SAM file generated from read alignment (eg. output from \code{align} function).}
   \item{output_file}{ character string giving the name of output file which includes the mapping results.}
+  \item{paired_end}{ logical, indicating whether the data is paired ended or single ended. \code{FALSE} by default.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. 1 by default.} 
   \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}
   \item{min_distance}{ numeric value giving the minimal distance between the pair of reads. 50 by default.}
@@ -17,15 +17,17 @@ subjunc(index,readfile1,readfile2=NULL,output_file,nthreads=1,indels=5,min_dista
   \item{PE_orientation}{ character string giving the orientation of the two reads in a pair. "fr" by default, which means the first read is on the forward strand and the second read is on the reverse strand.}
   }
 \details{
-This function uses a number of overlapping 16 mers extracted from each read to find junction reads and uses the mapping locations of these 16 mers to determine the exon junction locations in the reference genome.
-Exon junction locations with known donor and receptor sites are reported.
+This function takes as input the SAM format file generated from read alignment (eg. output from align() function), and then discover splicing points in the genome using junction reads reported in the SAM file (CIGAR strings include letter 'N').
+Donor and receptor sites are used when detecting splicing points.
+This function can detect junction locations in the reads which are as close as 4bp from the end of the reads.
+It supports INDEL detection during the junction detection as well.
+
 This function calls the underlying C program to perform the exon junction discovery.
 The C program can be run on its own as well, which is included in the subread software package (http://subread.sourceforge.net/)
 
-To use this function, the index has to built with \code{-b} option enabled (\code{\link{buildindex}}).
 }
 \value{ 
-This function ouputs two files: one is a BED format file which inlcudes the discovered junction locations and numbers of supporting reads, and the other is a SAM format file which includes the mapping result for each read.
+This function outputs two files: one is a BED format file which inlcudes the discovered junction locations and numbers of supporting reads, and a SAM format file which includes the mapping result for each read.
 }
 \references{
 }
