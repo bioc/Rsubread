@@ -1,6 +1,6 @@
 \name{callSNPs}
 \alias{callSNPs}
-\title{Finding Single Nucleotide Polymorphisms (SNPs) from next-gen sequencing data}
+\title{Finding Single Nucleotide Polymorphisms (SNPs) and INDELs (insertions and deletions) from next-gen sequencing data}
 \description{Use read coverage and allele frequency to call SNPs and INDELs}
 \usage{
 callSNPs(SAMfile,readLength,refGenomeFile,outputFile,minReadCoverage=5,minAlleleFraction=0.5)
@@ -25,7 +25,7 @@ These files include detailed SNP or INDEL information such as chromosomal locati
 }
 %\references{
 %}
-\author{Jenny Zhiyin Dai and Wei Shi}
+\author{Wei Shi and Jenny Zhiyin Dai}
 %\note{}
 %\seealso{}
 \examples{}

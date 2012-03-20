@@ -1,3 +1,7 @@
+March 21, 2012 - 1.5.6
+(1) Add snpCalls function.
+(2) Add removeDupReads function.
+
 Feb 15, 2012 - 1.5.5
 (1) Bug fix to subjunc parameters passed to the underlying C program.
 
