@@ -16,31 +16,32 @@ void gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned
 }
 
 
-void gvindex_baseno2offset(unsigned int base_number, gene_value_index_t * index, int * offset_byte, int * offset_bit)
+void gvindex_baseno2offset(unsigned int base_number, gene_value_index_t * index, unsigned int * offset_byte, unsigned int * offset_bit)
 {
 	// the base number corrsponding to the 0-th bit in the whole value array;
 
 	unsigned int offset = (base_number - index -> start_base_offset);
 
-	* offset_byte = offset / 4;
+	* offset_byte = offset >>2 ;
 	* offset_bit = base_number % 4 * 2;
 }
 
 // return 'A', 'G', 'T' and 'C'
 int gvindex_get(gene_value_index_t * index, gehash_data_t offset)
 {
-	int offset_byte, offset_bit;
+	unsigned int offset_byte, offset_bit;
 	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
 
-	unsigned char mask = 0x3 << (offset_bit);
-	unsigned int one_base_value = (index->values [offset_byte] & mask) >> (offset_bit);
+	if(offset_byte >= index-> values_bytes)return 'N';
 
-	return int2base(one_base_value);
+	unsigned int one_base_value = (index->values [offset_byte]) >> (offset_bit);
+
+	return int2base(one_base_value & 3);
 }
 
 int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_values)
 {
-	int offset_byte, offset_bit;
+	unsigned int offset_byte, offset_bit;
 
 	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
 	int i, ret = 0;
@@ -66,7 +67,7 @@ int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 
 void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_values)
 {
-	int offset_byte, offset_bit;
+	unsigned int offset_byte, offset_bit;
 	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
 	int i;
 
@@ -96,7 +97,7 @@ void gvindex_dump(gene_value_index_t * index, const char filename [])
 	fwrite(&index->start_point,4,1, fp);
 	fwrite(&index->length, 4, 1, fp);
 
-	int useful_bytes, useful_bits;
+	unsigned int useful_bytes, useful_bits;
 	gvindex_baseno2offset (index -> length+ index -> start_point, index,&useful_bytes,&useful_bits);
 
 	fwrite(index->values, 1, useful_bytes, fp);
@@ -116,7 +117,7 @@ void gvindex_load(gene_value_index_t * index, const char filename [])
 
 	//printf ("\nBINDEX %s : %u ~ +%u\n",filename, index->start_point, index->length );
 
-	int useful_bytes, useful_bits;
+	unsigned int useful_bytes, useful_bits;
 	index -> start_base_offset = index -> start_point - index -> start_point%4;
 	gvindex_baseno2offset (index -> length+ index -> start_point, index ,&useful_bytes,&useful_bits);
 	index -> values = malloc(useful_bytes);
@@ -183,7 +184,9 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 
 	for(i=0; i < test_len+min(0,offset); i++)
 	{
-		char tt = gvindex_get (index, pos + i + max(0, offset));
+		unsigned int npos = pos + i + max(0, offset);
+		char tt;
+		tt = gvindex_get (index, npos);
 
 		if(read[i-min(0,offset)]==tt)ret++;
 		else if(i + offset < test_len - INDEL_TEST_WINDOW - 3 && i >0)
@@ -228,7 +231,8 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 			{
 				if(offset > 0)//deletion
 				{
-					tt = gvindex_get (index, pos + i + offset);
+					npos = pos + i + offset;
+					tt = gvindex_get (index, npos);
 					ret += read[i] == tt;
 				}
 				else
@@ -256,9 +260,20 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 	int i;
 	int ret = 0;
 
+
+	if(pos > 0xffff0000 || pos + test_len>= index-> length + index->start_point) 
+	{
+		*indels = 0;
+		return 0;
+	}
+
 	for(i=test_len-1 ; i >=max(0,offset); i--)
 	{
-		char tt = gvindex_get (index, pos + i - max(0, offset));
+		unsigned int npos = pos + i - max(0, offset);
+		char tt;
+
+		tt = gvindex_get (index, npos);
+
 		#ifdef TEST_TARGET
 		if(memcmp(read, TEST_TARGET, 15)==0)
 			printf("%c=?=%c OFF=%d\n",read[i+min(0,offset)], tt, offset);
@@ -322,6 +337,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 				}
 				else	//deletion
 				{
+					npos = (pos + i - offset);
 					tt = gvindex_get (index, pos + i - offset);
 					ret += read[i] == tt;
 				}
@@ -350,7 +366,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 		for (i=test_len -1;i>=0;i--)
 		{
 			char tt = gvindex_get (index, pos+test_len-1-i);
-			int is_correct ;
+			int is_correct = 0;
 			switch(tt)
 			{
 				case 'A': is_correct = read[i] == 'T'; break;
@@ -414,10 +430,14 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 
 int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type)
 {
+
+	
 	int ret = 0;
 	int i;
 	char last_char='A';
 	
+	if ((unsigned int)(pos + test_len) >= index -> length + index -> start_point) return 0;
+	if (pos > 0xffff0000) return 0;
 
 	if (is_negative_strand)
 	{
@@ -465,22 +485,41 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 }
 
 
+int match_chro_slow(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type)
+{
+	if(is_negative_strand || space_type == GENE_SPACE_COLOR)
+		return match_chro_slow(read, index, pos, test_len, is_negative_strand, space_type);
+
+
+	unsigned int i;
+	unsigned int test_end = test_len+pos- index->start_base_offset;
+	int ret = 0, offset, bits;
+	for(i=(pos - index->start_base_offset); i< test_end ; i++)
+	{
+		offset = i/4;
+		bits = i%4*2;
+		ret += ((index -> values[offset] >> bits) & 0x3 )== base2int(*read);
+		read++;
+	}
+
+	return ret;
+}
 
 unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned int pos, int read_len, int search_length, int search_to_back)
 {
-	char key[4];
+	short key[4];
 	int i, j;
 	for(i = 0; i < 4; i++)
 	{
 		key[i]=0;
-		for(j = i+3; j >= i; j--)
+		for(j = i+7; j >= i; j--)
 		{
 			key[i] = key[i] << 2 | base2int(read[j]);
 		}
 	}
 
 
-	int offset_byte, offset_bit, search_dist;
+	unsigned int offset_byte, offset_bit, search_dist;
 
 	gvindex_baseno2offset(pos, index , &offset_byte, &offset_bit);
 
@@ -502,7 +541,7 @@ unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned 
 	{
 		unsigned long test_offset = offset_byte;
 		test_offset += (search_to_back == SEARCH_BACK)?-i:i;
-		char tv = index->values [test_offset];
+		short tv = *(short *)(index->values +test_offset);
 
 		for(j=0; j<4; j++)
 		{
@@ -583,7 +622,7 @@ int match_chro_maxerror(char * read, gene_value_index_t * index, unsigned int po
 
 int gvindex_match_base(gene_value_index_t * index, gehash_data_t offset, const char base_int_value)
 {
-	int offset_byte, offset_bit;
+	unsigned int offset_byte, offset_bit;
 
 	gvindex_baseno2offset(offset, index, &offset_byte, &offset_bit);
 

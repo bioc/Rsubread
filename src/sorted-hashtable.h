@@ -49,6 +49,8 @@ void gehash_destory(gehash_t * the_table);
 // It returns 0 if success, otherwise -1.
 int gehash_dump(gehash_t * the_table, const char fname []);
 
+void finalise_vote(gene_vote_t * vote);
+
 // This function loads a dumpped hash table.
 // The invoker does not need to initialise the table; it will be initialised in the function.
 // It returns 0 if success, otherwise -1.
@@ -56,4 +58,5 @@ int gehash_load(gehash_t * the_table, const char fname []);
 
 void gehash_prealloc(gehash_t * the_table);
 
+size_t gehash_update(gehash_t * the_table, gehash_key_t key, gehash_data_t data_new);
 #endif

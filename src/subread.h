@@ -102,6 +102,7 @@ typedef struct {
 	gehash_data_t max_position;
 	gene_quality_score_t max_quality;
 	char max_indel_recorder[MAX_INDEL_TOLERANCE*3];
+	char * max_tmp_indel_recorder;
 	short max_mask;
 
         unsigned char items[GENE_VOTE_TABLE_SIZE];
@@ -140,6 +141,7 @@ typedef struct{
 	gene_quality_score_t * max_final_quality;
 	short * masks;
 	char * max_indel_recorder;
+	char * span_coverage;
 #ifdef REPORT_ALL_THE_BEST
 	gene_best_record_t * best_records;
 #endif

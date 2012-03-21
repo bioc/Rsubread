@@ -17,9 +17,9 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
 #ifdef __MAX_ACCURACY_
- 	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE*2); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_mask = 0;
+ 	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE*2); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;
 #else
-	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE);  (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0;  (a)->max_mask = 0;
+	#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE);  (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0;  (a)->max_tmp_indel_recorder = NULL;  (a)->max_mask = 0;
 #endif
 // return current votes for a given position
 // if create_new_pos == 0 then do not take this position if it does not exist in the vote array
@@ -37,7 +37,7 @@ void init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 void clear_allvote(gene_allvote_t* allvote);
 
 
-void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version);
+void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage);
 
 unsigned char get_next_char(FILE * fp);
 
@@ -95,5 +95,6 @@ float read_quality_score(char * qualityb, int rl , int format);
 
 void compress_cigar(char * cigar,  int read_len, char *read);
 
+void print_votes(gene_vote_t * vote, char *index_prefix);
 #endif
 

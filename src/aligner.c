@@ -20,7 +20,7 @@ int MAX_PAIRED_DISTANCE = 600;
 int MIN_PAIRED_DISTANCE = 50;
 int REPORT_ONLY_UNIQUE = 0;
 int NUMBER_OF_ANCHORS_PAIRED = -1;
-int INDEL_TOLERANCE = 6;
+int INDEL_TOLERANCE = 17;
 int QUALITY_SCALE = QUALITY_SCALE_NONE;
 int USE_VALUE_ARRAY_INDEX = 1;
 int USE_BASEINDEX_BREAK_TIE = 0;
@@ -43,7 +43,6 @@ struct gene_thread_data
 	int * offsets;
 	int number_t;
 };
-
 
 
 #define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} }
@@ -208,8 +207,6 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 					}
 
 					gene_quality_score_t mapping_quality = av->max_final_quality[Curr_position];
-
-
 
 					fprintf (out_fp, "%s\t%d\t%s\t%d\t%d\t%s\t%s\t%d\t%lld\t%s\t",  nameb, flags, read_name,read_pos+1 , (int)mapping_quality , cigar_str, rnext, pnext+1, tlen, inb);
 
@@ -492,6 +489,8 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 
 
 	//if (read_len>110)printf("\nWHY?? %d\n%s\n%s\n",read_len, namebuf , InBuff);
+			finalise_vote(&vote_read1);
+			finalise_vote(&vote_read2);
 
 			if(USE_BASEINDEX_BREAK_TIE)
 				is_paired_match = select_positions_array(InBuff, read_len, InBuff2, read2_len,&vote_read1, &vote_read2, &numvote_read1, &numvote_read2, &sum_quality, &quality_read1, &quality_read2, read1_indel_recorder, read2_indel_recorder, &pos_read1, &pos_read2, MAX_PAIRED_DISTANCE, MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_counterpart, my_value_array_index, ginp -> space_type, INDEL_TOLERANCE, NUMBER_OF_ANCHORS_PAIRED , QualityBuff, QualityBuff2, QUALITY_SCALE, allvote->max_indel_tolerance, & is_break_even);
@@ -501,13 +500,14 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 			int pair_selected = 0;
 
 
-			//printf("SQ=%.4f, Q1=%.4f, Q2=%.4f, IS_PAIR=%d\n", sum_quality, quality_read1, quality_read2, is_paired_match);
+			//printf("SQ=%.4f, Q1=%.4f, Q2=%.4f, IS_PAIR=%d POS=%u\n", sum_quality, quality_read1, quality_read2, is_paired_match, pos_read1);
 
 			//if (0==memcmp("V0112_0155:7:1101:6917:2207",namebuf, 27))
 			//	printf("\nISP=%d, MAX1=%d, MAX2=%d, mask1=%d, mask2=%d\n", is_paired_match, vote_read1.max_vote, vote_read2.max_vote, vote_read1.max_mask, vote_read2.max_mask); 
 
 			//if(is_paired_match && !is_break_even)printf("POS=%u\n", pos_read1);
 
+			int need_replace = 0;
 			if (is_paired_match)
 			{
 				if (	(!(allvote->masks[queries*2] & IS_PAIRED_MATCH)) ||
@@ -515,50 +515,8 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 					  ((allvote->max_votes[queries*2]+allvote->max_votes[queries*2+1]) == (numvote_read1+numvote_read2) && sum_quality > allvote->max_quality[queries*2]+allvote->max_quality[queries*2+1])
   					)
 				   )
-				{
-					if (is_break_even){
-						vote_read1.max_mask |= IS_BREAKEVEN_READ;
-						vote_read2.max_mask |= IS_BREAKEVEN_READ;
-					}
-					else
-					{
-						vote_read1.max_mask &= ~IS_BREAKEVEN_READ;
-						vote_read2.max_mask &= ~IS_BREAKEVEN_READ;
-					}
-					allvote->max_votes[queries*2] = numvote_read1;
-					allvote->max_votes[queries*2+1] = numvote_read2;
-					allvote->max_quality[queries*2] = quality_read1;
-					allvote->max_quality[queries*2+1] = quality_read2;
+					need_replace = 1;
 
-					allvote->is_counterpart[queries*2] = is_counterpart;
-					allvote->is_counterpart[queries*2+1] = is_counterpart;
-					allvote->max_positions[queries*2] = pos_read1;
-					allvote->max_positions[queries*2+1] = pos_read2;
-					allvote->masks[queries*2] = vote_read1.max_mask |IS_PAIRED_MATCH;
-					allvote->masks[queries*2+1] = vote_read2.max_mask |IS_PAIRED_MATCH;
-					if(allvote->max_indel_tolerance)
-					{
-						find_and_explain_indel(allvote, queries*2  ,  pos_read1 , numvote_read1 , quality_read1,  is_counterpart, vote_read1.max_mask|IS_PAIRED_MATCH, read1_indel_recorder, my_value_array_index, InBuff , read_len , INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff , FASTQ_FORMAT);
-						find_and_explain_indel(allvote, queries*2+1,  pos_read2 , numvote_read2 , quality_read2, !is_counterpart, vote_read2.max_mask|IS_PAIRED_MATCH, read2_indel_recorder, my_value_array_index, InBuff2, read2_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS,  is_counterpart, QualityBuff2 , FASTQ_FORMAT);
-
-						char cigar_str [100];
-						cigar_str[0]=0;
-
-
-
-						pos_read1 = allvote -> max_positions[queries*2];
-						pos_read2 = allvote -> max_positions[queries*2+1];
-						show_cigar(allvote->max_indel_recorder + (queries*2) * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, InBuff);
-						allvote->max_final_quality[queries*2] = final_mapping_quality(my_value_array_index, pos_read1, InBuff, QualityBuff, cigar_str, FASTQ_FORMAT);
-
-						show_cigar(allvote->max_indel_recorder + (queries*2+1) * allvote -> indel_recorder_length, read2_len, is_counterpart, cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, InBuff2);
-						allvote->max_final_quality[queries*2+1] = final_mapping_quality(my_value_array_index, pos_read2, InBuff2, QualityBuff2, cigar_str, FASTQ_FORMAT);
-
-						//printf("COUNTER=%d , Q1 = %.4f , Q2 = %.4f , C1 = %s \nQ1=%s\n", is_counterpart, allvote->max_final_quality[queries*2], allvote->max_final_quality[queries*2+1], cigar_str, QualityBuff);
-
-					}
-					pair_selected = 1;
-				}
 				else if(
 					(allvote->max_votes[queries*2]+allvote->max_votes[queries*2+1]) == (numvote_read1+numvote_read2) &&
 					 sum_quality == allvote->max_quality[queries*2]+allvote->max_quality[queries*2+1]
@@ -566,8 +524,66 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 				{
 					allvote->masks[queries*2] |= IS_BREAKEVEN_READ;
 					allvote->masks[queries*2+1] |= IS_BREAKEVEN_READ;
+					if(pos_read1 <  allvote->max_positions[queries*2]) need_replace =1 ;
 				}
 			}
+
+
+
+
+			if(need_replace)
+			{
+
+				if (is_break_even){
+					vote_read1.max_mask |= IS_BREAKEVEN_READ;
+					vote_read2.max_mask |= IS_BREAKEVEN_READ;
+				}
+				else
+				{
+					vote_read1.max_mask &= ~IS_BREAKEVEN_READ;
+					vote_read2.max_mask &= ~IS_BREAKEVEN_READ;
+				}
+				allvote->max_votes[queries*2] = numvote_read1;
+				allvote->max_votes[queries*2+1] = numvote_read2;
+				allvote->max_quality[queries*2] = quality_read1;
+				allvote->max_quality[queries*2+1] = quality_read2;
+
+				allvote->is_counterpart[queries*2] = is_counterpart;
+				allvote->is_counterpart[queries*2+1] = is_counterpart;
+				allvote->max_positions[queries*2] = pos_read1;
+				allvote->max_positions[queries*2+1] = pos_read2;
+				allvote->masks[queries*2] = vote_read1.max_mask |IS_PAIRED_MATCH;
+				allvote->masks[queries*2+1] = vote_read2.max_mask |IS_PAIRED_MATCH;
+				if(allvote->max_indel_tolerance)
+				{
+					find_and_explain_indel(allvote, queries*2  ,  pos_read1 , numvote_read1 , quality_read1,  is_counterpart, vote_read1.max_mask|IS_PAIRED_MATCH, read1_indel_recorder, my_value_array_index, InBuff , read_len , INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff , FASTQ_FORMAT);
+					find_and_explain_indel(allvote, queries*2+1,  pos_read2 , numvote_read2 , quality_read2, !is_counterpart, vote_read2.max_mask|IS_PAIRED_MATCH, read2_indel_recorder, my_value_array_index, InBuff2, read2_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS,  is_counterpart, QualityBuff2 , FASTQ_FORMAT);
+
+					char cigar_str [100];
+					cigar_str[0]=0;
+
+
+
+					pos_read1 = allvote -> max_positions[queries*2];
+					pos_read2 = allvote -> max_positions[queries*2+1];
+					show_cigar(allvote->max_indel_recorder + (queries*2) * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, InBuff);
+					allvote->max_final_quality[queries*2] = final_mapping_quality(my_value_array_index, pos_read1, InBuff, QualityBuff, cigar_str, FASTQ_FORMAT);
+
+					show_cigar(allvote->max_indel_recorder + (queries*2+1) * allvote -> indel_recorder_length, read2_len, is_counterpart, cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, InBuff2);
+					allvote->max_final_quality[queries*2+1] = final_mapping_quality(my_value_array_index, pos_read2, InBuff2, QualityBuff2, cigar_str, FASTQ_FORMAT);
+
+					//printf("COUNTER=%d , Q1 = %.4f , Q2 = %.4f , C1 = %s \nQ1=%s\n", is_counterpart, allvote->max_final_quality[queries*2], allvote->max_final_quality[queries*2+1], cigar_str, QualityBuff);
+
+				}
+				pair_selected = 1;
+	
+
+			}
+
+
+
+
+
 
 			if ((!(allvote->masks[queries*2] & IS_PAIRED_MATCH)) && !pair_selected)
 			{
@@ -577,9 +593,9 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 				numvote_read2 = vote_read2.max_vote;
 
 				if(numvote_read1>0)
-					add_allvote_q(allvote, queries*2  ,  pos_read1 , numvote_read1 , vote_read1.max_quality, is_counterpart, vote_read1.max_mask, vote_read1.max_indel_recorder, my_value_array_index, InBuff, read_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff, FASTQ_FORMAT);
+					add_allvote_q(allvote, queries*2  ,  pos_read1 , numvote_read1 , vote_read1.max_quality, is_counterpart, vote_read1.max_mask, vote_read1.max_indel_recorder, my_value_array_index, InBuff, read_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff, FASTQ_FORMAT, vote_read1.max_coverage_end - vote_read1.max_coverage_start);
 				if(numvote_read2>0)
-					add_allvote_q(allvote, queries*2+1,  pos_read2 , numvote_read2 , vote_read2.max_quality, is_counterpart, vote_read2.max_mask, vote_read2.max_indel_recorder, my_value_array_index, InBuff2, read2_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS,  is_counterpart, QualityBuff2, FASTQ_FORMAT);
+					add_allvote_q(allvote, queries*2+1,  pos_read2 , numvote_read2 , vote_read2.max_quality, is_counterpart, vote_read2.max_mask, vote_read2.max_indel_recorder, my_value_array_index, InBuff2, read2_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS,  is_counterpart, QualityBuff2, FASTQ_FORMAT, vote_read1.max_coverage_end - vote_read1.max_coverage_start);
 			}
 		}
 		else
@@ -610,9 +626,9 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 					{
 						char * quality_string = QualityBuff + subread_offset;
 						subread_quality = get_subread_quality(quality_string, subread_string, QUALITY_SCALE, FASTQ_FORMAT);
-						//printf ("Pos=%d Rev=%d QQ=%.5f\n", subread_offset , is_counterpart , subread_quality);
 					}
 
+					//printf ("Pos=%d Subr=%u Rev=%d QQ=%.5f\n", subread_offset , subread_integer , is_counterpart , subread_quality);
 					if(is_valid_subread(subread_string))
 						total_results = gehash_go_q(my_table, subread_integer , subread_offset , read_len, is_counterpart, &vote , 1, 1 , subread_quality, INDEX_THRESHOLD, INDEL_TOLERANCE, subread_no, low_border, high_border - read_len);
 
@@ -626,8 +642,10 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 
 
 			//if(vote.max_vote > max(0,subread_no - (TOTAL_SUBREADS - ACCEPT_SUBREADS)))
+			//print_votes(&vote, index_prefix);
 			if(vote.max_vote >= ACCEPT_SUBREADS)
 			{
+				finalise_vote(&vote);
 				if(USE_BASEINDEX_BREAK_TIE)
 				{
 					gehash_data_t max_position;
@@ -641,12 +659,12 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 					final_matchingness_scoring(InBuff, (QUALITY_SCALE == QUALITY_SCALE_NONE )?NULL:QualityBuff, read_len, &vote, &max_position, &max_vote, &max_mask, &max_quality, my_value_array_index, ginp -> space_type, INDEL_TOLERANCE, QUALITY_SCALE, max_indel_recorder, & max_coverage_start, & max_coverage_end);
 					//	#warning max_indel_recorder UNINITED!
 					//printf("MQ=%.4f\n", max_quality);
-					add_allvote_q(allvote, queries,  max_position , max_vote, max_quality, is_counterpart, max_mask, max_indel_recorder, my_value_array_index,InBuff, read_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff, FASTQ_FORMAT);
+					add_allvote_q(allvote, queries,  max_position , max_vote, max_quality, is_counterpart, max_mask, max_indel_recorder, my_value_array_index,InBuff, read_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff, FASTQ_FORMAT, vote.max_coverage_end - vote.max_coverage_start);
 				}
 				else
 				{
 					//if (vote.max_mask & IS_BREAKEVEN_READ) printf("\nALIENER A BREAK EVEN! %u ; VOTE=%d\n%s\n\n",vote.max_position, vote.max_vote, InBuff);
-					add_allvote_q(allvote, queries,  vote.max_position , vote.max_vote, vote.max_quality , is_counterpart, vote.max_mask, vote.max_indel_recorder, my_value_array_index, InBuff, read_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff, FASTQ_FORMAT);
+					add_allvote_q(allvote, queries,  vote.max_position , vote.max_vote, vote.max_quality , is_counterpart, vote.max_mask, vote.max_indel_recorder, my_value_array_index, InBuff, read_len, INDEL_TOLERANCE, TOTAL_SUBREADS, ginp->space_type, REPORT_POTENTIAL_JUNCTION_READS, ! is_counterpart, QualityBuff, FASTQ_FORMAT, vote.max_coverage_end - vote.max_coverage_start);
 				}
 				matched =1;
 
@@ -839,8 +857,6 @@ void usage(char * execname)
 	puts("    -Q --quality        \t using mapping quality scores to break ties when more than one best mapping locations are found.");
 	puts("    -H --hamming        \t using Hamming distance to break ties when more than one best mapping locations are found.");
 	puts("    -J --junction       \t indicating the discovered junction reads in the SAM output using \"S\" operation in the CIGAR string. 'Subjunc' program shall then be used to discover exon junction locations and to perform complete alignment for junction reads.");
-//	puts("    -J --junction       \t outputting the discovered junction reads to a file ('.junc'). 'Subjunc' program shall then be used to discover exon junction locations and to perform complete alignment for junction reads.");
-//	puts("    -C --cigar_len <int>\t the maximum length of a cigar string, 20 by default");
 	puts("");
 	puts("Arguments for paired-end reads:");
 	puts("    -R --read2     <input>\t name of the second input file. The program will then be switched to the paired-end read mapping mode.");
@@ -848,11 +864,10 @@ void usage(char * execname)
 	puts("    -d --mindist   <int>\t minimum fragment length, 50 by default");
 	puts("    -D --maxdist   <int>\t maximum fragment length, 600 by default");
 	puts("    -S --order     <ff:fr:rf> \t orientation of the two read from the same pair, 'fr' by default");
-//	puts("    -A --anchors   <int>\t maximal number of anchor locations allowed, 10 by default. This has to be used together with -Q or -b options.");
 	puts("");
 /*	puts("Arguments for INDEL detection:");
 	puts("    --cigar_len       <int>\t the maximum length of a cigar string");
-	puts("    --cre_gap_penalty <int>\t penalty to creating a gap, default: 0;");
+	puts("    --cre_gap_penalty <int>\t penalty to creating a gap, default: -2;");
 	puts("    --ext_gap_penalty <int>\t penalty to extending a gap, default: 0;");
 	puts("    --mis_penalty     <int>\t penalty to a mismatched base, default: 0;");
 	puts("    --match_score     <int>\t default: 2; the parameters for tuning the outcome of indel alignment using dynamic programming.");
@@ -860,7 +875,7 @@ void usage(char * execname)
 */	puts("Example:");
 	puts(" ./subread-align -i my_index -r reads.fastq -o my_result.sam ");
 	puts("");
-	puts("Version: 1.1.0");
+	puts("Version: 1.2.0");
 	puts("For more information about these arguments, please refer to the User Manual.\n");
 
 }
@@ -915,7 +930,7 @@ int main_align(int argc,char ** argv)
 	TOTAL_SUBREADS = 10;
 	ACCEPT_SUBREADS = 3;
 	ACCEPT_MINOR_SUBREADS = 1;
-	INDEX_THRESHOLD = 12;
+	INDEX_THRESHOLD = 24;
 	read_file[0]=0;
 	read2_file[0]=0;
 	index_prefix[0]=0;
@@ -974,7 +989,7 @@ int main_align(int argc,char ** argv)
 				break;
 			case 'I':
 				INDEL_TOLERANCE = atoi(optarg);
-				if( INDEL_TOLERANCE >= MAX_INDEL_TOLERANCE )INDEL_TOLERANCE=MAX_INDEL_TOLERANCE-1;
+				if( INDEL_TOLERANCE >= MAX_INDEL_TOLERANCE )INDEL_TOLERANCE=MAX_INDEL_TOLERANCE;
 				if(INDEL_TOLERANCE>0)
 					INDEL_TOLERANCE ++;
 				break ;
