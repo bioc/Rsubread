@@ -682,7 +682,7 @@ void output_called_INDELs(int seg_index){
 		/* check whether this position generate an output line */
 		count_other_nuc = 0;
 		depth = 0;
-		for (j=0; j<=3; j++){
+		for (j=0; j<=4; j++){
 			if (ref_seq[i] != j){
 				count_other_nuc += count[j][i];
 			}
@@ -704,23 +704,28 @@ void output_called_INDELs(int seg_index){
 				strcat(alt, "/");
 				strcat(freq, "/");
 				if  (indel[i]->flag[j] == 'I'){
-					if(indel[i]->freq[j] > INDEL_freq_largest)
-						INDEL_freq_largest = indel[i]->freq[j];
-					strcat(alt, "+");
 					char *this_allele = indel[i]->seq[j];
+					if(strlen(this_allele)+strlen(alt) > 50) 
+						break;
+					strcat(alt,"+");
 					strcat(alt, this_allele);
-				} else if (indel[i]->flag[j] == 'D'){
                                         if(indel[i]->freq[j] > INDEL_freq_largest)
                                                 INDEL_freq_largest = indel[i]->freq[j];
-					strcat(alt, "-");
-					//printf("Length of this deletion component is : %d\n", indel[i+1]->indel_length[j]);
+				} else if (indel[i]->flag[j] == 'D'){
 					char this_allele[20];
 					int p;
 					for (p=0; p<indel[i]->indel_length[j]; p++){
 						sprintf(this_allele, "%c", NUCLEOTIDES[ref_seq[i+p]]);
 					}
+					if(strlen(this_allele)+strlen(alt) > 50)
+						break;
+					strcat(alt,"-");
 					strcat(alt, this_allele);
+                                        if(indel[i]->freq[j] > INDEL_freq_largest)
+                                                INDEL_freq_largest = indel[i]->freq[j];
 				}
+				if(strlen(this_freq)+strlen(freq) > 50)
+					break;
 				strcat(freq, this_freq);
 			}
 			if(INDEL_freq_largest >= SNP_min_fraction*depth)
@@ -748,7 +753,7 @@ void output_called_SNPs(int seg_index){
 	fprintf(fsnp,"chr\tpos\tref\talt\tfreq\tdepth\n");
 
 	char *chr = chrs[segments[seg_index]->chr_index];
-	int i, j;
+	int i, j, isSNP;
 	int depth = 0;
 	int count_other_nuc;
 	int offset = segments[seg_index]->offset;
@@ -788,23 +793,25 @@ void output_called_SNPs(int seg_index){
 		strcpy(freq,"DUMMY");
 
 		/* check whether position i has SNP */
+		isSNP = 0;
 		for (j=0; j<=3; j++){
 			if ((ref_seq[i] != j) && (count[j][i] > min_alter_count)){
+				isSNP = 1;
 				/* Add in this allele's information to alt and freq */
-					/* seperate each possible allele by a slash */
-					char this_allele[3];
-					sprintf(this_allele, "%c", NUCLEOTIDES[j]);
-				    char this_freq [ STR ];
-				    sprintf(this_freq, "%d", count[j][i]);
-					strcat(alt, "/");
-					strcat(freq, "/");
-					strcat(alt, this_allele);
-					strcat(freq, this_freq);
+				/* seperate each possible allele by a slash */
+				char this_allele[3];
+				sprintf(this_allele, "%c", NUCLEOTIDES[j]);
+			    	char this_freq [ STR ];
+				sprintf(this_freq, "%d", count[j][i]);
+				strcat(alt, "/");
+				strcat(freq, "/");
+				strcat(alt, this_allele);
+				strcat(freq, this_freq);
 			}
 		}
 
-
-		fprintf(fsnp, "%s\t%d\t%c\t%s\t%s\t%d\n", chr, i+offset, NUCLEOTIDES[ref_seq[i]], alt+6, freq+6, depth);
+		if(isSNP == 1)
+			fprintf(fsnp, "%s\t%d\t%c\t%s\t%s\t%d\n", chr, i+offset, NUCLEOTIDES[ref_seq[i]], alt+6, freq+6, depth);
 
 		if(alt) free(alt);
 		if(freq) free(freq);
