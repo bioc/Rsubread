@@ -14,7 +14,9 @@ callSNPs(SAMfile,readLength,refGenomeFile,outputFile,minReadCoverage=5,minAllele
   \item{minAlleleFraction}{ a numeric value giving the minimal fraction of reads which supports the called SNP or INDEL, out of all the reads which cover that chromosomal location. 0.5 by default.}
   }
 \details{
-This function takes as input a SAM format file, which includes mapping results for a set of reads, and calls SNPs and INDELs using read coverage and allele frequency for each chromosomal location.\\
+This function takes as input a SAM format file, which includes mapping results for a set of reads, and then calls SNPs and INDELs using read coverage and allele frequency for each chromosomal location.\\
+
+It requires the chromosome names included in the SAM file to be 'chr1', 'chr2', 'chr3', ..., 'chrX', and 'chrY'.\\ 
 
 To report a SNP or INDEL, a chromosomal location must be covered by at least \code{minReadCoverage} reads and the fraction of reads, which include bases different from the reference base at that location, must be equal to or greater than \code{minAlleleFraction}.
 

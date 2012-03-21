@@ -11,7 +11,9 @@ removeDupReads(SAMfile,threshold=50)
   }
 \details{
 This function uses the mapping location of the first base of each read to find duplicated reads (mapped to the same location).
-Reads will be removed from the SAM file if they are found to be duplicated equal to or more than \code{threshold} times.
+Reads will be removed from the SAM file if they are found to be duplicated equal to or more than \code{threshold} times.\\
+
+It requires the chromosome names included in the SAM file to be 'chr1', 'chr2', 'chr3', ..., 'chrX', and 'chrY'.
 }
 \value{
 A SAM file which includes the remaining reads after duplication removal, and a text file which includes removed reads.

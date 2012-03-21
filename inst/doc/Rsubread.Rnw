@@ -100,6 +100,14 @@ This function can be used for general-purpose read summarization as well (for bo
 \section{Finding exon junctions}
 The \R{subjunc} function takes as input FASTQ/FASTA files and outputs the exon junction locations found in the reference genome and also the numbers of reads supporting the discovered junctions.
 
+\section{Calling SNPs and INDELs}
+The \R{callSNPs} function implements a very simple method for calling SNPs or INDELs for a sequencing dataset.
+To call a chromosomal location containing a SNP or INDEL, that location must be covered by a certain number of reads (5 by default) and at least a certain fraction (0.5 by default) of these reads must provide bases (or insertions/deletions) which are different from the reference base.
+The input to this function is a SAM file, which is the output of a read alignment.
+
+\section{Removing duplicated reads}
+The function{removeDupReads} takes as input a SAM file and removes those reads, which are not only found to be mapped to exactly the same location (as determined by the mapping location of the first base of the read) and but also are found to be duplicated more than a certain number of times (50 by default). 
+
 \section{Quality assessment}
 {\noindent\bf Quality scores\\}
 Quality scores give the probability of base calling being wrong for each base in the reads, which is useful for examining quality of the sequencing data.
