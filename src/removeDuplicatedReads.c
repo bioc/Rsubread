@@ -390,18 +390,12 @@ int main_removeDuplicatedReads(int argc, char *argv[]){
 		sam_header = (char *)calloc(STR,sizeof(char));
 		output_sam_file = (char *)calloc(STR,sizeof(char));
 		strcpy(sam_file, argv[1]);
-		strncpy(sam_header, argv[1], (strlen(argv[1]) - 4));
+		strcpy(sam_header, argv[1]);
 		strcpy(output_sam_file, sam_header);
-		if (argc >= 3){
-			strcat(output_sam_file, "_");
-			strcat(output_sam_file, argv[2]);
-			strcat(output_sam_file, ".sam");
-		} else {
-			strcat(output_sam_file, "_duplicates_removed.sam");
-		}
+		strcat(output_sam_file, ".NoneDupReads");
 		remove_logfile = (char *)calloc(STR,sizeof(char));
 		strcpy(remove_logfile, sam_header);
-		strcat(remove_logfile, "_removed_reads.txt");
+		strcat(remove_logfile, ".DupReads.txt");
 
 	}
 	

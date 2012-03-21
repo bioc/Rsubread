@@ -727,6 +727,12 @@ void output_called_INDELs(int seg_index){
 				fprintf(fallsnv, "%s\t%d\t%c\t%s\t%s\t%d\n", chr, i+offset, NUCLEOTIDES[ref_seq[i]], alt+6, freq+6, depth);
 		}
 
+		if(alt) 
+			free(alt);
+
+		if(freq) 
+			free(freq);
+
 		/* In the final output line, both alt and freq should be refered with pointer +1
 		 * in this case, regardless of how many possible alternatives are there, each is started with
 		 * a slash, and the final output neglect the first slash by +1 */
@@ -780,6 +786,7 @@ void output_called_SNPs(int seg_index){
 		strcpy(alt,"DUMMY");
 		char * freq = (char *)calloc(STR,sizeof(char));
 		strcpy(freq,"DUMMY");
+
 		/* check whether position i has SNP */
 		for (j=0; j<=3; j++){
 			if ((ref_seq[i] != j) && (count[j][i] > min_alter_count)){
@@ -798,6 +805,9 @@ void output_called_SNPs(int seg_index){
 
 
 		fprintf(fsnp, "%s\t%d\t%c\t%s\t%s\t%d\n", chr, i+offset, NUCLEOTIDES[ref_seq[i]], alt+6, freq+6, depth);
+
+		if(alt) free(alt);
+		if(freq) free(freq);
 
 		/* In the final output line, both alt and freq should be refered with pointer +1
 		 * in this case, regardless of how many possible alternatives are there, each is started with
