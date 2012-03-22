@@ -160,7 +160,7 @@ void group_reads(void){
 	printf("Number of reads in input file: %d\n", num_input_reads);
 	printf("Number of reads mapped to given reference: %d\n", num_chr_reads);
 	printf("Mapping to reference rate is : %f\n\n", 1.0 * num_chr_reads/num_input_reads);
-	printf("Remove duplicate is : %d\n", duplicate_threshold);
+	printf("Maximal number of duplicates allowed is: %d\n", duplicate_threshold);
 }
 
 
@@ -196,7 +196,7 @@ void filter_one_chr(int chr_index){
 		pos = atoi(strtok(NULL,"\t"));
 		mapqual = atoi(strtok(NULL, "\t"));
 		if ((mapqual > 255) || (mapqual <=0)){
-			printf("Is there something wrong with mapq? %d\n", mapqual);
+			//printf("Is there something wrong with mapq? %d\n", mapqual);
 		}
 		depth[pos]++;
 		if (mapqual > mapq[pos]){

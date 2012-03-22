@@ -9,7 +9,7 @@ subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indel
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
   \item{samfile}{ character string giving the name of SAM file generated from read alignment (eg. output from \code{align} function).}
   \item{output_file}{ character string giving the name of output file which includes the mapping results.}
-  \item{nsubreads}{ numeric value giving the number of subreads extracted from each read for exon-exon junction detection. \code{14} by default.}
+  \item{nsubreads}{ numeric value giving the number of subreads extracted from each read. \code{14} by default.}
   \item{paired_end}{ logical, indicating whether the data is paired ended or single ended. \code{FALSE} by default.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. 1 by default.} 
   \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}

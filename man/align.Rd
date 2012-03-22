@@ -23,9 +23,9 @@ align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthrea
   \item{min_distance}{ numeric value giving the minimal distance between the pair of reads. 50 by default.}
   \item{max_distance}{ numeric value giving the maximal distance between the pair of reads. 600 by default.}
   \item{PE_orientation}{ character string giving the orientation of the two reads in a pair. "fr" by default, which means the first read is on the forward strand and the second read is on the reverse strand.}
-  \item{DP_GapOpenPenalty}{ a numeric value giving the penalty for open a gap when using the Smith-Waterman dynamic programming algorithm to find insertions and deletions. The Smith-Waterman algorithm is only applied for those reads which are found to contain insertions or deletions. \code{-2} by default.}
-  \item{DP_GapExtPenalty}{ a numeric value giving the penalty for extending the gap used by the Smith-Waterman algorithm. \code{0} by default.}
-  \item{DP_MismatchPenalty}{ a numeric value giving the penalty for mismatches used by the Smith-Watermain algorithm. \code{0} by default.}
+  \item{DP_GapOpenPenalty}{ a numeric value giving the penalty for opening a gap when using the Smith-Waterman dynamic programming algorithm to detect insertions and deletions. The Smith-Waterman algorithm is only applied for those reads which are found to contain insertions or deletions. \code{-2} by default.}
+  \item{DP_GapExtPenalty}{ a numeric value giving the penalty for extending the gap, used by the Smith-Waterman algorithm. \code{0} by default.}
+  \item{DP_MismatchPenalty}{ a numeric value giving the penalty for mismatches, used by the Smith-Waterman algorithm. \code{0} by default.}
   \item{DP_MatchScore}{ a numeric value giving the score for matches used by the Smith-Waterman algorithm. \code{2} by default.}
   }
 \details{
