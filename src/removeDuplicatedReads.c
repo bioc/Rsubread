@@ -93,7 +93,7 @@ void group_reads(void){
 		chr_reads_files[i] = fopen(chr_reads_filenames[i], "w");
 	}
 	
-	
+
 	/* Group reads into subgroups */
 	FILE *fallreads;
 	FILE *fout;
@@ -113,7 +113,6 @@ void group_reads(void){
 	line = (char *)calloc(LEN+1,sizeof(char));
 	line_copy = (char *)calloc(LEN+1,sizeof(char));
 	
-
 	while ((readline = fgets(line, LEN, fallreads)) != NULL){
 		strcpy(line_copy, line);
 		if(line[0] == '@'){
@@ -140,10 +139,8 @@ void group_reads(void){
 		} else {
 			num_chr_reads++;
 		}
-		
 		fprintf(chr_reads_files[read_chr_index], "%s", line_copy);
 	}
-
 	/* Close input file and read files for each chromosome */
   	fclose(fallreads);
   	fclose(fout);
@@ -312,7 +309,7 @@ void prepare_groups(void){
 				chr_length[count_seq] = atoi(len+3);
 				strcpy(filename, seq+3);
 				strcat(filename, "_read_");
-				strcat(filename, sam_header);
+				//strcat(filename, sam_header);
 				strcat(filename, ".txt");
 				chr_reads_filenames[count_seq] = (char *)calloc(STR,sizeof(char));
 				strcpy(chr_reads_filenames[count_seq], filename);
@@ -364,7 +361,6 @@ void duplicate_reads_remover(void){
 	for (i_chr = 1; i_chr <= count_seq; i_chr++){
 		filter_one_chr(i_chr);
 	}
-	
 	/* Step 4 - Data Tidy Up*/
 	output_clean_up();
 }
@@ -426,7 +422,6 @@ int main_removeDuplicatedReads(int argc, char *argv[]){
 			detail = 1;
 		}
 	}
-	
 	duplicate_reads_remover();
 
 }
