@@ -753,6 +753,7 @@ void output_called_SNPs(int seg_index){
 	fprintf(fsnp,"chr\tpos\tref\talt\tfreq\tdepth\n");
 
 	char *chr = chrs[segments[seg_index]->chr_index];
+	printf("DEBUG: processing chromosome %s\n", chr);
 	int i, j, isSNP;
 	int depth = 0;
 	int count_other_nuc;
@@ -1002,7 +1003,9 @@ void SNP_calling(void){
 	/*
 	 * Step 3: For each working segment, calculate SNP statistics
 	 */
+	printf("DEBUG: total number of segments is %d\n", num_segs);
 	for (i_main = 0; i_main < num_segs; i_main++){
+	printf("DEBUG: processing segment %d\n", i_main);
 		if (DEBUG == 1){
 			printf("Processing segment: %s\n", segments[i_main]->segment_id);
 		}

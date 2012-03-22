@@ -330,7 +330,7 @@ void prepare_groups(void){
 		for (i=0; i<NUMREGCHR; i++){
 			strcpy(filename, chrs[i]);
 			strcat(filename, "_read_");
-			strcat(filename, sam_header);
+			//strcat(filename, sam_header);
 			strcat(filename, ".txt");
 			chr_reads_filenames[i] = (char *)calloc(STR,sizeof(char));
 			strcpy(chr_reads_filenames[i], filename);
@@ -387,10 +387,12 @@ int main_removeDuplicatedReads(int argc, char *argv[]){
 		output_sam_file = (char *)calloc(STR,sizeof(char));
 		strcpy(sam_file, argv[1]);
 		strcpy(sam_header, argv[1]);
-		strcpy(output_sam_file, sam_header);
+		//strcpy(output_sam_file, sam_header);
+		strcpy(output_sam_file,argv[3]);
 		strcat(output_sam_file, ".NoneDupReads");
 		remove_logfile = (char *)calloc(STR,sizeof(char));
-		strcpy(remove_logfile, sam_header);
+		//strcpy(remove_logfile, sam_header);
+		strcpy(remove_logfile,argv[3]);
 		strcat(remove_logfile, ".DupReads.txt");
 
 	}
