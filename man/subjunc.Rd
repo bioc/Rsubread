@@ -30,7 +30,7 @@ The C program can be run on its own as well, which is included in the subread so
 
 }
 \value{ 
-This function outputs two files: one is a BED format file which inlcudes the discovered junction locations and numbers of supporting reads, and a SAM format file which includes the mapping result for each read.
+This function outputs two files: one is a SAM format file which includes the mapping results for all the reads (including both junction reads and exonic reads), and the other is a BED format file which inlcudes pairs of splicing points (exon-exon junctions) found from each junction read, number of supporting junction reads for each exon-exon junction and so on.
 }
 \references{
 }

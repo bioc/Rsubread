@@ -1,11 +1,11 @@
-CHANGES IN VERSION 1.4.0
+CHANGES IN VERSION 1.6.0
 ------------------------
 
 NEW FEATURES
 
-    o Detect exon junctions (subjunc function). 
+    o Significant improvement on the exon-exon junction detection (subjunc function). 
 
-    o Make detection calls for each genes to tell whether or not  they are expressed (detectionCall function). 
+    o Calling SNPs using a simple allele fraction approach (callSNPs function) . 
 
-    o Count number of reads falling into each gene or each exon (featureCounts function). 
+    o Removing duplicated reads (removeDupReads function). 
 
