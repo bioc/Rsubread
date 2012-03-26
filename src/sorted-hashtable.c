@@ -330,12 +330,17 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 	{
 		keyp ++;
 		if(keyp - tk > max_match_number)
+		{
+			//printf("MAX_OUT %u\n", max_match_number );
 			return 0;
+		}
 	}
 
 	match_end = keyp - current_bucket -> item_keys;
 
 	endkp = current_bucket -> item_values+match_end;
+
+	short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
 
 	if (indel_tolerance <1)
 		for (keyp = current_bucket -> item_values+match_start; keyp < endkp ; keyp++)
@@ -345,10 +350,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 			int offsetX = _index_vote(kv);
 			int datalen = vote -> items[offsetX];
 			unsigned int * dat = vote -> pos[offsetX];
-			#ifdef MAKE_FOR_EXON
-			short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
-			#endif
-		
 
 			if ((*keyp ) < offset)
 				continue;
@@ -429,9 +430,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 		{
 			unsigned int kv = (*keyp) - offset;
 			int iix;
-			#ifdef MAKE_FOR_EXON
-			short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
-			#endif
 
 			if ((*keyp ) < offset)
 				continue;
@@ -452,13 +450,13 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 				for (i=0;i<datalen;i++)
 				{
 					long long int dist0 = kv;
-					if (vote -> last_offset[offsetX][i]== offset){
-						continue;
-					}
-
 					dist0 -= dat[i];
 					if (abs(dist0) <= indel_tolerance)
 					{
+
+						if (vote -> last_offset[offsetX][i]== offset)
+							continue;
+
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 						test_max += weight;
 						vote -> votes[offsetX][i] = test_max;
@@ -583,8 +581,8 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 		}
 	
 		
-
-	return match_end-match_start;
+	return 1;
+	//return match_end-match_start;
 }
 
 void finalise_vote(gene_vote_t * vote)

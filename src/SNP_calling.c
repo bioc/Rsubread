@@ -21,7 +21,7 @@
 #define LEN 1000
 #define MAX_CIGAR_COMP 100
 #define MAX_INDEL 50
-#define MAX_INDEL_LENGTH 20
+#define MAX_INDEL_LENGTH 100
 #define DEBUG 0
 #define MAX_CALLED_DEPTH 10000000
 
@@ -264,15 +264,15 @@ void prepare_working_units(void){
 		if (line[0] == '>'){
 			/*chr = (char *)calloc(STR,sizeof(char));
 			strncpy(chr, line+1, (strlen(line) - 2));
-			printf("Notice\n");
-			printf("%s", line);
-			printf("%d\n", strlen(line) - 2);
-			printf("%s\n", chr);
-			printf("Notice\n");
+			//printf("Notice\n");
+			//printf("%s", line);
+			//printf("%d\n", strlen(line) - 2);
+			//printf("%s\n", chr);
+			//printf("Notice\n");
 			chr_index = SNP_find_chr_index(chr);*/
 			chr_index ++;
 			chr = chrs[chr_index];
-			printf("%s\t%s", chr, line);
+			//printf("%s\t%s", chr, line);
 			if (chr_index == -1){
 				// This reference sequence does not have read mapped to it
 				////////////////////////////////////////////////////////
@@ -344,10 +344,6 @@ void prepare_working_units(void){
 	fclose(fseg);
 	fclose(fin);
 
-	if (DEBUG == 1){
-		printf("Number of segments is : %d\n", num_segs);
-		printf("Finished preparing working units ...\n");
-	}
 
 }
 
@@ -423,10 +419,6 @@ SNP_make_empty_node(void){
 
 void process_chr_reads(int seg_index){
 
-	if (DEBUG == 1){
-		printf("In procesisng segment reads : %s\n", segments[seg_index]->segment_id);
-	}
-
 	char *chr = chrs[segments[seg_index]->chr_index];
 
 	FILE * fin;
@@ -447,8 +439,11 @@ void process_chr_reads(int seg_index){
 
 	int i;
 	int32_t offset = segments[seg_index]->offset;
+//printf("break1\n");
 
 	while ((readline = fgets(line, LEN, fin)) != NULL){
+//if(seg_index == 22) printf("%s",line);
+
 		strtok(line,"\t");
 		strtok(NULL,"\t");
 		read_chr = strtok(NULL,"\t");
@@ -465,6 +460,7 @@ void process_chr_reads(int seg_index){
 		strtok(NULL,"\t");
 		strtok(NULL,"\t");
 		read_seq = strtok(NULL, "\t");
+
 		if (strcmp(cigar, fully_match_cigar) == 0){
 			/* This read is fully matched/mismatched */
 			for (i=0; i<strlen(read_seq); i++){
@@ -489,7 +485,6 @@ void process_chr_reads(int seg_index){
 			/* This read is NOT fully matched/mismatched */
 			/* Process CIGAR information */
 			process_cigar_info(cigar);
-
 			int i_comp, rpos;	// iterator for read component and each component's read position
 			int32_t refer_cursor; 	// cumulated position from up to now read components
 			refer_cursor = pos;		// refer cursor starts from the read mapping location
@@ -529,13 +524,14 @@ void process_chr_reads(int seg_index){
 						break;
 
 					case 1:
-						if (1==1){	// wrapper to single statement block
+						if (1==0){	// wrapper to single statement block
 						/* This component of read is a 'I': Insertion*/
 						/* modify the read cursor only */
 						/* retrieve inserted sequence */
 						char * inserted_seq;
 						inserted_seq = (char *)calloc(MAX_INDEL_LENGTH,sizeof(char));
 						strncpy(inserted_seq, (char *)(read_seq+read_cursor), cigar_comp_length[i_comp]);
+						//printf("DEBUG: %s,%d\n",inserted_seq,cigar_comp_length[i_comp]);
 						if (DEBUG == 1){
 							//printf("read sequence is : %s\n", read_seq);
 							//printf("inserted sequence is : %s\n", inserted_seq);
@@ -584,11 +580,13 @@ void process_chr_reads(int seg_index){
 							}	// end if  (occurance_flag != -1)
 						}	//end else (indel[refer_cursor-1] == NULL)
 						read_cursor = read_cursor + cigar_comp_length[i_comp];
+						free(inserted_seq);
 						}	// closing bracket for wrapping if statement
+						read_cursor = read_cursor + cigar_comp_length[i_comp];
 						break;
 
 					case 2:
-						if (1 == 1){	// wrapper to single statement block/
+						if (1 == 0){	// wrapper to single statement block/
 							/* This component of read is a 'D': Deletion*/
 							/* For deletion, only need to specify from current position, how many bases are deleted
 							 * the actual deleted sequence can only be known when reference genome is inputed */
@@ -635,6 +633,7 @@ void process_chr_reads(int seg_index){
 							/* modify the refer cursor only */
 							refer_cursor = refer_cursor + cigar_comp_length[i_comp];
 						}	// closing bracket for wrapping if statement
+						refer_cursor = refer_cursor + cigar_comp_length[i_comp];
 						break;
 					case 3:
 						/* This component is a 'N':skip */
@@ -650,7 +649,10 @@ void process_chr_reads(int seg_index){
 				} // end-switch
 			} // end-while cigar_component
 		} // end-else not fully matched
+
+
 	} // end-while
+//printf("break2\n");
 
 	fclose(fin);
 	if (DEBUG == 1){
@@ -662,7 +664,7 @@ void output_called_INDELs(int seg_index){
 
 	FILE *fallsnv = fopen(snp_indel_filename,"a");
 	/* Print header line indicating each column */
-	fprintf(fallsnv,"chr\tpos\tref\talt\tfreq\tdepth\n");
+	//fprintf(fallsnv,"chr\tpos\tref\talt\tfreq\tdepth\n");
 
 	char *chr = chrs[segments[seg_index]->chr_index];
 	int i, j;
@@ -749,11 +751,11 @@ void output_called_INDELs(int seg_index){
 
 void output_called_SNPs(int seg_index){
 
+
 	FILE *fsnp = fopen(called_snp_filename,"a");
-	fprintf(fsnp,"chr\tpos\tref\talt\tfreq\tdepth\n");
+	//fprintf(fsnp,"chr\tpos\tref\talt\tfreq\tdepth\n");
 
 	char *chr = chrs[segments[seg_index]->chr_index];
-	printf("DEBUG: processing chromosome %s\n", chr);
 	int i, j, isSNP;
 	int depth = 0;
 	int count_other_nuc;
@@ -823,6 +825,8 @@ void output_called_SNPs(int seg_index){
 	}
 	
 	fclose(fsnp);
+
+
 }
 
 
@@ -985,44 +989,39 @@ void SNP_calling(void){
 
 	int i_main;
 	
-	/*
-	 * Step 1:  reads into chromosome groups, each chromosome has one reads file
-	 */
+	 // Step 1:  reads into chromosome groups, each chromosome has one reads file
 	SNP_prepare_groups();
 	SNP_group_reads();
 
-	/*
-	 * Step 2: Decide and divide working segments, it's part of a chromosome
-	 */
+	 // Step 2: Decide and divide working segments, it's part of a chromosome
 	prepare_working_units();
 	
-	if (DEBUG == 1){
-		printf("number of segement is: %d\n", num_segs);
-	}
-	
-	/*
-	 * Step 3: For each working segment, calculate SNP statistics
-	 */
-	printf("DEBUG: total number of segments is %d\n", num_segs);
+	 // Step 3: For each working segment, calculate SNP statistics
 	for (i_main = 0; i_main < num_segs; i_main++){
-	printf("DEBUG: processing segment %d\n", i_main);
-		if (DEBUG == 1){
-			printf("Processing segment: %s\n", segments[i_main]->segment_id);
-		}
+	//printf("DEBUG: Processing segment: %d, %s\n", i_main, segments[i_main]->segment_id);
+
+	//printf("DEBUG: start of 3.1\n");
 
 		/* Step 3.1 Read in reference genome sequence */
 		read_in_ref_seq(i_main);
+//printf("DEBUG: start of 3.2\n");
 
 		/* Step 3.2 Process reads */
 		process_chr_reads(i_main);
+//printf("DEBUG: start of 3.3\n");
 
 		/* Step 3.3 Output called INDELs */
-		output_called_INDELs(i_main);
+		//output_called_INDELs(i_main);
+
+//printf("DEBUG: start of 3.4\n");
 
 		/* Step 3.4 Output called SNPs */
 		output_called_SNPs(i_main);
+//printf("DEBUG: end of 3.4\n");
 
 	}
+
+//printf("DEBUG: end of i_main for loop\n");
 
 	clean_up_files();
 
@@ -1060,14 +1059,16 @@ int main_SNPcalling(int argc, char *argv[]){
 		strcpy(snp_indel_filename, sam_header);
 		strcpy(called_snp_filename, sam_header);
 		strcat(snp_indel_filename, ".INDEL");
-		strcat(called_snp_filename, ".SNP");
-		if ( (ftest_existence = fopen ( snp_indel_filename, "r" ) ) != NULL ){
-			remove(snp_indel_filename);
-		}
-		if ( (ftest_existence = fopen ( called_snp_filename, "r" ) ) != NULL ){
-			remove(called_snp_filename);
-		}		
-
+		//strcat(called_snp_filename, ".SNP");
+		//if ( (ftest_existence = fopen ( snp_indel_filename, "r" ) ) != NULL ){
+		//	remove(snp_indel_filename);
+		//}
+		//if ( (ftest_existence = fopen ( called_snp_filename, "r" ) ) != NULL ){
+		//	remove(called_snp_filename);
+		//}
+		FILE * ftmp = fopen(called_snp_filename,"w");
+		fprintf(ftmp,"chr\tpos\tref\talt\tfreq\tdepth\n");		
+		fclose(ftmp);
 	}
 
 	if (atoi(argv[2]) == 0){

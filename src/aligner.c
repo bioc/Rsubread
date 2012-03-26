@@ -628,9 +628,11 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 						subread_quality = get_subread_quality(quality_string, subread_string, QUALITY_SCALE, FASTQ_FORMAT);
 					}
 
-					//printf ("Pos=%d Subr=%u Rev=%d QQ=%.5f\n", subread_offset , subread_integer , is_counterpart , subread_quality);
 					if(is_valid_subread(subread_string))
+					{
 						total_results = gehash_go_q(my_table, subread_integer , subread_offset , read_len, is_counterpart, &vote , 1, 1 , subread_quality, INDEX_THRESHOLD, INDEL_TOLERANCE, subread_no, low_border, high_border - read_len);
+						//printf ("Pos=%d Subr=%u Rev=%d QQ=%.5f RES=%d\n", subread_offset , subread_integer , is_counterpart , subread_quality, total_results);
+					}
 
 				}
 				if(subread_offset1 >= read_len -16)
@@ -865,17 +867,16 @@ void usage(char * execname)
 	puts("    -D --maxdist   <int>\t maximum fragment length, 600 by default");
 	puts("    -S --order     <ff:fr:rf> \t orientation of the two read from the same pair, 'fr' by default");
 	puts("");
-/*	puts("Arguments for INDEL detection:");
-	puts("    --cigar_len       <int>\t the maximum length of a cigar string");
-	puts("    --cre_gap_penalty <int>\t penalty to creating a gap, default: -2;");
-	puts("    --ext_gap_penalty <int>\t penalty to extending a gap, default: 0;");
-	puts("    --mis_penalty     <int>\t penalty to a mismatched base, default: 0;");
-	puts("    --match_score     <int>\t default: 2; the parameters for tuning the outcome of indel alignment using dynamic programming.");
+	puts("Arguments for INDEL detection:");
+	//puts("    --cigar_len       <int>\t the maximum length of a cigar string");
+	puts("    -G --cre_gap_penalty <int>\t penalty to creating a gap, default: -2;");
+	puts("    -E --ext_gap_penalty <int>\t penalty to extending a gap, default: 0;");
+	puts("    -X --mis_penalty     <int>\t penalty to a mismatched base, default: 0;");
+	puts("    -Y --match_score     <int>\t default: 2; the parameters for tuning the outcome of indel alignment using dynamic programming.");
 	puts("");
-*/	puts("Example:");
+	puts("Example:");
 	puts(" ./subread-align -i my_index -r reads.fastq -o my_result.sam ");
 	puts("");
-	puts("Version: 1.2.0");
 	puts("For more information about these arguments, please refer to the User Manual.\n");
 
 }

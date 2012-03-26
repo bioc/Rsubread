@@ -375,17 +375,21 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 				case 'C': is_correct = read[i] == 'G'; break;
 			}
 
-			float base_p;
-			if(FASTQ_PHRED64 == qual_format)
+			float base_p = 0.;
+
+			if(qual_txt[0])
 			{
-				base_p = get_base_error_prob64(qual_txt[i]);
-			}
-			else
-			{
-				base_p = get_base_error_prob33(qual_txt[i]);
+				if(FASTQ_PHRED64 == qual_format)
+				{
+					base_p = get_base_error_prob64(qual_txt[i]);
+				}
+				else
+				{
+					base_p = get_base_error_prob33(qual_txt[i]);
+				}
 			}
 
-			if(base_p > 0.3) continue;
+			if(base_p > 0.35) continue;
 			base_p=0;
 			all_qual += (1-base_p);
 
@@ -399,18 +403,20 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 		{
 			char tt = gvindex_get (index, pos +i);
 			int is_correct =read[i] == tt; 
-			float base_p;
-			if(FASTQ_PHRED64 == qual_format)
+			float base_p = 0.;
+			if(qual_txt[0])
 			{
-				base_p = get_base_error_prob64(qual_txt[i]);
-			}
-			else
-			{
-				base_p = get_base_error_prob33(qual_txt[i]);
+				if(FASTQ_PHRED64 == qual_format)
+				{
+					base_p = get_base_error_prob64(qual_txt[i]);
+				}
+				else
+				{
+					base_p = get_base_error_prob33(qual_txt[i]);
+				}
 			}
 
-
-			if(base_p > 0.3) continue;
+			if(base_p > 0.35) continue;
 			base_p=0;
 
 			all_qual += (1-base_p);
@@ -421,7 +427,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 	}
 
 	//printf("%d\n", test_len);
-	if(all_qual < 6.1) return 0;
+	if(all_qual < 3.1) return 0;
 	return supported_qual / all_qual * test_len;
 }
 

@@ -765,7 +765,10 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 
 		int exp_indel = last_dist - max_indel_recorder[i+2];
 
-		int moves = dynamic_align (read_txt + black_base_start, black_base_end-black_base_start , array_index, pos + blackref_base_start, max_indel, indel_operations, exp_indel,  -10, black_base_end - black_base_start+5);
+		
+		int moves = 0;
+		if(black_base_end > black_base_start)
+			moves = dynamic_align (read_txt + black_base_start, black_base_end-black_base_start , array_index, pos + blackref_base_start, max_indel, indel_operations, exp_indel,  -10, black_base_end - black_base_start+5);
 
 #ifdef indel_debug
 		char tt = *(read_txt + black_base_end);
@@ -1848,11 +1851,12 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							int indel_movement = (indel_movement_i+1)/2 * (indel_movement_i %2?1:-1);
 							int test_length = window_end_pos /*- 1*/ - max(0, indel_movement) -  right_match_number;
 
-							if (test_length <= 1+ abs(indel_movement)/4) continue;
+							if (test_length < window_size) continue;
+							//if (test_length <= 1+ abs(indel_movement)/4) continue;
 							//test_length = min(10, test_length);
 							if (abs(indel_movement) > indel_tolerance) continue;
 
-							int test_start = window_end_pos - max(0, indel_movement) -  right_match_number - test_length;
+							int test_start =0;// window_end_pos - max(0, indel_movement) -  right_match_number - test_length;
 
 							int matched_bases_after_indel = match_chro_support(read +test_start, array_index, read_start_pos + indel_movement +test_start, test_length,0, space_type, qual_txt, qual_format);
 							//printf("MOV=%d ; MATCH=%d ; TLEN=%d\n", indel_movement , matched_bases_after_indel, test_length);
@@ -1937,7 +1941,8 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 
 							//printf("TAIL: RECOVERING0 : indel_adjustment=%d;   indel_movement=%d;  %d\n",indel_adjustment ,indel_movement,test_length);
 
-							if (test_length <= 1 + abs(indel_movement)/4) continue;
+							if (test_length < window_size) continue;
+							//if (test_length <= 1 + abs(indel_movement)/4) continue;
 							if (abs(indel_movement) > indel_tolerance) continue;
 
 							int matched_bases_after_indel = match_chro_support(read + window_start_pos - min(0, indel_adjustment) + left_match_number, array_index, read_start_pos + window_start_pos  + max(0,indel_movement) +left_match_number , test_length,0, space_type, qual_txt +  window_start_pos - min(0, indel_adjustment) + left_match_number , qual_format);
@@ -2321,7 +2326,7 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
                 for(j=0; j< vote->items[i]; j++)
                 {
 			locate_gene_position(vote -> pos[i][j], &offsets, &chrname, &chrpos);
-			printf("\tVote = %d , Position is %s,%u\n", vote->votes[i][j] , chrname, chrpos);
+			printf("\tVote = %d , Position is %s,%u (+%u)\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j]);
 		}
 	
 

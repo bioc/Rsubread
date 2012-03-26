@@ -50,7 +50,7 @@ typedef char gene_vote_number_t;
 #define SEARCH_BACK 0
 #define SEARCH_FRONT 1
 
-#define GENE_VOTE_SPACE 64 
+#define GENE_VOTE_SPACE 64
 #define GENE_VOTE_TABLE_SIZE 91
 
 #define MAX_INDEL_TOLERANCE 16
@@ -105,7 +105,7 @@ typedef struct {
 	char * max_tmp_indel_recorder;
 	short max_mask;
 
-        unsigned char items[GENE_VOTE_TABLE_SIZE];
+        unsigned short items[GENE_VOTE_TABLE_SIZE];
         unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];

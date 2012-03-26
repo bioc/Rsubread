@@ -299,7 +299,10 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				all_skips ++;
 			else
 			{
-				if(!gehash_exist(huge_table, int_key))
+				int is_no_info = gehash_exist(huge_table, int_key);
+				//if(offset > 371700 && offset < 372200)
+				//	printf("\nPOS=%u KEY=%u INFO=%d\n", offset, int_key, !is_no_info);
+				if(!is_no_info)
 				{
 					//if(offset > 61177100 && offset < 61177221 )
 					//	printf("\nPOS=%u KEY=%u\n", offset, int_key);
@@ -621,7 +624,10 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			for (j=0; j<current_bucket -> current_items; j++)
 			{
 				if(current_bucket -> item_values [j] > threshold)
+				{
 					gehash_insert(huge_table, current_bucket -> item_keys[j], 1);
+					//printf("NON-INFO:%u\n",  current_bucket -> item_keys[j]);
+				}
 			}
 		}
 	}

@@ -36,7 +36,6 @@ char *reg_chrs[] = {"chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr
 int debug = 0;	// whether output program progress to user	
 int detail = 0;	// whether output duplicate removal result on chromosome basis
 char *sam_file;
-char *sam_header;
 char *output_sam_file;
 char *remove_logfile;
 int count_seq = 0;
@@ -309,7 +308,6 @@ void prepare_groups(void){
 				chr_length[count_seq] = atoi(len+3);
 				strcpy(filename, seq+3);
 				strcat(filename, "_read_");
-				//strcat(filename, sam_header);
 				strcat(filename, ".txt");
 				chr_reads_filenames[count_seq] = (char *)calloc(STR,sizeof(char));
 				strcpy(chr_reads_filenames[count_seq], filename);
@@ -330,7 +328,6 @@ void prepare_groups(void){
 		for (i=0; i<NUMREGCHR; i++){
 			strcpy(filename, chrs[i]);
 			strcat(filename, "_read_");
-			//strcat(filename, sam_header);
 			strcat(filename, ".txt");
 			chr_reads_filenames[i] = (char *)calloc(STR,sizeof(char));
 			strcpy(chr_reads_filenames[i], filename);
@@ -368,12 +365,10 @@ void duplicate_reads_remover(void){
 int main_removeDuplicatedReads(int argc, char *argv[]){
 
 	if (argc < 2){
-		printf("Usage: ./remove_dup sample.sam (threshold) (progress) (detail)\n ");
+		printf("Usage: ./remove_dup sample.sam threshold output_file\n");
 		printf("\tIf threshold is not present, it will be calculated as 2*exonic base coverage.\n");
 		printf("\tIf threshold >1, program with remove all reads at position whose depth is greater or equal to duplicate_threshold.\n");
 		printf("\tIf threshold == 1: regardless of read depth, only one read per position is retained with best MAPQ.\n\n");
-		printf("\tIf option progress is present, it is in debug mode and output program progess.\n");
-		printf("\tIf option detail is present, program will output duplicate removal result on chromosome basis.\n\n");
 		exit(1);
 	}
 
@@ -383,15 +378,11 @@ int main_removeDuplicatedReads(int argc, char *argv[]){
 		exit(1);
 	} else {
 		sam_file = (char *)calloc(STR,sizeof(char));
-		sam_header = (char *)calloc(STR,sizeof(char));
 		output_sam_file = (char *)calloc(STR,sizeof(char));
 		strcpy(sam_file, argv[1]);
-		strcpy(sam_header, argv[1]);
-		//strcpy(output_sam_file, sam_header);
 		strcpy(output_sam_file,argv[3]);
 		strcat(output_sam_file, ".NoneDupReads");
 		remove_logfile = (char *)calloc(STR,sizeof(char));
-		//strcpy(remove_logfile, sam_header);
 		strcpy(remove_logfile,argv[3]);
 		strcat(remove_logfile, ".DupReads.txt");
 

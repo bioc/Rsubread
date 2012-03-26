@@ -3011,14 +3011,17 @@ void exon_usage(char * execname)
 	puts("    -o --output    <output>\t name of the output file(SAM format).");
 	puts("");
 	puts("Optional arguments:");
+        puts("    -n --subreads  <int>\t number of selected subreads, 14 by default.");
         puts("       --singleSAM <input>\t using as input file a SAM file which includes mapping results for single-end reads (e.g. 'subread-align' output).");
         puts("       --pairedSAM <input>\t using as input file a SAM file which includes mapping results for paired-end reads.");
 	puts("    -x --fusion           \t enabling the detection of fusion events.");
 	puts("    -A --nosam           \t disabling the SAM output for the reads. Only discovered exon junction locations will be reported (BED file).");
-	puts("    -H --hamming        \t using Hamming distance to break ties when more than one best mapping locations are found.");
-	puts("    -L --halflen   <int>\t minimal distance between the junction location and the end base (first or last) of the read or the segment, 0 by default.");
+	//puts("    -H --hamming        \t passed to subread-align program.");
+        //puts("    -Q --quality        \t passed to subread-align program.");
+        //puts("    -u --unique        \t passed to subread-align program.");
+	//puts("    -L --halflen   <int>\t minimal distance allowed between the junction location and the end base (first or last) of the read or the segment, 0 by default.");
 	puts("    -T --threads   <int>\t number of threads/CPUs used, 1 by default.");
-	puts("    -I --indel     <int>\t number of INDEL bases allowed, 3 by default.");
+	puts("    -I --indel     <int>\t number of INDEL bases allowed, 5 by default.");
         puts("    -P --phred     <3:6>\t the format of Phred scores used in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
 	puts("");
 	puts("Arguments for paired-end reads:");
@@ -3031,7 +3034,6 @@ void exon_usage(char * execname)
 	puts(" ./subjunc -i my_index -r reads.fastq -o my_result.sam ");
 	puts("");
 	puts("");
-	puts("Version: 1.2.0");
 	puts("For more information about these arguments, please refer to the User Manual.\n");
 
 }
