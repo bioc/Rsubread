@@ -3,7 +3,7 @@
 \title{Align next-gen sequencing reads to reference genome}
 \description{This is a R wrapper function for aligning reads. This function calls the underlying C function}
 \usage{
-align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=16,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,min_distance=50,max_distance=600,PE_orientation="fr",DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
+align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,min_distance=50,max_distance=600,PE_orientation="fr",DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -14,7 +14,7 @@ align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthrea
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This threshold will be applied to the first read if paired-end read data are provided. 3 by default.}
   \item{TH2}{ numeric value giving the consensus threhold for the second read in a pair. 1 by default.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. 1 by default.} 
-  \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 16 by default.}
+  \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}
   \item{phredOffset}{ numeric value added to the phred score of each base in each read. \code{33} by default.}
   \item{markJunctionReads}{ a logical value indicating whether the unmapped bases of discovered junction reads should be marked by "S" operations in their CIGAR strings in the SAM output file. The unmapped bases should originate from an exon which is different from the one the corresponding read was mapped to. 'Subjunc' program can then be called to discover exon junction locations. This options is only applicable to RNAseq data. \code{TRUE} by default.}
   \item{tieBreakQS}{logical. If \code{TRUE}, use quality scores to break ties when more than one best locations were found. \code{FALSE} by default. }
