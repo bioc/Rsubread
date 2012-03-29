@@ -9,14 +9,14 @@ buildindex(basename,reference,colorspace=FALSE,memory=3700)
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of the file containing all the refernece sequences.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
-  \item{memory}{ numeric value specifying the amount of memory to be requested in gigabytes}
+  \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 3700 MB by default.}
   }
 \details{
 A hash table will be built for the reference genome.
 Keys in the hash table are the 16bp sequences and hash values are their chromosomal locations.
 A 16bp sequence could have one or more than one chromosomal locations.
 They are all recorded in the hash table.
-Non-informative 16bp sequences, which are highly repetitive in the reference genome, are not included in the hash table.
+Non-informative 16bp sequences, which are highly repetitive in the reference genome (occurring 24 time or more in the genome), are excluded from the hash table.
 
 After the index is built, reads can then be mapped to the reference genome by using \code{\link{align}} function.
 
