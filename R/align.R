@@ -1,12 +1,10 @@
 align <- function(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,min_distance=50,max_distance=600,PE_orientation="fr",DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
 {
 	opt <- paste("-i",index,"-r",readfile1,"-o",output_file,"-n",nsubreads,"-m",TH1,"-T",nthreads,"-I",indels,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
+
 	if(!is.null(readfile2)) 
 		opt <- paste(opt,"-R",readfile2,"-p",TH2,"-d",min_distance,"-D",max_distance,"-S",PE_orientation,sep=",")
-	if(phredOffset == 33) 
-		opt <- paste(opt,"-P",3,sep=",")
-	else
-		opt <- paste(opt,"-P",6,sep=",")
+
 	if(markJunctionReads)
 		opt <- paste(opt,"-J",sep=",")
 	if(tieBreakQS)
@@ -15,6 +13,12 @@ align <- function(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,
 		opt <- paste(opt,"-H",sep=",")
 	if(unique)
 		opt <- paste(opt,"-u",sep=",")
+
+        if(phredOffset == 33)
+                opt <- paste(opt,"-P",3,sep=",")
+        else
+                opt <- paste(opt,"-P",6,sep=",")
+
 	cmd <- paste("subread-align",opt,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_align_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")

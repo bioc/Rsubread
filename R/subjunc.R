@@ -3,9 +3,9 @@ subjunc <- function(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthr
 	opt <- paste("-i",index,"-o",output_file,"-n",nsubreads,"-T",nthreads,"-I",indels,sep=",")
 
 	if(paired_end) 
-	  opt <- paste(opt,"--pairedSAM",samfile,"-d",min_distance,"-D",max_distance,sep=",")
+	  opt <- paste(opt,"-2",samfile,"-d",min_distance,"-D",max_distance,sep=",")
 	else
-	  opt <- paste(opt,"--singleSAM",samfile,sep=",")
+	  opt <- paste(opt,"-1",samfile,sep=",")
 
 	cmd <- paste("subjunc",opt,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))

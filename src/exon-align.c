@@ -3252,21 +3252,21 @@ int main_junction(int argc,char ** argv)
 			//	EXON_HALF_MATCH_PERCENTAGE = atof(optarg);
 			//	break;
 			case '1':
-				if(read_file[0] || IS_SAM_INPUT)
-				{
-					puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input.");
-					return -1;
-				}
+			//	if(read_file[0] || IS_SAM_INPUT)
+			//	{
+			//		puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input.");
+			//		return -1;
+			//	}
 				strncpy(read_file, optarg, 299);
 				IS_SAM_INPUT=1;
 				EXON_FASTQ_FORMAT = FASTQ_PHRED33;
 				break;
 			case '2':
-				if(read_file[0]|| IS_SAM_INPUT)
-				{
-					puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input");
-					return -1;
-				}
+			//	if(read_file[0]|| IS_SAM_INPUT)
+			//	{
+			//		puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input");
+			//		return -1;
+			//	}
 				IS_SAM_INPUT=2;
 				strncpy(read_file, optarg, 299);
 				EXON_FASTQ_FORMAT = FASTQ_PHRED33;
