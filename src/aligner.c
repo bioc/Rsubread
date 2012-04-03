@@ -20,7 +20,7 @@ int MAX_PAIRED_DISTANCE = 600;
 int MIN_PAIRED_DISTANCE = 50;
 int REPORT_ONLY_UNIQUE = 0;
 int NUMBER_OF_ANCHORS_PAIRED = -1;
-int INDEL_TOLERANCE = 17;
+int INDEL_TOLERANCE = 6;
 int QUALITY_SCALE = QUALITY_SCALE_NONE;
 int USE_VALUE_ARRAY_INDEX = 1;
 int USE_BASEINDEX_BREAK_TIE = 0;
@@ -990,7 +990,7 @@ int main_align(int argc,char ** argv)
 				break;
 			case 'I':
 				INDEL_TOLERANCE = atoi(optarg);
-				if( INDEL_TOLERANCE >= MAX_INDEL_TOLERANCE )INDEL_TOLERANCE=MAX_INDEL_TOLERANCE;
+				if(INDEL_TOLERANCE >= MAX_INDEL_TOLERANCE )INDEL_TOLERANCE=MAX_INDEL_TOLERANCE;
 				if(INDEL_TOLERANCE>0)
 					INDEL_TOLERANCE ++;
 				break ;
@@ -1119,6 +1119,8 @@ int main_align(int argc,char ** argv)
 		
 	if(read2_file[0] && geinput_open(read2_file, &ginp2))
 	{
+		destory_allvote(&allvote );
+
 		printf("Input file '%s' is not found or is in an incorrect format.\n", read2_file);
 		return -1;
 	}
@@ -1155,5 +1157,6 @@ int main_align(int argc,char ** argv)
 	printf("Done.\n");
 
 	fclose(out_fp);
+	destory_allvote(&allvote );
 	return 0;
 }

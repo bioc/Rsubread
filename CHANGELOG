@@ -1,5 +1,6 @@
-April 2, 2012 - 1.7.1
+April 3, 2012 - 1.7.1
 (1) Bug fix to parameter passing from R to C for align and subjunc
+(2) Fix memory leakage for align and subjun.
 
 March 26, 2012 - 1.5.8
 (1) Bug fixes to align and callSNPs function.
