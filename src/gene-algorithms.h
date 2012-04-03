@@ -92,5 +92,7 @@ float read_quality_score(char * qualityb, int rl , int format);
 void compress_cigar(char * cigar,  int read_len, char *read);
 
 void print_votes(gene_vote_t * vote, char *index_prefix);
+
+void destory_allvote(gene_allvote_t* allvote);
 #endif
 

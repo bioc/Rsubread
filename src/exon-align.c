@@ -35,7 +35,7 @@ int ACCEPT_MINOR_SUBREADS;
 int INDEX_THRESHOLD;
 int EXON_MAX_PAIRED_DISTANCE = 600;
 int EXON_MIN_PAIRED_DISTANCE = 50;
-int EXON_INDEL_TOLERANCE = 4;
+int EXON_INDEL_TOLERANCE = 6;
 int EXON_QUALITY_SCALE = QUALITY_SCALE_NONE;
 int EXON_USE_VALUE_ARRAY_INDEX = 1;
 int EXON_FIRST_READ_REVERSE = 0;
@@ -139,6 +139,31 @@ void init_halves_record(halves_record_t* halves_record, int items)
 	memset(halves_record -> cigar_string_buffer , 0 , sizeof(char)*items*EXON_MAX_CIGAR_LEN);
 	memset(halves_record -> half_marks_list, 0, sizeof(short)*halves_record -> max_len);
 }
+
+
+void destory_halves_record(halves_record_t* halves_record)
+{
+	free(halves_record -> best_pos1_list);
+	free(halves_record -> best_pos2_list);
+	free(halves_record -> best_vote1_list);
+	free(halves_record -> best_vote2_list);
+	free(halves_record -> is_abnormal_list);
+	free(halves_record -> is_reversed_list);
+	free(halves_record -> half_marks_list);
+	free(halves_record -> splice_point_list);
+	free(halves_record -> splice_point_offset_1);
+	free(halves_record -> splice_point_offset_2);
+	free(halves_record -> indel_in_piece1);
+	free(halves_record -> indel_in_piece2);
+	free(halves_record -> best1_read_start_pos);
+	free(halves_record -> best1_read_end_pos);
+	free(halves_record -> final_quality);
+	free(halves_record -> read_coverage_start);
+	free(halves_record -> read_coverage_end);
+	free(halves_record -> cigar_string_buffer);
+}
+
+
 
 
 
@@ -3122,6 +3147,7 @@ void print_bed_table(HashTable * bed_table, char * out_fn, unsigned long long in
 				(*support_number)+= (*counter& 0x7fffffff);
 				fprintf(ofp,"%s\t%u\t%s\t%u\t%d\t%s,%s,\n", chro_name, chro_pos, chro_name2, chro_pos_big, (*counter& 0x7fffffff), is_fusion, is_recovered);
 			}
+			free(counter);
 			cursor = cursor->next;
 		}
 	}
@@ -3151,6 +3177,7 @@ int main_junction(int argc,char ** argv)
 	int option_index = 0;
 	unsigned long long int junction_number=0, support_number=0; 
 
+	IS_SAM_INPUT=0;
 	TOTAL_SUBREADS = 14;
 	EXON_MAJOR_HALF_VOTES_RATE = .2;
 	ACCEPT_MINOR_SUBREADS = 1;
@@ -3208,11 +3235,9 @@ int main_junction(int argc,char ** argv)
 				break;
 			case 'r':
 				if(IS_SAM_INPUT)
-				{
-					puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input");
-					return -1;
-				}
-				strncpy(read_file, optarg, 299);
+					puts("\n!!WARNING!!\nYou should not specify both FASTQ/FASTA files and SAM files at same time!\nOnly the SAM file is used in the program.");
+				else
+					strncpy(read_file, optarg, 299);
 				break;
 			case 'R':
 				strncpy(read2_file, optarg, 299);
@@ -3252,21 +3277,20 @@ int main_junction(int argc,char ** argv)
 			//	EXON_HALF_MATCH_PERCENTAGE = atof(optarg);
 			//	break;
 			case '1':
-			//	if(read_file[0] || IS_SAM_INPUT)
-			//	{
-			//		puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input.");
-			//		return -1;
-			//	}
-				strncpy(read_file, optarg, 299);
+				if(read_file[0] || IS_SAM_INPUT)
+				{
+					puts("\n!!WARNING!!\nYou should not specify both FASTQ/FASTA files and SAM files at same time!\nOnly the SAM file is used in the program.");
+				}
 				IS_SAM_INPUT=1;
+
+				strncpy(read_file, optarg, 299);
 				EXON_FASTQ_FORMAT = FASTQ_PHRED33;
 				break;
 			case '2':
-			//	if(read_file[0]|| IS_SAM_INPUT)
-			//	{
-			//		puts("You cannot specify the input files in FASTQ/FASTA formats when specifying a SAM file as input");
-			//		return -1;
-			//	}
+				if(read_file[0]|| IS_SAM_INPUT)
+				{
+					puts("\n!!WARNING!!\nYou should not specify both FASTQ/FASTA files and SAM files at same time!\nOnly the SAM file is used in the program.");
+				}
 				IS_SAM_INPUT=2;
 				strncpy(read_file, optarg, 299);
 				EXON_FASTQ_FORMAT = FASTQ_PHRED33;
@@ -3420,6 +3444,7 @@ int main_junction(int argc,char ** argv)
 		
 	if((!IS_SAM_INPUT) && read2_file[0] && geinput_open(read2_file, &ginp2))
 	{
+		destory_halves_record(&halves_record);
 		printf("Input file '%s' is not found or is in an incorrect format.\n", read2_file);
 		return -1;
 	}
@@ -3483,5 +3508,6 @@ int main_junction(int argc,char ** argv)
 
 	if(tmpfile[0])
 		unlink(tmpfile);
+	destory_halves_record(&halves_record);
 	return 0;
 }

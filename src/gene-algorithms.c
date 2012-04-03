@@ -389,6 +389,22 @@ void clear_allvote(gene_allvote_t* allvote)
 	bzero(allvote -> span_coverage ,  allvote -> max_len* sizeof(char));
 }
 
+void destory_allvote(gene_allvote_t* allvote)
+{
+	free(allvote -> max_positions);
+	free(allvote -> max_votes);
+	free(allvote -> max_quality);
+	free(allvote -> max_final_quality);
+	free(allvote -> masks);
+	#ifdef REPORT_ALL_THE_BEST
+	free(allvote -> best_records);
+	#endif
+	free(allvote -> is_counterpart);
+	free(allvote -> span_coverage);
+	if(allvote -> max_indel_recorder)
+		free(allvote -> max_indel_recorder);
+}
+
 void init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 {
 	allvote -> max_len = expected_len; 
@@ -574,14 +590,17 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 	
 
 
-		find_and_explain_indel(allvote, qid, pos, votes, quality, is_counterpart, mask, max_indel_recorder, array_index, read_txt, read_len, max_indel, total_subreads, space_type, report_junction, is_head_high_quality, qual_txt, phred_version);
-
-		if(allvote -> max_indel_recorder)
+		if(max_indel>0)
 		{
-			char cigar_str [100];
-			cigar_str[0]=0;
-			show_cigar(allvote->max_indel_recorder + qid * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, max_indel, total_subreads, read_txt);
-			allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version);
+			find_and_explain_indel(allvote, qid, pos, votes, quality, is_counterpart, mask, max_indel_recorder, array_index, read_txt, read_len, max_indel, total_subreads, space_type, report_junction, is_head_high_quality, qual_txt, phred_version);
+
+			if(allvote -> max_indel_recorder)
+			{
+				char cigar_str [100];
+				cigar_str[0]=0;
+				show_cigar(allvote->max_indel_recorder + qid * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, max_indel, total_subreads, read_txt);
+				allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version);
+			}
 		}
 
 
