@@ -1328,6 +1328,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			    dist -= pos_small;
 			    sprintf (cigar_buf, "%dM%dN%dM",  h1_len , (int)abs(dist), rl - h1_len);
 			    }*/
+			compress_cigar(cigar_buf, rl, inb);
 			strncpy(halves_record -> cigar_string_buffer + i * EXON_MAX_CIGAR_LEN, cigar_buf, EXON_MAX_CIGAR_LEN-1);
 
 
@@ -1361,10 +1362,9 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 					halves_record -> best_pos1_list[i] = explain_result[0];
 			}
 
-			compress_cigar(cigar_buf, rl, inb);
 			halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, explain_result[0], inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT);
-			if(halves_record -> final_quality [i] < 10)	
-				printf("QUAL=%.4f POS=%u READ=%s", halves_record -> final_quality [i] ,  explain_result[0] , inb);
+			//if(halves_record -> final_quality [i] < 10)	
+			//	printf("QUAL=%.4f POS=%u READ=%s", halves_record -> final_quality [i] ,  explain_result[0] , inb);
 		}
 		else if(is_settle)
 		{
@@ -2253,7 +2253,11 @@ void print_exon_res(gene_value_index_t *array_index , halves_record_t * halves_r
 				cigar_print = halves_record -> cigar_string_buffer + i * EXON_MAX_CIGAR_LEN;
 			}else
 			{
-				sprintf (cigar_buf, "%dM%dN%dM",  h1_len , (int)abs(dist), rl - h1_len);
+				int abs_dist = abs(dist);
+				if(abs_dist<1 || abs_dist> 1000000)
+					sprintf (cigar_buf, "%dM",  rl);
+				else
+					sprintf (cigar_buf, "%dM%dN%dM",  h1_len , abs_dist, rl - h1_len);
 				cigar_print = cigar_buf;
 			}
 			mapping_quality = halves_record -> final_quality[i] ;
