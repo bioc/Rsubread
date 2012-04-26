@@ -1,3 +1,6 @@
+April 27, 2012 - 1.7.2
+(1) Bug fix to incorrect CIGAR strings.
+
 April 3, 2012 - 1.7.1
 (1) Bug fix to parameter passing from R to C for align and subjunc
 (2) Fix memory leakage for align and subjun.
