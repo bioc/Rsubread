@@ -451,6 +451,12 @@ void compress_cigar(char *cigar, int total_length, char * read)
 		{
 			tmpv=tmpv*10+(cc-'0');
 		}
+		else if(cc=='-')
+		{
+			last_tmpv = 0;
+			cigar_length = 0;
+			break;
+		}
 		else
 		{
 			if((cc!=last_operation) && (last_operation!='X'))
@@ -2291,10 +2297,10 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 			}
 			else if(cigar_txt[cigar_cursor] == 'I')
 			{
-				read_cursor +=x;
 				if(!qual_txt)
 				{
 					ret += x;
+					read_cursor +=x;
 				}
 				else if(FASTQ_PHRED64 == phred_version)
 				{
