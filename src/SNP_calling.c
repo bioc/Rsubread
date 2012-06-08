@@ -76,9 +76,11 @@ int num_segs;
 
 
 /* Global Variable - sequence and base coount */
-short ref_seq[SEG_SIZE+1];
-short count[5][SEG_SIZE+1];	//count[5] represents number of read that has a deletion at that position
+//short ref_seq[SEG_SIZE+1];
+//short count[5][SEG_SIZE+1];	count[5] represents number of read that has a deletion at that position
 
+short * ref_seq;
+short * count[5];   
 
 /* Global Variable - Indel node */
 typedef struct insertiondeletion{
@@ -91,8 +93,8 @@ typedef struct insertiondeletion{
 
 }node;
 
-node * indel[SEG_SIZE+1];
-
+//node * indel[SEG_SIZE+1];
+node ** indel;
 
 /* Global Variable - Coverage Tesing */
 int32_t positions[120000];
@@ -1039,6 +1041,12 @@ int main_SNPcalling(int argc, char *argv[]){
 		exit(1);
 	}
 
+	ref_seq = (short *)calloc(SEG_SIZE+1,sizeof(short));
+	for(int i=0; i<5 ;i++) 
+		count[i] = (short *)calloc(SEG_SIZE+1,sizeof(short));   
+
+	indel = (node **) calloc(SEG_SIZE+1, sizeof(node *));
+
 	SNP_MIN_CALLED_DEPTH = atoi(argv[5]); 
 	SNP_min_fraction = atof(argv[6]);
 
@@ -1093,4 +1101,10 @@ int main_SNPcalling(int argc, char *argv[]){
 	SNP_calling();
 	printf("Time elapsed for is: %f seconds\n",  ((double)clock() - start) / CLOCKS_PER_SEC);
 
+	if(ref_seq) free(ref_seq);
+	for(int i=0; i<5; i++)
+		if(count[i]) 
+			free(count[i]);
+
+	if(indel) free(indel);
 }

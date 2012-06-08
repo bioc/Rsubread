@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <assert.h>
 #include "input-files.h"
 
 
@@ -85,24 +86,39 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 {
 	int ret =0;
 	int started = 0;
-	while(!feof(fp))
+	if(must_upper)
 	{
-		char ch = fgetc(fp);
-
-/*		if(ret == 0 && ch == '#')
-			while(!feof(fp))
-				if(fgetc(fp) == '\n')break;
-*/
-		if (ch == '\n')
+		while(!feof(fp))
 		{
-			if (started)break;
-			else continue;
+			char ch = fgetc(fp);
+			if (ch == '\n')
+			{
+				if (started)break;
+				else continue;
+			}
+			else
+				started = 1;
+			if(ret <max_read_len && ch != '\r')
+				if ((ch!=' ' && ch != '\t'))
+					buff[ret++] = toupper(ch);
 		}
-
-		started = 1;
-		if(ret <max_read_len && ch != '\r')
-			if ((ch!=' ' && ch != '\t') || !must_upper)
-				buff[ret++] = must_upper?toupper(ch):ch;
+	}
+	else
+	{
+		while(!feof(fp))
+		{
+			char ch = fgetc(fp);
+			if (ch == '\n')
+			{
+				if (started)break;
+				else continue;
+			}
+			else
+				started = 1;
+			if(ret <max_read_len && ch != '\r')
+				buff[ret++] = ch;
+		}
+	
 	}
 	buff[ret]=0;
 	return ret;
@@ -274,6 +290,69 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer_3000)
 	return ret;
 }
 
+#define SKIP_LINE { nch=' '; while(nch != EOF && nch != '\n') nch = fgetc(input->input_fp); }
+
+void geinput_jump_read(gene_input_t * input)
+{
+	char nch=' ';
+	if(input->file_type == GENE_INPUT_PLAIN)
+		SKIP_LINE
+	else if(input->file_type >= GENE_INPUT_SAM_SINGLE)
+	{
+		while(1)
+		{
+			nch = fgetc(input->input_fp); 
+			if(nch=='@')
+				SKIP_LINE
+			else break;
+		}
+		
+		SKIP_LINE
+		//if(input->file_type != GENE_INPUT_SAM_SINGLE)
+		//	SKIP_LINE
+	}
+	else if(input->file_type == GENE_INPUT_FASTA)
+	{
+		SKIP_LINE
+		SKIP_LINE
+	}
+	else if(input->file_type == GENE_INPUT_FASTQ)
+	{
+		SKIP_LINE
+		SKIP_LINE
+		SKIP_LINE
+		SKIP_LINE
+	}
+}
+
+unsigned int read_numbers(gene_input_t * input)
+{
+	unsigned int ret = 0;
+	char nch;
+	long long int fpos = ftello(input->input_fp);
+	if(input->file_type >= GENE_INPUT_SAM_SINGLE)
+	{
+		while(1)
+		{
+			nch = fgetc(input->input_fp);
+			if(nch=='@')
+				SKIP_LINE
+			else break;
+		}
+	}
+
+	while(1)
+	{
+		SKIP_LINE
+		if(nch==EOF) break;
+		ret ++;
+	}
+	fseeko(input->input_fp, fpos, SEEK_SET);
+	if (input->file_type == GENE_INPUT_FASTQ) return ret/4;
+	if (input->file_type == GENE_INPUT_FASTA) return ret/2;
+	return ret;
+}
+
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string)
 {
 	if(input->file_type == GENE_INPUT_PLAIN)
@@ -341,9 +420,9 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 				reverse_quality(quality_string, ret);
 			reverse_read(read_string, ret, input->space_type);
 		}
-		if(input->file_type != GENE_INPUT_SAM_SINGLE)
+		//if(input->file_type != GENE_INPUT_SAM_SINGLE)
 			// skip a line if not single-end
-			read_line(1, input->input_fp, in_buff, 0);
+		//	read_line(1, input->input_fp, in_buff, 0);
 		return ret;
 	}
 	else if(input->file_type == GENE_INPUT_FASTA)
@@ -583,3 +662,217 @@ int find_subread_end(int len, int TOTAL_SUBREADS, int subread)
 	//return (int)((1.*len-16.)/TOTAL_SUBREADS * subread+15);
 }
 
+
+//This function returns 0 if the line is a mapped read; -1 if the line is in a wrong format and 1 if the read is unmapped.
+int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, char * sequence , char * quality_string, int * rl)
+{
+	char cc;
+	int ci = 0, k=0, field=0, ret_quality = 0, ret_flag = 0;
+	unsigned int ret_pos = 0;
+	
+	while( (cc = sam_line[k]) )
+	{
+		if(cc=='\t')
+		{
+			field++;
+			k++;
+			if(field == 1)read_name[ci]=0;
+			else if(field == 3)chro[ci]=0;
+			else if(field == 6)cigar[ci]=0;
+			else if(field == 10)
+			{
+				sequence[ci]=0;
+				(*rl) = ci;
+			}
+			else if(field == 11)quality_string[ci]=0;
+			ci=0;
+			continue;
+		}
+		if(field == 9)
+			sequence[ci++] = cc;
+		else if(field == 10)
+			quality_string[ci++] = cc;
+		else if(field == 0)
+			read_name[ci++] = cc;
+		else if(field == 1)
+			ret_flag = ret_flag*10 + (cc-'0');
+		else if(field == 2)
+		{
+			if(ci == 0 && cc == '*') return 1;
+			chro[ci++] = cc;
+		}
+		else if(field == 3)
+			ret_pos = ret_pos * 10 + (cc-'0');
+		else if(field == 4)
+			ret_quality = ret_quality * 10 + (cc-'0');
+		else if(field == 5)
+			cigar[ci++] = cc;
+		k++;
+
+	}
+
+	if(field == 10 && ci>0)quality_string[ci]=0;
+	else if(field < 10) return -1;
+	
+	(*mapping_quality) = ret_quality;
+	(*pos) = ret_pos;
+	(*flags) = ret_flag;
+	return 0;
+	
+}
+
+
+// This function returns 0 if the block is determined.
+// The block is undeterminable if the chromosome name is not in known_chromosomes, or the position is larger than the known length.
+int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromosome_t *known_chromosomes)
+{
+	int chro_no;
+
+	for(chro_no=0;known_chromosomes[chro_no].chromosome_name[0]; chro_no++)
+	{
+		if(strcmp(chro , known_chromosomes[chro_no].chromosome_name) == 0)
+			break;
+	}
+	if(!known_chromosomes[chro_no].chromosome_name[0]) return 1;
+	if(pos >= known_chromosomes[chro_no].known_length) return 1;
+
+	int block_no = pos / BASE_BLOCK_LENGTH;
+	sprintf(temp_file_suffix , "%s-%04u.bin", chro, block_no);
+	return 0;
+}
+
+FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
+{
+	FILE * temp_file_pointer = (FILE *) HashTableGet(fp_table, temp_file_name);
+	if(!temp_file_pointer)
+	{
+		temp_file_pointer = fopen(temp_file_name,"w");
+		assert(temp_file_pointer);
+
+		HashTablePut(fp_table, temp_file_name ,temp_file_pointer);
+	}
+
+	return temp_file_pointer;
+}
+
+void my_fclose(void * fp)
+{
+	fclose((FILE *)fp);
+}
+
+int my_strcmp(const void * s1, const void * s2)
+{
+	return strcmp((char*)s1, (char*)s2);
+}
+
+void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed)
+{
+	if(is_sequence_needed)
+	{
+		assert(0);
+	}
+	else
+	{
+		base_block_temp_read_t datum;
+		datum.read_number = read_number;
+		datum.pos = pos;
+
+		fwrite(&datum, sizeof(datum), 1, temp_fp);
+	}
+}
+
+int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed)
+{
+	FILE * fp = fopen(in_SAM_file,"r");
+	int i;
+	HashTable * fp_table;
+	unsigned int read_number = 0;
+
+	if(!fp){
+		printf("SAM file does not exist or is not accessible: '%s'\n", in_SAM_file);
+		return 1;
+	}
+
+
+	fp_table = HashTableCreate( OFFSET_TABLE_SIZE / 16 );
+	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
+	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
+
+	while(!feof(fp))
+	{
+		char line_buffer [3000];
+		int linelen = read_line(2999, fp, line_buffer, 0);
+
+		if(line_buffer[0]=='@')
+		{
+			int chro_numb=0, field = 0, ci=0, ciw = 0;
+			while(known_chromosomes[chro_numb].chromosome_name[0]!=0) chro_numb++;
+			known_chromosomes[chro_numb].known_length = 0;
+			for(i=0; i< linelen; i++)
+			{
+				char cc = line_buffer[i];
+
+				if(cc == '\r' || cc=='\n') continue;
+
+				if(cc == '\t')
+				{
+					if(field == 1)
+						known_chromosomes[chro_numb].chromosome_name[ci]=0;
+					ci = 0;
+					ciw = 0;
+					field ++;
+				}
+				else if(field == 1)
+				{
+					if(ci >2)
+						known_chromosomes[chro_numb].chromosome_name[ciw++]=cc;
+					ci++;
+				}
+				else if(field == 2)
+				{
+					if(ci >2)
+						known_chromosomes[chro_numb].known_length = known_chromosomes[chro_numb].known_length * 10 + (cc - '0');
+					ci++;
+				}
+			}
+		}
+
+		else if((line_buffer[0] >='A' && line_buffer[0]<='Z') || (line_buffer[0] >='a' && line_buffer[0] <='z') || (line_buffer[0] >='0' && line_buffer[0] <='9') || line_buffer[0] =='_' || line_buffer[0] =='.')
+		{
+			char read_name[MAX_READ_NAME_LEN], chro[MAX_CHROMOSOME_NAME_LEN], cigar[EXON_MAX_CIGAR_LEN], sequence[MAX_READ_LENGTH+1], quality_string[MAX_READ_LENGTH+1];
+			int flags = 0, mapping_quality = 0, rl=0;
+			unsigned int pos = 0;
+			char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
+			char temp_file_name[MAX_CHROMOSOME_NAME_LEN+20+300];
+			FILE * temp_fp;
+
+			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, sequence , quality_string, &rl);
+			printf("R#%d P=%d L=%s\n", read_number, line_parse_result, line_buffer);
+			if(line_parse_result)
+			{
+				read_number ++;
+				continue;
+			}
+
+			// if the read block is not determinable, do nothing.
+			if(get_read_block(chro, pos, temp_file_suffix, known_chromosomes))
+			{
+				read_number ++;
+				continue;
+			}
+
+			sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
+
+			temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
+			assert(temp_fp);
+
+			write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed);
+			read_number ++;
+		}
+	}
+
+	HashTableDestroy(fp_table);
+	fclose(fp);
+	(*real_read_count) = read_number;
+	return 0;
+}

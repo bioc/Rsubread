@@ -45,7 +45,6 @@ struct gene_thread_data
 };
 
 
-#define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} }
 
 void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_t* ginp,gene_input_t * ginp2, FILE * out_fp, char * index_prefix, unsigned int processed_reads, unsigned long long int all_processed_reads,  unsigned long long int *succeed_reads)
 {
@@ -77,10 +76,21 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 		int isOK = 0;
 		nameb[0]=0;
 
+
+		int Curr_position;
+		if(ginp2)
+		{
+			Curr_position = i*2+(Curr_ginp==ginp);
+		}
+		else
+			Curr_position = i;
+
+
 		if(ginp2) 
 		{
 			Curr_ginp = (Curr_ginp==ginp2)?ginp:ginp2;
-			if (Curr_ginp == ginp)
+
+			if((!(av->masks[Curr_position] & IS_R1R2_EQUAL_LEN)) && (Curr_ginp == ginp))
 			{
 				long long int fpos = ftello(ginp->input_fp);
 				rl1 = geinput_next_read(ginp, NULL, inb, NULL);
@@ -95,6 +105,11 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 			Curr_ginp = ginp;
 
 		int rl = geinput_next_read(Curr_ginp, nameb, inb, qualityb);
+		if(av->masks[Curr_position] & IS_R1R2_EQUAL_LEN)
+		{
+			rl1 = rl2 = rl;
+		}
+
 		if (rl<0){
 			break;
 		}
@@ -102,22 +117,27 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 		if (nameb[0]==0)
 			sprintf(nameb, "read_%llu", i+1+all_processed_reads);
 
-		int Curr_position;
+		int flags = 0;
+		unsigned char votes = av->max_votes[Curr_position];
+
+		int mate_index = 0; 
+		int is_mate_ok = 1;
+
 		if(ginp2)
 		{
-			Curr_position = i*2+(Curr_ginp==ginp2);
+			flags |= SAM_FLAG_PAIRED_TASK;
+			mate_index = i*2+(Curr_ginp!=ginp2);
+			is_mate_ok = ((av->masks[Curr_position] & IS_PAIRED_MATCH) || av->max_votes[mate_index]  >= ACCEPT_SUBREADS);
+
+			if (Curr_ginp==ginp2)
+				flags |= SAM_FLAG_SECOND_READ_IN_PAIR;
+			else
+				flags |= SAM_FLAG_FIRST_READ_IN_PAIR;
+
+			if(!is_mate_ok)flags|=SAM_FLAG_MATE_UNMATCHED;
+
 		}
-		else
-			Curr_position = i;
 
-		int flags = 0;
-		if (ginp2) flags |= SAM_FLAG_PAIRED_TASK;
-
-		unsigned char votes = av->max_votes[Curr_position];
-		//	printf("CMASK=%d, REV=%d\n", av->masks[Curr_position],  av->is_counterpart[Curr_position]);
-		//if(av->masks[Curr_position] & IS_BREAKEVEN_READ) printf("SKIPPED\n");
-		//gene_quality_score_t mapping_quality_0 = av->max_final_quality[Curr_position];
-		//if(mapping_quality_0 > 160 )
 		if (((votes >= ACCEPT_SUBREADS) || (av->masks[Curr_position] & IS_PAIRED_MATCH)) && ((!REPORT_ONLY_UNIQUE) ||  !(av->masks[Curr_position] & IS_BREAKEVEN_READ)))
 		{
 #ifdef REPORT_ALL_THE_BEST
@@ -150,7 +170,6 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				printf ("ERROR: position out of range:%u\n", lpos); 
 			else{
 				char cigar_str [100];
-				int mate_index = i*2+(Curr_ginp!=ginp2);
 
 				cigar_str[0]=0;
 				if ( av->max_indel_recorder ) 
@@ -163,26 +182,15 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 				if (is_counterpart + (Curr_ginp==ginp2) == 1)
 					flags |= SAM_FLAG_REVERSE_STRAND_MATCHED; 
-				else
-					if(ginp2)
-						flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
 
-				if (ginp2)
+				if(ginp2)
 				{
-					if (Curr_ginp==ginp2)
-						flags |= SAM_FLAG_SECOND_READ_IN_PAIR;
-					else
-						flags |= SAM_FLAG_FIRST_READ_IN_PAIR;
-
-					if (!(av->masks[Curr_position] & IS_PAIRED_MATCH))
-					{
-						if (av->max_votes[mate_index] < ACCEPT_SUBREADS)
-							flags |= SAM_FLAG_MATE_UNMATCHED;
-					}
+					if(av->is_counterpart[mate_index] + (Curr_ginp!=ginp2) == 1)
+						flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
 					remove_backslash(nameb);
 				}
 
-				if (ginp2 && ((av->masks[Curr_position] & IS_PAIRED_MATCH) || av->max_votes[mate_index]  >= ACCEPT_SUBREADS))
+				if (ginp2 && is_mate_ok)
 				{
 					unsigned int mate_pos = av->max_positions[mate_index];
 
@@ -203,6 +211,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 					else
 					{
 						strcpy(rnext, rnext_pnt);
+						flags &= (0xffffffff ^ SAM_FLAG_MATCHED_IN_PAIR);
 						tlen = 0;
 					}
 
@@ -224,6 +233,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				else
 				{
 					gene_quality_score_t mapping_quality = av->max_final_quality[Curr_position];
+
 					fprintf (out_fp, "%s\t%d\t%s\t%d\t%d\t%s\t*\t0\t0\t%s\t",  nameb, flags, read_name, read_pos+1, (int)mapping_quality, cigar_str, inb);
 
 					if(qualityb[0])
@@ -432,7 +442,14 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 
 			init_gene_vote(&vote_read1);
 			init_gene_vote(&vote_read2);
+
 			int is_paired ;
+
+			if(read2_len == read_len){
+				allvote->masks[queries*2] |=  IS_R1R2_EQUAL_LEN;
+				allvote->masks[queries*2+1] |=  IS_R1R2_EQUAL_LEN;
+			}
+
 			for (is_paired = 0; is_paired <2; is_paired ++)
 			{
 				int subread_no;
@@ -533,6 +550,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 
 			if(need_replace)
 			{
+				int mismatch=0;
 
 				if (is_break_even){
 					vote_read1.max_mask |= IS_BREAKEVEN_READ;
@@ -567,13 +585,23 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 					pos_read1 = allvote -> max_positions[queries*2];
 					pos_read2 = allvote -> max_positions[queries*2+1];
 					show_cigar(allvote->max_indel_recorder + (queries*2) * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, InBuff);
-					allvote->max_final_quality[queries*2] = final_mapping_quality(my_value_array_index, pos_read1, InBuff, QualityBuff, cigar_str, FASTQ_FORMAT);
+					allvote->max_final_quality[queries*2] = final_mapping_quality(my_value_array_index, pos_read1, InBuff, QualityBuff, cigar_str, FASTQ_FORMAT, &mismatch);
 
 					show_cigar(allvote->max_indel_recorder + (queries*2+1) * allvote -> indel_recorder_length, read2_len, is_counterpart, cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, InBuff2);
-					allvote->max_final_quality[queries*2+1] = final_mapping_quality(my_value_array_index, pos_read2, InBuff2, QualityBuff2, cigar_str, FASTQ_FORMAT);
+					allvote->max_final_quality[queries*2+1] = final_mapping_quality(my_value_array_index, pos_read2, InBuff2, QualityBuff2, cigar_str, FASTQ_FORMAT, &mismatch);
 
 					//printf("COUNTER=%d , Q1 = %.4f , Q2 = %.4f , C1 = %s \nQ1=%s\n", is_counterpart, allvote->max_final_quality[queries*2], allvote->max_final_quality[queries*2+1], cigar_str, QualityBuff);
 
+				}
+				else
+				{
+
+					char cigar_str [100];
+					sprintf(cigar_str, "%dM",read_len);
+					allvote->max_final_quality[queries*2] = final_mapping_quality(my_value_array_index, pos_read1, InBuff, QualityBuff, cigar_str, FASTQ_FORMAT, &mismatch);
+
+					sprintf(cigar_str, "%dM",read2_len);
+					allvote->max_final_quality[queries*2+1] = final_mapping_quality(my_value_array_index, pos_read2, InBuff2, QualityBuff2, cigar_str, FASTQ_FORMAT, &mismatch);
 				}
 				pair_selected = 1;
 	
@@ -761,7 +789,7 @@ int run_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_pre
 			printf ("Loading the %02d-th index file ...                                              \r", tabno+1);
 		fflush(stdout);
 
-		gehash_load(my_table, table_fn);
+		if(gehash_load(my_table, table_fn)) return -1;
 		if(USE_VALUE_ARRAY_INDEX)
 		{
 			
@@ -773,8 +801,8 @@ int run_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_pre
 				return -1;
 			}
 
-			if (tabno>0)gvindex_destory(&value_array_index);
-			gvindex_load(&value_array_index,table_fn);
+			if(tabno>0)gvindex_destory(&value_array_index);
+			if(gvindex_load(&value_array_index,table_fn)) return -1;
 		}
 
 		processed_reads = 0;
@@ -1113,7 +1141,7 @@ int main_align(int argc,char ** argv)
 	printf("***** WARNING: the REPORT_ALL_THE_BEST switch is turned on. You need an extra 1 GBytes of RAM space for saving the temporary results. *****\n");
 #endif
 	
-	init_allvote(&allvote, all_reads, INDEL_TOLERANCE );
+	if(init_allvote(&allvote, all_reads, INDEL_TOLERANCE )) return -1;
 	if(read2_file[0])
 		all_reads/=2;
 		
@@ -1137,7 +1165,7 @@ int main_align(int argc,char ** argv)
 		clear_allvote(&allvote);
 		processed_reads_block = run_search_index(&ginp, read2_file[0] ? (&ginp2):NULL, index_prefix, &allvote, out_fp, processed_reads, all_tables, &succeed_reads);
 		if (processed_reads_block<0)
-			break;
+			return -1;
 		processed_reads += processed_reads_block ;
 
 		// test if there no anyreads remaining

@@ -4,13 +4,13 @@
 #include "subread.h"
 #include "sorted-hashtable.h"
 
-void gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned int base_number);
+int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned int base_number);
 
 void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_value);
 
 void gvindex_dump(gene_value_index_t * index, const char filename []);
 
-void gvindex_load(gene_value_index_t * index, const char filename []);
+int gvindex_load(gene_value_index_t * index, const char filename []);
 
 void gvindex_destory(gene_value_index_t * index);
 

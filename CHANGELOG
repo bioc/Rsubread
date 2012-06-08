@@ -1,3 +1,7 @@
+June 8, 2012 - 1.7.4
+(1) Change static memory allocation to dynamic memory requests for a number of functions to reduce memory use when the package is loaded.
+(2) The buildindex function no longer requies an allocation of 1GB continous memory block.
+
 May 31, 2012 - 1.7.3
 (1) Tim Triche added createAnnotationFile function to convert annotations to the format which can be used by featureCounts.
 

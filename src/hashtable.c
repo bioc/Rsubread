@@ -6,18 +6,20 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 1.1 2011/11/16 03:48:51 cvs Exp $
+ * $Id: hashtable.c,v 9999.1 2012/05/22 03:40:14 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <pthread.h>
 #include "hashtable.h"
 
 static int pointercmp(const void *pointer1, const void *pointer2);
 static unsigned long pointerHashFunction(const void *pointer);
 static int isProbablePrime(long number);
 static long calculateIdealNumOfBuckets(HashTable *hashTable);
+
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -46,15 +48,18 @@ static long calculateIdealNumOfBuckets(HashTable *hashTable);
  *      HashTable    - a new Hashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
+
 HashTable *HashTableCreate(long numOfBuckets) {
     HashTable *hashTable;
     int i;
+
 
     assert(numOfBuckets > 0);
 
     hashTable = (HashTable *) malloc(sizeof(HashTable));
     if (hashTable == NULL)
         return NULL;
+
 
     hashTable->bucketArray = (KeyValuePair **)
                         malloc(numOfBuckets * sizeof(KeyValuePair *));
@@ -81,6 +86,7 @@ HashTable *HashTableCreate(long numOfBuckets) {
 
     return hashTable;
 }
+
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -199,6 +205,8 @@ int HashTablePut(HashTable *hashTable, const void *key, void *value) {
     assert(value != NULL);
 
     hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
+
     pair = hashTable->bucketArray[hashValue];
 
     while (pair != NULL && hashTable->keycmp(key, pair->key) != 0)
@@ -219,7 +227,7 @@ int HashTablePut(HashTable *hashTable, const void *key, void *value) {
     else {
         KeyValuePair *newPair = (KeyValuePair *) malloc(sizeof(KeyValuePair));
         if (newPair == NULL) {
-            return -1;
+		return -1;
         }
         else {
             newPair->key = key;
@@ -259,6 +267,7 @@ int HashTablePut(HashTable *hashTable, const void *key, void *value) {
 
 void *HashTableGet(const HashTable *hashTable, const void *key) {
     long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
     KeyValuePair *pair = hashTable->bucketArray[hashValue];
 
     while (pair != NULL && hashTable->keycmp(key, pair->key) != 0)
@@ -285,6 +294,8 @@ void *HashTableGet(const HashTable *hashTable, const void *key) {
 
 void HashTableRemove(HashTable *hashTable, const void *key) {
     long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
+
     KeyValuePair *pair = hashTable->bucketArray[hashValue];
     KeyValuePair *previousPair = NULL;
 
@@ -312,6 +323,8 @@ void HashTableRemove(HashTable *hashTable, const void *key) {
                 HashTableRehash(hashTable, 0);
         }
     }
+
+
 }
 
 /*--------------------------------------------------------------------------*\

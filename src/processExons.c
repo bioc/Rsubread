@@ -32,7 +32,10 @@ typedef struct a_gene{
 int exon_num;
 int gene_index;
 int gene_num;
-gene gene_array[MAX_GENE];
+
+//gene gene_array[MAX_GENE];
+gene * gene_array;
+
 int32_t current_gene_id;
 
 char *exon_file;
@@ -42,6 +45,8 @@ char *gene_file;
 
 void
 initialise_process_exons(){
+	gene_array = (gene *) calloc(MAX_GENE,sizeof(gene));
+
 	gene_num = 0;
 	gene_index = 0;
 	current_gene_id = 0;
@@ -269,4 +274,6 @@ processExons(char **utr_cds, char **fexon, char** fgene){
 	}
 	fclose(fin);
 	output_exons_to_file();
+	
+	if(gene_array) free(gene_array);
 }

@@ -7,12 +7,18 @@
 #include "input-files.h"
 
 
-void gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned int base_number)
+int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned int base_number)
 {
 	index->start_point = start_point;
 	index->length = base_number;
 	index->values = malloc(base_number / 4 + 1);
+	if(!index->values)
+	{
+		puts(MESSAGE_OUT_OF_MEMORY);
+		return 1;
+	}
 	index -> start_base_offset = index -> start_point - index -> start_point%4;
+	return 0;
 }
 
 
@@ -106,7 +112,7 @@ void gvindex_dump(gene_value_index_t * index, const char filename [])
 }
 
 
-void gvindex_load(gene_value_index_t * index, const char filename [])
+int gvindex_load(gene_value_index_t * index, const char filename [])
 {
 	FILE * fp = fopen(filename, "rb");
 	int read_length;
@@ -122,11 +128,18 @@ void gvindex_load(gene_value_index_t * index, const char filename [])
 	gvindex_baseno2offset (index -> length+ index -> start_point, index ,&useful_bytes,&useful_bits);
 	index -> values = malloc(useful_bytes);
 	index -> values_bytes = useful_bytes;
+	if(!index->values)
+	{
+		puts(MESSAGE_OUT_OF_MEMORY);
+		return 1;
+	}
+	
 
 	read_length =fread(index->values, 1, useful_bytes, fp);
 	assert(read_length>0);
 
 	fclose(fp);
+	return 0;
 
 }
 
@@ -208,7 +221,6 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 					{
 						int matched_tail = match_chro(read+i, index, pos+i+indel_test, test_len - i,0,GENE_SPACE_BASE);
 						float matched_score = matched_tail * 1. / ( test_len - i);
-						//printf("INDEL_DEL_TEST i=%d: Indel=%d, Score=%f\n",i, indel_test,matched_score  );
 						if(matched_score >  bast_match_score_remailing &&  matched_score > 0.8)
 						{
 							offset = indel_test;
@@ -216,9 +228,10 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 						}
 					}else	// insertion
 					{
-						int matched_tail = match_chro(read+i - indel_test, index, pos+i, test_len - i + offset ,0,GENE_SPACE_BASE);
-						float matched_score = matched_tail * 1. / (test_len - i + offset);
-						//printf("INDEL_INS_TEST i=%d: Indel=%d, Score=%f\n",i, indel_test,matched_score  );
+						int matched_tail = match_chro(read+i - indel_test, index, pos+i, test_len - i + indel_test ,0,GENE_SPACE_BASE);
+						//int matched_tail = match_chro(read+i - indel_test, index, pos+i, test_len - i + offset ,0,GENE_SPACE_BASE);
+						float matched_score = matched_tail * 1. / (test_len - i + indel_test);
+						//float matched_score = matched_tail * 1. / (test_len - i + offset);
 						if(matched_score >  bast_match_score_remailing &&  matched_score > 0.8)
 						{
 							offset = indel_test;
@@ -389,7 +402,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 				}
 			}
 
-			if(base_p > 0.35) continue;
+			if(base_p > 0.3) continue;
 			base_p=0;
 			all_qual += (1-base_p);
 
@@ -416,7 +429,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 				}
 			}
 
-			if(base_p > 0.35) continue;
+			if(base_p > 0.3) continue;
 			base_p=0;
 
 			all_qual += (1-base_p);
@@ -452,16 +465,19 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 		{
 			pos++;
 			last_char = (pos+test_len>= index -> length + index -> start_point)?'A': gvindex_get(index,pos+test_len);
-		}
-		for (i=test_len -1;i>=0;i--)
-		{
-			char tt = gvindex_get (index, pos+test_len-1-i);
-			if(space_type == GENE_SPACE_COLOR)
+			for (i=test_len -1;i>=0;i--)
 			{
+				char tt = gvindex_get (index, pos+test_len-1-i);
 				ret += read[i] == '0'+chars2color(tt, last_char); 
 				last_char = tt;
 			}
-			else
+		}
+		else
+		{
+
+			for (i=test_len -1;i>=0;i--)
+			{
+				char tt = gvindex_get (index, pos+test_len-1-i);
 				switch(tt)
 				{
 					case 'A': ret += read[i] == 'T'; break;
@@ -469,23 +485,63 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 					case 'G': ret += read[i] == 'C'; break;
 					case 'C': ret += read[i] == 'G'; break;
 				}
+			}
+	
+
+
 		}
-	}
+	}	
 	else
 	{
-		if (space_type == GENE_SPACE_COLOR)
-			last_char = (pos <= index -> start_point)?'A': gvindex_get(index,pos-1);
-		for (i=0;i<test_len;i++)
+		if(space_type == GENE_SPACE_BASE)
 		{
-			char tt = gvindex_get (index, pos +i);
-			if(space_type == GENE_SPACE_COLOR)
+			unsigned int offset_byte, offset_bit;
+
+			gvindex_baseno2offset(pos, index , &offset_byte, &offset_bit);
+
+			if(offset_byte >= index-> values_bytes)return 0;
+			char int_value = index->values [offset_byte];
+
+			for (i=0;i<test_len;i++)
 			{
+				char tt = (int_value >> offset_bit) & 3;
+				char tv = read[i];
+				switch(tv){
+					case 'A':
+						ret += tt==0;
+						break;
+					case 'G':
+						ret += tt==1;
+						break;
+					case 'C':
+						ret += tt==2;
+						break;
+					default:
+						ret += tt==3;
+						break;
+
+				}
+				offset_bit+=2;
+				if(offset_bit==8)
+				{
+					offset_byte++;
+					if(offset_byte == index-> values_bytes)return 0;
+					int_value = index->values [offset_byte];
+					offset_bit = 0;
+				}
+			}
+		}
+		else
+		{
+			last_char = (pos <= index -> start_point)?'A': gvindex_get(index,pos-1);
+			for (i=0;i<test_len;i++)
+			{
+				char tt = gvindex_get (index, pos +i);
 				ret += read[i] == '0'+chars2color(last_char, tt);
 				last_char = tt;
 			}
-			else
-				ret +=read[i] == tt; 
 		}
+		
 	}
 	return ret;
 }
