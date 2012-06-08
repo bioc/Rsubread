@@ -47,8 +47,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	char fn[300];
 	double local_begin_ftime = 0.;
 
-	unsigned int read_offsets[1000];
-	char read_names[1000][48];
+	unsigned int read_offsets[OFFSET_TABLE_SIZE];
+	char read_names[OFFSET_TABLE_SIZE][48];
 	gehash_t table;
 //	gehash_t huge_table;
 	gene_value_index_t value_array_index;
@@ -77,21 +77,19 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		return -1;
 	}
 
-//	gehash_create(& huge_table, segment_size/100, 0);
-	gehash_create(& table, segment_size, 0);
-//	gehash_prealloc(& table);
+	if(gehash_create(& table, segment_size, 0)) return 1;
 
 	unsigned int size_of_array_index = (unsigned int)(min(MAX_BASES_IN_INDEX, segment_size*4.35 + MIN_READ_SPLICING));
 
 	if(VALUE_ARRAY_INDEX)
-		gvindex_init(&value_array_index, 0, size_of_array_index);
+		if(gvindex_init(&value_array_index, 0, size_of_array_index)) return 1;
 
 	file_number = 0;
 	offset = 0;
 	table_no = 0;
 	read_no = 0;
 
-	bzero(read_offsets, 1000*sizeof(int));
+	bzero(read_offsets, OFFSET_TABLE_SIZE*sizeof(int));
 	sprintf(fn, "%s.files", index_prefix);
 	unlink(fn);
 
@@ -172,9 +170,9 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			if (status == NEXT_READ)
 			{
 
-				if(read_no>=999)
+				if(read_no>=OFFSET_TABLE_SIZE-1)
 				{
-					printf("\nThere are too many sections in the chromosome data files (more than 1000 sections).\n");
+					printf("\nThere are too many sections in the chromosome data files (more than %d sections).\n", OFFSET_TABLE_SIZE);
 					status = NEXT_FILE;
 					continue;
 				}
@@ -288,9 +286,9 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				else
 					array_int_key = int_key = genekey2int(window, GENE_SPACE_BASE);
 				
-				gehash_create(&table, segment_size, 0);
+				if(gehash_create(&table, segment_size, 0)) return 1;
 				if(VALUE_ARRAY_INDEX)
-					gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?0:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )));
+					if(gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?0:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )))) return 1;
 			}
 	
 			status = 0;
@@ -306,7 +304,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				{
 					//if(offset > 61177100 && offset < 61177221 )
 					//	printf("\nPOS=%u KEY=%u\n", offset, int_key);
-					gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0));
+					if(gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0))) return 1;
 				}
 				if(VALUE_ARRAY_INDEX)
 				{
@@ -388,20 +386,20 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	return 0;
 }
 
-void add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char * huge_index)
+int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** huge_index)
 {
 	unsigned int times;
 
-	int huge_byte = subr /4;
+	int huge_byte = (subr>>2) &0x3fffffff;
 	int huge_offset = (subr % 4) * 2;
-	unsigned int byte_value = huge_index[huge_byte] ;
+	unsigned int byte_value = huge_index[ (huge_byte >> 20) & 1023 ][huge_byte&0xfffff] ;
 
 	int huge_value = (byte_value>> huge_offset) & 0x3;
 	if(huge_value <3)
 	{
 		huge_value ++;
-		huge_index[huge_byte] = (byte_value & (~(0x3 << huge_offset))) | (huge_value << huge_offset);
-		return;
+		huge_index[ (huge_byte >> 20) & 1023 ][huge_byte&0xfffff] = (byte_value & (~(0x3 << huge_offset))) | (huge_value << huge_offset);
+		return 0;
 	}
 
 	int matched = gehash_get(tab, subr, &times, 1);
@@ -410,7 +408,8 @@ void add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char * hu
 		gehash_update(tab, subr, times+1);
 	}
 	else
-		gehash_insert(tab, subr,4);
+		if(gehash_insert(tab, subr,4)) return 1;
+	return 0;
 }
 
 
@@ -425,18 +424,22 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	char read_names[1000][48];
 	gehash_t occurance_table;
-	unsigned char * huge_index;
+	unsigned char * huge_index[1024];
 
-	huge_index = (unsigned char *)malloc(1024*1024*1024); 
-	if(!huge_index)
+	for(i=0;i<1024;i++)
 	{
-		printf("You need at least two gigabytes of memory for building the index.");
-		return -1;
+		huge_index[i] = (unsigned char *)malloc(1024*1024); 
+		if(!huge_index[i])
+		{
+			for(j=0;j<i;j++) free(huge_index[j]);
+			printf("You need at least one point five gigabytes of memory for building the index.\n");
+			return -1;
+		}
+		memset(huge_index[i], 0 , 1024*1024);
 	}
 
-	memset(huge_index, 0 , 1024*1024*1024 );
 
-	gehash_create(&occurance_table , 100000000, 0);
+	if(gehash_create(&occurance_table , 100000000, 0)) return 1;
 
 
 	gene_input_t ginp;
@@ -625,14 +628,15 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			{
 				if(current_bucket -> item_values [j] > threshold)
 				{
-					gehash_insert(huge_table, current_bucket -> item_keys[j], 1);
+					if(gehash_insert(huge_table, current_bucket -> item_keys[j], 1)) return 1;
 					//printf("NON-INFO:%u\n",  current_bucket -> item_keys[j]);
 				}
 			}
 		}
 	}
 
-	free(huge_index);
+	for(i=0;i<1024;i++)
+		free(huge_index[i]);
 	gehash_destory(&occurance_table);
 
 
@@ -699,8 +703,8 @@ int main_buildindex(int argc,char ** argv)
 
 	gehash_t huge_table;
 	gehash_create(& huge_table, 50000000, 0);
-	scan_gene_index(output_file, argv+optind , argc - optind, threshold, &huge_table);
-	build_gene_index(output_file, argv+optind , argc - optind,  memory_limit, threshold, &huge_table);
+	if(scan_gene_index(output_file, argv+optind , argc - optind, threshold, &huge_table)) return 1;
+	if(build_gene_index(output_file, argv+optind , argc - optind,  memory_limit, threshold, &huge_table)) return 1;
 	printf("\nIndex %s was successfully built.\n", output_file);
 
 /*

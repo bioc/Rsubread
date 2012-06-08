@@ -2,6 +2,7 @@
 #define __INPUT_FILES_H_
 
 #include "subread.h"
+#include "hashtable.h"
 
 #define GENE_SPACE_BASE 1
 #define GENE_SPACE_COLOR 2
@@ -46,6 +47,8 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 // The memory space for read_string must be at least 512 bytes.
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string);
 
+void geinput_jump_read(gene_input_t * input);
+
 // Close the input file
 void geinput_close(gene_input_t * input);
 
@@ -76,7 +79,14 @@ void reverse_read(char * ReadString, int Length, int space_type);
 
 void reverse_quality(char * QualtyString, int Length);
 
+unsigned int read_numbers(gene_input_t * input);
+
+//This function returns 0 if the line is a mapped read; -1 if the line is in a wrong format and 1 if the read is unmapped.
+int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, char * sequence , char * quality_string, int * rl);
+
 #define reverse_char(c)	((c)=='A'?'T':((c)=='G'?'C':((c)=='C'?'G':'A')))
 
 int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
+
+int break_SAM_file(char * in_SAM_file, char * temp_location, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed);
 #endif

@@ -53,8 +53,12 @@ int site_removed[MAXCHRNUM];
 int num_read[MAXCHRNUM];
 int num_read_removed[MAXCHRNUM];
 
-int depth[MAXCHRLENGTH];
-int mapq[MAXCHRLENGTH];
+//int depth[MAXCHRLENGTH];
+//int mapq[MAXCHRLENGTH];
+
+int * depth;
+int * mapq;
+
 
 /*
  *  Given the chromosome name(string), return chrosome order(int)
@@ -363,7 +367,7 @@ void duplicate_reads_remover(void){
 }
 
 int main_removeDuplicatedReads(int argc, char *argv[]){
-
+	
 	if (argc < 2){
 		printf("Usage: ./remove_dup sample.sam threshold output_file\n");
 		printf("\tIf threshold is not present, it will be calculated as 2*exonic base coverage.\n");
@@ -371,6 +375,9 @@ int main_removeDuplicatedReads(int argc, char *argv[]){
 		printf("\tIf threshold == 1: regardless of read depth, only one read per position is retained with best MAPQ.\n\n");
 		exit(1);
 	}
+
+	depth = (int *)calloc(MAXCHRLENGTH, sizeof(int));
+	mapq = (int *)calloc(MAXCHRLENGTH, sizeof(int));
 
 	FILE *ftest_existence;
 	if ( (ftest_existence = fopen ( argv[1], "r" ) ) == NULL ){
@@ -417,4 +424,6 @@ int main_removeDuplicatedReads(int argc, char *argv[]){
 	}
 	duplicate_reads_remover();
 
+	if(depth) free(depth);
+	if(mapq) free(mapq);
 }

@@ -20,7 +20,7 @@
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table);
 
 // This function puts a data item into the table. If there is duplication, it insert another copy into the table but do not overlap on the old one.
-void gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data);
+int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data);
 
 // This function queries the table and put the matched data item into data_result.
 // This function returns 0 if not found, or the number of matched items.

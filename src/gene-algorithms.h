@@ -13,6 +13,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix []);
 // The pointer to the name of the chromosome is put into chro_name, and the position in this chromosome is in pos.
 int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, unsigned int * pos);
 
+unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name, unsigned int chro_pos);
 
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
@@ -29,7 +30,7 @@ int max_gene_vote(gene_vote_t* vote, int * position_result, int query_id);
 int evaluate_piece(char * piece_str, int chromosome, int offset, int is_counterpart, int start_p, int end_p);
 
 // These two functions maintain the global vote for pieces
-void init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels);
+int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels);
 void clear_allvote(gene_allvote_t* allvote);
 
 
@@ -81,7 +82,7 @@ void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote
 
 int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int match_req_5end, int match_req_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_str, int qual_format);
 
-float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version);
+float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch);
 
 int bad_quality_base_number(char * qualityb, int rl , int format);
 

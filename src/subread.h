@@ -14,6 +14,12 @@
 #define SAM_FLAG_UNMAPPED 0x04
 
 #define MAX_PIECE_JUNCTION_READ 7
+#define MAX_READ_LENGTH 1200
+#define MAX_READ_NAME_LEN 48
+#define MAX_CHROMOSOME_NAME_LEN 48
+#define EXON_MAX_CIGAR_LEN 48
+#define BASE_BLOCK_LENGTH 15000000
+
 
 #define IS_LONG_OVERLAP 4
 #define IS_SHORT_OVERLAP 8
@@ -31,8 +37,16 @@
 #define IS_FINALISED_PROCESSING 8192
 #define IS_RECOVERED_JUNCTION_READ_STEP4 (8192*2)
 #define	IS_BREAKEVEN_READ (8192*4)
+#define IS_R1R2_EQUAL_LEN 1024
+#define QUALITY_KILL	198
+#define QUALITY_KILL_SUBREAD	160
 
-//#define TEST_TARGET "GCAGGCCGAAGCCGACAAGAA"
+#define MESSAGE_OUT_OF_MEMORY "Out of memory. If you are using Rsubread in R, please save your working environment and restart R. \n"
+
+//#define QUALITY_KILL	175
+//#define QUALITY_KILL_SUBREAD	150
+
+//#define TEST_TARGET "TGGTGGAGAGGACTGTGAAGCCGTCGGCAGGTGTGCCCTCGGTTG"
 
 
 typedef unsigned int gehash_key_t;
@@ -40,6 +54,10 @@ typedef unsigned int gehash_data_t;
 typedef float gene_quality_score_t;
 typedef char gene_vote_number_t;
 
+
+
+
+#define OFFSET_TABLE_SIZE 50000
 #define GENE_TABLE_SIZE 500000000
 
 #define ANCHORS_NUMBER 259
@@ -57,15 +75,19 @@ typedef char gene_vote_number_t;
 
 
 #define base2int(c) ((c)=='G'?1:((c)=='A'?0:((c)=='C'?2:3)))
+                     // A  B  C  D  E  F  G
+//#define base2int(c) ("\x0\x0\x2\x0\x0\x0\x1\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3"[(c)-'A'])
 //#define int2base(c) ((c)==1?'G':((c)==0?'A':((c)==2?'C':'T')))
 #define int2base(c) ("AGCT"[(c)]) 
 #define color2int(c) ((c) - '0')
 #define int2color(c) ("0123"[(c)])
+#define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} }
+
 
 #define get_base_error_prob64(a) ((a) < '@'-1?1:pow(10., -0.1*((a)-'@')))
 #define get_base_error_prob33(a) ((a) < '!'-1?1:pow(10., -0.1*((a)-'!'))) 
 
-
+#define SUBREAD_malloc(a) malloc(a)
 
 #define FASTQ_PHRED33 1
 #define FASTQ_PHRED64 0
@@ -152,10 +174,25 @@ typedef struct{
 
 
 typedef struct{
-        char read_name[1000][48];
-        unsigned int read_offset[1000];
+	int total_offsets;
+        char read_name[OFFSET_TABLE_SIZE][MAX_READ_NAME_LEN];
+        unsigned int read_offset[OFFSET_TABLE_SIZE];
 } gene_offset_t;
 
+
+#define EXON_BUFFER_SIZE 3000 
+
+struct thread_input_buffer {
+	char read_names [EXON_BUFFER_SIZE][121];
+	char read [EXON_BUFFER_SIZE][1201];
+	char quality [EXON_BUFFER_SIZE][1201];
+	int rl[EXON_BUFFER_SIZE];
+	int write_pointer;
+	int read_pointer;
+
+	unsigned int read_id[EXON_BUFFER_SIZE];
+
+};
 
 
 typedef struct {
@@ -173,6 +210,18 @@ typedef struct{
 
 
 double miltime();
+
+
+
+typedef struct{
+	char chromosome_name[MAX_CHROMOSOME_NAME_LEN];
+	unsigned long known_length;
+} chromosome_t;
+
+typedef struct{
+	unsigned int read_number;
+	unsigned int pos;
+} base_block_temp_read_t;
 
 
 #define abs(a) 	  ((a)>=0?(a):-(a))

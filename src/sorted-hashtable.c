@@ -44,6 +44,12 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
   			  sizeof(struct gehash_bucket )
 			);
 
+	if(!the_table -> buckets)
+	{
+		puts(MESSAGE_OUT_OF_MEMORY);
+		return 1;
+	}
+
 	for(i=0; i<expected_bucket_number; i++){
 		the_table -> buckets [i].item_keys = NULL;
 		the_table -> buckets [i].current_items = 0;
@@ -53,7 +59,7 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
 	return 0;
 }
 
-void _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_table)
+int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_table)
 {
 	int new_bucket_length;
 	struct gehash_bucket * current_bucket = &(the_table -> buckets [bucket_no]);
@@ -70,14 +76,15 @@ void _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_t
 
 		new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
 		new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
+
+		if(!(new_item_keys && new_item_values))
+		{
+			puts(MESSAGE_OUT_OF_MEMORY);
+			return 1;
+		}
+
 		bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
 		bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
-
-		if(!new_item_values || !new_item_keys)
-		{
-			printf("\nThe system cannot allocate virtual memory for the index. It seems that you specified a too large memory limit on a 32-bit computer. You may reduce the limit and try again.\n");
-			exit(1);
-		}
 
 		current_bucket->item_keys = new_item_keys;
 		current_bucket->item_values = new_item_values;
@@ -153,14 +160,16 @@ void _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_t
 				new_bucket_length = (int)(current_bucket->space_size*1.5);
 			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
 			new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
+
+
+			if(!(new_item_keys && new_item_values))
+			{
+				puts(MESSAGE_OUT_OF_MEMORY);
+				return 1;
+			}
+
 			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
 			bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
-
-			if(!new_item_values || !new_item_keys)
-			{
-				printf("\nThe system cannot allocate virtual memory for the index. It seems that you specified a too large memory limit on a 32-bit computer. You may reduce the limit and try again.\n");
-				exit(1);
-			}
 
 			memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
 			memcpy(new_item_values, current_bucket->item_values, current_bucket->current_items*sizeof(gehash_data_t));
@@ -175,7 +184,7 @@ void _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_t
 
 		}
 	}
-	//printf ("New length = %d\n", new_bucket_length);
+	return 0;
 
 }
 
@@ -186,24 +195,28 @@ struct gehash_bucket * _gehash_get_bucket(gehash_t * the_table, gehash_key_t key
 	return  &(the_table -> buckets [bucket_number]);
 }
 
-void gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
+int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 {
 	struct gehash_bucket * current_bucket;
+	int is_fault = 0;
 
 	current_bucket = _gehash_get_bucket (the_table, key);
 	//printf("P=%lld\n",(long long)(the_table->mem_keys - current_bucket->item_keys));
 	if (current_bucket->current_items >= current_bucket->space_size)
 	{
 
-	        int bucket_number;
-        	bucket_number = _gehash_hash(key) % the_table -> buckets_number;
+		int bucket_number;
+		bucket_number = _gehash_hash(key) % the_table -> buckets_number;
 
-		_gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
+		is_fault = _gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
+		if(is_fault)
+			return 1;
 	}
 	current_bucket->item_keys[current_bucket->current_items] = key;
 	current_bucket->item_values[current_bucket->current_items] = data;
 	current_bucket->current_items ++;
 	the_table ->current_items ++;
+	return 0;
 }
 
 #define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
@@ -501,7 +514,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 
 						int go_replace = 0;
 
-						if(test_max > vote->max_vote || (test_max == vote->max_vote && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] > vote->max_coverage_end - vote->max_coverage_start ) || (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start)&& vote -> quality[offsetX][i] > vote->max_quality))
+						if(test_max > vote->max_vote || (test_max == vote->max_vote && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] > vote->max_coverage_end - vote->max_coverage_start )) ||( (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start)&& vote -> quality[offsetX][i] > vote->max_quality))
 							go_replace = 1;
 						else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start))
 						{
@@ -712,25 +725,6 @@ size_t gehash_remove(gehash_t * the_table, gehash_key_t key)
 
 	current_bucket -> current_items -= removed;
 	the_table-> current_items -= removed;
-/*
-	if (current_bucket -> space_size - current_bucket -> current_items > 50)
-	{
-		gehash_key_t * new_item_keys;
-		gehash_data_t * new_item_values;
-
-		new_item_keys = (gehash_key_t*)malloc(sizeof(gehash_key_t) * current_bucket -> current_items);
-		memcpy(new_item_keys, current_bucket -> item_keys, sizeof(gehash_key_t) * current_bucket -> current_items);
-		free(current_bucket -> item_keys);
-		current_bucket -> item_keys = new_item_keys;
-
-		new_item_values = (gehash_data_t*)malloc(sizeof(gehash_data_t) * current_bucket -> current_items);
-		memcpy(new_item_values, current_bucket -> item_values, sizeof(gehash_data_t) * current_bucket -> current_items);
-		free(current_bucket -> item_values);
-		current_bucket -> item_values = new_item_values;
-
-		current_bucket -> space_size  = current_bucket -> current_items;
-	}
-*/
 
 	return removed;
 }
@@ -743,30 +737,7 @@ size_t gehash_get_hpc(gehash_t * the_table, gehash_key_t key, gehash_data_t * da
 
 void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 {
-/*
-        struct gehash_bucket * current_bucket;
-        int search_start = 0, search_end;
 
-        current_bucket = _gehash_get_bucket (the_table, key);
-        if (current_bucket->current_items >= current_bucket->space_size)
-                _gehash_resize_bucket(current_bucket, , the_table->is_small_table);
-
-        for (;search_start<current_bucket->current_items;search_start++)
-        {
-                if(current_bucket->item_keys[search_start] >= key)
-                        break;
-        }
-
-
-
-        for (search_end = current_bucket->current_items;search_end>search_start;search_start--)
-                current_bucket->item_keys[search_end] = current_bucket->item_keys[search_end-1];
-
-        current_bucket->item_keys[search_start] = key;
-        current_bucket->item_values[search_start] = data;
-
-        current_bucket->current_items ++;
-*/
 	printf("UNIMPLEMENTED! gehash_insert_sorted \n");
 }
 
@@ -778,10 +749,10 @@ void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 //      size_t buckets_number;
 //      struct 
 //      {
-//              size_t current_items;
-//              size_t space_size;
-//              gehash_key_t item_keys [current_items];
-//              gehash_data_t item_values [current_items]
+//	      size_t current_items;
+//	      size_t space_size;
+//	      gehash_key_t item_keys [current_items];
+//	      gehash_data_t item_values [current_items]
 //      } [buckets_number];
 // }
 //
@@ -815,12 +786,17 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	if (!fp)
 	{
 		printf ("Table file `%s' is not found.\n", fname);
-		return -1;
+		return 1;
 	}
 
 	the_table -> current_items = load_int64(fp);
 	the_table -> buckets_number = load_int32(fp);
 	the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
+	if(!the_table -> buckets)
+	{
+		puts(MESSAGE_OUT_OF_MEMORY);
+		return 1;
+	}
 
 	for (i=0; i<the_table -> buckets_number; i++)
 	{
@@ -831,7 +807,12 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		current_bucket -> item_keys = (gehash_key_t *) malloc ( sizeof(gehash_key_t) * current_bucket -> space_size);
 		current_bucket -> item_values = (gehash_data_t *) malloc ( sizeof(gehash_data_t) * current_bucket -> space_size);
 
-		//printf("IKV=%d\n", (int)current_bucket -> space_size);
+		if(!(current_bucket -> item_keys&&current_bucket -> item_values))
+		{
+			puts(MESSAGE_OUT_OF_MEMORY);
+			return 1;
+
+		}
 
 		if(current_bucket -> current_items > 0)
 		{
@@ -841,16 +822,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			assert(read_length>0);
 		}
 
-/*
-		int j;
-		for (j=0; j<current_bucket -> current_items; j++)
-		{
-			if(current_bucket -> item_keys[j]==4131185942)
-			{
-				printf("FOUND %u @ %d",4131185942, current_bucket -> item_values[j]);
-			}
-		}
-*/	}
+	}
 
 	read_length = fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
 	assert(read_length>0);
@@ -880,7 +852,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		gehash_data_t tmp_val;
 
 
-                if(i % 200 == 0)
+		if(i % 200 == 0)
 			print_text_scrolling_bar("Saving index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 
