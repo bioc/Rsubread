@@ -9,7 +9,7 @@ featureCounts(SAMfiles,type="gene",species="mm",annot=NULL)
   \item{SAMfiles}{ a character vector giving names of SAM format files.}
   \item{type}{ a character string giving the feature type. Its value could be \code{gene} or \code{exon}.}
   \item{species}{ a character string specifying the species. It can be \code{mm} or \code{hg}. Values of this argument determines which in-built annotation file will be used, if \code{annot} is \code{NULL}.}
-  \item{annot}{ a character string giving the name of the annotation file provided by users, which includes feature information such as chromosomal coordinates etc. This file will override the in-built annotation file chosen from using \option{species} argument.}
+  \item{annot}{ a character string giving the name of an annotation file provided by the user, or a data frame containing annotation information. If \code{NULL} (by default), the in-built annotation file will be used. See below for more details.}
   }
 \details{
 This function takes as input a set of SAM format files and assigns reads to the features.
@@ -19,11 +19,15 @@ Currently, only feature types including \code{gene} and \code{exon} are supporte
 There are two in-built annotation files which are used by this function to summarize reads for genes or exons for mouse and human, respectively.
 These annotation files include the exon annotation information downloaded from NCBI Build 37.2, including Entrez gene identifier and chromosomal coordinates for each exon.
 The \code{species} argument specifies which annotation file should be used.
+These in-built annotation will be used when \code{annot} is \code{NULL}.
 
-Users can provide their own annotation file for read summarization as well, by using the \code{annot} argument.
-In this case, the user provided annotation file will override the in-built annotation file.
-The annotation file provided by users should be a tab delimited file, and its first four columns should provide gene identifiers, chromosome names, chromosomal start locations and chromosomal end locations for each exon, respectively.
-Below is an example:
+Users can also provide their own annotation for read summarization, via the \code{annot} argument.
+In this case, user provided annotation will override the in-built annotation.
+Users can either provide the name of their own annotation file, or they can provide a data frame which contain annotation information.
+If a data frame is provided, at least four columns, named \code{entrezid}, \code{chromosome}, \code{chr_start} and \code{chr_stop}, are required.
+If users provide an annotation file, then it should be a tab delimited file and its first four columns should be named as \code{entrezid}, \code{chromosome}, \code{chr_start} and \code{chr_stop}, respectively.
+The file has to be sorted by the \code{chromosome} column (either increasing or decreasing order is OK), and chromosome names should not contain more than 40 characters.
+Below is an example for the annotation file provided by the user (sorted by the chromosome column):
 \preformatted{
 entrezid	chromosome	chr_start	chr_stop
 497097	chr1	3204563	3207049

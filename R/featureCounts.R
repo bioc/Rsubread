@@ -1,5 +1,7 @@
 featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 {
+	flag <- FALSE
+
 	if(is.null(annot)){
 	  if(species == "mm"){
 	    ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
@@ -15,10 +17,26 @@ featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 	  }
 	}
 	else{
-	  ann <- annot
+	  if(is.character(annot)){
+	    cat("Please make sure the annotation file you provided has been SORTED by chromosome names.\n")
+	    ann <- annot
+	  }
+	  else{
+	    annot_df <- as.data.frame(annot,stringsAsFactors=FALSE)
+	    if(sum(c("entrezid","chromosome","chr_start","chr_stop") %in% colnames(annot_df)) != 4)
+	      stop("annot is not a data frame or required columns can not be found in annot.\n")
+	    annot_df$chromosome <- as.character(annot_df$chromosome)
+	    annot_df <- annot_df[order(annot_df$chromosome),]
+	    if(any(nchar(annot_df$chromosome) > 40))
+	      annot_df$chromosome <- substring(annot_df$chromosome,1,40)
+	    fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
+	    write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
+	    ann <- fout_annot
+	    flag <- TRUE
+	  }
 	}
 
-	fout <- file.path("/tmp",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
+	fout <- file.path(".",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
 
 	for(i in 1:length(SAMfiles)){
 	  cat("Processing", SAMfiles[i], " ...\n")
@@ -33,7 +51,11 @@ featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 	}
 	colnames(x)[1:4] <- c("EntrezID","Chr","Start","End")
 	colnames(x)[-c(1:4)] <- SAMfiles
+
 	file.remove(fout)
+	if(flag) 
+	  file.remove(fout_annot)
+
 	if(type == "gene"){
 	  y <- rowsum(x[,-c(1:4)],x$EntrezID)
 	  gene_length <- rowsum(x$End-x$Start+1,x$EntrezID)

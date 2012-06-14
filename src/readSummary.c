@@ -54,7 +54,7 @@ getline(&line, &len, fp_ann);
 for(i=0;i<nexons;i++){
  getline(&line, &len, fp_ann);
  geneid[i] = atoi(strtok(line,"\t"));
- chr[i] = malloc(20);
+ chr[i] = malloc(41);
  strcpy(chr[i],strtok(NULL,"\t"));
  start[i] = atoi(strtok(NULL,"\t"));
  stop[i] = atoi(strtok(NULL,"\t"));
@@ -70,6 +70,8 @@ for(i=0;i<nexons;i++){
 nchr = curchr;
 anno_chr_head[curchr] = nexons;
 fclose(fp_ann);
+
+printf("Number of chromosomes included in the annotation is %\d\n",nchr);
 
 fp_in = fopen(argv[2],"r");
 while ((z = getline(&line, &len, fp_in)) != -1){
