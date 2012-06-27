@@ -34,8 +34,10 @@
   transcripts, exons, features, import.bed, subjunc 
 }
 \examples{
+\dontrun{
   library(TxDb.Hsapiens.UCSC.hg19.lincRNAsTranscripts)
   hg19LincRNAs <- transcripts(TxDb.Hsapiens.UCSC.hg19.lincRNAsTranscripts)
   names(values(hg19LincRNAs)) <- gsub('tx_id','id',names(values(hg19LincRNAs)))
   createAnnotationFile(hg19LincRNAs)
+}
 }

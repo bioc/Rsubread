@@ -9,4 +9,3 @@ URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
 License: LGPL-3
 LazyLoad: yes
 biocViews: Sequencing, HighThroughputSequencing
-Imports: TxDb.Hsapiens.UCSC.hg19.lincRNAsTranscripts

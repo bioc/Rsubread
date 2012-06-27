@@ -1,5 +1,6 @@
 June 26, 2012 - 1.7.6
 (1) Add an option to featureCounts to count fragments for paired-end sequencing data.
+(2) Disable the running of example included in createAnnotationFile.Rd.
 
 June 14, 2012 - 1.7.5
 (1) featureCounts function now accepts a data frame as the annotation input.
