@@ -1,4 +1,4 @@
-featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
+featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min_distance=50,max_distance=2000)
 {
 	flag <- FALSE
 
@@ -40,7 +40,7 @@ featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL)
 
 	for(i in 1:length(SAMfiles)){
 	  cat("Processing", SAMfiles[i], " ...\n")
-	  cmd <- paste("readSummary",ann,SAMfiles[i],fout,sep=",")
+	  cmd <- paste("readSummary",ann,SAMfiles[i],fout,as.numeric(isPairedEnd),min_distance,max_distance,sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
 	  C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	  x1 <- read.delim(fout,stringsAsFactors=FALSE)  
