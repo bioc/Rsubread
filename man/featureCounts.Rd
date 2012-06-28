@@ -3,7 +3,7 @@
 \title{Count the number of mapped reads for each feature}
 \description{Summarize read counts to features including genes and exons}
 \usage{
-featureCounts(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min_distance=50,max_distance=2000)
+featureCounts(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min_distance=10,max_distance=2000)
 }
 \arguments{
   \item{SAMfiles}{ a character vector giving names of SAM format files.}
@@ -11,7 +11,7 @@ featureCounts(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min
   \item{species}{ a character string specifying the species. It can be \code{mm} or \code{hg}. Values of this argument determines which in-built annotation file will be used, if \code{annot} is \code{NULL}.}
   \item{annot}{ a character string giving the name of an annotation file provided by the user, or a data frame containing annotation information. If \code{NULL} (by default), the in-built annotation file will be used. See below for more details.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. \code{FALSE} by default.}
-  \item{min_distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{50} by default.}
+  \item{min_distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
   \item{max_distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default.}
   }
 \details{

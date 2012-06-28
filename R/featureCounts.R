@@ -1,4 +1,4 @@
-featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min_distance=50,max_distance=2000)
+featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min_distance=10,max_distance=2000)
 {
 	flag <- FALSE
 

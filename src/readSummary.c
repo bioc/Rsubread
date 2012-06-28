@@ -84,6 +84,7 @@ fclose(fp_ann);
 
 printf("Number of chromosomes included in the annotation is \%d\n",nchr);
 
+/* get read length */
 fp_in = fopen(argv[2],"r");
 while ((z = getline(&line, &len, fp_in)) != -1){
   if(line[0] == '@')
@@ -123,7 +124,7 @@ while ((z = getline(&line, &len, fp_in)) != -1){
     mate_chr = strtok(NULL,"\t"); //get chr to which the mate read is mapped 
     mate_pos = atoi(strtok(NULL,"\t"));
     fragment_length = abs(atoi(strtok(NULL,"\t"))); //get the fragment length
-    if(strcmp(mate_chr,"=") != 0 || fragment_length > maxPEDistance || fragment_length < minPEDistance){
+    if(strcmp(mate_chr,"=") != 0 || fragment_length > (maxPEDistance + read_length -1) || fragment_length < (minPEDistance + read_length - 1)){
       //the two reads are not properly paired and are skipped 
       getline(&line, &len, fp_in);
       continue;
