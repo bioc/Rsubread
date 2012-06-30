@@ -1,20 +1,25 @@
-featureCounts <- function(SAMfiles,type="gene",species="mm",annot=NULL,isPairedEnd=FALSE,min_distance=10,max_distance=2000)
+featureCounts <- function(SAMfiles,type="gene",species="mm9",annot=NULL,isPairedEnd=FALSE,min_distance=10,max_distance=2000)
 {
 	flag <- FALSE
 
 	if(is.null(annot)){
-	  if(species == "mm"){
-	    ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
-	    cat("Mouse annotation from NCBI Build 37.2 is used.\n")
-	  }
-	  else{
-	    if(species == "hg"){
+	  switch(tolower(as.character(species)),
+	    mm9={
+	      ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
+	      cat("Mouse annotation NCBI Build 37.2 is used.\n")
+		},
+	    mm10={
+	      ann <- system.file("annot","mm10_NCBI_annotation_exon_sorted.txt",package="Rsubread")
+	      cat("Mouse annotation NCBI Build 38.1 is used.\n")
+		 },
+	    hg={
 	      ann <- system.file("annot","hg19_NCBI_exon.txt",package="Rsubread")
-	      cat("Human annotation from NCBI Build 37.2 is used.\n")
-	    }
-	    else
-	      stop("In-built annotation for species", species, "is not available. Please make sure the species name is correct or provide an annotation file for it.\n")
-	  }
+	      cat("Human annotation NCBI Build 37.2 is used.\n")
+	       },
+	       {
+		stop("In-built annotation for ", species, " is not available.\n")
+	       }
+	  ) # end switch
 	}
 	else{
 	  if(is.character(annot)){
