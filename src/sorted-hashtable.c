@@ -3,7 +3,11 @@
 #include<assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef MACOS
 #include <malloc.h>
+#endif
+
 #include<math.h>
 
 #define _gehash_hash(k) ((unsigned int)(k))
@@ -219,10 +223,11 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 	return 0;
 }
 
-#define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
-#define _index_vote_tol(key) (((unsigned int)(key)/16)%GENE_VOTE_TABLE_SIZE)
+#define INDEL_SEGMENT_SIZE 6
 
-#define JUMP_GAP 3
+#define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
+#define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_VOTE_TABLE_SIZE)
+
 
 #define is_quality_subread(scr)	((scr)>15?1:0)
 
@@ -292,37 +297,136 @@ size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset,
 }
 
 
+size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int is_add, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, unsigned int low_border, unsigned int high_border)
+{
+	int error_pos_stack[10];	// max error bases = 10;
+	int C_poses[16];
+	int  availableC=0;
+
+	gehash_key_t mutation_key;
+	int ret = 0,i;
+
+	ret+=gehash_go_q(the_table, key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
+	int error_bases ;
+
+	for(i=0; i<16; i++)
+	{
+		if(((key >> ((15-i)*2) )&3) == 3)	// if it is 'T' at i-th base
+		{
+			 C_poses[availableC++] = i;
+		}
+//		printf("%c", int2base(((key >> ((15-i)*2) )&3)));
+	}
+//	printf("\n");
+
+
+
+	for (error_bases= min(availableC,max_error_bases); error_bases <= min(availableC,max_error_bases); error_bases++)
+	{
+		int j;
+		for(i=0; i<error_bases; i++)
+		{
+			error_pos_stack [i] = i;
+		}
+
+		while (1)
+		{
+
+			char mutation_stack[10];
+			memset(mutation_stack, 0 , error_bases);
+			while(1)
+			{
+				int is_end2 = 1;
+				for (i = error_bases-1; i>=0; i--)
+					if (mutation_stack[i] <1)
+					{
+						int base_to_change=-1;
+						mutation_key = key;
+		
+						for (j = 0; j < error_bases; j++)
+						{
+							base_to_change = C_poses[error_pos_stack[j]];
+							int new_value = mutation_stack[j]?2:3; //(C or T)
+							mutation_key = mutation_key & ~(0x3 << (2*(15-base_to_change)));
+							mutation_key = mutation_key | (new_value << (2*(15-base_to_change)));
+						}
+						for (j = i+1; j<error_bases; j++)
+							mutation_stack[j] = 0;
+						is_end2 = 0;
+/*
+					printf ("K=%u VS M=%08X @J=%d , BC=%d\n --", key, mutation_key, j, base_to_change );
+
+	int xx;
+	for(xx=0; xx<16; xx++)
+	{
+		printf("%c", int2base(((mutation_key >> ((15-xx)*2) )&3)));
+	}
+	printf("\n");
+*/
+
+
+						if(key != mutation_key)
+							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
+						mutation_stack[i] ++;
+						break;
+					}
+				if (is_end2)break;
+			}
+
+
+			int is_end = 1;
+			for (i = error_bases-1; i>=0; i--)
+				if (error_pos_stack[i] < availableC - (error_bases - i))
+				{
+					error_pos_stack[i] ++;
+					for (j = i+1; j<error_bases; j++)
+						error_pos_stack[j] = error_pos_stack[i] + (j-i);
+					is_end = 0;
+					break;
+				}
+
+			if(is_end) break;
+		}
+	}
+	return ret;
+}
+
+
+#define JUMP_GAP 4
+
+
 size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int is_add, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border)
 {
 	struct gehash_bucket * current_bucket;
 	int i, items;
 	gehash_key_t * keyp, *endkp, *endp12;
 	int match_start, match_end;
+	int ii_end = (indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
 
 	current_bucket = _gehash_get_bucket (the_table, key);
 	items = current_bucket -> current_items;
 
+	int citems = items/4;
 
-	if(1)
+	gehash_key_t * last_acceptable = current_bucket -> item_keys;
+
+	keyp = last_acceptable + items/2;
+	endkp = keyp;
+	for(i=0; i<6; i++)
 	{
-		int citems = items/4;
-		keyp = current_bucket -> item_keys + items/2;
-		endkp = keyp;
-		for(i=0; i<5; i++)
+		if(*(keyp) < key)
 		{
-			if(*(keyp+citems) < key)
-				keyp += citems;
-			else if(*(keyp) >= key)
-				keyp -= citems;
-
-			citems = citems/2;
+			last_acceptable = keyp;
+			keyp += citems;
 		}
-	//	if(*(keyp) >= key || keyp < current_bucket -> item_keys || keyp >= current_bucket -> item_keys + items)
-		if(*(keyp) >= key)
-			keyp = current_bucket -> item_keys;
+		else if(*(keyp) >= key)
+			keyp -= citems;
+
+		citems = citems/2;
 	}
-	else
-		keyp = current_bucket -> item_keys;
+
+	if(*(keyp) >= key)
+		keyp = last_acceptable;
 
 	endkp = current_bucket -> item_keys  + items;
 	endp12 = endkp - JUMP_GAP;
@@ -333,21 +437,12 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 	while(*keyp < key && keyp < endkp)
 		keyp ++;
 
-	if(keyp == endkp)return 0;
+	if(keyp == endkp || *keyp>key)return 0;
 
 	match_start = keyp - current_bucket -> item_keys;
 
-	gehash_key_t * tk = keyp;
-
-	while(*keyp == key && keyp < endkp)
-	{
+	while(keyp < endkp && *keyp == key)
 		keyp ++;
-		if(keyp - tk > max_match_number)
-		{
-			//printf("MAX_OUT %u\n", max_match_number );
-			return 0;
-		}
-	}
 
 	match_end = keyp - current_bucket -> item_keys;
 
@@ -378,12 +473,10 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 					test_max += weight;
 					vote->votes[offsetX][i] = test_max;
 					vote->quality[offsetX][i] += quality;
-					#ifdef MAKE_FOR_EXON
 					if (offset_from_5 <  vote->coverage_start [offsetX][i])
 						vote->coverage_start [offsetX][i] = offset_from_5;
 					if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
 						vote->coverage_end [offsetX][i] = offset_from_5+16;
-					#endif
 
 					int new_test_dist = vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i];
 
@@ -403,10 +496,8 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 							vote->max_vote = test_max;
 							vote->max_position = kv;
 							vote->max_quality = vote->quality[offsetX][i];
-							#ifdef MAKE_FOR_EXON
 							vote->max_coverage_start = vote->coverage_start [offsetX][i];
 							vote->max_coverage_end = vote->coverage_end [offsetX][i];
-							#endif
 					}
 					i = 9999999;
 				}
@@ -419,17 +510,13 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 				vote->votes[offsetX][i]=weight;
 				vote->quality[offsetX][i]=quality;
 				vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
-				#ifdef MAKE_FOR_EXON
 				vote->coverage_start [offsetX][i] = offset_from_5;
 				vote->coverage_end [offsetX][i] = offset_from_5+16;
-				#endif
 
 				if(vote->max_vote==0)
 				{
-					#ifdef MAKE_FOR_EXON
 					vote->max_coverage_start = offset_from_5;
 					vote->max_coverage_end = offset_from_5+16;
-					#endif
 					vote->max_mask =  (is_reversed?IS_NEGATIVE_STRAND:0);
 					vote->max_vote = weight;
 					vote->max_position = kv;
@@ -441,30 +528,30 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 		// We duplicated all codes for indel_tolerance >= 1 for the minimal impact to performance.
 		for (keyp = current_bucket -> item_values+match_start; keyp < endkp ; keyp++)
 		{
-			unsigned int kv = (*keyp) - offset;
+			unsigned int kv = (*keyp);
 			int iix;
 
-			if ((*keyp ) < offset)
-				continue;
+			/*if ((*keyp ) < offset)
+				continue;*/
 
 			if (kv < low_border || kv > high_border)
 				continue;
 
-			for(iix = 0; iix<=3; iix++)
-			{
-				int ii;
-				if (iix) ii = iix*2 - 3;
-				else ii = 0;
+			kv -= offset;
 
-				int offsetX = _index_vote_tol(kv+16*ii);
+			for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
+			{
+				int offsetX = _index_vote_tol(kv+iix);
 				int datalen = vote -> items[offsetX];
+				if(!datalen)continue;
+
 				unsigned int * dat = vote -> pos[offsetX];
 
 				for (i=0;i<datalen;i++)
 				{
-					long long int dist0 = kv;
-					dist0 -= dat[i];
-					if (abs(dist0) <= indel_tolerance)
+					int di = dat[i];
+					int dist0 = kv-di;
+					if(abs(dist0) <= indel_tolerance)
 					{
 
 						if (vote -> last_offset[offsetX][i]== offset)
@@ -493,35 +580,35 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 							if (! vote -> indel_recorder[offsetX][i][toli+3])break;
 						}
 	
-						if (dist0!=0 || vote->current_indel_cursor[offsetX][i] !=0)
+
+
+						if (dist0 !=  vote->current_indel_cursor[offsetX][i])
 						{
-							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+							toli +=3;
+							if (toli < indel_tolerance*3)
 							{
-								toli +=3;
-								//printf("NEW (%d, %d) TOLI=%d  DIST=%d  SUBR=%d\n", offsetX , i, toli, dist0, subread_number);
-								if (toli < indel_tolerance*3)
-								{
-									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+								vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+								vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
 									
-									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-								}
-								vote->current_indel_cursor [offsetX][i] = (char)dist0;
+								if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
 							}
+							vote->current_indel_cursor [offsetX][i] = (char)dist0;
 						}
-						//printf("OLD TOLI=%d  DIST=%d  SUBR=%d\n", toli, dist0, subread_number);
 						vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 
 						int go_replace = 0;
 
-						if(test_max > vote->max_vote || (test_max == vote->max_vote && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] > vote->max_coverage_end - vote->max_coverage_start )) ||( (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start)&& vote -> quality[offsetX][i] > vote->max_quality))
-							go_replace = 1;
-						else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start))
+						if(test_max >= vote->max_vote)
 						{
-							//printf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position , kv);
-							vote->max_mask |= IS_BREAKEVEN_READ ;
-							if(vote->max_position >  dat[i])
+							if(test_max > vote->max_vote || (test_max == vote->max_vote && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] > vote->max_coverage_end - vote->max_coverage_start )) ||( (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start)&& vote -> quality[offsetX][i] > vote->max_quality))
 								go_replace = 1;
+							else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start))
+							{
+								//printf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position , kv);
+								vote->max_mask |= IS_BREAKEVEN_READ ;
+								if(vote->max_position >  di)
+									go_replace = 1;
+							}
 						}
 						if(go_replace)
 						{
@@ -534,7 +621,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 							vote->max_vote = test_max;
 							vote->max_quality = vote -> quality[offsetX][i];
 
-							vote->max_position = dat[i];
+							vote->max_position = di;
 							vote->max_mask = vote->masks[offsetX][i];
 							
 						}
@@ -598,10 +685,32 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 	//return match_end-match_start;
 }
 
+void indel_recorder_copy(char *dst, char * src)
+{
+//	memcpy(dst, src, 3*MAX_INDEL_TOLERANCE);  return;
+
+
+	int i=0;
+	while(src[i] && (i<3*MAX_INDEL_TOLERANCE))
+	{
+		dst[i] = src[i];
+		i++;
+		dst[i] = src[i];
+		i++;
+		dst[i] = src[i];
+		i++;
+	}
+	dst[i] = 0;
+
+}
+
 void finalise_vote(gene_vote_t * vote)
 {
 	if(vote->max_tmp_indel_recorder)
-		memcpy(vote->max_indel_recorder, vote->max_tmp_indel_recorder,  sizeof(char)*3 * MAX_INDEL_TOLERANCE);
+	{
+		indel_recorder_copy(vote->max_indel_recorder, vote->max_tmp_indel_recorder);
+	}
+//		memcpy(vote->max_indel_recorder, vote->max_tmp_indel_recorder,  sizeof(char)*3 * MAX_INDEL_TOLERANCE);
 }
 
 int gehash_exist(gehash_t * the_table, gehash_key_t key)

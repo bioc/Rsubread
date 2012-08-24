@@ -12,12 +12,13 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix []);
 // Return 0 if the linear position is in a reasonable range or -1 if it is out of range.
 // The pointer to the name of the chromosome is put into chro_name, and the position in this chromosome is in pos.
 int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, unsigned int * pos);
+int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, unsigned int * pos, int rl);
 
 unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name, unsigned int chro_pos);
 
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
-#define init_gene_vote(a) bzero((a)->items, GENE_VOTE_TABLE_SIZE*2); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;
+#define init_gene_vote(a) memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof(short)); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;
 // return current votes for a given position
 // if create_new_pos == 0 then do not take this position if it does not exist in the vote array
 inline void add_gene_vote(gene_vote_t* vote, int position, int create_new_pos);
@@ -34,7 +35,7 @@ int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels);
 void clear_allvote(gene_allvote_t* allvote);
 
 
-void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage);
+void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short  ,  char** dynamic_programming_char);
 
 unsigned char get_next_char(FILE * fp);
 
@@ -70,19 +71,19 @@ void final_matchingness_scoring(const char read_str[], const char quality_str[],
 
 float match_read(const char read_str[], int read_len, unsigned int potential_position,  gene_value_index_t * my_array_index, int space_type, int indel_tolerance, const char quality_str [], int quality_scale) ;
 
-void show_cigar(char * info, int len, int is_reversed_map, char * buf, int max_indel, int total_subreads, char * read);
+void show_cigar(char * info, int len, int is_reversed_map, char * buf, int max_indel, int total_subreads, char * read, int * pos_offset, int * adjust_rl);
 
-int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigned int begin_position, int max_indel, char * movement_buffer, int expected_offset,int begin_read_offset, int end_read_offset);
+int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigned int begin_position, int max_indel, char * movement_buffer, int expected_offset,int begin_read_offset, int end_read_offset, short **dynamic_programming_short ,  char** dynamic_programming_char );
 
 int window_indel_align(char * read, int read_len, gene_value_index_t * index, unsigned int begin_position, int max_indel, char * movement_buffer, int expected_offset,int begin_read_offset, int end_read_offset);
 
-void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int head_start_point, int tail_end_point, int head_indel_movement, int tail_indel_movement, int find_junctions);
+void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int head_start_point, int tail_end_point, int head_indel_movement, int tail_indel_movement, int find_junctions, short **dynamic_programming_short ,  char** dynamic_programming_char);
 
-void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type,int find_junctions, int is_head_high_quality, char * qual_txt, int phred_version);
+void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type,int find_junctions, int is_head_high_quality, char * qual_txt, int phred_version, short** dynamic_programming_short ,  char **dynamic_programming_char );
 
 int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int match_req_5end, int match_req_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_str, int qual_format);
 
-float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch);
+float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl);
 
 int bad_quality_base_number(char * qualityb, int rl , int format);
 
@@ -90,10 +91,18 @@ int min_matched_bases(char * qualityb, int rl , int format, float match_score);
 
 float read_quality_score(char * qualityb, int rl , int format);
 
-void compress_cigar(char * cigar,  int read_len, char *read);
+void compress_cigar(char * cigar,  int read_len, char *read, int * position_offset, int * adjust_rl);
 
 void print_votes(gene_vote_t * vote, char *index_prefix);
 
 void destory_allvote(gene_allvote_t* allvote);
+
+float get_base_error_prob33(char v);
+float get_base_error_prob64(char v);
+
+
+int get_base_error_prob33i(char v);
+int get_base_error_prob64i(char v);
+
 #endif
 

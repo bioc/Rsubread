@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "input-files.h"
+#include "gene-algorithms.h"
 
 
 void fastq_64_to_33(char * qs)
@@ -82,13 +83,43 @@ long long int guess_gene_bases(char ** files, int file_number)
 	return ret * 70 / 71;
 }
 
+
 int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
+{
+	int ret =0;
+	if(must_upper)
+	{
+		while(1)
+		{
+			char ch = fgetc(fp);
+			if(ch == '\n' || ch == EOF) break;
+			if(ret < max_read_len-1)
+				buff[ret++] = toupper(ch);
+		}
+	}
+	else
+	{
+		while(1)
+		{
+			char ch = fgetc(fp);
+			if (ch == '\n' || ch == EOF) break;
+			buff[ret++] = ch;
+		}
+	
+	}
+	buff[ret]=0;
+	return ret;
+}
+
+
+
+int read_line_back(int max_read_len, FILE * fp, char * buff, int must_upper)
 {
 	int ret =0;
 	int started = 0;
 	if(must_upper)
 	{
-		while(!feof(fp))
+		while(1)
 		{
 			char ch = fgetc(fp);
 			if (ch == '\n')
@@ -96,6 +127,7 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 				if (started)break;
 				else continue;
 			}
+			else if(ch == EOF) break;
 			else
 				started = 1;
 			if(ret <max_read_len && ch != '\r')
@@ -105,7 +137,7 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 	}
 	else
 	{
-		while(!feof(fp))
+		while(1)
 		{
 			char ch = fgetc(fp);
 			if (ch == '\n')
@@ -113,8 +145,10 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 				if (started)break;
 				else continue;
 			}
+			else if(ch == EOF) break;
 			else
 				started = 1;
+			
 			if(ret <max_read_len && ch != '\r')
 				buff[ret++] = ch;
 		}
@@ -353,6 +387,88 @@ unsigned int read_numbers(gene_input_t * input)
 	return ret;
 }
 
+int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_string, char * quality_string, gene_offset_t* offsets, unsigned int *pos, int * quality, int * flags, int need_reversed)
+{
+	char in_buff [3001];
+	int tabs = 0;
+	int current_str_pos = 0;
+	int i;
+	int ret = -1;
+	int linelen = read_line(3000, input->input_fp, in_buff, 0);
+	int in_sam_reverse = 0;
+	int mapping_flags = 0;
+	int mapping_quality = 0;
+	char chro[MAX_CHROMOSOME_NAME_LEN];
+	unsigned int chro_pos = 0;
+
+	if(linelen <1)return -1;
+	if(read_name)
+		*read_name = 0;
+	if(quality_string)
+		*quality_string = 0;
+	*read_string = 0;
+
+	for(i=0; i<linelen+1; i++)
+	{
+		if(in_buff[i]=='\t'|| i ==linelen)
+		{
+			if(tabs == 0 && read_name)read_name[current_str_pos] = 0;
+			if(tabs == 2)
+			{
+				chro[current_str_pos] = 0;
+			}
+			if(tabs == 1)
+			{
+				in_sam_reverse = (mapping_flags & 16 )?1:0;
+				*flags=mapping_flags;
+			}
+			if(tabs == 9){
+				read_string[current_str_pos] = 0;
+				ret = current_str_pos;
+			}
+			if(tabs == 10 && quality_string){
+				quality_string[current_str_pos] = 0;
+				break;
+			}
+
+			current_str_pos = 0;
+			tabs +=1;
+		}
+		else
+		{
+			if(tabs == 9)// read
+				read_string[current_str_pos++] = in_buff[i];
+			else if(tabs == 10 && quality_string)// quality string
+				quality_string[current_str_pos++] = in_buff[i];
+			else if(tabs == 0 && read_name)// name
+				read_name[current_str_pos++] = in_buff[i];
+			else if(tabs == 1)
+				mapping_flags = mapping_flags*10+(in_buff[i]-'0');
+			else if(tabs == 2)
+				chro[current_str_pos++] = in_buff[i];
+			else if(tabs == 3)
+				chro_pos = chro_pos*10+(in_buff[i]-'0');
+			else if(tabs == 4)
+				mapping_quality = mapping_quality*10+(in_buff[i]-'0');
+			else if(tabs == 5)
+				if(in_buff[i]=='S')	mapping_quality = 0;
+		}
+	}
+
+	*quality = mapping_quality;
+	if(offsets)
+		*pos= linear_gene_position(offsets , chro, chro_pos-1);
+		
+
+	if(in_sam_reverse + need_reversed == 1)
+	{
+		if(quality_string)
+			reverse_quality(quality_string, ret);
+		reverse_read(read_string, ret, input->space_type);
+	}
+	return ret;
+
+}
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string)
 {
 	if(input->file_type == GENE_INPUT_PLAIN)
@@ -432,6 +548,18 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		{
 			ret = read_line(1200, input->input_fp, read_string, 0);
 			if(ret <1)return -1;
+
+			int cursor = 2;
+			while(read_string[cursor])
+			{
+				if(read_string[cursor] == ' ' || read_string[cursor] == '\t')
+				{
+					read_string [cursor] = 0;
+					break;	
+				}
+				cursor++;
+			}
+
 			if(read_string[0]=='>'){
 				if (read_name != NULL)
 					strncpy(read_name, read_string+1, 100);
@@ -442,7 +570,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		while(1)
 		{
 			char nch;
-			ret += read_line(1200, input->input_fp, read_string+ret, 1);
+			ret += read_line(1200-ret, input->input_fp, read_string+ret, 1);
 
 			while(1){
 				nch = fgetc(input->input_fp);
@@ -463,57 +591,72 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 	}
 	else if(input->file_type == GENE_INPUT_FASTQ)
 	{
+		char nch;
 		int ret;
-		while(1)
+
+		//READ NAME
+		if (read_name == NULL)
 		{
-			ret = read_line(1200, input->input_fp, read_string, 0);
-			if(ret <1)return -1;
-			if(read_string[0]=='@'){
-				if (read_name != NULL)
-					strncpy(read_name, read_string+1,100);
-				break;
-			}
+			SKIP_LINE;
+			if(nch == EOF) return -1;
 		}
-		ret = 0;
-		while(1)
+		else
 		{
-			char nch;
-			ret += read_line(1200, input->input_fp, read_string+ret, 1);
-
-
-			// test if the next line is the continued line of this read
-			// read one more line, see if it is '+'
 			nch = fgetc(input->input_fp);
-			if (nch<1)
-				break;
-			fseek(input->input_fp, -1, SEEK_CUR);
-			if(!is_gene_char(nch)) 
-				break;
-		}
-		if(1)
-		{
-			int qret = 0;
-			char nch;
-			char fake_q_string [1200];
-			if (!quality_string) quality_string = fake_q_string;
-			// skip the line starting with '+'
-			read_line(1200, input->input_fp, quality_string+qret, 0);
-
-			while(1)
+			if(nch==EOF) return -1;
+			if(nch=='@')
 			{
-				qret += read_line(1200, input->input_fp, quality_string+qret, 0);
-
-				// test if the next line is the continued line of this read
-				nch = fgetc(input->input_fp);
-				if (nch<1)
-					 break;
-				fseek(input->input_fp, -1, SEEK_CUR);
-				if(nch =='@')
-					break;
+				read_line(1200, input->input_fp, read_name, 0);
+				int cursor = 1;
+				while(read_name[cursor])
+				{
+					if(read_name[cursor] == ' ' || read_name[cursor] == '\t')
+					{
+						read_name [cursor] = 0;
+						break;	
+					}
+					cursor++;
+				}
 			}
-		}
+			else
+			{
+				printf("WARNING: unexpected line: %s\nFASTQ file may be damaged.\n", read_string);
+				return -1;
+			}
 
-		if(ret <1)return -1;
+		}
+		// READ LINE 
+		ret = read_line(1200, input->input_fp, read_string, 1);
+
+		// SKIP "+"
+		SKIP_LINE;
+
+		// QUAL LINE 
+		if (quality_string)
+			read_line(1200, input->input_fp, quality_string, 0);
+		else
+			SKIP_LINE;
+
+		#ifdef MODIFIED_READ_LEN
+		{
+			int modified_start = 0;
+			if(modified_start)
+			{
+				int i;
+				for(i=0;i<MODIFIED_READ_LEN; i++)
+				{
+					read_string[i] = read_string[i+modified_start];
+					if(quality_string)
+						quality_string[i] = quality_string[i+modified_start];
+				}
+			}
+			read_string[MODIFIED_READ_LEN]=0;
+			if(quality_string)
+				quality_string[MODIFIED_READ_LEN]=0;
+			ret = MODIFIED_READ_LEN;
+		}
+		#endif
+
 		return ret;
 		
 	}else return -1;
@@ -590,14 +733,14 @@ int genekey2int(char key [],int space_type)
 	if(space_type == GENE_SPACE_BASE)
 		for (i=0; i<16; i++)
 		{
-			ret = ret << 2;
-			ret += base2int (key[i]);
+			//ret = ret << 2;
+			ret |= (base2int(key[i]))<<(2*(15-i));
 		}
 	else
 		for (i=0; i<16; i++)
 		{
 			ret = ret << 2;
-			ret += color2int (key[i]);
+			ret |= color2int (key[i]);
 		}
 	
 	return ret;
@@ -724,20 +867,27 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 
 // This function returns 0 if the block is determined.
 // The block is undeterminable if the chromosome name is not in known_chromosomes, or the position is larger than the known length.
-int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromosome_t *known_chromosomes)
+// Pos is in terms of [1, ... , max_length]
+int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromosome_t *known_chromosomes, unsigned int * max_base_position)
 {
 	int chro_no;
+	unsigned int max_known_chromosome=0;
 
 	for(chro_no=0;known_chromosomes[chro_no].chromosome_name[0]; chro_no++)
 	{
 		if(strcmp(chro , known_chromosomes[chro_no].chromosome_name) == 0)
+		{
+			max_known_chromosome = known_chromosomes[chro_no].known_length;
 			break;
+		}
 	}
 	if(!known_chromosomes[chro_no].chromosome_name[0]) return 1;
 	if(pos >= known_chromosomes[chro_no].known_length) return 1;
 
-	int block_no = pos / BASE_BLOCK_LENGTH;
+	int block_no = (pos-1) / BASE_BLOCK_LENGTH;
 	sprintf(temp_file_suffix , "%s-%04u.bin", chro, block_no);
+	if(max_base_position)*max_base_position=min((block_no+1)*BASE_BLOCK_LENGTH, max_known_chromosome);
+
 	return 0;
 }
 
@@ -746,10 +896,16 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 	FILE * temp_file_pointer = (FILE *) HashTableGet(fp_table, temp_file_name);
 	if(!temp_file_pointer)
 	{
-		temp_file_pointer = fopen(temp_file_name,"w");
+		char *key_name;
+		key_name = (char *)SUBREAD_malloc(300);
+		if(!key_name)
+			return NULL;
+		strcpy(key_name, temp_file_name);
+		//printf("FN=%s\n", key_name);
+		temp_file_pointer = fopen(key_name,"a");
 		assert(temp_file_pointer);
 
-		HashTablePut(fp_table, temp_file_name ,temp_file_pointer);
+		HashTablePut(fp_table, key_name ,temp_file_pointer);
 	}
 
 	return temp_file_pointer;
@@ -762,26 +918,28 @@ void my_fclose(void * fp)
 
 int my_strcmp(const void * s1, const void * s2)
 {
+	//printf("%s   %s 0=%d\n",s1,s2, strcmp((char*)s1, (char*)s2));
 	return strcmp((char*)s1, (char*)s2);
 }
 
-void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed)
+void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand)
 {
+	base_block_temp_read_t datum;
+	datum.read_number = read_number;
+	datum.pos = pos;
+	datum.strand = strand;
+
+	fwrite(&datum, sizeof(datum), 1, temp_fp);
 	if(is_sequence_needed)
 	{
-		assert(0);
-	}
-	else
-	{
-		base_block_temp_read_t datum;
-		datum.read_number = read_number;
-		datum.pos = pos;
-
-		fwrite(&datum, sizeof(datum), 1, temp_fp);
+		unsigned short srl = rl&0xffff;
+		fwrite(&srl, sizeof(short),1, temp_fp);
+		fwrite(sequence , 1, rl,temp_fp );
+		fwrite(quality_string , 1, rl,temp_fp );
 	}
 }
 
-int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed)
+int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail)
 {
 	FILE * fp = fopen(in_SAM_file,"r");
 	int i;
@@ -797,7 +955,7 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 	fp_table = HashTableCreate( OFFSET_TABLE_SIZE / 16 );
 	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
 	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
-
+	HashTableSetHashFunction(fp_table,HashTableStringHashFunction);
 	while(!feof(fp))
 	{
 		char line_buffer [3000];
@@ -806,6 +964,8 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 		if(line_buffer[0]=='@')
 		{
 			int chro_numb=0, field = 0, ci=0, ciw = 0;
+			if(line_buffer[1]!='S' || line_buffer[2]!='Q' || line_buffer[3]!='\t' ) continue;
+
 			while(known_chromosomes[chro_numb].chromosome_name[0]!=0) chro_numb++;
 			known_chromosomes[chro_numb].known_length = 0;
 			for(i=0; i< linelen; i++)
@@ -841,32 +1001,120 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 		{
 			char read_name[MAX_READ_NAME_LEN], chro[MAX_CHROMOSOME_NAME_LEN], cigar[EXON_MAX_CIGAR_LEN], sequence[MAX_READ_LENGTH+1], quality_string[MAX_READ_LENGTH+1];
 			int flags = 0, mapping_quality = 0, rl=0;
+			char is_negative_strand = 0;
 			unsigned int pos = 0;
 			char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
 			char temp_file_name[MAX_CHROMOSOME_NAME_LEN+20+300];
 			FILE * temp_fp;
 
 			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, sequence , quality_string, &rl);
-			printf("R#%d P=%d L=%s\n", read_number, line_parse_result, line_buffer);
-			if(line_parse_result)
+			//printf("R#%d P=%d L=%s\n", read_number, line_parse_result, line_buffer);
+			if(line_parse_result || (flags & SAM_FLAG_UNMAPPED) )
 			{
 				read_number ++;
 				continue;
 			}
+
+			is_negative_strand = (flags & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0;
 
 			// if the read block is not determinable, do nothing.
-			if(get_read_block(chro, pos, temp_file_suffix, known_chromosomes))
+
+			if(is_sequence_needed)
 			{
-				read_number ++;
-				continue;
+				int read_cursor = 0;
+				int is_first_S = 1;
+				unsigned int chromosome_cursor = pos;
+				int j, tmpv=0;
+				char cc;
+
+				for(j=0; cigar[j]; j++)
+				{
+					cc = cigar[j];
+					if(cc>='0' && cc<='9') tmpv= tmpv*10+(cc-'0');
+					else if(cc == 'S'||cc == 'M')
+					{
+						if(cc == 'M') is_first_S = 0;
+
+						if(cc == 'M')
+						{
+							unsigned int insertion_cursor = chromosome_cursor;
+							// DO INSERTION
+							while(insertion_cursor < (chromosome_cursor + tmpv) && read_cursor < (rl - base_ignored_head_tail))
+							{
+								unsigned int max_section_pos, insert_length;
+								int need_write = 1;
+
+								if(get_read_block(chro, insertion_cursor , temp_file_suffix, known_chromosomes, &max_section_pos))break;
+								insert_length = min(max_section_pos + 1, chromosome_cursor + tmpv) - insertion_cursor;
+								if(insert_length<1) break;
+
+								if(base_ignored_head_tail)
+								{
+									if(read_cursor+insert_length < base_ignored_head_tail)
+										need_write = 0;
+									else if(read_cursor < base_ignored_head_tail)
+									{
+										int ignored_length = base_ignored_head_tail - read_cursor;
+										insert_length = read_cursor + insert_length - base_ignored_head_tail;
+										
+										read_cursor = base_ignored_head_tail;
+										insertion_cursor += ignored_length;
+									}
+
+									if(read_cursor >= (rl - base_ignored_head_tail))
+										need_write = 0;
+									else if(read_cursor +insert_length >= (rl - base_ignored_head_tail))
+										insert_length = (rl - base_ignored_head_tail) - read_cursor;
+								}
+
+								if(need_write)
+								{
+									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
+								//printf("%s\n", temp_file_name);
+									temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
+									assert(temp_fp);
+									write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand);
+								}
+								insertion_cursor += insert_length;
+								read_cursor += insert_length;
+							}
+						}
+						else 
+							read_cursor += tmpv;
+
+						if(!is_first_S)
+							chromosome_cursor += tmpv;
+
+						tmpv=0;
+					}
+					else if(cc == 'D' || cc == 'N')
+					{
+						chromosome_cursor += tmpv;
+						tmpv = 0;					
+					}
+					else if(cc == 'I' )
+					{
+						read_cursor += tmpv;
+						tmpv = 0;
+					}
+					else	tmpv = 0;
+
+				}
+				
+			}else
+			{
+				if(get_read_block(chro, pos, temp_file_suffix, known_chromosomes, NULL))
+				{
+					read_number ++;
+					continue;
+				}
+				sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
+	
+				temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
+				assert(temp_fp);
+
+				write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand);
 			}
-
-			sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
-
-			temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
-			assert(temp_fp);
-
-			write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed);
 			read_number ++;
 		}
 	}
@@ -874,5 +1122,123 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 	HashTableDestroy(fp_table);
 	fclose(fp);
 	(*real_read_count) = read_number;
+	return 0;
+}
+
+int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_start)
+{
+	int i,j;
+
+	for(i=0; i< MAX_ANNOTATION_EXONS; i++)
+	{
+		if(!output_genes[i].end_offset) break;
+		if(output_genes[i].end_offset >= offset && output_genes[i].start_offset <= offset)
+		{
+			for(j=0; j< MAX_EXONS_PER_GENE; j++)
+			{
+				if(output_genes[i].exon_ends[j] >= offset && output_genes[i].exon_starts[j] <= offset)
+				{
+					if(output_genes[i].exon_starts[j] == offset && is_start) return 2;	// 2==exactly matched
+					if(output_genes[i].exon_ends[j] == offset && !is_start)	return 2;
+					return 1;	// 1==enclosed
+				}
+			}
+		}
+	}
+	return 0;	//0==exon not found
+}
+
+int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, gene_offset_t* offsets)
+{
+	int line_len, gene_number = 0, exons = 0;
+	char old_gene_name[MAX_GENE_NAME_LEN];
+	FILE * fp = fopen(annotation_file_name, "r");
+
+	if(!fp)
+	{
+		printf("Cannot open the exon annotation file: %s\n", annotation_file_name);
+		return -1;
+	}
+	(*output_genes) = malloc(sizeof(gene_t)*MAX_ANNOTATION_EXONS);
+	if(!*output_genes)
+	{
+		printf("Cannot allocate memory for the exon table. \n");
+		return -1;
+	}
+
+	
+	old_gene_name[0]=0;
+	(*output_genes)[0].end_offset = 0;
+	(*output_genes)[0].start_offset = 0xffffffff;
+	while(gene_number < MAX_ANNOTATION_EXONS)
+	{
+		char buff[200], this_gene_name[MAX_GENE_NAME_LEN], chromosome_name[MAX_CHROMOSOME_NAME_LEN];
+		int i = 0, j=0;
+		unsigned int exon_location;
+
+		line_len = read_line(200, fp, buff, 0);	
+
+		if(line_len>0)	//Not EOF
+		{
+			if(!isdigit(buff[0]))	// it is a title line or something else
+				continue;
+		
+			for(i=0; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+				this_gene_name[i] = buff[i];
+			this_gene_name[i] = 0;
+		}
+		
+		if(line_len<=0 || (exons && old_gene_name[0] && strcmp(this_gene_name , old_gene_name)))	// it is a new gene
+		{
+			strncpy((*output_genes)[gene_number].gene_name , old_gene_name, MAX_GENE_NAME_LEN);
+			(*output_genes)[gene_number].exon_ends[exons] = 0;
+			gene_number++;
+			exons = 0;
+			(*output_genes)[gene_number].end_offset = 0;
+			(*output_genes)[gene_number].start_offset = 0xffffffff;
+		}
+
+		if(line_len<=0) break;
+
+	
+		// copy chromosome name
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+			chromosome_name[j++] = buff[i];
+		chromosome_name[j] = 0;
+
+		// start location
+		exon_location = 0;
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+			if(isdigit(buff[i]))
+				exon_location = exon_location*10 + buff[i] - '0';
+
+		(*output_genes)[gene_number].exon_starts[exons] = linear_gene_position(offsets, chromosome_name , exon_location-1); 
+		if( (*output_genes)[gene_number].exon_starts[exons] == 0xffffffff)
+			continue;
+
+		if((*output_genes)[gene_number].start_offset > (*output_genes)[gene_number].exon_starts[exons])
+			(*output_genes)[gene_number].start_offset = (*output_genes)[gene_number].exon_starts[exons];
+
+		// end location
+		exon_location = 0;
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && buff[i] && i < 200; i++)
+			if(isdigit(buff[i]))
+				exon_location = exon_location*10 + buff[i] - '0';
+
+		(*output_genes)[gene_number].exon_ends[exons] = linear_gene_position(offsets, chromosome_name , exon_location); 
+
+		if((*output_genes)[gene_number].end_offset <  (*output_genes)[gene_number].exon_ends[exons])
+			(*output_genes)[gene_number].end_offset =  (*output_genes)[gene_number].exon_ends[exons];
+
+		exons ++;
+		if(exons >= MAX_EXONS_PER_GENE)
+		{
+			printf("The number of exons excesses the limit. Please increase the value of MAX_EXONS_PER_GENE in subread.h.\n");
+			return -1;
+		}
+
+		strncpy(old_gene_name, this_gene_name , MAX_GENE_NAME_LEN);
+	}
+	fclose(fp);
 	return 0;
 }

@@ -21,6 +21,8 @@ int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned 
 	return 0;
 }
 
+#define gvindex_baseno2offset_m(base_number, index, offset_byte, offset_bit)	{offset_byte =  (base_number - index -> start_base_offset) >>2; offset_bit = base_number % 4 * 2;}
+
 
 void gvindex_baseno2offset(unsigned int base_number, gene_value_index_t * index, unsigned int * offset_byte, unsigned int * offset_bit)
 {
@@ -36,7 +38,7 @@ void gvindex_baseno2offset(unsigned int base_number, gene_value_index_t * index,
 int gvindex_get(gene_value_index_t * index, gehash_data_t offset)
 {
 	unsigned int offset_byte, offset_bit;
-	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
+	gvindex_baseno2offset_m(offset, index , offset_byte, offset_bit);
 
 	if(offset_byte >= index-> values_bytes)return 'N';
 
@@ -49,7 +51,7 @@ int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 {
 	unsigned int offset_byte, offset_bit;
 
-	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
+	gvindex_baseno2offset_m(offset, index , offset_byte, offset_bit);
 	int i, ret = 0;
 
 	for (i=0; i<16; i++)
@@ -188,8 +190,9 @@ int match_chro_wronglen(char * read, gene_value_index_t * index, unsigned int po
 }
 
 #define INDEL_TEST_WINDOW 3
+#define MIN_INDEL_SEARCH_MATCH_SCORE 8500
 
-int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number)
+int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number, int max_test_length)
 {
 	int offset = 0;
 	int i;
@@ -201,11 +204,13 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 		char tt;
 		tt = gvindex_get (index, npos);
 
+		//if(i-min(0,offset) >= max_test_length)break;
+
 		if(read[i-min(0,offset)]==tt)ret++;
 		else if(i + offset < test_len - INDEL_TEST_WINDOW - 3 && i >0)
 		{
 			// if there is a base unmatched, it is potentially an indel from here.
-			float bast_match_score_remailing=-1;
+			int bast_match_score_remailing=-1;
 			int window_match = match_chro(read+i-min(0,offset), index, pos+i+ max(0, offset), INDEL_TEST_WINDOW ,0,GENE_SPACE_BASE);
 
 			if(window_match < INDEL_TEST_WINDOW -1)
@@ -217,22 +222,20 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 					int indel_test = (indel_test_i+1)/2*(indel_test_i%2?1:-1);
 					if(abs(indel_test)>max_indel_number) continue;
 
-					if(indel_test > 0)	// deletion
+					if(indel_test > 0)	//insertion 
 					{
 						int matched_tail = match_chro(read+i, index, pos+i+indel_test, test_len - i,0,GENE_SPACE_BASE);
-						float matched_score = matched_tail * 1. / ( test_len - i);
-						if(matched_score >  bast_match_score_remailing &&  matched_score > 0.8)
+						int matched_score = matched_tail * 10000 / ( test_len - i);
+						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
 							bast_match_score_remailing = matched_score;
 						}
-					}else	// insertion
+					}else	// deletion
 					{
 						int matched_tail = match_chro(read+i - indel_test, index, pos+i, test_len - i + indel_test ,0,GENE_SPACE_BASE);
-						//int matched_tail = match_chro(read+i - indel_test, index, pos+i, test_len - i + offset ,0,GENE_SPACE_BASE);
-						float matched_score = matched_tail * 1. / (test_len - i + indel_test);
-						//float matched_score = matched_tail * 1. / (test_len - i + offset);
-						if(matched_score >  bast_match_score_remailing &&  matched_score > 0.8)
+						int matched_score = matched_tail * 10000 / (test_len - i + indel_test);
+						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
 							bast_match_score_remailing = matched_score;
@@ -265,7 +268,7 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 
 // "pos" here is the expected position of the head of the read , but it is not the final position. If indels are found in the read, the head position must be offset.
 // Only certain is pos+test_len is the EXACT position of the TAIL of the read.
-int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number)
+int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number, int min_test_offset)
 {
 	//return  match_chro(read, index, pos, test_len, 0, 1);
 	//printf("TEST_INDEL_CHRO %s VS %u LEN=%d\n", read, pos, test_len);
@@ -280,7 +283,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 		return 0;
 	}
 
-	for(i=test_len-1 ; i >=max(0,offset); i--)
+	for(i=test_len-1 ; i >=0/*max(0,offset)*/; i--)
 	{
 		unsigned int npos = pos + i - max(0, offset);
 		char tt;
@@ -292,11 +295,12 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 			printf("%c=?=%c OFF=%d\n",read[i+min(0,offset)], tt, offset);
 		#endif
 
+		//if(i+min(0,offset) < min_test_offset) break;
 		if(read[i+min(0,offset)]==tt)ret++;
 		else if(i + offset >INDEL_TEST_WINDOW +3 && i < test_len-1)
 		{
 			// if there is a base unmatched, it is potentially an indel from here.
-			float bast_match_score_remailing=-1;
+			int bast_match_score_remailing=-1;
 			int window_match = match_chro(read+i-min(0,offset)-INDEL_TEST_WINDOW, index, pos+i+ max(0, offset)-INDEL_TEST_WINDOW, INDEL_TEST_WINDOW ,0,GENE_SPACE_BASE);
 
 			if(window_match < INDEL_TEST_WINDOW-1)
@@ -310,14 +314,14 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 					if(indel_test > 0)	//deletion 
 					{
 						int matched_tail = match_chro(read , index, pos-indel_test, i ,0,GENE_SPACE_BASE);
-						float matched_score = matched_tail * 1. / ( i );
+						int matched_score = matched_tail * 10000 / ( i );
 
 						#ifdef TEST_TARGET
 						if(memcmp(read, TEST_TARGET, 15)==0)
 							printf("INDEL_DEL_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score , pos-indel_test );
 						#endif
 
-						if(matched_score >  bast_match_score_remailing &&  matched_score > 0.8)
+						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
 							bast_match_score_remailing = matched_score;
@@ -325,12 +329,12 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 					}else	//insertion 
 					{
 						int matched_tail = match_chro(read, index, pos - indel_test, i ,0,GENE_SPACE_BASE);
-						float matched_score = matched_tail * 1. / (i + indel_test);
+						int matched_score = matched_tail * 10000 / (i + indel_test);
 						#ifdef TEST_TARGET
 						if(memcmp(read, TEST_TARGET, 15)==0)
 							printf("INDEL_INS_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score  , pos + indel_test);
 						#endif
-						if(matched_score >  bast_match_score_remailing &&  matched_score > 0.8)
+						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
 							bast_match_score_remailing = matched_score;
@@ -369,8 +373,8 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 float match_chro_support(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, char * qual_txt, int qual_format)
 {
 	int i;
-	float all_qual = 0.0000;
-	float supported_qual = 0.0000; 
+	int all_qual = 0;
+	int supported_qual = 0; 
 				
 
 	if (is_negative_strand)
@@ -378,7 +382,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 
 		for (i=test_len -1;i>=0;i--)
 		{
-			char tt = gvindex_get (index, pos+test_len-1-i);
+			char tt = gvindex_get(index, pos+test_len-1-i);
 			int is_correct = 0;
 			switch(tt)
 			{
@@ -388,60 +392,84 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 				case 'C': is_correct = read[i] == 'G'; break;
 			}
 
-			float base_p = 0.;
+			int base_p = 0.;
 
 			if(qual_txt[0])
 			{
 				if(FASTQ_PHRED64 == qual_format)
 				{
-					base_p = get_base_error_prob64(qual_txt[i]);
+					base_p = get_base_error_prob64i(qual_txt[i]);
 				}
 				else
 				{
-					base_p = get_base_error_prob33(qual_txt[i]);
+					base_p = get_base_error_prob33i(qual_txt[i]);
 				}
 			}
 
-			if(base_p > 0.3) continue;
+			if(base_p > 300000) continue;
 			base_p=0;
-			all_qual += (1-base_p);
+			all_qual += (1000000-base_p);
 
 			if(is_correct)
-				supported_qual += (1-base_p);
+				supported_qual += (1000000-base_p);
 		}
 	}
 	else
 	{
-		for (i=0;i<test_len;i++)
+		if(qual_txt[0])
 		{
-			char tt = gvindex_get (index, pos +i);
-			int is_correct =read[i] == tt; 
-			float base_p = 0.;
-			if(qual_txt[0])
+			if(FASTQ_PHRED33 == qual_format)
 			{
-				if(FASTQ_PHRED64 == qual_format)
+				for (i=0;i<test_len;i++)
 				{
-					base_p = get_base_error_prob64(qual_txt[i]);
-				}
-				else
-				{
-					base_p = get_base_error_prob33(qual_txt[i]);
+					char tt = gvindex_get (index, pos +i);
+					int is_correct =read[i] == tt; 
+					int base_p = get_base_error_prob33i(qual_txt[i]);
+
+					if(base_p > 300000) continue;
+					base_p=0;
+
+					all_qual += (1000000-base_p);
+	
+					if(is_correct)
+						supported_qual += (1000000-base_p);
 				}
 			}
+			else
+			{
+				for (i=0;i<test_len;i++)
+				{
+					char tt = gvindex_get (index, pos +i);
+					int is_correct =read[i] == tt; 
+					int base_p = get_base_error_prob64i(qual_txt[i]);
 
-			if(base_p > 0.3) continue;
-			base_p=0;
+					if(base_p > 300000) continue;
+					base_p=0;
 
-			all_qual += (1-base_p);
-
-			if(is_correct)
-				supported_qual += (1-base_p);
+					all_qual += (1000000-base_p);
+	
+					if(is_correct)
+						supported_qual += (1000000-base_p);
+				}
+			}
 		}
+		else
+			for (i=0;i<test_len;i++)
+			{
+				char tt = gvindex_get (index, pos +i);
+				int is_correct =read[i] == tt; 
+				
+				all_qual += (1000000);
+
+				if(is_correct)
+					supported_qual += (1000000);
+			}	
 	}
 
 	//printf("%d\n", test_len);
-	if(all_qual < 3.1) return 0;
-	return supported_qual / all_qual * test_len;
+	//if(all_qual < 3100000) return 0;
+	if(all_qual < 3100000) return 0;
+	return supported_qual*1. / all_qual * test_len;
 }
 
 
@@ -497,7 +525,7 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 		{
 			unsigned int offset_byte, offset_bit;
 
-			gvindex_baseno2offset(pos, index , &offset_byte, &offset_bit);
+			gvindex_baseno2offset_m(pos, index , offset_byte, offset_bit);
 
 			if(offset_byte >= index-> values_bytes)return 0;
 			char int_value = index->values [offset_byte];

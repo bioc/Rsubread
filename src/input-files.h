@@ -46,6 +46,7 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 // Return the length of this read or -1 if EOF. 
 // The memory space for read_string must be at least 512 bytes.
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string);
+int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_string, char * quality_string, gene_offset_t* offsets, unsigned int * pos, int * mapping_quality, int * mapping_flags, int need_reversed);
 
 void geinput_jump_read(gene_input_t * input);
 
@@ -88,5 +89,9 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 
 int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
 
-int break_SAM_file(char * in_SAM_file, char * temp_location, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed);
+int break_SAM_file(char * in_SAM_file, char * temp_location, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail);
+
+int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, gene_offset_t* offsets );
+
+int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_start);
 #endif

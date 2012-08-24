@@ -13,16 +13,26 @@
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
 #define SAM_FLAG_UNMAPPED 0x04
 
+#define FUSION_BREAK_POINT	2
+#define FUSION_JUNCTION		1
+#define SPLICING_JUNCTION	0
+
+#define RUN_ALIGN 		0
+#define RUN_FINAL 		1
+
+
+
 #define MAX_PIECE_JUNCTION_READ 7
 #define MAX_READ_LENGTH 1200
 #define MAX_READ_NAME_LEN 48
 #define MAX_CHROMOSOME_NAME_LEN 48
+
 #define EXON_MAX_CIGAR_LEN 48
 #define BASE_BLOCK_LENGTH 15000000
 
 
-#define IS_LONG_OVERLAP 4
-#define IS_SHORT_OVERLAP 8
+#define IS_MIN_POS_NEGATIVE_STRAND 4
+#define IS_MAX_POS_NEGATIVE_STRAND 8
 #define IS_PAIRED_HINTED 16
 #define IS_R1_CLOSE_TO_5 1
 #define IS_REVERSED_HALVES 2
@@ -38,27 +48,47 @@
 #define IS_RECOVERED_JUNCTION_READ_STEP4 (8192*2)
 #define	IS_BREAKEVEN_READ (8192*4)
 #define IS_R1R2_EQUAL_LEN 1024
+
+#ifdef MACOS
+#define pthread_spinlock_t pthread_mutex_t
+#define pthread_spin_lock pthread_mutex_lock
+#define pthread_spin_unlock pthread_mutex_unlock
+#define pthread_spin_init(a, b) pthread_mutex_init(a, NULL)
+#define pthread_spin_destroy(a) pthread_mutex_destroy(a) 
+#define strnlen(a,l) strlen(a)
+#endif
+
+#ifndef NONONO_DONOTDEF
+
 #define QUALITY_KILL	198
 #define QUALITY_KILL_SUBREAD	160
+#define MAX_QUALITY_TO_CALL_JUNCTION 195
+#define MAX_QUALITY_TO_EXPLORER_JUNCTION 209
+
+#else
+
+#define TEST_TARGET ""
+
+#endif
+
+#define SNP_CALLING_ONLY_HIGHQUAL 1
 
 #define MESSAGE_OUT_OF_MEMORY "Out of memory. If you are using Rsubread in R, please save your working environment and restart R. \n"
+#define fatal_memory_size(a) puts(MESSAGE_OUT_OF_MEMORY);
 
 //#define QUALITY_KILL	175
 //#define QUALITY_KILL_SUBREAD	150
 
-//#define TEST_TARGET "TGGTGGAGAGGACTGTGAAGCCGTCGGCAGGTGTGCCCTCGGTTG"
 
 
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
-typedef float gene_quality_score_t;
+//typedef float gene_quality_score_t;
+typedef int gene_quality_score_t;
 typedef char gene_vote_number_t;
 
 
-
-
 #define OFFSET_TABLE_SIZE 50000
-#define GENE_TABLE_SIZE 500000000
 
 #define ANCHORS_NUMBER 259
 
@@ -68,31 +98,59 @@ typedef char gene_vote_number_t;
 #define SEARCH_BACK 0
 #define SEARCH_FRONT 1
 
-#define GENE_VOTE_SPACE 64
-#define GENE_VOTE_TABLE_SIZE 91
+//#define GENE_VOTE_SPACE 64 
 
+#define GENE_VOTE_SPACE 32 
+#define GENE_VOTE_TABLE_SIZE 293
+
+#define MAX_ANNOTATION_EXONS 30000 
+#define MAX_EXONS_PER_GENE 400 
+#define MAX_EXON_CONNECTIONS 10
+
+#define MAX_GENE_NAME_LEN 12
 #define MAX_INDEL_TOLERANCE 16
 
+//#define base2int(c) ((c)=='A'?0:((c)=='T'?3:((c)=='C'?2:1)))
+#define base2int(c) ((c)<'G'?((c)=='A'?0:2):((c)=='G'?1:3))
 
-#define base2int(c) ((c)=='G'?1:((c)=='A'?0:((c)=='C'?2:3)))
+
                      // A  B  C  D  E  F  G
 //#define base2int(c) ("\x0\x0\x2\x0\x0\x0\x1\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3"[(c)-'A'])
 //#define int2base(c) ((c)==1?'G':((c)==0?'A':((c)==2?'C':'T')))
-#define int2base(c) ("AGCT"[(c)]) 
+//#define int2base(c) ("AGCT"[(c)]) 
+#define int2base(c) (1413695297 >> (8*(c))&0xff);
 #define color2int(c) ((c) - '0')
 #define int2color(c) ("0123"[(c)])
 #define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} }
 
-
+/*
 #define get_base_error_prob64(a) ((a) < '@'-1?1:pow(10., -0.1*((a)-'@')))
 #define get_base_error_prob33(a) ((a) < '!'-1?1:pow(10., -0.1*((a)-'!'))) 
 
+*/
 #define SUBREAD_malloc(a) malloc(a)
 
 #define FASTQ_PHRED33 1
 #define FASTQ_PHRED64 0
 
 #define IS_DEBUG 0
+
+
+typedef struct {
+  char gene_name [MAX_GENE_NAME_LEN]; 
+  // The chromosome name is not stored in this data structure
+  // All coordinates are translated into the linear location in the entire referenced genome, usually 0 ~ 3.2G 
+  unsigned int start_offset;
+  unsigned int end_offset;
+
+  // All exons are marked with the linear location in the entire referenced genome, usually 0 ~ 3.2G
+  // This marks the end of the list: exon_ends [total_number_of_exons] = 0
+  // It shouldn't be equal to 0, should it be?
+
+  unsigned int exon_starts [MAX_EXONS_PER_GENE];
+  unsigned int exon_ends [MAX_EXONS_PER_GENE];
+} gene_t;
+
 
 typedef struct{
 	unsigned int start_base_offset;
@@ -208,10 +266,14 @@ typedef struct{
 	unsigned int big_key;
 } paired_exon_key;
 
+typedef struct{
+	unsigned int supporting_reads;
+	char is_fusion;
+	char big_pos_neg;
+	char small_pos_neg;
+} fusion_record;
 
 double miltime();
-
-
 
 typedef struct{
 	char chromosome_name[MAX_CHROMOSOME_NAME_LEN];
@@ -221,6 +283,7 @@ typedef struct{
 typedef struct{
 	unsigned int read_number;
 	unsigned int pos;
+	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
 
 

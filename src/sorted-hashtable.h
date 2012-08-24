@@ -32,6 +32,8 @@ size_t gehash_get(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_r
 int gehash_exist(gehash_t * the_table, gehash_key_t key);
 
 
+size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
+
 size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
 
 size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border);
@@ -59,4 +61,6 @@ int gehash_load(gehash_t * the_table, const char fname []);
 void gehash_prealloc(gehash_t * the_table);
 
 size_t gehash_update(gehash_t * the_table, gehash_key_t key, gehash_data_t data_new);
+
+void indel_recorder_copy(char *dst, char * src);
 #endif

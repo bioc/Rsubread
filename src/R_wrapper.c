@@ -9,8 +9,8 @@ int main_buildindex(int argc,char ** argv);
 int sam2bed(int argc,char *argv[]);
 int propmapped(int argc,char *argv[]);
 int readSummary(int argc,char *argv[]);
-int main_SNPcalling(int argc,char *argv[]);
-int main_removeDuplicatedReads(int argc, char *argv[]);
+int main_snp_calling_test(int argc,char *argv[]);
+int main_repeated_test(int argc, char *argv[]);
 
 void R_buildindex_wrapper(int * nargs, char ** argv)
 {
@@ -175,7 +175,7 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        main_SNPcalling(n,c_argv);
+        main_snp_calling_test(n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);
@@ -200,7 +200,7 @@ void R_removeDupReads_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        main_removeDuplicatedReads(n,c_argv);
+        main_repeated_test(n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);

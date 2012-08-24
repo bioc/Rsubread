@@ -647,10 +647,14 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 
 
+#ifdef MAKE_STANDALONE
+int main(int argc,char ** argv)
+#else
 int main_buildindex(int argc,char ** argv)
+#endif
 {
 	int threshold = 24;
-	int memory_limit = 3700;	// 3700 MBytes
+	int memory_limit = 8000;	// 8000 MBytes
 	char output_file[300], c;
 	output_file[0] = 0;
 
@@ -680,8 +684,8 @@ int main_buildindex(int argc,char ** argv)
 	if (argc == optind || !output_file[0])
 	{
 
-                //printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
-                printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 3700 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
+                //printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 8000 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
+                printf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 8000 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
 
 		return -1 ;
 	}
