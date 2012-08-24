@@ -1,6 +1,6 @@
 propmapped <- function(samfiles)
 {
-    fout <- file.path("/tmp",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
+    fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
     for(i in 1:length(samfiles)){
 	cmd <- paste("propmapped",samfiles[i],fout,sep=",")

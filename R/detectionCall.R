@@ -23,7 +23,7 @@ detectionCall <- function(dataset, species="hg", plot=FALSE)
 			
 	}
 
-	temp_header <- 	"/tmp"
+	temp_header <- 	"."
 
 	temp_header <- paste(temp_header,paste("/.Rsubread_pid",Sys.getpid(),sep=""), sep="")
 	

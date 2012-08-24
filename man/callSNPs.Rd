@@ -1,32 +1,28 @@
 \name{callSNPs}
 \alias{callSNPs}
 \title{Finding Single Nucleotide Polymorphisms (SNPs) from next-gen sequencing data}
-\description{Use read coverage and allele frequency to call SNPs}
+\description{}
 \usage{
-callSNPs(SAMfile,readLength,refGenomeFile,outputFile,minReadCoverage=5,minAlleleFraction=0.5)
+callSNPs(SAMfile,refGenomeFile,outputFile,minBaseQuality=13,minReadCoverage=5,minAlleleFraction=0.5)
 }
 \arguments{
   \item{SAMfile}{ a character string giving the name of a SAM format file.}
-  \item{readLength}{ a numeric value giving the read length.}
-  \item{refGenomeFile}{ a character string giving the name of a FASTA format file which contains reference sequences.}
-  \item{outputFile}{ a character string giving the name of the output file which includes discovered SNPs.}
-  \item{minReadCoverage}{ a numeric value giving the minimal number of reads which cover a chromosomal location, when considering if it contains a SNP or INDEL. 5 by default.}
-  \item{minAlleleFraction}{ a numeric value giving the minimal fraction of reads which supports the called SNP or INDEL, out of all the reads which cover that chromosomal location. 0.5 by default.}
+  \item{refGenomeFile}{ a character string giving the name of the reference sequence file (FASTA format).}
+  \item{outputFile}{ a character string giving the name of the output file including called SNPs (BED format).}
+  \item{minBaseQuality}{ a numeric value giving the base quality cutoff for selecting the bases included in SNP calling. 13 by default(corresponding to base calling p value of 0.05). Bases with quality scores less than 13 will be excluded from reads when using them to discover SNPs.}
+  \item{minReadCoverage}{ a numeric value giving the minimal number of reads required for considering a chromosomal location to include a SNP. 5 by default.}
+  \item{minAlleleFraction}{ a numeric value giving the minimal required fraction of reads supporting a called SNP. 0.5 by default.}
   }
 \details{
-This function takes as input a SAM format file, which includes mapping results for a set of reads, and then calls SNPs using read coverage and allele frequency for each chromosomal location.\\
-
-It requires the chromosome names included in the SAM file to be 'chr1', 'chr2', 'chr3', ..., 'chrX', and 'chrY'.\\ 
-
-To be reported as a SNP-containing loci, a chromosomal location must be covered by at least \code{minReadCoverage} reads and the fraction of reads, which include bases different from the reference base at that location, must be equal to or greater than \code{minAlleleFraction}.
-
+This function takes as input a SAM format file, which includes mapping results for a set of reads, and then calls SNPs by performing Fisher's exact tests.
+Bases of low sequencing quality or low mapping quality were removed so as to use high confidence bases to call SNPs at each chromosomal loci.
 }
 \value{
-A text file including detailed information about called SNPs, such as chromosomal location, reference base, alternative base, read coverage, allele frequency and so on. 
+A BED format file including detailed information about called SNPs, such as chromosomal location, reference base, alternative base, read coverage, allele frequency, p value etc. 
 }
 %\references{
 %}
-\author{Wei Shi and Jenny Zhiyin Dai}
+\author{Yang Liao and Wei Shi}
 %\note{}
 %\seealso{}
 \examples{}

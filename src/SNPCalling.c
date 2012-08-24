@@ -655,27 +655,30 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'p':
-				if(parameters.neighbour_filter_testlen > 0)
-				{
-					printf("You cannot use both neighbour filtering and Fisher's exact test.\n");
-					return -1;
-				}
+				//if(parameters.neighbour_filter_testlen > 0)
+				//{
+				//	printf("You cannot use both neighbour filtering and Fisher's exact test.\n");
+				//	return -1;
+				//}
 
-				k=strlen(optarg);
-				for(t=0;t<k;t++)
-					if(optarg[t]==',')
-					{
-						optarg[t]=0;
-						break;
-					}
+				//k=strlen(optarg);
+				//for(t=0;t<k;t++)
+				//	if(optarg[t]==',')
+				//	{
+				//		optarg[t]=0;
+				//		break;
+				//	}
 
-				if(t==k)
-					printf("Warning: the Fisher's exact test parameter is unparseable. It should be like \"-p 5,0.5\".\n");
-				else
-				{
-					parameters.fisher_exact_testlen = atoi(optarg);
-					parameters.fisher_exact_p_threshold = atof(optarg+t+1);
-				}
+				//if(t==k)
+				//	printf("Warning: the Fisher's exact test parameter is unparseable. It should be like \"-p 5,0.5\".\n");
+				//else
+				//{
+				//	parameters.fisher_exact_testlen = atoi(optarg);
+				//	parameters.fisher_exact_p_threshold = atof(optarg+t+1);
+				//}
+
+				parameters.fisher_exact_testlen = 6;
+				parameters.fisher_exact_p_threshold = atof(optarg);
 				break;
 
 			case 'q':
