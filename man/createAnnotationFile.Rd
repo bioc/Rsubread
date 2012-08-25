@@ -1,4 +1,5 @@
 \name{createAnnotationFile}
+\alias{createAnnotationFile}
 \alias{write.Rsubread}
 \title{
   Create an annotation file from a GRanges object, suitable for featureCounts() 
@@ -14,7 +15,8 @@
   The GRanges object must contain an elementMetadata column named 'id'.
 }
 \usage{
-  createAnnotationFile(GR, fname=NULL)
+createAnnotationFile(GR, fname=NULL)
+write.Rsubread(GR, fname=NULL)
 }
 \arguments{
   \item{GR}{
