@@ -24,4 +24,4 @@ createAnnotationFile <- function(GR, fname=NULL) {
 }
 
 # an alias for backward compatibility:
-# write.Rsubread <- createAnnotationFile
+ write.Rsubread <- createAnnotationFile
