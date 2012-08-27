@@ -18,13 +18,11 @@ This function converts a SAM format file to a BED format file, which can then be
 \value{ 
 A BED format file.
 }
-%\references{
-%}
+%\references{}
 \author{Wei Shi}
 %\note{}
 %\seealso{}
-\examples{
-}
+%\examples{}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}

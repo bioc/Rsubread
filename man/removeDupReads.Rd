@@ -23,7 +23,7 @@ A SAM file which includes the remaining reads after duplicate removal.
 \author{Yang Liao and Wei Shi}
 %\note{}
 %\seealso{}
-\examples{}
+%\examples{}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}

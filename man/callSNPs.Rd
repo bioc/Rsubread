@@ -1,7 +1,7 @@
 \name{callSNPs}
 \alias{callSNPs}
 \title{Finding Single Nucleotide Polymorphisms (SNPs) from next-gen sequencing data}
-\description{}
+\description{Fisher's exact tests are performed to call SNPs.}
 \usage{
 callSNPs(SAMfile,refGenomeFile,outputFile,minBaseQuality=13,minReadCoverage=5,minAlleleFraction=0.5)
 }
@@ -25,7 +25,7 @@ A BED format file including detailed information about called SNPs, such as chro
 \author{Yang Liao and Wei Shi}
 %\note{}
 %\seealso{}
-\examples{}
+%\examples{}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}

@@ -58,7 +58,7 @@ A list with the following components:
 \author{Wei Shi}
 %\note{}
 %\seealso{}
-\examples{}
+%\examples{}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}
