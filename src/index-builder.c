@@ -422,7 +422,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	float local_begin_ftime = miltime();
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 
-	char read_names[1000][48];
+	char read_names[OFFSET_TABLE_SIZE][48];
 	gehash_t occurance_table;
 	unsigned char * huge_index[1024];
 
@@ -500,9 +500,9 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			if (status == NEXT_READ)
 			{
 
-				if(read_no>=999)
+				if(read_no>=OFFSET_TABLE_SIZE-1)
 				{
-					printf("\nThere are too many sections in the chromosome data files (more than 1000 sections).\n");
+					//printf("\nThere are too many sections in the chromosome data files (more than 1000 sections).\n");
 					status = NEXT_FILE;
 					continue;
 				}
