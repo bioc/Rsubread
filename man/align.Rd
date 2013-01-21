@@ -1,7 +1,7 @@
 \name{align}
 \alias{align}
 \title{Align next-gen sequencing reads to reference genome}
-\description{This is a R wrapper function for aligning reads. This function calls the underlying C function}
+\description{This function performs read mapping using the seed-and-vote method. It can be used for mapping both gDNA and RNA sequencing data. It supports indel detection.}
 \usage{
 align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,min_distance=50,max_distance=600,PE_orientation="fr",DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
 }
@@ -49,10 +49,10 @@ The index can be re-used once it has been built.
 If paired-end read data is provided, file \code{readfile1} will assumed to contain the first read from the read pair and \code{readfile2} the second read. 
 }
 \value{ 
-A file of SAM format which includes the mapping results.
+No value is produced but a SAM format file is written to the current working directory.
 }
 \references{
-Yang Liao and Wei Shi, "Subread: a superfast read aligner with high sensitivity and accuracy", In preparation.
+Yang Liao, Gordon K Smyth and Wei Shi, "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote", Manuscript under review.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}

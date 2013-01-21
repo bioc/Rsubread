@@ -1,15 +1,16 @@
 \name{buildindex}
 \alias{buildindex}
 \title{Build index for a reference genome for read mapping}
-\description{This is an R wrapper function for building index for a reference genome. This function calls the underlying C function.}
+\description{This function builds an index for the reference genome using a hash table. Memory usage can be adjusted when loading the index into the computer memory.}
 \usage{
-buildindex(basename,reference,colorspace=FALSE,memory=3700)
+buildindex(basename,reference,colorspace=FALSE,memory=3700,TH_subread=24)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of the file containing all the refernece sequences.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
   \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 3700 MB by default.}
+  \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16 mers). 24 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
   }
 \details{
 A hash table will be built for the reference genome.
