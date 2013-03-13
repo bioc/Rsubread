@@ -1,3 +1,8 @@
+March 14, 2013 - 1.9.3
+(1) Mac support was added.
+(2) Subread version 1.3.1 was used.
+(3) Fix warnings related to C functions.
+
 August 24, 2012 - 1.7.7
 (1) Align and subjunc functions are now updated using the latest Subread package (1.3.0 on sourceforge.net).
 (2) Major updates to SNP calling function and the function for removing duplicated reads.

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+#cp src/Makevars.in src/Makevars
+
+UNAME=`uname`
+
+echo @@@@@ The operation system is supposed to be $UNAME.
+
+if [[ $UNAME == "Linux" ]]
+then
+	# This is a Linux machine! 
+	cp src/Makevars.Linux src/Makevars
+else
+	cp src/Makevars.MacOS src/Makevars
+fi
