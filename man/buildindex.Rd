@@ -1,7 +1,7 @@
 \name{buildindex}
 \alias{buildindex}
 \title{Build index for a reference genome for read mapping}
-\description{This is an R wrapper function for building index for a reference genome. This function calls the underlying C function.}
+\description{This function builds an index for the reference genome using a hash table. Memory usage can be adjusted when loading the index into the computer memory.}
 \usage{
 buildindex(basename,reference,colorspace=FALSE,memory=3700)
 }
