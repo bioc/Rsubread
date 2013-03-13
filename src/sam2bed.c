@@ -5,10 +5,12 @@
 
 int sam2bed(int argc,char *argv[]){
 
+/*
   if(argc == 1){
     printf("Usage: sam2bed -n read_length sam_filename bed_filename\n");
     exit(0);
   }
+*/
 
   FILE *fp, *fp_out;
 
@@ -22,9 +24,13 @@ int sam2bed(int argc,char *argv[]){
   char * chr;
   int i, readlen, chr_start, chr_end;
 
+  int MAX_LINE_LENGTH = 100000;
+  
   readlen = atoi(argv[2]);
+  
+  line = (char*)calloc(MAX_LINE_LENGTH, 1);
 
-  while ((z = getline(&line, &len, fp)) != -1) {
+  while (fgets(line, MAX_LINE_LENGTH, fp)) {
     if(line[0] == '@')
       continue;
 

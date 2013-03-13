@@ -239,13 +239,13 @@ find_list(int32_t gene_id, char *chr_id){
 		p_gene = find_gene(gene_id);
 	}
 	if (p_gene < 0){
-		printf("exceeding max number of genes that can be processed.\n");
+		// printf("exceeding max number of genes that can be processed.\n");
 		return(NULL);
 	}
 	// locate chromosome array index
 	p_chr = find_chr(p_gene, chr_id);
 	if (p_chr < 0) {
-		printf("exceed the maximum number of chromosomes for parallel gene with id:%d\n",gene_id);
+		// printf("exceed the maximum number of chromosomes for parallel gene with id:%d\n",gene_id);
 		return(NULL);
 	}
 	// now, we locate the linked list head.

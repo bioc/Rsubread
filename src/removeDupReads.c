@@ -100,7 +100,7 @@ int report_remainder(char *in_SAM_file, char *out_SAM_file, char* read_selection
 	FILE * out_fp = fopen(out_SAM_file,"w");
 	if(!out_fp)
 	{
-		printf("Unable to open the output file, '%s'.\n",out_SAM_file);
+		SUBREADprintf("Unable to open the output file, '%s'.\n",out_SAM_file);
 		return 1;
 	}
 
@@ -152,7 +152,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	if(known_read_count<1) known_read_count = 400000000;
 	read_selection_list_size = known_read_count / 8 +1;	// One bit for a read, one more byte for remainder.
 	
-	printf("Repeated Read Removal\nInput=%s\nOutput=%s\nTemporary Path=%s\nThreshold=%d\nMaximum Reads=%u\n\n", in_SAM_file, out_SAM_file, temp_location, threshold, known_read_count);
+	SUBREADprintf("Repeated Read Removal\nInput=%s\nOutput=%s\nTemporary Path=%s\nThreshold=%d\nMaximum Reads=%u\n\n", in_SAM_file, out_SAM_file, temp_location, threshold, known_read_count);
 
 
 	// All parameters are validated.
@@ -192,13 +192,13 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	if(report_remainder(in_SAM_file, out_SAM_file, read_selection_list)) return -1;
 	free(read_selection_list);
 	free(known_chromosomes);
-	printf("Finished.\n");
+	SUBREADprintf("Finished.\n");
 	return 0;
 }
 
 void print_usage_rrr(char * myname)
 {
-	printf("Usage: %s -i <input_SAM_file> -o <output_SAM_file> {-r threshold} {-t temp_path} {-c max_read_number}\n\n", myname);
+	SUBREADprintf("Usage: %s -i <input_SAM_file> -o <output_SAM_file> {-r threshold} {-t temp_path} {-c max_read_number}\n\n", myname);
 }
 
 #ifdef MAKE_STANDALONE

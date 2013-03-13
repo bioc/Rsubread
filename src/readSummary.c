@@ -4,11 +4,14 @@
 #include <string.h>
 
 int readSummary(int argc,char *argv[]){
+
+/*
 if(argc == 1){
     printf("This function counts the number of reads falling into each exon region and saves the result to file output_file.\nThe order of exons in the output_file is the same as the exon order in the annotation file.\nThe input file should be in SAM format.\nThe annotation file should have already been sorted by chromosome name.\n\n"); 
     printf("Usage: readSummary annotation_file_sorted input_file output_file isPairedEnd min_distance max_distance\n\n");
     exit(0);
 }
+*/
 
 FILE *fp_ann, *fp_in, *fp_out;
 
@@ -23,6 +26,8 @@ size_t len = 0;
 ssize_t z;
 long i,nexons,read_pos;
 
+int MAX_LINE_LENGTH = 100000;
+  
 int nreads_mapped_to_exon = 0;
 
 long anno_chr_head[500];
@@ -38,18 +43,20 @@ int isPE, minPEDistance, maxPEDistance;
 char * mate_chr;
 int mate_pos, pos_leftmost, fragment_length;
 
+line = (char*)calloc(MAX_LINE_LENGTH, 1);
+
 isPE = atoi(argv[4]);
 minPEDistance = atoi(argv[5]);
 maxPEDistance = atoi(argv[6]);
 
-if(isPE == 1)
-  printf("Minimal and maximal allowable paired-end distances are: \%d and \%d\n", minPEDistance, maxPEDistance); 
+// if(isPE == 1)
+//   printf("Minimal and maximal allowable paired-end distances are: \%d and \%d\n", minPEDistance, maxPEDistance); 
 	
 /* read in annotation data */
 fp_ann = fopen(argv[1],"r");
-getline(&line, &len, fp_ann);
+fgets(line, MAX_LINE_LENGTH, fp_ann);
 nexons = 0;
-while ((z = getline(&line, &len, fp_ann)) != -1)
+while (fgets(line, MAX_LINE_LENGTH, fp_ann))
   nexons++;
 
 geneid = (int *) calloc(nexons,sizeof(int));
@@ -60,10 +67,10 @@ nreads = (int *) calloc(nexons,sizeof(int));
 for(i=0;i<nexons;i++) nreads[i] = 0;
 
 rewind(fp_ann);
-getline(&line, &len, fp_ann);
+fgets(line, MAX_LINE_LENGTH, fp_ann);
 
 for(i=0;i<nexons;i++){
- getline(&line, &len, fp_ann);
+ fgets(line, MAX_LINE_LENGTH, fp_ann);
  geneid[i] = atoi(strtok(line,"\t"));
  chr[i] = malloc(41);
  strcpy(chr[i],strtok(NULL,"\t"));
@@ -82,11 +89,11 @@ nchr = curchr;
 anno_chr_head[curchr] = nexons;
 fclose(fp_ann);
 
-printf("Number of chromosomes included in the annotation is \%d\n",nchr);
+// printf("Number of chromosomes included in the annotation is \%d\n",nchr);
 
 /* get read length */
 fp_in = fopen(argv[2],"r");
-while ((z = getline(&line, &len, fp_in)) != -1){
+while (fgets(line, MAX_LINE_LENGTH, fp_in)){
   if(line[0] == '@')
     continue;
   strtok(line,"\t");
@@ -98,7 +105,7 @@ fclose(fp_in);
 
 /* summarize reading mapping data */
 fp_in = fopen(argv[2],"r");
-while ((z = getline(&line, &len, fp_in)) != -1){
+while (fgets(line, MAX_LINE_LENGTH, fp_in)){
   if(line[0] == '@')
     continue;
   strtok(line,"\t");
@@ -108,7 +115,7 @@ while ((z = getline(&line, &len, fp_in)) != -1){
   //skip the read if it is unmapped (its mate is skipped too if paired-end)
   if(*read_chr == '*')
     if(isPE == 1){
-      getline(&line, &len, fp_in);
+      fgets(line, MAX_LINE_LENGTH, fp_in);
       continue;
     }
     else
@@ -126,7 +133,7 @@ while ((z = getline(&line, &len, fp_in)) != -1){
     fragment_length = abs(atoi(strtok(NULL,"\t"))); //get the fragment length
     if(strcmp(mate_chr,"=") != 0 || fragment_length > (maxPEDistance + read_length -1) || fragment_length < (minPEDistance + read_length - 1)){
       //the two reads are not properly paired and are skipped 
-      getline(&line, &len, fp_in);
+      fgets(line, MAX_LINE_LENGTH, fp_in);
       continue;
     }
   }//end if(isPE==1)
@@ -167,14 +174,17 @@ while ((z = getline(&line, &len, fp_in)) != -1){
 
   //if paired end data are used, the current read pair is found properly paired and there is no need to process the second read in the pair 
   if(isPE == 1)
-    getline(&line, &len, fp_in); 
+    fgets(line, MAX_LINE_LENGTH, fp_in); 
 
 } //end while 
 
+
+/*
 if(isPE == 1)
   printf("Number of fragments mapped to features is: %d\n\n", nreads_mapped_to_exon);
 else
   printf("Number of reads mapped to features is: %d\n\n", nreads_mapped_to_exon);
+*/
 
 /* save the results */
 fp_out = fopen(argv[3],"w");

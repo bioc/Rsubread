@@ -168,7 +168,7 @@ calculateExonGCContent(void){
 		strcpy(filename, fa_header);
 		strcat(filename, exon[i].id);
 		strcat(filename,".fa");
-		printf("Exon GC content: the fa file is: %s\n", filename);
+		// printf("Exon GC content: the fa file is: %s\n", filename);
 
 
 		fseq = fopen(filename, "r");
@@ -256,7 +256,7 @@ calculateIRGCContent(void){
 		strcpy(filename, fa_header);
 		strcat(filename, ir[i].id);
 		strcat(filename,".fa");
-		printf("IR GC content: the fa file is: %s\n", filename);
+		// printf("IR GC content: the fa file is: %s\n", filename);
 
 		fseq = fopen(filename, "r");
 		fgets(line, sizeof(line), fseq);
@@ -331,7 +331,7 @@ void
 DetectionCallAnnotationBody(void){
 
 	breakIntegenicRegion();
-	printf("finsihed break into binss\n");
+	// printf("finsihed break into binss\n");
 	
 	build_ir_data_structure();
 	//printf("The chr number after building ir structure is : %d\n", chr_num);
@@ -366,7 +366,7 @@ detectionCallAnnotation(char **exonfile, char **irfile, char **species, int *use
 		strcpy(fa_header, "mouse_sequence_data/");
 	} 
 	binsize = *user_binsize;
-	printf("going to main body of function\n");
+	// printf("going to main body of function\n");
 	DetectionCallAnnotationBody();
 
 	/*  printf("\nUSAGE: DetectionCallAnnotation(exonFilename, integenicRegionFilename, binsizse)\n\n");

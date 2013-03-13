@@ -1,3 +1,4 @@
+#include "subread.h"
 #include <ctype.h>
 #include <math.h>
 #include <errno.h>
@@ -6,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "subread.h"
 #include "gene-algorithms.h"
 #include "SNPCalling.h"
 #include "input-files.h"
@@ -46,7 +46,6 @@ double factorial_float_real(int a)
 double factorial_float(int a)
 {
 
-	//	printf("WARNING: VERY LARGE A VALUE : %d\n",a);
 	if(a<PRECALCULATE_FACTORIAL && (precalculated_factorial[a]!=0.))
 		return precalculated_factorial[a]; 
 	else
@@ -81,18 +80,6 @@ double fisherSub(int a, int b, int c, int d)
 
 float fisher_exact_test(int a, int b, int c, int d)
 {
-	/*
-	if(a>1000 || b>1000||c>1000||d>1000)
-	{
-		printf("BIG FRAC: %d %d %d %d\n",a,b,c,d);
-		int max_v = max(a, max(b,max(c,d)));
-		if(max_v > 2000000) return 1.0;
-		a=a*1000/max_v;
-		b=b*1000/max_v;
-		c=c*1000/max_v;
-		d=d*1000/max_v;
-	}*/
-	//printf("A=%d  B=%d  C=%d  D=%d", a,b,c,d);
 
 	if(a*1./c < b*1./d)	return 1.1;
 		// the abnormal level at this base should be at least as the noise level.
@@ -159,19 +146,21 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		char qual[MAX_READ_LENGTH];
 		char base_neighbour_test[MAX_READ_LENGTH];
 		char base_used[MAX_READ_LENGTH];
+		int rret;
 
-		fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
-		fread(&read_len, sizeof(short), 1, tmp_fp);
-		fread(read, sizeof(char), read_len, tmp_fp);
-		fread(qual, sizeof(char), read_len, tmp_fp);
+		rret=fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
+		rret=fread(&read_len, sizeof(short), 1, tmp_fp);
+		rret=fread(read, sizeof(char), read_len, tmp_fp);
+		rret=fread(qual, sizeof(char), read_len, tmp_fp);
+
+		if(rret<1)SUBREADprintf("Warning: reads are not loaded.\n");
 
 		first_base_pos = read_rec.pos - block_no * BASE_BLOCK_LENGTH;
-		//printf("v=%u ; offset=%u ; read=%u ; rl=%d ; feof=%d\n", first_base_pos, offset, read_rec.pos, read_len, feof(tmp_fp));
 
 
 		if(first_base_pos + read_len -1> reference_len || first_base_pos<1)
 		{
-			printf("WARNING: read length %u+%d out of boundary: %u at the %d-th block.\n", first_base_pos, read_len, reference_len, block_no);
+			SUBREADprintf("WARNING: read length %u+%d out of boundary: %u at the %d-th block.\n", first_base_pos, read_len, reference_len, block_no);
 			continue;
 		}
 
@@ -209,7 +198,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 			if(i+first_base_pos > reference_len  || i+first_base_pos<1)
 			{
-				printf("Warning: read out of boundary: %u >= %u\n", i+first_base_pos, reference_len);
+				SUBREADprintf("Warning: read out of boundary: %u >= %u\n", i+first_base_pos, reference_len);
 				break;
 			}
 
@@ -247,7 +236,6 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 	char * base_is_reliable = NULL;
 
-	//printf("fisher_exact_testlen = %d ;  reference_len = %u\n", parameters -> fisher_exact_testlen, reference_len);
 
 	if(parameters -> fisher_exact_testlen || parameters -> test_two_strands)
 	{
@@ -298,11 +286,9 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		 **/
 
 
-		//printf("XX1 ; %d\n" , reference_len);
 		for(i= - parameters -> fisher_exact_testlen;i<reference_len_long; i++)
 		{
 			a=0; c=0;
-			//printf("XX2 %d\n", i);
 			for(j=0;j<4;j++)
 			{
 				if(i+parameters -> fisher_exact_testlen < reference_len_long)
@@ -336,8 +322,6 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 				else
 					snp_fisher_raws [i] = p_middle;
 				fisher_test_size ++;
-			//	if (i > 1000000 && i < 1000020)
-			//		printf("ABCD= %d %d %d %d : %.9f\n", a, b-a, c, d-c , p_middle);
 			
 			}
 
@@ -437,11 +421,12 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 		}
 	}
 
-	printf("Processing chromosome %s in FASTA file; expected length is %u.\n", chro_name, chro_len);
-	fflush(stdout);
+	SUBREADprintf("Processing chromosome %s in FASTA file; expected length is %u.\n", chro_name, chro_len);
+	
+	SUBREADfflush(stdout);
 	if(!chro_len)
 	{
-		printf("Unknown chromosome name in FASTA file: %s\n", chro_name);
+		SUBREADprintf("Unknown chromosome name in FASTA file: %s\n", chro_name);
 		free(referenced_base);
 		return 1;
 	}
@@ -460,11 +445,10 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 			nc = toupper(nc);
 			referenced_base[offset++] = (nc=='A' || nc == 'G' || nc == 'C')?nc:'T';
 			all_offset ++;
-		//	if(all_offset >= chro_len)printf("CC %s  AO %u  OO %u  CL %u\n", chro_name, all_offset, offset, chro_len);
 		}
 
 		if((nc == '>'||nc == EOF) && all_offset < chro_len)
-			printf("WARNING: Chromosome is shorter than expected: %s\n", chro_name);
+			SUBREADprintf("WARNING: Chromosome is shorter than expected: %s\n", chro_name);
 
 		if(offset == BASE_BLOCK_LENGTH || nc == EOF || nc == '>')
 		{
@@ -494,7 +478,7 @@ int parse_read_lists(char * in_FASTA_file, FILE * out_fp, char * temp_prefix, ch
 
 	if(!fp)
 	{
-		printf("Referenced Genome not found or inaccessible: '%s'.\n", in_FASTA_file);
+		SUBREADprintf("Referenced Genome not found or inaccessible: '%s'.\n", in_FASTA_file);
 		return -1;
 	}
 	
@@ -525,7 +509,7 @@ int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, ch
 	FILE * out_fp = fopen(out_BED_file,"w");
 	int ret;
 	if(!out_fp){
-		printf("Cannot open the output file: '%s'\n", out_BED_file);
+		SUBREADprintf("Cannot open the output file: '%s'\n", out_BED_file);
 	}
 	fputs("chr\tpos\tref\talt\tfreq\tdepth\n", out_fp);
 	ret =  parse_read_lists(in_FASTA_file, out_fp, temp_prefix, chromosomes, parameters , all_threads, 0);
@@ -561,8 +545,8 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	known_chromosomes[0].chromosome_name[0]=0;
 
-	printf("Spliting SAM file\n");
-	fflush(stdout);
+	SUBREADprintf("Spliting SAM file\n");
+	SUBREADfflush(stdout);
 	//Step 1:The SAM file is scanned to create a number of temp files "temp-snps-chrX-21-00000000-XXXXXX" and the related read positions/sequences are written into them (in 2-bit base coding). A read can contribute to two blocks if it crosses the border of the blocks. If there are indels in a read, each continuously mapped section is individually written into the temporary file. The quality scores are written companying the bases. The hierarchy of the data is: block -> read -> sections {bases, phred scores, CIGAR string, reported mapping quality}
 	memcpy(rand48_seed, &start_time, 6);
 	seed48(rand48_seed);
@@ -591,7 +575,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 	free(known_chromosomes);
 
 	free(precalculated_factorial);
-	printf("Finished.\n");
+	SUBREADprintf("Finished.\n");
 
 	return 0;
 }
@@ -599,7 +583,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 void print_usage_snp(char * myname)
 {
-	printf("Usage: %s -i <input_SAM_file> -g <single_genome_FASTA_file> -o <output_BED_file> {-r threshold (float)} {-t temp_path} {-c max_read_number} {-n read_threshold_min} {-m read_threshold_max} {-q min_phred_score} {-N neighbour_test_len,matching_rate} {-S} {-p Len,Pvalue for Fisher's Exact Test} {-I number of first/last bases ignored from each read}\n\t-q\t ignoring low-quality bases in reads\n\t-N\t using neighbour filtering to remove wrongly mapped read segments\n", myname);
+	SUBREADprintf("Usage: %s -i <input_SAM_file> -g <single_genome_FASTA_file> -o <output_BED_file> {-r threshold (float)} {-t temp_path} {-c max_read_number} {-n read_threshold_min} {-m read_threshold_max} {-q min_phred_score} {-N neighbour_test_len,matching_rate} {-S} {-p Len,Pvalue for Fisher's Exact Test} {-I number of first/last bases ignored from each read}\n\t-q\t ignoring low-quality bases in reads\n\t-N\t using neighbour filtering to remove wrongly mapped read segments\n", myname);
 }
 
 
@@ -655,32 +639,33 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'p':
-				//if(parameters.neighbour_filter_testlen > 0)
-				//{
-				//	printf("You cannot use both neighbour filtering and Fisher's exact test.\n");
-				//	return -1;
-				//}
+				break;
+		/*
+			case 'p':
+				if(parameters.neighbour_filter_testlen > 0)
+				{
+					SUBREADprintf("You cannot use both neighbour filtering and Fisher's exact test.\n");
+					return -1;
+				}
 
-				//k=strlen(optarg);
-				//for(t=0;t<k;t++)
-				//	if(optarg[t]==',')
-				//	{
-				//		optarg[t]=0;
-				//		break;
-				//	}
+				k=strlen(optarg);
+				for(t=0;t<k;t++)
+					if(optarg[t]==',')
+					{
+						optarg[t]=0;
+						break;
+					}
 
-				//if(t==k)
-				//	printf("Warning: the Fisher's exact test parameter is unparseable. It should be like \"-p 5,0.5\".\n");
-				//else
-				//{
-				//	parameters.fisher_exact_testlen = atoi(optarg);
-				//	parameters.fisher_exact_p_threshold = atof(optarg+t+1);
-				//}
-
-				parameters.fisher_exact_testlen = 6;
-				parameters.fisher_exact_p_threshold = atof(optarg);
+				if(t==k)
+					SUBREADprintf("Warning: the Fisher's exact test parameter is unparseable. It should be like \"-p 5,0.5\".\n");
+				else
+				{
+					parameters.fisher_exact_testlen = atoi(optarg);
+					parameters.fisher_exact_p_threshold = atof(optarg+t+1);
+				}
 				break;
 
+		*/
 			case 'q':
 				parameters.min_phred_score = atoi(optarg);
 				break;
@@ -689,7 +674,7 @@ int main_snp_calling_test(int argc,char ** argv)
 
 				if(parameters.fisher_exact_p_threshold >= -0.00001)
 				{
-					printf("You cannot use both neighbour filtering and Fisher's exact test.\n");
+					SUBREADprintf("You cannot use both neighbour filtering and Fisher's exact test.\n");
 					return -1;
 				}
 	
@@ -702,7 +687,7 @@ int main_snp_calling_test(int argc,char ** argv)
 						break;
 					}
 				if(t==k)
-					printf("Warning: the neighbour filtering parameter is unparseable. It should be like \"-N 5,0.5\".\n");
+					SUBREADprintf("Warning: the neighbour filtering parameter is unparseable. It should be like \"-N 5,0.5\".\n");
 				else
 				{
 					parameters.neighbour_filter_testlen = atoi(optarg);
@@ -752,7 +737,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		}
 	}
 
-	printf("Parameters: \nneighbour_filter_testlen = %d\nneighbour_filter_rate = %.4f\nmin_supporting_read_number = %d\nsupporting_read_rate = %.4f\nmin_phred_score = %d\nFisher's exact test len = %d\nFisher's exact test maximum p-valie = %.5f\n\n", parameters.neighbour_filter_testlen , parameters.neighbour_filter_rate, parameters.min_supporting_read_number, parameters.supporting_read_rate, parameters.min_phred_score, parameters.fisher_exact_testlen , parameters.fisher_exact_p_threshold);
+	SUBREADprintf("Parameters: \nneighbour_filter_testlen = %d\nneighbour_filter_rate = %.4f\nmin_supporting_read_number = %d\nsupporting_read_rate = %.4f\nmin_phred_score = %d\nFisher's exact test len = %d\nFisher's exact test maximum p-valie = %.5f\n\n", parameters.neighbour_filter_testlen , parameters.neighbour_filter_rate, parameters.min_supporting_read_number, parameters.supporting_read_rate, parameters.min_phred_score, parameters.fisher_exact_testlen , parameters.fisher_exact_p_threshold);
 	
 	return SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
 	

@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifndef MAKE_STANDALONE
+#include <R.h>
+#endif
+
+
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -58,6 +63,20 @@
 #define strnlen(a,l) strlen(a)
 #endif
 
+#ifdef MAKE_STANDALONE 
+#define SUBREADprintf printf
+#define SUBREADputs puts
+#define SUBREADputchar putchar
+#define SUBREADfflush(x) fflush(x)
+#define fatal_memory_size(a) puts(MESSAGE_OUT_OF_MEMORY);
+#else
+#define SUBREADprintf Rprintf
+#define SUBREADputs(x) Rprintf("%s\n",(x))
+#define SUBREADputchar(X) Rprintf("%c",(X)) 
+#define SUBREADfflush(X) 
+#define fatal_memory_size(a) Rprintf("%s\n",MESSAGE_OUT_OF_MEMORY);
+#endif
+
 #ifndef NONONO_DONOTDEF
 
 #define QUALITY_KILL	198
@@ -74,7 +93,6 @@
 #define SNP_CALLING_ONLY_HIGHQUAL 1
 
 #define MESSAGE_OUT_OF_MEMORY "Out of memory. If you are using Rsubread in R, please save your working environment and restart R. \n"
-#define fatal_memory_size(a) puts(MESSAGE_OUT_OF_MEMORY);
 
 //#define QUALITY_KILL	175
 //#define QUALITY_KILL_SUBREAD	150
@@ -188,6 +206,7 @@ typedef struct {
         unsigned short items[GENE_VOTE_TABLE_SIZE];
         unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+
         gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
@@ -219,9 +238,14 @@ typedef struct{
 	gene_vote_number_t * max_votes;
 	gene_quality_score_t * max_quality;
 	gene_quality_score_t * max_final_quality;
+	unsigned char * big_margin_votes_shared;
+
 	short * masks;
 	char * max_indel_recorder;
 	char * span_coverage;
+
+	unsigned short * edit_distance;
+
 #ifdef REPORT_ALL_THE_BEST
 	gene_best_record_t * best_records;
 #endif

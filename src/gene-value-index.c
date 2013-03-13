@@ -14,7 +14,7 @@ int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned 
 	index->values = malloc(base_number / 4 + 1);
 	if(!index->values)
 	{
-		puts(MESSAGE_OUT_OF_MEMORY);
+		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 		return 1;
 	}
 	index -> start_base_offset = index -> start_point - index -> start_point%4;
@@ -119,11 +119,9 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	FILE * fp = fopen(filename, "rb");
 	int read_length;
 	read_length = fread(&index->start_point,4,1, fp);
-	assert(read_length>0);
 	read_length = fread(&index->length,4,1, fp);
-	assert(read_length>0);
 
-	//printf ("\nBINDEX %s : %u ~ +%u\n",filename, index->start_point, index->length );
+	//SUBREADprintf ("\nBINDEX %s : %u ~ +%u\n",filename, index->start_point, index->length );
 
 	unsigned int useful_bytes, useful_bits;
 	index -> start_base_offset = index -> start_point - index -> start_point%4;
@@ -132,13 +130,13 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	index -> values_bytes = useful_bytes;
 	if(!index->values)
 	{
-		puts(MESSAGE_OUT_OF_MEMORY);
+		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 		return 1;
 	}
 	
 
 	read_length =fread(index->values, 1, useful_bytes, fp);
-	assert(read_length>0);
+	if(read_length<=0)SUBREADprintf("Unable to load index\n");
 
 	fclose(fp);
 	return 0;
@@ -172,7 +170,7 @@ int match_chro_wronglen(char * read, gene_value_index_t * index, unsigned int po
 			newv =read[i] == tt; 
 
 		//if(left_wrong_bases)
-		//	printf("I=%d, *LWB=%d, LWE=%d\n", i, *left_wrong_bases, left_wrong_end);
+		//	SUBREADprintf("I=%d, *LWB=%d, LWE=%d\n", i, *left_wrong_bases, left_wrong_end);
 
 		if(left_match_bases && (newv) && (!left_correct_end ))
 			(*left_match_bases)++;
@@ -271,7 +269,7 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number, int min_test_offset)
 {
 	//return  match_chro(read, index, pos, test_len, 0, 1);
-	//printf("TEST_INDEL_CHRO %s VS %u LEN=%d\n", read, pos, test_len);
+	//SUBREADprintf("TEST_INDEL_CHRO %s VS %u LEN=%d\n", read, pos, test_len);
 	int offset = 0;
 	int i;
 	int ret = 0;
@@ -292,7 +290,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 
 		#ifdef TEST_TARGET
 		if(memcmp(read, TEST_TARGET, 15)==0)
-			printf("%c=?=%c OFF=%d\n",read[i+min(0,offset)], tt, offset);
+			SUBREADprintf("%c=?=%c OFF=%d\n",read[i+min(0,offset)], tt, offset);
 		#endif
 
 		//if(i+min(0,offset) < min_test_offset) break;
@@ -318,7 +316,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 
 						#ifdef TEST_TARGET
 						if(memcmp(read, TEST_TARGET, 15)==0)
-							printf("INDEL_DEL_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score , pos-indel_test );
+							SUBREADprintf("INDEL_DEL_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score , pos-indel_test );
 						#endif
 
 						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
@@ -332,7 +330,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 						int matched_score = matched_tail * 10000 / (i + indel_test);
 						#ifdef TEST_TARGET
 						if(memcmp(read, TEST_TARGET, 15)==0)
-							printf("INDEL_INS_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score  , pos + indel_test);
+							SUBREADprintf("INDEL_INS_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score  , pos + indel_test);
 						#endif
 						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
@@ -346,7 +344,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 			{
 				#ifdef TEST_TARGET
 				if(memcmp(read, TEST_TARGET, 15)==0)
-					printf("PIECE_LEN=%d ; INDEL AT %d ; INDEL=%d\n", test_len , i + min(0, offset) , offset);
+					SUBREADprintf("PIECE_LEN=%d ; INDEL AT %d ; INDEL=%d\n", test_len , i + min(0, offset) , offset);
 				#endif
 				if(offset > 0)//insertion
 				{
@@ -363,7 +361,7 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 		}
 	}
 	//if(memcmp(read, "AACCCCTTGCAGAAAA", 15)==0)
-	//	printf("\nINDEL_SPOT %d\n", offset);
+	//	SUBREADprintf("\nINDEL_SPOT %d\n", offset);
 	*indels = offset;
 	return ret;
 }
@@ -466,7 +464,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 			}	
 	}
 
-	//printf("%d\n", test_len);
+	//SUBREADprintf("%d\n", test_len);
 	//if(all_qual < 3100000) return 0;
 	if(all_qual < 3100000) return 0;
 	return supported_qual*1. / all_qual * test_len;
@@ -613,7 +611,7 @@ unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned 
 
 	gvindex_baseno2offset(pos, index , &offset_byte, &offset_bit);
 
-	//printf("POS=%u, OFFBYTE=%d\n" , pos, offset_byte);
+	//SUBREADprintf("POS=%u, OFFBYTE=%d\n" , pos, offset_byte);
 
 	
 	search_dist = search_length /4;
@@ -643,7 +641,7 @@ unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned 
 				int retv = match_chro_maxerror(read, index, hit_pos, read_len, 0, 0, 0);
 				if(retv >0)
 				{
-					//printf("POS=%u, TOFF=%u, STARTBASE=%d, j=%d , RETV=%d\n" , test_offset*4 + index -> start_base_offset - j , test_offset , index -> start_base_offset , j , retv);
+					//SUBREADprintf("POS=%u, TOFF=%u, STARTBASE=%d, j=%d , RETV=%d\n" , test_offset*4 + index -> start_base_offset - j , test_offset , index -> start_base_offset , j , retv);
 					return hit_pos; 
 				}
 			}
@@ -700,7 +698,7 @@ int match_chro_maxerror(char * read, gene_value_index_t * index, unsigned int po
 			}
 			else
 				ret +=read[i] != tt; 
-			//printf("RET=%d\n",ret);
+			//SUBREADprintf("RET=%d\n",ret);
 			if(ret>max_error)return 0;
 		}
 	}
@@ -720,7 +718,7 @@ int gvindex_match_base(gene_value_index_t * index, gehash_data_t offset, const c
 
 	if(offset_byte >= index->values_bytes)
 		return 0;
-//		printf("\nERROR: %u > %u\n", offset_byte, index->values_bytes);
+//		SUBREADprintf("\nERROR: %u > %u\n", offset_byte, index->values_bytes);
 
 	char reference_base = ((index->values [offset_byte] & mask) >> offset_bit);
 

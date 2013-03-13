@@ -52,16 +52,18 @@ void retrieve_sequence(char ** input, char ** output_seq){
   int offset;
   int line_num = 0;
   int data_ready=1;
+
+  int MAX_LINE_LENGTH = 100000;
   
   FILE *fin,*fout;
   fin = fopen(*input,"r");
   fout = fopen(*output_seq,"w");
 
-
-	while ((z = getline(&line, &len, fin)) != -1){
+    line = (char*)calloc(MAX_LINE_LENGTH, 1);
+	while (fgets(line, MAX_LINE_LENGTH, fin)){
 		line_num++;
 		if(line[0] == '@'){
-			z = getline(&line, &len, fin);
+			fgets(line, MAX_LINE_LENGTH, fin);
 			line_num++;
 			i=0;
 			while ((toascii(*(line+i))!=10) && (toascii(*(line+i))!=32)){
@@ -93,6 +95,10 @@ void atgcContent(char ** input, char ** output, int *basewise){
   double freq[5];
   double total_freq[5];
   
+  int MAX_LINE_LENGTH = 100000;
+
+  line = (char*)calloc(MAX_LINE_LENGTH, 1);
+  
   initialise();
  
   //corresponding index:
@@ -101,7 +107,7 @@ void atgcContent(char ** input, char ** output, int *basewise){
   fout = fopen(*output, "w");
   
   fprintf(fout,"A,T,G,C,N\n");
-  while ((z = getline(&line, &len, fin)) != -1){
+  while (fgets(line, MAX_LINE_LENGTH, fin)){
     line_num++;
 	i=0;
 	while  ((toascii(*(line+i)) != 10) && (toascii(*(line+i)) != 32)){

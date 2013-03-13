@@ -47,7 +47,6 @@ double guess_reads_density(char * fname, int is_sam)
 	fpos2 = ftello(ginp.input_fp) - fpos;
 	geinput_close(&ginp);
 
-	//printf("T0=%llu T1=%llu DENS=%.5f\n", fpos, fpos2+ fpos, fpos2*1.0/i);
 	return fpos2*1.0/i;
 }
 
@@ -278,7 +277,7 @@ int geinput_next_char(gene_input_t * input)
 			char nch = fgetc(input->input_fp);
 			if (nch <0 && feof(input->input_fp))
 				return -2;
-			else if (nch < 0 || nch > 126)printf("\nUnrecognised char = #%d\n", nch);
+			else if (nch < 0 || nch > 126)SUBREADprintf("\nUnrecognised char = #%d\n", nch);
 
 			if (nch == '\r' || nch == '\n')
 			{
@@ -300,7 +299,7 @@ int geinput_next_char(gene_input_t * input)
 				return toupper(nch);
 			else
 			{
-				printf ("\nUnknown character in the chromosome data: %d, ignored!\n", nch);
+				SUBREADprintf ("\nUnknown character in the chromosome data: %d, ignored!\n", nch);
 				return 'N';
 			}		
 			last_br = 0;
@@ -308,7 +307,7 @@ int geinput_next_char(gene_input_t * input)
 	}
 	else
 	{
-		printf("Only the FASTA format is accepted for input chromosome data.\n");
+		SUBREADprintf("Only the FASTA format is accepted for input chromosome data.\n");
 		return -3;
 	}
 
@@ -620,7 +619,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 			}
 			else
 			{
-				printf("WARNING: unexpected line: %s\nFASTQ file may be damaged.\n", read_string);
+				SUBREADprintf("WARNING: unexpected line: %s\nFASTQ file may be damaged.\n", read_string);
 				return -1;
 			}
 
@@ -901,7 +900,6 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 		if(!key_name)
 			return NULL;
 		strcpy(key_name, temp_file_name);
-		//printf("FN=%s\n", key_name);
 		temp_file_pointer = fopen(key_name,"a");
 		assert(temp_file_pointer);
 
@@ -918,7 +916,6 @@ void my_fclose(void * fp)
 
 int my_strcmp(const void * s1, const void * s2)
 {
-	//printf("%s   %s 0=%d\n",s1,s2, strcmp((char*)s1, (char*)s2));
 	return strcmp((char*)s1, (char*)s2);
 }
 
@@ -947,7 +944,7 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 	unsigned int read_number = 0;
 
 	if(!fp){
-		printf("SAM file does not exist or is not accessible: '%s'\n", in_SAM_file);
+		SUBREADprintf("SAM file does not exist or is not accessible: '%s'\n", in_SAM_file);
 		return 1;
 	}
 
@@ -1008,7 +1005,6 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 			FILE * temp_fp;
 
 			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, sequence , quality_string, &rl);
-			//printf("R#%d P=%d L=%s\n", read_number, line_parse_result, line_buffer);
 			if(line_parse_result || (flags & SAM_FLAG_UNMAPPED) )
 			{
 				read_number ++;
@@ -1070,7 +1066,6 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 								if(need_write)
 								{
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
-								//printf("%s\n", temp_file_name);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
 									assert(temp_fp);
 									write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand);
@@ -1156,13 +1151,13 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 
 	if(!fp)
 	{
-		printf("Cannot open the exon annotation file: %s\n", annotation_file_name);
+		SUBREADprintf("Cannot open the exon annotation file: %s\n", annotation_file_name);
 		return -1;
 	}
 	(*output_genes) = malloc(sizeof(gene_t)*MAX_ANNOTATION_EXONS);
 	if(!*output_genes)
 	{
-		printf("Cannot allocate memory for the exon table. \n");
+		SUBREADprintf("Cannot allocate memory for the exon table. \n");
 		return -1;
 	}
 
@@ -1233,7 +1228,7 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 		exons ++;
 		if(exons >= MAX_EXONS_PER_GENE)
 		{
-			printf("The number of exons excesses the limit. Please increase the value of MAX_EXONS_PER_GENE in subread.h.\n");
+			SUBREADprintf("The number of exons excesses the limit. Please increase the value of MAX_EXONS_PER_GENE in subread.h.\n");
 			return -1;
 		}
 

@@ -18,6 +18,8 @@ void retrieve_scores(char ** input, int *offset_pt, int *size, char **output_tem
   offset = *offset_pt;
   int n;
 
+  int MAX_LINE_LENGTH = 100000;
+  
   char * input_name;
   char * output_temp_name;
   char * output_sc_name; 
@@ -47,11 +49,12 @@ void retrieve_scores(char ** input, int *offset_pt, int *size, char **output_tem
      return;
   }
 
+  line = (char*)calloc(MAX_LINE_LENGTH, 1);
    
-  while ((z = getline(&line, &len, fin)) != -1){
+  while (fgets(line, MAX_LINE_LENGTH, fin)){
 		line_num++;
 		if(line[0] == '+'){
-			z = getline(&line, &len, fin);
+			fgets(line, MAX_LINE_LENGTH, fin);
 			line_num++;
 			score = toascii(*line)-offset;
 			fprintf(fout, "%d", score);
@@ -94,14 +97,15 @@ void retrieve_scores(char ** input, int *offset_pt, int *size, char **output_tem
   	}
 
 
-	while ((z=getline(&line, &len, ffin)) != -1){
+	while (fgets(line, MAX_LINE_LENGTH, ffin)){
 		line_number ++;
 		if ((((line_number-1) % gap)==0) && (printed < n)){
 		  fprintf(ffout, "%s", line);
 		  printed++;
 		}
 	}
-    
+
+	free(line);
     free(input_name); 
     free(output_temp_name); 
     free(output_sc_name);  

@@ -1,5 +1,3 @@
-#include "sorted-hashtable.h"
-#include "gene-algorithms.h"
 #include<assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +7,9 @@
 #endif
 
 #include<math.h>
+#include "subread.h"
+#include "gene-algorithms.h"
+#include "gene-algorithms.h"
 
 #define _gehash_hash(k) ((unsigned int)(k))
 
@@ -50,7 +51,7 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
 
 	if(!the_table -> buckets)
 	{
-		puts(MESSAGE_OUT_OF_MEMORY);
+		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 		return 1;
 	}
 
@@ -83,7 +84,7 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 
 		if(!(new_item_keys && new_item_values))
 		{
-			puts(MESSAGE_OUT_OF_MEMORY);
+			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
 		}
 
@@ -168,7 +169,7 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 
 			if(!(new_item_keys && new_item_values))
 			{
-				puts(MESSAGE_OUT_OF_MEMORY);
+				SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 				return 1;
 			}
 
@@ -205,7 +206,6 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 	int is_fault = 0;
 
 	current_bucket = _gehash_get_bucket (the_table, key);
-	//printf("P=%lld\n",(long long)(the_table->mem_keys - current_bucket->item_keys));
 	if (current_bucket->current_items >= current_bucket->space_size)
 	{
 
@@ -269,7 +269,6 @@ size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset,
 						for (j = i+1; j<error_bases; j++)
 							mutation_stack[j] = 0;
 						is_end2 = 0;
-					//printf ("K=%u VS M=%u @J=%d , BC=%d\n", key, mutation_key, j, base_to_change );
 						if(key != mutation_key)
 							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
 						mutation_stack[i] ++;
@@ -315,9 +314,7 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 		{
 			 C_poses[availableC++] = i;
 		}
-//		printf("%c", int2base(((key >> ((15-i)*2) )&3)));
 	}
-//	printf("\n");
 
 
 
@@ -353,17 +350,6 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 						for (j = i+1; j<error_bases; j++)
 							mutation_stack[j] = 0;
 						is_end2 = 0;
-/*
-					printf ("K=%u VS M=%08X @J=%d , BC=%d\n --", key, mutation_key, j, base_to_change );
-
-	int xx;
-	for(xx=0; xx<16; xx++)
-	{
-		printf("%c", int2base(((mutation_key >> ((15-xx)*2) )&3)));
-	}
-	printf("\n");
-*/
-
 
 						if(key != mutation_key)
 							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
@@ -485,7 +471,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 						go_replace = 1;
 					else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (new_test_dist == vote ->max_coverage_end - vote ->max_coverage_start))
 					{
-						//printf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u and %u\n", vote->max_position , kv);
+						//SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u and %u\n", vote->max_position , kv);
 						if(vote->max_position > kv)
 							go_replace=1;
 						vote->max_mask |= IS_BREAKEVEN_READ ;
@@ -564,7 +550,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 						vote -> last_offset[offsetX][i]=offset;
 
 
-						//printf("\nFOUND-OLD! %u, V=%d\n", kv, test_max);
 						if (offset_from_5 <  vote->coverage_start [offsetX][i])
 						{
 							vote->coverage_start [offsetX][i] = offset_from_5;
@@ -604,7 +589,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 								go_replace = 1;
 							else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start))
 							{
-								//printf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position , kv);
+								//SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position , kv);
 								vote->max_mask |= IS_BREAKEVEN_READ ;
 								if(vote->max_position >  di)
 									go_replace = 1;
@@ -635,7 +620,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 
 			if (i < 9999999)
 			{
-				//printf("\nFOUND-NEW! %u\n", kv);
+				//SUBREADprintf("\nFOUND-NEW! %u\n", kv);
 				int offsetX2 = _index_vote_tol(kv);
 				int datalen2 = vote -> items[offsetX2];
 				unsigned int * dat2 = vote -> pos[offsetX2];
@@ -847,7 +832,7 @@ size_t gehash_get_hpc(gehash_t * the_table, gehash_key_t key, gehash_data_t * da
 void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 {
 
-	printf("UNIMPLEMENTED! gehash_insert_sorted \n");
+	SUBREADprintf("UNIMPLEMENTED! gehash_insert_sorted \n");
 }
 
 
@@ -871,7 +856,7 @@ inline unsigned int load_int32(FILE * fp)
 	int ret;
 	int read_length;
 	read_length = fread(&ret, sizeof(int), 1, fp);
-	assert(read_length>0);
+	if(read_length<=0)SUBREADprintf("Integer is not positive\n");
 	return ret;
 }
 
@@ -880,7 +865,7 @@ inline long long int load_int64(FILE * fp)
 	long long int ret;
 	int read_length;
 	read_length = fread(&ret, sizeof(long long int), 1, fp);
-	assert(read_length>0);
+	if(read_length<=0)SUBREADprintf("Integer is not positive\n");
 	return ret;
 }
 
@@ -894,7 +879,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	FILE * fp = fopen(fname, "rb");
 	if (!fp)
 	{
-		printf ("Table file `%s' is not found.\n", fname);
+		SUBREADprintf ("Table file `%s' is not found.\n", fname);
 		return 1;
 	}
 
@@ -903,7 +888,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
 	if(!the_table -> buckets)
 	{
-		puts(MESSAGE_OUT_OF_MEMORY);
+		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 		return 1;
 	}
 
@@ -918,7 +903,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 		if(!(current_bucket -> item_keys&&current_bucket -> item_values))
 		{
-			puts(MESSAGE_OUT_OF_MEMORY);
+			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
 
 		}
@@ -945,7 +930,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	FILE * fp = fopen(fname, "wb");
 	if (!fp)
 	{
-		printf ("Table file `%s' is not able to open.\n", fname);
+		SUBREADprintf ("Table file `%s' is not able to open.\n", fname);
 		return -1;
 	}
 
@@ -985,23 +970,11 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 			}
 		}
 
-//		if (i % 1000 ==0)
-//			printf("Sorted %d buckets in %d\n",i, the_table -> buckets_number);
-
 		fwrite(& (current_bucket -> current_items), sizeof(int), 1, fp);
 		fwrite(& (current_bucket -> space_size), sizeof(int), 1, fp);
 		fwrite(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
 		fwrite(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
-/*
-		int j;
-		for (j=0; j<current_bucket -> current_items; j++)
-		{
-			if(current_bucket -> item_keys[j]==4131185942)
-			{
-				printf("FOUND %u @ %d\n",4131185942, current_bucket -> item_values[j]);
-			}
-		}
-*/	}
+	}
 
 	fwrite(&(the_table -> is_small_table), sizeof(char), 1, fp);
 	fclose(fp);

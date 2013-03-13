@@ -5,10 +5,12 @@
 
 int propmapped(int argc,char *argv[]){
 
+/*
   if(argc == 1){
     printf("Usage: propmapped sam_file\n");
     exit(0);
   }
+*/
 
   FILE *fp, *fp_out;
   fp = fopen(argv[1],"r");
@@ -20,7 +22,10 @@ int propmapped(int argc,char *argv[]){
   int unmapped = 0;
   int totalreads = 0;
 
-  while ((z = getline(&line, &len, fp)) != -1) {
+  int MAX_LINE_LENGTH = 100000;
+  
+  line = (char*)calloc(MAX_LINE_LENGTH, 1);
+  while (fgets(line, MAX_LINE_LENGTH, fp)) {
     if(line[0] == '@')
       continue;
     else
@@ -35,8 +40,8 @@ int propmapped(int argc,char *argv[]){
  
   fclose(fp);
 
-  printf("Total number of reads is: %d\n", totalreads);
-  printf("Proportion of mapped reads is %f\n\n",1-(float)unmapped/totalreads);
+  // printf("Total number of reads is: %d\n", totalreads);
+  // printf("Proportion of mapped reads is %f\n\n",1-(float)unmapped/totalreads);
 
   fprintf(fp_out,"%s,%d,%d,%f\n",argv[1],totalreads,totalreads-unmapped,1-(float)unmapped/totalreads);
 

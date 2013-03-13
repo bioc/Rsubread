@@ -24,7 +24,7 @@ void non_func(const char * fmt, ...)
 //#define indel_debug
 
 #ifdef indel_debug
-#define ddprintf printf
+#define ddprintf SUBREADprintf
 #define ddfflush fflush
 #else
 #define ddprintf non_func
@@ -35,6 +35,55 @@ void non_func(const char * fmt, ...)
 
 
 double begin_ftime;
+
+int test_big_margin(unsigned char * all_big_margin_rec, int qid)
+{
+
+	unsigned char * big_margin_rec = all_big_margin_rec+sizeof(int)*qid;
+	int current_best = big_margin_rec[0];
+
+	int xxx, ret=0;
+
+	
+	/*22
+	for (xxx=0; xxx<4; xxx++)
+		printf("%02X ", big_margin_rec[xxx]);
+	*/
+	for (xxx=1; xxx<4; xxx++)
+		if(big_margin_rec[xxx]>current_best-2) ret++;
+	//printf ("REP=%d\n",ret);
+	return ret;
+}
+
+void reg_big_margin_votes(gene_vote_t * vote, unsigned char * all_big_margin_rec, int query_id)
+{
+	unsigned char * big_margin_rec = all_big_margin_rec+ sizeof(int)*query_id;
+	int current_worst = big_margin_rec[3];
+
+	if(vote ->max_vote <= current_worst)return;
+
+	int i, j;
+
+	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+	{
+		for(j=0; j< vote->items[i]; j++)
+		{
+			int vote_n = vote->votes[i][j];
+			if(vote_n >current_worst)
+			{ 
+				int replace_id, xxx;
+				for(replace_id=0; replace_id<4;replace_id++)
+					if(big_margin_rec[replace_id]< vote_n)
+						break;
+				for(xxx=3; xxx>replace_id; xxx--)
+					big_margin_rec[xxx] = big_margin_rec[xxx-1];
+				big_margin_rec[replace_id] = vote_n;
+				current_worst = big_margin_rec[3];
+			}
+		}
+	}
+	
+}
 
 unsigned char get_next_char(FILE * fp)
 {
@@ -147,7 +196,7 @@ gene_quality_score_t get_subread_quality(const char * quality_str, const char * 
 	/*
 	if (ret <0 && !reported_version_error)
 	{
-		printf("\nWARNING: negative Phred quality score! Please verify the version of the Phred scores.\n");
+		SUBREADprintf("\nWARNING: negative Phred quality score! Please verify the version of the Phred scores.\n");
 		reported_version_error=1;
 	}*/
 	
@@ -164,10 +213,10 @@ void print_running_log(double finished_rate, double read_per_second, double expe
 {
         char outbuff[99]; int i;
         snprintf(outbuff, 98,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk reads/s; time left=%.1fs; total=%lluk %s", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,expected_seconds, total_reads/1000, is_pair?"pairs":"reads");
-        fputs(outbuff, stdout);
+        SUBREADprintf("%s",outbuff);
         for(i=strlen(outbuff); i<105; i++)
-                printf(" ");
-        printf("\r");
+                SUBREADprintf(" ");
+        SUBREADprintf("\r");
 }
 
 void print_text_scrolling_bar(char * hint, float percentage, int width, int * internal_counter)
@@ -179,8 +228,8 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 	int space_width = bar_width - 1 - dash_width;
 
 	for (i=0; i<width; i++);
-		putchar(' ');
-	printf("\r");
+		SUBREADputchar(' ');
+	SUBREADprintf("\r");
 
  
 	switch ((*internal_counter) % 4)
@@ -201,18 +250,18 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 
 	(*internal_counter) ++;
 
-	printf (" %c %s [", fan, hint);
+	SUBREADprintf (" %c %s [", fan, hint);
 	for(i = 0; i< dash_width; i++)
-		putchar('=');
-	putchar('>');
+		SUBREADputchar('=');
+	SUBREADputchar('>');
 	for(i = 0; i< space_width; i++)
-		putchar(' ');
-	printf("]\r");
+		SUBREADputchar(' ');
+	SUBREADprintf("]\r");
 	
-	fflush(stdout);
+	SUBREADfflush(stdout);
 }
 
-
+/*
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_threshold)
 {
 	int i;
@@ -248,8 +297,8 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 			{
 				if(val_c>199999)
 				{
-					printf("\nThere are too many items in a bucket; you may reduce the threshold of non-informative subreads to eliminate this problem.\n");
-					exit(-1);
+					SUBREADprintf("\nThere are too many items in a bucket; you may reduce the threshold of non-informative subreads to eliminate this problem.\n");
+					return -1;
 				}
 				else
 				{
@@ -260,7 +309,7 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 			}
 		}
 
-//			printf ("F3\n");
+//			SUBREADprintf ("F3\n");
 
 		for(j=0; j<val_c; j++)
 		{
@@ -277,19 +326,18 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 	}
 
 	if(IS_DEBUG)
-		printf ("@LOG There are %u subreads removed from the index.\n", all_removed);
+		SUBREADprintf ("@LOG There are %u subreads removed from the index.\n", all_removed);
 
 	return all_removed;
 }
 
-
+*/
 unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name, unsigned int chro_pos)
 {
 	unsigned int ret = 0 ;
 	int n;
 	for (n=0; offsets->read_offset[n]; n++)
 	{
-		//printf("NOV=|%s|   |%s|\n", chro_name, offsets->read_name[n]);
 		if (strcmp(offsets->read_name[n], chro_name) == 0)
 			return ret + chro_pos;
 		else
@@ -346,7 +394,7 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 #define _index_vote(key) (((unsigned int)key)%GENE_VOTE_TABLE_SIZE)
 
 int vv=0;
-inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
+/*inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
 {
 	add_gene_vote_weighted(vote, key, add_new, 1);
 }
@@ -384,6 +432,7 @@ inline void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int
 	dat[i] = key;
 	vote->votes[offset][i]=w;
 }
+*/
 
 int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 {
@@ -411,7 +460,6 @@ int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 	}
 	else
 	{
-		//printf("err:%X\n",max_index);
 		*position_result = vote->pos[max_index>>16][max_index&0xffff];
 		return max_votes;
 	}
@@ -423,6 +471,8 @@ void clear_allvote(gene_allvote_t* allvote)
 	bzero(allvote -> max_votes,  allvote -> max_len* sizeof(*allvote -> max_votes));
 	bzero(allvote -> masks,  allvote -> max_len* sizeof(*allvote -> masks));
 	bzero(allvote -> span_coverage ,  allvote -> max_len* sizeof(char));
+	bzero(allvote -> big_margin_votes_shared, allvote -> max_len* sizeof(char));
+	bzero(allvote -> edit_distance ,  allvote -> max_len* sizeof(short));
 }
 
 void destory_allvote(gene_allvote_t* allvote)
@@ -437,6 +487,7 @@ void destory_allvote(gene_allvote_t* allvote)
 	#endif
 	free(allvote -> is_counterpart);
 	free(allvote -> span_coverage);
+	free(allvote -> edit_distance);
 	if(allvote -> max_indel_recorder)
 		free(allvote -> max_indel_recorder);
 }
@@ -449,6 +500,8 @@ int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 	allvote -> max_votes = (gene_vote_number_t *) calloc(sizeof(gene_vote_number_t), expected_len);
 	allvote -> max_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
 	allvote -> max_final_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
+	allvote -> big_margin_votes_shared = (unsigned char *) allvote -> max_final_quality;
+
 	allvote -> masks = (short *) calloc(sizeof(short), expected_len);
 #ifdef REPORT_ALL_THE_BEST
 	allvote -> best_records = (gene_best_record_t *) malloc(sizeof(gene_best_record_t)* expected_len);
@@ -458,6 +511,7 @@ int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 	allvote -> max_indel_tolerance = allowed_indels;
 	allvote	-> indel_recorder_length = max(3*(allowed_indels+1)+1, 28);
 	allvote -> span_coverage = (char *)calloc(sizeof(char), expected_len);
+	allvote -> edit_distance = (unsigned short *)calloc(sizeof(short), expected_len);
 
 	if((allvote -> max_quality &&  allvote -> max_positions  && allvote -> max_votes  && allvote -> max_final_quality && allvote -> masks && allvote -> is_counterpart && allvote -> span_coverage))
 		is_OK = 1;
@@ -473,14 +527,14 @@ int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 		return 0;
 	else
 	{
-		puts(MESSAGE_OUT_OF_MEMORY);
+		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 		return 1;
 	}
 }
 
 
 // rl_adjust >0: "D" in read; rl_adjust<0: "I" in read
-void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset, int *rl_adjust)
+void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset, int *rl_adjust, int * is_safegurded)
 {
 	char tmp[200];
 	char cigar_piece [10];
@@ -528,6 +582,7 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 					{
 						sprintf(cigar_piece,"%dI", delta_i); 
 						strcat(tmp, cigar_piece);
+						cigar_length += delta_i;
 					}
 					delta_i = 0;
 
@@ -541,10 +596,10 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 
 					sprintf(cigar_piece,"%lld%c", last_tmpv, last_operation); 
 					strcat(tmp, cigar_piece);
+					if(last_operation == 'M' || last_operation == 'S' )
+						cigar_length += last_tmpv;
 				}
 
-				if(last_operation == 'M' || last_operation == 'S' || last_operation == 'I')
-					cigar_length += last_tmpv;
 
 				last_tmpv = 0;
 			}
@@ -575,6 +630,7 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		{
 			sprintf(cigar_piece,"%dI", delta_i); 
 			strcat(tmp, cigar_piece);
+			cigar_length += delta_i;
 		}
 		if(delta_d)
 		{
@@ -588,31 +644,28 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		{
 			sprintf(cigar_piece,"%lld%c", tmpv+last_tmpv, last_operation); 
 			strcat(tmp, cigar_piece);
-		}
-
-		if(last_operation == 'M' || last_operation == 'S' || last_operation == 'I')
 			cigar_length += tmpv+last_tmpv;
+		}
 	}
-	//printf("\nCIG=%s\n", cigar);
 	if(cigar_length == total_length)
 	{
 		if(rl_adjust)(*rl_adjust)=delta_rl;
 		strcpy(cigar, tmp);
+		(*is_safegurded)=0;
 	}
 	else
 	{
-		//printf("CIG=%s; read=%s\n", cigar, read);
+		(*is_safegurded)=1;
 		sprintf(cigar, "%dM", total_length);
 	}
 }
 
 // adjust_len <0: "I" in read; adjust_len>0: "D" in read
-void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read, int * pos_offset, int * adjust_len)
+void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read, int * pos_offset, int * adjust_len, int * is_safegurded)
 {
-	int i, is_error = 0;
-	int last_end=0, last_offset = 0, cursor = 0;
+	int i;
+	int last_offset = 0, cursor = 0;
 
-	//printf("L0=%d\n", info[0]);
 	if(info[0]==-1){
 		sprintf(buf, "%dM", len);
 		return;
@@ -623,13 +676,12 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		else
 		{
 			strncpy(buf, info+1, 98);
-			compress_cigar(buf, len, read, pos_offset, adjust_len);
+			compress_cigar(buf, len, read, pos_offset, adjust_len, is_safegurded);
 		}
 		return;
 	}
 	else if(info[0]==-3){
 		info ++;
-		is_error = 1;
 	}
 
 	for(i=0; i<indel_tolerance*3; i+=3)
@@ -639,10 +691,9 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		//int subread_start = info[i]-1;
 		int subread_end = info[i+1]-1;
 
-		//int base_start = (last_end==0)?0:(find_subread_end(len, TOTAL_SUBREADS, subread_start)-16);
 		int base_end = (i < indel_tolerance*3-3 && info[i+3])?find_subread_end(len, total_subreads, subread_end):len;
 
-//			printf("BE=%d ; II+3=%d ; len=%d\n", base_end, info[i+3], len);
+//			SUBREADprintf("BE=%d ; II+3=%d ; len=%d\n", base_end, info[i+3], len);
 
 		int offset = last_offset-dist;
 		if (base_end - cursor - (offset>0?offset:0) <0) 
@@ -661,32 +712,44 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		else
 			sprintf(buf+strlen(buf), "%dM", base_end);
 		last_offset = dist;
-		last_end = base_end;
 		cursor = base_end;
 		//if (dist >0)cursor += dist;
 	}
-	if(cursor < len)
-		sprintf(buf+strlen(buf), "%dM", len-cursor);
-//	if(is_error)
-//		strcat(buf, "XX");
+	compress_cigar(buf, len, read, pos_offset, adjust_len, is_safegurded);
 }
 
-void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short ,  char ** dynamic_programming_char)
+void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short ,  char ** dynamic_programming_char, int use_hamming_dist)
 {
 
-//	printf("Ospan=%d Nspan=%d\n", allvote -> span_coverage[qid], span_coverage);
+//	SUBREADprintf("Ospan=%d Nspan=%d\n", allvote -> span_coverage[qid], span_coverage);
 
 	int is_add_new = 0;
-	if((votes > allvote -> max_votes[qid] ) || (votes  == allvote -> max_votes[qid]  && span_coverage > allvote -> span_coverage[qid]) || (votes == allvote -> max_votes[qid] && (span_coverage == allvote -> span_coverage[qid]) && quality > allvote -> max_quality[qid]))
+	if(use_hamming_dist)
 	{
-		is_add_new = 1;
+		if((votes > allvote -> max_votes[qid] ) || (votes  == allvote -> max_votes[qid]  && quality > allvote -> max_quality[qid]))
+		{
+			is_add_new = 1;
+		}
+		else if (votes == allvote -> max_votes[qid] && quality == allvote -> max_quality[qid])
+		{
+			allvote -> masks[qid]|= IS_BREAKEVEN_READ;
+			if(pos < allvote -> max_positions[qid] ) is_add_new=1;
+		}
+
 	}
-	else if (votes == allvote -> max_votes[qid] && quality == allvote -> max_quality[qid] && span_coverage == allvote -> span_coverage[qid])
+	else
 	{
-		//printf("ADD1\n");
-		allvote -> masks[qid]|= IS_BREAKEVEN_READ;
-		if(pos < allvote -> max_positions[qid] ) is_add_new=1;
+		if((votes > allvote -> max_votes[qid] ) || (votes  == allvote -> max_votes[qid]  && span_coverage > allvote -> span_coverage[qid]) || (votes == allvote -> max_votes[qid] && (span_coverage == allvote -> span_coverage[qid]) && quality > allvote -> max_quality[qid]))
+		{
+			is_add_new = 1;
+		}
+		else if (votes == allvote -> max_votes[qid] && quality == allvote -> max_quality[qid] && span_coverage == allvote -> span_coverage[qid])
+		{
+			allvote -> masks[qid]|= IS_BREAKEVEN_READ;
+			if(pos < allvote -> max_positions[qid] ) is_add_new=1;
+		}
 	}
+
 
 	if(is_add_new)
 	{
@@ -703,7 +766,6 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 			allvote -> best_records [qid].best_len ++;
 		}
 #endif
-		//printf("ADD ALL: POS=%u > %u VOTES=%d > %d ; Q=%f > %f ; SPAN=%d > %d\n", pos, allvote -> max_positions[qid], votes,  allvote->max_votes[qid], quality, allvote -> max_quality[qid], span_coverage, allvote -> span_coverage[qid]);
 		allvote -> is_counterpart[qid] = is_counterpart;
 		allvote -> max_positions[qid] = pos;
 		allvote -> max_votes[qid] = votes;
@@ -714,8 +776,8 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 		if(allvote -> max_indel_recorder)
 			indel_recorder_copy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length, max_indel_recorder);
 
-		/*if(mask & IS_BREAKEVEN_READ)		printf("ADD2\n");
-		else printf("NOADD3\n");*/
+		/*if(mask & IS_BREAKEVEN_READ)		SUBREADprintf("ADD2\n");
+		else SUBREADprintf("NOADD3\n");*/
 	
 		return;
 
@@ -834,7 +896,6 @@ void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote
 					else EXON_INDEL_MATCHING_RATE_TAIL = 0.92;
 				}else	EXON_INDEL_MATCHING_RATE_TAIL = 9999;
 
-				//printf("HQ=%.4f in %d ; TQ=%.4f in %d\n%s\n", head_qual, cover_start, tail_qual, (read_len-cover_end), qual_txt);
 
 				
 
@@ -861,7 +922,6 @@ void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote
 			if((head_indel_pos>=0 && report_junction) || head_indel_movement)head_pos = head_indel_pos ;//- max(0,head_indel_movement);
 			int tail_pos = read_len;
 			if((tail_indel_pos>0 && report_junction) || tail_indel_movement)tail_pos = tail_indel_pos ;//- min(0, tail_indel_movement);
-			//printf ("\nEE H=%d T=%d HM=%d TM=%d\n",head_pos, tail_pos, head_indel_movement, tail_indel_movement);
 			explain_indel_in_middle(allvote, qid , pos, max_indel_recorder,  array_index, read_txt, read_len,  max_indel, total_subreads, head_pos, tail_pos , head_indel_movement, tail_indel_movement, report_junction, dynamic_programming_short, dynamic_programming_char);
 			//if(*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) != 0xfd ) allvote -> max_positions[qid] = pos0;
 		}
@@ -913,7 +973,7 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 		int black_base_end = find_subread_end(read_len, total_subreads, black_subread_end)-15 + 3 + max(0,-max_indel_recorder[i+2]);
 
 		int blackref_base_start = black_base_start - max(0,-last_dist) + max(0,last_dist);
-//		printf("baseref_offset=%d\n", max(0,last_dist));
+//		SUBREADprintf("baseref_offset=%d\n", max(0,last_dist));
 
 		int gap_end_read =  black_base_end + max(0,max_indel_recorder[i+2]);
 
@@ -926,12 +986,10 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 
 		int exp_indel = last_dist - max_indel_recorder[i+2];
 
-		//printf("%s, %d, %u, %d, %d, %d", read_txt + black_base_start, black_base_end-black_base_start , pos + blackref_base_start, max_indel, exp_indel, black_base_end - black_base_start+5);
 		
 		int moves = 0;
 		if(black_base_end > black_base_start)
 			moves = dynamic_align (read_txt + black_base_start, black_base_end-black_base_start , array_index, pos + blackref_base_start, max_indel, indel_operations, exp_indel,  -10, black_base_end - black_base_start+5, dynamic_programming_short, dynamic_programming_char);
-		//printf("EXP_MOV=%d\n", exp_indel);
 
 		last_operation = 0;
 		if(moves)// < (black_base_end-black_base_start) + 6 + 1.5 * exp_indel)
@@ -955,7 +1013,6 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 					if (vpos>EXON_MAX_CIGAR_LEN-6) break;
 					sprintf(tmp_cigar + vpos, "%d%c", last_operation==1?del_number:(current_pos - explain_cursor), last_operation==0?'M':(last_operation==1?'D':'I'));
 					explain_cursor = current_pos ;
-					//printf("EXP=%d of %d;  XX=%d of %d;  MOV=%d->%d ; vpos=%d>%d cpos=%d > gapend=%d\nS=%s\n", explain_cursor, gap_end_read , xx , moves, last_operation,current_operation, vpos, EXON_MAX_CIGAR_LEN-6, current_pos, gap_end_read-1, tmp_cigar);
 					del_number = 0;
 				}
 				if(current_pos >= gap_end_read-1 || xx == moves - 1){
@@ -977,6 +1034,7 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 
 				last_operation = current_operation; 
 			} 
+//	printf("\nCIGAR_CURRENT2=%s; MOVES=%d\n", tmp_cigar, moves);
 		}
 		else
 		{
@@ -1000,12 +1058,9 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 		}
 		last_operation = 0;
 		current_pos = black_base_end;
-	//	if (!moves)
-			//strcat(tmp_cigar,"X");
-			//printf("Wrong explaination! dist=%d   dyn=%d R=%s\n", max_indel_recorder[i+2], dynamic_delta, read_txt);
 			
-		
 	}
+
 
 	int vpos = strlen(tmp_cigar);
 	if (vpos > EXON_MAX_CIGAR_LEN-9 )
@@ -1037,7 +1092,6 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 	//	if (head_start_point >0 || tail_end_point < read_len)
 	//		strcat(tmp_cigar,"X");
 
-	//printf("\n%s\n", tmp_cigar);
 		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xfe ;
 		strncpy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length+1, tmp_cigar, allvote -> indel_recorder_length - 2);
 	}
@@ -1094,23 +1148,33 @@ int evaluate_piece(char * piece_str, int chron, int offset, int is_counterpart, 
 
 }
 
-int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int indel_size)
+int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int indel_size, char * indel_recorder, int total_subreads)
 {
 
-	int i;
 	int ret = 0;
-	for (i = -indel_size; i<=indel_size ; i++)
+	int tali = 0;
+	int last_section_end = 0;
+
+	for(tali = 0; indel_recorder[tali*3] && tali<MAX_INDEL_TOLERANCE; tali++)
 	{
-		if (pos +i + test_len < index -> start_base_offset + index -> length && pos > -i)
-			ret += match_chro(read, index, pos + i, test_len, is_negative_strand, space_type);
+		int section_last_subread = indel_recorder[tali*3+1] - 1;
+		int section_offset = indel_recorder[tali*3+2];
+		int this_section_end = find_subread_end(test_len , total_subreads, section_last_subread); 
+		if(!indel_recorder[tali*3+3]) this_section_end = test_len;
+
+		ret += match_chro(read + last_section_end - min(0, section_offset), index, pos + last_section_end + max(0, section_offset), this_section_end - last_section_end + min(0, section_offset), is_negative_strand, space_type);
+		last_section_end = this_section_end;
 	}
+
+	//ret = match_chro(read , index, pos , test_len, is_negative_strand, space_type);
+	//printf("\nRET=%d\n",ret);
 	return ret;
 
 }
 
 
 
-void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, gene_vote_t * src, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int min_minor, const char quality_str [], int quality_scale, int is_negative_strand)
+void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, gene_vote_t * src, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int min_minor, const char quality_str [], int quality_scale, int is_negative_strand, int total_subreads)
 {
 	int i, j;
 
@@ -1123,14 +1187,13 @@ void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, g
 		for(j=0; j< src->items[i]; j++)
 		{
 			unsigned int potential_position = src-> pos[i][j];
-			float matchingness_count = 0;
+			int matchingness_count = 0;
 			if (src -> votes [i][j]>= min_minor)
 				//matchingness_count = match_read(read_str, read_len, potential_position, my_array_index, color_space, indel_tolerance, quality_str, quality_scale);
-				matchingness_count = 1.*match_chro_indel(read_str, my_array_index, potential_position, read_len, 0, color_space, indel_tolerance);
+				matchingness_count = match_chro_indel(read_str, my_array_index, potential_position, read_len, 0, color_space, indel_tolerance, src -> indel_recorder[i][j], total_subreads);
 	
 			dest -> pos[i][j] = potential_position;
 			dest -> quality[i][j] = matchingness_count;
-			//printf ("Q=%.4f\n", matchingness_count);
 			dest -> votes [i][j] =src -> votes [i][j];
 			dest -> masks[i][j] = src -> masks[i][j];
 			dest -> coverage_start[i][j] = src -> coverage_start[i][j];
@@ -1151,14 +1214,14 @@ void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, g
 	}
 }
 
-int select_positions_array(char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2,  gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2, char * r1_recorder, char * r2_recorder, gehash_data_t * pos_read1, gehash_data_t * pos_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int number_of_anchors_quality, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int * is_break_even)
+int select_positions_array(char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2,  gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2, char * r1_recorder, char * r2_recorder, gehash_data_t * pos_read1, gehash_data_t * pos_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int number_of_anchors_quality, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int * is_break_even, int total_subreads)
 {
 	gene_vote_t base_vote_1 , base_vote_2;
 
-	mark_votes_array_index(read1_str, read1_len, &base_vote_1, vote_read1, my_array_index, color_space, indel_tolerance, min_minor, quality_str1, quality_scale, is_negative_strand);
-	mark_votes_array_index(read2_str, read2_len, &base_vote_2, vote_read2, my_array_index, color_space, indel_tolerance, min_minor, quality_str2, quality_scale, is_negative_strand);
+	mark_votes_array_index(read1_str, read1_len, &base_vote_1, vote_read1, my_array_index, color_space, indel_tolerance, min_minor, quality_str1, quality_scale, is_negative_strand, total_subreads);
+	mark_votes_array_index(read2_str, read2_len, &base_vote_2, vote_read2, my_array_index, color_space, indel_tolerance, min_minor, quality_str2, quality_scale, is_negative_strand, total_subreads);
 
-//	printf("Q=%.3f\n", *qual_r2);
+//	SUBREADprintf("Q=%.3f\n", *qual_r2);
 
 	return select_positions(&base_vote_1, &base_vote_2, numvote_read1, numvote_read2, sum_quality, qual_r1, qual_r2,  pos_read1, pos_read2, r1_recorder , r2_recorder ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, number_of_anchors_quality,max_indel_len, is_break_even);
 }
@@ -1209,7 +1272,7 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 
 					if(anchors >= ANCHORS_NUMBER)
 					{
-	//					printf("Abnormally too many anchors [%d, %d] %f\n", i, j, anchor_votes);
+	//					SUBREADprintf("Abnormally too many anchors [%d, %d] %f\n", i, j, anchor_votes);
 						anchors --;
 					}
 				}
@@ -1245,7 +1308,6 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 						if((anchor_read[l] && !is_negative_strand) ||
 						    ((!anchor_read[l]) && is_negative_strand))
 							abdist = -abdist;
-						//printf ("\n\nDIST=%d, ANCHOR=%d, NEGATIVE=%d\n", abdist, anchor_read[l], is_negative_strand);
 
 						if (abdist < 0)
 						//#warning WGSIM generates paired-end data in a wrong way; abdist is given its absolute value in such a case.
@@ -1294,7 +1356,6 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 		int need_replace = 0;
 
 
-		//printf("SSS: O1max=%d O2max=%d N1v=%d N2v=%d Oq=%d Nq=%d Opos=%u Npos=%u\n", selection_major_vote, selection_minor_vote, anchors_votes[k], minor_votes[k], *sum_quality, minor_quality[k] + anchors_quality[k], selection_major_pos, anchors_position[k]);
 		if ((minor_votes[k]+anchors_votes[k]) > (selection_minor_vote+selection_major_vote) ||
 	   	       ((minor_votes[k]+anchors_votes[k]) == (selection_minor_vote+selection_major_vote) &&
 		 	 minor_quality[k] + anchors_quality[k] > *sum_quality))
@@ -1328,7 +1389,6 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 	
 		}
 	}
-//	if (*is_breakeven)printf("BKF3 R=%d\n", reason);
 
 	if(selection_minor_vote > 0)
 	{
@@ -1368,7 +1428,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 
 	if(!fp)
 	{
-		printf("file not found :%s\n", fn);
+		SUBREADprintf("file not found :%s\n", fn);
 		return 1;
 	}
 
@@ -1468,7 +1528,7 @@ float match_read(const char read_str[], int read_len, unsigned int potential_pos
 			}
 		}
 
-//		printf("best-match=%f\n", max_matchness);
+//		SUBREADprintf("best-match=%f\n", max_matchness);
 //
 
 		if (quality_str[0])
@@ -1488,35 +1548,34 @@ float match_read(const char read_str[], int read_len, unsigned int potential_pos
 					//max_matchness += 0.2-get_base_phred(quality_str[j+i])*0.01;
 				}
 			}
-		//	printf("Delta matchingness = %f\n", qs0 - max_matchness);
+		//	SUBREADprintf("Delta matchingness = %f\n", qs0 - max_matchness);
 		}
 		
 		ret += max_matchness; //front8(read_matchingness[movement], i);  // (front4(read_matchingness[movement], i)==4?4:0);
 	}
 
-	//printf ("Read matchingness = %f\n", (ret));
 
 	return  ret;
 }
 
 
-void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, char * max_indel_recorder, int * max_coverage_start, int * max_coverage_end)
+void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, char * max_indel_recorder, int * max_coverage_start, int * max_coverage_end, int total_subreads)
 {
 	int i, j;
-	gene_quality_score_t max_matching = -1.0;
+	int max_matching = -1 ;
 
 	*max_vote = vote -> max_vote; 
 
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< vote->items[i]; j++)
 		{
-			if( vote->votes[i][j]  < vote -> max_vote ) continue;
+			if( vote->votes[i][j]  < vote -> max_vote) continue;
 
 			unsigned int potential_position = vote -> pos[i][j];
-			gene_quality_score_t matchingness_count = 1.*match_chro_indel((char *)read_str, my_array_index, potential_position, read_len, 0, space_type, indel_tolerance);
-			//printf("TQ=%.4f VS MQ=%.4f\n", matchingness_count, max_matching);
+			int matchingness_count = match_chro_indel((char *)read_str, my_array_index, potential_position, read_len, 0, space_type, indel_tolerance, vote -> indel_recorder[i][j], total_subreads);
 			if(matchingness_count > max_matching)
 			{
+				//printf("%d>%d\n", matchingness_count , max_matching);
 				max_matching = matchingness_count;
 				*max_position = potential_position;
 				*max_mask = vote -> masks[i][j];
@@ -1528,7 +1587,7 @@ void final_matchingness_scoring(const char read_str[], const char quality_str[],
 			}
 			else if (matchingness_count == max_matching)
 			{
-//				printf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position, vote -> pos[i][j]);
+//				SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position, vote -> pos[i][j]);
 				(*max_mask) |= IS_BREAKEVEN_READ ;
 			}
 		}
@@ -1545,8 +1604,6 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 {
 
 	if (1499 - out_pos > (read_len <<2) || (*all_steps) > 3000 + (read_len << 3) || (*all_steps) > 33000){
-		/*ddprintf("\nTOO MANY STEPS: rl = %d    len=%d    steps=%d\n", read_len, 1499 - out_pos, *all_steps);
-		ddfflush(stdout) ;*/
 		return 0;
 	}
 	if(path_j < 0 || path_i < 0)
@@ -1592,16 +1649,12 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 	{
 		movement_buffer[out_pos] = 1;
 		(*all_steps) ++;
-		//ddprintf ("Path_i = %d ; Path_j = %d ; Offset = %d => 1\n", path_i, path_j, current_offset);
-		//ddfflush(stdout) ;
 		found =search_DP_branch (read, read_len, index, begin_position, path_i , path_j -1, table  , table_mask, max_indel, movement_buffer, expected_offset, left_score, out_pos -1, current_offset - ((path_i >= init_read_offset && path_i <= shutdown_read_offset)?1:0),  init_read_offset, shutdown_read_offset, all_steps); 
 	}
 	if ((!found )&& ( table_mask_i_1 || (current_score == 0 && table_mask2_i_1)))
 	{
 		movement_buffer[out_pos] = 2;
 		(*all_steps) ++;
-		//ddprintf ("Path_i = %d ; Path_j = %d ; Offset = %d => 2\n", path_i, path_j, current_offset);
-		//ddfflush(stdout) ;
 		found =search_DP_branch (read, read_len, index, begin_position, path_i -1 , path_j , table , table_mask , max_indel, movement_buffer, expected_offset, upper_score, out_pos -1, current_offset + ((path_i >= init_read_offset && path_i <= shutdown_read_offset)?1:0),  init_read_offset, shutdown_read_offset, all_steps); 
 	}
 	if((!found )&& (is_matched_ij + (upperleft_score - current_score) == 0))
@@ -1628,8 +1681,6 @@ int window_indel_align(char * read, int read_len, gene_value_index_t * index, un
 	memset(indel_windows,0, 32*sizeof(short));
 
 	windows_number = abs(expected_offset)+1;
-	//ddprintf ("\nWindow size = %d ; ExpOffset = %d\n", windows_number , expected_offset);
-	ddfflush(stdout) ;
 	for (i=0; i< read_len; i++)
 		for (j=0; j< windows_number; j++)
 		{
@@ -1658,8 +1709,6 @@ int window_indel_align(char * read, int read_len, gene_value_index_t * index, un
 	chro_str[i]=0;
 	j = read[read_len];
 	read[read_len]=0;
-
-	ddprintf ("CHRO=%s\nREAD=%s\n", chro_str, read);
 
 	/*
 	float contingency_list [MAX_READ_LENGTH];
@@ -1715,8 +1764,8 @@ int window_indel_align(char * read, int read_len, gene_value_index_t * index, un
 
 		#ifdef indel_debug
 		for (j=0; j< windows_number; j++)
-			printf("%d ",scores[j][i]);
-		printf ("     %c\n", (i==max_pos)?'*':' ') ;
+			SUBREADprintf("%d ",scores[j][i]);
+		SUBREADprintf ("     %c\n", (i==max_pos)?'*':' ') ;
 		#endif
 	}
 	for(; i< read_len; i++)
@@ -1740,9 +1789,9 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 	#ifdef indel_debug
 	int ii, jj;
 	for(ii = 0; ii<read_len - expected_offset; ii++)
-		putchar(gvindex_get(index, begin_position + ii));
+		SUBREADputchar(gvindex_get(index, begin_position + ii));
 
-	printf ("\n%s\n", read);
+	SUBREADprintf ("\n%s\n", read);
 	#endif
 
 	for (i=0; i<read_len ; i++)
@@ -1754,7 +1803,7 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 			{
 				table[i][j]=-9999;
 			#ifdef indel_debug
-				putchar('\t');
+				SUBREADputchar('\t');
 			#endif
 				continue;
 			}
@@ -1782,21 +1831,19 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 
 			table[i][j]=max(0,max(from_upper, max(from_left, from_upperleft)));
 			#ifdef indel_debug
-			printf("%c%c\t", chromo_ch, read[i]);
-			//printf("%d,%d,%d\t", from_left,from_upperleft,from_upper);
+			SUBREADprintf("%c%c\t", chromo_ch, read[i]);
 			#endif
 		}
 		#ifdef indel_debug
-		puts("");
+		SUBREADputs("");
 		#endif
 
 	}
 	#ifdef indel_debug
-	//puts("");
-	//puts("");
+	//SUBREADputs("");
+	//SUBREADputs("");
 
 	#endif
-	//printf ("EXP_OFFSET=%d    RLEN=%d\n", read_len, expected_offset);
 
 	short current_score = table[read_len-1] [read_len - expected_offset-1];
 	short path_i = read_len-1 ;
@@ -1810,17 +1857,17 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 	for(ii=0;ii< 20; ii++)
 	{
 		for(jj=0; jj<20; jj++)
-			printf("%d\t",table[ii][jj]);
-		puts("");
+			SUBREADprintf("%d\t",table[ii][jj]);
+		SUBREADputs("");
 	}
-		puts("");
-		puts("");
+		SUBREADputs("");
+		SUBREADputs("");
 
 	for(ii=0;ii< 20; ii++)
 	{
 		for(jj=0; jj<20; jj++)
-			printf("%d\t",table_mask[ii][jj]);
-		puts("");
+			SUBREADprintf("%d\t",table_mask[ii][jj]);
+		SUBREADputs("");
 	}
 	#endif
 
@@ -1846,7 +1893,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 		int roughly_mapped = match_chro(read, array_index, read_start_pos, head_test_len , 0, space_type);
 		if (roughly_mapped >= head_test_len  * EXON_RECOVER_MATCHING_RATE - 0.0001)
 		{
-			//printf ("HEAD: ROUGHLY MAPPED %d in %d!\n", roughly_mapped,head_test_len );
 			ret |= 1;
 		}
 		else
@@ -1855,7 +1901,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 			int not_too_bad = 1;
 			int right_match_number=0;
 
-			//printf ("HEAD: ROUGHLY UNMAPPED %d in %d!\n", roughly_mapped,head_test_len );
 			while (1)
 			{
 				int matched_bases_in_window = match_chro_wronglen(read+ window_end_pos - window_size, array_index, read_start_pos + window_end_pos - window_size, window_size, space_type, NULL, &right_match_number);
@@ -1867,7 +1912,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 				else
 				{
 					roughly_mapped = match_chro(read, array_index, read_start_pos, window_end_pos - right_match_number , 0, space_type);
-					//printf("\nMATCH: %d in %d\n", roughly_mapped , (window_end_pos - window_size/2));
 					if (roughly_mapped < (int)(0.5+ (window_end_pos - right_match_number)  * EXON_RECOVER_MATCHING_RATE))
 					{
 						// the quality of this window is too low (at most 1 base is matched). I must consider if it is an indel.
@@ -1889,7 +1933,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							int test_start =0;// window_end_pos - max(0, indel_movement) -  right_match_number - test_length;
 
 							int matched_bases_after_indel = match_chro_support(read +test_start, array_index, read_start_pos + indel_movement +test_start, test_length,0, space_type, qual_txt, qual_format);
-							//printf("MOV=%d ; MATCH=%d ; TLEN=%d\n", indel_movement , matched_bases_after_indel, test_length);
 							float test_rate = EXON_INDEL_MATCHING_RATE_HEAD;
 							
 							if(test_length < 3) test_rate = 1;
@@ -1897,13 +1940,11 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							if(best_matched_bases_after_indel <matched_bases_after_indel  && matched_bases_after_indel >= (int)(0.5+test_length * test_rate))
 							{
 								not_too_bad = 1;
-								//printf ("0WSP=%d, RHT_MAT=%d\n", window_end_pos, right_match_number);
 
 								best_matched_bases_after_indel = matched_bases_after_indel;
 								best_indel_movement = indel_movement;
 								best_indel_pos = window_end_pos - right_match_number;
 
-								//printf("HEAD: RECOVERED : %d/%d  ; BINDEL=%d , MOVE=%d\n",matched_bases_after_indel , test_length, best_indel_pos , best_indel_movement);
 
 								
 								*head_indel_pos = best_indel_pos;
@@ -1932,14 +1973,12 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 		int roughly_mapped = match_chro(read + cover_end, array_index, read_start_pos + cover_end + tail_indel, tail_test_len , 0, space_type);
 		if (roughly_mapped >= tail_test_len  * EXON_RECOVER_MATCHING_RATE - 0.0001)
 		{
-			//printf ("TAIL: ROUGHLY MAPPED %d in %d! T=%f\n", roughly_mapped,tail_test_len,tail_test_len  * EXON_RECOVER_MATCHING_RATE - 0.0001 );
 			ret |= 2;
 		}
 		else
 		{
 			int window_start_pos = cover_end - window_size +1;
 			int not_too_bad = 1;
-			//printf ("TAIL: ROUGHLY UNMAPPED %d in %d!\n", roughly_mapped,tail_test_len );
 
 			while (1)
 			{
@@ -1953,7 +1992,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 				else
 				{
 					roughly_mapped = match_chro(read+window_start_pos + left_match_number, array_index, read_start_pos + window_start_pos + tail_indel + left_match_number, read_len - window_start_pos - left_match_number , 0, space_type);
-					//printf("\nMATCH2: %d in %d\n", roughly_mapped , (int)(0.5+(read_len - window_start_pos -left_match_number )  * EXON_RECOVER_MATCHING_RATE));
 
 					if (roughly_mapped < (int)(0.5+(read_len - window_start_pos -left_match_number )  * EXON_RECOVER_MATCHING_RATE))
 					{
@@ -1969,7 +2007,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							int test_length = read_len - window_start_pos  - left_match_number + min(0, indel_adjustment);
 							//test_length = min(10, test_length);
 
-							//printf("TAIL: RECOVERING0 : indel_adjustment=%d;   indel_movement=%d;  %d\n",indel_adjustment ,indel_movement,test_length);
 
 							if (test_length < window_size) continue;
 							//if (test_length <= 1 + abs(indel_movement)/4) continue;
@@ -1986,7 +2023,6 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 								not_too_bad = 1;
 								best_matched_bases_after_indel = matched_bases_after_indel;
 								best_indel_movement = indel_movement;
-								//printf ("WSP=%d, LFT_MAT=%d\n", window_start_pos, left_match_number);
 								best_indel_pos = window_start_pos + left_match_number ;//-1;
 								*tail_indel_movement = best_indel_movement ;
 							}
@@ -2010,9 +2046,59 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 	else ret |= 2;
 
 
-	//printf("\nEXRET=%d\n", ret);
 	return ret;
 }
+
+
+
+
+float match_base_quality_edit(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch)
+{
+	int i;
+	int ret =0;
+	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
+		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+	//	exit(-1);
+		return 100;
+	}
+	for(i=0; i<read_len; i++)
+	{
+		char true_chr = gvindex_get(array_index, pos + i);
+		if (true_chr == read_txt[i])
+		{
+			if(!qual_txt)
+				ret += 1000000;
+			else if(FASTQ_PHRED64 == phred_version)
+				ret += (1000000-get_base_error_prob64i(qual_txt[i]));
+			else
+				ret += (1000000-get_base_error_prob33i(qual_txt[i]));
+		}
+		else
+		{
+			if(!qual_txt)
+			{
+				ret -= 1000000;
+				(*high_qual_unmatch)++;
+			}
+			else
+			{
+				int ql ;
+				if(FASTQ_PHRED64 == phred_version)
+					ql = get_base_error_prob64i(qual_txt[i]);
+				else
+					ql = get_base_error_prob33i(qual_txt[i]);
+				(*high_qual_unmatch)++;
+
+				ret += ql-1000000;
+			}
+		}
+	}
+	//printf ("SECTION QUAL = %.4f LEN = %d\n", ret, read_len);
+	return ret/1000000.;
+}
+
+
+
 
 
 float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch)
@@ -2020,14 +2106,13 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 	int i;
 	int ret =0;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
-		printf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
 	//	exit(-1);
 		return 100;
 	}
 	for(i=0; i<read_len; i++)
 	{
 		char true_chr = gvindex_get(array_index, pos + i);
-		//printf("%c VS %c\n", true_chr, read_txt[i]);
 		if (true_chr == read_txt[i])
 		{
 			if(!qual_txt)
@@ -2053,7 +2138,7 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 					ql = get_base_error_prob33i(qual_txt[i]);
 				#ifdef QUALITY_KILL
 					#if QUALITY_KILL > 196
-						#define QL_MIN 999000
+						#define QL_MIN 970000
 					#endif
 				#endif
 	
@@ -2071,13 +2156,17 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 	return ret/1000000.;
 }
 
+
+
+
+
+
 float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl)
 {
 	int cigar_cursor = 0;
 	int read_cursor = 0;
 	long long int chromosome_cursor = pos, x;
 	int cigar_length = strlen(cigar_txt);
-	int i;
 	int ret = 0;
 
 	x= 0;
@@ -2098,15 +2187,81 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
 
 				ret += (int)(nret*1000000);
+				if(x<10) ret -= 19999999;
 				chromosome_cursor +=x;
 				read_cursor +=x;
 			}
 			else if(cigar_txt[cigar_cursor] == 'I')
 			{
+				read_cursor +=x;
+				ret -= 19999999;
+			}
+			else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N')
+			{
+				chromosome_cursor +=x;
+				if(cigar_txt[cigar_cursor] == 'D' )
+					ret -= 19999999;
+			}
+			else if(cigar_txt[cigar_cursor] == 'B')
+				chromosome_cursor -=x;
+
+			x= 0;
+		}
+		cigar_cursor++;
+	}
+	if(read_cursor != rl)
+	{
+		*mismatch = 9999;
+		return 0.;
+	}
+	//printf("S=%.5f, LEN=%d\n", ret , read_cursor);
+	return max(1,(ret/10000.) / read_cursor+100.);
+}
+
+
+
+
+
+
+
+float final_mapping_quality_edit(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl)
+{
+	int cigar_cursor = 0;
+	int read_cursor = 0;
+	long long int chromosome_cursor = pos, x;
+	int cigar_length = strlen(cigar_txt);
+	int ret = 0;
+
+	x= 0;
+	while(cigar_cursor < cigar_length)
+	{
+		if(cigar_txt[cigar_cursor] =='X')
+		{
+			cigar_cursor++;
+			continue;
+		}
+		if(cigar_txt[cigar_cursor]>='0' && cigar_txt[cigar_cursor]<='9')
+			x = x*10+ (cigar_txt[cigar_cursor]-'0');
+		else
+		{
+			if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S') 
+			{
+				float nret = match_base_quality_edit(array_index, read_txt + read_cursor, chromosome_cursor , (qual_txt && qual_txt[0])?qual_txt + read_cursor:NULL, x, phred_version, mismatch);
+				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
+
+				ret += (int)(nret*1000000);
+				if(x < 10) ret -= 40000001;
+				chromosome_cursor +=x;
+				read_cursor +=x;
+			}
+			else if(cigar_txt[cigar_cursor] == 'I')
+			{
+				(*mismatch)+=x;
+				read_cursor +=x;
+				/*
 				if(!qual_txt)
 				{
 					ret += x*1000000;
-					read_cursor +=x;
 				}
 				else if(FASTQ_PHRED64 == phred_version)
 				{
@@ -2124,9 +2279,17 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 						ret += (1000000-get_base_error_prob33i(qchar));
 					}
 				}
+				*/
+				ret -= 20000001;
 			}
 			else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N')
+			{
+				if(cigar_txt[cigar_cursor] == 'D'){
+					(*mismatch)+=x;
+					ret -= 20000001;
+				}
 				chromosome_cursor +=x;
+			}
 			else if(cigar_txt[cigar_cursor] == 'B')
 				chromosome_cursor -=x;
 
@@ -2140,7 +2303,7 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 		return 0.;
 	}
 	//printf("S=%.5f, LEN=%d\n", ret , read_cursor);
-	return (ret/10000.) / read_cursor+100.;
+	return max(1., (ret/10000.) / read_cursor+100.);
 }
 
 
@@ -2157,12 +2320,12 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 
 	locate_gene_position(vote -> max_position, &offsets, &chrname, &chrpos);
 
-	printf("Max votes = %d , Position is %s,%u\n", vote->max_vote, chrname, chrpos );
+	SUBREADprintf("Max votes = %d , Position is %s,%u\n", vote->max_vote, chrname, chrpos );
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
                 for(j=0; j< vote->items[i]; j++)
                 {
 			locate_gene_position(vote -> pos[i][j], &offsets, &chrname, &chrpos);
-			printf("\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) %s\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j], vote -> masks[i][j] & IS_NEGATIVE_STRAND?"NEG":"POS");
+			SUBREADprintf("\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) %s\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j], vote -> masks[i][j] & IS_NEGATIVE_STRAND?"NEG":"POS");
 		}
 	
 

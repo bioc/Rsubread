@@ -16,9 +16,9 @@ int ic = 0;
 
 void fullscan_usage()
 {
-	puts("This program is for scanning a particular read in the whole chromosome space by completely scanning the index file.");
+	SUBREADputs("This program is for scanning a particular read in the whole chromosome space by completely scanning the index file.");
 
-	puts("Usage: subread-fullscan -i <index_base> -m <report_threshold> <read_string>");
+	SUBREADputs("Usage: subread-fullscan -i <index_base> -m <report_threshold> <read_string>");
 }
 
 void report_pos(unsigned int pos)
@@ -26,7 +26,7 @@ void report_pos(unsigned int pos)
 	char * chro_name;
 	unsigned int chro_pos;
 	locate_gene_position(pos, &_global_offsets, &chro_name, &chro_pos);
-	printf ("%s,%u\n", chro_name,chro_pos);
+	SUBREADprintf ("%s,%u\n", chro_name,chro_pos);
 }
 
 
@@ -45,17 +45,17 @@ void scan_test_match(char * read, char * read_rev, char * chro, int rl, unsigned
 	int threshold = (int)(MIN_REPORTING_RATIO * rl - 0.001);
 	if (m>=threshold)
 	{
-		printf("\nFound on positive strand (%0.2f%%): ", m*100./rl);
+		SUBREADprintf("\nFound on positive strand (%0.2f%%): ", m*100./rl);
 		report_pos(pos);
 	}
 	if (mr>=threshold)
 	{
-		printf("\nFound on negative strand (%0.2f%%): ", mr*100./rl);
+		SUBREADprintf("\nFound on negative strand (%0.2f%%): ", mr*100./rl);
 		report_pos(pos);
 	}
 
 	//if (pos > 19999999)
-	//printf ("m=%d  mr=%d  T=%d\n", m, mr, threshold);
+	//SUBREADprintf ("m=%d  mr=%d  T=%d\n", m, mr, threshold);
 }
 
 void full_scan_read(char * index_name, char * read_str)
@@ -79,7 +79,7 @@ void full_scan_read(char * index_name, char * read_str)
 		if (stat_ret !=0 )
 		{
 			if(!tabno)
-				printf("The index does not contain any raw base data which is required in scanning. Please use the -b option while building the index.\n");
+				SUBREADprintf("The index does not contain any raw base data which is required in scanning. Please use the -b option while building the index.\n");
 			return ;
 		}
 		if (tabno>0)gvindex_destory(&index);
@@ -145,18 +145,18 @@ int main (int argc , char ** argv)
 	strncpy(read_str, argv[optind], 1199);
 
 	load_offsets (&_global_offsets, index_name);
-	printf ("Reporting threshold=%0.2f%%\n", MIN_REPORTING_RATIO*100);
+	SUBREADprintf ("Reporting threshold=%0.2f%%\n", MIN_REPORTING_RATIO*100);
 	for(i=0;i<1000;i++)
 	{
 		if (!_global_offsets.read_offset[i])break;
 		SCAN_TOTAL_BASES = _global_offsets.read_offset[i];
 	}
-	printf ("All bases =%u\n", SCAN_TOTAL_BASES);
-	printf ("Scanning the full index for %s...\n\n", read_str);
+	SUBREADprintf ("All bases =%u\n", SCAN_TOTAL_BASES);
+	SUBREADprintf ("Scanning the full index for %s...\n\n", read_str);
 
 	full_scan_read(index_name, read_str);
 
-	printf ("\nFinished.\n");
+	SUBREADprintf ("\nFinished.\n");
 
 	return 0;
 }
