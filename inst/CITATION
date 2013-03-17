@@ -1,10 +1,13 @@
-citEntry(entry="article",
-         title = "Subread: a superfast read aligner with high sensitivity and accuracy",
-         author = personList( as.person("Yang Liao" ),
-                              as.person("Wei Shi" ) ),
-         year = 2011,
-         journal = In_Preparation,
-         volume = ,
-         pages = ,
-         doi = ,
-)
+citHeader("Please cite Rsubread as below:")
+
+citEntry(entry="Article",
+    title = "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",
+    author = personList(as.person("Liao Y"),as.person("Smyth GK"),as.person("Shi W")),
+    journal="Nucleic Acids Research",
+    year = 2013,
+    note = "In Press, accepted on 8 March 2013",
+
+    textVersion = 
+    paste("Liao Y, Smyth GK and Shi W. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, In Press, accepted on 8 March 2013")
+    )
+
