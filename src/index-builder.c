@@ -429,7 +429,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	SUBREADprintf("Scanning non-informative reads in the chromosomes...\n");
+	SUBREADprintf("Scanning uninformative subreads(16mers) in the reference sequences \n");
 
 	if (chro_file_number > 199)
 	{

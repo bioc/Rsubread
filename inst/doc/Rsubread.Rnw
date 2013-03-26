@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread: An R package for aligning next-generation sequencing reads}
 \author{Wei Shi}
-\date{1 September 2011}
+\date{25 March 2013}
 \maketitle
 
 \section{Introduction}
@@ -145,12 +145,14 @@ propmapped(results)
 @
 
 \section{Citation}
-Yang Liao and Wei Shi. ``Seed-and-vote: the next-generation read mapping paradigm'', submitted.
+Liao Y, Smyth GK and Shi W (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, Volume 41, accepted on 8 March (In Press).
 
 \section{Authors}
-Wei Shi (maintainer of Rsubread), Bioinformatics Division, The Walter and Eliza Hall Institute of Medical Research, Australia \\
-Yang Liao (maintainer of Subread), Department of Computer Science and Software Engineering, The University of Melbourne, Australia \\
-Jenny Zhiying Dai, Department of Computer Science and Software Engineering, The University of Melbourne, Australia
+Drs Wei Shi and Yang Liao \\
+Bioinformatics Division \\
+The Walter and Eliza Hall Institute of Medical Research \\
+1G Royal Parade, Parkville, Victoria 3052 \\
+Australia \\
 
 \section{Contact}
 Please contact Wei Shi (shi@wehi.edu.au) if you have any inquires.

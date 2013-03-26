@@ -2,15 +2,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <R.h>
+#include <zlib.h>
+#include "sambam-file.h"
+
 
 int readSummary(int argc,char *argv[]){
 
 /*
-if(argc == 1){
-    printf("This function counts the number of reads falling into each exon region and saves the result to file output_file.\nThe order of exons in the output_file is the same as the exon order in the annotation file.\nThe input file should be in SAM format.\nThe annotation file should have already been sorted by chromosome name.\n\n"); 
-    printf("Usage: readSummary annotation_file_sorted input_file output_file isPairedEnd min_distance max_distance\n\n");
-    exit(0);
-}
+This function counts the number of reads falling into each exon region.
+The order of exons in the output is the same as that of exons included in the annotation.
+The annotation, if provided as a file, should be sorted by chromosome name.
+
+Parameters passed from the featureCounts R function:
+0: "readSummary"
+1: ann
+2: files[i]
+3: fout
+4: as.numeric(isPairedEnd)
+5: min.distance
+6: max.distance
+7: as.numeric(tolower(file.type)=="sam")
 */
 
 FILE *fp_ann, *fp_in, *fp_out;
@@ -43,17 +55,24 @@ int isPE, minPEDistance, maxPEDistance;
 char * mate_chr;
 int mate_pos, pos_leftmost, fragment_length;
 
+int isSAM;
+char * ret;
+SamBam_FILE * fp_in_bam;
+
 line = (char*)calloc(MAX_LINE_LENGTH, 1);
 
 isPE = atoi(argv[4]);
 minPEDistance = atoi(argv[5]);
 maxPEDistance = atoi(argv[6]);
 
-// if(isPE == 1)
-//   printf("Minimal and maximal allowable paired-end distances are: \%d and \%d\n", minPEDistance, maxPEDistance); 
-	
+isSAM = atoi(argv[7]);
+ 	
 /* read in annotation data */
 fp_ann = fopen(argv[1],"r");
+if(!fp_ann){
+  Rprintf("Failed to open the annotation file %s\n",argv[1]);
+  return -1;
+}
 fgets(line, MAX_LINE_LENGTH, fp_ann);
 nexons = 0;
 while (fgets(line, MAX_LINE_LENGTH, fp_ann))
@@ -89,38 +108,76 @@ nchr = curchr;
 anno_chr_head[curchr] = nexons;
 fclose(fp_ann);
 
-// printf("Number of chromosomes included in the annotation is \%d\n",nchr);
+Rprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
 
 /* get read length */
-fp_in = fopen(argv[2],"r");
-while (fgets(line, MAX_LINE_LENGTH, fp_in)){
-  if(line[0] == '@')
-    continue;
-  strtok(line,"\t");
-  for(i=0;i<8;i++) strtok(NULL,"\t");
-  read_length = strlen(strtok(NULL,"\t"));
-  break;
+if (isSAM == 1){
+  fp_in = fopen(argv[2],"r");
+  if(!fp_in){
+    Rprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+	return -1;
+  }
 }
-fclose(fp_in);
+else{
+  fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
+  if(!fp_in_bam){
+    Rprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+	return -1;
+  }
+}
 
-/* summarize reading mapping data */
-fp_in = fopen(argv[2],"r");
-while (fgets(line, MAX_LINE_LENGTH, fp_in)){
-  if(line[0] == '@')
-    continue;
+while (1){
+  if (isSAM == 1)
+	ret = fgets(line, MAX_LINE_LENGTH, fp_in);
+  else
+	ret = SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);  
+
+  if(!ret) break;
+	
+  if(line[0] != '@'){
+	strtok(line,"\t");
+	for(i=0;i<8;i++) strtok(NULL,"\t");
+	read_length = strlen(strtok(NULL,"\t"));
+	break;
+  }
+} //end while
+
+if (isSAM == 1)
+  fclose(fp_in);
+else
+  SamBam_fclose(fp_in_bam);
+
+/* SUMMARIZE READ MAPPING DATA */
+if (isSAM == 1)
+  fp_in = fopen(argv[2],"r");
+else
+  fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
+
+while (1){
+  if (isSAM == 1)
+	ret = fgets(line, MAX_LINE_LENGTH, fp_in);
+  else
+	ret = SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);  
+
+  if(!ret) break;
+  if(line[0] == '@') continue;
+
+  // process the current read or read pair
   strtok(line,"\t");
   strtok(NULL,"\t");
   read_chr = strtok(NULL,"\t");
 
-  //skip the read if it is unmapped (its mate is skipped too if paired-end)
-  if(*read_chr == '*')
-    if(isPE == 1){
-      fgets(line, MAX_LINE_LENGTH, fp_in);
-      continue;
+  //skip the read if unmapped (its mate will be skipped as well if paired-end)
+  if(*read_chr == '*'){
+	if(isPE == 1){
+	  if (isSAM == 1)
+		fgets(line, MAX_LINE_LENGTH, fp_in);
+	  else
+		SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);
     }
-    else
-     continue;
-
+	continue;
+  }
+  
   //get mapping location of the read (it could be the first read in a pair)
   read_pos = atoi(strtok(NULL,"\t"));
   
@@ -128,15 +185,18 @@ while (fgets(line, MAX_LINE_LENGTH, fp_in)){
   if(isPE == 1){
     strtok(NULL,"\t");
     strtok(NULL,"\t");
-    mate_chr = strtok(NULL,"\t"); //get chr to which the mate read is mapped 
+    mate_chr = strtok(NULL,"\t"); //get chr which the mate read is mapped to
     mate_pos = atoi(strtok(NULL,"\t"));
     fragment_length = abs(atoi(strtok(NULL,"\t"))); //get the fragment length
     if(strcmp(mate_chr,"=") != 0 || fragment_length > (maxPEDistance + read_length -1) || fragment_length < (minPEDistance + read_length - 1)){
-      //the two reads are not properly paired and are skipped 
-      fgets(line, MAX_LINE_LENGTH, fp_in);
-      continue;
+      //the two reads are not properly paired and are skipped
+	  if (isSAM == 1)
+		fgets(line, MAX_LINE_LENGTH, fp_in);
+	  else
+		SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);
+	continue;
     }
-  }//end if(isPE==1)
+  } //end if(isPE==1)
 
   //assign reads or fragments to features 
   flag = 0;
@@ -152,11 +212,11 @@ while (fgets(line, MAX_LINE_LENGTH, fp_in)){
   if(flag == 1)
     for(i=search_start;i<=search_end;i++){
       if(isPE == 1){
-	//get the mapping position of leftmost base of the fragment
+	  //get the mapping position of leftmost base of the fragment
         if(read_pos < mate_pos)
-	  pos_leftmost = read_pos;
-	else
-	  pos_leftmost = mate_pos;
+		  pos_leftmost = read_pos;
+		else
+	      pos_leftmost = mate_pos;
 
         if(pos_leftmost >= (start[i]-fragment_length+1) && pos_leftmost <= stop[i]){
           nreads_mapped_to_exon++;
@@ -166,33 +226,43 @@ while (fgets(line, MAX_LINE_LENGTH, fp_in)){
       }
       else
         if(read_pos >= (start[i]-read_length+1) && read_pos <= stop[i]){
-	  nreads_mapped_to_exon++;
+		  nreads_mapped_to_exon++;
           nreads[i]++;
           break;
         }
     } //end for
 
   //if paired end data are used, the current read pair is found properly paired and there is no need to process the second read in the pair 
-  if(isPE == 1)
-    fgets(line, MAX_LINE_LENGTH, fp_in); 
+  if(isPE == 1){
+	if (isSAM == 1)
+	  fgets(line, MAX_LINE_LENGTH, fp_in);
+	else
+	  SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);
+  }
 
 } //end while 
 
 
-/*
 if(isPE == 1)
-  printf("Number of fragments mapped to features is: %d\n\n", nreads_mapped_to_exon);
+  Rprintf("Number of fragments mapped to the features is: %d\n\n", nreads_mapped_to_exon);
 else
-  printf("Number of reads mapped to features is: %d\n\n", nreads_mapped_to_exon);
-*/
+  Rprintf("Number of reads mapped to the features is: %d\n\n", nreads_mapped_to_exon);
 
 /* save the results */
 fp_out = fopen(argv[3],"w");
-fprintf(fp_out,"entrezid\tchromosome\tchr_start\tchr_stop\tnreads\n");
+if(!fp_out){
+  Rprintf("Failed to create file %s\n", argv[3]);
+  return -1;
+}
+fprintf(fp_out,"geneid\tchr\tstart\tend\tnreads\n");
 for(i=0;i<nexons;i++)
-  fprintf(fp_out,"%d\t%s\t%d\t%d\t%d\n",geneid[i],chr[i],start[i],stop[i],nreads[i]);
+  fprintf(fp_out,"%d\t%s\t%ld\t%ld\t%d\n",geneid[i],chr[i],start[i],stop[i],nreads[i]);
 
-fclose(fp_in);
+if (isSAM == 1)
+  fclose(fp_in);
+else
+  SamBam_fclose(fp_in_bam);
+
 fclose(fp_out);
 
 free(line);

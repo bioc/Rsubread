@@ -1,3 +1,13 @@
+CHANGES IN VERSION 1.10.0
+------------------------
+
+NEW FEATURES
+
+    o Rsubread package can now run on Mac OS X operating systems.
+
+    o Major updates to the function 'featureCounts', a general-purpose read summarization function.
+
+
 CHANGES IN VERSION 1.8.0
 ------------------------
 

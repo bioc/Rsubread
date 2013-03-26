@@ -1,15 +1,15 @@
-featureCounts <- function(SAMfiles,type="gene",species="mm9",annot=NULL,isPairedEnd=FALSE,min_distance=10,max_distance=2000)
+featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
 {
 	flag <- FALSE
 
 	if(is.null(annot)){
-	  switch(tolower(as.character(species)),
+	  switch(tolower(as.character(genome)),
 	    mm9={
 	      ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 37.2 is used.\n")
 		},
 	    mm10={
-	      ann <- system.file("annot","mm10_NCBI_annotation_exon_sorted.txt",package="Rsubread")
+	      ann <- system.file("annot","mm10_NCBI_exon.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 38.1 is used.\n")
 		 },
 	    hg={
@@ -17,7 +17,7 @@ featureCounts <- function(SAMfiles,type="gene",species="mm9",annot=NULL,isPaired
 	      cat("Human annotation NCBI Build 37.2 is used.\n")
 	       },
 	       {
-		stop("In-built annotation for ", species, " is not available.\n")
+		stop("In-built annotation for ", genome, " is not available.\n")
 	       }
 	  ) # end switch
 	}
@@ -28,12 +28,14 @@ featureCounts <- function(SAMfiles,type="gene",species="mm9",annot=NULL,isPaired
 	  }
 	  else{
 	    annot_df <- as.data.frame(annot,stringsAsFactors=FALSE)
-	    if(sum(c("entrezid","chromosome","chr_start","chr_stop") %in% colnames(annot_df)) != 4)
-	      stop("annot is not a data frame or required columns can not be found in annot.\n")
-	    annot_df$chromosome <- as.character(annot_df$chromosome)
-	    annot_df <- annot_df[order(annot_df$chromosome),]
-	    if(any(nchar(annot_df$chromosome) > 40))
-	      annot_df$chromosome <- substring(annot_df$chromosome,1,40)
+	    if(sum(c("geneid","chr","start","end") %in% tolower(colnames(annot_df))) != 4)
+	      stop("The format of the provided annotation data is incorrect. Please refer to the help page of this function for the correct data format.\n")
+		colnames(annot_df) <- tolower(colnames(annot_df))
+		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,stringsAsFactors=FALSE)		
+	    annot_df$chr <- as.character(annot_df$chr)
+	    annot_df <- annot_df[order(annot_df$chr),]
+	    if(any(nchar(annot_df$chr) > 40))
+	      annot_df$chr <- substring(annot_df$chr,1,40)
 	    fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
 	    write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
 	    ann <- fout_annot
@@ -43,9 +45,9 @@ featureCounts <- function(SAMfiles,type="gene",species="mm9",annot=NULL,isPaired
 
 	fout <- file.path(".",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
 
-	for(i in 1:length(SAMfiles)){
-	  cat("Processing", SAMfiles[i], " ...\n")
-	  cmd <- paste("readSummary",ann,SAMfiles[i],fout,as.numeric(isPairedEnd),min_distance,max_distance,sep=",")
+	for(i in 1:length(files)){
+	  cat("Processing", files[i], " ...\n")
+	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
 	  C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	  x1 <- read.delim(fout,stringsAsFactors=FALSE)  
@@ -54,22 +56,22 @@ featureCounts <- function(SAMfiles,type="gene",species="mm9",annot=NULL,isPaired
 	  else
 	    x <- cbind(x,x1$nreads)
 	}
-	colnames(x)[1:4] <- c("EntrezID","Chr","Start","End")
-	colnames(x)[-c(1:4)] <- SAMfiles
+	colnames(x)[1:4] <- c("GeneID","Chr","Start","End")
+	colnames(x)[-c(1:4)] <- files
 
 	file.remove(fout)
 	if(flag) 
 	  file.remove(fout_annot)
 
-	if(type == "gene"){
-	  y <- rowsum(x[,-c(1:4)],x$EntrezID)
-	  gene_length <- rowsum(x$End-x$Start+1,x$EntrezID)
-	  z <- list(counts=as.matrix(y),annotation=data.frame(EntrezID=rownames(y),GeneLength=gene_length,stringsAsFactors=FALSE),targets=SAMfiles)
+	if(tolower(feature.type) == "gene"){
+	  y <- rowsum(x[,-c(1:4)],x$GeneID)
+	  gene_length <- rowsum(x$End-x$Start+1,x$GeneID)
+	  z <- list(counts=as.matrix(y),annotation=data.frame(GeneID=rownames(y),Length=gene_length,stringsAsFactors=FALSE),targets=files)
 	}
 	else{
 	  y <- as.matrix(x[,-c(1:4)]) 
-	  rownames(y) <- x$EntrezID
-	  z <- list(counts=y,annotation=data.frame(x[,1:4],ExonLength=x$End-x$Start+1,stringsAsFactors=FALSE),targets=SAMfiles)
+	  rownames(y) <- x$GeneID
+	  z <- list(counts=y,annotation=data.frame(x[,1:4],Length=x$End-x$Start+1,stringsAsFactors=FALSE),targets=files)
 	}
 	z	
 }

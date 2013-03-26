@@ -1,64 +1,91 @@
 \name{featureCounts}
 \alias{featureCounts}
-\title{Count the number of mapped reads for each feature}
-\description{Summarize read counts to features including genes and exons}
+\title{featureCounts: a general-purpose read summarization function}
+\description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(SAMfiles,type="gene",species="mm9",annot=NULL,isPairedEnd=FALSE,min_distance=10,max_distance=2000)
+featureCounts(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
 }
 \arguments{
-  \item{SAMfiles}{ a character vector giving names of SAM format files.}
-  \item{type}{ a character string giving the feature type. Its value could be \code{gene} or \code{exon}.}
-  \item{species}{ a character string specifying the species. The allowed value is \code{mm9}, \code{mm10} or \code{hg}. Values of this argument determines which in-built annotation file will be used, if \code{annot} is \code{NULL}.}
-  \item{annot}{ a character string giving the name of an annotation file provided by the user, or a data frame containing annotation information. If \code{NULL} (by default), the in-built annotation file will be used. See below for more details.}
+  \item{files}{ a character vector giving names of SAM format files.}
+  \item{file.type}{ a character string giving the type of files provided. \code{SAM} and \code{BAM} formats are supported. \code{SAM} by default.}
+  \item{feature.type}{ a character string giving the feature type. Its value could be \code{gene}, \code{exon} or \code{other}. \code{gene} by default.}
+  \item{genome}{ a character string specifying the reference genome to which the sequencing reads were mapped. \code{mm9} by default. This argument is only applicable when \code{annot} is \code{NULL}.}
+  \item{annot}{ a data frame containing annotation information. When \code{annot} is \code{NULL}, an in-built annotation will be used.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. \code{FALSE} by default.}
-  \item{min_distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
-  \item{max_distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default.}
+  \item{min.distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
+  \item{max.distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default. \code{min.distance} and \code{max.distance} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a template spans two or more exons, the mapping locations of the pair of reads sequenced from this template may have a distance much larger than the nominal template length.}
   }
 \details{
-This function takes as input a set of SAM format files and assigns reads to the features.
-Currently, only feature types including \code{gene} and \code{exon} are supported.
-\code{gene} is the aggregation of all the exons for each gene.
+\code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features the mapped reads that were generated from genomic DNA and RNA sequencing.
 
-There are three in-built annotation files which are used by this function to summarize reads for genes or exons for mm9, mm10 and hg19, respectively.
-Gene annotation were downloaded from NCBI (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}) and then processed to create annotation files used by this function. 
-The \code{species} argument specifies which annotation file should be used.
-These in-built annotation will be used when \code{annot} is \code{NULL}.
+This function takes as input a set of files containing read mapping results output from a read aligner (e.g. \code{\link{align}}), and then assigns the mapped reads to the genomic features.
+The input files should be in SAM or BAM format.
 
-Users can also provide their own annotation for read summarization, via the \code{annot} argument.
-In this case, user provided annotation will override the in-built annotation.
-Users can either provide the name of their own annotation file, or they can provide a data frame which contain annotation information.
-If a data frame is provided, at least four columns, named \code{entrezid}, \code{chromosome}, \code{chr_start} and \code{chr_stop}, are required.
-If users provide an annotation file, then it should be a tab delimited file and its first four columns should be named as \code{entrezid}, \code{chromosome}, \code{chr_start} and \code{chr_stop}, respectively.
-The file has to be sorted by the \code{chromosome} column (either increasing or decreasing order is OK), and chromosome names should not contain more than 40 characters.
-Below is an example for the annotation file provided by the user (sorted by the chromosome column):
+The argument \code{feature.type} specifies the type of genomic features used by this function.
+It has the values of \code{gene}, \code{exon} or \code{other}.
+\code{gene} and \code{exon} are typically used when summarizing RNA-seq read data, which will yield read counts for genes and exons, respectively.
+This function includes the in-built annotations for a few genomes including \code{mm9}, \code{mm10} and hg19 (\code{hg}).
+These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}).
+They contain the Entrez gene identifier, chromosomal name, chromosomal start location and chromosomal end location of each exon.
+Users may select an appropriate in-built annotation for their data via the argument \code{genome}.
+\code{annot} should be set to \code{NULL} when using an in-built annotation.
+Users can provide their own annotation via the \code{annot} argument (see below for the format of the user provided annotation).
+
+When assigning to the features the reads generated by genomic DNA sequencing (WES, WGS and ChIP-seq), users may set \code{feature.type} to be \code{other}.
+For this feature type, users can still use the in-built annotations to get the reads counts for the NCBI exons, or they can provide their own annotation to this function so as to quantify the genomic features of their interest.
+
+The user provided annotation data must contain at least four columns named \code{GeneID}, \code{Chr}, \code{Start} and \code{end} (case insensitive), giving the gene identifier (eg. a gene sybmol or an accession number), chromosomal name, chromosomal start location and chromosomal end location of each feature, respectively.
+When the features do not have a gene identifier, users can simply populate the \code{geneid} column by using the row numbers of the features in the annotation data frame.
+Chromosome names of the features are not allowed to contain more than 40 characters.
+Below is an example of a user provided annotation:
 \preformatted{
-entrezid	chromosome	chr_start	chr_stop
-497097	chr1	3204563	3207049
-497097	chr1	3411783	3411982
-497097	chr1	3660633	3661579
-100503874	chr1	3637390	3640590
-100503874	chr1	3648928	3648985
-100038431	chr1	3670236	3671869
+GeneID		Chr		Start		End
+497097		chr1	3204563		3207049
+497097		chr1	3411783		3411982
+497097		chr1	3660633		3661579
+100503874	chr1	3637390		3640590
+100503874	chr1	3648928		3648985
+100038431	chr1	3670236		3671869
 ...
 }
 
-Although this function is designed for summarizing reads from RNA-seq experiments, it can be used to summarize reads from other next-gen sequencing experiments as well, for example ChIP-seq or other DNA sequencing experiments.
-Simply by setting \code{type} to \code{exon} and providing an annotation, this function will yield numbers of mapped reads for each feature. 
+Note that the chromosomal names included in the annotation (the 'Chr' column) must match the chromosomal names used in the reference sequence file/s to which the reads were mapped, otherwise reads cannot be assigned to the features.
+In the in-built annotations, each chromosomal name is a character string starting with "chr" (lower case) and ending with the chromosome number, for example "chr1", "chr20" etc.
+ 
+When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, the fragments (not reads) will be counted for each feature.
+For RNA-seq data, the distance between the mapping locations of the pair of reads sequenced from the same fragment could be much greater than the fragment length when the fragment spans two or more exons.
+Such fragments can be counted when a large value of the argument \code{max.distance} is used (\code{2000} by default).
+Note that the Subread (\code{\link{align}}) and Subjunc (\code{\link{subjunc}}) aligners can report the mapping coordinates of the paired-end reads even when the two reads have a mapping distance much larger than the nominal fragment length.
+ 
 }
 \value{ 
 A list with the following components:
 \tabular{ll}{
-  \code{counts}:\tab a data matrix containing read counts for each gene or exon.\cr
-  \code{annotation}:\tab a data frame containing Entrez gene identifers, gene/exon length etc.\cr
+  \code{counts}:\tab a data matrix containing read counts for each feature in each library\cr
+  \code{annotation}:\tab a data frame including columns named \code{GeneID}, \code{Chr}, \code{Start} and \code{End}. The \code{GeneID} column includes Entrez gene identifiers when the in-built annotations are used.\cr
   \code{targets}:\tab a character vector giving sample information.
 }
 }
 %\references{
 %}
-\author{Wei Shi}
+\author{Wei Shi and Yang Liao}
 %\note{}
 %\seealso{}
-%\examples{}
+\examples{
+# build an index using a sample reference sequence ('reference.fa') that includes a chromosome called 'chr_dummy' and 90,000 bases
+library(Rsubread)
+ref <- system.file("extdata","reference.fa",package="Rsubread")
+buildindex(basename="./reference_index",reference=ref)
+
+# align a sample read dataset ('reads.txt') to the sample reference
+reads <- system.file("extdata","reads.txt",package="Rsubread")
+align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.SAM")
+
+# assign mapped reads to dummy features
+dummy_features <- data.frame(GeneID=1:5,Chr="chr_dummy",Start=c(1,2000,5000,20000,50000),End=c(1,2000,5000,20000,50000)+1000,stringsAsFactors=FALSE)
+fc <- featureCounts("Rsubread_alignment.SAM",feature.type="other",annot=dummy_features)
+fc
+}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}

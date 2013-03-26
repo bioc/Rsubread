@@ -1,5 +1,7 @@
-March 18, 2013
-(1) updated CITATION file.
+March 26, 2013
+(1) Updated CITATION file.
+(2) Updated documentation.
+(3) Modified the arguments of featureCounts() function
 
 March 14, 2013 - 1.9.3
 (1) Mac support was added.
