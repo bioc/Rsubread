@@ -1,7 +1,7 @@
 Package: Rsubread
 Type: Package
 Title:  Rsubread: An R package for the alignment, summarization and analyses of next-generation sequencing data
-Version: 1.9.4
+Version: 1.9.5
 Author: Wei Shi, Yang Liao, Jenny Zhiyin Dai and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>
 Description: This package performs read mapping, exon junction detection and other tasks for next-generation sequencing data. The read mapping function implements a novel mapping paradigm based on seed-and-vote. It can be used to map both short reads and long reads (>200bp) and reads of variable lengths. It also provides functions to summarize read counts to genes or exons and gives detection p values for each gene in the RNA-seq data.

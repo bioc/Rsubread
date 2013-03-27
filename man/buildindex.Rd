@@ -31,13 +31,14 @@ The index for the human or mouse genome can be built into one whole segment by s
 This allows the maximal mapping speed to be achieved.
 It takes less than 20 minutes to map 10 million reads to the human or mouse genome with this setting.
 
-It takes typically less than one hour and half to build an index for the human or mouse genome. 
+It takes typically less than one hour and half to build an index for the human or mouse genome.
+The index only needs to be built once and can be re-used in the subsequent alignments.
 }
 \value{
 No value is produced but index files are written to the current working directory.
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi, "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, In Press, accepted on 8 March 2013.
+Yang Liao, Gordon K Smyth and Wei Shi (2013), "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, Volume 41, Accepted on 8 March, In Press.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}

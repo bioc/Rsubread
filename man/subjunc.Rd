@@ -32,7 +32,9 @@ The C program can be run on its own as well, which is included in the subread so
 \value{ 
 This function outputs two files: one is a SAM format file which includes the mapping results for all the reads (including both junction reads and exonic reads), and the other is a BED format file which inlcudes pairs of splicing points (exon-exon junctions) found from each junction read, number of supporting junction reads for each exon-exon junction and so on.
 }
-%\references{}
+\references{
+Yang Liao, Gordon K Smyth and Wei Shi (2013), "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, Volume 41, Accepted on 8 March, In Press.
+}
 \author{Wei Shi and Yang Liao}
 %\note{}
 %\seealso{}
