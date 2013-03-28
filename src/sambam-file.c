@@ -73,7 +73,7 @@ SamBam_FILE * SamBam_fopen(const char * fname , int file_type)
 		ret -> bam_file_stage = BAM_FILE_STAGE_HEADER;
 		
 		BS_uint_32 magic_4 = gzread_B32(ret -> gz_file);
-		if(magic_4 != '\1MAB')
+		if(magic_4 != 21840194) // this number is the four bytes of "BAM1"
 		{
 			free(ret);
 			return NULL;

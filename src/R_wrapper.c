@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <Rversion.h>
+#if (R_VERSION >= R_Version(2,3,0))
+#define R_INTERFACE_PTRS 1
+#define CSTACK_DEFNS 1
+#include <Rinterface.h>
+#endif 
 
 int main_junction(int argc,char ** argv);
 int main_align(int argc,char ** argv);
@@ -38,6 +44,8 @@ void R_buildindex_wrapper(int * nargs, char ** argv)
 
 void R_align_wrapper(int * nargs, char ** argv)
 {
+	uintptr_t old_cstack_limit = R_CStackLimit;
+	R_CStackLimit =(uintptr_t)-1;
         optind = 1;
 
         char * r_argv, ** c_argv;
@@ -58,10 +66,13 @@ void R_align_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	R_CStackLimit = old_cstack_limit;
 }
 
 void R_junction_wrapper(int * nargs, char ** argv)
 {
+	uintptr_t old_cstack_limit = R_CStackLimit;
+	R_CStackLimit =(uintptr_t)-1;
         optind = 1;
 
         char * r_argv, ** c_argv;
@@ -82,6 +93,7 @@ void R_junction_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	R_CStackLimit = old_cstack_limit;
 }
 
 
@@ -161,6 +173,8 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
 
 void R_SNPcalling_wrapper(int * nargs, char ** argv)
 {
+	uintptr_t old_cstack_limit = R_CStackLimit;
+	R_CStackLimit =(uintptr_t)-1;
         optind = 1;
 
         char * r_argv, ** c_argv;
@@ -181,6 +195,7 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	R_CStackLimit = old_cstack_limit;
 }
 
 
