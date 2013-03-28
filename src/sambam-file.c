@@ -335,9 +335,10 @@ int test_bamview(int argc, char ** argv)
 			char buf[3000];
 			char * buf2 = SamBam_fgets(fp,buf, 3000);
 			//printf(">>%s<<\n",buf);
-			if(buf2)
-				fwrite(buf,strlen(buf), 1, stdout);
-			else break;
+			//if(buf2)
+				//fwrite(buf,strlen(buf), 1, stdout);
+			//else break;
+			break;
 		}
 
 		SamBam_fclose(fp);
