@@ -946,7 +946,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		gehash_data_t tmp_val;
 
 
-		if(i % 200 == 0)
+		if(i % (200*70) == 0)
 			print_text_scrolling_bar("Saving index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 
