@@ -1,7 +1,7 @@
 \name{subjunc}
 \alias{subjunc}
-\title{Discovering exon-exon junctions from RNA-seq data}
-\description{Discover exon-exon junction locations from RNA-seq data using seed-and-vote paradigm}
+\title{Discovering exon-exon junctions from using RNA-seq data}
+\description{Use the seed-and-vote paradigm to accurately detect exon-exon junctions from RNA-seq data}
 \usage{
 subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indels=5,min_distance=50,max_distance=600,PE_orientation="fr")
 }
@@ -18,16 +18,22 @@ subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indel
   \item{PE_orientation}{ character string giving the orientation of the two reads in a pair. "fr" by default, which means the first read is on the forward strand and the second read is on the reverse strand.}
   }
 \details{
-This function takes as input the SAM format file generated from read alignment (eg. output from \code{align} function), and then tries to discover exon-exon junctions.
-Donor and receptor sites are being examined when detecting junctions.
-This function can detect junction locations located at any position of the read.
-It can detect spliced exons which are as far as 500kb.
-It supports INDEL detection during the junction detection as well.
-\code{align} function should be run first before calling this function.
+The RNA-seq technology provides a unique opportunity to identify the alternative splicing events that occur during the gene transcription process.
+This function makes use of a powerful read mapping paradigm called ``seed-and-vote" to accurately detect the exon-exon junctions (Liao et al. 2013).
 
-This function calls the underlying C program to perform the exon junction discovery.
-The C program can be run on its own as well, which is included in the subread software package (http://subread.sourceforge.net/)
+This function takes as input the mapping results (in SAM format) from a read aligner, preferably the Subread aligner included in this package (\code{\link{align}}).
+It extracts a number of subreads (16mers) from each read, maps them to the reference genome and then identifies the two best mapping locations for each read.
+A verification step is then applied to determine whether each read should be mapped as an exon-spanning read or not and to report the discovered exon-exon junctions.
+The donor and receptor sites, which are splicing signals, are required to be present when calling exon-exon junctions.
+The indels identified in the mapped reads included in the provided SAM file will be kept in the output of this function.
+This function also reports the indels discovered in the exon-spanning reads.
 
+It has the capacity to detect junction locations that are present at any position of the reads.
+The pair of exons that are spliced together are allowed to be up to 500kb apart in the genome.
+
+This function can run on both single-ended and paired-end data.
+
+It calls the \emph{Subjunc} program (written in C programming language) included in the Subread package (http://subread.sourceforge.net/) for this analysis.
 }
 \value{ 
 This function outputs two files: one is a SAM format file which includes the mapping results for all the reads (including both junction reads and exonic reads), and the other is a BED format file which inlcudes pairs of splicing points (exon-exon junctions) found from each junction read, number of supporting junction reads for each exon-exon junction and so on.
