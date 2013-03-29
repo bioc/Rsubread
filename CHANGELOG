@@ -1,4 +1,8 @@
-March 28, 2013
+March 29, 2013 - 1.9.7
+(1) Changes to the configure file and Makevars.Linux
+(2) Changes to sorted-hashtable.c
+
+March 28, 2013 - 1.9.6
 (1) Fix the multithreading issue
 (2) Documentation improvements
 

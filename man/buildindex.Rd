@@ -13,7 +13,7 @@ buildindex(basename,reference,colorspace=FALSE,memory=3700,TH_subread=24)
   \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16 mers). 24 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
   }
 \details{
-This function builds an index for a reference genome and the built index can then be used by Subread (\code{\link{align}}) and \code{\link{Subjunc}} to map reads.
+This function builds an index for a reference genome and the built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} to map reads.
 Subread is a general-purpose read aligner that can be used to map both genomic DNA sequencing (gDNA-seq) reads and RNA sequencing (RNA-seq) reads.
 Subjunc is designed for detecting exon-exon junctions from using RNA-seq data.
 Subread and Subjunc use a mapping paradigm called 'seed-and-vote', allowing more efficient and accurate read mapping (Liao et al. 2013).

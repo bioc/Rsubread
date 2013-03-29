@@ -4,9 +4,9 @@
 
 UNAME=`uname`
 
-echo @@@@@ The operation system is supposed to be $UNAME.
+echo @@@@@ The operating system is $UNAME.
 
-if [[ $UNAME == "Linux" ]]
+if [ $UNAME == "Linux" ]
 then
 	# This is a Linux machine! 
 	cp src/Makevars.Linux src/Makevars
