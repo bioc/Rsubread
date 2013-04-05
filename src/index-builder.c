@@ -443,6 +443,14 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		return -1;
 	}
 
+	if(all_bases<1)
+	{
+		SUBREADprintf("File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
+		return -1;
+	}
+
+
+
 	file_number = 0;
 	offset = 0;
 	read_no = 0;
