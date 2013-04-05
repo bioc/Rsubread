@@ -57,7 +57,7 @@ In particular, it has a superior performance in mapping RNA-seq reads thanks to 
 No value is produced but a SAM format file is written to the current working directory.
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi (2013), "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, Volume 41, Accepted on 8 March, In Press.
+Yang Liao, Gordon K Smyth and Wei Shi (2013), "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, Volume 41, Advance Access, April 4 [Epub ahead of print] (\url{http://nar.oxfordjournals.org/content/early/2013/04/03/nar.gkt214.abstract})
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
