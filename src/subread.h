@@ -17,6 +17,7 @@
 #define SAM_FLAG_REVERSE_STRAND_MATCHED 0x10
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
 #define SAM_FLAG_UNMAPPED 0x04
+#define SAM_FLAG_SECONDARY_ALIGNMENT 0x100
 
 #define FUSION_BREAK_POINT	2
 #define FUSION_JUNCTION		1
@@ -101,8 +102,7 @@
 
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
-//typedef float gene_quality_score_t;
-typedef int gene_quality_score_t;
+typedef unsigned int gene_quality_score_t;
 typedef char gene_vote_number_t;
 
 
@@ -230,27 +230,29 @@ typedef struct{
 } gene_best_record_t;
 
 
+typedef struct{
+	unsigned int read_pos;
+	short masks;
+	char is_negative_strand;
+	gene_quality_score_t final_quality; // this varable is also used as big margin register.
+
+	gene_quality_score_t read_quality;
+	short vote_number;
+	short coverage_start;
+	short coverage_end;
+	short edit_distance;
+	
+} voting_result_t;
+
+
 
 typedef struct{
 	int max_len;
-	unsigned int * max_positions;
-	unsigned char * is_counterpart;
-	gene_vote_number_t * max_votes;
-	gene_quality_score_t * max_quality;
-	gene_quality_score_t * max_final_quality;
-	unsigned char * big_margin_votes_shared;
+	voting_result_t * results;
 
-	short * masks;
-	char * max_indel_recorder;
-	char * span_coverage;
-
-	unsigned short * edit_distance;
-
-#ifdef REPORT_ALL_THE_BEST
-	gene_best_record_t * best_records;
-#endif
-	char max_indel_tolerance;
 	short indel_recorder_length;
+	char  *all_indel_recorder;
+	unsigned int multi_best_reads;
 
 } gene_allvote_t;
 
@@ -309,7 +311,6 @@ typedef struct{
 	unsigned int pos;
 	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
-
 
 #define abs(a) 	  ((a)>=0?(a):-(a))
 #define max(a,b)  ((a)<(b)?(b):(a))

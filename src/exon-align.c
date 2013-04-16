@@ -882,6 +882,7 @@ void junction_tree_b_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 		group_anchor--;
 	}
 
+	int digged = 0;
 	if(next_jump && EXON_EXPLAIN_DEPTH > number_of_piece)
 	{
 		cigar_recorder [number_of_piece * 4+1] = rl - max_piece_len + max_indels;
@@ -910,6 +911,7 @@ void junction_tree_b_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 			SUBREADprintf ("DIG-IN B-SEARCH REMAIN_LEN=%d, POS_TAIL=%u\n", rl + max_indels- max_piece_len, connect_to_iii);
 			#endif
 			junction_tree_b_explorer(bed_table, pos_table, connection_table, read, rl + max_indels - max_piece_len, full_rl, connect_to_iii , 1+number_of_piece , cigar_recorder, total_matched_bases + max_matched_bases, result_total_matched_bases , result_cigar_recorder, result_number_pieces,  my_value_array_index, ginp, subread_votes_cover_start, quality_str , quality_format, match_score, total_jump_length + this_jump, max_jump_length);
+			digged = 1;
 		}
 	}
 		// the "read_tail_pos" is the exon that matches through this read; it has to be well matched to accept the read.
@@ -1028,6 +1030,7 @@ void junction_tree_f_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 		group_anchor++;
 	}
 	
+	int digged = 0;
 	if(next_jump && EXON_EXPLAIN_DEPTH > number_of_piece)
 	{
 		cigar_recorder [number_of_piece * 4+2] = full_rl - rl + max_piece_len - max_indels;
@@ -1060,6 +1063,7 @@ void junction_tree_f_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 			//SUBREADprintf("F-MAXINDEL=%d ; NEXT_HEAD_MODIFY=%d ; #PIECES=%d\n", max_indels, next_head_modify, number_of_piece );
 			unsigned int this_jump_size = connect_to_iii - max_grouped_pos;
 			junction_tree_f_explorer(bed_table, pos_table, connection_table, read+max_piece_len-max_indels, rl - max_piece_len + max_indels, full_rl , connect_to_iii , 1+number_of_piece , cigar_recorder, total_matched_bases + max_matched_bases, result_total_matched_bases , result_cigar_recorder,result_number_pieces, my_value_array_index, ginp, 0 , quality_str + max_piece_len-max_indels , quality_format, match_score, total_jump_length + this_jump_size, max_jump_length);
+			digged = 1;
 		}
 	}
 		// the "read_head_pos" is the exon that matches through this read; it has to be well matched to accept the read.
@@ -1229,7 +1233,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 
 		unsigned int explain_buff[138], explain_result[138];
-		int result_number_pieces = 0,  result_total_matched_bases = 0, total_pieces = 0;
+		int result_number_pieces = 0,  result_total_matched_bases = 0, total_pieces = 0, total_total_matched_bases;
 		float match_score = EXON_HALF_MATCH_PERCENTAGE;
 
 		//int before_best_offset = (pos >   halves_record -> best_pos2_list[i])? halves_record -> splice_point_offset_2[i] : halves_record ->splice_point_offset_1[i];
@@ -1345,6 +1349,8 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			max_jump_length = 999999999;
 			junction_tree_f_explorer(bed_table, pos_table, connection_table, inb + f_search_head , rl - f_search_head, rl , explain_result[(total_pieces-1)*4], 0, explain_buff, 0, &result_total_matched_bases , explain_result+ 4 * (total_pieces>0?(total_pieces-1):0),  &result_number_pieces, my_value_array_index, ginp, result_head_modify, qualityb+ f_search_head,  EXON_FASTQ_FORMAT, match_score, 0 , &max_jump_length);
 
+			total_total_matched_bases = result_total_matched_bases;
+
 			total_pieces --;
 		}
 
@@ -1411,6 +1417,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			cigar_buf[0]=0;
 			if (is_settle)
 			{
+				int last_indel = 0;
 				for (j = 0; j < total_pieces; j++)
 				{
 					char cigar_piece[100];
@@ -1461,6 +1468,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 #endif
 						sprintf (cigar_piece, "%dN",explain_result[4*j+4]- (explain_result[ 4*j] + explain_result[ 4*j+2] - explain_result[4*j+1] + indel_length));
 						strcat(cigar_buf, cigar_piece);
+						last_indel = indel_length;
 
 					}
 				}
@@ -3801,7 +3809,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 			{
 				finalise_vote(vote_p1);
 				finalise_vote(vote_p2);
-				int is_paired_match = select_positions(vote_p1, vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, 3, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven);
+				int is_paired_match = select_positions_exons(vote_p1, vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, 3, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven);
 				for (is_second_read = 0; is_second_read <2; is_second_read ++)
 				{
 					gene_vote_t * current_vote = is_second_read?vote_p2: vote_p1;
@@ -3977,6 +3985,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 	unsigned long long int current_fp = ftello(ginp -> input_fp);
 	unsigned long long int last_fp_pos =  0;
 	struct stat filestat;
+	int last_table = 0;
 	int stat_ret;
 	char table_fn [300];
 	gehash_t my_raw_table;
@@ -4014,6 +4023,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 			if(gvindex_load(&value_array_index,table_fn)) return -1;
 		}
 		processed_reads = 0;
+		last_table = tabno;
 
 // Run the search algorithm on a part of the index
 		if(EXON_ALL_THREADS <2)
@@ -4607,8 +4617,6 @@ int main_junction(int argc,char ** argv)
 			sprintf(command, "%ssubread-align  -J --allow-repeating  -T %d -i '%s' -r '%s' -o '%s' -P %d %s %s -I %d -b %d",cwd, EXON_ALL_THREADS, index_prefix, read_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6 , EXON_QUALITY_SCALE?"-Q":"", using_base_distance?"-H":"", EXON_INDEL_TOLERANCE-1, EXON_MAX_METHYLATION_C_NUMBER);
 		SUBREADputs(command);
 		is_successful = system(command);
-
-		if(!is_successful) SUBREADprintf("We have a very unlikely error.\n");
 
 		strcpy(read_file, tmpfile);
 		IS_SAM_INPUT=1;

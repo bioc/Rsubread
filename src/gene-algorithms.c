@@ -36,10 +36,10 @@ void non_func(const char * fmt, ...)
 
 double begin_ftime;
 
-int test_big_margin(unsigned char * all_big_margin_rec, int qid)
+int test_big_margin(gene_allvote_t * allvote, int qid)
 {
 
-	unsigned char * big_margin_rec = all_big_margin_rec+sizeof(int)*qid;
+	unsigned char * big_margin_rec = (unsigned char *)&(allvote->results[allvote->multi_best_reads * qid + 0].final_quality);
 	int current_best = big_margin_rec[0];
 
 	int xxx, ret=0;
@@ -55,9 +55,9 @@ int test_big_margin(unsigned char * all_big_margin_rec, int qid)
 	return ret;
 }
 
-void reg_big_margin_votes(gene_vote_t * vote, unsigned char * all_big_margin_rec, int query_id)
+void reg_big_margin_votes(gene_vote_t * vote, gene_allvote_t * allvote, int query_id)
 {
-	unsigned char * big_margin_rec = all_big_margin_rec+ sizeof(int)*query_id;
+	unsigned char * big_margin_rec = (unsigned char *)&(allvote->results[allvote->multi_best_reads * query_id + 0].final_quality);
 	int current_worst = big_margin_rec[3];
 
 	if(vote ->max_vote <= current_worst)return;
@@ -261,7 +261,7 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 	SUBREADfflush(stdout);
 }
 
-/*
+
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_threshold)
 {
 	int i;
@@ -298,7 +298,7 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 				if(val_c>199999)
 				{
 					SUBREADprintf("\nThere are too many items in a bucket; you may reduce the threshold of non-informative subreads to eliminate this problem.\n");
-					return -1;
+					return (-1);
 				}
 				else
 				{
@@ -331,7 +331,7 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 	return all_removed;
 }
 
-*/
+
 unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name, unsigned int chro_pos)
 {
 	unsigned int ret = 0 ;
@@ -394,7 +394,7 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 #define _index_vote(key) (((unsigned int)key)%GENE_VOTE_TABLE_SIZE)
 
 int vv=0;
-/*inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
+inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
 {
 	add_gene_vote_weighted(vote, key, add_new, 1);
 }
@@ -432,7 +432,6 @@ inline void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int
 	dat[i] = key;
 	vote->votes[offset][i]=w;
 }
-*/
 
 int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 {
@@ -468,60 +467,28 @@ int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 
 void clear_allvote(gene_allvote_t* allvote)
 {
-	bzero(allvote -> max_votes,  allvote -> max_len* sizeof(*allvote -> max_votes));
-	bzero(allvote -> masks,  allvote -> max_len* sizeof(*allvote -> masks));
-	bzero(allvote -> span_coverage ,  allvote -> max_len* sizeof(char));
-	bzero(allvote -> big_margin_votes_shared, allvote -> max_len* sizeof(char));
-	bzero(allvote -> edit_distance ,  allvote -> max_len* sizeof(short));
+	unsigned long long int multi_best = allvote->multi_best_reads; 
+	bzero(allvote -> results,  multi_best * sizeof(voting_result_t) * allvote -> max_len);
 }
 
 void destory_allvote(gene_allvote_t* allvote)
 {
-	free(allvote -> max_positions);
-	free(allvote -> max_votes);
-	free(allvote -> max_quality);
-	free(allvote -> max_final_quality);
-	free(allvote -> masks);
-	#ifdef REPORT_ALL_THE_BEST
-	free(allvote -> best_records);
-	#endif
-	free(allvote -> is_counterpart);
-	free(allvote -> span_coverage);
-	free(allvote -> edit_distance);
-	if(allvote -> max_indel_recorder)
-		free(allvote -> max_indel_recorder);
+	free(allvote -> results);
+	free(allvote -> all_indel_recorder);
 }
 
-int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
+int init_allvote(gene_allvote_t* allvote, int expected_len, unsigned int multi_best_reads, int allowed_indels)
 {
 	int is_OK = 0;
+	unsigned long long int multi_best = multi_best_reads; 
 	allvote -> max_len = expected_len; 
-	allvote -> max_positions = (unsigned int *) malloc(sizeof(int)*expected_len);
-	allvote -> max_votes = (gene_vote_number_t *) calloc(sizeof(gene_vote_number_t), expected_len);
-	allvote -> max_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
-	allvote -> max_final_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
-	allvote -> big_margin_votes_shared = (unsigned char *) allvote -> max_final_quality;
+	allvote -> multi_best_reads = multi_best_reads;
+	allvote -> indel_recorder_length = max(3*(allowed_indels+1)+1, 28);
 
-	allvote -> masks = (short *) calloc(sizeof(short), expected_len);
-#ifdef REPORT_ALL_THE_BEST
-	allvote -> best_records = (gene_best_record_t *) malloc(sizeof(gene_best_record_t)* expected_len);
-#endif
-	allvote -> is_counterpart = (unsigned char *) malloc(expected_len);
-
-	allvote -> max_indel_tolerance = allowed_indels;
-	allvote	-> indel_recorder_length = max(3*(allowed_indels+1)+1, 28);
-	allvote -> span_coverage = (char *)calloc(sizeof(char), expected_len);
-	allvote -> edit_distance = (unsigned short *)calloc(sizeof(short), expected_len);
-
-	if((allvote -> max_quality &&  allvote -> max_positions  && allvote -> max_votes  && allvote -> max_final_quality && allvote -> masks && allvote -> is_counterpart && allvote -> span_coverage))
+	allvote -> results = calloc(sizeof(voting_result_t), multi_best * expected_len);
+	allvote -> all_indel_recorder = malloc(sizeof(char) * allvote -> indel_recorder_length * multi_best * expected_len);
+	if(allvote ->all_indel_recorder)
 		is_OK = 1;
-
-	if(allowed_indels && is_OK)
-	{
-		allvote -> max_indel_recorder = (char *)malloc( allvote -> indel_recorder_length *expected_len);
-		is_OK = (allvote -> max_indel_recorder!=NULL);
-	}
-	else	allvote -> max_indel_recorder =  NULL;
 
 	if(is_OK)
 		return 0;
@@ -663,8 +630,8 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 // adjust_len <0: "I" in read; adjust_len>0: "D" in read
 void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read, int * pos_offset, int * adjust_len, int * is_safegurded)
 {
-	int i;
-	int last_offset = 0, cursor = 0;
+	int i, is_error = 0;
+	int last_end=0, last_offset = 0, cursor = 0;
 
 	if(info[0]==-1){
 		sprintf(buf, "%dM", len);
@@ -682,6 +649,7 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 	}
 	else if(info[0]==-3){
 		info ++;
+		is_error = 1;
 	}
 
 	for(i=0; i<indel_tolerance*3; i+=3)
@@ -691,6 +659,7 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		//int subread_start = info[i]-1;
 		int subread_end = info[i+1]-1;
 
+		//int base_start = (last_end==0)?0:(find_subread_end(len, TOTAL_SUBREADS, subread_start)-16);
 		int base_end = (i < indel_tolerance*3-3 && info[i+3])?find_subread_end(len, total_subreads, subread_end):len;
 
 //			SUBREADprintf("BE=%d ; II+3=%d ; len=%d\n", base_end, info[i+3], len);
@@ -712,13 +681,23 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		else
 			sprintf(buf+strlen(buf), "%dM", base_end);
 		last_offset = dist;
+		last_end = base_end;
 		cursor = base_end;
 		//if (dist >0)cursor += dist;
 	}
 	compress_cigar(buf, len, read, pos_offset, adjust_len, is_safegurded);
+//	if(cursor < len)
+//		sprintf(buf+strlen(buf), "%dM", len-cursor);
+//	if(is_error)
+//		strcat(buf, "XX");
 }
 
+
 void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short ,  char ** dynamic_programming_char, int use_hamming_dist)
+{
+	return;
+}
+/*
 {
 
 //	SUBREADprintf("Ospan=%d Nspan=%d\n", allvote -> span_coverage[qid], span_coverage);
@@ -753,19 +732,6 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 
 	if(is_add_new)
 	{
-
-#ifdef REPORT_ALL_THE_BEST
-		if(votes > allvote -> max_votes[qid])
-			allvote -> best_records [qid].best_len = 0;
-
-		if(allvote -> best_records [qid].best_len < BEXT_RESULT_LIMIT)
-		{
-			int bestlen = allvote -> best_records [qid].best_len;
-			allvote -> best_records [qid].offsets[bestlen] = pos;
-			allvote -> best_records [qid].is_reverse[bestlen] = is_counterpart;
-			allvote -> best_records [qid].best_len ++;
-		}
-#endif
 		allvote -> is_counterpart[qid] = is_counterpart;
 		allvote -> max_positions[qid] = pos;
 		allvote -> max_votes[qid] = votes;
@@ -775,162 +741,128 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 
 		if(allvote -> max_indel_recorder)
 			indel_recorder_copy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length, max_indel_recorder);
-
-		/*if(mask & IS_BREAKEVEN_READ)		SUBREADprintf("ADD2\n");
-		else SUBREADprintf("NOADD3\n");*/
-	
 		return;
-
-		/*
-		int mismatch=0;
-
-		if(max_indel>0)
-		{
-			find_and_explain_indel(allvote, qid, pos, votes, quality, is_counterpart, mask, max_indel_recorder, array_index, read_txt, read_len, max_indel, total_subreads, space_type, report_junction, is_head_high_quality, qual_txt, phred_version, dynamic_programming_short, dynamic_programming_char);
-
-			if(allvote -> max_indel_recorder)
-			{
-				char cigar_str [100];
-				cigar_str[0]=0;
-				show_cigar(allvote->max_indel_recorder + qid * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, max_indel, total_subreads, read_txt, NULL, NULL);
-				allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version, &mismatch);
-			}
-		}
-		else
-		{
-			char cigar_str [100];
-			sprintf(cigar_str,"%dM", read_len);	
-			allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version, &mismatch);
-		}
-
-		*/
 	}
 
 }
-
+*/
 
 float EXON_RECOVER_MATCHING_RATE = 0.9;
 float EXON_INDEL_MATCHING_RATE_TAIL = 0.8;
 float EXON_INDEL_MATCHING_RATE_HEAD = 0.8;
 
-void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction,  int is_head_high_quality, char * qual_txt, int phred_version , short ** dynamic_programming_short,  char **dynamic_programming_char)
+void find_and_explain_indel(gene_allvote_t* allvote,int result_av_offset, int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction,  int is_head_high_quality, char * qual_txt, int phred_version , short ** dynamic_programming_short,  char **dynamic_programming_char)
 {
-	//unsigned int pos0 = pos;
-	if(allvote -> max_indel_recorder)
+	//PNT111
+	short head_indel_pos=-1 , tail_indel_pos=-1;
+	int head_indel_movement=0, tail_indel_movement=0;
+	if (array_index)
 	{
-		//PNT111
-		short head_indel_pos=-1 , tail_indel_pos=-1;
-		int head_indel_movement=0, tail_indel_movement=0;
-		if (array_index)
+		int k;
+		if (max_indel_recorder[0])
 		{
-			int k;
-			if (max_indel_recorder[0])
+			int cover_start = find_subread_end(read_len, total_subreads, max_indel_recorder[0]-1)- 15;
+
+			for (k=0; max_indel_recorder[k]; k+=3);
+			int cover_end = find_subread_end(read_len, total_subreads, max_indel_recorder[k-2]-1) + max(0,-max_indel_recorder[k-1]);
+
+			int head_qual = is_head_high_quality?0x7fffffff:0, tail_qual = is_head_high_quality?0:0x7fffffff;
+
+
+			if(qual_txt && qual_txt[0])
 			{
-				int cover_start = find_subread_end(read_len, total_subreads, max_indel_recorder[0]-1)- 15;
-
-				for (k=0; max_indel_recorder[k]; k+=3);
-				int cover_end = find_subread_end(read_len, total_subreads, max_indel_recorder[k-2]-1) + max(0,-max_indel_recorder[k-1]);
-
-				int head_qual = is_head_high_quality?0x7fffffff:0, tail_qual = is_head_high_quality?0:0x7fffffff;
-
-
-				if(qual_txt && qual_txt[0])
+				int j;
+				head_qual = 0;
+				tail_qual = 0;
+				for (j = 0; j<cover_start; j++)
 				{
-					int j;
-					head_qual = 0;
-					tail_qual = 0;
-					for (j = 0; j<cover_start; j++)
+					if(FASTQ_PHRED64 == phred_version)
 					{
-						if(FASTQ_PHRED64 == phred_version)
-						{
-							head_qual += (1000000-get_base_error_prob64i(qual_txt[j]));
-						}
-						else
-						{
-							head_qual += (1000000-get_base_error_prob33i(qual_txt[j]));
-						}
+						head_qual += (1000000-get_base_error_prob64i(qual_txt[j]));
 					}
-					for (j = 0; j<read_len - cover_end; j++)
+					else
 					{
-						if(FASTQ_PHRED64 == phred_version)
-						{
-							tail_qual += (1000000-get_base_error_prob64i(qual_txt[read_len - j -1]));
-						}
-						else
-						{
-							tail_qual += (1000000-get_base_error_prob33i(qual_txt[read_len - j -1]));
-						}
+						head_qual += (1000000-get_base_error_prob33i(qual_txt[j]));
 					}
 				}
-
-				int head_must_correct = 4;
-				if(cover_start > 0)
+				for (j = 0; j<read_len - cover_end; j++)
 				{
-					if (head_qual / cover_start < 850000)
+					if(FASTQ_PHRED64 == phred_version)
 					{
-						EXON_INDEL_MATCHING_RATE_HEAD = 0.75;
-						head_must_correct =2;
+						tail_qual += (1000000-get_base_error_prob64i(qual_txt[read_len - j -1]));
 					}
-					else if (head_qual / cover_start < 950000 )
+					else
 					{
-						EXON_INDEL_MATCHING_RATE_HEAD = 0.85;
-						head_must_correct =3;
+						tail_qual += (1000000-get_base_error_prob33i(qual_txt[read_len - j -1]));
 					}
-					else EXON_INDEL_MATCHING_RATE_HEAD = 0.92;
-				}else	EXON_INDEL_MATCHING_RATE_HEAD = 9999;
-	
-
-				int tail_must_correct = 4;
-				if(read_len-cover_end > 0)
-				{
-					if (tail_qual / (read_len-cover_end) < 850000)
-					{
-						EXON_INDEL_MATCHING_RATE_TAIL = 0.75;
-						tail_must_correct =2;
-					}
-					else if (tail_qual / (read_len-cover_end) < 950000)
-					{
-						EXON_INDEL_MATCHING_RATE_TAIL = 0.85;
-						tail_must_correct =3;
-					}
-					else EXON_INDEL_MATCHING_RATE_TAIL = 0.92;
-				}else	EXON_INDEL_MATCHING_RATE_TAIL = 9999;
-
-
-				
-
-				int is_full_covered = 0;
-				is_full_covered = extend_covered_region(array_index, pos, read_txt, read_len, cover_start, cover_end, 4, head_must_correct, tail_must_correct,  max_indel, space_type, max_indel_recorder[k-1], &head_indel_pos, &head_indel_movement, &tail_indel_pos, &tail_indel_movement, is_head_high_quality, qual_txt, phred_version);
-				if(head_indel_movement)
-				{
-					pos += head_indel_movement;
-					allvote -> max_positions[qid] = pos; 
 				}
-				if(is_full_covered == 3)
-				{
-					allvote -> masks[qid] &= ~IS_RECOVERED_JUNCTION_READ;
-				}
-				else	allvote -> masks[qid] |= IS_RECOVERED_JUNCTION_READ;
 			}
+
+			int head_must_correct = 4;
+			if(cover_start > 0)
+			{
+				if (head_qual / cover_start < 850000)
+				{
+					EXON_INDEL_MATCHING_RATE_HEAD = 0.75;
+					head_must_correct =2;
+				}
+				else if (head_qual / cover_start < 950000 )
+				{
+					EXON_INDEL_MATCHING_RATE_HEAD = 0.85;
+					head_must_correct =3;
+				}
+				else EXON_INDEL_MATCHING_RATE_HEAD = 0.92;
+			}else	EXON_INDEL_MATCHING_RATE_HEAD = 9999;
+
+
+			int tail_must_correct = 4;
+			if(read_len-cover_end > 0)
+			{
+				if (tail_qual / (read_len-cover_end) < 850000)
+				{
+					EXON_INDEL_MATCHING_RATE_TAIL = 0.75;
+					tail_must_correct =2;
+				}
+				else if (tail_qual / (read_len-cover_end) < 950000)
+				{
+					EXON_INDEL_MATCHING_RATE_TAIL = 0.85;
+					tail_must_correct =3;
+				}
+				else EXON_INDEL_MATCHING_RATE_TAIL = 0.92;
+			}else	EXON_INDEL_MATCHING_RATE_TAIL = 9999;
+
+
+			
+
+			int is_full_covered = 0;
+			is_full_covered = extend_covered_region(array_index, pos, read_txt, read_len, cover_start, cover_end, 4, head_must_correct, tail_must_correct,  max_indel, space_type, max_indel_recorder[k-1], &head_indel_pos, &head_indel_movement, &tail_indel_pos, &tail_indel_movement, is_head_high_quality, qual_txt, phred_version);
+			if(head_indel_movement)
+			{
+				pos += head_indel_movement;
+				allvote -> results[result_av_offset].read_pos = pos; 
+			}
+			if(is_full_covered == 3)
+			{
+				allvote -> results[result_av_offset].masks &= ~IS_RECOVERED_JUNCTION_READ;
+			}
+			else	allvote -> results[result_av_offset].masks |= IS_RECOVERED_JUNCTION_READ;
 		}
-
-		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xff ;
-
-
-		if ((max_indel_recorder[3] || head_indel_pos>=0 || tail_indel_pos>0)){
-			int head_pos = 0;
-			if((head_indel_pos>=0 && report_junction) || head_indel_movement)head_pos = head_indel_pos ;//- max(0,head_indel_movement);
-			int tail_pos = read_len;
-			if((tail_indel_pos>0 && report_junction) || tail_indel_movement)tail_pos = tail_indel_pos ;//- min(0, tail_indel_movement);
-			explain_indel_in_middle(allvote, qid , pos, max_indel_recorder,  array_index, read_txt, read_len,  max_indel, total_subreads, head_pos, tail_pos , head_indel_movement, tail_indel_movement, report_junction, dynamic_programming_short, dynamic_programming_char);
-			//if(*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) != 0xfd ) allvote -> max_positions[qid] = pos0;
-		}
-
 	}
 
+	long long int multi_best =result_av_offset;
+	multi_best *= allvote -> indel_recorder_length;
+	allvote -> all_indel_recorder[multi_best]=0xff;
+
+	if ((max_indel_recorder[3] || head_indel_pos>=0 || tail_indel_pos>0)){
+		int head_pos = 0;
+		if((head_indel_pos>=0 && report_junction) || head_indel_movement)head_pos = head_indel_pos ;//- max(0,head_indel_movement);
+		int tail_pos = read_len;
+		if((tail_indel_pos>0 && report_junction) || tail_indel_movement)tail_pos = tail_indel_pos ;//- min(0, tail_indel_movement);
+		explain_indel_in_middle(allvote, result_av_offset, pos, max_indel_recorder,  array_index, read_txt, read_len,  max_indel, total_subreads, head_pos, tail_pos , head_indel_movement, tail_indel_movement, report_junction, dynamic_programming_short, dynamic_programming_char);
+	}
 }
 
-void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int head_start_point, int tail_end_point, int head_indel_movement, int tail_indel_movement, int report_junction, short ** dynamic_programming_short ,  char ** dynamic_programming_char)
+void explain_indel_in_middle(gene_allvote_t* allvote, int result_av_offset, int pos, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int head_start_point, int tail_end_point, int head_indel_movement, int tail_indel_movement, int report_junction, short ** dynamic_programming_short ,  char ** dynamic_programming_char)
 {
 
 	char indel_operations[1500];
@@ -1065,8 +997,10 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 	int vpos = strlen(tmp_cigar);
 	if (vpos > EXON_MAX_CIGAR_LEN-9 )
 	{
-		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xfd; 
-		memcpy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length+1, max_indel_recorder, 3 * max_indel);
+		long long int multi_best = result_av_offset;
+		multi_best *=  allvote -> indel_recorder_length;
+		allvote -> all_indel_recorder[multi_best]=0xfd;
+		memcpy(allvote -> all_indel_recorder + multi_best + 1, max_indel_recorder, 3 * max_indel - 1);
 	}
 	else
 	{
@@ -1089,11 +1023,11 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 					sprintf(tmp_cigar+vpos, "%dS",read_len - tail_end_point );
 			}
 		}
-	//	if (head_start_point >0 || tail_end_point < read_len)
-	//		strcat(tmp_cigar,"X");
 
-		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xfe ;
-		strncpy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length+1, tmp_cigar, allvote -> indel_recorder_length - 2);
+		long long int multi_best = result_av_offset;
+		multi_best *= allvote -> indel_recorder_length;
+		allvote -> all_indel_recorder[multi_best]=0xfe;
+		strncpy(allvote -> all_indel_recorder + multi_best+ 1, tmp_cigar, allvote -> indel_recorder_length - 2);
 	}
 }
 
@@ -1214,20 +1148,28 @@ void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, g
 	}
 }
 
-int select_positions_array(char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2,  gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2, char * r1_recorder, char * r2_recorder, gehash_data_t * pos_read1, gehash_data_t * pos_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int number_of_anchors_quality, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int * is_break_even, int total_subreads)
+int select_positions_array(int use_bases_scoring, int qid, gene_allvote_t * allvotes, short current_masks, char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, const char quality_str1 [], const char quality_str2 [], int quality_scale, int total_subreads)
 {
-	gene_vote_t base_vote_1 , base_vote_2;
+	gene_vote_t * used_vote_1 = vote_read1;
+	gene_vote_t * used_vote_2 = vote_read2;
+	if(use_bases_scoring)
+	{
+		gene_vote_t base_vote_1 , base_vote_2;
 
-	mark_votes_array_index(read1_str, read1_len, &base_vote_1, vote_read1, my_array_index, color_space, indel_tolerance, min_minor, quality_str1, quality_scale, is_negative_strand, total_subreads);
-	mark_votes_array_index(read2_str, read2_len, &base_vote_2, vote_read2, my_array_index, color_space, indel_tolerance, min_minor, quality_str2, quality_scale, is_negative_strand, total_subreads);
+		used_vote_1 = &base_vote_1;
+		used_vote_2 = &base_vote_2;
+
+		mark_votes_array_index(read1_str, read1_len, &base_vote_1, vote_read1, my_array_index, color_space, indel_tolerance, min_minor, quality_str1, quality_scale, is_negative_strand, total_subreads);
+		mark_votes_array_index(read2_str, read2_len, &base_vote_2, vote_read2, my_array_index, color_space, indel_tolerance, min_minor, quality_str2, quality_scale, is_negative_strand, total_subreads);
+	}
 
 //	SUBREADprintf("Q=%.3f\n", *qual_r2);
 
-	return select_positions(&base_vote_1, &base_vote_2, numvote_read1, numvote_read2, sum_quality, qual_r1, qual_r2,  pos_read1, pos_read2, r1_recorder , r2_recorder ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, number_of_anchors_quality,max_indel_len, is_break_even);
+	return select_positions(allvotes, qid, current_masks, used_vote_1, used_vote_2 ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, indel_tolerance);
 }
 
 
-int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven)
+int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int max_indel_len)
 {
 
 	int k, i, j, anchors = 0;
@@ -1240,12 +1182,17 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 	int anchors_buckets [ANCHORS_NUMBER];
 	int anchors_index [ANCHORS_NUMBER];
 
+	int ret = 0;
 	gene_vote_number_t minor_votes [ANCHORS_NUMBER];
 	gene_quality_score_t minor_quality [ANCHORS_NUMBER];
 	gehash_data_t minor_position [ANCHORS_NUMBER];
 	int minor_buckets [ANCHORS_NUMBER];
 	int minor_index [ANCHORS_NUMBER];
 	char is_minor_breakeven [ANCHORS_NUMBER];
+
+	voting_result_t *tmp_best_records_r1, *tmp_best_records_r2;
+
+	int tmp_best_records_r1_number = 0, tmp_best_records_r2_number = 0;
 
 	if(anchor_votes < min_major)
 		return 0;
@@ -1336,17 +1283,24 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 
 	}
 
-	gene_vote_number_t selection_minor_vote = 0;
-	gene_vote_number_t selection_major_vote = 0;
-	gehash_data_t selection_minor_pos = 0;
-	gehash_data_t selection_major_pos = 0;
 
-	int selected_major_index=0, selected_major_bucket=0, selected_minor_bucket=0, selected_minor_index=0;
-
-	*sum_quality = 0;
-
-	unsigned char selection_major_read_no = 0;
-	//int reason = 0;
+	tmp_best_records_r1 = allvotes -> results+qid * 2 * allvotes -> multi_best_reads;
+	tmp_best_records_r2 = allvotes -> results+(qid * 2+1) * allvotes -> multi_best_reads;
+	unsigned int max_R1R2_total_votes = allvotes -> results[qid * 2 * allvotes -> multi_best_reads].vote_number + allvotes -> results [(qid * 2+1) * allvotes -> multi_best_reads].vote_number; 
+	unsigned int max_R1R2_total_quality = allvotes -> results[qid * 2 * allvotes -> multi_best_reads].read_quality + allvotes -> results [(qid * 2+1) * allvotes -> multi_best_reads].read_quality; 
+	long long int max_R1R2_dist = allvotes -> results[qid * 2 * allvotes -> multi_best_reads].read_pos;
+	max_R1R2_dist -= allvotes -> results[(qid * 2 +1)* allvotes -> multi_best_reads].read_pos;
+	if(max_R1R2_dist<0)max_R1R2_dist=0;
+	if(0 == (allvotes -> results[qid * 2 * allvotes -> multi_best_reads].masks & IS_PAIRED_MATCH))
+	{
+		max_R1R2_total_votes = 0;
+		max_R1R2_total_quality = 0;
+		max_R1R2_dist=0x7fffffff;
+	}
+	for(tmp_best_records_r1_number=0; tmp_best_records_r1_number<allvotes -> multi_best_reads; tmp_best_records_r1_number++)
+		if(tmp_best_records_r1[tmp_best_records_r1_number].vote_number == 0)break;
+	tmp_best_records_r2_number=tmp_best_records_r1_number;
+	
 
 	for (k=0; k<anchors; k++)
 	{
@@ -1354,66 +1308,122 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 			continue;
 
 		int need_replace = 0;
+		int is_breakeven = 0;
+		long long int K_R1R2_dist = anchors_position[k];
+		K_R1R2_dist -= minor_position[k];
+		if(K_R1R2_dist<0)K_R1R2_dist=-K_R1R2_dist;
 
+		// need_replace and is_breakeven cannot be true at the same time.
 
-		if ((minor_votes[k]+anchors_votes[k]) > (selection_minor_vote+selection_major_vote) ||
-	   	       ((minor_votes[k]+anchors_votes[k]) == (selection_minor_vote+selection_major_vote) &&
-		 	 minor_quality[k] + anchors_quality[k] > *sum_quality))
+		if ((minor_votes[k]+anchors_votes[k]) > (max_R1R2_total_votes) ||
+	   	       ((minor_votes[k]+anchors_votes[k]) == (max_R1R2_total_votes) &&
+		 	 minor_quality[k] + anchors_quality[k] > max_R1R2_total_quality) ||
+			((minor_votes[k]+anchors_votes[k]) == (max_R1R2_total_votes) && minor_quality[k] + anchors_quality[k]==max_R1R2_total_quality&& K_R1R2_dist<max_R1R2_dist ))
 		{
 			need_replace = 1;
 		}
-		else if (minor_votes[k]+anchors_votes[k] == selection_minor_vote+selection_major_vote &&
-		 	 minor_quality[k] + anchors_quality[k] == *sum_quality)
+		else if (minor_votes[k]+anchors_votes[k] == max_R1R2_total_votes &&
+		 	 minor_quality[k] + anchors_quality[k] == max_R1R2_total_quality && (K_R1R2_dist== max_R1R2_dist))
 		{
-			if (selection_minor_pos != minor_position[k] && minor_position[k] != selection_major_pos)
+			int is_pos1_used = 0, is_pos2_used = 0;
+			int xk1;
+
+			for(xk1=0; xk1<tmp_best_records_r1_number; xk1++)
 			{
-				* is_breakeven = 1;
-				if (selection_major_pos >  anchors_position[k]) need_replace = 1;
+				if(minor_position[k] == tmp_best_records_r1[xk1].read_pos || anchors_position[k] == tmp_best_records_r1[xk1].read_pos )
+					is_pos1_used = 1;
+				if(minor_position[k] == tmp_best_records_r2[xk1].read_pos || anchors_position[k] == tmp_best_records_r2[xk1].read_pos )
+					is_pos2_used = 1;
+			}
+			if (!(is_pos1_used && is_pos2_used))
+				is_breakeven = 1;
+		}
+
+		if(need_replace || is_breakeven)
+		{
+			if(need_replace || (allvotes->multi_best_reads==1 &&  anchors_position[k] < tmp_best_records_r1[0].read_pos ))
+			{
+				tmp_best_records_r1_number=0;
+				tmp_best_records_r2_number=0;
+			}
+
+			if(tmp_best_records_r1_number < allvotes->multi_best_reads-1)
+				tmp_best_records_r1[tmp_best_records_r1_number+1].vote_number = 0;
+			if(tmp_best_records_r1_number < allvotes->multi_best_reads-1)
+				tmp_best_records_r2[tmp_best_records_r2_number+1].vote_number = 0;
+
+			max_R1R2_total_votes = minor_votes[k] + anchors_votes[k];
+			max_R1R2_total_quality = minor_quality[k] + anchors_quality[k];
+			max_R1R2_dist = K_R1R2_dist;
+
+			if(tmp_best_records_r1_number<allvotes->multi_best_reads)
+			{
+				tmp_best_records_r1[tmp_best_records_r1_number].is_negative_strand = is_negative_strand;
+				tmp_best_records_r2[tmp_best_records_r2_number].is_negative_strand = is_negative_strand;
+
+				long long int offset_indel_rec1 = (qid * 2   + tmp_best_records_r1_number) * allvotes -> multi_best_reads;
+				offset_indel_rec1 *= allvotes -> indel_recorder_length;
+				long long int offset_indel_rec2 = ((qid*2+1) + tmp_best_records_r2_number) * allvotes -> multi_best_reads;
+				offset_indel_rec2 *= allvotes -> indel_recorder_length;
+
+				if(anchor_read[k])	// major is on read 2 
+				{
+					tmp_best_records_r1[tmp_best_records_r1_number].read_pos = minor_position[k];
+					tmp_best_records_r2[tmp_best_records_r2_number].read_pos = anchors_position[k];
+					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec1, vote_read1 -> indel_recorder[minor_buckets[k]][minor_index[k]]);
+					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec2, vote_read2 -> indel_recorder[anchors_buckets[k]][anchors_index[k]]);
+					tmp_best_records_r1[tmp_best_records_r1_number].vote_number = minor_votes[k];
+					tmp_best_records_r2[tmp_best_records_r2_number].vote_number = anchors_votes[k];
+					tmp_best_records_r1[tmp_best_records_r1_number].coverage_start = vote_read1 -> coverage_start[minor_buckets[k]][minor_index[k]];
+					tmp_best_records_r2[tmp_best_records_r2_number].coverage_start = vote_read2 -> coverage_start[anchors_buckets[k]][anchors_index[k]];
+					tmp_best_records_r1[tmp_best_records_r1_number].coverage_end = vote_read1 -> coverage_end[minor_buckets[k]][minor_index[k]];
+					tmp_best_records_r2[tmp_best_records_r2_number].coverage_end = vote_read2 -> coverage_end[anchors_buckets[k]][anchors_index[k]];
+					tmp_best_records_r1[tmp_best_records_r1_number].read_quality = minor_quality[k];
+					tmp_best_records_r2[tmp_best_records_r2_number].read_quality = anchors_quality[k];
+
+					tmp_best_records_r1[tmp_best_records_r1_number].masks = vote_read1 -> masks[minor_buckets[k]][minor_index[k]] | current_masks| IS_PAIRED_MATCH;
+					tmp_best_records_r2[tmp_best_records_r2_number].masks = vote_read2 -> masks[anchors_buckets[k]][anchors_index[k]] | current_masks| IS_PAIRED_MATCH;
+				}
+				else
+				{
+					tmp_best_records_r1[tmp_best_records_r1_number].read_pos = anchors_position[k];
+					tmp_best_records_r2[tmp_best_records_r2_number].read_pos = minor_position[k];
+					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec1, vote_read1 -> indel_recorder[anchors_buckets[k]][anchors_index[k]]);
+					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec2, vote_read2 -> indel_recorder[minor_buckets[k]][minor_index[k]]);
+					tmp_best_records_r1[tmp_best_records_r1_number].vote_number = anchors_votes[k];
+					tmp_best_records_r2[tmp_best_records_r2_number].vote_number = minor_votes[k];
+					tmp_best_records_r1[tmp_best_records_r1_number].coverage_start = vote_read1 -> coverage_start[anchors_buckets[k]][anchors_index[k]];
+					tmp_best_records_r2[tmp_best_records_r2_number].coverage_start = vote_read2 -> coverage_start[minor_buckets[k]][minor_index[k]];
+					tmp_best_records_r1[tmp_best_records_r1_number].coverage_end = vote_read1 -> coverage_end[anchors_buckets[k]][anchors_index[k]];
+					tmp_best_records_r2[tmp_best_records_r2_number].coverage_end = vote_read2 -> coverage_end[minor_buckets[k]][minor_index[k]];
+					tmp_best_records_r1[tmp_best_records_r1_number].read_quality = anchors_quality[k];
+					tmp_best_records_r2[tmp_best_records_r2_number].read_quality = minor_quality[k];
+
+					tmp_best_records_r1[tmp_best_records_r1_number].masks = vote_read1 -> masks[anchors_buckets[k]][anchors_index[k]]| current_masks| IS_PAIRED_MATCH;
+					tmp_best_records_r2[tmp_best_records_r2_number].masks = vote_read2 -> masks[minor_buckets[k]][minor_index[k]]| current_masks | IS_PAIRED_MATCH;
+				}
+				ret = 1;
+			}
+			if(is_breakeven)
+			{
+				tmp_best_records_r1[0].masks |= IS_BREAKEVEN_READ;
+		 		tmp_best_records_r2[0].masks |= IS_BREAKEVEN_READ;
+				if(tmp_best_records_r1_number<allvotes->multi_best_reads)
+				{
+					tmp_best_records_r1[tmp_best_records_r1_number].masks |= IS_BREAKEVEN_READ;
+		 			tmp_best_records_r2[tmp_best_records_r2_number].masks |= IS_BREAKEVEN_READ;
+				}
+			}
+			tmp_best_records_r1_number++;
+			tmp_best_records_r2_number++;
+			if(tmp_best_records_r1_number<allvotes->multi_best_reads)
+			{
+				tmp_best_records_r1[tmp_best_records_r1_number].vote_number =0;
+				tmp_best_records_r2[tmp_best_records_r2_number].vote_number =0;
 			}
 		}
-
-		if(need_replace){
-			selection_minor_pos = minor_position[k];
-			selection_major_pos = anchors_position[k];
-			selection_minor_vote = minor_votes[k];
-			selection_major_vote = anchors_votes[k];
-			selection_major_read_no = anchor_read[k];
-			selected_major_bucket = anchors_buckets[k];
-			selected_minor_bucket = minor_buckets[k];
-			selected_major_index = anchors_index[k];
-			selected_minor_index = minor_index[k];
-			* is_breakeven = is_minor_breakeven[k];
-			* qual_r1 = anchor_read[k] ? minor_quality[k]:anchors_quality[k];
-			* qual_r2 = anchor_read[k] ? anchors_quality[k]: minor_quality[k];
-			* sum_quality = minor_quality[k] + anchors_quality[k];
-	
-		}
 	}
-
-	if(selection_minor_vote > 0)
-	{
-		if(selection_major_read_no)	// major is on read 2
-		{
-			*numvote_read1 = selection_minor_vote;
-			*numvote_read2 = selection_major_vote;
-			*pos_read1 = selection_minor_pos;
-			*pos_read2 = selection_major_pos ;
-			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
-			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_major_bucket][selected_major_index]);
-		}
-		else
-		{
-			*numvote_read1 = selection_major_vote;
-			*numvote_read2 = selection_minor_vote;
-			*pos_read1 = selection_major_pos;
-			*pos_read2 = selection_minor_pos;
-			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_major_bucket][selected_major_index]);
-			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
-		}
-		return 1;
-	}
-
-	return 0;
+	return ret;
 }
 
 int load_offsets(gene_offset_t* offsets , const char index_prefix [])
@@ -1558,37 +1568,91 @@ float match_read(const char read_str[], int read_len, unsigned int potential_pos
 	return  ret;
 }
 
-
-void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, char * max_indel_recorder, int * max_coverage_start, int * max_coverage_end, int total_subreads)
+void final_matchingness_scoring(int use_base_scoring , const char read_str[], const char quality_str[], unsigned char is_negative_strand, int read_len, gene_vote_t * vote, unsigned short current_masks, gene_allvote_t * allvotes, unsigned  int qid, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, int total_subreads)
 {
 	int i, j;
-	int max_matching = -1 ;
+	int max_matching = -1;
 
-	*max_vote = vote -> max_vote; 
+	int current_max_vote = allvotes -> results[qid * allvotes -> multi_best_reads + 0].vote_number;
 
-	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+	gene_quality_score_t old_max_quality = allvotes -> results[qid * allvotes -> multi_best_reads + 0].read_quality;
+	max_matching = old_max_quality;
+
+	voting_result_t *tmp_best_records = allvotes -> results + qid * allvotes -> multi_best_reads;
+	int tmp_best_records_number = 0, current_max_coverage = allvotes -> results[qid * allvotes -> multi_best_reads + 0].coverage_end - allvotes -> results[qid * allvotes -> multi_best_reads + 0].coverage_start;
+
+	for(tmp_best_records_number=0;tmp_best_records_number<qid * allvotes -> multi_best_reads; tmp_best_records_number++)
+		if(tmp_best_records[tmp_best_records_number].vote_number == 0)break;
+	
+
+	for(i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< vote->items[i]; j++)
 		{
-			if( vote->votes[i][j]  < vote -> max_vote) continue;
-
+			if( vote->votes[i][j]  < current_max_vote) continue;
+			int vote_ij_coverage = vote -> coverage_end[i][j] - vote-> coverage_start[i][j];
 			unsigned int potential_position = vote -> pos[i][j];
-			int matchingness_count = match_chro_indel((char *)read_str, my_array_index, potential_position, read_len, 0, space_type, indel_tolerance, vote -> indel_recorder[i][j], total_subreads);
-			if(matchingness_count > max_matching)
-			{
-				//printf("%d>%d\n", matchingness_count , max_matching);
-				max_matching = matchingness_count;
-				*max_position = potential_position;
-				*max_mask = vote -> masks[i][j];
-				*max_coverage_start = vote-> coverage_start[i][j];
-				*max_coverage_end = vote -> coverage_end[i][j];
-				indel_recorder_copy(max_indel_recorder, vote-> indel_recorder[i][j]);
+			int matchingness_count;
 
-				* max_quality = max_matching;
-			}
-			else if (matchingness_count == max_matching)
+			if(use_base_scoring) matchingness_count = match_chro_indel((char *)read_str, my_array_index, potential_position, read_len, 0, space_type, indel_tolerance, vote -> indel_recorder[i][j], total_subreads);
+			else		     matchingness_count = vote -> quality[i][j]; 
+
+			if((vote->votes[i][j] > current_max_vote) ||
+			   (vote->votes[i][j] == current_max_vote && matchingness_count > max_matching))
 			{
-//				SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position, vote -> pos[i][j]);
-				(*max_mask) |= IS_BREAKEVEN_READ ;
+				max_matching = matchingness_count;
+				current_max_coverage = vote_ij_coverage;
+				current_max_vote = vote->votes[i][j];
+
+				long long int indel_rec_offset = 0+allvotes -> multi_best_reads*qid;
+				indel_rec_offset *= allvotes -> indel_recorder_length;
+
+				tmp_best_records_number = 1;
+				tmp_best_records[0].read_pos = potential_position;
+				tmp_best_records[0].vote_number = current_max_vote;
+				tmp_best_records[0].is_negative_strand = is_negative_strand; 
+				tmp_best_records[0].read_quality = max_matching;
+				tmp_best_records[0].masks= vote-> masks[i][j] | current_masks;
+				tmp_best_records[0].coverage_start = vote-> coverage_start[i][j];
+				tmp_best_records[0].coverage_end = vote -> coverage_end[i][j];
+				indel_recorder_copy(allvotes -> all_indel_recorder+indel_rec_offset, vote-> indel_recorder[i][j]);
+
+				if(allvotes -> multi_best_reads>1)
+					tmp_best_records[1].vote_number = 0;
+			}
+			else if (vote->votes[i][j] == current_max_vote && matchingness_count == max_matching)
+			{
+				tmp_best_records[0].masks |= IS_BREAKEVEN_READ;
+				if(tmp_best_records_number >=  allvotes -> multi_best_reads){
+					if(tmp_best_records[0].read_pos  >  potential_position)
+					{
+						tmp_best_records[0].read_pos = potential_position;
+						tmp_best_records[0].vote_number = current_max_vote;
+						tmp_best_records[0].is_negative_strand = is_negative_strand; 
+						tmp_best_records[0].read_quality = max_matching;
+						tmp_best_records[0].masks= vote-> masks[i][j] |IS_BREAKEVEN_READ| current_masks;
+						tmp_best_records[0].coverage_start = vote-> coverage_start[i][j];
+						tmp_best_records[0].coverage_end = vote -> coverage_end[i][j];
+						long long int indel_rec_offset = 0+allvotes -> multi_best_reads*qid;
+						indel_rec_offset *= allvotes -> indel_recorder_length;
+						indel_recorder_copy(allvotes -> all_indel_recorder+indel_rec_offset, vote-> indel_recorder[i][j]);
+					}
+					break;
+				}
+
+				tmp_best_records[tmp_best_records_number].read_pos = potential_position;
+				tmp_best_records[tmp_best_records_number].vote_number = current_max_vote;
+				tmp_best_records[tmp_best_records_number].read_quality = max_matching;
+				tmp_best_records[tmp_best_records_number].is_negative_strand = is_negative_strand; 
+				tmp_best_records[tmp_best_records_number].masks= vote-> masks[i][j]| IS_BREAKEVEN_READ | current_masks;
+				tmp_best_records[tmp_best_records_number].coverage_start = vote-> coverage_start[i][j];
+				tmp_best_records[tmp_best_records_number].coverage_end = vote -> coverage_end[i][j];
+				long long int indel_rec_offset = tmp_best_records_number+allvotes -> multi_best_reads*qid;
+				indel_rec_offset *= allvotes -> indel_recorder_length;
+				indel_recorder_copy(allvotes -> all_indel_recorder+indel_rec_offset, vote-> indel_recorder[i][j]);
+
+				tmp_best_records_number ++;
+
+				if(tmp_best_records_number<allvotes -> multi_best_reads) tmp_best_records[tmp_best_records_number].vote_number = 0;
 			}
 		}
 }
@@ -1709,6 +1773,8 @@ int window_indel_align(char * read, int read_len, gene_value_index_t * index, un
 	chro_str[i]=0;
 	j = read[read_len];
 	read[read_len]=0;
+
+	ddprintf ("CHRO=%s\nREAD=%s\n", chro_str, read);
 
 	/*
 	float contingency_list [MAX_READ_LENGTH];
@@ -2058,7 +2124,6 @@ float match_base_quality_edit(gene_value_index_t *array_index, char * read_txt, 
 	int ret =0;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
 		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
-	//	exit(-1);
 		return 100;
 	}
 	for(i=0; i<read_len; i++)
@@ -2107,7 +2172,6 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 	int ret =0;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
 		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
-	//	exit(-1);
 		return 100;
 	}
 	for(i=0; i<read_len; i++)
@@ -2357,4 +2421,198 @@ int get_base_error_prob64i(char v)
 {
         return PROB_QUAL_INT_TABLE[v-'@'];
 }
+
+
+
+
+
+int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven)
+{
+
+	int k, i, j, anchors = 0;
+	gehash_data_t anchors_position [ANCHORS_NUMBER];
+	unsigned char anchor_read [ANCHORS_NUMBER];
+
+	gene_vote_number_t anchor_votes = max(vote_read1->max_vote, vote_read2->max_vote);
+	gene_vote_number_t anchors_votes [ANCHORS_NUMBER];
+	gene_quality_score_t anchors_quality [ANCHORS_NUMBER];
+	int anchors_buckets [ANCHORS_NUMBER];
+	int anchors_index [ANCHORS_NUMBER];
+
+	gene_vote_number_t minor_votes [ANCHORS_NUMBER];
+	gene_quality_score_t minor_quality [ANCHORS_NUMBER];
+	gehash_data_t minor_position [ANCHORS_NUMBER];
+	int minor_buckets [ANCHORS_NUMBER];
+	int minor_index [ANCHORS_NUMBER];
+	char is_minor_breakeven [ANCHORS_NUMBER];
+
+	if(anchor_votes < min_major)
+		return 0;
+
+	for (k=0; k<2; k++)
+	{
+		gene_vote_t * current_vote = k?vote_read2:vote_read1;
+		if (current_vote->max_vote < anchor_votes)
+			continue;
+
+		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+			for(j=0; j< current_vote->items[i]; j++)
+			{
+				if(current_vote->votes[i][j] >= anchor_votes -            0)
+				{
+					anchors_position[anchors] = current_vote->pos[i][j];
+					anchors_votes   [anchors] = current_vote->votes[i][j];
+					anchors_quality [anchors] = current_vote->quality[i][j];
+					anchor_read	[anchors] = k;
+					anchors_buckets [anchors] = i;
+					anchors_index   [anchors] = j;
+
+					anchors++;
+
+					if(anchors >= ANCHORS_NUMBER)
+					{
+	//					SUBREADprintf("Abnormally too many anchors [%d, %d] %f\n", i, j, anchor_votes);
+						anchors --;
+					}
+				}
+			}
+
+	}
+
+	bzero(minor_votes, ANCHORS_NUMBER*sizeof(gene_vote_number_t));
+	bzero(minor_quality, ANCHORS_NUMBER*sizeof(gene_quality_score_t));
+	bzero(is_minor_breakeven, ANCHORS_NUMBER);
+	for (k=0; k<2; k++)
+	{
+		gene_vote_t * current_vote = k?vote_read2:vote_read1;
+		gene_vote_t * current_vote2 = k?vote_read1:vote_read2;
+
+		if (current_vote2->max_vote < anchor_votes)
+			continue;
+
+		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+			for(j=0; j< current_vote->items[i]; j++)
+			{
+				if(current_vote->votes[i][j] >= min_minor)
+				{
+					int l;
+					for (l=0; l<anchors; l++)
+					{
+
+						if(anchor_read[l]==k)continue;
+
+						long long int abdist = current_vote->pos[i][j];
+						abdist -= anchors_position[l];
+
+						if((anchor_read[l] && !is_negative_strand) ||
+						    ((!anchor_read[l]) && is_negative_strand))
+							abdist = -abdist;
+
+						if (abdist < 0)
+						//#warning WGSIM generates paired-end data in a wrong way; abdist is given its absolute value in such a case.
+							abdist = -abdist;
+						//	continue;
+
+						long long int abdist_old = minor_position[l];
+						abdist_old -=  anchors_position[l];
+						if(abdist_old <0) abdist_old=-abdist_old;
+						if (	(minor_votes[l] < current_vote->votes[i][j] ||
+							(minor_votes[l] == current_vote->votes[i][j] && current_vote->quality [i][j] > minor_quality[l]) ||
+							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<0.0001 && abdist < abdist_old))&& 
+							(abdist <= max_pair_dest) &&
+							(abdist >= min_pair_dest) 
+						   )
+						{
+							minor_votes[l] = current_vote->votes[i][j];
+							minor_position[l] = current_vote->pos[i][j];
+							minor_quality[l] = current_vote->quality [i][j];
+							minor_buckets[l] = i;
+							minor_index[l] = j;
+						}
+					}
+				}
+			}
+
+	}
+
+	gene_vote_number_t selection_minor_vote = 0;
+	gene_vote_number_t selection_major_vote = 0;
+	gehash_data_t selection_minor_pos = 0;
+	gehash_data_t selection_major_pos = 0;
+
+	int selected_major_index=0, selected_major_bucket=0, selected_minor_bucket=0, selected_minor_index=0;
+
+	*sum_quality = 0;
+
+	unsigned char selection_major_read_no = 0;
+	//int reason = 0;
+
+	for (k=0; k<anchors; k++)
+	{
+		if(minor_votes[k]==0)
+			continue;
+
+		int need_replace = 0;
+
+
+		if ((minor_votes[k]+anchors_votes[k]) > (selection_minor_vote+selection_major_vote) ||
+	   	       ((minor_votes[k]+anchors_votes[k]) == (selection_minor_vote+selection_major_vote) &&
+		 	 minor_quality[k] + anchors_quality[k] > *sum_quality))
+		{
+			need_replace = 1;
+		}
+		else if (minor_votes[k]+anchors_votes[k] == selection_minor_vote+selection_major_vote &&
+		 	 minor_quality[k] + anchors_quality[k] == *sum_quality)
+		{
+			if (selection_minor_pos != minor_position[k] && minor_position[k] != selection_major_pos)
+			{
+				* is_breakeven = 1;
+				if (selection_major_pos >  anchors_position[k]) need_replace = 1;
+			}
+		}
+
+		if(need_replace){
+			selection_minor_pos = minor_position[k];
+			selection_major_pos = anchors_position[k];
+			selection_minor_vote = minor_votes[k];
+			selection_major_vote = anchors_votes[k];
+			selection_major_read_no = anchor_read[k];
+			selected_major_bucket = anchors_buckets[k];
+			selected_minor_bucket = minor_buckets[k];
+			selected_major_index = anchors_index[k];
+			selected_minor_index = minor_index[k];
+			* is_breakeven = is_minor_breakeven[k];
+			* qual_r1 = anchor_read[k] ? minor_quality[k]:anchors_quality[k];
+			* qual_r2 = anchor_read[k] ? anchors_quality[k]: minor_quality[k];
+			* sum_quality = minor_quality[k] + anchors_quality[k];
+	
+		}
+	}
+
+	if(selection_minor_vote > 0)
+	{
+		if(selection_major_read_no)	// major is on read 2
+		{
+			*numvote_read1 = selection_minor_vote;
+			*numvote_read2 = selection_major_vote;
+			*pos_read1 = selection_minor_pos;
+			*pos_read2 = selection_major_pos ;
+			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
+			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_major_bucket][selected_major_index]);
+		}
+		else
+		{
+			*numvote_read1 = selection_major_vote;
+			*numvote_read2 = selection_minor_vote;
+			*pos_read1 = selection_major_pos;
+			*pos_read2 = selection_minor_pos;
+			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_major_bucket][selected_major_index]);
+			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
+		}
+		return 1;
+	}
+
+	return 0;
+}
+
 
