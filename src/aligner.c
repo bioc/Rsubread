@@ -533,8 +533,9 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 					{
 						unsigned int tmp_mapped_pos = allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].read_pos;
 
-						allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read_txt, qual_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl);
-						allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].edit_distance = mismatch;
+						allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read_txt, qual_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl, APPLY_REPEATING_PENALTY);
+						//allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read_txt, qual_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl);
+						//allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].edit_distance = mismatch;
 					}
 				}
 			}
@@ -598,7 +599,8 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 						if(APPLY_REPEATING_PENALTY)
 							repeated_number = test_big_margin(allvote, queries * allvote -> multi_best_reads + best_read_id);
 
-						allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1) / (1+repeated_number);
+						allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1, APPLY_REPEATING_PENALTY) / (1+repeated_number);
+						//allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1) / (1+repeated_number);
 						allvote->results[queries * allvote -> multi_best_reads + best_read_id].edit_distance = mismatch;
 					}
 				}

@@ -2210,6 +2210,17 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 					#define QL_MIN 200000
 				#endif
 
+                                #ifdef QUALITY_KILL
+                                        #if QUALITY_KILL > 196
+                                                #define QL_MIN 999000
+                                        #endif
+                                #endif
+        
+                                #ifndef QL_MIN
+                                        #define QL_MIN 200000
+                                #endif
+
+
 				if( ql < QL_MIN) (*high_qual_unmatch)++;
 
 				ret += ql-1000000;
@@ -2225,7 +2236,7 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 
 
 
-float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl)
+float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl, int apply_repeat_penalty)
 {
 	int cigar_cursor = 0;
 	int read_cursor = 0;
@@ -2251,19 +2262,21 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
 
 				ret += (int)(nret*1000000);
-				if(x<10) ret -= 19999999;
+			
+				if(apply_repeat_penalty && x<10) ret -= 19999999;
 				chromosome_cursor +=x;
 				read_cursor +=x;
 			}
 			else if(cigar_txt[cigar_cursor] == 'I')
 			{
 				read_cursor +=x;
-				ret -= 19999999;
+				if(apply_repeat_penalty)
+					ret -= 19999999;
 			}
 			else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N')
 			{
 				chromosome_cursor +=x;
-				if(cigar_txt[cigar_cursor] == 'D' )
+				if(apply_repeat_penalty && cigar_txt[cigar_cursor] == 'D' )
 					ret -= 19999999;
 			}
 			else if(cigar_txt[cigar_cursor] == 'B')

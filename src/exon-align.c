@@ -1478,7 +1478,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			int is_safeguarded= 0;
 			compress_cigar(cigar_buf, rl, inb, NULL, NULL, &is_safeguarded);
 
-			halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, explain_result[0], inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT, &mismatch, rl);
+			halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, explain_result[0], inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT, &mismatch, rl, 0);
 
 
 			#ifdef QUALITY_KILL

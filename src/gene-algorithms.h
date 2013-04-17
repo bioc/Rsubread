@@ -19,10 +19,6 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
 #define init_gene_vote(a) memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof(short)); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;
-// return current votes for a given position
-// if create_new_pos == 0 then do not take this position if it does not exist in the vote array
-inline void add_gene_vote(gene_vote_t* vote, int position, int create_new_pos);
-inline void add_gene_vote_weighted(gene_vote_t* vote, int position, int create_new_pos, int w);
 
 // return the votes; the position is put into position_result 
 int max_gene_vote(gene_vote_t* vote, int * position_result, int query_id);
@@ -82,7 +78,7 @@ void find_and_explain_indel(gene_allvote_t* allvote, int result_av_offset, int p
 
 int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int match_req_5end, int match_req_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_str, int qual_format);
 
-float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl);
+float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl, int apply_repeat_penalty);
 float final_mapping_quality_edit(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl);
 
 int bad_quality_base_number(char * qualityb, int rl , int format);
