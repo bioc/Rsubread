@@ -19,6 +19,8 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
 #define init_gene_vote(a) memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof(short)); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;
+void add_gene_vote(gene_vote_t* vote, int position, int create_new_pos);
+void add_gene_vote_weighted(gene_vote_t* vote, int position, int create_new_pos, int w);
 
 // return the votes; the position is put into position_result 
 int max_gene_vote(gene_vote_t* vote, int * position_result, int query_id);

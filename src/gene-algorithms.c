@@ -394,12 +394,12 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 #define _index_vote(key) (((unsigned int)key)%GENE_VOTE_TABLE_SIZE)
 
 int vv=0;
-inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
+void add_gene_vote(gene_vote_t* vote, int key , int add_new)
 {
 	add_gene_vote_weighted(vote, key, add_new, 1);
 }
 
-inline void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int w)
+void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int w)
 {
 	int offset = _index_vote(key);
 	int datalen = vote -> items[offset];
@@ -2200,16 +2200,6 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 					ql = get_base_error_prob64i(qual_txt[i]);
 				else
 					ql = get_base_error_prob33i(qual_txt[i]);
-				#ifdef QUALITY_KILL
-					#if QUALITY_KILL > 196
-						#define QL_MIN 970000
-					#endif
-				#endif
-	
-				#ifndef QL_MIN
-					#define QL_MIN 200000
-				#endif
-
                                 #ifdef QUALITY_KILL
                                         #if QUALITY_KILL > 196
                                                 #define QL_MIN 999000
