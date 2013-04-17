@@ -142,7 +142,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 			unsigned char votes = Curr_result -> vote_number;
 
 			int mate_index = 0, mate_rl = 0; 
-			int is_mate_ok = 1;
+			int is_mate_ok = 0;
 			unsigned int mate_pos=0;
 
 			int mate_offset_pos = 0;
@@ -590,6 +590,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 					
 					if(is_safeguarded)
 					{
+						//printf("SG! %s\n", cigar_str);
 						allvote ->results[queries * allvote -> multi_best_reads + best_read_id].vote_number = 0;
 					}
 					else
@@ -597,7 +598,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 						int repeated_number = 0;
 
 						if(APPLY_REPEATING_PENALTY)
-							repeated_number = test_big_margin(allvote, queries * allvote -> multi_best_reads + best_read_id);
+							repeated_number = test_big_margin(allvote, queries);
 
 						allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1, APPLY_REPEATING_PENALTY) / (1+repeated_number);
 						//allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1) / (1+repeated_number);
@@ -887,7 +888,8 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 
 
 			//if(vote.max_vote > max(0,subread_no - (TOTAL_SUBREADS - ACCEPT_SUBREADS)))
-			//print_votes(&vote, index_prefix);
+			//	print_votes(vote, index_prefix);
+
 			if(vote->max_vote >= ACCEPT_SUBREADS)
 			{
 				finalise_vote(vote);
@@ -897,7 +899,8 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 				matched =1;
 				good_match += matched;
 			}
-	
+
+
 		}
 
 
@@ -1158,7 +1161,7 @@ void usage(char * execname)
 	SUBREADputs("    -m --minmatch  <int>\t consensus threshold (minimal number of consensus subreads required) for reporting a hit. If paired-end read data are provided, this gives the consensus threshold for the read which receives more votes than the other read from the same pair. 3 by default.");
 	SUBREADputs("    -T --threads   <int>\t number of threads, 1 by default.");
 	SUBREADputs("    -I --indel     <int>\t number of indels allowed, 5 by default. Up to 16 indels are allowed.");
-	SUBREADputs("    -B --multi     <int>\t number of locations reported per multi-mapping read, 1 by default. Up to 16 locations.");
+	SUBREADputs("    -B --multi     <int>\t Specify the maximal number of equally-best mapping locations allowed to be reported for any read. The value has to be within the range of 1 to 16. 1 by default. ");
 	SUBREADputs("    -P --phred     <3:6>\t the format of Phred scores in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
 	SUBREADputs("    -u --unique         \t reporting uniquely mapped reads only.");
 	SUBREADputs("    -Q --quality        \t using mapping quality scores to break ties when more than one best mapping locations are found.");
@@ -1251,6 +1254,7 @@ int main_align(int argc,char ** argv)
 	INDEX_THRESHOLD = 1024;
 	INDEL_TOLERANCE = 6;
 	MAX_METHYLATION_C_NUMBER = 0;
+	REPORT_ONLY_UNIQUE = 0;
 	APPLY_REPEATING_PENALTY = 1;
 	read_file[0]=0;
 	read2_file[0]=0;
