@@ -574,7 +574,6 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 					short read_mask = allvote->results[queries * allvote -> multi_best_reads + best_read_id].masks;
 					int is_safeguarded = 0;
 
-					unsigned int tmp_mapped_pos = allvote->results[queries * allvote -> multi_best_reads + best_read_id].read_pos;
 
 
 					long long int qur_rec_offset =queries * allvote -> multi_best_reads + best_read_id;
@@ -587,6 +586,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 					cigar_str[0]=0;
 
 					show_cigar(allvote->all_indel_recorder + qur_rec_offset, rl1, r_need_reverse , cigar_str, INDEL_TOLERANCE, TOTAL_SUBREADS, read1_txt, NULL, NULL, &is_safeguarded);
+					unsigned int tmp_mapped_pos = allvote->results[queries * allvote -> multi_best_reads + best_read_id].read_pos;
 					
 					if(is_safeguarded)
 					{

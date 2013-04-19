@@ -538,6 +538,9 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		}
 		else
 		{
+			if(tmpv==0)
+				cigar_length = -99999999;
+						
 			if(is_first_M && pos_offset && cc=='S')
 				*pos_offset = tmpv;
 			else if(cc=='M') is_first_M = 0;
@@ -2263,6 +2266,7 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 			else if(cigar_txt[cigar_cursor] == 'I')
 			{
 				read_cursor +=x;
+				
 				if(apply_repeat_penalty)
 					ret -= 19999999;
 			}
