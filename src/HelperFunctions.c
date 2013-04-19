@@ -65,8 +65,14 @@ void display_sections(char * CIGAR_Str)
 	
 }
 
+#ifdef RSUBREAD_TEST_HELPER_FUNCTIONS
+void main()
+#else
 void test_main()
+#endif
 {
+	display_sections("");
+	display_sections("*");
 	display_sections("5S10M2D10M800N12M3I12M450N12M12D99M6S");
 	display_sections("110M2I10M800N32M3I12M6S");
 	display_sections("200S110M2I10M800N32M3I12M200N40M");
