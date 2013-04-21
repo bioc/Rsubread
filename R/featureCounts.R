@@ -1,19 +1,19 @@
-featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
+featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,allowMultiOverlap=FALSE,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
 {
 	flag <- FALSE
 
 	if(is.null(annot)){
 	  switch(tolower(as.character(genome)),
 	    mm9={
-	      ann <- system.file("annot","mm9_NCBI_exon.txt",package="Rsubread")
+	      ann <- system.file("annot","mm9_NCBI_exon_sorted.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 37.2 is used.\n")
 		},
 	    mm10={
-	      ann <- system.file("annot","mm10_NCBI_exon.txt",package="Rsubread")
+	      ann <- system.file("annot","mm10_NCBI_exon_sorted.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 38.1 is used.\n")
 		 },
 	    hg={
-	      ann <- system.file("annot","hg19_NCBI_exon.txt",package="Rsubread")
+	      ann <- system.file("annot","hg19_NCBI_exon_sorted.txt",package="Rsubread")
 	      cat("Human annotation NCBI Build 37.2 is used.\n")
 	       },
 	       {
@@ -47,7 +47,7 @@ featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9"
 
 	for(i in 1:length(files)){
 	  cat("Processing", files[i], " ...\n")
-	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),sep=",")
+	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
 	  C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	  x1 <- read.delim(fout,stringsAsFactors=FALSE)  

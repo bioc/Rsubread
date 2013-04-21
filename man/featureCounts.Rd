@@ -3,7 +3,7 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
+featureCounts(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,allowMultiOverlap=FALSE,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM format files.}
@@ -11,6 +11,7 @@ featureCounts(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,
   \item{feature.type}{ a character string giving the feature type. Its value could be \code{gene}, \code{exon} or \code{other}. \code{gene} by default.}
   \item{genome}{ a character string specifying the reference genome to which the sequencing reads were mapped. \code{mm9} by default. This argument is only applicable when \code{annot} is \code{NULL}.}
   \item{annot}{ a data frame containing annotation information. When \code{annot} is \code{NULL}, an in-built annotation will be used.}
+  \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature if it overlaps with all of them. \code{FALSE} by default.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. \code{FALSE} by default.}
   \item{min.distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
   \item{max.distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default. \code{min.distance} and \code{max.distance} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a template spans two or more exons, the mapping locations of the pair of reads sequenced from this template may have a distance much larger than the nominal template length.}

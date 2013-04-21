@@ -23,6 +23,7 @@ Parameters passed from the featureCounts R function:
 5: min.distance
 6: max.distance
 7: as.numeric(tolower(file.type)=="sam")
+8: as.numeric(allowMultiOverlap)
 */
 
 FILE *fp_ann, *fp_in, *fp_out;
@@ -55,7 +56,7 @@ int isPE, minPEDistance, maxPEDistance;
 char * mate_chr;
 int mate_pos, pos_leftmost, fragment_length;
 
-int isSAM;
+int isSAM, isMultiOverlapAllowed;
 char * ret;
 SamBam_FILE * fp_in_bam;
 
@@ -66,6 +67,7 @@ minPEDistance = atoi(argv[5]);
 maxPEDistance = atoi(argv[6]);
 
 isSAM = atoi(argv[7]);
+isMultiOverlapAllowed = atoi(argv[8]);
  	
 /* read in annotation data */
 fp_ann = fopen(argv[1],"r");
