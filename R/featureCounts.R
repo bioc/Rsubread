@@ -47,7 +47,7 @@ featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9"
 
 	for(i in 1:length(files)){
 	  cat("Processing", files[i], " ...\n")
-	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),sep=",")
+	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),as.numeric(tolower(feature.type)=="gene"),sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
 	  C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	  x1 <- read.delim(fout,stringsAsFactors=FALSE)  

@@ -24,6 +24,7 @@ Parameters passed from the featureCounts R function:
 6: max.distance
 7: as.numeric(tolower(file.type)=="sam")
 8: as.numeric(allowMultiOverlap)
+9: as.numeric(isGeneLevel)
 */
 
 FILE *fp_ann, *fp_in, *fp_out;
@@ -56,9 +57,12 @@ int isPE, minPEDistance, maxPEDistance;
 char * mate_chr;
 int mate_pos, pos_leftmost, fragment_length;
 
-int isSAM, isMultiOverlapAllowed;
+int isSAM;
 char * ret;
 SamBam_FILE * fp_in_bam;
+
+int nhits, j, prev_gid, isMultiOverlapAllowed, isGeneLevel, flag_overlap;
+long hits_indices[1000];
 
 line = (char*)calloc(MAX_LINE_LENGTH, 1);
 
@@ -68,6 +72,7 @@ maxPEDistance = atoi(argv[6]);
 
 isSAM = atoi(argv[7]);
 isMultiOverlapAllowed = atoi(argv[8]);
+isGeneLevel = atoi(argv[9]);
  	
 /* read in annotation data */
 fp_ann = fopen(argv[1],"r");
@@ -211,7 +216,8 @@ while (1){
 	  break;
 	}
 	
-  if(flag == 1)
+  if(flag == 1){
+    nhits = 0;
     for(i=search_start;i<=search_end;i++){
       if(isPE == 1){
 	  //get the mapping position of leftmost base of the fragment
@@ -226,13 +232,55 @@ while (1){
           break;
         }   
       }
-      else
-        if(read_pos >= (start[i]-read_length+1) && read_pos <= stop[i]){
-		  nreads_mapped_to_exon++;
-          nreads[i]++;
-          break;
-        }
+      else{
+		if (start[i] > (read_pos + read_length -1)) break;
+		if (stop[i] >= read_pos){
+			hits_indices[nhits] = i;
+			nhits++;
+		} 
+		
+        //if(read_pos >= (start[i]-read_length+1) && read_pos <= stop[i]){
+		//  nreads_mapped_to_exon++;
+        //  nreads[i]++;
+        //  break;
+        //}
+		
+	  } //end else
     } //end for
+	
+	if (nhits > 0){
+	  if (nhits == 1){
+	    nreads_mapped_to_exon++;
+	    nreads[hits_indices[0]]++; 
+	  }
+	  else { // nhits greater than 1	    		
+		if (isMultiOverlapAllowed == 1){
+		  for (j=0;j<nhits;j++){
+		    nreads[hits_indices[j]]++;
+		  }
+		  nreads_mapped_to_exon++;
+		}
+		else { // multi-overlap is not allowed		
+		  if (isGeneLevel == 1){
+		    prev_gid = geneid[hits_indices[0]];
+			flag_overlap = 0;
+			for (j=1;j<nhits;j++){
+			  if (geneid[hits_indices[j]] != prev_gid){
+			    flag_overlap = 1;
+				break;
+			  } 
+			}
+			
+			if (flag_overlap == 0){ //overlap multiple exons from a single gene
+			  nreads_mapped_to_exon++;
+			  nreads[hits_indices[0]]++;
+			}
+		  } //end if isGeneLevel equal to 1
+		} //end else multi-overlap not allowed
+	  } //end else nhits greater than 1
+	} // end if nhits greater than 0	
+  } //end if flag equal to 1
+
 
   //if paired end data are used, the current read pair is found properly paired and there is no need to process the second read in the pair 
   if(isPE == 1){
