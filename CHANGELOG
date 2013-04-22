@@ -1,3 +1,6 @@
+April 22, 2013
+(1) sam2bed functions now output strandness information.
+
 April 17, 2013 - 1.11.1
 (1) Allowed multiple equally-best mapping locations to be reported for reads
 

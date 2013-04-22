@@ -19,10 +19,11 @@ int sam2bed(int argc,char *argv[]){
 
   char * line = NULL;
   char * tok;
+  char strand;
   size_t len = 0;
   ssize_t z;
   char * chr;
-  int i, readlen, chr_start, chr_end;
+  int i, readlen, chr_start, chr_end, flag, mqs;
 
   int MAX_LINE_LENGTH = 100000;
   
@@ -35,12 +36,21 @@ int sam2bed(int argc,char *argv[]){
       continue;
 
     tok = strtok(line,"\t");
-    for(i=0;i<2;i++)
-       chr = strtok(NULL,"\t");
+	flag = atoi(strtok(NULL,"\t"));
+		
+	chr = strtok(NULL,"\t");
     if(chr[0] != '*'){
        chr_start = atoi(strtok(NULL,"\t")) - 1; 
        chr_end = chr_start + readlen;
-       fprintf(fp_out,"%s\t%d\t%d\n", chr, chr_start, chr_end);
+	   mqs = atoi(strtok(NULL,"\t"));
+	   
+	   if ((flag & 0x10) == 0){ 
+		 strand = '+';
+	   }
+	   else{
+		 strand = '-';
+	   }
+       fprintf(fp_out,"%s\t%d\t%d\t%s\t%d\t%c\n", chr, chr_start, chr_end, ".",mqs,strand);
     }
   }
 
