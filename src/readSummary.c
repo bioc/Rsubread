@@ -175,7 +175,7 @@ while (1){
   read_chr = strtok(NULL,"\t");
 
   //skip the read if unmapped (its mate will be skipped as well if paired-end)
-  if(*read_chr == '*'){
+  if(*read_chr == '*'){ //better to use flag field to decide if it is mapped or not
 	if(isPE == 1){
 	  if (isSAM == 1)
 		fgets(line, MAX_LINE_LENGTH, fp_in);
@@ -220,17 +220,23 @@ while (1){
     nhits = 0;
     for(i=search_start;i<=search_end;i++){
       if(isPE == 1){
-	  //get the mapping position of leftmost base of the fragment
         if(read_pos < mate_pos)
 		  pos_leftmost = read_pos;
 		else
 	      pos_leftmost = mate_pos;
 
-        if(pos_leftmost >= (start[i]-fragment_length+1) && pos_leftmost <= stop[i]){
-          nreads_mapped_to_exon++;
-          nreads[i]++;
-          break;
-        }   
+		if (start[i] > (pos_leftmost + fragment_length - 1)) break;
+		if (stop[i] >= pos_leftmost){
+			hits_indices[nhits] = i;
+			nhits++;
+		} 
+		
+        //if(pos_leftmost >= (start[i]-fragment_length+1) && pos_leftmost <= stop[i]){
+        //  nreads_mapped_to_exon++;
+        //  nreads[i]++;
+        //  break;
+        //}
+		
       }
       else{
 		if (start[i] > (read_pos + read_length -1)) break;
@@ -246,7 +252,7 @@ while (1){
         //}
 		
 	  } //end else
-    } //end for
+    } //end for i from search start to search end
 	
 	if (nhits > 0){
 	  if (nhits == 1){
