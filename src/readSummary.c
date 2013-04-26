@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <R.h>
 #include <zlib.h>
 #include <pthread.h>
@@ -601,7 +602,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 		{
 			nreads[xk2]+=global_context -> thread_contexts[xk1].count_table[xk2];
 		}
-		printf("The %d-th thread processed %u reads\n", xk1, global_context -> thread_contexts[xk1].nreads_mapped_to_exon);
+		Rprintf("The %d-th thread processed %d reads\n", xk1, global_context -> thread_contexts[xk1].nreads_mapped_to_exon);
 		(*nreads_mapped_to_exon) += global_context -> thread_contexts[xk1].nreads_mapped_to_exon;
 	}
 }
