@@ -1,3 +1,6 @@
+April 28, 2013 - 1.11.2
+(1) featureCounts now supports multi-threading.
+
 April 22, 2013
 (1) sam2bed functions now output strandness information.
 
