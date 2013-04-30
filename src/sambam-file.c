@@ -319,7 +319,7 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len)
 
 
 // test function
-#ifdef MAKE_STANDALONE
+#ifdef MAKE_TEST_SAMBAM
 int main(int argc , char ** argv)
 #else
 int test_bamview(int argc, char ** argv)

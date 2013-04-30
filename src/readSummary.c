@@ -3,353 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <R.h>
+
+#ifndef MAKE_STANDALONE
+  #include <R.h>
+#endif
+
 #include <zlib.h>
 #include <pthread.h>
+#include <getopt.h>
 #include "subread.h"
 #include "sambam-file.h"
-
-#define readSummary_multi_threads readSummary
-//#define readSummary_single_thread readSummary
-
-int readSummary_single_thread(int argc,char *argv[]){
-
-/*
-This function counts the number of reads falling into each exon region.
-The order of exons in the output is the same as that of exons included in the annotation.
-The annotation, if provided as a file, should be sorted by chromosome name.
-
-Parameters passed from the featureCounts R function:
-0: "readSummary"
-1: ann
-2: files[i]
-3: fout
-4: as.numeric(isPairedEnd)
-5: min.distance
-6: max.distance
-7: as.numeric(tolower(file.type)=="sam")
-8: as.numeric(allowMultiOverlap)
-9: as.numeric(isGeneLevel)
-*/
-
-FILE *fp_ann, *fp_in, *fp_out;
-
-int read_length;
-char **chr;
-long *start, *stop;
-int *geneid, *nreads;
-
-char * line = NULL;
-char * read_chr;
-size_t len = 0;
-ssize_t z;
-long i,nexons,read_pos;
-
-int MAX_LINE_LENGTH = 100000;
-  
-int nreads_mapped_to_exon = 0;
-
-long anno_chr_head[500];
-char * anno_chrs[500];
-long curchr, curpos, search_start, search_end;
-char * curchr_name;
-int nchr, flag;
-curchr = 0;
-curpos = 0;
-curchr_name = "";
-
-int isPE, minPEDistance, maxPEDistance;
-char * mate_chr;
-int mate_pos, pos_leftmost, fragment_length;
-
-int isSAM;
-char * ret;
-SamBam_FILE * fp_in_bam;
-
-int nhits, j, prev_gid, isMultiOverlapAllowed, isGeneLevel, flag_overlap;
-long hits_indices[1000];
-
-line = (char*)calloc(MAX_LINE_LENGTH, 1);
-
-isPE = atoi(argv[4]);
-minPEDistance = atoi(argv[5]);
-maxPEDistance = atoi(argv[6]);
-
-isSAM = atoi(argv[7]);
-isMultiOverlapAllowed = atoi(argv[8]);
-isGeneLevel = atoi(argv[9]);
- 	
-/* read in annotation data */
-fp_ann = fopen(argv[1],"r");
-if(!fp_ann){
-  Rprintf("Failed to open the annotation file %s\n",argv[1]);
-  return -1;
-}
-fgets(line, MAX_LINE_LENGTH, fp_ann);
-nexons = 0;
-while (fgets(line, MAX_LINE_LENGTH, fp_ann))
-  nexons++;
-
-geneid = (int *) calloc(nexons,sizeof(int));
-chr = (char **) calloc(nexons,sizeof(char *));
-start = (long *) calloc(nexons,sizeof(long));
-stop = (long *) calloc(nexons,sizeof(long));
-nreads = (int *) calloc(nexons,sizeof(int));
-for(i=0;i<nexons;i++) nreads[i] = 0;
-
-rewind(fp_ann);
-fgets(line, MAX_LINE_LENGTH, fp_ann);
-
-for(i=0;i<nexons;i++){
- fgets(line, MAX_LINE_LENGTH, fp_ann);
- geneid[i] = atoi(strtok(line,"\t"));
- chr[i] = malloc(41);
- strcpy(chr[i],strtok(NULL,"\t"));
- start[i] = atoi(strtok(NULL,"\t"));
- stop[i] = atoi(strtok(NULL,"\t"));
- 
- if(strcmp(curchr_name,chr[i]) != 0){
-  curchr_name = chr[i];
-  anno_chrs[curchr] = chr[i];
-  anno_chr_head[curchr] = curpos;
-  curchr++;
- }
- curpos++;
-}
-nchr = curchr;
-anno_chr_head[curchr] = nexons;
-fclose(fp_ann);
-
-Rprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
-
-/* get read length */
-if (isSAM == 1){
-  fp_in = fopen(argv[2],"r");
-  if(!fp_in){
-    Rprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
-	return -1;
-  }
-}
-else{
-  fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
-  if(!fp_in_bam){
-    Rprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
-	return -1;
-  }
-}
-
-while (1){
-  if (isSAM == 1)
-	ret = fgets(line, MAX_LINE_LENGTH, fp_in);
-  else
-	ret = SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);  
-
-  if(!ret) break;
-	
-  if(line[0] != '@'){
-	strtok(line,"\t");
-	for(i=0;i<8;i++) strtok(NULL,"\t");
-	read_length = strlen(strtok(NULL,"\t"));
-	break;
-  }
-} //end while
-
-if (isSAM == 1)
-  fclose(fp_in);
-else
-  SamBam_fclose(fp_in_bam);
-
-/* SUMMARIZE READ MAPPING DATA */
-if (isSAM == 1)
-  fp_in = fopen(argv[2],"r");
-else
-  fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
-
-while (1){
-  if (isSAM == 1)
-	ret = fgets(line, MAX_LINE_LENGTH, fp_in);
-  else
-	ret = SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);  
-
-  if(!ret) break;
-  if(line[0] == '@') continue;
-
-  // process the current read or read pair
-  strtok(line,"\t");
-  strtok(NULL,"\t");
-  read_chr = strtok(NULL,"\t");
-
-  //skip the read if unmapped (its mate will be skipped as well if paired-end)
-  if(*read_chr == '*'){ //better to use flag field to decide if it is mapped or not
-	if(isPE == 1){
-	  if (isSAM == 1)
-		fgets(line, MAX_LINE_LENGTH, fp_in);
-	  else
-		SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);
-    }
-	continue;
-  }
-  
-  //get mapping location of the read (it could be the first read in a pair)
-  read_pos = atoi(strtok(NULL,"\t"));
-  
-  //remove reads which are not properly paired if paired-end reads are used (on different chromsomes or paired-end distance is too big or too small)
-  if(isPE == 1){
-    strtok(NULL,"\t");
-    strtok(NULL,"\t");
-    mate_chr = strtok(NULL,"\t"); //get chr which the mate read is mapped to
-    mate_pos = atoi(strtok(NULL,"\t"));
-    fragment_length = abs(atoi(strtok(NULL,"\t"))); //get the fragment length
-    if(strcmp(mate_chr,"=") != 0 || fragment_length > (maxPEDistance + read_length -1) || fragment_length < (minPEDistance + read_length - 1)){
-      //the two reads are not properly paired and are skipped
-	  if (isSAM == 1)
-		fgets(line, MAX_LINE_LENGTH, fp_in);
-	  else
-		SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);
-	continue;
-    }
-  } //end if(isPE==1)
-
-  //assign reads or fragments to features 
-  flag = 0;
-  for(i=0;i<nchr;i++)
-    if(strcmp(read_chr,anno_chrs[i])==0){
-	  //get chr to which the current read or fragment is mapped and also the searching range
-	  flag = 1;
-	  search_start = anno_chr_head[i];
-	  search_end = anno_chr_head[i+1] - 1;
-	  break;
-	}
-	
-  if(flag == 1){
-    nhits = 0;
-    for(i=search_start;i<=search_end;i++){
-      if(isPE == 1){
-        if(read_pos < mate_pos)
-		  pos_leftmost = read_pos;
-		else
-	      pos_leftmost = mate_pos;
-
-		if (start[i] > (pos_leftmost + fragment_length - 1)) break;
-		if (stop[i] >= pos_leftmost){
-			hits_indices[nhits] = i;
-			nhits++;
-		} 
-		
-        //if(pos_leftmost >= (start[i]-fragment_length+1) && pos_leftmost <= stop[i]){
-        //  nreads_mapped_to_exon++;
-        //  nreads[i]++;
-        //  break;
-        //}
-		
-      }
-      else{
-		if (start[i] > (read_pos + read_length -1)) break;
-		if (stop[i] >= read_pos){
-			hits_indices[nhits] = i;
-			nhits++;
-		} 
-		
-        //if(read_pos >= (start[i]-read_length+1) && read_pos <= stop[i]){
-		//  nreads_mapped_to_exon++;
-        //  nreads[i]++;
-        //  break;
-        //}
-		
-	  } //end else
-    } //end for i from search start to search end
-	
-	if (nhits > 0){
-	  if (nhits == 1){
-	    nreads_mapped_to_exon++;
-	    nreads[hits_indices[0]]++; 
-	  }
-	  else { // nhits greater than 1	    		
-		if (isMultiOverlapAllowed == 1){
-		  for (j=0;j<nhits;j++){
-		    nreads[hits_indices[j]]++;
-		  }
-		  nreads_mapped_to_exon++;
-		}
-		else { // multi-overlap is not allowed		
-		  if (isGeneLevel == 1){
-		    prev_gid = geneid[hits_indices[0]];
-			flag_overlap = 0;
-			for (j=1;j<nhits;j++){
-			  if (geneid[hits_indices[j]] != prev_gid){
-			    flag_overlap = 1;
-				break;
-			  } 
-			}
-			
-			if (flag_overlap == 0){ //overlap multiple exons from a single gene
-			  nreads_mapped_to_exon++;
-			  nreads[hits_indices[0]]++;
-			}
-		  } //end if isGeneLevel equal to 1
-		} //end else multi-overlap not allowed
-	  } //end else nhits greater than 1
-	} // end if nhits greater than 0	
-  } //end if flag equal to 1
-
-
-  //if paired end data are used, the current read pair is found properly paired and there is no need to process the second read in the pair 
-  if(isPE == 1){
-	if (isSAM == 1)
-	  fgets(line, MAX_LINE_LENGTH, fp_in);
-	else
-	  SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);
-  }
-
-} //end while 
-
-
-if(isPE == 1)
-  Rprintf("Number of fragments mapped to the features is: %d\n\n", nreads_mapped_to_exon);
-else
-  Rprintf("Number of reads mapped to the features is: %d\n\n", nreads_mapped_to_exon);
-
-/* save the results */
-fp_out = fopen(argv[3],"w");
-if(!fp_out){
-  Rprintf("Failed to create file %s\n", argv[3]);
-  return -1;
-}
-fprintf(fp_out,"geneid\tchr\tstart\tend\tnreads\n");
-for(i=0;i<nexons;i++)
-  fprintf(fp_out,"%d\t%s\t%ld\t%ld\t%d\n",geneid[i],chr[i],start[i],stop[i],nreads[i]);
-
-if (isSAM == 1)
-  fclose(fp_in);
-else
-  SamBam_fclose(fp_in_bam);
-
-fclose(fp_out);
-
-free(line);
-for(i=0;i<nexons;i++) free(chr[i]);
-free(geneid);
-free(chr);
-free(start);
-free(stop);
-free(nreads);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /********************************************************************/
 /********************************************************************/
@@ -358,6 +21,24 @@ free(nreads);
 /********************************************************************/
 /********************************************************************/
 /********************************************************************/
+#define FEATURE_NAME_LENGTH 48
+#define CHROMOSOME_NAME_LENGTH 48
+#define MAX_LINE_LENGTH 100000
+#define FILE_TYPE_RSUBREAD 10
+#define FILE_TYPE_GTF 100
+
+typedef struct
+{
+	unsigned char feature_name[FEATURE_NAME_LENGTH];
+	unsigned char chro[CHROMOSOME_NAME_LENGTH];
+	
+	unsigned int start;
+	unsigned int end;
+
+	unsigned int sorted_order;
+
+	char is_negative_strand;
+} fc_feature_info_t;
 
 typedef struct
 {
@@ -405,6 +86,175 @@ typedef struct
 } fc_thread_global_context_t;
 
 unsigned int tick_time = 1000;
+
+
+// This function loads annotations from the file.
+// It returns the number of featres loaded, or -1 if something is wrong. 
+// Memory will be allowcated in this function. The pointer is saved in *loaded_features.
+// The invoker must release the memory itself.
+
+int load_feature_info(const char * annotation_file, int file_type, fc_feature_info_t ** loaded_features)
+{
+	unsigned int features = 0, xk1 = 0;
+	char * file_line = malloc(MAX_LINE_LENGTH);
+	FILE * fp = fopen(annotation_file,"r"); 
+	if(!fp) return -1;
+	fgets(file_line, MAX_LINE_LENGTH, fp);
+
+	while(1)
+	{
+		char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
+		if(file_type == FILE_TYPE_RSUBREAD)
+		if(!fgets_ret) break;
+		features++;
+	}
+
+	fseek(fp,0,SEEK_SET);
+	fgets(file_line, MAX_LINE_LENGTH, fp);
+
+	fc_feature_info_t * ret_features = malloc(sizeof(fc_feature_info_t) * features);
+
+	while(xk1 < features)
+	{
+		fgets(file_line, MAX_LINE_LENGTH, fp);
+		char * token_temp;
+
+		if(file_type == FILE_TYPE_RSUBREAD)
+		{
+			char * feature_name = strtok_r(file_line,"\t",&token_temp);
+			strncpy((char *)ret_features[xk1].feature_name, (char *)feature_name, FEATURE_NAME_LENGTH);
+			char * seq_name = strtok_r(NULL,"\t", &token_temp);
+			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
+			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
+			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
+			ret_features[xk1].is_negative_strand = 0;//('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
+			ret_features[xk1].sorted_order = xk1;
+		}
+		else if(file_type == FILE_TYPE_GTF)
+		{
+			sprintf((char *)ret_features[xk1].feature_name, "%u", xk1 + 1);
+			char * seq_name = strtok_r(file_line,"\t",&token_temp);
+			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
+
+			strtok_r(NULL,"\t", &token_temp);// source
+			strtok_r(NULL,"\t", &token_temp);// feature_type
+			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
+			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
+			strtok_r(NULL,"\t", &token_temp);// score 
+			ret_features[xk1].is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
+			ret_features[xk1].sorted_order = xk1;
+		}
+		xk1++;
+	}
+	fclose(fp);
+
+	(*loaded_features) = ret_features;
+	SUBREADprintf("There are %d features loaded from the annotation file.\n", features);
+	return features;
+}
+
+void sort_feature_info(unsigned int features, fc_feature_info_t * loaded_features, char *** sorted_chr_names, int ** sorted_entrezid, long ** sorted_start, long ** sorted_end, unsigned char ** sorted_strand, int * chro_number, char *** anno_chrs, long ** anno_chr_head)
+{
+	unsigned int chro_pnt;
+	unsigned char * is_chro_name_explored = malloc(features);
+	int * ret_entrez = malloc(sizeof(int) * features);
+	long * ret_start = malloc(sizeof(long) * features);
+	long * ret_end = malloc(sizeof(long) * features);
+	unsigned char * ret_strand = malloc(features);
+	char ** ret_char_name = malloc(sizeof(void *) * features);
+	fc_feature_info_t ** old_info_ptr = malloc(sizeof(void *) * features);
+	(*anno_chrs) = malloc(sizeof(void *) * 500);
+	(*anno_chr_head) = malloc(sizeof(long) * 500);
+
+	unsigned int this_chro_start = 0;
+	unsigned int this_chro_end = 0;
+	unsigned int ret_array_pointer = 0;
+
+	memset(is_chro_name_explored, 0 , features);
+
+	(*sorted_chr_names) = ret_char_name;
+	(*sorted_entrezid) = ret_entrez;
+	(*sorted_start) = ret_start;
+	(*sorted_end) = ret_end;
+	(*sorted_strand) = ret_strand;
+	(*chro_number) = 0;
+
+	for(chro_pnt=0; chro_pnt < features; chro_pnt++)
+	{
+		if(!is_chro_name_explored[chro_pnt])
+		{
+			unsigned char * current_chro = loaded_features[chro_pnt].chro;
+			unsigned int xk1;
+			// aggregate all features belonging to this chromosome.
+			this_chro_start = ret_array_pointer;
+			(*anno_chrs) [(*chro_number)] = (char *)current_chro;
+			(*anno_chr_head) [(*chro_number)] = this_chro_start;
+			(*chro_number) ++;
+			for(xk1 = chro_pnt; xk1<features; xk1++)
+			{
+				if(strcmp((char *)current_chro, (char *)loaded_features[xk1].chro)==0)
+				{
+					is_chro_name_explored[xk1]=1;
+					ret_entrez[ret_array_pointer] = atoi((char *)loaded_features[xk1].feature_name);
+					ret_start[ret_array_pointer] = loaded_features[xk1].start;
+					ret_end[ret_array_pointer] = loaded_features[xk1].end;
+					ret_strand[ret_array_pointer] = loaded_features[xk1].is_negative_strand;
+					ret_char_name[ret_array_pointer] = (char *)loaded_features[xk1].chro;
+					old_info_ptr[ret_array_pointer] = &loaded_features[xk1];
+					ret_array_pointer++;
+				}
+			}
+			this_chro_end = ret_array_pointer;
+			(*anno_chr_head) [(*chro_number)] = this_chro_end;
+
+			// sorting the features.
+			unsigned int sort_i, sort_j;
+			for(sort_i = this_chro_start; sort_i< this_chro_end; sort_i++)
+			{
+				unsigned int min_j = sort_i;
+				unsigned int min_start = ret_start[min_j];
+				for(sort_j = sort_i+1; sort_j < this_chro_end; sort_j++)
+				{
+					// put the minimun start to *sort_i 
+					if(ret_start[sort_j] < min_start)
+					{
+						min_j = sort_j;
+						min_start = ret_start[sort_j];
+					}
+				}
+				if(min_j != sort_i)
+				{
+					unsigned int tmp;
+					void * tmp_ptr;
+					long tmpl;
+
+					tmpl = ret_start[sort_i];
+					ret_start[sort_i] = ret_start[min_j];
+					ret_start[min_j] = tmpl;
+
+					tmpl = ret_end[sort_i];
+					ret_end[sort_i] = ret_end[min_j];
+					ret_end[min_j] = tmpl;
+
+					tmp = ret_strand[sort_i];
+					ret_strand[sort_i] = ret_strand[min_j];
+					ret_strand[min_j] = tmp;
+
+					tmp = ret_entrez[sort_i];
+					ret_entrez[sort_i] = ret_entrez[min_j];
+					ret_entrez[min_j] = tmp;
+
+					tmp_ptr = old_info_ptr[sort_i];
+					old_info_ptr[sort_i] = old_info_ptr[min_j];
+					old_info_ptr[min_j] = tmp_ptr;
+				}
+				old_info_ptr[sort_i]->sorted_order = sort_i;
+			}
+		}
+	}
+	SUBREADprintf("The %u features are sorted.\n", ret_array_pointer);
+	free(old_info_ptr);
+}
 
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
@@ -602,7 +452,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 		{
 			nreads[xk2]+=global_context -> thread_contexts[xk1].count_table[xk2];
 		}
-		Rprintf("The %d-th thread processed %d reads\n", xk1, global_context -> thread_contexts[xk1].nreads_mapped_to_exon);
+		SUBREADprintf("The %d-th thread processed %llu reads\n", xk1, global_context -> thread_contexts[xk1].nreads_mapped_to_exon);
 		(*nreads_mapped_to_exon) += global_context -> thread_contexts[xk1].nreads_mapped_to_exon;
 	}
 }
@@ -674,7 +524,35 @@ void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 		pthread_join(global_context -> thread_contexts[xk1].thread_object, NULL);
 }
 
-int readSummary_multi_threads(int argc,char *argv[]){
+
+void fc_write_final_results(fc_thread_global_context_t * global_context, const char * out_file, int features, int * nreads, fc_feature_info_t * loaded_features)
+{
+	/* save the results */
+	FILE * fp_out;
+	int i;
+	fp_out = fopen(out_file,"w");
+	if(!fp_out){
+		SUBREADprintf("Failed to create file %s\n", out_file);
+		return;
+	}
+	fprintf(fp_out,"geneid\tchr\tstart\tend\tnreads\n");
+	for(i=0;i<features;i++)
+		fprintf(fp_out,"%s\t%s\t%u\t%u\t%d\n",loaded_features[i].feature_name,loaded_features[i].chro,loaded_features[i].start, loaded_features[i].end, nreads[loaded_features[i].sorted_order]);
+
+	fclose(fp_out);
+}
+
+static struct option long_options[] =
+{
+	{0, 0, 0, 0}
+};
+
+void print_usage()
+{
+	SUBREADprintf("Usage: TBD\n");
+}
+
+int readSummary(int argc,char *argv[]){
 
 	/*
 	   This function counts the number of reads falling into each exon region.
@@ -695,41 +573,36 @@ int readSummary_multi_threads(int argc,char *argv[]){
 	10: as.numeric(nthreads)
 	 */
 
-	FILE *fp_ann, *fp_in, *fp_out;
+	FILE *fp_in = NULL;
 
-	int read_length;
+	int read_length = 0;
 	char **chr;
 	long *start, *stop;
 	int *geneid, *nreads;
 
 	char * line = NULL;
-	char * read_chr;
-	size_t len = 0;
-	ssize_t z;
-	long i,nexons,read_pos;
+	long i,nexons;
 
-	int MAX_LINE_LENGTH = 100000;
 
 	int nreads_mapped_to_exon = 0;
 
-	long anno_chr_head[500];
-	char * anno_chrs[500];
-	long curchr, curpos, search_start, search_end;
+	long * anno_chr_head;
+	char ** anno_chrs;
+	long curchr, curpos;
 	char * curchr_name;
-	int nchr, flag;
+	unsigned char * sorted_strand;
+	int nchr;
 	curchr = 0;
 	curpos = 0;
 	curchr_name = "";
 
 	int isPE, minPEDistance, maxPEDistance;
-	char * mate_chr;
-	int mate_pos, pos_leftmost, fragment_length;
 
 	int isSAM;
 	char * ret;
-	SamBam_FILE * fp_in_bam;
+	SamBam_FILE * fp_in_bam = NULL;
 
-	int nhits, j, prev_gid, isMultiOverlapAllowed, isGeneLevel, flag_overlap;
+	int isMultiOverlapAllowed, isGeneLevel;
 	double time_start = miltime();
 
 	line = (char*)calloc(MAX_LINE_LENGTH, 1);
@@ -749,61 +622,32 @@ int readSummary_multi_threads(int argc,char *argv[]){
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
 
-	/* read in annotation data */
-	fp_ann = fopen(argv[1],"r");
-	if(!fp_ann){
-		Rprintf("Failed to open the annotation file %s\n",argv[1]);
+	fc_feature_info_t * loaded_features;
+
+	nexons = load_feature_info(argv[1], FILE_TYPE_RSUBREAD, &loaded_features);
+	if(nexons<1){
+		SUBREADprintf("Failed to open the annotation file %s\n",argv[1]);
 		return -1;
 	}
-	fgets(line, MAX_LINE_LENGTH, fp_ann);
-	nexons = 0;
-	while (fgets(line, MAX_LINE_LENGTH, fp_ann))
-		nexons++;
 
-	geneid = (int *) calloc(nexons,sizeof(int));
-	chr = (char **) calloc(nexons,sizeof(char *));
-	start = (long *) calloc(nexons,sizeof(long));
-	stop = (long *) calloc(nexons,sizeof(long));
+	sort_feature_info(nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &nchr, &anno_chrs, &anno_chr_head);
 	nreads = (int *) calloc(nexons,sizeof(int));
 	for(i=0;i<nexons;i++) nreads[i] = 0;
 
-	rewind(fp_ann);
-	fgets(line, MAX_LINE_LENGTH, fp_ann);
-
-	for(i=0;i<nexons;i++){
-		fgets(line, MAX_LINE_LENGTH, fp_ann);
-		geneid[i] = atoi(strtok(line,"\t"));
-		chr[i] = malloc(41);
-		strcpy(chr[i],strtok(NULL,"\t"));
-		start[i] = atoi(strtok(NULL,"\t"));
-		stop[i] = atoi(strtok(NULL,"\t"));
-
-		if(strcmp(curchr_name,chr[i]) != 0){
-			curchr_name = chr[i];
-			anno_chrs[curchr] = chr[i];
-			anno_chr_head[curchr] = curpos;
-			curchr++;
-		}
-		curpos++;
-	}
-	nchr = curchr;
-	anno_chr_head[curchr] = nexons;
-	fclose(fp_ann);
-
-	Rprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
+	SUBREADprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
 
 	/* get read length */
 	if (isSAM == 1){
 		fp_in = fopen(argv[2],"r");
 		if(!fp_in){
-			Rprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+			SUBREADprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
 			return -1;
 		}
 	}
 	else{
 		fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
 		if(!fp_in_bam){
-			Rprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+			SUBREADprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
 			return -1;
 		}
 	}
@@ -957,33 +801,116 @@ int readSummary_multi_threads(int argc,char *argv[]){
 
 	double time_end = miltime();
 	if(isPE == 1)
-		Rprintf("Number of fragments mapped to the features is: %d\nTime cost = %.1f seconds\n\n", nreads_mapped_to_exon, time_end - time_start);
+		SUBREADprintf("Number of fragments mapped to the features is: %d\nTime cost = %.1f seconds\n\n", nreads_mapped_to_exon, time_end - time_start);
 	else
-		Rprintf("Number of reads mapped to the features is: %d\nTime cost = %.1f seconds\n\n", nreads_mapped_to_exon, time_end - time_start);
+		SUBREADprintf("Number of reads mapped to the features is: %d\nTime cost = %.1f seconds\n\n", nreads_mapped_to_exon, time_end - time_start);
 
-	/* save the results */
-	fp_out = fopen(argv[3],"w");
-	if(!fp_out){
-		Rprintf("Failed to create file %s\n", argv[3]);
-		return -1;
-	}
-	fprintf(fp_out,"geneid\tchr\tstart\tend\tnreads\n");
-	for(i=0;i<nexons;i++)
-		fprintf(fp_out,"%d\t%s\t%ld\t%ld\t%d\n",geneid[i],chr[i],start[i],stop[i],nreads[i]);
+
+	fc_write_final_results(&global_context, argv[3], nexons, nreads, loaded_features);
 
 	if (isSAM == 1)
 		fclose(fp_in);
 	else
 		SamBam_fclose(fp_in_bam);
 
-	fclose(fp_out);
 
 	free(line);
-	for(i=0;i<nexons;i++) free(chr[i]);
+	//for(i=0;i<nexons;i++) free(chr[i]);
+	free(loaded_features);
 	free(geneid);
 	free(chr);
 	free(start);
+	free(anno_chrs);
+	free(anno_chr_head);
 	free(stop);
 	free(nreads);
 
+	return 0;
 }
+
+
+#ifdef MAKE_STANDALONE
+int main(int argc, char ** argv)
+#else
+int feature_count_main(int argc, char ** argv)
+#endif
+{
+	char * Rargv[11];
+	char annot_name[300];
+	char sam_name[300];
+	char out_name[300];
+	int min_dist = 50;
+	int max_dist = 600;
+	char min_dist_str[11];
+	char max_dist_str[11];
+	int is_PE = 0;
+	int is_SAM = 1;
+	int is_GeneLevel = 0;
+	int is_Overlap = 0;
+	int threads = 1;
+	char nthread_str[4];
+	int option_index = 0;
+	int c;
+
+	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
+
+	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbgO?", long_options, &option_index)) != -1)
+		switch(c)
+		{
+			case 'T':
+				threads = atoi(optarg);
+				break;
+			case 'd':
+				min_dist = atoi(optarg);
+				break;
+			case 'D':
+				max_dist = atoi(optarg);
+				break;
+			case 'p':
+				is_PE = 1;
+				break;
+			case 'b':
+				is_SAM = 0;
+				break;
+			case 'g':
+				is_GeneLevel = 1;
+				break;
+			case 'O':
+				is_Overlap = 1;
+				break;
+			case 'i':
+				strncpy(sam_name, optarg,299);
+				break;
+			case 'o':
+				strncpy(out_name, optarg,299);
+				break;
+			case 'a':
+				strncpy(annot_name, optarg,299);
+				break;
+			case '?':
+			default :
+				print_usage();
+				return -1;
+				break;
+		}
+
+
+	sprintf(nthread_str,"%d", threads);
+	sprintf(min_dist_str,"%d",min_dist);
+	sprintf(max_dist_str,"%d",max_dist);
+	Rargv[0] = "readSummary";
+	Rargv[1] = annot_name;
+	Rargv[2] = sam_name;
+	Rargv[3] = out_name;
+	Rargv[4] = is_PE?"1":"0";
+	Rargv[5] = min_dist_str;
+	Rargv[6] = max_dist_str;
+	Rargv[7] = is_SAM?"1":"0";
+	Rargv[8] = is_Overlap?"1":"0";
+	Rargv[9] = is_GeneLevel?"1":"0";
+	Rargv[10] = nthread_str;
+	readSummary(11, Rargv);
+	return 0;
+}
+
+
