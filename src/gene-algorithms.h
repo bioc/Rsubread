@@ -106,5 +106,6 @@ int test_big_margin( gene_allvote_t *allvotes, int qid);
 void reg_big_margin_votes(gene_vote_t * vote, gene_allvote_t * all_big_margin_rec, int query_id);
 
 
+void print_version_info();
 #endif
 

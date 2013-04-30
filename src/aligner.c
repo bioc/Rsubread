@@ -156,7 +156,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				flags |= SAM_FLAG_PAIRED_TASK;
 				mate_index = i*2+(Curr_ginp!=ginp2);
 				Mate_result = av->results + mate_index*av->multi_best_reads + best_read_id;
-				is_mate_ok = ((Curr_result->masks & IS_PAIRED_MATCH) ||Curr_result->vote_number  >= ACCEPT_SUBREADS) &&  ((!REPORT_ONLY_UNIQUE) ||  !(Curr_result->masks & IS_BREAKEVEN_READ));
+				is_mate_ok = ((Mate_result -> vote_number>0 && Curr_result -> vote_number>0 && (Curr_result->masks & IS_PAIRED_MATCH)) ||Mate_result->vote_number  >= ACCEPT_SUBREADS) &&  ((!REPORT_ONLY_UNIQUE) ||  !(Curr_result->masks & IS_BREAKEVEN_READ));
 
 
 				if (Curr_ginp==ginp2)
@@ -186,7 +186,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 			}
 
-			if (((votes >= ACCEPT_SUBREADS) || (Curr_result->masks & IS_PAIRED_MATCH)) && ((!REPORT_ONLY_UNIQUE) ||  !(Curr_result -> masks & IS_BREAKEVEN_READ)))
+			if (((votes >= ACCEPT_SUBREADS) || ((Curr_result->masks & IS_PAIRED_MATCH) && votes>0 && Mate_result -> vote_number>0) ) && ((!REPORT_ONLY_UNIQUE) ||  !(Curr_result -> masks & IS_BREAKEVEN_READ)))
 			{
 
 				if(Curr_result->masks & IS_PAIRED_MATCH)
@@ -464,8 +464,11 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 		int r2_reversed = 0;
 		for(best_read_id = 0; best_read_id < allvote->multi_best_reads; best_read_id++)
 		{
-			if(ginp2 && allvote->results[queries*2*allvote->multi_best_reads+best_read_id].vote_number==0) break;
-			if(!ginp2 && allvote->results[queries*allvote->multi_best_reads+best_read_id].vote_number==0) break;
+			if(best_read_id>0)
+			{
+				if(ginp2 && allvote->results[queries*2*allvote->multi_best_reads+best_read_id].vote_number==0) break;
+				if(!ginp2 && allvote->results[queries*allvote->multi_best_reads+best_read_id].vote_number==0) break;
+			}
 			if(ginp2)
 			{
 				int r1_need_reverse = (FIRST_READ_REVERSE  + allvote->results[queries*2*allvote->multi_best_reads+best_read_id].is_negative_strand)==1;
@@ -1167,6 +1170,7 @@ void usage(char * execname)
 	SUBREADputs("    -Q --quality        \t using mapping quality scores to break ties when more than one best mapping locations are found.");
 	SUBREADputs("    -H --hamming        \t using Hamming distance to break ties when more than one best mapping locations are found.");
 	SUBREADputs("    -J --junction       \t indicating the discovered junction reads in the SAM output using \"S\" operation in the CIGAR string. 'Subjunc' program shall then be used to discover exon junction locations and to perform complete alignment for junction reads.");
+	SUBREADputs("    -v                  \t displaying the version number.");
 	SUBREADputs("");
 	SUBREADputs("Arguments for paired-end reads:");
 	SUBREADputs("    -R --read2     <input>\t name of the second input file. The program will then be switched to the paired-end read mapping mode.");
@@ -1268,9 +1272,13 @@ int main_align(int argc,char ** argv)
 
 
 
-	while ((c = getopt_long (argc, argv, "QJuHB:S:d:D:n:m:p:f:R:r:i:o:T:E:I:A:P:G:X:b:Y:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vQJuHB:S:d:D:n:m:p:f:R:r:i:o:T:E:I:A:P:G:X:b:Y:?", long_options, &option_index)) != -1)
 		switch(c)
 		{
+			case 'v':
+				print_version_info();
+				return 0;
+				break;
 			case 'B':
 				multi_best_reads = max(1, min(16, atoi(optarg)));
 				break;

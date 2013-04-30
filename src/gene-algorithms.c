@@ -2289,7 +2289,7 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 		return 0.;
 	}
 	//printf("S=%.5f, LEN=%d\n", ret , read_cursor);
-	return max(1,(ret/10000.) / read_cursor+100.);
+	return max(min(200,(ret/10000.) / read_cursor+100.),1);
 }
 
 
@@ -2625,4 +2625,9 @@ int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, g
 	return 0;
 }
 
-
+void print_version_info()
+{
+	SUBREADprintf("\nSubread %s\n", SUBREAD_VERSION);
+	SUBREADprintf("http://www.sourceforge.net/projects/subread/\n");
+	SUBREADprintf("\n");
+}
