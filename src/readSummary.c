@@ -537,7 +537,9 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 	}
 	fprintf(fp_out,"geneid\tchr\tstart\tend\tnreads\n");
 	for(i=0;i<features;i++)
+	{
 		fprintf(fp_out,"%s\t%s\t%u\t%u\t%d\n",loaded_features[i].feature_name,loaded_features[i].chro,loaded_features[i].start, loaded_features[i].end, nreads[loaded_features[i].sorted_order]);
+	}
 
 	fclose(fp_out);
 }
@@ -549,7 +551,7 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADprintf("Usage: TBD\n");
+	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} \n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n\n");
 }
 
 int readSummary(int argc,char *argv[]){
@@ -894,6 +896,12 @@ int feature_count_main(int argc, char ** argv)
 				break;
 		}
 
+	if(sam_name[0]==0||out_name[0]==0 || annot_name[0]==0)
+	{
+		SUBREADprintf("The input file, out put file and annotation file must be specified.\n");
+		print_usage();
+		return -1;
+	}
 
 	sprintf(nthread_str,"%d", threads);
 	sprintf(min_dist_str,"%d",min_dist);
