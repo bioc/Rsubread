@@ -405,7 +405,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
 	char fn[300];
-	float local_begin_ftime = miltime();
+	double local_begin_ftime = miltime();
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 
 	gehash_t occurance_table;

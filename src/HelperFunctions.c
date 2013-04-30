@@ -68,7 +68,7 @@ void display_sections(char * CIGAR_Str)
 #ifdef RSUBREAD_TEST_HELPER_FUNCTIONS
 void main()
 #else
-void test_main()
+void testi_helper_1_main()
 #endif
 {
 	display_sections("");

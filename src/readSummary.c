@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include "subread.h"
 #include "sambam-file.h"
+#include "HelperFunctions.h"
 
 /********************************************************************/
 /********************************************************************/
@@ -255,33 +256,39 @@ void sort_feature_info(unsigned int features, fc_feature_info_t * loaded_feature
 	free(old_info_ptr);
 }
 
+#define MAX_HIT_NUMBER 200
+
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
 
-	char * mate_chr = NULL, * read_chr, * line = thread_context -> line_buffer1, *tmp_tok_ptr;
+	char * mate_chr = NULL, * read_chr, * line = thread_context -> line_buffer1, *tmp_tok_ptr, *CIGAR_str ;
 	long read_pos, mate_pos = 0, fragment_length = 0, search_start, search_end, pos_leftmost;
-	int flag, i, j, nhits, flag_overlap, prev_gid;
-	long hits_indices[1000];
+	int is_chro_found, i, j, nhits, flag_overlap, prev_gid, alignment_masks;
+	long hits_indices[MAX_HIT_NUMBER];
+	char is_gene_explored[MAX_HIT_NUMBER];
 
 	//printf("L=%s (%d)\n", line, strlen(line));
 
 	// process the current read or read pair
-	strtok_r(line,"\t", &tmp_tok_ptr);
-	strtok_r(NULL,"\t", &tmp_tok_ptr);
+	strtok_r(line,"\t", &tmp_tok_ptr);	// read name
+
+	alignment_masks = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
+
 	read_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);
 
 	//skip the read if unmapped (its mate will be skipped as well if paired-end)
-	if(*read_chr == '*'){ //better to use flag field to decide if it is mapped or not
+	if(*read_chr == '*' || (alignment_masks & SAM_FLAG_UNMAPPED) == 4){
 		return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 	}
 
 	//get mapping location of the read (it could be the first read in a pair)
 	read_pos = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
 
+	strtok_r(NULL,"\t", &tmp_tok_ptr);	// mapping quality
+	CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// CIGAR string
+
 	//remove reads which are not properly paired if paired-end reads are used (on different chromsomes or paired-end distance is too big or too small)
 	if(global_context -> is_paired_end_data){
-		strtok_r(NULL,"\t", &tmp_tok_ptr);
-		strtok_r(NULL,"\t", &tmp_tok_ptr);
 		mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
 		mate_pos = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
 		char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
@@ -293,69 +300,92 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 	} //end if(isPE==1)
 
-	//assign reads or fragments to features 
-	flag = 0;
+	is_chro_found = 0;
 	for(i=0;i<global_context -> exontable_nchrs;i++)
 		if(strcmp(read_chr,global_context -> exontable_anno_chrs[i])==0){
 			//get chr to which the current read or fragment is mapped and also the searching range
-			flag = 1;
+			is_chro_found = 1;
 			search_start = global_context -> exontable_anno_chr_heads[i];
 			search_end = global_context -> exontable_anno_chr_heads[i+1] - 1;
 			break;
 		}
 
-	if(flag == 1){
-		nhits = 0;
-		for(i=search_start;i<=search_end;i++){
-			if(global_context -> is_paired_end_data == 1){
-				if(read_pos < mate_pos)
-					pos_leftmost = read_pos;
-				else
-					pos_leftmost = mate_pos;
 
+	if(is_chro_found)
+	{
+		nhits = 0;
+
+		if(global_context -> is_paired_end_data)
+		{
+			if(read_pos < mate_pos)
+				pos_leftmost = read_pos;
+			else
+				pos_leftmost = mate_pos;
+
+			for(i=search_start;i<=search_end;i++){
 				if (global_context -> exontable_start[i] > (pos_leftmost + fragment_length - 1)) break;
 				if (global_context -> exontable_stop[i] >= pos_leftmost){
 					hits_indices[nhits] = i;
+					is_gene_explored[nhits] = 0;
 					nhits++;
+					if(nhits>=MAX_HIT_NUMBER) break;
 				} 
-
-				//if(pos_leftmost >= (start[i]-fragment_length+1) && pos_leftmost <= stop[i]){
-				//  nreads_mapped_to_exon++;
-				//  nreads[i]++;
-				//  break;
-				//}
-
 			}
-			else{
-				if (global_context -> exontable_start[i] > (read_pos + thread_context->current_read_length1 -1)) break;
-				if (global_context -> exontable_stop[i] >= read_pos){
-					hits_indices[nhits] = i;
-					nhits++;
-				} 
+		}
+		else{
+			int cigar_section_id, cigar_sections;
+			unsigned int Staring_Points[6];
+			unsigned short Section_Lengths[6];
 
-				//if(read_pos >= (start[i]-read_length+1) && read_pos <= stop[i]){
-				//  nreads_mapped_to_exon++;
-				//  nreads[i]++;
-				//  break;
-				//}
+			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Staring_Points, Section_Lengths);
+			for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
+			{
+				long section_begin_pos = read_pos + Staring_Points[cigar_section_id];
+				long section_length = Section_Lengths[cigar_section_id];
+				//printf("CIGAR_str=%s; cigar_sections=%d; pos[%d]=%u ; len[%d]=%d\n", CIGAR_str, cigar_sections, cigar_section_id, Staring_Points[cigar_section_id],cigar_section_id, Section_Lengths[cigar_section_id]);
+				for(i=search_start;i<=search_end;i++){
+					if (global_context -> exontable_start[i] > (section_begin_pos + section_length -1)) break;
+					if (global_context -> exontable_stop[i] >= section_begin_pos){
+						hits_indices[nhits] = i;
+						is_gene_explored[nhits] = 0;
+						nhits++;
+						if(nhits>=MAX_HIT_NUMBER) break;
+					} 
+				}
+				if(nhits>=MAX_HIT_NUMBER) break;
+			}
+		}
 
-			} //end else
-		} //end for i from search start to search end
-
+		//printf("HHITS=%d\n", nhits);
 		if (nhits > 0){
 			if (nhits == 1){
 				thread_context->nreads_mapped_to_exon++;
 				thread_context->count_table[hits_indices[0]]++; 
 			}
 			else { // nhits greater than 1	    		
-				if (global_context -> is_multi_overlap_allowed == 1){
-					for (j=0;j<nhits;j++){
-						thread_context->count_table[hits_indices[j]]++;
+				if (global_context -> is_multi_overlap_allowed){
+					if (global_context -> is_gene_level){
+						//gives only one vote to each gene.
+						int xk1;
+
+						for(xk1=0; xk1<nhits; xk1++)
+						{
+							if(is_gene_explored[xk1])continue;
+							prev_gid = global_context -> exontable_geneid[hits_indices[xk1]];
+							thread_context->count_table[hits_indices[xk1]]++;
+							int xk2;
+							for(xk2=xk1; xk2<nhits; xk2++)
+								if(prev_gid == global_context -> exontable_geneid[hits_indices[xk2]]) is_gene_explored[xk2]=1;
+						}
 					}
+					else
+						for (j=0;j<nhits;j++){
+							thread_context->count_table[hits_indices[j]]++;
+						}
 					thread_context->nreads_mapped_to_exon++;
 				}
 				else { // multi-overlap is not allowed		
-					if (global_context -> is_gene_level == 1){
+					if (global_context -> is_gene_level){
 						prev_gid = global_context -> exontable_geneid[hits_indices[0]];
 						flag_overlap = 0;
 						for (j=1;j<nhits;j++){
@@ -367,13 +397,14 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 						if (flag_overlap == 0){ //overlap multiple exons from a single gene
 							thread_context->nreads_mapped_to_exon++;
+							// only one vote for a gene. the vote is given to the first exon.
 							thread_context->count_table[hits_indices[0]]++;
 						}
-					} //end if isGeneLevel equal to 1
-				} //end else multi-overlap not allowed
-			} //end else nhits greater than 1
-		} // end if nhits greater than 0	
-	} //end if flag equal to 1
+					}
+				}
+			}
+		}
+	}
 
 	// Note that we actually make NO use of the second read in a pair.
 	// All information we need is in the first line.
