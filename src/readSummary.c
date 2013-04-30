@@ -104,7 +104,6 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 	while(1)
 	{
 		char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
-		if(file_type == FILE_TYPE_RSUBREAD)
 		if(!fgets_ret) break;
 		features++;
 	}
@@ -551,7 +550,7 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} \n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n\n");
+	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-G} \n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n   -G  \t Read the annotation file as GTF, false by default\n\n");
 }
 
 int readSummary(int argc,char *argv[]){
@@ -573,6 +572,7 @@ int readSummary(int argc,char *argv[]){
 	8: as.numeric(allowMultiOverlap)
 	9: as.numeric(isGeneLevel)
 	10: as.numeric(nthreads)
+	11: as.numeric(isGTFannotation)
 	 */
 
 	FILE *fp_in = NULL;
@@ -600,7 +600,7 @@ int readSummary(int argc,char *argv[]){
 
 	int isPE, minPEDistance, maxPEDistance;
 
-	int isSAM;
+	int isSAM, isGTF;
 	char * ret;
 	SamBam_FILE * fp_in_bam = NULL;
 
@@ -620,13 +620,16 @@ int readSummary(int argc,char *argv[]){
 	if(argc > 10)
 		thread_number = atoi(argv[10]);
 	else	thread_number = 4;
+	if(argc > 11)
+		isGTF = atoi(argv[11]);
+	else	isGTF = 0;
 
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
 
 	fc_feature_info_t * loaded_features;
 
-	nexons = load_feature_info(argv[1], FILE_TYPE_RSUBREAD, &loaded_features);
+	nexons = load_feature_info(argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
 		SUBREADprintf("Failed to open the annotation file %s\n",argv[1]);
 		return -1;
@@ -850,13 +853,14 @@ int feature_count_main(int argc, char ** argv)
 	int is_GeneLevel = 0;
 	int is_Overlap = 0;
 	int threads = 1;
+	int isGTF = 0;
 	char nthread_str[4];
 	int option_index = 0;
 	int c;
 
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbgO?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbGgO?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'T':
@@ -876,6 +880,9 @@ int feature_count_main(int argc, char ** argv)
 				break;
 			case 'g':
 				is_GeneLevel = 1;
+				break;
+			case 'G':
+				isGTF = 1;
 				break;
 			case 'O':
 				is_Overlap = 1;
@@ -917,7 +924,8 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[8] = is_Overlap?"1":"0";
 	Rargv[9] = is_GeneLevel?"1":"0";
 	Rargv[10] = nthread_str;
-	readSummary(11, Rargv);
+	Rargv[11] = isGTF?"1":"0";
+	readSummary(12, Rargv);
 	return 0;
 }
 
