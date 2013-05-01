@@ -322,7 +322,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			else
 				pos_leftmost = mate_pos;
 
-			for(i=search_start;i<=search_end;i++){
+		for(i=search_start;i<=search_end;i++){
 				if (global_context -> exontable_start[i] > (pos_leftmost + fragment_length - 1)) break;
 				if (global_context -> exontable_stop[i] >= pos_leftmost){
 					hits_indices[nhits] = i;
@@ -342,12 +342,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			{
 				long section_begin_pos = read_pos + Staring_Points[cigar_section_id];
 				long section_length = Section_Lengths[cigar_section_id];
-				//printf("CIGAR_str=%s; cigar_sections=%d; pos[%d]=%u ; len[%d]=%d\n", CIGAR_str, cigar_sections, cigar_section_id, Staring_Points[cigar_section_id],cigar_section_id, Section_Lengths[cigar_section_id]);
+		//		printf("CIGAR_str=%s; cigar_sections=%d; base=%ld; pos[%d]=%u ; len[%d]=%d\n", CIGAR_str, cigar_sections, read_pos, cigar_section_id, Staring_Points[cigar_section_id],cigar_section_id, Section_Lengths[cigar_section_id]);
 				for(i=search_start;i<=search_end;i++){
 					if (global_context -> exontable_start[i] > (section_begin_pos + section_length -1)) break;
 					if (global_context -> exontable_stop[i] >= section_begin_pos){
 						hits_indices[nhits] = i;
 						is_gene_explored[nhits] = 0;
+		//				printf("HIT: %s, %ld ~ %ld\n",global_context -> exontable_chr[i] , global_context -> exontable_start[i] ,global_context -> exontable_stop[i] );
 						nhits++;
 						if(nhits>=MAX_HIT_NUMBER) break;
 					} 
@@ -672,7 +673,9 @@ int readSummary(int argc,char *argv[]){
 
 	SUBREADprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
 
-	/* get read length */
+
+	/*
+	// get read length 
 	if (isSAM == 1){
 		fp_in = fopen(argv[2],"r");
 		if(!fp_in){
@@ -709,7 +712,7 @@ int readSummary(int argc,char *argv[]){
 	else
 		SamBam_fclose(fp_in_bam);
 
-
+	*/
 	
 	/**********************************************************/
 	/**********************************************************/
@@ -726,12 +729,29 @@ int readSummary(int argc,char *argv[]){
 	thread_ret |= fc_thread_init_global_context(& global_context, buffer_size, thread_number, nchr, nexons, geneid, chr, start, stop, anno_chrs, anno_chr_head, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance, read_length, isGeneLevel, isMultiOverlapAllowed);
 
 
-
 	if (isSAM == 1)
-		fp_in = fopen(argv[2],"r");
+	{
+		#ifdef MAKE_STANDALONE
+		if(strcmp("STDIN",argv[2])==0)
+			fp_in = stdin;
+		else
+			fp_in = fopen(argv[2],"r");
+		#else
+			fp_in = fopen(argv[2],"r");
+		#endif
+		if(!fp_in){
+			SUBREADprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+			return -1;
+		}
+	}
 	else
+	{
 		fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
-
+		if(!fp_in_bam){
+			SUBREADprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+			return -1;
+		}
+	}
 	int buffer_pairs = 16;
 	char * preload_line = malloc(sizeof(char) * (2+MAX_LINE_LENGTH)*(isPE?2:1)*buffer_pairs);
 	int preload_line_ptr;
@@ -759,6 +779,24 @@ int readSummary(int argc,char *argv[]){
 
 				if(!ret) break;
 				int curr_line_len = strlen(line);
+
+				if(read_length < 1)
+				{
+					int tab_no;
+					int read_len_tmp=0, read_cursor;
+					for(read_cursor=0; read_cursor<curr_line_len; read_cursor++)
+					{
+						if(line[read_cursor] == '\t')
+							tab_no++;
+						else
+						{
+							if(tab_no == 9)	// SEQ
+								read_len_tmp++;
+						}
+					}
+					read_length = read_len_tmp;
+					global_context.read_length = read_length;
+				}
 
 				//printf("L %d =%s\n", preload_line_ptr , line);
 				strcpy(preload_line+preload_line_ptr, line);
@@ -845,7 +883,12 @@ int readSummary(int argc,char *argv[]){
 	fc_write_final_results(&global_context, argv[3], nexons, nreads, loaded_features);
 
 	if (isSAM == 1)
-		fclose(fp_in);
+	{
+		#ifdef MAKE_STANDALONE
+		if(strcmp("STDIN",argv[2])!=0)
+		#endif
+			fclose(fp_in);
+	}
 	else
 		SamBam_fclose(fp_in_bam);
 
