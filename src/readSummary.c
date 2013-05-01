@@ -64,6 +64,7 @@ typedef struct
 	int is_gene_level;
 	int is_paired_end_data;
 	int is_multi_overlap_allowed;
+	int is_strand_checked;
 	int min_paired_end_distance;
 	int max_paired_end_distance;
 	int read_length;
@@ -77,6 +78,7 @@ typedef struct
 	int exontable_nchrs;
 	int exontable_exons;
 	int * exontable_geneid;
+	char * exontable_strand;
 	char ** exontable_chr;
 	long * exontable_start;
 	long * exontable_stop;
@@ -127,7 +129,11 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
 			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
 			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
-			ret_features[xk1].is_negative_strand = 0;//('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
+			char * strand_str = strtok_r(NULL,"\t", &token_temp); 
+			if(strand_str == NULL)
+				ret_features[xk1].is_negative_strand = 0;
+			else
+				ret_features[xk1].is_negative_strand = ('-' ==strand_str[0]);
 			ret_features[xk1].sorted_order = xk1;
 		}
 		else if(file_type == FILE_TYPE_GTF)
@@ -280,6 +286,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	if(*read_chr == '*' || (alignment_masks & SAM_FLAG_UNMAPPED) == 4){
 		return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 	}
+	int is_first_read_negative_strand = alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED; 
+	int is_second_read_negative_strand = alignment_masks & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED; 
+
 
 	//get mapping location of the read (it could be the first read in a pair)
 	read_pos = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
@@ -293,8 +302,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		mate_pos = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
 		char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
 		fragment_length = abs(atoi(frag_len_str)); //get the fragment length
-		//printf("PE_R : %s , '%s':%d > %d || %d < %d\n", mate_chr, frag_len_str, fragment_length, (global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) , fragment_length, (global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1));
-		if(strcmp(mate_chr,"=") != 0 || fragment_length > (global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || fragment_length < (global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1)){
+
+		//printf("MM=%s ; FL=%d; LL=%d ; CK=%d   %d~%d\n", mate_chr, fragment_length,  thread_context->current_read_length1, global_context->is_strand_checked, global_context -> min_paired_end_distance, global_context -> max_paired_end_distance);
+		if(strcmp(mate_chr,"=") != 0 || fragment_length > (global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || fragment_length < (global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1) || (global_context->is_strand_checked && (is_first_read_negative_strand==is_second_read_negative_strand))){
+		//	printf("PMQ\n");
 			//the two reads are not properly paired and are skipped
 			return;
 		}
@@ -311,6 +322,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 
+	//printf("FX=%d\n", is_chro_found);
 	if(is_chro_found)
 	{
 		nhits = 0;
@@ -322,9 +334,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			else
 				pos_leftmost = mate_pos;
 
-		for(i=search_start;i<=search_end;i++){
+			for(i=search_start;i<=search_end;i++){
 				if (global_context -> exontable_start[i] > (pos_leftmost + fragment_length - 1)) break;
-				if (global_context -> exontable_stop[i] >= pos_leftmost){
+				if (global_context -> exontable_stop[i] >= pos_leftmost && ((!global_context->is_strand_checked)||is_first_read_negative_strand == global_context -> exontable_strand[i])){
 					hits_indices[nhits] = i;
 					is_gene_explored[nhits] = 0;
 					nhits++;
@@ -345,7 +357,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		//		printf("CIGAR_str=%s; cigar_sections=%d; base=%ld; pos[%d]=%u ; len[%d]=%d\n", CIGAR_str, cigar_sections, read_pos, cigar_section_id, Staring_Points[cigar_section_id],cigar_section_id, Section_Lengths[cigar_section_id]);
 				for(i=search_start;i<=search_end;i++){
 					if (global_context -> exontable_start[i] > (section_begin_pos + section_length -1)) break;
-					if (global_context -> exontable_stop[i] >= section_begin_pos){
+					if (global_context -> exontable_stop[i] >= section_begin_pos && ((!global_context->is_strand_checked)||is_first_read_negative_strand == global_context -> exontable_strand[i])){
 						hits_indices[nhits] = i;
 						is_gene_explored[nhits] = 0;
 		//				printf("HIT: %s, %ld ~ %ld\n",global_context -> exontable_chr[i] , global_context -> exontable_start[i] ,global_context -> exontable_stop[i] );
@@ -488,7 +500,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 	}
 }
 
-int fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int et_nchrs, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, char ** et_anno_chrs, long * et_anno_chr_heads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int read_length, int is_gene_level, int is_overlap_allowed)
+int fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int et_nchrs, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, char * et_strand, char ** et_anno_chrs, long * et_anno_chr_heads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int read_length, int is_gene_level, int is_overlap_allowed, int is_strand_checked)
 {
 	int xk1;
 
@@ -497,6 +509,8 @@ int fc_thread_init_global_context(fc_thread_global_context_t * global_context, u
 	global_context -> is_multi_overlap_allowed = is_overlap_allowed;
 	global_context -> is_paired_end_data = is_PE_data;
 	global_context -> is_gene_level = is_gene_level;
+	global_context -> is_strand_checked = is_strand_checked;
+
 	global_context -> read_length = read_length;
 	global_context -> line_length = read_length;
 
@@ -506,6 +520,7 @@ int fc_thread_init_global_context(fc_thread_global_context_t * global_context, u
 	global_context -> exontable_chr = et_chr;
 	global_context -> exontable_start = et_start;
 	global_context -> exontable_stop = et_stop;
+	global_context -> exontable_strand = et_strand;
 	global_context -> exontable_anno_chrs = et_anno_chrs;
 	global_context -> exontable_anno_chr_heads = et_anno_chr_heads;
 	global_context -> min_paired_end_distance = min_pe_dist;
@@ -605,11 +620,12 @@ int readSummary(int argc,char *argv[]){
 	9: as.numeric(isGeneLevel)
 	10: as.numeric(nthreads)
 	11: as.numeric(isGTFannotation)
+	12: as.numeric(isStrandChecked)
 	 */
 
 	FILE *fp_in = NULL;
 
-	int read_length = 0;
+	int read_length = 0, isStrandChecked;
 	char **chr;
 	long *start, *stop;
 	int *geneid, *nreads;
@@ -655,6 +671,9 @@ int readSummary(int argc,char *argv[]){
 	if(argc > 11)
 		isGTF = atoi(argv[11]);
 	else	isGTF = 0;
+	if(argc > 12)
+		isStrandChecked = atoi(argv[12]);
+	else	isStrandChecked = 0;
 
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
@@ -726,7 +745,7 @@ int readSummary(int argc,char *argv[]){
 	int thread_ret = 0;
 
 	fc_thread_global_context_t global_context;
-	thread_ret |= fc_thread_init_global_context(& global_context, buffer_size, thread_number, nchr, nexons, geneid, chr, start, stop, anno_chrs, anno_chr_head, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance, read_length, isGeneLevel, isMultiOverlapAllowed);
+	thread_ret |= fc_thread_init_global_context(& global_context, buffer_size, thread_number, nchr, nexons, geneid, chr, start, stop, sorted_strand, anno_chrs, anno_chr_head, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance, read_length, isGeneLevel, isMultiOverlapAllowed, isStrandChecked);
 
 
 	if (isSAM == 1)
@@ -782,7 +801,7 @@ int readSummary(int argc,char *argv[]){
 
 				if(read_length < 1)
 				{
-					int tab_no;
+					int tab_no = 0;
 					int read_len_tmp=0, read_cursor;
 					for(read_cursor=0; read_cursor<curr_line_len; read_cursor++)
 					{
@@ -796,6 +815,7 @@ int readSummary(int argc,char *argv[]){
 					}
 					read_length = read_len_tmp;
 					global_context.read_length = read_length;
+					//printf("READ LEN = %d\n", read_length);
 				}
 
 				//printf("L %d =%s\n", preload_line_ptr , line);
@@ -899,6 +919,7 @@ int readSummary(int argc,char *argv[]){
 	free(geneid);
 	free(chr);
 	free(start);
+	free(sorted_strand);
 	free(anno_chrs);
 	free(anno_chr_head);
 	free(stop);
