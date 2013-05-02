@@ -5,15 +5,15 @@ featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9"
 	if(is.null(annot)){
 	  switch(tolower(as.character(genome)),
 	    mm9={
-	      ann <- system.file("annot","mm9_NCBI_exon_sorted.txt",package="Rsubread")
+	      ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 37.2 is used.\n")
 		},
 	    mm10={
-	      ann <- system.file("annot","mm10_NCBI_exon_sorted.txt",package="Rsubread")
+	      ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 38.1 is used.\n")
 		 },
 	    hg={
-	      ann <- system.file("annot","hg19_NCBI_exon_sorted.txt",package="Rsubread")
+	      ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
 	      cat("Human annotation NCBI Build 37.2 is used.\n")
 	       },
 	       {
@@ -23,17 +23,15 @@ featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9"
 	}
 	else{
 	  if(is.character(annot)){
-	    cat("Please make sure the annotation file you provided has been SORTED by chromosome names.\n")
 	    ann <- annot
 	  }
 	  else{
 	    annot_df <- as.data.frame(annot,stringsAsFactors=FALSE)
-	    if(sum(c("geneid","chr","start","end") %in% tolower(colnames(annot_df))) != 4)
-	      stop("The format of the provided annotation data is incorrect. Please refer to the help page of this function for the correct data format.\n")
+	    if(sum(c("geneid","chr","start","end", "strand") %in% tolower(colnames(annot_df))) != 5)
+	      stop("The format of the provided annotation data is incorrect. Please refer to the help page for the correct data format.\n")
 		colnames(annot_df) <- tolower(colnames(annot_df))
-		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,stringsAsFactors=FALSE)		
+		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)		
 	    annot_df$chr <- as.character(annot_df$chr)
-	    annot_df <- annot_df[order(annot_df$chr),]
 	    if(any(nchar(annot_df$chr) > 40))
 	      annot_df$chr <- substring(annot_df$chr,1,40)
 	    fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
