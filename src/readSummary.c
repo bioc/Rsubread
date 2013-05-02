@@ -126,8 +126,10 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 		if(file_type == FILE_TYPE_RSUBREAD)
 		{
 			char * feature_name = strtok_r(file_line,"\t",&token_temp);
+			if(!feature_name) break;
 			strncpy((char *)ret_features[xk1].feature_name, (char *)feature_name, FEATURE_NAME_LENGTH);
 			char * seq_name = strtok_r(NULL,"\t", &token_temp);
+			if(!seq_name) break;
 			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
 			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
 			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
@@ -290,8 +292,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			fprintf(global_context -> SAM_output_fp,"%s\tUNMAPPED\n", read_name);
 		return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 	}
-	int is_first_read_negative_strand = alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED; 
-	int is_second_read_negative_strand = alignment_masks & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED; 
+	int is_first_read_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
+	int is_second_read_negative_strand = (alignment_masks & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)?1:0; 
 
 
 	//get mapping location of the read (it could be the first read in a pair)
@@ -620,10 +622,10 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 		SUBREADprintf("Failed to create file %s\n", out_file);
 		return;
 	}
-	fprintf(fp_out,"geneid\tchr\tstart\tend\tnreads\n");
+	fprintf(fp_out,"geneid\tchr\tstart\tend\tstrand\tnreads\n");
 	for(i=0;i<features;i++)
 	{
-		fprintf(fp_out,"%s\t%s\t%u\t%u\t%d\n",loaded_features[i].feature_name,loaded_features[i].chro,loaded_features[i].start, loaded_features[i].end, nreads[loaded_features[i].sorted_order]);
+		fprintf(fp_out,"%s\t%s\t%u\t%u\t%c\t%d\n",loaded_features[i].feature_name,loaded_features[i].chro,loaded_features[i].start, loaded_features[i].end, loaded_features[i].is_negative_strand?'-':'+', nreads[loaded_features[i].sorted_order]);
 	}
 
 	fclose(fp_out);
@@ -636,7 +638,7 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-g} {-d <min_PE_dist>} {-D <max_PE_dist>} \n\n  Optional parameters:\n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n   -G  \tRead the annotation file as GTF, false by default\n   -g  \tDo gene-level aggregation, false by default.\n   -S  \tWrite the read classification result into output_file.reads.\n\n");
+	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-g} {-d <min_PE_dist>} {-D <max_PE_dist>} \n\n  Optional parameters:\n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n   -G  \tRead the annotation file as GTF, false by default\n   -g  \tDo gene-level aggregation, false by default.\n   -S  \tWrite the read classification result into output_file.reads.\n   -s  \tMatch the strand of features with the strands of reads mapped to.\n\n");
 }
 
 int readSummary(int argc,char *argv[]){
@@ -997,7 +999,7 @@ int feature_count_main(int argc, char ** argv)
 			case 'S':
 				is_ReadSummary_Report = 1;
 				break;
-			case '2':
+			case 's':
 				is_Strand_Sensitive = 1;
 				break;
 			case 'i':
