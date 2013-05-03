@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include "subread.h"
 #include "sambam-file.h"
+#include "hashtable.h"
 #include "HelperFunctions.h"
 
 /********************************************************************/
@@ -75,6 +76,8 @@ typedef struct
 	int is_all_finished;
 	unsigned int input_buffer_max_size;
 
+	HashTable * gene_name_table;	// gene_name -> gene_internal_number
+	unsigned char ** gene_name_array;	// gene_name -> gene_internal_number
 	int exontable_nchrs;
 	int exontable_exons;
 	int * exontable_geneid;
@@ -104,17 +107,29 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 	char * file_line = malloc(MAX_LINE_LENGTH);
 	FILE * fp = fopen(annotation_file,"r"); 
 	if(!fp) return -1;
-	fgets(file_line, MAX_LINE_LENGTH, fp);
+	if(file_type == FILE_TYPE_RSUBREAD)
+		fgets(file_line, MAX_LINE_LENGTH, fp);
 
 	while(1)
 	{
 		char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
 		if(!fgets_ret) break;
-		features++;
+		if(file_type == FILE_TYPE_GTF)
+		{
+			char * token_temp;
+			strtok_r(file_line,"\t",&token_temp);
+			strtok_r(NULL,"\t", &token_temp);
+			char * feature_type = strtok_r(NULL,"\t", &token_temp);
+			if(strcmp(feature_type, "exon")==0)
+				features++;
+		}
+		else
+			features++;
 	}
 
 	fseek(fp,0,SEEK_SET);
-	fgets(file_line, MAX_LINE_LENGTH, fp);
+	if(file_type == FILE_TYPE_RSUBREAD)
+		fgets(file_line, MAX_LINE_LENGTH, fp);
 
 	fc_feature_info_t * ret_features = malloc(sizeof(fc_feature_info_t) * features);
 
@@ -139,6 +154,7 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 			else
 				ret_features[xk1].is_negative_strand = ('-' ==strand_str[0]);
 			ret_features[xk1].sorted_order = xk1;
+			xk1++;
 		}
 		else if(file_type == FILE_TYPE_GTF)
 		{
@@ -147,14 +163,60 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
 
 			strtok_r(NULL,"\t", &token_temp);// source
-			strtok_r(NULL,"\t", &token_temp);// feature_type
-			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
-			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
-			strtok_r(NULL,"\t", &token_temp);// score 
-			ret_features[xk1].is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
-			ret_features[xk1].sorted_order = xk1;
+			char * feature_type = strtok_r(NULL,"\t", &token_temp);// feature_type
+			if(strcmp(feature_type, "exon")==0)
+			{
+				ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
+				ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
+				strtok_r(NULL,"\t", &token_temp);// score 
+				ret_features[xk1].is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
+				ret_features[xk1].sorted_order = xk1;
+				strtok_r(NULL,"\t",&token_temp);	// "frame"
+				char * extra_attrs = strtok_r(NULL,"\t",&token_temp);	// name_1 "val1"; name_2 "val2"; ... 
+				if(extra_attrs && (strlen(extra_attrs)>6))
+				{
+					#define FC_GTF_GENE_ID_NAME	"gene_id"
+					int attr_state = 0;	// 0: name; 1:value
+					int name_start = 0;
+					int val_start = 0;
+					int is_gene_id = 0;
+					int xk2, exch;
+					for(xk2 = 0; exch = extra_attrs[xk2]; xk2++)
+					{
+						if(exch == ' ' && attr_state == 0)
+							continue;
+						else if(exch == '\"')
+						{
+							if(xk2<1) break;
+							if(attr_state == 0){
+								val_start = xk2 + 1;
+								extra_attrs[xk2 - 1] = 0;
+								if(strcmp(extra_attrs + name_start, FC_GTF_GENE_ID_NAME)==0)
+									is_gene_id = 1;
+							}
+							else if(attr_state == 1)
+							{
+								if(is_gene_id)
+								{
+									extra_attrs[xk2]=0;
+									strncpy((char *)ret_features[xk1].feature_name, extra_attrs + val_start, FEATURE_NAME_LENGTH);
+									//printf("N=%s\n", ret_features[xk1].feature_name);
+									is_gene_id = 2;
+									break;
+								}
+								is_gene_id = 0 ;
+								name_start = xk2 + 2;	// "; NAME2
+							}
+							
+							attr_state = !attr_state;
+							continue;
+						}
+						
+					}
+				}
+				xk1++;
+			}
 		}
-		xk1++;
 	}
 	fclose(fp);
 
@@ -163,7 +225,32 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 	return features;
 }
 
-void sort_feature_info(unsigned int features, fc_feature_info_t * loaded_features, char *** sorted_chr_names, int ** sorted_entrezid, long ** sorted_start, long ** sorted_end, unsigned char ** sorted_strand, int * chro_number, char *** anno_chrs, long ** anno_chr_head)
+int find_or_insert_gene_name(fc_thread_global_context_t * global_context, unsigned char * feature_name)
+{
+	HashTable * genetable = global_context -> gene_name_table;
+
+	long long int gene_number = HashTableGet(genetable, feature_name) - NULL;
+	if(gene_number>0)
+		return gene_number-1;
+	else
+	{
+		gene_number = genetable -> numOfElements; 
+		HashTablePut(genetable, feature_name, NULL+gene_number+1);
+		global_context -> gene_name_array[gene_number] = feature_name;
+			// real memory space of feature_name is in the "loaded_features" data structure.
+			// now we only save its pointer.
+
+		return gene_number;
+	}
+}
+
+int fc_strcmp(const void * s1, const void * s2)
+{
+	return strcmp((char*)s1, (char*)s2);
+}
+
+
+void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int features, fc_feature_info_t * loaded_features, char *** sorted_chr_names, int ** sorted_entrezid, long ** sorted_start, long ** sorted_end, unsigned char ** sorted_strand, int * chro_number, char *** anno_chrs, long ** anno_chr_head)
 {
 	unsigned int chro_pnt;
 	unsigned char * is_chro_name_explored = malloc(features);
@@ -175,6 +262,12 @@ void sort_feature_info(unsigned int features, fc_feature_info_t * loaded_feature
 	fc_feature_info_t ** old_info_ptr = malloc(sizeof(void *) * features);
 	(*anno_chrs) = malloc(sizeof(void *) * 500);
 	(*anno_chr_head) = malloc(sizeof(long) * 500);
+
+	global_context -> gene_name_array = malloc(sizeof(char *) * features);	// there should be much less identical names.
+	global_context -> gene_name_table = HashTableCreate(5000);
+	HashTableSetHashFunction(global_context -> gene_name_table, HashTableStringHashFunction);
+	HashTableSetKeyComparisonFunction(global_context -> gene_name_table, fc_strcmp);
+
 
 	unsigned int this_chro_start = 0;
 	unsigned int this_chro_end = 0;
@@ -205,7 +298,8 @@ void sort_feature_info(unsigned int features, fc_feature_info_t * loaded_feature
 				if(strcmp((char *)current_chro, (char *)loaded_features[xk1].chro)==0)
 				{
 					is_chro_name_explored[xk1]=1;
-					ret_entrez[ret_array_pointer] = atoi((char *)loaded_features[xk1].feature_name);
+					//ret_entrez[ret_array_pointer] = atoi((char *)loaded_features[xk1].feature_name);
+					ret_entrez[ret_array_pointer] = find_or_insert_gene_name(global_context, loaded_features[xk1].feature_name);
 					ret_start[ret_array_pointer] = loaded_features[xk1].start;
 					ret_end[ret_array_pointer] = loaded_features[xk1].end;
 					ret_strand[ret_array_pointer] = loaded_features[xk1].is_negative_strand;
@@ -531,9 +625,8 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 	}
 }
 
-int fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int et_nchrs, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char ** et_anno_chrs, long * et_anno_chr_heads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int read_length, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out)
 {
-	int xk1;
 
 	global_context -> input_buffer_max_size = buffer_size;
 
@@ -542,20 +635,6 @@ int fc_thread_init_global_context(fc_thread_global_context_t * global_context, u
 	global_context -> is_gene_level = is_gene_level;
 	global_context -> is_strand_checked = is_strand_checked;
 
-	global_context -> read_length = read_length;
-	global_context -> line_length = read_length;
-
-	global_context -> exontable_nchrs = et_nchrs;
-	global_context -> exontable_exons = et_exons;
-	global_context -> exontable_geneid = et_geneid;
-	global_context -> exontable_chr = et_chr;
-	global_context -> exontable_start = et_start;
-	global_context -> exontable_stop = et_stop;
-	global_context -> exontable_strand = (char *)et_strand;
-	global_context -> exontable_anno_chrs = et_anno_chrs;
-	global_context -> exontable_anno_chr_heads = et_anno_chr_heads;
-	global_context -> min_paired_end_distance = min_pe_dist;
-	global_context -> max_paired_end_distance = max_pe_dist;
 
 	if(is_sam_out)
 	{
@@ -566,20 +645,40 @@ int fc_thread_init_global_context(fc_thread_global_context_t * global_context, u
 	else
 		global_context -> SAM_output_fp = NULL;
 
-	global_context -> is_all_finished = 0;
+	global_context -> min_paired_end_distance = min_pe_dist;
+	global_context -> max_paired_end_distance = max_pe_dist;
 	global_context -> thread_number = threads;
-	global_context -> thread_contexts = malloc(sizeof(fc_thread_thread_context_t) * threads);
-	for(xk1=0; xk1<threads; xk1++)
+	global_context -> line_length = line_length;
+
+}
+int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_nchrs, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char ** et_anno_chrs, long * et_anno_chr_heads, int read_length)
+{
+	int xk1;
+
+	global_context -> read_length = read_length;
+
+	global_context -> exontable_nchrs = et_nchrs;
+	global_context -> exontable_exons = et_exons;
+	global_context -> exontable_geneid = et_geneid;
+	global_context -> exontable_chr = et_chr;
+	global_context -> exontable_start = et_start;
+	global_context -> exontable_stop = et_stop;
+	global_context -> exontable_strand = (char *)et_strand;
+	global_context -> exontable_anno_chrs = et_anno_chrs;
+	global_context -> exontable_anno_chr_heads = et_anno_chr_heads;
+	global_context -> is_all_finished = 0;
+	global_context -> thread_contexts = malloc(sizeof(fc_thread_thread_context_t) * global_context -> thread_number);
+	for(xk1=0; xk1<global_context -> thread_number; xk1++)
 	{
 		pthread_spin_init(&global_context->thread_contexts[xk1].input_buffer_lock, PTHREAD_PROCESS_PRIVATE);
 		global_context -> thread_contexts[xk1].input_buffer_remainder = 0;
 		global_context -> thread_contexts[xk1].input_buffer_write_ptr = 0;
-		global_context -> thread_contexts[xk1].input_buffer = malloc(buffer_size);
+		global_context -> thread_contexts[xk1].input_buffer = malloc(global_context -> input_buffer_max_size);
 		global_context -> thread_contexts[xk1].thread_id = xk1;
 		global_context -> thread_contexts[xk1].count_table = calloc(sizeof(unsigned int), et_exons);
 		global_context -> thread_contexts[xk1].nreads_mapped_to_exon = 0;
-		global_context -> thread_contexts[xk1].line_buffer1 = malloc(line_length + 2);
-		global_context -> thread_contexts[xk1].line_buffer2 = malloc(line_length);
+		global_context -> thread_contexts[xk1].line_buffer1 = malloc(global_context -> line_length + 2);
+		global_context -> thread_contexts[xk1].line_buffer2 = malloc(global_context -> line_length + 2);
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 		void ** thread_args = malloc(sizeof(void *)*2);
 		thread_args[0] = global_context;
@@ -601,7 +700,9 @@ void fc_thread_destroy_global_context(fc_thread_global_context_t * global_contex
 		free(global_context -> thread_contexts[xk1].input_buffer);
 		pthread_spin_destroy(&global_context -> thread_contexts[xk1].input_buffer_lock);
 	}
+	HashTableDestroy(global_context -> gene_name_table);
 	free(global_context -> thread_contexts);
+	free(global_context -> gene_name_array);
 	if(global_context -> SAM_output_fp) fclose(global_context -> SAM_output_fp);
 }
 void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
@@ -612,6 +713,37 @@ void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 }
 
 
+void fc_write_final_gene_results(fc_thread_global_context_t * global_context, int * et_geneid, long * et_start, long * et_stop, const char * out_file, int features, int * nreads, fc_feature_info_t * loaded_features)
+{
+	int xk1;
+	int genes = global_context -> gene_name_table -> numOfElements;
+	int * gene_nreads = calloc(sizeof(int) , genes);
+	int * gene_lengths = calloc(sizeof(int) , genes);
+
+	for(xk1 = 0; xk1 < features; xk1++)
+	{
+		int gene_id = et_geneid[xk1];
+		gene_nreads[gene_id] += nreads[xk1];
+		gene_lengths[gene_id] += et_stop[xk1] - et_start[xk1] + 1;
+	}
+	FILE * fp_out = fopen(out_file,"w");
+	if(!fp_out){
+		SUBREADprintf("Failed to create file %s\n", out_file);
+		return;
+	}
+
+	fprintf(fp_out,"geneid\tlength\tnreads\n");
+	for(xk1 = 0 ; xk1 < genes; xk1++)
+	{
+		unsigned char * gene_symbol = global_context -> gene_name_array [xk1];
+		//printf("%s\tXK1=%d\tGENEs=%d\n", gene_symbol, xk1, genes);
+		fprintf(fp_out,"%s\t%d\t%d\n", gene_symbol , gene_nreads[xk1], gene_lengths[xk1]);
+	}
+
+	free(gene_nreads);
+	free(gene_lengths);
+	fclose(fp_out);
+}
 void fc_write_final_results(fc_thread_global_context_t * global_context, const char * out_file, int features, int * nreads, fc_feature_info_t * loaded_features)
 {
 	/* save the results */
@@ -620,8 +752,8 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 	fp_out = fopen(out_file,"w");
 	if(!fp_out){
 		SUBREADprintf("Failed to create file %s\n", out_file);
-		return;
-	}
+			return;
+		}
 	fprintf(fp_out,"geneid\tchr\tstart\tend\tstrand\tnreads\n");
 	for(i=0;i<features;i++)
 	{
@@ -638,7 +770,7 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-g} {-d <min_PE_dist>} {-D <max_PE_dist>} \n\n  Optional parameters:\n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n   -G  \tRead the annotation file as GTF, false by default\n   -g  \tDo gene-level aggregation, false by default.\n   -S  \tWrite the read classification result into output_file.reads.\n   -s  \tMatch the strand of features with the strands of reads mapped to.\n\n");
+	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-m} {-d <min_PE_dist>} {-D <max_PE_dist>} {-F <annot_format>} \n\n  Optional parameters:\n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n   -F f\tThe format of annotations, either 'GTF' or 'Customized', 'GTF' by default\n   -m  \tDo gene-level aggregation, false by default.\n   -S  \tWrite the read classification result into output_file.reads.\n   -s  \tMatch the strand of features with the strands of reads mapped to.\n\n");
 }
 
 int readSummary(int argc,char *argv[]){
@@ -667,13 +799,13 @@ int readSummary(int argc,char *argv[]){
 
 	FILE *fp_in = NULL;
 
-	int read_length = 0, isStrandChecked;
+	int read_length = 0, isStrandChecked, isCVersion;
 	char **chr;
 	long *start, *stop;
 	int *geneid, *nreads;
 
 	char * line = NULL;
-	long i,nexons;
+	long nexons;
 
 
 	int nreads_mapped_to_exon = 0;
@@ -699,6 +831,8 @@ int readSummary(int argc,char *argv[]){
 
 	line = (char*)calloc(MAX_LINE_LENGTH, 1);
 
+	isCVersion = ((argv[0][0]=='C')?1:0);
+
 	isPE = atoi(argv[4]);
 	minPEDistance = atoi(argv[5]);
 	maxPEDistance = atoi(argv[6]);
@@ -723,36 +857,11 @@ int readSummary(int argc,char *argv[]){
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
 
-	fc_feature_info_t * loaded_features;
-
-	nexons = load_feature_info(argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
-	if(nexons<1){
-		SUBREADprintf("Failed to open the annotation file %s\n",argv[1]);
-		return -1;
-	}
-
-	sort_feature_info(nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &nchr, &anno_chrs, &anno_chr_head);
-	nreads = (int *) calloc(nexons,sizeof(int));
-	for(i=0;i<nexons;i++) nreads[i] = 0;
-
-	SUBREADprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
-
-
-	/**********************************************************/
-	/**********************************************************/
-	// SO FAR THE CODES ARE UNCHANGED.
-	// NOW THE NEW CODES: CREATE GLOBAL CONTEXT AND THREAD CONTEXTS.
-	// THEN DO featureCount IN THREADS.
-	/**********************************************************/
-	/**********************************************************/
-
 	unsigned int buffer_size = 1024*1024*6;
-	int thread_ret = 0;
-
-	fc_thread_global_context_t global_context;
-	thread_ret |= fc_thread_init_global_context(& global_context, buffer_size, thread_number, nchr, nexons, geneid, chr, start, stop, sorted_strand, anno_chrs, anno_chr_head, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance, read_length, isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport);
 
 
+	// Open the SAM/BAM file
+	// Nothing is done if the file does not exist.
 	if (isSAM == 1)
 	{
 		#ifdef MAKE_STANDALONE
@@ -776,6 +885,29 @@ int readSummary(int argc,char *argv[]){
 			return -1;
 		}
 	}
+
+
+	// Loading the annotations.
+	// Nothing is done if the annotation does not exist.
+	fc_feature_info_t * loaded_features;
+	nexons = load_feature_info(argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
+	if(nexons<1){
+		SUBREADprintf("Failed to open the annotation file %s\n",argv[1]);
+		return -1;
+	}
+
+
+	fc_thread_global_context_t global_context;
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport);
+
+	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &nchr, &anno_chrs, &anno_chr_head);
+	nreads = (int *) calloc(nexons,sizeof(int));
+
+	SUBREADprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
+
+	int thread_ret = 0;
+	thread_ret |= fc_thread_start_threads(& global_context, nchr, nexons, geneid, chr, start, stop, sorted_strand, anno_chrs, anno_chr_head, read_length);
+
 	int buffer_pairs = 16;
 	char * preload_line = malloc(sizeof(char) * (2+MAX_LINE_LENGTH)*(isPE?2:1)*buffer_pairs);
 	int preload_line_ptr;
@@ -806,6 +938,8 @@ int readSummary(int argc,char *argv[]){
 				if(!ret) break;
 				int curr_line_len = strlen(line);
 
+				// Try to figure out the length of the first read.
+				// It is assumed that all reads have the same length.
 				if(read_length < 1)
 				{
 					int tab_no = 0;
@@ -822,10 +956,8 @@ int readSummary(int argc,char *argv[]){
 					}
 					read_length = read_len_tmp;
 					global_context.read_length = read_length;
-					//printf("READ LEN = %d\n", read_length);
 				}
 
-				//printf("L %d =%s\n", preload_line_ptr , line);
 				strcpy(preload_line+preload_line_ptr, line);
 				preload_line_ptr += curr_line_len;
 				if(line[curr_line_len-1]!='\n')
@@ -840,13 +972,14 @@ int readSummary(int argc,char *argv[]){
 
 
 		int line_length = preload_line_ptr;
-		//printf("DL=%s\n" , preload_line);
 
 		if(isPE && (fresh_read_no%2>0))
 		{
+			// Safegarding -- it should not happen if the SAM file has a correct format.
 			SUBREADprintf("WARNING! THE LAST READ IS UNPAIRED!!\nIGNORED!\n");
 			line_length = 0;
 		}
+
 		if(line_length > 0)
 		{
 			while(1)
@@ -895,15 +1028,6 @@ int readSummary(int argc,char *argv[]){
 	fc_thread_wait_threads(&global_context);
 
 	fc_thread_merge_results(&global_context, nreads , &nreads_mapped_to_exon);
-	fc_thread_destroy_global_context(&global_context);
-
-
-
-	/**********************************************************/
-	/**********************************************************/
-	// END OF THE NEW CODES
-	/**********************************************************/
-	/**********************************************************/
 
 	double time_end = miltime();
 	if(isPE == 1)
@@ -912,7 +1036,10 @@ int readSummary(int argc,char *argv[]){
 		SUBREADprintf("Number of reads mapped to the features is: %d\nTime cost = %.1f seconds\n\n", nreads_mapped_to_exon, time_end - time_start);
 
 
-	fc_write_final_results(&global_context, argv[3], nexons, nreads, loaded_features);
+	if(isCVersion && isGeneLevel)
+		fc_write_final_gene_results(&global_context, geneid, start, stop, argv[3], nexons, nreads, loaded_features);
+	else
+		fc_write_final_results(&global_context, argv[3], nexons, nreads, loaded_features);
 
 	if (isSAM == 1)
 	{
@@ -925,8 +1052,8 @@ int readSummary(int argc,char *argv[]){
 		SamBam_fclose(fp_in_bam);
 
 
+	fc_thread_destroy_global_context(&global_context);
 	free(line);
-	//for(i=0;i<nexons;i++) free(chr[i]);
 	free(loaded_features);
 	free(geneid);
 	free(chr);
@@ -962,14 +1089,14 @@ int feature_count_main(int argc, char ** argv)
 	int is_Strand_Sensitive = 0;
 	int is_ReadSummary_Report = 0;
 	int threads = 1;
-	int isGTF = 0;
+	int isGTF = 1;
 	char nthread_str[4];
 	int option_index = 0;
 	int c;
 
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbGgsOS?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbF:msOS?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'T':
@@ -987,11 +1114,11 @@ int feature_count_main(int argc, char ** argv)
 			case 'b':
 				is_SAM = 0;
 				break;
-			case 'g':
+			case 'm':
 				is_GeneLevel = 1;
 				break;
-			case 'G':
-				isGTF = 1;
+			case 'F':
+				isGTF = (optarg[0]=='G');
 				break;
 			case 'O':
 				is_Overlap = 1;
@@ -1028,7 +1155,7 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(nthread_str,"%d", threads);
 	sprintf(min_dist_str,"%d",min_dist);
 	sprintf(max_dist_str,"%d",max_dist);
-	Rargv[0] = "readSummary";
+	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
 	Rargv[2] = sam_name;
 	Rargv[3] = out_name;
