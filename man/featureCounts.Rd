@@ -3,56 +3,67 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,allowMultiOverlap=FALSE,nthreads=1,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
+featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM format files.}
   \item{file.type}{ a character string giving the type of files provided. \code{SAM} and \code{BAM} formats are supported. \code{SAM} by default.}
-  \item{feature.type}{ a character string giving the feature type. Its value could be \code{gene}, \code{exon} or \code{other}. \code{gene} by default.}
-  \item{genome}{ a character string specifying the reference genome to which the sequencing reads were mapped. \code{mm9} by default. This argument is only applicable when \code{annot} is \code{NULL}.}
-  \item{annot}{ a data frame containing annotation information. When \code{annot} is \code{NULL}, an in-built annotation will be used.}
-  \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature if it overlaps with all of them. \code{FALSE} by default.}
+  \item{annot}{ a data frame containing annotation information. When \code{annot} is \code{NULL}, an in-built annotation file will be used. \code{NULL} by default.}
+  \item{genome}{ a character string specifying the reference genome to which the sequencing reads were mapped. It has the values of \code{mm9}, \code{mm10} and \code{hg}, corresponding to mouse genome build `mm9', mouse genome build `mm10' and human genome build `hg19', respectively. \code{mm9} by default. This argument is only applicable when \code{annot} is \code{NULL}.}
+  \item{isGTFAnnotationFile}{ logical indicating if the annotation file provided via \code{annot} is in GTF format. \code{FALSE} by default. If \code{isGTFAnnotationFile} is \code{TRUE}, a GTF format annotation file must be provided via \code{annot} argument.}
+  \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features using their values in the ``GeneID" column or using the ``gene_id" attribute in the GTF-format annotation file, and reads will assiged to the meta-features instead of the features. See below for more details.}
+  \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
+  \item{isStrandSpecific}{ logical indicating whether the strandness should be considered when assigning reads to features. \code{FALSE} by default.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. \code{FALSE} by default.}
   \item{min.distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
   \item{max.distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default. \code{min.distance} and \code{max.distance} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a template spans two or more exons, the mapping locations of the pair of reads sequenced from this template may have a distance much larger than the nominal template length.}
   }
 \details{
-\code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features the mapped reads that were generated from genomic DNA and RNA sequencing.
+\code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.
 
 This function takes as input a set of files containing read mapping results output from a read aligner (e.g. \code{\link{align}}), and then assigns the mapped reads to the genomic features.
-The input files should be in SAM or BAM format.
+The acceptable formats of the input files are SAM and BAM.
 
-The argument \code{feature.type} specifies the type of genomic features used by this function.
-It has the values of \code{gene}, \code{exon} or \code{other}.
+The argument \code{useMetaFeatures} specifies the read summarization should be performed at the feature level or at the meta-feature level.
+Each entry in the annotation data is a feature, which for example could be an exon.
+When \code{useMetaFeatures} is \code{TRUE}, the \code{featureCounts} function creates meta-features by grouping features using the gene identifiers included in the ``GeneID" column in the annotation data (or in the ``gene_id" attribute in the GTF format annotation file) and then assigns reads to meta-features instead of features.
+The \code{useMetaFeatures} is particularly useful for gene-level expression analysis, because it instructs this function to count reads for genes (meta-features) instead of exons (features).
+Note that when meta-features are used in the read summarization, if a read is found to overlap two or more features belong to the same meta-feature it will be only counted once for that meta-feature.
+
+The argument \code{allowMultiOverlap} specifies how those reads, which are found to overlap with more than one feature (or meta-feature), should be assigned.
+When \code{allowMultiOverlap} is \code{FALSE}, a read overlapping multiple features (or meta-features) will not be assigned to any of them (not counted).
+Otherwise, it will be assigned to all of them.
+A read overlaps a meta-feature if it overlaps at least one of the features belonging to this meta-feature.
+
 \code{gene} and \code{exon} are typically used when summarizing RNA-seq read data, which will yield read counts for genes and exons, respectively.
-This function includes the in-built annotations for a few genomes including \code{mm9}, \code{mm10} and hg19 (\code{hg}).
-These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}).
-They contain the Entrez gene identifier, chromosomal name, chromosomal start location and chromosomal end location of each exon.
-Users may select an appropriate in-built annotation for their data via the argument \code{genome}.
-\code{annot} should be set to \code{NULL} when using an in-built annotation.
-Users can provide their own annotation via the \code{annot} argument (see below for the format of the user provided annotation).
 
-When assigning to the features the reads generated by genomic DNA sequencing (WES, WGS and ChIP-seq), users may set \code{feature.type} to be \code{other}.
-For this feature type, users can still use the in-built annotations to get the reads counts for the NCBI exons, or they can provide their own annotation to this function so as to quantify the genomic features of their interest.
+In-built annotation files for a few model organisms are included in the \code{Rsubread} package and these annotations can be easily used with this function to summarize reads for genes and exons.
+These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}) and then processed to remove redundant chromosomal regions within each gene.
+The resulting annotations contain non-overlapping exon regions for each gene.
+Users can use these in-built annotation files simply by setting the parameter \code{genome} to a proper value (\code{mm9}, \code{mm10} or \code{hg}).
+The format of in-built annotation files is the same as that of an example format shown below (a data frame provided by users).
 
-The user provided annotation data must contain at least four columns named \code{GeneID}, \code{Chr}, \code{Start} and \code{end} (case insensitive), giving the gene identifier (eg. a gene sybmol or an accession number), chromosomal name, chromosomal start location and chromosomal end location of each feature, respectively.
-When the features do not have a gene identifier, users can simply populate the \code{geneid} column by using the row numbers of the features in the annotation data frame.
-Chromosome names of the features are not allowed to contain more than 40 characters.
-Below is an example of a user provided annotation:
+This function supports the use of GTF format annotation file.
+Users should be provide the name of the annotation file via the \code{annot} argument and set the argument \code{isGTFAnnotationFile} to be \code{TRUE}.
+This function uses the `gene_id' attribute to group features to form meta-features if meta-feature level read summarization is needed.
+
+Alternatively, users may create a data frame including the annotation information and then provide that data frame to this function via the \code{annot} parameter for read summarization.
+The data frame must have the following format:
+
 \preformatted{
-GeneID		Chr		Start		End
-497097		chr1	3204563		3207049
-497097		chr1	3411783		3411982
-497097		chr1	3660633		3661579
-100503874	chr1	3637390		3640590
-100503874	chr1	3648928		3648985
-100038431	chr1	3670236		3671869
+GeneID		Chr	Start	End	Strand
+497097		chr1	3204563	3207049	-
+497097		chr1	3411783	3411982	-
+497097		chr1	3660633	3661579	-
+100503874	chr1	3637390	3640590	-
+100503874	chr1	3648928	3648985	-
+100038431	chr1	3670236	3671869	-
 ...
 }
 
-Note that the chromosomal names included in the annotation (the 'Chr' column) must match the chromosomal names used in the reference sequence file/s to which the reads were mapped, otherwise reads cannot be assigned to the features.
-In the in-built annotations, each chromosomal name is a character string starting with "chr" (lower case) and ending with the chromosome number, for example "chr1", "chr20" etc.
+The \code{GeneID} column may include numbers or character strings.
+Note that the chromosomal names included in the \code{Chr} column must match the chromosomal names used in the sequences of the reference genome to which the reads were mapped, otherwise reads cannot be assigned to the features.
  
 When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, the fragments (not reads) will be counted for each feature.
 For RNA-seq data, the distance between the mapping locations of the pair of reads sequenced from the same fragment could be much greater than the fragment length when the fragment spans two or more exons.

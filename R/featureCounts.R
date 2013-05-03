@@ -1,4 +1,4 @@
-featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9",annot=NULL,allowMultiOverlap=FALSE,nthreads=1,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
+featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
 {
 	flag <- FALSE
 
@@ -45,7 +45,7 @@ featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9"
 
 	for(i in 1:length(files)){
 	  cat("Processing", files[i], " ...\n")
-	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),as.numeric(tolower(feature.type)=="gene"),nthreads,sep=",")
+	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),as.numeric(isStrandSpecific),as.numeric(FALSE),sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
 	  C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	  x1 <- read.delim(fout,stringsAsFactors=FALSE)  
@@ -54,22 +54,22 @@ featureCounts <- function(files,file.type="SAM",feature.type="gene",genome="mm9"
 	  else
 	    x <- cbind(x,x1$nreads)
 	}
-	colnames(x)[1:4] <- c("GeneID","Chr","Start","End")
-	colnames(x)[-c(1:4)] <- files
+	colnames(x)[1:5] <- c("GeneID","Chr","Start","End","Strand")
+	colnames(x)[-c(1:5)] <- files
 
 	file.remove(fout)
 	if(flag) 
 	  file.remove(fout_annot)
 
-	if(tolower(feature.type) == "gene"){
-	  y <- rowsum(x[,-c(1:4)],x$GeneID)
+	if(useMetaFeatures){
+	  y <- rowsum(x[,-c(1:5)],x$GeneID)
 	  gene_length <- rowsum(x$End-x$Start+1,x$GeneID)
 	  z <- list(counts=as.matrix(y),annotation=data.frame(GeneID=rownames(y),Length=gene_length,stringsAsFactors=FALSE),targets=files)
 	}
 	else{
-	  y <- as.matrix(x[,-c(1:4)]) 
+	  y <- as.matrix(x[,-c(1:5)]) 
 	  rownames(y) <- x$GeneID
-	  z <- list(counts=y,annotation=data.frame(x[,1:4],Length=x$End-x$Start+1,stringsAsFactors=FALSE),targets=files)
+	  z <- list(counts=y,annotation=data.frame(x[,1:5],Length=x$End-x$Start+1,stringsAsFactors=FALSE),targets=files)
 	}
 	z	
 }
