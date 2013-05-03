@@ -158,7 +158,7 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 		}
 		else if(file_type == FILE_TYPE_GTF)
 		{
-			sprintf((char *)ret_features[xk1].feature_name, "%u", xk1 + 1);
+			sprintf((char *)ret_features[xk1].feature_name, "UK%06u", xk1 + 1);
 			char * seq_name = strtok_r(file_line,"\t",&token_temp);
 			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
 
