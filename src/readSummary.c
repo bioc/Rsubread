@@ -737,7 +737,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	{
 		unsigned char * gene_symbol = global_context -> gene_name_array [xk1];
 		//printf("%s\tXK1=%d\tGENEs=%d\n", gene_symbol, xk1, genes);
-		fprintf(fp_out,"%s\t%d\t%d\n", gene_symbol , gene_nreads[xk1], gene_lengths[xk1]);
+		fprintf(fp_out,"%s\t%d\t%d\n", gene_symbol , gene_lengths[xk1], gene_nreads[xk1]);
 	}
 
 	free(gene_nreads);
