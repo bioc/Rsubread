@@ -973,7 +973,68 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADprintf("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-m} {-d <min_PE_dist>} {-D <max_PE_dist>} {-F <annot_format>} \n\n  Optional parameters:\n   -T n\tThe number of threads, 1 by default.\n   -b  \tRead input file as BAM, false by default.\n   -O \tAllow overlapped exons, false by default.\n   -p \tUse paired-end information, false by default.\n   -F f\tThe format of annotations, either 'GTF' or 'Customized', 'GTF' by default\n   -m  \tDo gene-level aggregation, false by default.\n   -S  \tWrite the read classification result into output_file.reads.\n   -s  \tMatch the strand of features with the strands of reads mapped to.\n\n");
+	SUBREADputs("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-m} {-d <min_PE_dist>} {-D <max_PE_dist>} {-F <annot_format>} \n");
+	SUBREADputs("    -a <input>\tGive the name of the annotation file. The program assumes"); 
+	SUBREADputs("              \tthat the provided annotation file is in GTF format. Use -F"); 
+	SUBREADputs("              \toption to specify other annotation formats."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -i <input>\tGive the name of input file including the read data. The "); 
+	SUBREADputs("              \tfile can have a SAM or BAM format. -b option needs to be"); 
+	SUBREADputs("              \tspecified if the file is in BAM format. "); 
+	SUBREADputs("              "); 
+	SUBREADputs("    -o <input>\tGive the name of the output file. The output file contains"); 
+	SUBREADputs("              \tthe number of reads assigned to each meta-feature (or each"); 
+	SUBREADputs("              \tfeature if -f is specified)."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    Optional parameters:"); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -F        \tSpecify the format of the annotation file. Acceptable "); 
+	SUBREADputs("              \tformats include `GTF' and `SAF'. `GTF' by default."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -b        \tIndicate that the input file is in BAM format."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -f        \tIf specified, read summarization will be performed at the "); 
+	SUBREADputs("              \tfeature level. By default (-f is not specified), the read"); 
+	SUBREADputs("              \tsummarization is performed at the meta-feature level."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -O        \tIf specified, reads (or fragments if -p is specified) will"); 
+	SUBREADputs("              \tbe allowed to be assigned to more than one matched meta-"); 
+	SUBREADputs("              \tfeature (or matched feature if -f is specified). "); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -s        \tIf specified, strand-specific read assignment will be "); 
+	SUBREADputs("              \tperformed."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -T <int>  \tNumber of the threads. 1 by default."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -R        \tOutput the read assignment result for each read."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    Optional paired-end parameters:"); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -p        \tIf specified, fragments (or templates) will be counted "); 
+	SUBREADputs("              \tinstead of reads. This option is only applicable for "); 
+	SUBREADputs("              \tpaired-end reads. "); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -P        \tIf specified, paired-end distance will be checked when "); 
+	SUBREADputs("              \tassigning fragments to meta-features or features. This "); 
+	SUBREADputs("              \toption is only applicable when -p is specified. The "); 
+	SUBREADputs("              \tdistance thresholds should be specified using -d and -D "); 
+	SUBREADputs("              \toptions."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -d <int>  \tMinimal allowed paired-end distance. 1 by default."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -D <int>  \tMaximal allowed paired-end distance. 2000 by default."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -B        \tIf specified, only fragments that have both ends "); 
+	SUBREADputs("              \tsuccessfully aligned will be considered for summarization."); 
+	SUBREADputs("              \tThis option is only applicable for paired-end reads."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -C        \tIf specified, the chimeric fragments (those fragments that "); 
+	SUBREADputs("              \thave their two ends aligned to different chromosomes) will"); 
+	SUBREADputs("              \tNOT be included for summarization. This option is only "); 
+	SUBREADputs("              \tapplicable for paired-end read data."); 
+	SUBREADputs("    "); 
+
+
 }
 
 int readSummary(int argc,char *argv[]){
