@@ -973,7 +973,7 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADputs("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> {optional parameters} \n");
+	SUBREADputs("\nUsage: featureCount -i <input_file> -o <output_file> -a <annotation_file> {optional parameters} \n");
 	SUBREADputs("    Required parameters:\n"); 
 	SUBREADputs("    -a <input>\tGive the name of the annotation file. The program assumes"); 
 	SUBREADputs("              \tthat the provided annotation file is in GTF format. Use -F"); 
