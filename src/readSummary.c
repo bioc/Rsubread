@@ -80,7 +80,7 @@ typedef struct
 	unsigned int input_buffer_max_size;
 
 	HashTable * gene_name_table;	// gene_name -> gene_internal_number
-	unsigned char ** gene_name_array;	// gene_name -> gene_internal_number
+	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
 	int exontable_nchrs;
 	int exontable_exons;
 	int * exontable_geneid;
@@ -469,10 +469,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(mate_chr[0]=='=' && is_first_read_negative_strand!=is_second_read_negative_strand)
 				{
-					if(global_context -> is_PE_distance_checked && fragment_length > (global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || fragment_length < (global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1))
+					if((global_context -> is_PE_distance_checked && fragment_length > global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || (fragment_length < global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1))
 					{
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tPAIR_DISTANCE\t%d\n", read_name, fragment_length);
+							fprintf(global_context -> SAM_output_fp,"%s\tPAIR_DISTANCE\t%ld\n", read_name, fragment_length);
 						return;
 					}
 				}
@@ -563,7 +563,11 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		thread_context->count_table[hit_exon_id]++;
 		thread_context->nreads_mapped_to_exon++;
 		if(global_context -> SAM_output_fp)
-			fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_1_%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON");
+		{
+			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
+			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+			fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
+		}
 	}
 	else if(nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0])
 	{
@@ -571,7 +575,11 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		thread_context->count_table[hit_exon_id]++;
 		thread_context->nreads_mapped_to_exon++;
 		if(global_context -> SAM_output_fp)
-			fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_2_%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON");
+		{
+			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
+			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+			fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
+		}
 	}
 	else
 	{
@@ -683,23 +691,41 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				thread_context->count_table[top_voter_id]++;
 				thread_context->nreads_mapped_to_exon++;
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\tV=%d\n", read_name, global_context -> is_gene_level?"GENE":"EXON", max_votes);
+				{
+					int final_gene_number = global_context -> exontable_geneid[top_voter_id];
+					unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+					fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
+				}
 			}
 			else if(top_voters >1)
 			{
 				if(global_context -> is_multi_overlap_allowed)
 				{
+					char final_feture_names[1000];
+					final_feture_names[0]=0;
 					for(xk1 = 0; xk1 < decision_table_items; xk1++)
 					{
 						if(decision_table_votes[xk1] == max_votes)
 						{
 							long tmp_voter_id = (global_context -> is_gene_level)?decision_table_exon_ids[xk1]:decision_table_ids[xk1];
 							thread_context->count_table[tmp_voter_id]++;
+
+							if(global_context -> SAM_output_fp)
+							{
+								int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
+								unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+								strncat(final_feture_names, (char *)final_feture_name, 999);
+								strncat(final_feture_names, ",", 999);
+							}
 						}
 					}
 					thread_context->nreads_mapped_to_exon++;
 					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_MULTI_%sS\t%d\n", read_name, global_context -> is_gene_level?"GENE":"EXON", top_voters);
+					{
+						int ffnn = strlen(final_feture_names);
+						if(ffnn>0) final_feture_names[ffnn-1]=0;
+						fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_MULTI_%sS\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_names);
+					}
 				}
 				else if(global_context -> SAM_output_fp)
 					fprintf(global_context -> SAM_output_fp,"%s\tOVERLAPPED_%sS\t%d\n", read_name, global_context -> is_gene_level?"GENE":"EXON", top_voters);
@@ -1377,7 +1403,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[14] = is_Both_End_Mapped?"1":"0";
 	Rargv[15] = is_Chimeric_Disallowed?"1":"0";
 	Rargv[16] = is_PE_Dist_Checked?"1":"0";
-	readSummary(16, Rargv);
+	readSummary(17, Rargv);
 	return 0;
 }
 
