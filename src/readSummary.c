@@ -886,7 +886,9 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		void ** thread_args = malloc(sizeof(void *)*2);
 		thread_args[0] = global_context;
 		thread_args[1] = & global_context -> thread_contexts[xk1];
-		pthread_create(&global_context -> thread_contexts[xk1].thread_object, NULL, feature_count_worker, thread_args);
+
+		if(global_context -> thread_number>1)
+			pthread_create(&global_context -> thread_contexts[xk1].thread_object, NULL, feature_count_worker, thread_args);
 	}
 
 	return 0;
@@ -997,6 +999,7 @@ void print_usage()
 	SUBREADputs("    -f        \tIf specified, read summarization will be performed at the "); 
 	SUBREADputs("              \tfeature level. By default (-f is not specified), the read"); 
 	SUBREADputs("              \tsummarization is performed at the meta-feature level."); 
+	//getopt_long (argc, argv, "T:i:o:a:d:D:pbF:fsCBPOR?", long_options, &option_index)) != -1)
 	SUBREADputs("    "); 
 	SUBREADputs("    -O        \tIf specified, reads (or fragments if -p is specified) will"); 
 	SUBREADputs("              \tbe allowed to be assigned to more than one matched meta-"); 
@@ -1185,10 +1188,11 @@ int readSummary(int argc,char *argv[]){
 	int thread_ret = 0;
 	thread_ret |= fc_thread_start_threads(& global_context, nchr, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
 
-	int buffer_pairs = 16;
+	int buffer_pairs = thread_number>1?20:1;
 	char * preload_line = malloc(sizeof(char) * (2+MAX_LINE_LENGTH)*(isPE?2:1)*buffer_pairs);
 	int preload_line_ptr;
 	int current_thread_id = 0;
+	fc_thread_thread_context_t * one_thread_context = global_context.thread_contexts;
 
 	while (1){
 		int pair_no;
@@ -1196,34 +1200,35 @@ int readSummary(int argc,char *argv[]){
 		int fresh_read_no = 0;
 		preload_line[0] = 0;
 		preload_line_ptr = 0;
-		
 
-		for(pair_no=0; pair_no < buffer_pairs; pair_no++)
+
+		
+		if(thread_number==1)
 		{
+			int is_second_read;
+
 			for(is_second_read=0;is_second_read<(isPE?2:1);is_second_read++)
 			{
+				char * lbuf = is_second_read?one_thread_context -> line_buffer2:one_thread_context -> line_buffer1;
 				while(1)
 				{
 					if (isSAM == 1)
-						ret = fgets(line, MAX_LINE_LENGTH, fp_in);
+						ret = fgets(lbuf, MAX_LINE_LENGTH, fp_in);
 					else
-						ret = SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);  
+						ret = SamBam_fgets(fp_in_bam, lbuf, MAX_LINE_LENGTH);  
 					if(!ret) break;
-					if(line[0] != '@') break;
+					if(lbuf[0] != '@') break;
 				}
 
 				if(!ret) break;
-				int curr_line_len = strlen(line);
-
-				// Try to figure out the length of the first read.
-				// It is assumed that all reads have the same length.
 				if(read_length < 1)
 				{
 					int tab_no = 0;
 					int read_len_tmp=0, read_cursor;
+					int curr_line_len = strlen(lbuf);
 					for(read_cursor=0; read_cursor<curr_line_len; read_cursor++)
 					{
-						if(line[read_cursor] == '\t')
+						if(lbuf[read_cursor] == '\t')
 							tab_no++;
 						else
 						{
@@ -1234,75 +1239,121 @@ int readSummary(int argc,char *argv[]){
 					read_length = read_len_tmp;
 					global_context.read_length = read_length;
 				}
+			}
 
-				strcpy(preload_line+preload_line_ptr, line);
-				preload_line_ptr += curr_line_len;
-				if(line[curr_line_len-1]!='\n')
+			if(!ret) break;
+			
+			one_thread_context -> current_read_length1 = global_context.read_length;
+			one_thread_context -> current_read_length2 = global_context.read_length;
+
+			process_line_buffer(&global_context, one_thread_context);
+		}
+		else
+		{
+			for(pair_no=0; pair_no < buffer_pairs; pair_no++)
+			{
+				for(is_second_read=0;is_second_read<(isPE?2:1);is_second_read++)
 				{
-					strcpy(preload_line+preload_line_ptr, "\n");
-					preload_line_ptr++;
+					while(1)
+					{
+						if (isSAM == 1)
+							ret = fgets(line, MAX_LINE_LENGTH, fp_in);
+						else
+							ret = SamBam_fgets(fp_in_bam, line, MAX_LINE_LENGTH);  
+						if(!ret) break;
+						if(line[0] != '@') break;
+					}
+
+					if(!ret) break;
+					int curr_line_len = strlen(line);
+
+					// Try to figure out the length of the first read.
+					// It is assumed that all reads have the same length.
+					if(read_length < 1)
+					{
+						int tab_no = 0;
+						int read_len_tmp=0, read_cursor;
+						for(read_cursor=0; read_cursor<curr_line_len; read_cursor++)
+						{
+							if(line[read_cursor] == '\t')
+								tab_no++;
+							else
+							{
+								if(tab_no == 9)	// SEQ
+									read_len_tmp++;
+							}
+						}
+						read_length = read_len_tmp;
+						global_context.read_length = read_length;
+					}
+
+					strcpy(preload_line+preload_line_ptr, line);
+					preload_line_ptr += curr_line_len;
+					if(line[curr_line_len-1]!='\n')
+					{
+						strcpy(preload_line+preload_line_ptr, "\n");
+						preload_line_ptr++;
+					}
+					fresh_read_no++;
 				}
-				fresh_read_no++;
+				if(!ret) break;
+			}
+
+			int line_length = preload_line_ptr;
+			if(isPE && (fresh_read_no%2>0))
+			{
+				// Safegarding -- it should not happen if the SAM file has a correct format.
+				SUBREADprintf("WARNING! THE LAST READ IS UNPAIRED!!\nIGNORED!\n");
+				line_length = 0;
+			}
+
+			if(line_length > 0)
+			{
+				while(1)
+				{
+					int is_finished = 0;
+					fc_thread_thread_context_t * thread_context = global_context.thread_contexts+current_thread_id;
+
+					pthread_spin_lock(&thread_context->input_buffer_lock);
+					unsigned int empty_bytes = global_context.input_buffer_max_size -  thread_context->input_buffer_remainder; 
+					if(empty_bytes > line_length)
+					{
+						unsigned int tail_bytes = global_context.input_buffer_max_size -  thread_context->input_buffer_write_ptr; 
+						unsigned int write_p1_len = (tail_bytes > line_length)?line_length:tail_bytes;
+						unsigned int write_p2_len = (tail_bytes > line_length)?0:(line_length - tail_bytes);
+						memcpy(thread_context->input_buffer + thread_context->input_buffer_write_ptr, preload_line, write_p1_len);
+						if(write_p2_len)
+						{
+							memcpy(thread_context->input_buffer, preload_line + write_p1_len, write_p2_len);
+							thread_context->input_buffer_write_ptr = write_p2_len;
+						}
+						else	thread_context->input_buffer_write_ptr += write_p1_len;
+						if(thread_context->input_buffer_write_ptr == global_context.input_buffer_max_size) 
+							thread_context->input_buffer_write_ptr=0;
+
+
+						thread_context->input_buffer_remainder += line_length;
+						is_finished = 1;
+					}
+
+					pthread_spin_unlock(&thread_context->input_buffer_lock);
+
+					current_thread_id++;
+					if(current_thread_id >= thread_number) current_thread_id = 0;
+
+					if(is_finished) break;
+					else usleep(tick_time);
+				}
 			}
 			if(!ret) break;
 		}
-
-
-		int line_length = preload_line_ptr;
-
-		if(isPE && (fresh_read_no%2>0))
-		{
-			// Safegarding -- it should not happen if the SAM file has a correct format.
-			SUBREADprintf("WARNING! THE LAST READ IS UNPAIRED!!\nIGNORED!\n");
-			line_length = 0;
-		}
-
-		if(line_length > 0)
-		{
-			while(1)
-			{
-				int is_finished = 0;
-				fc_thread_thread_context_t * thread_context = global_context.thread_contexts+current_thread_id;
-
-				pthread_spin_lock(&thread_context->input_buffer_lock);
-				unsigned int empty_bytes = global_context.input_buffer_max_size -  thread_context->input_buffer_remainder; 
-				if(empty_bytes > line_length)
-				{
-					unsigned int tail_bytes = global_context.input_buffer_max_size -  thread_context->input_buffer_write_ptr; 
-					unsigned int write_p1_len = (tail_bytes > line_length)?line_length:tail_bytes;
-					unsigned int write_p2_len = (tail_bytes > line_length)?0:(line_length - tail_bytes);
-					memcpy(thread_context->input_buffer + thread_context->input_buffer_write_ptr, preload_line, write_p1_len);
-					if(write_p2_len)
-					{
-						memcpy(thread_context->input_buffer, preload_line + write_p1_len, write_p2_len);
-						thread_context->input_buffer_write_ptr = write_p2_len;
-					}
-					else	thread_context->input_buffer_write_ptr += write_p1_len;
-					if(thread_context->input_buffer_write_ptr == global_context.input_buffer_max_size) 
-						thread_context->input_buffer_write_ptr=0;
-
-
-					thread_context->input_buffer_remainder += line_length;
-					is_finished = 1;
-				}
-
-				pthread_spin_unlock(&thread_context->input_buffer_lock);
-
-				current_thread_id++;
-				if(current_thread_id >= thread_number) current_thread_id = 0;
-
-				if(is_finished) break;
-				else usleep(tick_time);
-			}
-		}
-
-		if(!ret) break;
-
 	}
 
 	free(preload_line);
 	global_context.is_all_finished = 1;
-	fc_thread_wait_threads(&global_context);
+
+	if(thread_number > 1)
+		fc_thread_wait_threads(&global_context);
 
 	fc_thread_merge_results(&global_context, nreads , &nreads_mapped_to_exon);
 
@@ -1411,7 +1462,10 @@ int feature_count_main(int argc, char ** argv)
 				is_GeneLevel = 0;
 				break;
 			case 'F':
-				isGTF = (optarg[0]=='G');
+				isGTF = 1;
+				if(strcmp("SAF", optarg)==0) isGTF=0;
+				else if(strcmp("GTF", optarg)==0) isGTF=1;
+				else SUBREADprintf("WARNING: Unknown annotation format: %s. GTF format is used.\n", optarg); 
 				break;
 			case 'O':
 				is_Overlap = 1;
