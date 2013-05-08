@@ -973,7 +973,8 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADputs("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {-b} {-O} {-p} {-S} {-G} {-m} {-d <min_PE_dist>} {-D <max_PE_dist>} {-F <annot_format>} \n");
+	SUBREADputs("\nUsage: readSummary -i <input_file> -o <output_file> -a <annotation_file> { -T <n_threads> } {optional parameters} \n");
+	SUBREADputs("    Required parameters:\n"); 
 	SUBREADputs("    -a <input>\tGive the name of the annotation file. The program assumes"); 
 	SUBREADputs("              \tthat the provided annotation file is in GTF format. Use -F"); 
 	SUBREADputs("              \toption to specify other annotation formats."); 
