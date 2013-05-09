@@ -3,7 +3,7 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,min.distance=10,max.distance=2000)
+featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=10,max.distance=2000,countChimericFragments=TRUE)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM format files.}
@@ -15,9 +15,12 @@ featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{isStrandSpecific}{ logical indicating whether the strandness should be considered when assigning reads to features. \code{FALSE} by default.}
-  \item{isPairedEnd}{ logical indicating if paired-end reads are used. \code{FALSE} by default.}
+  \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (two reads are generated from each fragment in paired-end data) will be counted rather than individual reads. \code{FALSE} by default.}
+  \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
+  \item{checkPairedEndDistance}{ logical indicating if the two ends from the same fragment are required to satisify the paired-end distance criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. Paired-end distance criteria are specified via \code{min.distance} and \code{max.distance}.}
   \item{min.distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
   \item{max.distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default. \code{min.distance} and \code{max.distance} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a template spans two or more exons, the mapping locations of the pair of reads sequenced from this template may have a distance much larger than the nominal template length.}
+  \item{countChimericFragments}{ logical indicating whether a chimeric fragment, which has its two reads mapped to different chromosomes, should be counted or not. If this fragment overlaps with only one feature (or one meta-feature), typically by one of its two read, this fragment will be assigned to that feature (or meta-feature). If it is found to overlap more than one feature (or meta-feature), for example one of its two reads overlaps meta-feature A and the other overlaps meta-feature B, and \code{allowMultiOverlap} is \code{FALSE}, then this fragment will not be counted. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   }
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.
