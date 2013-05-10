@@ -153,7 +153,7 @@ int SamBam_get_alignment(SamBam_FILE * fp, SamBam_Alignment * aln)
 				SUBREADprintf("WARNING: cigar string is too long to the buffer\n");
 		}
 
-		char read_2_seq;
+		char read_2_seq = 0;
 		int seq_qual_bytes = read_len + (read_len /2)+(read_len%2);
 		int gzread_len = gzread(fp->gz_file, aln-> buff_for_seq, seq_qual_bytes);
 		if(gzread_len < seq_qual_bytes)
@@ -334,11 +334,10 @@ int test_bamview(int argc, char ** argv)
 		{
 			char buf[3000];
 			char * buf2 = SamBam_fgets(fp,buf, 3000);
-			//printf(">>%s<<\n",buf);
-			//if(buf2)
-				//fwrite(buf,strlen(buf), 1, stdout);
-			//else break;
-			break;
+			printf(">>%s<<\n",buf);
+			if(buf2)
+				fwrite(buf,strlen(buf), 1, stdout);
+			else break;
 		}
 
 		SamBam_fclose(fp);
