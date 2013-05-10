@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <getopt.h>
 #include "subread.h"
+#include "gene-algorithms.h"
 #include "sambam-file.h"
 #include "hashtable.h"
 #include "HelperFunctions.h"
@@ -1431,9 +1432,13 @@ int feature_count_main(int argc, char ** argv)
 
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbF:fsCBPOR?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbF:fsCBPORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{
+			case 'v':
+				print_version_info();
+				return 0;
+				break;
 			case 'T':
 				threads = atoi(optarg);
 				break;
