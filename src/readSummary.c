@@ -411,7 +411,7 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 	free(old_info_ptr);
 }
 
-#define MAX_HIT_NUMBER 50
+#define MAX_HIT_NUMBER 80
 
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
@@ -624,6 +624,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 					long gene_id = uniq_gene_table[xk1];
 					int is_fresh = 1;
+					if(decision_table_items >= MAX_HIT_NUMBER) break;
 					for(xk2=0; xk2<decision_table_items; xk2++)
 					{
 						if(gene_id == decision_table_ids[xk2])
@@ -648,6 +649,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 					long exon_id = global_context -> exontable_geneid[hits_indices[xk1]];
 					int is_fresh = 1;
+					if(decision_table_items >= MAX_HIT_NUMBER) break;
 					for(xk2=0; xk2<decision_table_items; xk2++)
 					{
 						if(exon_id == decision_table_ids[xk2])
@@ -979,7 +981,7 @@ static struct option long_options[] =
 
 void print_usage()
 {
-	SUBREADputs("\nUsage: featureCount -i <input_file> -o <output_file> -a <annotation_file> {optional parameters} \n");
+	SUBREADputs("\nUsage: featureCounts -a <annotation_file> -i <input_file> -o <output_file> {optional parameters} \n");
 	SUBREADputs("    Required parameters:\n"); 
 	SUBREADputs("    -a <input>\tGive the name of the annotation file. The program assumes"); 
 	SUBREADputs("              \tthat the provided annotation file is in GTF format. Use -F"); 
@@ -998,23 +1000,25 @@ void print_usage()
 	SUBREADputs("    Optional parameters:"); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -F        \tSpecify the format of the annotation file. Acceptable formats");
-        SUBREADputs("              \tinclude `GTF' and `SAF'. `GTF' by default. Please refer to the");
-        SUBREADputs("              \tusers guide for SAF annotation format."); 
+	SUBREADputs("              \tinclude `GTF' and `SAF'. `GTF' by default. Please refer to the");
+	SUBREADputs("              \tusers guide for SAF annotation format."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -t <input>\tSpecify the feature type. Only rows which have the matched"); 
+	SUBREADputs("              \tmatched feature type in the provided GTF annotation file"); 
+	SUBREADputs("              \t will be included for read counting. `exon' by default."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -g <input>\tSpecify the attribute type used to group features (eg. exons)");
+	SUBREADputs("              \tinto meta-features (eg. genes), when GTF annotation is provided.");
+	SUBREADputs("              \t`gene_id' by default. This attribute type is usually the gene");
+	SUBREADputs("              \tidentifier. This attribute type is usually the gene");
+	SUBREADputs("              \tidentifier. This argument is useful for the meta-feature level");
+	SUBREADputs("              \tsummarization.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -b        \tIndicate that the input file is in BAM format."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -f        \tIf specified, read summarization will be performed at the "); 
 	SUBREADputs("              \tfeature level. By default (-f is not specified), the read"); 
 	SUBREADputs("              \tsummarization is performed at the meta-feature level."); 
-	SUBREADputs("    "); 
-	SUBREADputs("    -t <input>\tSpecify the feature type. Only rows which have the matched"); 
-	SUBREADputs("              \tmatched feature type in the provided GTF annotation file"); 
-	SUBREADputs("              \t will be included for read counting. `exon' by default."); 
-	SUBREADputs("    "); 
-	SUBREADputs("    -g <input>\tSpecify the attribute type in the provided GTF annotation."); 
-	SUBREADputs("              \tThe attribute type will be used to group features (eg. exons)"); 
-	SUBREADputs("              \tinto meta-features (eg. genes). `gene_id' by default."); 
-	//getopt_long (argc, argv, "T:i:o:a:d:D:pbF:fsCBPOR?", long_options, &option_index)) != -1)
 	SUBREADputs("    "); 
 	SUBREADputs("    -O        \tIf specified, reads (or fragments if -p is specified) will"); 
 	SUBREADputs("              \tbe allowed to be assigned to more than one matched meta-"); 
@@ -1531,7 +1535,6 @@ int feature_count_main(int argc, char ** argv)
 
 	if(sam_name[0]==0||out_name[0]==0 || annot_name[0]==0)
 	{
-		SUBREADprintf("The input file, out put file and annotation file must be specified.\n");
 		print_usage();
 		return -1;
 	}
