@@ -1024,9 +1024,9 @@ void print_usage()
 	SUBREADputs("              \tdistance thresholds should be specified using -d and -D "); 
 	SUBREADputs("              \toptions."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -d <int>  \tMinimal allowed paired-end distance. 1 by default."); 
+	SUBREADputs("    -d <int>  \tMinimal allowed paired-end distance. 50 by default."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -D <int>  \tMaximal allowed paired-end distance. 2000 by default."); 
+	SUBREADputs("    -D <int>  \tMaximal allowed paired-end distance. 600 by default."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -B        \tIf specified, only fragments that have both ends "); 
 	SUBREADputs("              \tsuccessfully aligned will be considered for summarization."); 
@@ -1410,8 +1410,8 @@ int feature_count_main(int argc, char ** argv)
 	char annot_name[300];
 	char sam_name[300];
 	char out_name[300];
-	int min_dist = 1;
-	int max_dist = 2000;
+	int min_dist = 50;
+	int max_dist = 600;
 	char min_dist_str[11];
 	char max_dist_str[11];
 	int is_PE = 0;
