@@ -678,16 +678,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			for(xk1 = 0; xk1 < decision_table_items; xk1++)
 			{
 				if(decision_table_votes[xk1] > max_votes)
-					max_votes = decision_table_votes[xk1];
-			}
-
-			for(xk1 = 0; xk1 < decision_table_items; xk1++)
-			{
-				if(decision_table_votes[xk1] == max_votes)
 				{
-					top_voters ++;
+					max_votes = decision_table_votes[xk1];
+					top_voters = 1;
 					top_voter_id = (global_context -> is_gene_level)?decision_table_exon_ids[xk1]:decision_table_ids[xk1];
 				}
+				else
+					if(decision_table_votes[xk1] == max_votes) top_voters++;
 			}
 
 			if(top_voters == 1)
