@@ -89,6 +89,8 @@ typedef struct
 	char ** exontable_chr;
 	long * exontable_start;
 	long * exontable_stop;
+	char feature_name_column[66];
+	char gene_id_column[66];
 
 	long * exontable_block_end_index;
 	long * exontable_block_max_end;
@@ -110,7 +112,7 @@ unsigned int tick_time = 1000;
 // Memory will be allowcated in this function. The pointer is saved in *loaded_features.
 // The invoker must release the memory itself.
 
-int load_feature_info(const char * annotation_file, int file_type, fc_feature_info_t ** loaded_features)
+int load_feature_info(fc_thread_global_context_t *global_context, const char * annotation_file, int file_type, fc_feature_info_t ** loaded_features)
 {
 	unsigned int features = 0, xk1 = 0;
 	char * file_line = malloc(MAX_LINE_LENGTH);
@@ -129,7 +131,7 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 			strtok_r(file_line,"\t",&token_temp);
 			strtok_r(NULL,"\t", &token_temp);
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);
-			if(strcmp(feature_type, "exon")==0)
+			if(strcmp(feature_type, global_context -> feature_name_column)==0)
 				features++;
 		}
 		else
@@ -173,7 +175,7 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 
 			strtok_r(NULL,"\t", &token_temp);// source
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);// feature_type
-			if(strcmp(feature_type, "exon")==0)
+			if(strcmp(feature_type, global_context -> feature_name_column)==0)
 			{
 				ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
 				ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
@@ -184,7 +186,6 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 				char * extra_attrs = strtok_r(NULL,"\t",&token_temp);	// name_1 "val1"; name_2 "val2"; ... 
 				if(extra_attrs && (strlen(extra_attrs)>6))
 				{
-					#define FC_GTF_GENE_ID_NAME	"gene_id"
 					int attr_state = 0;	// 0: name; 1:value
 					int name_start = 0;
 					int val_start = 0;
@@ -201,7 +202,7 @@ int load_feature_info(const char * annotation_file, int file_type, fc_feature_in
 							if(attr_state == 0){
 								val_start = xk2 + 1;
 								extra_attrs[xk2 - 1] = 0;
-								if(strcmp(extra_attrs + name_start, FC_GTF_GENE_ID_NAME)==0)
+								if(strcmp(extra_attrs + name_start, global_context -> gene_id_column)==0)
 									is_gene_id = 1;
 							}
 							else if(attr_state == 1)
@@ -821,7 +822,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column)
 {
 
 	global_context -> input_buffer_max_size = buffer_size;
@@ -833,6 +834,8 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_both_end_required = is_both_end_required;
 	global_context -> is_chimertc_disallowed = is_chimertc_disallowed;
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
+	strcpy(global_context -> feature_name_column,feature_name_column);
+	strcpy(global_context -> gene_id_column,gene_id_column);
 
 	if(is_sam_out)
 	{
@@ -988,18 +991,29 @@ void print_usage()
 	SUBREADputs("              "); 
 	SUBREADputs("    -o <input>\tGive the name of the output file. The output file contains"); 
 	SUBREADputs("              \tthe number of reads assigned to each meta-feature (or each"); 
-	SUBREADputs("              \tfeature if -f is specified)."); 
+	SUBREADputs("              \tfeature if -f is specified). A meta-feature is the aggregation");
+	SUBREADputs("              \tof features, grouped by using gene identifiers. Please refer");
+	SUBREADputs("              \tto the users guide for more details."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional parameters:"); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -F        \tSpecify the format of the annotation file. Acceptable "); 
-	SUBREADputs("              \tformats include `GTF' and `SAF'. `GTF' by default."); 
+	SUBREADputs("    -F        \tSpecify the format of the annotation file. Acceptable formats");
+        SUBREADputs("              \tinclude `GTF' and `SAF'. `GTF' by default. Please refer to the");
+        SUBREADputs("              \tusers guide for SAF annotation format."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -b        \tIndicate that the input file is in BAM format."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -f        \tIf specified, read summarization will be performed at the "); 
 	SUBREADputs("              \tfeature level. By default (-f is not specified), the read"); 
 	SUBREADputs("              \tsummarization is performed at the meta-feature level."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -t <input>\tSpecify the feature type. Only rows which have the matched"); 
+	SUBREADputs("              \tmatched feature type in the provided GTF annotation file"); 
+	SUBREADputs("              \t will be included for read counting. `exon' by default."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -g <input>\tSpecify the attribute type in the provided GTF annotation."); 
+	SUBREADputs("              \tThe attribute type will be used to group features (eg. exons)"); 
+	SUBREADputs("              \tinto meta-features (eg. genes). `gene_id' by default."); 
 	//getopt_long (argc, argv, "T:i:o:a:d:D:pbF:fsCBPOR?", long_options, &option_index)) != -1)
 	SUBREADputs("    "); 
 	SUBREADputs("    -O        \tIf specified, reads (or fragments if -p is specified) will"); 
@@ -1067,6 +1081,8 @@ int readSummary(int argc,char *argv[]){
 	14: as.numeric(isBothEndMapped)
 	15: as.numeric(isChimericDisallowed)
 	16: as.numeric(isPEDistChecked)
+	17: nameFeatureTypeColumn 
+	18: nameGeneIDColumn
 	 */
 
 	FILE *fp_in = NULL;
@@ -1076,7 +1092,7 @@ int readSummary(int argc,char *argv[]){
 	long *start, *stop;
 	int *geneid, *nreads;
 
-	char * line = NULL;
+	char * line = NULL, *nameFeatureTypeColumn, *nameGeneIDColumn;
 	long nexons;
 
 
@@ -1134,6 +1150,12 @@ int readSummary(int argc,char *argv[]){
 	if(argc > 16)
 		isPEDistChecked = atoi(argv[16]);
 	else	isPEDistChecked = 0;
+	if(argc > 17)
+		nameFeatureTypeColumn = argv[17];
+	else	nameFeatureTypeColumn = "exon";
+	if(argc > 18)
+		nameGeneIDColumn = argv[18];
+	else	nameGeneIDColumn = "gene_id";
 
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
@@ -1168,18 +1190,18 @@ int readSummary(int argc,char *argv[]){
 	}
 
 
+	fc_thread_global_context_t global_context;
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn);
+
+
 	// Loading the annotations.
 	// Nothing is done if the annotation does not exist.
 	fc_feature_info_t * loaded_features;
-	nexons = load_feature_info(argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
+	nexons = load_feature_info(&global_context, argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
 		SUBREADprintf("Failed to open the annotation file %s\n",argv[1]);
 		return -1;
 	}
-
-
-	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked);
 
 	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &nchr, &anno_chr_2ch, &anno_chrs, &anno_chr_head, & block_end_index, & block_min_start, & block_max_end);
 	nreads = (int *) calloc(nexons,sizeof(int));
@@ -1407,10 +1429,12 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[17];
+	char * Rargv[19];
 	char annot_name[300];
 	char sam_name[300];
 	char out_name[300];
+	char nameFeatureTypeColumn[66];
+	char nameGeneIDColumn[66];
 	int min_dist = 50;
 	int max_dist = 600;
 	char min_dist_str[11];
@@ -1430,14 +1454,22 @@ int feature_count_main(int argc, char ** argv)
 	int option_index = 0;
 	int c;
 
+	strcpy(nameFeatureTypeColumn,"exon");
+	strcpy(nameGeneIDColumn,"gene_id");
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "T:i:o:a:d:D:pbF:fsCBPORv?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:pbF:fsCBPORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'v':
 				print_version_info();
 				return 0;
+				break;
+			case 't':
+				strcpy(nameFeatureTypeColumn, optarg);
+				break;
+			case 'g':
+				strcpy(nameGeneIDColumn, optarg);
 				break;
 			case 'T':
 				threads = atoi(optarg);
@@ -1524,7 +1556,9 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[14] = is_Both_End_Mapped?"1":"0";
 	Rargv[15] = is_Chimeric_Disallowed?"1":"0";
 	Rargv[16] = is_PE_Dist_Checked?"1":"0";
-	readSummary(17, Rargv);
+	Rargv[17] = nameFeatureTypeColumn;
+	Rargv[18] = nameGeneIDColumn;
+	readSummary(19, Rargv);
 	return 0;
 }
 
