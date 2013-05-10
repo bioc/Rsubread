@@ -1,4 +1,4 @@
-featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=10,max.distance=2000,countChimericFragments=TRUE)
+featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
 {
 	flag <- FALSE
 

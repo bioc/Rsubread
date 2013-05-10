@@ -3,7 +3,7 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=10,max.distance=2000,countChimericFragments=TRUE)
+featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM format files.}
@@ -18,8 +18,8 @@ featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (two reads are generated from each fragment in paired-end data) will be counted rather than individual reads. \code{FALSE} by default.}
   \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   \item{checkPairedEndDistance}{ logical indicating if the two ends from the same fragment are required to satisify the paired-end distance criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. Paired-end distance criteria are specified via \code{min.distance} and \code{max.distance}.}
-  \item{min.distance}{ \code{integer} giving the minimal allowable fragment/template length. \code{10} by default.}
-  \item{max.distance}{ \code{integer} giving the maximal allowable fragment/template length. \code{2000} by default. \code{min.distance} and \code{max.distance} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a template spans two or more exons, the mapping locations of the pair of reads sequenced from this template may have a distance much larger than the nominal template length.}
+  \item{min.distance}{ \code{integer} giving the minimal allowable distance for paired-end reads. \code{50} by default. The paired-end distance used here is the distance between the leftmost base of the left side read and the leftmost base of the right side read.}
+  \item{max.distance}{ \code{integer} giving the maximal allowable distance for paired-end reads. \code{600} by default. \code{min.distance} and \code{max.distance} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a template spans two or more exons, the mapping locations of the pair of reads sequenced from this template may have a distance much larger than the nominal template length.}
   \item{countChimericFragments}{ logical indicating whether a chimeric fragment, which has its two reads mapped to different chromosomes, should be counted or not. If this fragment overlaps with only one feature (or one meta-feature), typically by one of its two read, this fragment will be assigned to that feature (or meta-feature). If it is found to overlap more than one feature (or meta-feature), for example one of its two reads overlaps meta-feature A and the other overlaps meta-feature B, and \code{allowMultiOverlap} is \code{FALSE}, then this fragment will not be counted. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   }
 \details{
@@ -70,7 +70,7 @@ Note that the chromosomal names included in the \code{Chr} column must match the
  
 When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, the fragments (not reads) will be counted for each feature.
 For RNA-seq data, the distance between the mapping locations of the pair of reads sequenced from the same fragment could be much greater than the fragment length when the fragment spans two or more exons.
-Such fragments can be counted when a large value of the argument \code{max.distance} is used (\code{2000} by default).
+Such fragments can be counted when a large value of the argument \code{max.distance} is used.
 Note that the Subread (\code{\link{align}}) and Subjunc (\code{\link{subjunc}}) aligners can report the mapping coordinates of the paired-end reads even when the two reads have a mapping distance much larger than the nominal fragment length.
  
 }
@@ -98,8 +98,8 @@ reads <- system.file("extdata","reads.txt",package="Rsubread")
 align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.SAM")
 
 # assign mapped reads to dummy features
-dummy_features <- data.frame(GeneID=1:5,Chr="chr_dummy",Start=c(1,2000,5000,20000,50000),End=c(1,2000,5000,20000,50000)+1000,stringsAsFactors=FALSE)
-fc <- featureCounts("Rsubread_alignment.SAM",feature.type="other",annot=dummy_features)
+dummy_features <- data.frame(GeneID=1:5,Chr="chr_dummy",Start=c(1,2000,5000,20000,50000),End=c(1,2000,5000,20000,50000)+1000,Strand="+",stringsAsFactors=FALSE)
+fc <- featureCounts(files="Rsubread_alignment.SAM",annot=dummy_features)
 fc
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
