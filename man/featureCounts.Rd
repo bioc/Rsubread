@@ -3,7 +3,7 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
+featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM format files.}
@@ -11,6 +11,8 @@ featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=
   \item{annot}{ a data frame containing annotation information. When \code{annot} is \code{NULL}, an in-built annotation file will be used. \code{NULL} by default.}
   \item{genome}{ a character string specifying the reference genome to which the sequencing reads were mapped. It has the values of \code{mm9}, \code{mm10} and \code{hg}, corresponding to mouse genome build `mm9', mouse genome build `mm10' and human genome build `hg19', respectively. \code{mm9} by default. This argument is only applicable when \code{annot} is \code{NULL}.}
   \item{isGTFAnnotationFile}{ logical indicating if the annotation file provided via \code{annot} is in GTF format. \code{FALSE} by default. If \code{isGTFAnnotationFile} is \code{TRUE}, a GTF format annotation file must be provided via \code{annot} argument.}
+  \item{GTF.featureType}{ a character string giving the feature type. Only rows which have the matched feature type in the provided GTF annotation file will be included for read counting. \code{exon} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
+  \item{GTF.attrType}{ a character string giving the attribute type (in the GTF annotation) which will be used to group features (eg. exons) into meta-features (eg. genes). \code{gene_id} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. This attribute type is usually the gene identifier.}
   \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features using their values in the ``GeneID" column or using the ``gene_id" attribute in the GTF-format annotation file, and reads will assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
