@@ -1027,7 +1027,7 @@ void print_usage()
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional parameters:"); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -F        \tSpecify the format of the annotation file. Acceptable formats");
+	SUBREADputs("    -F <input>\tSpecify the format of the annotation file. Acceptable formats");
 	SUBREADputs("              \tinclude `GTF' and `SAF'. `GTF' by default. Please refer to the");
 	SUBREADputs("              \tusers guide for SAF annotation format."); 
 	SUBREADputs("    "); 
