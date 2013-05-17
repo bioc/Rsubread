@@ -345,7 +345,7 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 
 			if((*chro_number)>=FC_MAX_CHROMOSOME_NUMBER - 1)
 			{
-				SUBREADPrintf("WARNING: There are too many chromosomes in the annotations. The remainder of the annotation file is ignored\n");
+				SUBREADprintf("WARNING: There are too many chromosomes in the annotations. The remainder of the annotation file is ignored\n");
 				break;
 			}
 
