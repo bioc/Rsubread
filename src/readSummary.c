@@ -107,6 +107,15 @@ typedef struct
 unsigned int tick_time = 1000;
 
 
+int is_comment_line(const char * l, int file_type)
+{
+	int tabs = 0, xk1 = 0;
+	if(l[0]=='#') return 1;
+	while(l[xk1]) tabs += (l[xk1++] == '\t');
+
+	return tabs < (file_type == FILE_TYPE_GTF?8:4);
+}
+
 // This function loads annotations from the file.
 // It returns the number of featres loaded, or -1 if something is wrong. 
 // Memory will be allowcated in this function. The pointer is saved in *loaded_features.
@@ -115,8 +124,9 @@ unsigned int tick_time = 1000;
 int load_feature_info(fc_thread_global_context_t *global_context, const char * annotation_file, int file_type, fc_feature_info_t ** loaded_features)
 {
 	unsigned int features = 0, xk1 = 0;
-	char * file_line = malloc(MAX_LINE_LENGTH);
+	char * file_line = malloc(MAX_LINE_LENGTH+1);
 	FILE * fp = fopen(annotation_file,"r"); 
+	int is_GFF_warned = 0;
 	if(!fp) return -1;
 	if(file_type == FILE_TYPE_RSUBREAD)
 		fgets(file_line, MAX_LINE_LENGTH, fp);
@@ -125,6 +135,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	{
 		char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
 		if(!fgets_ret) break;
+		if(is_comment_line(file_line, file_type))continue;
 		if(file_type == FILE_TYPE_GTF)
 		{
 			char * token_temp;
@@ -144,10 +155,14 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 	fc_feature_info_t * ret_features = malloc(sizeof(fc_feature_info_t) * features);
 
+	int lineno = 0;
 	while(xk1 < features)
 	{
+		int is_gene_id_found = 0;
 		fgets(file_line, MAX_LINE_LENGTH, fp);
+		lineno++;
 		char * token_temp;
+		if(is_comment_line(file_line, file_type))continue;
 
 		if(file_type == FILE_TYPE_RSUBREAD)
 		{
@@ -165,11 +180,12 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			else
 				ret_features[xk1].is_negative_strand = ('-' ==strand_str[0]);
 			ret_features[xk1].sorted_order = xk1;
+			is_gene_id_found = 1;
 			xk1++;
 		}
 		else if(file_type == FILE_TYPE_GTF)
 		{
-			sprintf((char *)ret_features[xk1].feature_name, "UK%06u", xk1 + 1);
+			sprintf((char *)ret_features[xk1].feature_name, "LINE_%07u", xk1 + 1);
 			char * seq_name = strtok_r(file_line,"\t",&token_temp);
 			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
 
@@ -179,6 +195,10 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			{
 				ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
 				ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
+
+				if(ret_features[xk1].start < 1 || ret_features[xk1].end<1 || ret_features[xk1].start >= ret_features[xk1].end)
+					SUBREADprintf("WARNING: the feature on the %d-th line has zero coordinate or zero lengths\n", lineno);
+
 				strtok_r(NULL,"\t", &token_temp);// score 
 				ret_features[xk1].is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
 				ret_features[xk1].sorted_order = xk1;
@@ -196,6 +216,8 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 						exch = extra_attrs[xk2];
 						if(exch == ' ' && attr_state == 0)
 							continue;
+						else if(exch == '#' && attr_state == 0)
+							break;
 						else if(exch == '\"')
 						{
 							if(xk2<1) break;
@@ -213,6 +235,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 									strncpy((char *)ret_features[xk1].feature_name, extra_attrs + val_start, FEATURE_NAME_LENGTH);
 									//printf("N=%s\n", ret_features[xk1].feature_name);
 									is_gene_id = 2;
+									is_gene_id_found = 1;
 									break;
 								}
 								is_gene_id = 0 ;
@@ -228,8 +251,16 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				xk1++;
 			}
 		}
+
+		if(!is_gene_id_found)
+		{
+			if(!is_GFF_warned)
+				SUBREADprintf("**********\n**********\n  WARNING\n**********\nNo meta-feature id is found on the %d-th line. If it is a GTF file, you may need to check the name of the gene_id field and specify a correct field name using a '-g' option.\n**********\n**********\n", lineno);
+			is_GFF_warned++;
+		}
 	}
 	fclose(fp);
+	free(file_line);
 
 	(*loaded_features) = ret_features;
 	SUBREADprintf("There are %d features loaded from the annotation file.\n", features);
@@ -509,7 +540,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			if(last_chr_chr != global_context -> exontable_anno_chr_2ch[search_item_id*2+1]||second_chr_chr != global_context -> exontable_anno_chr_2ch[search_item_id*2])
 				continue;
 
-			if(strcmp(read_chr,global_context -> exontable_anno_chrs[search_item_id])==0){
+			if(memcmp(read_chr,global_context -> exontable_anno_chrs[search_item_id], chro_name_len+1)==0){
 				//get chr to which the current read or fragment is mapped and also the searching range
 				is_chro_found = 1;
 				search_start = global_context -> exontable_anno_chr_heads[search_item_id];
@@ -1007,7 +1038,6 @@ void print_usage()
 	SUBREADputs("    -g <input>\tSpecify the attribute type used to group features (eg. exons)");
 	SUBREADputs("              \tinto meta-features (eg. genes), when GTF annotation is provided.");
 	SUBREADputs("              \t`gene_id' by default. This attribute type is usually the gene");
-	SUBREADputs("              \tidentifier. This attribute type is usually the gene");
 	SUBREADputs("              \tidentifier. This argument is useful for the meta-feature level");
 	SUBREADputs("              \tsummarization.");
 	SUBREADputs("    "); 
@@ -1177,7 +1207,7 @@ int readSummary(int argc,char *argv[]){
 			fp_in = fopen(argv[2],"r");
 		#endif
 		if(!fp_in){
-			SUBREADprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+			SUBREADprintf("Failed to open file %s. Please check if the file name is correct and it is a SAM file.\n", argv[2]); 
 			return -1;
 		}
 	}
@@ -1185,7 +1215,7 @@ int readSummary(int argc,char *argv[]){
 	{
 		fp_in_bam = SamBam_fopen(argv[2], SAMBAM_FILE_BAM);
 		if(!fp_in_bam){
-			SUBREADprintf("Failed to open file %s. Please check if the file name and specified file type are correct.\n", argv[2]); 
+			SUBREADprintf("Failed to open file %s. Please check if the file name is correct and it is a BAM file.\n", argv[2]); 
 			return -1;
 		}
 	}
@@ -1200,7 +1230,7 @@ int readSummary(int argc,char *argv[]){
 	fc_feature_info_t * loaded_features;
 	nexons = load_feature_info(&global_context, argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
-		SUBREADprintf("Failed to open the annotation file %s\n",argv[1]);
+		SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect.\n",argv[1]);
 		return -1;
 	}
 
