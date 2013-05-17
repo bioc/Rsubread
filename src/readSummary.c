@@ -342,6 +342,13 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 			unsigned char * current_chro = loaded_features[chro_pnt].chro;
 			unsigned int xk1;
 			// aggregate all features belonging to this chromosome.
+
+			if((*chro_number)>=FC_MAX_CHROMOSOME_NUMBER - 1)
+			{
+				SUBREADPrintf("WARNING: There are too many chromosomes in the annotations. The remainder of the annotation file is ignored\n");
+				break;
+			}
+
 			this_chro_start = ret_array_pointer;
 			(*anno_chrs) [(*chro_number)] = (char *)current_chro;
 			int chro_name_len = strlen((char *)current_chro);
