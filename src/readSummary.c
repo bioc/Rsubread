@@ -1230,7 +1230,7 @@ int readSummary(int argc,char *argv[]){
 	fc_feature_info_t * loaded_features;
 	nexons = load_feature_info(&global_context, argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
-		SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect.\n",argv[1]);
+		SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect, or it contains no '%s' features.\n",argv[1], nameFeatureTypeColumn);
 		return -1;
 	}
 
