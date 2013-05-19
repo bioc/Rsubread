@@ -249,14 +249,14 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 					}
 				}
 				xk1++;
-			}
-		}
 
-		if(!is_gene_id_found)
-		{
-			if(!is_GFF_warned)
-				SUBREADprintf("**********\n**********\n  WARNING\n**********\nNo meta-feature id is found on the %d-th line. If it is a GTF file, you may need to check the name of the gene_id field and specify a correct field name using a '-g' option.\n**********\n**********\n", lineno);
-			is_GFF_warned++;
+				if(!is_gene_id_found)
+				{
+					if(!is_GFF_warned)
+						SUBREADprintf("**********\n**********\n  WARNING\n**********\nNo meta-feature id is found on the %d-th line. If it is a GTF file, you may need to check the name of the gene_id field and specify a correct field name using a '-g' option.\n**********\n**********\n", lineno);
+					is_GFF_warned++;
+				}
+			}
 		}
 	}
 	fclose(fp);
@@ -468,7 +468,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		char * line = is_second_read? thread_context -> line_buffer2:thread_context -> line_buffer1;
 	
 		read_name = strtok_r(line,"\t", &tmp_tok_ptr);	// read name
-		alignment_masks = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
+		char * mask_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
+		if(!mask_str) return;
+
+		alignment_masks = atoi(mask_str);
 
 		if(is_second_read == 0)
 		{
@@ -486,9 +489,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 
 		read_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		read_pos = atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));
+		char * read_pos_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
+		if((!read_chr) || !(read_pos_str)) return;
+
+		read_pos = atoi(read_pos_str);
 		strtok_r(NULL,"\t", &tmp_tok_ptr);	// mapping quality
 		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// CIGAR string
+		if(!CIGAR_str) return;
 
 		if(is_second_read == 0 && global_context -> is_paired_end_data && 
 	   	  (global_context -> is_PE_distance_checked || global_context -> is_chimertc_disallowed)
@@ -499,8 +506,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			if(!is_half_mapped)
 			{
 				char * mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
-				atoi(strtok_r(NULL,"\t", &tmp_tok_ptr));	// mate_pos
+				strtok_r(NULL,"\t", &tmp_tok_ptr);	// mate_pos
 				char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
+				if((!frag_len_str)||(!mate_chr))return;
+
 				fragment_length = abs(atoi(frag_len_str)); //get the fragment length
 
 
