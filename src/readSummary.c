@@ -127,6 +127,33 @@ int fc_strcmp(const void * s1, const void * s2)
 }
 
 
+int fc_strcmp_chro(const void * s1, const void * s2)
+{
+
+//	// we can compare the 3-th and 4-th bytes because we know that the buffers have enough lengths.
+//	if(((char *)s1)[4] != ((char *)s2)[4] || ((char *)s1)[3] != ((char *)s2)[3] )
+//		return 1;
+	return strcmp((char*)s1, (char*)s2);
+}
+
+
+
+unsigned long fc_chro_hash(const void *key) {
+	const unsigned char *str = (const unsigned char *) key;
+
+	int xk1;
+	unsigned long hashValue = 0;
+
+	for(xk1=0; str[xk1]; xk1++)
+	{
+		unsigned long ch = str[xk1];
+		hashValue += (ch + xk1) << (ch & 0xf);
+	}
+		
+
+	return hashValue;
+}
+
 
 int is_comment_line(const char * l, int file_type)
 {
@@ -150,9 +177,9 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	int is_GFF_warned = 0;
 	if(!fp) return -1;
 
-	HashTable * chro_name_table = HashTableCreate(1000);
-	HashTableSetHashFunction(chro_name_table, HashTableStringHashFunction);
-	HashTableSetKeyComparisonFunction(chro_name_table, fc_strcmp);
+	HashTable * chro_name_table = HashTableCreate(1603);
+	HashTableSetHashFunction(chro_name_table, fc_chro_hash);
+	HashTableSetKeyComparisonFunction(chro_name_table, fc_strcmp_chro);
 
 
 	if(file_type == FILE_TYPE_RSUBREAD)
