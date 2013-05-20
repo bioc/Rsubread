@@ -581,6 +581,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		strtok_r(NULL,"\t", &tmp_tok_ptr);	// mapping quality
 		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// CIGAR string
+		if((!CIGAR_str) || !isdigit(CIGAR_str[0]))
+			return;
 
 		if(is_second_read == 0 && global_context -> is_paired_end_data && 
 	   	  (global_context -> is_PE_distance_checked || global_context -> is_chimertc_disallowed)
