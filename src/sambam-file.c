@@ -199,6 +199,7 @@ void SamBam_fclose(SamBam_FILE * fp)
 	else
 	{
 		gzclose(fp->gz_file);
+		free(fp -> bam_chro_table);
 		free(fp);
 	}
 }
@@ -217,6 +218,7 @@ void SamBam_read_ref_info(SamBam_FILE * ret)
 	unsigned int ref_info_size = gzread_B32(ret -> gz_file);
 
 	int xk1;
+	ret -> bam_chro_table = malloc(sizeof(SamBam_Reference_Info) * ref_info_size);
 	for(xk1=0;xk1<ref_info_size;xk1++)
 	{
 		int ref_name_len = gzread_B32(ret -> gz_file);
@@ -230,10 +232,7 @@ void SamBam_read_ref_info(SamBam_FILE * ret)
 
 		ret -> bam_chro_table[xk1].chro_length = gzread_B32(ret -> gz_file);
 
-
 		//printf("CHRO[%d] : %s [%d]\n", xk1+1, ret -> bam_chro_table[xk1].chro_name , ret -> bam_chro_table[xk1].chro_length);
-		if(xk1 >= BAM_MAX_CHROMOSOME_NUMBER)
-			SUBREADprintf("WARNING: There are too many reference sequences in the BAM file!\n"); 
 	}
 	ret ->bam_chro_table_size = ref_info_size;
 }

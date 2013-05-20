@@ -6,7 +6,6 @@ typedef unsigned short BS_uint_16;
 typedef unsigned int BS_uint_32;
 
 #define BAM_MAX_CHROMOSOME_NAME_LEN 256 
-#define BAM_MAX_CHROMOSOME_NUMBER 1024
 #define BAM_MAX_CIGAR_LEN 64
 #define BAM_MAX_READ_NAME_LEN 256
 #define BAM_MAX_READ_LEN 3000
@@ -54,7 +53,7 @@ typedef struct
 	int file_type;
 	int bam_file_stage;
 	unsigned long long bam_file_next_section_start;
-	SamBam_Reference_Info bam_chro_table[BAM_MAX_CHROMOSOME_NUMBER];
+	SamBam_Reference_Info * bam_chro_table;
 	int bam_chro_table_size;
 	SamBam_Alignment aln_buff;
 } SamBam_FILE;

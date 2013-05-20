@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
+
 
 #ifndef MAKE_STANDALONE
   #include <R.h>
@@ -60,6 +62,14 @@ typedef struct
 	pthread_spinlock_t input_buffer_lock;
 } fc_thread_thread_context_t;
 
+typedef struct
+{
+	unsigned int chro_number;
+	unsigned int chro_features;
+	unsigned int chro_feature_table_start;
+	unsigned int chro_block_table_start;
+	unsigned int chro_block_table_end;
+} fc_chromosome_index_info;
 
 typedef struct
 {
@@ -82,6 +92,8 @@ typedef struct
 
 	HashTable * gene_name_table;	// gene_name -> gene_internal_number
 	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
+
+	HashTable * exontable_chro_table;	// gene_name -> gene_internal_number
 	int exontable_nchrs;
 	int exontable_exons;
 	int * exontable_geneid;
@@ -107,13 +119,22 @@ typedef struct
 unsigned int tick_time = 1000;
 
 
+
+
+int fc_strcmp(const void * s1, const void * s2)
+{
+	return strcmp((char*)s1, (char*)s2);
+}
+
+
+
 int is_comment_line(const char * l, int file_type)
 {
 	int tabs = 0, xk1 = 0;
 	if(l[0]=='#') return 1;
 	while(l[xk1]) tabs += (l[xk1++] == '\t');
 
-	return tabs < (file_type == FILE_TYPE_GTF?8:4);
+	return tabs < ((file_type == FILE_TYPE_GTF)?8:4);
 }
 
 // This function loads annotations from the file.
@@ -128,25 +149,55 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	FILE * fp = fopen(annotation_file,"r"); 
 	int is_GFF_warned = 0;
 	if(!fp) return -1;
+
+	HashTable * chro_name_table = HashTableCreate(1000);
+	HashTableSetHashFunction(chro_name_table, HashTableStringHashFunction);
+	HashTableSetKeyComparisonFunction(chro_name_table, fc_strcmp);
+
+
 	if(file_type == FILE_TYPE_RSUBREAD)
 		fgets(file_line, MAX_LINE_LENGTH, fp);
 
 	while(1)
 	{
 		char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
+		char * token_temp, *chro_name;
+		fc_chromosome_index_info * chro_stab;
+
 		if(!fgets_ret) break;
 		if(is_comment_line(file_line, file_type))continue;
 		if(file_type == FILE_TYPE_GTF)
 		{
-			char * token_temp;
-			strtok_r(file_line,"\t",&token_temp);
+			chro_name = strtok_r(file_line,"\t",&token_temp);
 			strtok_r(NULL,"\t", &token_temp);
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);
 			if(strcmp(feature_type, global_context -> feature_name_column)==0)
 				features++;
+			else chro_name = NULL;
 		}
 		else
+		{
+			strtok_r(file_line,"\t", &token_temp);
+			chro_name = strtok_r(NULL,"\t",&token_temp);
+
 			features++;
+		}
+
+		if(chro_name)
+		{
+			chro_stab = HashTableGet(chro_name_table, chro_name);
+
+			if(!chro_stab)
+			{
+				char * tmp_chro_name = malloc(CHROMOSOME_NAME_LENGTH);
+				strncpy(tmp_chro_name, chro_name, CHROMOSOME_NAME_LENGTH);
+				chro_stab = calloc(sizeof(fc_chromosome_index_info),1);
+				chro_stab -> chro_number = chro_name_table->numOfElements;
+				HashTablePut(chro_name_table, tmp_chro_name, chro_stab);
+			}
+
+			chro_stab -> chro_features ++;
+		}
 	}
 
 	fseek(fp,0,SEEK_SET);
@@ -167,10 +218,8 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 		if(file_type == FILE_TYPE_RSUBREAD)
 		{
 			char * feature_name = strtok_r(file_line,"\t",&token_temp);
-			if(!feature_name) break;
 			strncpy((char *)ret_features[xk1].feature_name, (char *)feature_name, FEATURE_NAME_LENGTH);
 			char * seq_name = strtok_r(NULL,"\t", &token_temp);
-			if(!seq_name) break;
 			strncpy((char *)ret_features[xk1].chro, (char *)seq_name, CHROMOSOME_NAME_LENGTH);
 			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
 			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
@@ -263,6 +312,9 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	free(file_line);
 
 	(*loaded_features) = ret_features;
+	global_context -> exontable_nchrs = (int)chro_name_table-> numOfElements;
+	global_context -> exontable_chro_table = chro_name_table;
+
 	SUBREADprintf("There are %d features loaded from the annotation file.\n", features);
 	return features;
 }
@@ -286,19 +338,12 @@ int find_or_insert_gene_name(fc_thread_global_context_t * global_context, unsign
 	}
 }
 
-int fc_strcmp(const void * s1, const void * s2)
-{
-	return strcmp((char*)s1, (char*)s2);
-}
-
-
 #define FC_FAST_BLOCK_SIZE 70
-#define FC_MAX_CHROMOSOME_NUMBER 500
 
-void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int features, fc_feature_info_t * loaded_features, char *** sorted_chr_names, int ** sorted_entrezid, long ** sorted_start, long ** sorted_end, unsigned char ** sorted_strand, int * chro_number, char ** anno_chr_2ch, char *** anno_chrs, long ** anno_chr_head, long ** block_end_index, long ** block_min_start_pos, long ** block_max_end_pos)
+void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int features, fc_feature_info_t * loaded_features, char *** sorted_chr_names, int ** sorted_entrezid, long ** sorted_start, long ** sorted_end, unsigned char ** sorted_strand, char ** anno_chr_2ch, char *** anno_chrs, long ** anno_chr_head, long ** block_end_index, long ** block_min_start_pos, long ** block_max_end_pos)
 {
 	unsigned int chro_pnt;
-	unsigned char * is_chro_name_explored = malloc(features);
+	unsigned int xk1;
 	int * ret_entrez = malloc(sizeof(int) * features);
 	long * ret_start = malloc(sizeof(long) * features);
 	long * ret_end = malloc(sizeof(long) * features);
@@ -308,22 +353,46 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 	unsigned char * ret_strand = malloc(features);
 	char ** ret_char_name = malloc(sizeof(void *) * features);
 	fc_feature_info_t ** old_info_ptr = malloc(sizeof(void *) * features);
-	(*anno_chrs) = malloc(sizeof(void *) * FC_MAX_CHROMOSOME_NUMBER);
-	(*anno_chr_head) = malloc(sizeof(long) * FC_MAX_CHROMOSOME_NUMBER);
-	(*anno_chr_2ch) = malloc(sizeof(char) * FC_MAX_CHROMOSOME_NUMBER*2); 
+	(*anno_chrs) = malloc(sizeof(void *) * global_context -> exontable_nchrs);
+	(*anno_chr_head) = malloc(sizeof(long) * global_context -> exontable_nchrs);
+	(*anno_chr_2ch) = malloc(sizeof(char) * global_context -> exontable_nchrs*2); 
+	unsigned int * chro_feature_ptr = calloc(sizeof(int) * global_context -> exontable_nchrs,1);
+	fc_chromosome_index_info ** tmp_chro_info_ptrs = malloc(global_context -> exontable_nchrs * sizeof(fc_chromosome_index_info *));
 
 	global_context -> gene_name_array = malloc(sizeof(char *) * features);	// there should be much less identical names.
 	global_context -> gene_name_table = HashTableCreate(5000);
 	HashTableSetHashFunction(global_context -> gene_name_table, HashTableStringHashFunction);
 	HashTableSetKeyComparisonFunction(global_context -> gene_name_table, fc_strcmp);
 
+	// init start positions of each chromosome block.
+	if(1)
+	{
+		KeyValuePair * cursor;
+		int bucket;
+		unsigned int sum_ptr = 0;
+		for(bucket=0; bucket < global_context -> exontable_chro_table  -> numOfBuckets; bucket++)
+		{
+			cursor = global_context -> exontable_chro_table -> bucketArray[bucket];
+			while (1)
+			{
+				if (!cursor) break;
+				fc_chromosome_index_info * tmp_chro_inf = cursor -> value;
+				cursor = cursor->next;
+				chro_feature_ptr [tmp_chro_inf -> chro_number] = tmp_chro_inf -> chro_features;
+				tmp_chro_info_ptrs[tmp_chro_inf -> chro_number] = tmp_chro_inf;
+			}
+		}
 
-	unsigned int this_chro_start = 0;
-	unsigned int this_chro_end = 0;
-	unsigned int ret_array_pointer = 0;
-	int current_block_id = 0;
+		for(xk1 = 0; xk1 < global_context -> exontable_nchrs; xk1++)
+		{
+			unsigned int tmpv = chro_feature_ptr[xk1];
+			chro_feature_ptr[xk1] = sum_ptr;
+			tmp_chro_info_ptrs[xk1] -> chro_feature_table_start = sum_ptr;
+			sum_ptr += tmpv;
+		}
 
-	memset(is_chro_name_explored, 0 , features);
+	}
+	int current_block_id = 0, sort_i = 0;
 
 	(*sorted_chr_names) = ret_char_name;
 	(*sorted_entrezid) = ret_entrez;
@@ -333,120 +402,106 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 	(*block_end_index) = ret_block_end_index;
 	(*block_min_start_pos) = ret_block_min_start;
 	(*block_max_end_pos) = ret_block_max_end;
-	(*chro_number) = 0;
+	int curr_chro_number = 0;
 
 	for(chro_pnt=0; chro_pnt < features; chro_pnt++)
 	{
-		if(!is_chro_name_explored[chro_pnt])
+		unsigned char * this_chro_name = loaded_features[chro_pnt].chro;
+		fc_chromosome_index_info * this_chro_info = HashTableGet(global_context -> exontable_chro_table , this_chro_name);
+		unsigned int this_chro_number = this_chro_info -> chro_number;
+		unsigned int this_chro_table_ptr = chro_feature_ptr[this_chro_number];
+
+		ret_char_name[this_chro_table_ptr] = (char *)loaded_features[chro_pnt].chro;
+		ret_entrez[this_chro_table_ptr] = find_or_insert_gene_name(global_context, loaded_features[chro_pnt].feature_name);
+		ret_start[this_chro_table_ptr] = loaded_features[chro_pnt].start;
+		ret_end[this_chro_table_ptr] = loaded_features[chro_pnt].end;
+		ret_strand[this_chro_table_ptr] = loaded_features[chro_pnt].is_negative_strand;
+		old_info_ptr[this_chro_table_ptr] = &loaded_features[chro_pnt];
+
+		chro_feature_ptr[this_chro_number]++;
+	}
+
+
+	for(xk1 = 0; xk1 < global_context -> exontable_nchrs; xk1++)
+	{
+		fc_chromosome_index_info * tmp_chro_inf = tmp_chro_info_ptrs[xk1];
+
+		tmp_chro_inf -> chro_block_table_start = current_block_id; 
+		unsigned int sort_j, this_block_items = 0;
+		long this_block_min_start = 0x7fffffff, this_block_max_end = 0;
+		unsigned int this_chro_tab_end =  tmp_chro_inf -> chro_features + tmp_chro_inf -> chro_feature_table_start;
+		for(sort_i = tmp_chro_inf -> chro_feature_table_start; sort_i< this_chro_tab_end ; sort_i++)
 		{
-			unsigned char * current_chro = loaded_features[chro_pnt].chro;
-			unsigned int xk1;
-			// aggregate all features belonging to this chromosome.
-
-			if((*chro_number)>=FC_MAX_CHROMOSOME_NUMBER - 1)
+			unsigned int min_j = sort_i;
+			unsigned int min_start = ret_start[min_j];
+			for(sort_j = sort_i+1; sort_j < this_chro_tab_end; sort_j++)
 			{
-				SUBREADprintf("WARNING: There are too many chromosomes in the annotations. The remainder of the annotation file is ignored\n");
-				break;
-			}
-
-			this_chro_start = ret_array_pointer;
-			(*anno_chrs) [(*chro_number)] = (char *)current_chro;
-			int chro_name_len = strlen((char *)current_chro);
-			(*anno_chr_2ch)[(*chro_number)*2+1] = current_chro[chro_name_len-1];
-			if(chro_name_len>1)
-				(*anno_chr_2ch)[(*chro_number)*2] = current_chro[chro_name_len-2];
-			else
-				(*anno_chr_2ch)[(*chro_number)*2] = 0;
-
-			(*anno_chr_head) [(*chro_number)] = current_block_id;
-			(*chro_number) ++;
-			for(xk1 = chro_pnt; xk1<features; xk1++)
-			{
-				if(strcmp((char *)current_chro, (char *)loaded_features[xk1].chro)==0)
+				// put the minimun start to *sort_i 
+				if(ret_start[sort_j] < min_start)
 				{
-					is_chro_name_explored[xk1]=1;
-					//ret_entrez[ret_array_pointer] = atoi((char *)loaded_features[xk1].feature_name);
-					ret_entrez[ret_array_pointer] = find_or_insert_gene_name(global_context, loaded_features[xk1].feature_name);
-					ret_start[ret_array_pointer] = loaded_features[xk1].start;
-					ret_end[ret_array_pointer] = loaded_features[xk1].end;
-					ret_strand[ret_array_pointer] = loaded_features[xk1].is_negative_strand;
-					ret_char_name[ret_array_pointer] = (char *)loaded_features[xk1].chro;
-					old_info_ptr[ret_array_pointer] = &loaded_features[xk1];
-					ret_array_pointer++;
+					min_j = sort_j;
+					min_start = ret_start[sort_j];
 				}
 			}
-			this_chro_end = ret_array_pointer;
-
-			// sorting the features.
-			unsigned int sort_i, sort_j, this_block_items = 0;
-			long this_block_min_start = 0x7fffffff, this_block_max_end = 0;
-			for(sort_i = this_chro_start; sort_i< this_chro_end; sort_i++)
+			if(min_j != sort_i)
 			{
-				unsigned int min_j = sort_i;
-				unsigned int min_start = ret_start[min_j];
-				for(sort_j = sort_i+1; sort_j < this_chro_end; sort_j++)
-				{
-					// put the minimun start to *sort_i 
-					if(ret_start[sort_j] < min_start)
-					{
-						min_j = sort_j;
-						min_start = ret_start[sort_j];
-					}
-				}
-				if(min_j != sort_i)
-				{
-					unsigned int tmp;
-					void * tmp_ptr;
-					long tmpl;
+				unsigned int tmp;
+				void * tmp_ptr;
+				long tmpl;
 
-					tmpl = ret_start[sort_i];
-					ret_start[sort_i] = ret_start[min_j];
-					ret_start[min_j] = tmpl;
+				tmpl = ret_start[sort_i];
+				ret_start[sort_i] = ret_start[min_j];
+				ret_start[min_j] = tmpl;
 
-					tmpl = ret_end[sort_i];
-					ret_end[sort_i] = ret_end[min_j];
-					ret_end[min_j] = tmpl;
+				tmpl = ret_end[sort_i];
+				ret_end[sort_i] = ret_end[min_j];
+				ret_end[min_j] = tmpl;
 
-					tmp = ret_strand[sort_i];
-					ret_strand[sort_i] = ret_strand[min_j];
-					ret_strand[min_j] = tmp;
+				tmp = ret_strand[sort_i];
+				ret_strand[sort_i] = ret_strand[min_j];
+				ret_strand[min_j] = tmp;
 
-					tmp = ret_entrez[sort_i];
-					ret_entrez[sort_i] = ret_entrez[min_j];
-					ret_entrez[min_j] = tmp;
+				tmp = ret_entrez[sort_i];
+				ret_entrez[sort_i] = ret_entrez[min_j];
+				ret_entrez[min_j] = tmp;
 
-					tmp_ptr = old_info_ptr[sort_i];
-					old_info_ptr[sort_i] = old_info_ptr[min_j];
-					old_info_ptr[min_j] = tmp_ptr;
-				}
-				old_info_ptr[sort_i]->sorted_order = sort_i;
-				this_block_max_end = max(this_block_max_end, ret_end[sort_i]);
-				this_block_min_start = min(this_block_min_start, ret_start[sort_i]);
-				this_block_items ++;
-				if(this_block_items >= FC_FAST_BLOCK_SIZE)
-				{
-					ret_block_end_index[current_block_id] = sort_i+1;
-					ret_block_min_start[current_block_id] = this_block_min_start;
-					ret_block_max_end[current_block_id] = this_block_max_end;
-					current_block_id++;
-					this_block_max_end = 0;
-					this_block_items = 0;
-					this_block_min_start = 0x7fffffff;
-				}
+				tmp_ptr = old_info_ptr[sort_i];
+				old_info_ptr[sort_i] = old_info_ptr[min_j];
+				old_info_ptr[min_j] = tmp_ptr;
 			}
-			if(this_block_items)
+			old_info_ptr[sort_i]->sorted_order = sort_i;
+			this_block_max_end = max(this_block_max_end, ret_end[sort_i]);
+			this_block_min_start = min(this_block_min_start, ret_start[sort_i]);
+			this_block_items ++;
+			if(this_block_items >= FC_FAST_BLOCK_SIZE)
 			{
-				ret_block_end_index[current_block_id] = this_chro_end;
+				ret_block_end_index[current_block_id] = sort_i+1;
 				ret_block_min_start[current_block_id] = this_block_min_start;
 				ret_block_max_end[current_block_id] = this_block_max_end;
 				current_block_id++;
+				this_block_max_end = 0;
+				this_block_items = 0;
+				this_block_min_start = 0x7fffffff;
 			}
-
-			(*anno_chr_head) [(*chro_number)] = current_block_id; 
 		}
+		if(this_block_items)
+		{
+			ret_block_end_index[current_block_id] = this_chro_tab_end;
+			ret_block_min_start[current_block_id] = this_block_min_start;
+			ret_block_max_end[current_block_id] = this_block_max_end;
+			current_block_id++;
+		}
+
+		(*anno_chr_head) [curr_chro_number] = current_block_id; 
+		tmp_chro_inf -> chro_block_table_end = current_block_id; 
+
 	}
-	SUBREADprintf("The %u features are sorted.\n", ret_array_pointer);
+
+
+	SUBREADprintf("The %u features are sorted.\n", sort_i);
 	free(old_info_ptr);
+	free(tmp_chro_info_ptrs);
+	free(chro_feature_ptr);
 }
 
 #define MAX_HIT_NUMBER 80
@@ -468,8 +523,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		char * line = is_second_read? thread_context -> line_buffer2:thread_context -> line_buffer1;
 	
 		read_name = strtok_r(line,"\t", &tmp_tok_ptr);	// read name
+		if(!read_name) return;
 		char * mask_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if(!mask_str) return;
+		if((!mask_str) || !isdigit(mask_str[0])) return;
 
 		alignment_masks = atoi(mask_str);
 
@@ -489,13 +545,15 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 
 		read_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);
+		if(!read_chr)  return;
 		char * read_pos_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if((!read_chr) || !(read_pos_str)) return;
+		if(!read_pos_str) return;
 
 		read_pos = atoi(read_pos_str);
+		if(read_pos < 1) return;
+
 		strtok_r(NULL,"\t", &tmp_tok_ptr);	// mapping quality
 		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// CIGAR string
-		if(!CIGAR_str) return;
 
 		if(is_second_read == 0 && global_context -> is_paired_end_data && 
 	   	  (global_context -> is_PE_distance_checked || global_context -> is_chimertc_disallowed)
@@ -508,10 +566,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				char * mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
 				strtok_r(NULL,"\t", &tmp_tok_ptr);	// mate_pos
 				char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-				if((!frag_len_str)||(!mate_chr))return;
 
 				fragment_length = abs(atoi(frag_len_str)); //get the fragment length
-
 
 				int is_first_read_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
 				int is_second_read_negative_strand = (alignment_masks & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)?1:0; 
@@ -551,18 +607,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			second_chr_chr = read_chr[chro_name_len-2];
 		else	second_chr_chr = 0 ;
 
-		for(search_item_id=0;search_item_id<global_context -> exontable_nchrs;search_item_id++)
-		{
-			if(last_chr_chr != global_context -> exontable_anno_chr_2ch[search_item_id*2+1]||second_chr_chr != global_context -> exontable_anno_chr_2ch[search_item_id*2])
-				continue;
 
-			if(memcmp(read_chr,global_context -> exontable_anno_chrs[search_item_id], chro_name_len+1)==0){
-				//get chr to which the current read or fragment is mapped and also the searching range
-				is_chro_found = 1;
-				search_start = global_context -> exontable_anno_chr_heads[search_item_id];
-				search_end = global_context -> exontable_anno_chr_heads[search_item_id+1] - 1;
-				break;
-			}
+		fc_chromosome_index_info * this_chro_info = HashTableGet(global_context -> exontable_chro_table, read_chr);
+		if(this_chro_info)
+		{
+			search_start = this_chro_info -> chro_block_table_start;
+			search_end = this_chro_info -> chro_block_table_end;
+			is_chro_found = 1;
 		}
 
 		//printf("FX=%d\n", is_chro_found);
@@ -581,7 +632,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				long section_begin_pos = read_pos + Staring_Points[cigar_section_id];
 				long section_length = Section_Lengths[cigar_section_id];
 		//		printf("CIGAR_str=%s; cigar_sections=%d; base=%ld; pos[%d]=%u ; len[%d]=%d\n", CIGAR_str, cigar_sections, read_pos, cigar_section_id, Staring_Points[cigar_section_id],cigar_section_id, Section_Lengths[cigar_section_id]);
-				for(search_block_id=search_start;search_block_id<=search_end;search_block_id++){
+				for(search_block_id=search_start;search_block_id<search_end;search_block_id++){
 					if (global_context -> exontable_block_min_start[search_block_id] > (section_begin_pos + section_length -1)) break;
 					if (global_context -> exontable_block_max_end[search_block_id] < section_begin_pos) continue;
 
@@ -898,13 +949,12 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> line_length = line_length;
 
 }
-int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_nchrs, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, long * et_anno_chr_heads, long * et_bk_end_index, long * et_bk_min_start, long * et_bk_max_end, int read_length)
+int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, long * et_anno_chr_heads, long * et_bk_end_index, long * et_bk_min_start, long * et_bk_max_end, int read_length)
 {
 	int xk1;
 
 	global_context -> read_length = read_length;
 
-	global_context -> exontable_nchrs = et_nchrs;
 	global_context -> exontable_exons = et_exons;
 	global_context -> exontable_geneid = et_geneid;
 	global_context -> exontable_chr = et_chr;
@@ -1150,7 +1200,6 @@ int readSummary(int argc,char *argv[]){
 	long curchr, curpos;
 	char * curchr_name;
 	unsigned char * sorted_strand;
-	int nchr;
 	curchr = 0;
 	curpos = 0;
 	curchr_name = "";
@@ -1250,13 +1299,13 @@ int readSummary(int argc,char *argv[]){
 		return -1;
 	}
 
-	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &nchr, &anno_chr_2ch, &anno_chrs, &anno_chr_head, & block_end_index, & block_min_start, & block_max_end);
+	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &anno_chr_2ch, &anno_chrs, &anno_chr_head, & block_end_index, & block_min_start, & block_max_end);
 	nreads = (int *) calloc(nexons,sizeof(int));
 
-	SUBREADprintf("Number of chromosomes included in the annotation is \%d\n",nchr);
+	SUBREADprintf("Number of chromosomes included in the annotation is \%d\n", global_context . exontable_nchrs);
 
 	int thread_ret = 0;
-	thread_ret |= fc_thread_start_threads(& global_context, nchr, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
+	thread_ret |= fc_thread_start_threads(& global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
 
 	int buffer_pairs = thread_number>1?20:1;
 	char * preload_line = malloc(sizeof(char) * (2+MAX_LINE_LENGTH)*(isPE?2:1)*buffer_pairs);
@@ -1451,6 +1500,24 @@ int readSummary(int argc,char *argv[]){
 
 
 	fc_thread_destroy_global_context(&global_context);
+
+
+	KeyValuePair * cursor;
+	int bucket;
+	for(bucket=0; bucket < global_context.exontable_chro_table  -> numOfBuckets; bucket++)
+	{
+		cursor = global_context.exontable_chro_table -> bucketArray[bucket];
+		while (1)
+		{
+			if (!cursor) break;
+			free((void *)cursor -> key);
+			free((void *)cursor -> value);
+			cursor = cursor->next;
+		}
+	}
+
+	HashTableDestroy(global_context.exontable_chro_table);
+
 	free(line);
 	free(loaded_features);
 	free(geneid);
