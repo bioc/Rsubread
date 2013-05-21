@@ -273,7 +273,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
 
 				if(ret_features[xk1].start < 1 || ret_features[xk1].end<1 || ret_features[xk1].start >= ret_features[xk1].end)
-					SUBREADprintf("WARNING: the feature on the %d-th line has zero coordinate or zero lengths\n", lineno);
+					SUBREADprintf("\nWarning: the feature on the %d-th line has zero coordinate or zero lengths\n\n", lineno);
 
 				strtok_r(NULL,"\t", &token_temp);// score 
 				ret_features[xk1].is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
@@ -287,6 +287,10 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 					int val_start = 0;
 					int is_gene_id = 0;
 					int xk2, exch;
+
+					
+					while((*extra_attrs)==' ')extra_attrs++;
+
 					for(xk2 = 0;  extra_attrs[xk2]; xk2++)
 					{
 						exch = extra_attrs[xk2];
@@ -298,10 +302,16 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 						{
 							if(xk2<1) break;
 							if(attr_state == 0){
+								char tmpx;
 								val_start = xk2 + 1;
+								tmpx = extra_attrs[xk2 - 1];
 								extra_attrs[xk2 - 1] = 0;
+								//printf("%s=%s\n", extra_attrs + name_start, global_context -> gene_id_column);
+								while(extra_attrs[name_start] == ' ' )name_start++;
+
 								if(strcmp(extra_attrs + name_start, global_context -> gene_id_column)==0)
 									is_gene_id = 1;
+								extra_attrs[xk2 - 1] = tmpx;
 							}
 							else if(attr_state == 1)
 							{
@@ -329,7 +339,11 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				if(!is_gene_id_found)
 				{
 					if(!is_GFF_warned)
-						SUBREADprintf("**********\n**********\n  WARNING\n**********\nNo meta-feature id is found on the %d-th line. If it is a GTF file, you may need to check the name of the gene_id field and specify a correct field name using a '-g' option.\n**********\n**********\n", lineno);
+					{
+						int ext_att_len = strlen(extra_attrs);
+						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
+						SUBREADprintf("\nWarning: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n",  global_context -> gene_id_column, extra_attrs);
+					}
 					is_GFF_warned++;
 				}
 			}
@@ -582,7 +596,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		strtok_r(NULL,"\t", &tmp_tok_ptr);	// mapping quality
 		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// CIGAR string
 		if((!CIGAR_str) || !isdigit(CIGAR_str[0]))
-			return;
+			continue;
 
 		if(is_second_read == 0 && global_context -> is_paired_end_data && 
 	   	  (global_context -> is_PE_distance_checked || global_context -> is_chimertc_disallowed)
@@ -1612,6 +1626,7 @@ int feature_count_main(int argc, char ** argv)
 				strcpy(nameFeatureTypeColumn, optarg);
 				break;
 			case 'g':
+				while((*optarg) == ' ') optarg++;
 				strcpy(nameGeneIDColumn, optarg);
 				break;
 			case 'T':
@@ -1645,7 +1660,7 @@ int feature_count_main(int argc, char ** argv)
 				isGTF = 1;
 				if(strcmp("SAF", optarg)==0) isGTF=0;
 				else if(strcmp("GTF", optarg)==0) isGTF=1;
-				else SUBREADprintf("WARNING: Unknown annotation format: %s. GTF format is used.\n", optarg); 
+				else SUBREADprintf("\nWarning: Unknown annotation format: %s. GTF format is used.\n\n", optarg); 
 				break;
 			case 'O':
 				is_Overlap = 1;
