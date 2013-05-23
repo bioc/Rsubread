@@ -1,3 +1,22 @@
+/***************************************************************
+
+   The Subread software package is free software package: 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -617,7 +636,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(mate_chr[0]=='=' && is_first_read_negative_strand!=is_second_read_negative_strand)
 				{
-					if((global_context -> is_PE_distance_checked && fragment_length > global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || (fragment_length < global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1))
+					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || (fragment_length < global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1)))
 					{
 						if(global_context -> SAM_output_fp)
 							fprintf(global_context -> SAM_output_fp,"%s\tPAIR_DISTANCE\t%ld\n", read_name, fragment_length);
@@ -828,7 +847,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if(decision_table_votes[xk1] == max_votes) top_voters++;
 			}
 
-			if(top_voters == 1)
+			if(top_voters == 1 && (!global_context -> is_multi_overlap_allowed))
 			{
 				thread_context->count_table[top_voter_id]++;
 				thread_context->nreads_mapped_to_exon++;
@@ -839,7 +858,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
 				}
 			}
-			else if(top_voters >1)
+			else if(top_voters >1 || (global_context -> is_multi_overlap_allowed))
 			{
 				if(global_context -> is_multi_overlap_allowed)
 				{
@@ -847,7 +866,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					final_feture_names[0]=0;
 					for(xk1 = 0; xk1 < decision_table_items; xk1++)
 					{
-						if(decision_table_votes[xk1] == max_votes)
+						//if(decision_table_votes[xk1] == max_votes)
+						if(decision_table_votes[xk1] >= 1)
 						{
 							long tmp_voter_id = (global_context -> is_gene_level)?decision_table_exon_ids[xk1]:decision_table_ids[xk1];
 							thread_context->count_table[tmp_voter_id]++;
@@ -1651,7 +1671,7 @@ int feature_count_main(int argc, char ** argv)
 				is_PE_Dist_Checked = 1;
 				break;
 			case 'B':
-				is_Both_End_Mapped = 0;
+				is_Both_End_Mapped = 1;
 				break;
 			case 'f':
 				is_GeneLevel = 0;
