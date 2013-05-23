@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -29,7 +50,7 @@ void print_build_log(double finished_rate, double read_per_second, double expect
 {
         char outbuff[81]; int i;
         snprintf(outbuff, 80,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum bps", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
-        SUBREADprintf("%s",outbuff);
+        fputs(outbuff, stdout);
         for(i=strlen(outbuff); i<105; i++)
                 SUBREADprintf(" ");
         SUBREADprintf("\r");
@@ -120,7 +141,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					SUBREADprintf ("\n Processing chromosome files ...\n");
 
 					sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-					SUBREADfflush(stdout);
+					fflush(stdout);
 
 					gehash_dump(&table, fn);
 
@@ -232,7 +253,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				}
 
 				sprintf(fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-				SUBREADfflush(stdout);
+				fflush(stdout);
 
 				gehash_dump(&table, fn);
 				if(VALUE_ARRAY_INDEX)
@@ -352,7 +373,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 						double ETA = (all_bases-offset) / base_per_second;
 						print_build_log(finished_rate,base_per_second,ETA, all_bases);
 					}
-					SUBREADfflush(stdout) ;
+					fflush(stdout) ;
 				}
 
 				offset ++;
@@ -401,13 +422,14 @@ int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** hu
 
 int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, gehash_t *huge_table)
 {
-	int file_number, i ,j;
+	int file_number, table_no, i ,j;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
 	char fn[300];
 	double local_begin_ftime = miltime();
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 
+	char read_names[OFFSET_TABLE_SIZE][48];
 	gehash_t occurance_table;
 	unsigned char * huge_index[1024];
 
@@ -429,7 +451,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	SUBREADprintf("Scanning uninformative subreads(16mers) in the reference sequences \n");
+	SUBREADprintf("Scanning non-informative reads in the chromosomes...\n");
 
 	if (chro_file_number > 199)
 	{
@@ -442,7 +464,6 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		SUBREADprintf("The path is too long. It should not be longer than 290 chars.\n");
 		return -1;
 	}
-
 	if(all_bases<1)
 	{
 		SUBREADprintf("File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
@@ -450,9 +471,9 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	}
 
 
-
 	file_number = 0;
 	offset = 0;
+	table_no = 0;
 	read_no = 0;
 
 	sprintf(fn, "%s.files", index_prefix);
@@ -500,6 +521,11 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				}
 
 				geinput_readline(&ginp, fn, 0);
+
+				for(i=0;(fn[i+1] != ' ' && fn[i+1] != '\0' && fn[i+1] != '\t' && i<47); i++)
+					read_names[read_no][i] = fn[i+1];
+
+				read_names[read_no][i] = 0;
 
 				for (i=0; i<16; i++)
 				{
@@ -587,7 +613,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 						double ETA = (all_bases-offset) / base_per_second;
 						print_build_log(finished_rate,base_per_second,ETA, all_bases);
 					}
-					SUBREADfflush(stdout) ;
+					fflush(stdout) ;
 				}
 
 				if(offset > 0xFFFFFFFDU)	
@@ -645,9 +671,13 @@ int main_buildindex(int argc,char ** argv)
 	output_file[0] = 0;
 
 	SUBREADprintf("\n");
-	while ((c = getopt (argc, argv, "cqM:o:f:D?")) != -1)
+	while ((c = getopt (argc, argv, "vcqM:o:f:D?")) != -1)
 		switch(c)
 		{
+			case 'v':
+				print_version_info();
+				return 0;
+				break;
 			case 'q':
 				QUICK_BUILD = 1;
 				break;
@@ -670,7 +700,7 @@ int main_buildindex(int argc,char ** argv)
 	if (argc == optind || !output_file[0])
 	{
 
-                SUBREADprintf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 8000 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
+                SUBREADprintf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 8000 by default\n    -f <int>\t\t specify the threshold for removing uninformative subreads (highly repetitive 16mers in the reference). 24 by default.\n    -c      \t\t build a color-space index\n    -v      \t\t display the version number.\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
 
 		return -1 ;
 	}
@@ -684,7 +714,7 @@ int main_buildindex(int argc,char ** argv)
 	SUBREADprintf("Size of memory used=%d MB\n",memory_limit);
 	SUBREADprintf("Base name of the built index = %s\n",output_file);
 
-	SUBREADfflush(stdout);
+	fflush(stdout);
 	begin_ftime = miltime();
 
 

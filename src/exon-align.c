@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
@@ -4188,6 +4209,7 @@ void exon_usage(char * execname)
 	SUBREADputs("    -T --threads   <int>\t number of threads/CPUs used, 1 by default.");
 	SUBREADputs("    -I --indel     <int>\t number of INDEL bases allowed, 5 by default.");
 	SUBREADputs("    -P --phred     <3:6>\t the format of Phred scores used in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("    -v                  \t displaying the version number.");
 	SUBREADputs("");
 	SUBREADputs("Arguments for paired-end reads:");
 	SUBREADputs("    -R --read2     <input>\t name of the second input file from paired-end data. The program will then be switched to paired-end read mapping mode.");
@@ -4463,9 +4485,13 @@ int main_junction(int argc,char ** argv)
 	//	SUBREADprintf ("I'm the %d-th thread RRRKK\n", -9999);return 0;
 
 
-	while ((c = getopt_long (argc, argv, "xS:L:AH:d:D:n:m:p:f:P:R:r:i:l:o:T:Q:I:1:2:t:B:b:F?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vxS:L:AH:d:D:n:m:p:f:P:R:r:i:l:o:T:Q:I:1:2:t:B:b:F?", long_options, &option_index)) != -1)
 		switch(c)
 		{
+			case 'v':
+				print_version_info();
+				return 0;
+				break;
 			case 'A':
 				REPORT_SAM_FILE = 0;
 				break;

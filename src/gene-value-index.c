@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -119,7 +140,9 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	FILE * fp = fopen(filename, "rb");
 	int read_length;
 	read_length = fread(&index->start_point,4,1, fp);
+	assert(read_length>0);
 	read_length = fread(&index->length,4,1, fp);
+	assert(read_length>0);
 
 	//SUBREADprintf ("\nBINDEX %s : %u ~ +%u\n",filename, index->start_point, index->length );
 
@@ -136,7 +159,7 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	
 
 	read_length =fread(index->values, 1, useful_bytes, fp);
-	if(read_length<=0)SUBREADprintf("Unable to load index\n");
+	assert(read_length>0);
 
 	fclose(fp);
 	return 0;
