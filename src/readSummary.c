@@ -1,6 +1,8 @@
 /***************************************************************
 
-   The Subread software package is free software package: 
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
