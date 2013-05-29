@@ -1190,7 +1190,7 @@ void usage(char * execname)
 	SUBREADputs("    -u --unique         \t reporting uniquely mapped reads only.");
 	SUBREADputs("    -Q --quality        \t using mapping quality scores to break ties when more than one best mapping locations are found.");
 	SUBREADputs("    -H --hamming        \t using Hamming distance to break ties when more than one best mapping locations are found.");
-	SUBREADputs("    -J --junction       \t indicating the discovered junction reads in the SAM output using \"S\" operation in the CIGAR string. 'Subjunc' program shall then be used to discover exon junction locations and to perform complete alignment for junction reads.");
+	SUBREADputs("    -J --junction       \t make those bases which can not be aligned together with other bases from the same read using the `S' operation in the CIGAR string (soft-clipping). This option is useful for marking exon-spanning reads and fusion reads.");
 	SUBREADputs("    -v                  \t displaying the version number.");
 	SUBREADputs("");
 	SUBREADputs("Arguments for paired-end reads:");

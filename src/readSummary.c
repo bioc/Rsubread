@@ -101,6 +101,7 @@ typedef struct
 	int is_both_end_required;
 	int is_chimertc_disallowed;
 	int is_PE_distance_checked;
+	int min_mapping_quality_score;
 	int min_paired_end_distance;
 	int max_paired_end_distance;
 	int read_length;
@@ -577,6 +578,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	long hits_indices1[MAX_HIT_NUMBER], hits_indices2[MAX_HIT_NUMBER];
 
 	int is_second_read;
+	int first_read_quality_score = 0;
 
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++)
 	{
@@ -614,8 +616,25 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		read_pos = atoi(read_pos_str);
 		if(read_pos < 1) return;
 
-		strtok_r(NULL,"\t", &tmp_tok_ptr);	// mapping quality
-		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// CIGAR string
+		char * mapping_qual_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
+		if(!mapping_qual_str) return;
+		int mapping_qual =atoi(mapping_qual_str);
+
+		//printf("SECOND=%d; FIRST=%d; THIS=%d; Q=%d\n", is_second_read, first_read_quality_score, mapping_qual, );
+		if(( mapping_qual < global_context -> min_mapping_quality_score  && ! global_context -> is_paired_end_data)||( is_second_read  && max( first_read_quality_score, mapping_qual ) < global_context -> min_mapping_quality_score))
+		{
+			if(global_context -> SAM_output_fp)
+			{
+				fprintf(global_context -> SAM_output_fp,"%s\tMAPPING_QUALITY\t%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+			}
+			return;
+		}
+		if(is_second_read==0 && global_context -> is_paired_end_data)
+		{
+			first_read_quality_score = mapping_qual;
+		}
+
+		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
 		if((!CIGAR_str) || !isdigit(CIGAR_str[0]))
 			continue;
 
@@ -987,7 +1006,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score)
 {
 
 	global_context -> input_buffer_max_size = buffer_size;
@@ -999,6 +1018,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_both_end_required = is_both_end_required;
 	global_context -> is_chimertc_disallowed = is_chimertc_disallowed;
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
+	global_context -> min_mapping_quality_score = min_map_qual_score;
 	strcpy(global_context -> feature_name_column,feature_name_column);
 	strcpy(global_context -> gene_id_column,gene_id_column);
 
@@ -1188,6 +1208,10 @@ void print_usage()
 	SUBREADputs("    -s        \tIf specified, strand-specific read assignment will be "); 
 	SUBREADputs("              \tperformed."); 
 	SUBREADputs("    "); 
+	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must have so as to be");
+        SUBREADputs("              \tcounted. For paired-end reads, at least one end should satisfy");
+        SUBREADputs("              \tthis criteria. 0 by default."); 
+	SUBREADputs("    "); 
 	SUBREADputs("    -T <int>  \tNumber of the threads. 1 by default."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -R        \tOutput the read assignment result for each read."); 
@@ -1248,11 +1272,12 @@ int readSummary(int argc,char *argv[]){
 	16: as.numeric(isPEDistChecked)
 	17: nameFeatureTypeColumn 
 	18: nameGeneIDColumn
+	19: min.MappingQualityScore
 	 */
 
 	FILE *fp_in = NULL;
 
-	int read_length = 0, isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked;
+	int read_length = 0, isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0;
 	char **chr;
 	long *start, *stop;
 	int *geneid, *nreads;
@@ -1320,6 +1345,11 @@ int readSummary(int argc,char *argv[]){
 	if(argc > 18)
 		nameGeneIDColumn = argv[18];
 	else	nameGeneIDColumn = "gene_id";
+	if(argc > 19)
+		minMappingQualityScore = atoi(argv[19]);
+	else	minMappingQualityScore = 0;
+
+
 
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
@@ -1355,7 +1385,7 @@ int readSummary(int argc,char *argv[]){
 
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore);
 
 
 	// Loading the annotations.
@@ -1611,16 +1641,18 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[19];
+	char * Rargv[20];
 	char annot_name[300];
 	char sam_name[300];
 	char out_name[300];
 	char nameFeatureTypeColumn[66];
 	char nameGeneIDColumn[66];
+	int min_qual_score = 0;
 	int min_dist = 50;
 	int max_dist = 600;
 	char min_dist_str[11];
 	char max_dist_str[11];
+	char min_qual_score_str[11];
 	int is_PE = 0;
 	int is_SAM = 1;
 	int is_GeneLevel = 1;
@@ -1640,12 +1672,14 @@ int feature_count_main(int argc, char ** argv)
 	strcpy(nameGeneIDColumn,"gene_id");
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:pbF:fsCBPORv?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:Q:pbF:fsCBPORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'v':
 				print_version_info();
 				return 0;
+			case 'Q':
+				min_qual_score = atoi(optarg);
 				break;
 			case 't':
 				strcpy(nameFeatureTypeColumn, optarg);
@@ -1721,6 +1755,7 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(nthread_str,"%d", threads);
 	sprintf(min_dist_str,"%d",min_dist);
 	sprintf(max_dist_str,"%d",max_dist);
+	sprintf(min_qual_score_str,"%d", min_qual_score);
 	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
 	Rargv[2] = sam_name;
@@ -1740,7 +1775,8 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[16] = is_PE_Dist_Checked?"1":"0";
 	Rargv[17] = nameFeatureTypeColumn;
 	Rargv[18] = nameGeneIDColumn;
-	readSummary(19, Rargv);
+	Rargv[19] = min_qual_score_str;
+	readSummary(20, Rargv);
 	return 0;
 }
 
