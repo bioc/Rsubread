@@ -71,7 +71,7 @@ GeneID		Chr	Start	End	Strand
 The \code{GeneID} column may include numbers or character strings.
 Note that the chromosomal names included in the \code{Chr} column must match the chromosomal names used in the sequences of the reference genome to which the reads were mapped, otherwise reads cannot be assigned to the features.
  
-When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, the fragments (not reads) will be counted for each feature.
+When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, fragments will be counted for each feature/meta-feature instead of reads.
 For RNA-seq data, the distance between the mapping locations of the pair of reads sequenced from the same fragment could be much greater than the fragment length when the fragment spans two or more exons.
 Such fragments can be counted when a large value of the argument \code{max.distance} is used.
 Note that the Subread (\code{\link{align}}) and Subjunc (\code{\link{subjunc}}) aligners can report the mapping coordinates of the paired-end reads even when the two reads have a mapping distance much larger than the nominal fragment length.
@@ -90,21 +90,33 @@ A list with the following components:
 \author{Wei Shi and Yang Liao}
 %\note{}
 %\seealso{}
-\examples{
-# build an index using a sample reference sequence ('reference.fa') that includes a chromosome called 'chr_dummy' and 90,000 bases
+\examples{\dontrun{
 library(Rsubread)
-ref <- system.file("extdata","reference.fa",package="Rsubread")
-buildindex(basename="./reference_index",reference=ref)
 
-# align a sample read dataset ('reads.txt') to the sample reference
-reads <- system.file("extdata","reads.txt",package="Rsubread")
-align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.SAM")
+# Summarizing single-end reads using built-in RefSeq annotation for mouse genome mm9:
+featureCounts(files="mapping_results_SE.sam",genome="mm9")
 
-# assign mapped reads to dummy features
-dummy_features <- data.frame(GeneID=1:5,Chr="chr_dummy",Start=c(1,2000,5000,20000,50000),End=c(1,2000,5000,20000,50000)+1000,Strand="+",stringsAsFactors=FALSE)
-fc <- featureCounts(files="Rsubread_alignment.SAM",annot=dummy_features)
-fc
-}
+# Summarizing single-end reads using a user-provided GTF annotation file:
+featureCounts(files="mapping_results_SE.sam",annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+
+# Summarizing single-end reads using 5 threads:
+featureCounts(files="mapping_results_SE.sam",nthreads=5,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+
+# Summarizing BAM format single-end read data:
+featureCounts(files="mapping_results_SE.bam",file.type="BAM",annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+
+# Summarizing paired-end reads and counting fragments (instead of reads):
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+
+# Counting fragments satisfying a paired-end distance criteria, eg. [50bp, 600bp]:
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,checkPairedEndDistance=TRUE,min.distance=50,max.distance=600,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+
+# Counting fragments which have both ends successfully aligned without considering the paired-end distance:
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,requireBothEndsMapped=TRUE,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+
+# Excluding chimeric fragments from the fragment counting:
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,countChimericFragments=FALSE,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}
