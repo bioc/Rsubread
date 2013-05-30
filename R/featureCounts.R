@@ -1,4 +1,4 @@
-featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
+featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
 {
 	flag <- FALSE
 
@@ -45,7 +45,7 @@ featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnn
 
 	for(i in 1:length(files)){
 	  cat("Processing", files[i], " ...\n")
-	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),as.numeric(isStrandSpecific),as.numeric(FALSE),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkPairedEndDistance),GTF.featureType,GTF.attrType,sep=",")
+	  cmd <- paste("readSummary",ann,files[i],fout,as.numeric(isPairedEnd),min.distance,max.distance,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),as.numeric(isStrandSpecific),as.numeric(FALSE),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkPairedEndDistance),GTF.featureType,GTF.attrType,minMQS,sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
 	  C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	  x1 <- read.delim(fout,stringsAsFactors=FALSE)  

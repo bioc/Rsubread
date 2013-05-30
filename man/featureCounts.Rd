@@ -3,7 +3,7 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
+featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,isStrandSpecific=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkPairedEndDistance=FALSE,min.distance=50,max.distance=600,countChimericFragments=TRUE)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM format files.}
@@ -17,6 +17,7 @@ featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{isStrandSpecific}{ logical indicating whether the strandness should be considered when assigning reads to features. \code{FALSE} by default.}
+  \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must have so as to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (two reads are generated from each fragment in paired-end data) will be counted rather than individual reads. \code{FALSE} by default.}
   \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   \item{checkPairedEndDistance}{ logical indicating if the two ends from the same fragment are required to satisify the paired-end distance criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. Paired-end distance criteria are specified via \code{min.distance} and \code{max.distance}.}
