@@ -6,9 +6,10 @@ citEntry(entry="Article",
     journal="Nucleic Acids Research",
     year = 2013,
     volume = 41,
-    note = "In Press, accepted on 8 March 2013",
+    issue = 10,
+    page = e108,
 
     textVersion = 
-    paste("Liao Y, Smyth GK and Shi W (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, Volume 41, accepted on 8 March")
+    paste("Liao Y, Smyth GK and Shi W. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108, 2013)
     )
 

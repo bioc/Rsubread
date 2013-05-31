@@ -38,7 +38,7 @@ The index only needs to be built once and can be re-used in the subsequent align
 No value is produced but index files are written to the current working directory.
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi (2013), "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, Volume 41, Accepted on 8 March, In Press.
+Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
