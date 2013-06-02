@@ -7,9 +7,8 @@ citEntry(entry="Article",
     year = 2013,
     volume = 41,
     issue = 10,
-    page = e108,
+    pages = "e108",
 
     textVersion = 
-    paste("Liao Y, Smyth GK and Shi W. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108, 2013)
+    paste("Liao Y, Smyth GK and Shi W. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108, 2013")
     )
-

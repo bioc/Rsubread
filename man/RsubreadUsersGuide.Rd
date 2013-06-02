@@ -1,15 +1,14 @@
 \name{RsubreadUsersGuide}
 \alias{RsubreadUsersGuide}
 
-\title{View Rsubread User's Guide}
-\description{}
+\title{View Rsubread Users Guide}
+\description{Users Guide for Rsubread and Subread}
 
 \usage{
 RsubreadUsersGuide()
 }
 
-\arguments{
-}
+%\arguments{}
 
 \value{Character string giving the file location.}
 
@@ -23,11 +22,11 @@ The Rsubread package provides R wrappers functions for many of the programs incl
 }
 
 \seealso{
+\code{\link{vignette}}
 }
 
 \author{Wei Shi}
 
-\examples{
-}
+%\examples{}
 
 \keyword{documentation}
