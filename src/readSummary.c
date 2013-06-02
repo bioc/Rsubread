@@ -724,10 +724,21 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					for(search_item_id = search_item_start ; search_item_id < search_item_end; search_item_id++)
 					{
 						if (global_context -> exontable_start[search_item_id] > (section_begin_pos + section_length -1)) break;
-						if (global_context -> exontable_stop[search_item_id] >= section_begin_pos && ((!global_context->is_strand_checked)||is_this_negative_strand == global_context -> exontable_strand[search_item_id])){
-							hits_indices[nhits] = search_item_id;
-							nhits++;
-							if(nhits>=MAX_HIT_NUMBER) break;
+						if (global_context -> exontable_stop[search_item_id] >= section_begin_pos)
+						{
+
+							int is_strand_ok =1;
+
+							if(global_context->is_strand_checked == 1)
+								is_strand_ok = (is_this_negative_strand == global_context -> exontable_strand[search_item_id]);
+							else if(global_context->is_strand_checked == 2)
+								is_strand_ok = (is_this_negative_strand != global_context -> exontable_strand[search_item_id]);
+
+							if(is_strand_ok){
+								hits_indices[nhits] = search_item_id;
+								nhits++;
+								if(nhits>=MAX_HIT_NUMBER) break;
+							}
 						} 
 					}
 				}
@@ -1205,8 +1216,9 @@ void print_usage()
 	SUBREADputs("              \tbe allowed to be assigned to more than one matched meta-"); 
 	SUBREADputs("              \tfeature (or matched feature if -f is specified). "); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -s        \tIf specified, strand-specific read assignment will be "); 
-	SUBREADputs("              \tperformed."); 
+	SUBREADputs("    -s <int>  \tindicate if strand-specific read counting should be performed.");
+	SUBREADputs("              \tIt has three possible values:  0 (unstranded), 1 (stranded) and");
+	SUBREADputs("              \t2 (reversely stranded). 0 by default.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must have so as to be");
         SUBREADputs("              \tcounted. For paired-end reads, at least one end should satisfy");
@@ -1653,12 +1665,13 @@ int feature_count_main(int argc, char ** argv)
 	char min_dist_str[11];
 	char max_dist_str[11];
 	char min_qual_score_str[11];
+	char Strand_Sensitive_Str[11];
 	int is_PE = 0;
 	int is_SAM = 1;
 	int is_GeneLevel = 1;
 	int is_Overlap = 0;
 	int is_Both_End_Mapped = 0;
-	int is_Strand_Sensitive = 0;
+	int Strand_Sensitive_Mode = 0;
 	int is_ReadSummary_Report = 0;
 	int is_Chimeric_Disallowed = 0;
 	int is_PE_Dist_Checked = 0;
@@ -1672,7 +1685,7 @@ int feature_count_main(int argc, char ** argv)
 	strcpy(nameGeneIDColumn,"gene_id");
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:Q:pbF:fsCBPORv?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:Q:pbF:fs:CBPORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'v':
@@ -1728,7 +1741,7 @@ int feature_count_main(int argc, char ** argv)
 				is_ReadSummary_Report = 1;
 				break;
 			case 's':
-				is_Strand_Sensitive = 1;
+				Strand_Sensitive_Mode = atoi(optarg);
 				break;
 			case 'i':
 				strncpy(sam_name, optarg,299);
@@ -1756,6 +1769,7 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(min_dist_str,"%d",min_dist);
 	sprintf(max_dist_str,"%d",max_dist);
 	sprintf(min_qual_score_str,"%d", min_qual_score);
+	sprintf(Strand_Sensitive_Str,"%d", Strand_Sensitive_Mode);
 	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
 	Rargv[2] = sam_name;
@@ -1768,7 +1782,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[9] = is_GeneLevel?"1":"0";
 	Rargv[10] = nthread_str;
 	Rargv[11] = isGTF?"1":"0";
-	Rargv[12] = is_Strand_Sensitive?"1":"0";
+	Rargv[12] = Strand_Sensitive_Str;
 	Rargv[13] = is_ReadSummary_Report?"1":"0";
 	Rargv[14] = is_Both_End_Mapped?"1":"0";
 	Rargv[15] = is_Chimeric_Disallowed?"1":"0";
