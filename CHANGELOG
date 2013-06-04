@@ -1,3 +1,7 @@
+4 June, 2013 - 1.11.4
+(1) Modified featureCounts to let it exclude multi-mapping reads from read summarization in its default setting.
+(2) Added 'countMultiMappingReads' option to allow multi-mapping reads to be counted if required.
+
 2 Jun, 2013
 (1) Made changes to the isStrandSpecific parameter of featureCounts.
 
