@@ -101,6 +101,8 @@ typedef struct
 	int is_both_end_required;
 	int is_chimertc_disallowed;
 	int is_PE_distance_checked;
+	int is_multi_mapping_allowed;
+
 	int min_mapping_quality_score;
 	int min_paired_end_distance;
 	int max_paired_end_distance;
@@ -574,7 +576,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 	char * read_chr, *tmp_tok_ptr, *CIGAR_str , *read_name = NULL;
 	long read_pos, fragment_length = 0, search_start, search_end;
-	int is_chro_found, nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
+	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
 	long hits_indices1[MAX_HIT_NUMBER], hits_indices2[MAX_HIT_NUMBER];
 
 	int is_second_read;
@@ -618,24 +620,28 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		char * mapping_qual_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
 		if(!mapping_qual_str) return;
-		int mapping_qual =atoi(mapping_qual_str);
 
-		//printf("SECOND=%d; FIRST=%d; THIS=%d; Q=%d\n", is_second_read, first_read_quality_score, mapping_qual, );
-		if(( mapping_qual < global_context -> min_mapping_quality_score  && ! global_context -> is_paired_end_data)||( is_second_read  && max( first_read_quality_score, mapping_qual ) < global_context -> min_mapping_quality_score))
+		if(global_context -> min_mapping_quality_score>0)
 		{
-			if(global_context -> SAM_output_fp)
+			int mapping_qual =atoi(mapping_qual_str);
+
+			//printf("SECOND=%d; FIRST=%d; THIS=%d; Q=%d\n", is_second_read, first_read_quality_score, mapping_qual, );
+			if(( mapping_qual < global_context -> min_mapping_quality_score  && ! global_context -> is_paired_end_data)||( is_second_read  && max( first_read_quality_score, mapping_qual ) < global_context -> min_mapping_quality_score))
 			{
-				fprintf(global_context -> SAM_output_fp,"%s\tMAPPING_QUALITY\t%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+				if(global_context -> SAM_output_fp)
+				{
+					fprintf(global_context -> SAM_output_fp,"%s\tMAPPING_QUALITY\t%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+				}
+				return;
 			}
-			return;
-		}
-		if(is_second_read==0 && global_context -> is_paired_end_data)
-		{
-			first_read_quality_score = mapping_qual;
+			if(is_second_read==0 && global_context -> is_paired_end_data)
+			{
+				first_read_quality_score = mapping_qual;
+			}
 		}
 
 		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if((!CIGAR_str) || !isdigit(CIGAR_str[0]))
+		if(!CIGAR_str)
 			continue;
 
 		if(is_second_read == 0 && global_context -> is_paired_end_data && 
@@ -676,13 +682,27 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
+
 		if(SAM_FLAG_UNMAPPED & alignment_masks) continue;
+
+		if(!global_context -> is_multi_mapping_allowed)
+		{
+			char * NH_pos = strstr(tmp_tok_ptr, "\tNH:i:");
+			if(NH_pos)
+			{
+				if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
+				{
+					if(global_context -> SAM_output_fp)
+						fprintf(global_context -> SAM_output_fp,"%s\tMULTI_MAPPING\n", read_name);
+					return;
+				}
+			}
+		}
 
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
 		if(is_second_read) is_this_negative_strand = !is_this_negative_strand;
 
 
-		is_chro_found = 0;
 		char last_chr_chr, second_chr_chr;
 		int chro_name_len = strlen(read_chr);
 		last_chr_chr = read_chr[chro_name_len-1];
@@ -694,14 +714,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		fc_chromosome_index_info * this_chro_info = HashTableGet(global_context -> exontable_chro_table, read_chr);
 		if(this_chro_info)
 		{
-			search_start = this_chro_info -> chro_block_table_start;
-			search_end = this_chro_info -> chro_block_table_end;
-			is_chro_found = 1;
-		}
-
-		//printf("FX=%d\n", is_chro_found);
-		if(is_chro_found)
-		{
 			int nhits = 0;
 
 			int cigar_section_id, cigar_sections;
@@ -709,6 +721,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			unsigned short Section_Lengths[6];
 			long * hits_indices = (is_second_read?hits_indices2:hits_indices1);
 
+			search_start = this_chro_info -> chro_block_table_start;
+			search_end = this_chro_info -> chro_block_table_end;
 			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Staring_Points, Section_Lengths);
 			for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
 			{
@@ -1017,7 +1031,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, int * 
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed)
 {
 
 	global_context -> input_buffer_max_size = buffer_size;
@@ -1029,6 +1043,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_both_end_required = is_both_end_required;
 	global_context -> is_chimertc_disallowed = is_chimertc_disallowed;
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
+	global_context -> is_multi_mapping_allowed = is_multi_mapping_allowed;
 	global_context -> min_mapping_quality_score = min_map_qual_score;
 	strcpy(global_context -> feature_name_column,feature_name_column);
 	strcpy(global_context -> gene_id_column,gene_id_column);
@@ -1220,6 +1235,9 @@ void print_usage()
 	SUBREADputs("              \tIt has three possible values:  0 (unstranded), 1 (stranded) and");
 	SUBREADputs("              \t2 (reversely stranded). 0 by default.");
 	SUBREADputs("    "); 
+	SUBREADputs("    -M        \tif specified, multi-mapping reads/fragments will NOT be counted.");
+	SUBREADputs("              \tThe program will use the 'NH' tag to find multi-mapping reads.");
+	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must have so as to be");
         SUBREADputs("              \tcounted. For paired-end reads, at least one end should satisfy");
         SUBREADputs("              \tthis criteria. 0 by default."); 
@@ -1285,6 +1303,7 @@ int readSummary(int argc,char *argv[]){
 	17: nameFeatureTypeColumn 
 	18: nameGeneIDColumn
 	19: min.MappingQualityScore
+	20: as.numeric(isMultiMappingAllowed)
 	 */
 
 	FILE *fp_in = NULL;
@@ -1309,7 +1328,7 @@ int readSummary(int argc,char *argv[]){
 	curpos = 0;
 	curchr_name = "";
 
-	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired;
+	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed;
 
 	int isSAM, isGTF;
 	char * ret = NULL;
@@ -1360,6 +1379,10 @@ int readSummary(int argc,char *argv[]){
 	if(argc > 19)
 		minMappingQualityScore = atoi(argv[19]);
 	else	minMappingQualityScore = 0;
+	if(argc > 20)
+		isMultiMappingAllowed = atoi(argv[20]);
+	else	isMultiMappingAllowed = 1;
+
 
 
 
@@ -1397,7 +1420,7 @@ int readSummary(int argc,char *argv[]){
 
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed);
 
 
 	// Loading the annotations.
@@ -1653,7 +1676,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[20];
+	char * Rargv[21];
 	char annot_name[300];
 	char sam_name[300];
 	char out_name[300];
@@ -1675,6 +1698,7 @@ int feature_count_main(int argc, char ** argv)
 	int is_ReadSummary_Report = 0;
 	int is_Chimeric_Disallowed = 0;
 	int is_PE_Dist_Checked = 0;
+	int is_Multi_Mapping_Allowed = 1;
 	int threads = 1;
 	int isGTF = 1;
 	char nthread_str[4];
@@ -1685,9 +1709,12 @@ int feature_count_main(int argc, char ** argv)
 	strcpy(nameGeneIDColumn,"gene_id");
 	annot_name[0]=0;sam_name[0]=0;out_name[0]=0;
 
-	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:Q:pbF:fs:CBPORv?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "g:t:T:i:o:a:d:D:Q:pbF:fs:CBPMORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{
+			case 'M':
+				is_Multi_Mapping_Allowed = 0;
+				break;
 			case 'v':
 				print_version_info();
 				return 0;
@@ -1790,7 +1817,8 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[17] = nameFeatureTypeColumn;
 	Rargv[18] = nameGeneIDColumn;
 	Rargv[19] = min_qual_score_str;
-	readSummary(20, Rargv);
+	Rargv[20] = is_Multi_Mapping_Allowed?"1":"0";
+	readSummary(21, Rargv);
 	return 0;
 }
 
