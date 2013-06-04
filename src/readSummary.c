@@ -1235,8 +1235,10 @@ void print_usage()
 	SUBREADputs("              \tIt has three possible values:  0 (unstranded), 1 (stranded) and");
 	SUBREADputs("              \t2 (reversely stranded). 0 by default.");
 	SUBREADputs("    "); 
-	SUBREADputs("    -M        \tif specified, multi-mapping reads/fragments will NOT be counted.");
-	SUBREADputs("              \tThe program will use the 'NH' tag to find multi-mapping reads.");
+	SUBREADputs("    -M        \tif specified, multi-mapping reads/fragments will be counted (ie.");
+	SUBREADputs("              \ta multi-mapping read will be counted up to N times if it has N");
+	SUBREADputs("              \treported mapping locations). The program uses the `NH' tag to");
+	SUBREADputs("              \tfind multi-mapping reads.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must have so as to be");
         SUBREADputs("              \tcounted. For paired-end reads, at least one end should satisfy");
@@ -1698,7 +1700,7 @@ int feature_count_main(int argc, char ** argv)
 	int is_ReadSummary_Report = 0;
 	int is_Chimeric_Disallowed = 0;
 	int is_PE_Dist_Checked = 0;
-	int is_Multi_Mapping_Allowed = 1;
+	int is_Multi_Mapping_Allowed = 0;
 	int threads = 1;
 	int isGTF = 1;
 	char nthread_str[4];
@@ -1713,7 +1715,7 @@ int feature_count_main(int argc, char ** argv)
 		switch(c)
 		{
 			case 'M':
-				is_Multi_Mapping_Allowed = 0;
+				is_Multi_Mapping_Allowed = 1;
 				break;
 			case 'v':
 				print_version_info();
