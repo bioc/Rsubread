@@ -30,7 +30,7 @@
 #endif
 
 
-#define SUBREAD_VERSION "1.3.3"
+#define SUBREAD_VERSION "1.3.4"
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -275,6 +275,9 @@ typedef struct{
 	short indel_recorder_length;
 	char  *all_indel_recorder;
 	unsigned int multi_best_reads;
+
+	gene_vote_t *vote_for_quality_scoring_1;
+	gene_vote_t *vote_for_quality_scoring_2;
 
 } gene_allvote_t;
 

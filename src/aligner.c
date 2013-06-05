@@ -854,7 +854,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 			reg_big_margin_votes(vote_read1, allvote, queries*2);
 			reg_big_margin_votes(vote_read2, allvote, queries*2+1);
 
-			is_paired_match = select_positions_array(USE_BASEINDEX_BREAK_TIE, queries, allvote, current_masks, InBuff, read_len, InBuff2, read2_len,vote_read1, vote_read2, MAX_PAIRED_DISTANCE, MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_counterpart, my_value_array_index, ginp -> space_type, INDEL_TOLERANCE, QualityBuff, QualityBuff2, QUALITY_SCALE, TOTAL_SUBREADS);
+			is_paired_match = select_positions_array(USE_BASEINDEX_BREAK_TIE, queries, allvote, current_masks, InBuff, read_len, InBuff2, read2_len,vote_read1, vote_read2, MAX_PAIRED_DISTANCE, MIN_PAIRED_DISTANCE, ACCEPT_SUBREADS, ACCEPT_MINOR_SUBREADS, is_counterpart, my_value_array_index, ginp -> space_type, INDEL_TOLERANCE, QualityBuff, QualityBuff2, QUALITY_SCALE, TOTAL_SUBREADS, my_thread_no);
 
 			if (!is_paired_match && !(allvote -> results[queries*2*allvote->multi_best_reads + 0].masks & IS_PAIRED_MATCH))
 			{
@@ -1190,14 +1190,14 @@ void usage(char * execname)
 	SUBREADputs("    -u --unique         \t reporting uniquely mapped reads only.");
 	SUBREADputs("    -Q --quality        \t using mapping quality scores to break ties when more than one best mapping locations are found.");
 	SUBREADputs("    -H --hamming        \t using Hamming distance to break ties when more than one best mapping locations are found.");
-	SUBREADputs("    -J --junction       \t make those bases which can not be aligned together with other bases from the same read using the `S' operation in the CIGAR string (soft-clipping). This option is useful for marking exon-spanning reads and fusion reads.");
+	SUBREADputs("    -J --junction       \t mark those bases which can not be aligned together with other bases from the same read using the `S' operation in the CIGAR string (soft-clipping). This option is useful for marking exon-spanning reads and fusion reads.");
 	SUBREADputs("    -v                  \t displaying the version number.");
 	SUBREADputs("");
 	SUBREADputs("Arguments for paired-end reads:");
 	SUBREADputs("    -R --read2     <input>\t name of the second input file. The program will then be switched to the paired-end read mapping mode.");
 	SUBREADputs("    -p --minmatch2 <int>\t consensus threshold for the read which receives less votes than the other read from the same pair, 1 by default");
-	SUBREADputs("    -d --mindist   <int>\t minimum fragment length, 50 by default");
-	SUBREADputs("    -D --maxdist   <int>\t maximum fragment length, 600 by default");
+	SUBREADputs("    -d --mindist   <int>\t minimum distance required for the two reads from the same pair, 50 by default. The distance between the two reads is measured as the distance between the mapping location of the leftmost base of the left read and the mapping location of the leftmost base of the right hand read.");
+	SUBREADputs("    -D --maxdist   <int>\t maximum distance required for the two reads from the same pair, 600 by default.");
 	SUBREADputs("    -S --order     <ff:fr:rf> \t orientation of the two read from the same pair, 'fr' by default");
 	SUBREADputs("");
 	SUBREADputs("Arguments for INDEL detection:");
@@ -1336,6 +1336,7 @@ int main_align(int argc,char ** argv)
 				break;
 			case 'T':
 				ALL_THREADS = atoi(optarg);
+				if(ALL_THREADS>64)ALL_THREADS=64;
 				break;
 			case 'r':
 				strncpy(read_file, optarg, 299);

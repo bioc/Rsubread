@@ -3064,7 +3064,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			old_inb2_reversed = (old_flag2 & 0x10)?1:0;
 
 			#ifdef QUALITY_KILL_SUBREAD
-				if(old_quality1 <= QUALITY_KILL_SUBREAD)
+				if(old_quality1 <= QUALITY_KILL_SUBREAD || (old_flag1 & SAM_FLAG_UNMAPPED))
 				{
 					/*
 					if(old_inb1_reversed)
@@ -3077,14 +3077,14 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 					*/
 
 					old_chro1[0]=0;
-					old_flag1=4;
+					old_flag1=SAM_FLAG_UNMAPPED;
 					old_quality1=0;
 					old_cigar1[0]=0;
 					old_pos1=0;
 				}
 
 
-				if(old_quality2 <= QUALITY_KILL_SUBREAD)
+				if(old_quality2 <= QUALITY_KILL_SUBREAD || (old_flag2 & SAM_FLAG_UNMAPPED))
 				{
 					/*
 
@@ -3100,7 +3100,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 
 
 					old_chro2[0]=0;
-					old_flag2=4;
+					old_flag2=SAM_FLAG_UNMAPPED;
 					old_quality2=0;
 					old_cigar2[0]=0;
 					old_pos2=0;
@@ -3296,7 +3296,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 		{
 			char mate_for_1[120], mate_for_2[120];
 			int tlen = 0;
-			if(strcmp(old_chro1, old_chro2) == 0)
+			if(old_chro1[0] && (strcmp(old_chro1, old_chro2) == 0))
 			{
 				long long int pair_dist = old_pos1;
 				pair_dist -= old_pos2;
@@ -3320,12 +3320,18 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			{
 				if(old_chro2[0])
 					strcpy(mate_for_1,old_chro2);
-				else	strcpy(mate_for_1,"*");
-
+				else{
+					strcpy(mate_for_1,"*");
+					old_pos2=0;
+				}
 				
-				if(old_chro2[1])
+				if(old_chro1[0])
 					strcpy(mate_for_2,old_chro1);
-				else	strcpy(mate_for_2,"*");
+				else
+				{
+					strcpy(mate_for_2,"*");
+					old_pos1=0;
+				}
 
 				old_flag1 &= ~SAM_FLAG_MATCHED_IN_PAIR;
 				old_flag2 &= ~SAM_FLAG_MATCHED_IN_PAIR;
@@ -3359,9 +3365,6 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			else
 			{
 				strcpy(old_chro1,"*");
-				//strcpy(mate_for_1,"*");
-				strcpy(mate_for_2,"*");
-				old_pos1=0;
 				tlen = 0;
 			}
 
@@ -3369,10 +3372,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			else
 			{
 				strcpy(old_chro2,"*");
-				strcpy(mate_for_1,"*");
-				//strcpy(mate_for_2,"*");
 				tlen = 0;
-				old_pos2=0;
 			}
 
 			if(!old_cigar1[0])
@@ -4214,8 +4214,8 @@ void exon_usage(char * execname)
 	SUBREADputs("Arguments for paired-end reads:");
 	SUBREADputs("    -R --read2     <input>\t name of the second input file from paired-end data. The program will then be switched to paired-end read mapping mode.");
 	//SUBREADputs("       --jreadonly	\t only report junction reads in SAM file.");
-	SUBREADputs("    -d --mindist   <int>\t the minimum distance between two reads in a pair, 50 by default");
-	SUBREADputs("    -D --maxdist   <int>\t the maximum distance between two reads in a pair, 600 by default");
+	SUBREADputs("    -d --mindist   <int>\t minimum distance required for the two reads from the same pair, 50 by default. The distance between the two reads is measured as the distance between the mapping location of the leftmost base of the left read and the mapping location of the leftmost base of the right hand read.");
+	SUBREADputs("    -D --maxdist   <int>\t maximum distance required for the two reads from the same pair, 600 by default.");
 	SUBREADputs("    -S --order     <ff:fr:rf> \t specifying if the first/second reads are forward or reversed, 'fr' by default");
 	SUBREADputs("");
 	//SUBREADputs("Arguments for mapping bisulfite reads:");
