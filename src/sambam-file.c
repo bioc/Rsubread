@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -354,10 +352,10 @@ int test_bamview(int argc, char ** argv)
 		{
 			char buf[3000];
 			char * buf2 = SamBam_fgets(fp,buf, 3000);
-			printf(">>%s<<\n",buf);
-			if(buf2)
-				fwrite(buf,strlen(buf), 1, stdout);
-			else break;
+			//printf(">>%s<<\n",buf);
+			//if(buf2)
+			//	fwrite(buf,strlen(buf), 1, stdout);
+			//else break;
 		}
 
 		SamBam_fclose(fp);

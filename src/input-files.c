@@ -971,7 +971,7 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 	}
 
 
-	fp_table = HashTableCreate( OFFSET_TABLE_SIZE / 16 );
+	fp_table = HashTableCreate( XOFFSET_TABLE_SIZE / 16 );
 	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
 	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
 	HashTableSetHashFunction(fp_table,HashTableStringHashFunction);

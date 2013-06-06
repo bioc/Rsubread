@@ -167,10 +167,10 @@ int main (int argc , char ** argv)
 
 	load_offsets (&_global_offsets, index_name);
 	SUBREADprintf ("Reporting threshold=%0.2f%%\n", MIN_REPORTING_RATIO*100);
-	for(i=0;i<1000;i++)
+	for(i=0;i<_global_offsets.total_offsets;i++)
 	{
-		if (!_global_offsets.read_offset[i])break;
-		SCAN_TOTAL_BASES = _global_offsets.read_offset[i];
+		if (!_global_offsets.read_offsets[i])break;
+		SCAN_TOTAL_BASES = _global_offsets.read_offsets[i];
 	}
 	SUBREADprintf ("All bases =%u\n", SCAN_TOTAL_BASES);
 	SUBREADprintf ("Scanning the full index for %s...\n\n", read_str);
@@ -178,6 +178,7 @@ int main (int argc , char ** argv)
 	full_scan_read(index_name, read_str);
 
 	SUBREADprintf ("\nFinished.\n");
+	destroy_offsets(&_global_offsets);
 
 	return 0;
 }

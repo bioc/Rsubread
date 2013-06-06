@@ -186,7 +186,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	}
 	memset(read_selection_list, 0xff, sizeof(char) * read_selection_list_size);
 
-	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * OFFSET_TABLE_SIZE);
+	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * XOFFSET_TABLE_SIZE);
 	if(!known_chromosomes)
 	{
 		fatal_memory_size();

@@ -429,7 +429,7 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 	}
 
 
-	for(chro_no=0;chro_no < OFFSET_TABLE_SIZE; chro_no++)
+	for(chro_no=0;chro_no < XOFFSET_TABLE_SIZE; chro_no++)
 	{
 		if(!chromosomes[chro_no].chromosome_name[0]) break;
 		if(strcmp(chro_name , chromosomes[chro_no].chromosome_name)==0)
@@ -440,7 +440,7 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 	}
 
 	SUBREADprintf("Processing chromosome %s in FASTA file; expected length is %u.\n", chro_name, chro_len);
-	fflush(stdout);
+	SUBREADfflush(stdout);
 	if(!chro_len)
 	{
 		SUBREADprintf("Unknown chromosome name in FASTA file: %s\n", chro_name);
@@ -553,7 +553,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		precalculated_factorial[i] = 0.; 
 		
 
-	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * OFFSET_TABLE_SIZE);
+	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * XOFFSET_TABLE_SIZE);
 	if(!known_chromosomes)
 	{
 		fatal_memory_size();
@@ -563,7 +563,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 	known_chromosomes[0].chromosome_name[0]=0;
 
 	SUBREADprintf("Spliting SAM file\n");
-	fflush(stdout);
+	SUBREADfflush(stdout);
 	//Step 1:The SAM file is scanned to create a number of temp files "temp-snps-chrX-21-00000000-XXXXXX" and the related read positions/sequences are written into them (in 2-bit base coding). A read can contribute to two blocks if it crosses the border of the blocks. If there are indels in a read, each continuously mapped section is individually written into the temporary file. The quality scores are written companying the bases. The hierarchy of the data is: block -> read -> sections {bases, phred scores, CIGAR string, reported mapping quality}
 	memcpy(rand48_seed, &start_time, 6);
 	seed48(rand48_seed);
