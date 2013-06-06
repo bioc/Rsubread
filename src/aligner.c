@@ -351,7 +351,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				if(ginp2)
 					remove_backslash(nameb);
 
-				fprintf (out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%u\t0\t%s\tNH:i:0", nameb, flags,rnext_pnt  , pnext+(is_mate_ok?1:0), inb);
+				fprintf (out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%u\t0\t%s\t", nameb, flags,rnext_pnt  , pnext+(is_mate_ok?1:0), inb);
 				if(qualityb[0])
 				{
 
@@ -362,6 +362,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				else
 					for(j=0; j<rl; j++)
 						fputc('J', out_fp);
+				fputs("\tNH:i:0", out_fp);
 				fprintf(out_fp, "\n");
 			}
 	//			SUBREADprintf ("@UNK Q#%d UNKNOW %s\n", i, inb);
