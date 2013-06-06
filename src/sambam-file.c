@@ -347,7 +347,7 @@ int test_bamview(int argc, char ** argv)
 	{
 		SamBam_FILE * fp = SamBam_fopen(argv[1], SAMBAM_FILE_BAM);
 		assert(fp);
-
+		/*
 		while(1)
 		{
 			char buf[3000];
@@ -357,7 +357,7 @@ int test_bamview(int argc, char ** argv)
 			//	fwrite(buf,strlen(buf), 1, stdout);
 			//else break;
 		}
-
+		*/
 		SamBam_fclose(fp);
 	}
 	return 0;
