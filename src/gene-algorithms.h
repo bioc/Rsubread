@@ -28,6 +28,7 @@
 // Load the ".reads" file into the memory
 // Return 0 if succeed or -1 if errors.
 int load_offsets(gene_offset_t* offsets , const char index_prefix []);
+void destroy_offsets(gene_offset_t* offsets);
 
 // Locate the position of a linear address
 // Return 0 if the linear position is in a reasonable range or -1 if it is out of range.
@@ -67,11 +68,11 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 void print_running_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads, int is_pair) ;
 
 
-int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int max_indel_len);
+int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int max_indel_len, int read1_len, int read2_len);
 
 int select_positions_array(int use_bases_scoring, int qid, gene_allvote_t * allvotes, short current_masks, char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int thread_no);
 
-int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven);
+int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven, int read1_len, int read2_len);
 #define QUALITY_SCALE_NONE 0
 #define QUALITY_SCALE_LINEAR 1
 #define QUALITY_SCALE_LOG 2

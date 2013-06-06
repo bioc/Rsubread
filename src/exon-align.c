@@ -2796,10 +2796,10 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 	{
 		unsigned int last_offset = 0;
 		i=0;
-		while(_global_offsets.read_offset[i])
+		while(_global_offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_name[i], _global_offsets.read_offset[i] - last_offset+16);
-			last_offset = _global_offsets.read_offset[i];
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_READ_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
+			last_offset = _global_offsets.read_offsets[i];
 			i++;
 		}
 	}
@@ -2952,10 +2952,10 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 	{
 		unsigned int last_offset = 0;
 		i=0;
-		while(_global_offsets.read_offset[i])
+		while(_global_offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_name[i], _global_offsets.read_offset[i] - last_offset+16);
-			last_offset = _global_offsets.read_offset[i];
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_READ_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
+			last_offset = _global_offsets.read_offsets[i];
 			i++;
 		}
 	}
@@ -3300,9 +3300,8 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			{
 				long long int pair_dist = old_pos1;
 				pair_dist -= old_pos2;
-				tlen = pair_dist;
-				pair_dist = abs(pair_dist);
-				if(pair_dist >= EXON_MIN_PAIRED_DISTANCE && pair_dist <= EXON_MAX_PAIRED_DISTANCE)
+				tlen = abs(pair_dist) + (tlen>0?rl1:rl2);
+				if(tlen >= EXON_MIN_PAIRED_DISTANCE && tlen <= EXON_MAX_PAIRED_DISTANCE)
 				{
 					old_flag1 |= SAM_FLAG_MATCHED_IN_PAIR;
 					old_flag2 |= SAM_FLAG_MATCHED_IN_PAIR;
@@ -3314,7 +3313,6 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 				}
 				strcpy(mate_for_1,"=");
 				strcpy(mate_for_2,"=");
-				tlen = abs(tlen) + (tlen>0?rl1:rl2);
 			}
 			else
 			{
@@ -3588,13 +3586,13 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 
 	// if this block of index is not the last one
 
-	if(_global_offsets.read_offset[ _global_offsets.total_offsets ] > high_border+10)
+	if(_global_offsets.read_offsets[ _global_offsets.total_offsets ] > high_border+10)
 		for(i=0; i< _global_offsets.total_offsets; i++)
 		{
-			if(_global_offsets.read_offset[i] > index_valid_range)
+			if(_global_offsets.read_offsets[i] > index_valid_range)
 			{
-				if(i>0 && _global_offsets.read_offset[i-1] > index_valid_range-2000000)
-					index_valid_range = _global_offsets.read_offset[i-1] ;
+				if(i>0 && _global_offsets.read_offsets[i-1] > index_valid_range-2000000)
+					index_valid_range = _global_offsets.read_offsets[i-1] ;
 				else
 					index_valid_range = index_valid_range-2000000 ;
 				break;
@@ -3830,7 +3828,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 			{
 				finalise_vote(vote_p1);
 				finalise_vote(vote_p2);
-				int is_paired_match = select_positions_exons(vote_p1, vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, 3, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven);
+				int is_paired_match = select_positions_exons(vote_p1, vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, 3, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven, read_len, read2_len);
 				for (is_second_read = 0; is_second_read <2; is_second_read ++)
 				{
 					gene_vote_t * current_vote = is_second_read?vote_p2: vote_p1;
@@ -4214,8 +4212,8 @@ void exon_usage(char * execname)
 	SUBREADputs("Arguments for paired-end reads:");
 	SUBREADputs("    -R --read2     <input>\t name of the second input file from paired-end data. The program will then be switched to paired-end read mapping mode.");
 	//SUBREADputs("       --jreadonly	\t only report junction reads in SAM file.");
-	SUBREADputs("    -d --mindist   <int>\t minimum distance required for the two reads from the same pair, 50 by default. The distance between the two reads is measured as the distance between the mapping location of the leftmost base of the left read and the mapping location of the leftmost base of the right hand read.");
-	SUBREADputs("    -D --maxdist   <int>\t maximum distance required for the two reads from the same pair, 600 by default.");
+	SUBREADputs("    -d --mindist   <int>\t minimum fragment/template length, 50bp by default.");
+	SUBREADputs("    -D --maxdist   <int>\t maximum fragment/template length, 600bp by default.");
 	SUBREADputs("    -S --order     <ff:fr:rf> \t specifying if the first/second reads are forward or reversed, 'fr' by default");
 	SUBREADputs("");
 	//SUBREADputs("Arguments for mapping bisulfite reads:");
@@ -4822,5 +4820,6 @@ int main_junction(int argc,char ** argv)
 	if(tmpfile[0])
 		unlink(tmpfile);
 	destory_halves_record(&halves_record);
+	destroy_offsets (&_global_offsets);
 	return 0;
 }

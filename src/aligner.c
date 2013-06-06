@@ -80,15 +80,16 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 	unsigned int paired_match = 0;
 
 	load_offsets (&offsets, index_prefix);
+	//printf("NS=%d\n", offsets.total_offsets);
 
 	if(all_processed_reads ==0)
 	{
 		unsigned int last_offset = 0;
 		i=0;
-		while(offsets.read_offset[i])
+		while(offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", offsets.read_name[i], offsets.read_offset[i] - last_offset+16);
-			last_offset = offsets.read_offset[i];
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", offsets.read_names+i*MAX_READ_NAME_LEN, offsets.read_offsets[i] - last_offset+16);
+			last_offset = offsets.read_offsets[i];
 			i++;
 		}
 	}
@@ -99,51 +100,65 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 	int rl1=0, rl2=0, rl=0;
 	while(1)
 	{
-		int isOK = 0, best_read_id;
+		int isOK = 0, best_read_id, total_best_read_id;
 		nameb[0]=0;
+		long long int fpos1 = 0 , fpos2 = 0;
 
-
-		int Curr_position;
-		if(ginp2)
+		for(total_best_read_id = 0 ; total_best_read_id <  av->multi_best_reads; total_best_read_id ++)
 		{
-			Curr_position = i*2+(Curr_ginp==ginp);
+			int Curr_position = (ginp2?(i*2):i);
+			voting_result_t * Curr_result = &(av -> results[Curr_position * av->multi_best_reads + total_best_read_id]);
+
+			if(total_best_read_id && (REPORT_ONLY_UNIQUE || !(Curr_result -> masks & IS_PAIRED_MATCH))) break;
+			if(Curr_result -> vote_number <1) break;
 		}
-		else
-			Curr_position = i;
 
-		voting_result_t * Curr_result = &(av -> results[Curr_position * av->multi_best_reads]);
-		long long int fpos = 0;
-
-		if(ginp2) 
+		for(best_read_id = 0 ; best_read_id <  av->multi_best_reads; best_read_id += (ginp2?(Curr_ginp==ginp2):1))
 		{
-			Curr_ginp = (Curr_ginp==ginp2)?ginp:ginp2;
-			if((!(Curr_result -> masks & IS_R1R2_EQUAL_LEN)) && (Curr_ginp == ginp))
+			int Curr_position;
+			if(ginp2)
+				Curr_position = i*2+(Curr_ginp==ginp);
+			else
+				Curr_position = i;
+
+
+			voting_result_t * Curr_result = &(av -> results[Curr_position * av->multi_best_reads + best_read_id]);
+			if(best_read_id && (REPORT_ONLY_UNIQUE || Curr_result -> vote_number <1 || !(Curr_result -> masks & IS_PAIRED_MATCH))) break;
+	
+			voting_result_t * Curr_result0 = &(av -> results[Curr_position * av->multi_best_reads]);
+
+			if(ginp2) 
 			{
-				fpos = ftello(ginp->input_fp);
-				rl1 = geinput_next_read(ginp, NULL, inb, NULL);
-				fseeko(ginp->input_fp, fpos, SEEK_SET);
+				Curr_ginp = (Curr_ginp==ginp2)?ginp:ginp2;
+				if((!(Curr_result0 -> masks & IS_R1R2_EQUAL_LEN)) && (Curr_ginp == ginp) )
+				{
+					if((!feof(ginp->input_fp)) && !feof(ginp2->input_fp))
+					{
+						long long int tfpos = ftello(ginp->input_fp);
+						rl1 = geinput_next_read(ginp, NULL, inb, NULL);
+						fseeko(ginp->input_fp, tfpos, SEEK_SET);
 
-				fpos = ftello(ginp2->input_fp);
-				rl2 = geinput_next_read(ginp2, NULL, inb, NULL);
-				fseeko(ginp2->input_fp, fpos, SEEK_SET);
+						tfpos = ftello(ginp2->input_fp);
+						rl2 = geinput_next_read(ginp2, NULL, inb, NULL);
+						fseeko(ginp2->input_fp, tfpos, SEEK_SET);
+					}
+				}
 			}
-		}
-		else
-			Curr_ginp = ginp;
-
-
-
-		for(best_read_id = 0 ; best_read_id <  av->multi_best_reads; best_read_id++) 
-		{
-			Curr_result = &(av -> results[Curr_position * av->multi_best_reads + best_read_id]);
-			if(best_read_id && (REPORT_ONLY_UNIQUE || Curr_result -> vote_number <1)) break;
+			else
+				Curr_ginp = ginp;
 
 			if(best_read_id) 
 			{
 				if(!feof(Curr_ginp->input_fp))
-					fseeko(Curr_ginp->input_fp, fpos, SEEK_SET);
+					fseeko(Curr_ginp->input_fp, Curr_ginp==ginp2?fpos2:fpos1, SEEK_SET);
 			}
-			else	fpos = ftello(Curr_ginp->input_fp);
+			else{
+				if(Curr_ginp==ginp2)
+					fpos2 = ftello(Curr_ginp->input_fp);
+				else
+					fpos1 = ftello(Curr_ginp->input_fp);
+			}
+
 
 			//printf("R %d V0=%d\n", Curr_position, Curr_result->vote_number);
 			rl = geinput_next_read(Curr_ginp, nameb, inb, qualityb);
@@ -294,7 +309,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 						else
 							for(j=0; j<rl; j++)
 								fputc('J', out_fp);
-						fprintf(out_fp, "\tAS:i:%d\tNM:i:%d", Curr_result -> vote_number, Curr_result->edit_distance);
+						fprintf(out_fp, "\tAS:i:%d\tNM:i:%d\tNH:i:%d", Curr_result -> vote_number, Curr_result->edit_distance, total_best_read_id);
 
 					}
 					else
@@ -312,7 +327,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 						else
 							for(j=0; j<rl; j++)
 								fputc('J', out_fp);
-						fprintf(out_fp, "\tAS:i:%d\tNM:i:%d", Curr_result -> vote_number, Curr_result->edit_distance);
+						fprintf(out_fp, "\tAS:i:%d\tNM:i:%d\tNH:i:%d", Curr_result -> vote_number, Curr_result->edit_distance,total_best_read_id);
 					}
 					fputc('\n',out_fp);
 
@@ -336,7 +351,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				if(ginp2)
 					remove_backslash(nameb);
 
-				fprintf (out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%u\t0\t%s\t", nameb, flags,rnext_pnt  , pnext+(is_mate_ok?1:0), inb);
+				fprintf (out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%u\t0\t%s\tNH:i:0", nameb, flags,rnext_pnt  , pnext+(is_mate_ok?1:0), inb);
 				if(qualityb[0])
 				{
 
@@ -357,8 +372,8 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 			break;
 		}
 
-		if((!ginp2) || ginp2 == Curr_ginp)
-			i++;
+		//if((!ginp2) || ginp2 == Curr_ginp)
+		i++;
 		if(i >= processed_reads)break;
 
 
@@ -370,6 +385,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 	//else
 	//	SUBREADprintf("\nNo reads are mapped in pairs.\b");
 
+	destroy_offsets (&offsets);
 }
 
 
@@ -1196,8 +1212,8 @@ void usage(char * execname)
 	SUBREADputs("Arguments for paired-end reads:");
 	SUBREADputs("    -R --read2     <input>\t name of the second input file. The program will then be switched to the paired-end read mapping mode.");
 	SUBREADputs("    -p --minmatch2 <int>\t consensus threshold for the read which receives less votes than the other read from the same pair, 1 by default");
-	SUBREADputs("    -d --mindist   <int>\t minimum distance required for the two reads from the same pair, 50 by default. The distance between the two reads is measured as the distance between the mapping location of the leftmost base of the left read and the mapping location of the leftmost base of the right hand read.");
-	SUBREADputs("    -D --maxdist   <int>\t maximum distance required for the two reads from the same pair, 600 by default.");
+	SUBREADputs("    -d --mindist   <int>\t minimum fragment/template length, 50bp by default.");
+	SUBREADputs("    -D --maxdist   <int>\t maximum fragment/template length, 600bp by default.");
 	SUBREADputs("    -S --order     <ff:fr:rf> \t orientation of the two read from the same pair, 'fr' by default");
 	SUBREADputs("");
 	SUBREADputs("Arguments for INDEL detection:");

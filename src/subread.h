@@ -30,7 +30,7 @@
 #endif
 
 
-#define SUBREAD_VERSION "1.3.4"
+#define SUBREAD_VERSION "1.3.5"
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -128,7 +128,7 @@ typedef unsigned int gene_quality_score_t;
 typedef char gene_vote_number_t;
 
 
-#define OFFSET_TABLE_SIZE 50000
+#define XOFFSET_TABLE_SIZE 50000
 
 #define ANCHORS_NUMBER 259
 
@@ -284,8 +284,8 @@ typedef struct{
 
 typedef struct{
 	int total_offsets;
-        char read_name[OFFSET_TABLE_SIZE][MAX_READ_NAME_LEN];
-        unsigned int read_offset[OFFSET_TABLE_SIZE];
+        char *read_names; //[MAX_READ_NAME_LEN];
+        unsigned int *read_offsets;
 } gene_offset_t;
 
 

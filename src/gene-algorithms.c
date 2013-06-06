@@ -357,12 +357,12 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 {
 	unsigned int ret = 0 ;
 	int n;
-	for (n=0; offsets->read_offset[n]; n++)
+	for (n=0; offsets->read_offsets[n]; n++)
 	{
-		if (strcmp(offsets->read_name[n], chro_name) == 0)
+		if (strcmp(offsets->read_names + n*MAX_READ_NAME_LEN, chro_name) == 0)
 			return ret + chro_pos;
 		else
-			ret = offsets->read_offset[n];
+			ret = offsets->read_offsets[n];
 	}
 	return 0xffffffff;
 }
@@ -380,24 +380,31 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 	int total_offsets = offsets -> total_offsets;
 
-	#define GENE_LOCATE_JUMP 15
+	int GENE_LOCATE_JUMP = total_offsets/4;
 
-	while(n+GENE_LOCATE_JUMP < total_offsets &&  offsets->read_offset[n+GENE_LOCATE_JUMP] <= linear)
-		n+=GENE_LOCATE_JUMP;
-
-	for (; offsets->read_offset[n]; n++)
+	while (GENE_LOCATE_JUMP > 5)
 	{
-		if (offsets->read_offset[n] > linear)
+		while(n+GENE_LOCATE_JUMP < total_offsets &&  offsets->read_offsets[n+GENE_LOCATE_JUMP] <= linear)
+			n+=GENE_LOCATE_JUMP;
+		GENE_LOCATE_JUMP /=4;
+	}
+
+
+
+
+	for (; offsets->read_offsets[n]; n++)
+	{
+		if (offsets->read_offsets[n] > linear)
 		{
 			// the end of the read should not excess the end of the chromosome
-			if(rl + linear >= offsets->read_offset[n]) return 1;
+			if(rl + linear >= offsets->read_offsets[n]) return 1;
 
 			if (n==0)
 				*pos = linear;
 			else
-				*pos = linear - offsets->read_offset[n-1];
+				*pos = linear - offsets->read_offsets[n-1];
 
-			*chro_name = (char *)offsets->read_name[n];
+			*chro_name = offsets->read_names+n*MAX_READ_NAME_LEN;
 
 			return 0;
 		}
@@ -1193,11 +1200,11 @@ int select_positions_array(int use_bases_scoring, int qid, gene_allvote_t * allv
 
 //	SUBREADprintf("Q=%.3f\n", *qual_r2);
 
-	return select_positions(allvotes, qid, current_masks, used_vote_1, used_vote_2 ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, indel_tolerance);
+	return select_positions(allvotes, qid, current_masks, used_vote_1, used_vote_2 ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, indel_tolerance, read1_len, read2_len);
 }
 
 
-int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int max_indel_len)
+int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int max_indel_len, int read1_len, int read2_len)
 {
 
 	int k, i, j, anchors = 0;
@@ -1247,7 +1254,6 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 
 					if(anchors >= ANCHORS_NUMBER)
 					{
-	//					SUBREADprintf("Abnormally too many anchors [%d, %d] %f\n", i, j, anchor_votes);
 						anchors --;
 					}
 				}
@@ -1258,6 +1264,9 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 	bzero(minor_votes, ANCHORS_NUMBER*sizeof(gene_vote_number_t));
 	bzero(minor_quality, ANCHORS_NUMBER*sizeof(gene_quality_score_t));
 	bzero(is_minor_breakeven, ANCHORS_NUMBER);
+
+	// k == 1 : current is read2
+	// k == 0 : current is read1
 	for (k=0; k<2; k++)
 	{
 		gene_vote_t * current_vote = k?vote_read2:vote_read1;
@@ -1279,22 +1288,30 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 
 						long long int abdist = current_vote->pos[i][j];
 						abdist -= anchors_position[l];
-
-						if((anchor_read[l] && !is_negative_strand) ||
-						    ((!anchor_read[l]) && is_negative_strand))
-							abdist = -abdist;
-
+						
 						if (abdist < 0)
-						//#warning WGSIM generates paired-end data in a wrong way; abdist is given its absolute value in such a case.
+						{
 							abdist = -abdist;
-						//	continue;
+							abdist += (anchor_read[l]?read2_len:read1_len);
+						}
+						else
+							abdist += (anchor_read[l]?read1_len:read2_len);
 
 						long long int abdist_old = minor_position[l];
 						abdist_old -=  anchors_position[l];
-						if(abdist_old <0) abdist_old=-abdist_old;
+
+						if(abdist_old <0)
+						{
+							abdist_old = -abdist_old;
+							abdist_old += (anchor_read[l]?read2_len:read1_len);
+						}
+						else
+							abdist_old += (anchor_read[l]?read1_len:read2_len);
+
+
 						if (	(minor_votes[l] < current_vote->votes[i][j] ||
 							(minor_votes[l] == current_vote->votes[i][j] && current_vote->quality [i][j] > minor_quality[l]) ||
-							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<0.0001 && abdist < abdist_old))&& 
+							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<1 && abdist < abdist_old))&& 
 							(abdist <= max_pair_dest) &&
 							(abdist >= min_pair_dest) 
 						   )
@@ -1454,6 +1471,12 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 	return ret;
 }
 
+void destroy_offsets(gene_offset_t* offsets)
+{
+	free(offsets->read_names);
+	free(offsets->read_offsets);
+}
+
 int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 {
 	char fn[300];
@@ -1470,6 +1493,11 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 		return 1;
 	}
 
+	int current_max_n = 100;
+	offsets->read_names = malloc(current_max_n * MAX_READ_NAME_LEN);
+	offsets->read_offsets= malloc(current_max_n * sizeof(int));
+
+
 	while (!feof(fp))
 	{
 		int i=0, step = 0, j=0;
@@ -1481,24 +1509,29 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 			if (fn[i] == '\t')
 			{
 				fn[i]=0;
-				offsets->read_offset[n] = (unsigned int)atoll(fn);
+				offsets->read_offsets[n] = (unsigned int)atoll(fn);
 				step = 1;
 			}
 			else if (step)
 			{
 				if(j<47)
 				{
-					offsets->read_name[n][j++] = fn[i];
-					offsets->read_name[n][j]=0;
+					*(offsets->read_names + n*MAX_READ_NAME_LEN + (j++)) = fn[i];
+					*(offsets->read_names + n*MAX_READ_NAME_LEN + j) =0;
 				}
 			}
 			i++;
 		}
 		n++;
+		if(n >= current_max_n)
+		{
+			offsets->read_names = realloc(offsets->read_names, 2*current_max_n * MAX_READ_NAME_LEN);
+			offsets->read_offsets = realloc(offsets->read_offsets, 2*current_max_n * sizeof(int));
+			current_max_n*=2;
+		}
 
-		offsets->read_offset[n] = 0;
+		offsets->read_offsets[n] = 0;
 
-		if( n >= OFFSET_TABLE_SIZE -1) break;
 	}
 
 	offsets->total_offsets=n;
@@ -2459,7 +2492,7 @@ int get_base_error_prob64i(char v)
 
 
 
-int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven)
+int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven, int read1_len, int read2_len)
 {
 
 	int k, i, j, anchors = 0;
@@ -2537,21 +2570,31 @@ int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, g
 						long long int abdist = current_vote->pos[i][j];
 						abdist -= anchors_position[l];
 
-						if((anchor_read[l] && !is_negative_strand) ||
-						    ((!anchor_read[l]) && is_negative_strand))
-							abdist = -abdist;
-
+	
 						if (abdist < 0)
-						//#warning WGSIM generates paired-end data in a wrong way; abdist is given its absolute value in such a case.
+						{
 							abdist = -abdist;
-						//	continue;
+							abdist += (anchor_read[l]?read2_len:read1_len);
+						}
+						else
+							abdist += (anchor_read[l]?read1_len:read2_len);
 
 						long long int abdist_old = minor_position[l];
 						abdist_old -=  anchors_position[l];
-						if(abdist_old <0) abdist_old=-abdist_old;
+
+						if(abdist_old <0)
+						{
+							abdist_old = -abdist_old;
+							abdist_old += (anchor_read[l]?read2_len:read1_len);
+						}
+						else
+							abdist_old += (anchor_read[l]?read1_len:read2_len);
+
+
+
 						if (	(minor_votes[l] < current_vote->votes[i][j] ||
 							(minor_votes[l] == current_vote->votes[i][j] && current_vote->quality [i][j] > minor_quality[l]) ||
-							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<0.0001 && abdist < abdist_old))&& 
+							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<1 && abdist < abdist_old))&& 
 							(abdist <= max_pair_dest) &&
 							(abdist >= min_pair_dest) 
 						   )
