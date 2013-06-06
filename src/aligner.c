@@ -109,7 +109,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 			int Curr_position = (ginp2?(i*2):i);
 			voting_result_t * Curr_result = &(av -> results[Curr_position * av->multi_best_reads + total_best_read_id]);
 
-			if(total_best_read_id && (REPORT_ONLY_UNIQUE || !(Curr_result -> masks & IS_PAIRED_MATCH))) break;
+			if(total_best_read_id && (REPORT_ONLY_UNIQUE || (ginp2 && !(Curr_result -> masks & IS_PAIRED_MATCH)))) break;
 			if(Curr_result -> vote_number <1) break;
 		}
 
@@ -123,7 +123,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 
 			voting_result_t * Curr_result = &(av -> results[Curr_position * av->multi_best_reads + best_read_id]);
-			if(best_read_id &&( Curr_ginp==ginp2 || !ginp2 ) && (REPORT_ONLY_UNIQUE || Curr_result -> vote_number <1 || !(Curr_result -> masks & IS_PAIRED_MATCH))) break;
+			if(best_read_id &&( Curr_ginp==ginp2 || !ginp2 ) && (REPORT_ONLY_UNIQUE || Curr_result -> vote_number <1 || (ginp2 && !(Curr_result -> masks & IS_PAIRED_MATCH)))) break;
 	
 			voting_result_t * Curr_result0 = &(av -> results[Curr_position * av->multi_best_reads]);
 
