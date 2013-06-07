@@ -1303,7 +1303,7 @@ int main_align(int argc,char ** argv)
 	index_prefix[0]=0;
 	output_file[0]=0;
 //	all_reads = 1*1024*1024/10; //*14
-	all_reads = 7*1024*1024;
+	all_reads = 14*1024*1024;
 
 
 	SUBREADprintf("\n");
