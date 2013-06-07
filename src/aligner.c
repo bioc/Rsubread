@@ -99,7 +99,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 	int rl1=0, rl2=0, rl=0;
 	while(1)
 	{
-		int isOK = 0, best_read_id, total_best_read_id;
+		int best_read_id, total_best_read_id;
 		nameb[0]=0;
 		long long int fpos1 = 0 , fpos2 = 0;
 		gene_input_t * Curr_ginp=ginp2;
@@ -115,7 +115,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 		for(best_read_id = 0 ; best_read_id <  av->multi_best_reads; best_read_id += (ginp2?(Curr_ginp==ginp2):1))
 		{
-			int Curr_position;
+			int Curr_position, isOK=0;
 			if(ginp2)
 				Curr_position = i*2+(Curr_ginp==ginp);
 			else
@@ -123,7 +123,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 
 			voting_result_t * Curr_result = &(av -> results[Curr_position * av->multi_best_reads + best_read_id]);
-			if(best_read_id &&( Curr_ginp==ginp2 || !ginp2 ) && (REPORT_ONLY_UNIQUE || Curr_result -> vote_number <1 || (ginp2 && !(Curr_result -> masks & IS_PAIRED_MATCH)))) break;
+			if(best_read_id && (Curr_ginp==ginp2 || !ginp2) && (REPORT_ONLY_UNIQUE || Curr_result -> vote_number <1 || (ginp2 && !(Curr_result -> masks & IS_PAIRED_MATCH)))) break;
 	
 			voting_result_t * Curr_result0 = &(av -> results[Curr_position * av->multi_best_reads]);
 
@@ -255,7 +255,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 				lpos += offset_pos;
 
-				if(!locate_gene_position_max(lpos, &offsets, &read_name, &read_pos, rl + rl_adj))
+				if(!locate_gene_position_max(lpos, &offsets, &read_name, &read_pos, rl + rl_adj - offset_pos))
 				{
 
 					if (best_read_id) flags |= SAM_FLAG_SECONDARY_ALIGNMENT;
@@ -1303,7 +1303,7 @@ int main_align(int argc,char ** argv)
 	index_prefix[0]=0;
 	output_file[0]=0;
 //	all_reads = 1*1024*1024/10; //*14
-	all_reads = 14*1024*1024;
+	all_reads = 7*1024*1024;
 
 
 	SUBREADprintf("\n");

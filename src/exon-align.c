@@ -3041,8 +3041,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 					k++;
 
 				}
-				if(field == 11)qualityb[ci]=0;
-				if(field == 10 && ci>0)qualityb[ci]=0;
+				if(ci>0)qualityb[ci]=0;
 
 				if(j)
 				{
