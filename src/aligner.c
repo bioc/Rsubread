@@ -213,8 +213,9 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 					show_cigar(av-> all_indel_recorder+ mate_rec_offset , mate_rl, 0, mate_cigar, INDEL_TOLERANCE, TOTAL_SUBREADS, NULL,&mate_offset_pos, &mate_rl_adj, &is_safeguarded);
 
 					mate_pos = Mate_result -> read_pos;
+					mate_pos += mate_offset_pos;
 
-					if(locate_gene_position_max(mate_pos, &offsets, &rnext_pnt, &pnext, mate_rl+mate_rl_adj)) is_mate_ok = 0;
+					if(locate_gene_position_max(mate_pos, &offsets, &rnext_pnt, &pnext, mate_rl+mate_rl_adj - mate_offset_pos)) is_mate_ok = 0;
 				}
 
 				if(!is_mate_ok)
@@ -277,7 +278,6 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 					{
 
 
-						mate_pos += mate_offset_pos;
 
 						long long int tlen; 		// the total length of the whole segment, which is split into two readso.
 
