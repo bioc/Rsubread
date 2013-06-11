@@ -357,14 +357,14 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 {
 	unsigned int ret = 0 ;
 	int n;
-	for (n=0; offsets->read_offsets[n]; n++)
-	{
-		if (strcmp(offsets->read_names + n*MAX_READ_NAME_LEN, chro_name) == 0)
-			return ret + chro_pos;
-		else
-			ret = offsets->read_offsets[n];
-	}
-	return 0xffffffff;
+
+	n = HashTableGet(offsets -> read_name_to_index, chro_name)-NULL;
+	if(n<1) return 0xffffffff;
+
+	if(n>1)
+		ret = offsets->read_offsets[n-2];
+
+	return ret + chro_pos;
 }
 
 unsigned int get_gene_linear(int chrono, int offset, const unsigned int offsets [])
@@ -1475,6 +1475,7 @@ void destroy_offsets(gene_offset_t* offsets)
 {
 	free(offsets->read_names);
 	free(offsets->read_offsets);
+	HashTableDestroy(offsets->read_name_to_index);
 }
 
 int load_offsets(gene_offset_t* offsets , const char index_prefix [])
@@ -1494,9 +1495,13 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	}
 
 	int current_max_n = 100;
-	offsets->read_names = malloc(current_max_n * MAX_READ_NAME_LEN);
-	offsets->read_offsets= malloc(current_max_n * sizeof(int));
+	offsets->read_names = malloc(current_max_n * MAX_CHROMOSOME_NAME_LEN);
+	offsets->read_offsets = malloc(current_max_n * sizeof(int));
+	offsets->read_name_to_index = HashTableCreate(5000);
 
+	HashTableSetKeyComparisonFunction(offsets->read_name_to_index, my_strcmp);
+	HashTableSetHashFunction(offsets->read_name_to_index ,HashTableStringHashFunction);
+	HashTableSetDeallocationFunctions(offsets->read_name_to_index ,free, NULL);
 
 	while (!feof(fp))
 	{
@@ -1514,18 +1519,23 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 			}
 			else if (step)
 			{
-				if(j<47)
+				if(j<MAX_CHROMOSOME_NAME_LEN-1)
 				{
-					*(offsets->read_names + n*MAX_READ_NAME_LEN + (j++)) = fn[i];
-					*(offsets->read_names + n*MAX_READ_NAME_LEN + j) =0;
+					*(offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN + (j++)) = fn[i];
+					*(offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN + j) =0;
 				}
 			}
 			i++;
 		}
+
+		char * read_name_mem = malloc(MAX_CHROMOSOME_NAME_LEN);
+		strcpy(read_name_mem, offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN);
+
+		HashTablePut(offsets->read_name_to_index, read_name_mem , NULL + 1 + n);
 		n++;
 		if(n >= current_max_n)
 		{
-			offsets->read_names = realloc(offsets->read_names, 2*current_max_n * MAX_READ_NAME_LEN);
+			offsets->read_names = realloc(offsets->read_names, 2*current_max_n * MAX_CHROMOSOME_NAME_LEN);
 			offsets->read_offsets = realloc(offsets->read_offsets, 2*current_max_n * sizeof(int));
 			current_max_n*=2;
 		}

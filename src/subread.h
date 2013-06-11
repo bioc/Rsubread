@@ -29,8 +29,9 @@
 #include <R.h>
 #endif
 
+#include "hashtable.h" 
 
-#define SUBREAD_VERSION "1.3.5"
+#define SUBREAD_VERSION "1.3.6"
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -286,6 +287,7 @@ typedef struct{
 	int total_offsets;
         char *read_names; //[MAX_READ_NAME_LEN];
         unsigned int *read_offsets;
+	HashTable * read_name_to_index;
 } gene_offset_t;
 
 

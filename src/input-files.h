@@ -117,5 +117,5 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_start);
 
 void colorread2base(char * read_buffer, int read_len);
-
+int my_strcmp(const void * s1, const void * s2);
 #endif
