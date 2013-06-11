@@ -291,10 +291,10 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 						long long int tlen; 		// the total length of the whole segment, which is split into two readso.
 
 						if (Curr_ginp==ginp2)
-							tlen = ( (mate_pos > lpos) ? (mate_pos - mate_offset_pos - lpos + offset_pos + rl1) :(lpos - offset_pos - mate_pos + mate_offset_pos + rl2));
+							tlen = ( (mate_pos - mate_offset_pos) > (lpos - offset_pos) ? (mate_pos - mate_offset_pos - lpos + offset_pos + rl1) :(lpos - offset_pos - mate_pos + mate_offset_pos + rl2));
 						else
-							tlen = ( (mate_pos > lpos) ? (mate_pos - mate_offset_pos - lpos + offset_pos + rl2) :(lpos - offset_pos - mate_pos + mate_offset_pos + rl1));
-						if (mate_pos < lpos) tlen=-tlen;
+							tlen = ( (mate_pos - mate_offset_pos) > (lpos - offset_pos) ? (mate_pos - mate_offset_pos - lpos + offset_pos + rl2) :(lpos - offset_pos - mate_pos + mate_offset_pos + rl1));
+						if (((mate_pos - mate_offset_pos) < (lpos - offset_pos))) tlen=-tlen;
 
 						if(strncmp(rnext_pnt, read_name, 1200) ==0)
 							strcpy(rnext,"=");
