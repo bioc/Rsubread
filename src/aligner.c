@@ -35,6 +35,7 @@
 
 int ALL_THREADS=1;
 int TOTAL_SUBREADS;
+int CONVERT_COLOR_READ_TO_BASE;
 int ACCEPT_SUBREADS;
 int ACCEPT_MINOR_SUBREADS;
 int INDEX_THRESHOLD;
@@ -223,6 +224,9 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 			}
 
+			if(ginp->space_type==GENE_SPACE_COLOR && CONVERT_COLOR_READ_TO_BASE)
+				colorread2base(inb, rl);
+
 			if (((votes >= ACCEPT_SUBREADS) || ((Curr_result->masks & IS_PAIRED_MATCH) && votes>0 && Mate_result -> vote_number>0) ) && ((!REPORT_ONLY_UNIQUE) ||  !(Curr_result -> masks & IS_BREAKEVEN_READ)))
 			{
 
@@ -244,10 +248,15 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 				if(is_counterpart + (Curr_ginp==ginp2) == 1)
 				{
-					int rev_offset = (Curr_ginp->space_type==GENE_SPACE_COLOR && inb[0]>='A' && inb[0]<='Z')?1:0;
-					reverse_read(inb+ rev_offset, rl- rev_offset, ginp->space_type);
+					int reverse_space_type = GENE_SPACE_BASE;
+
+					if(ginp->space_type==GENE_SPACE_COLOR && !CONVERT_COLOR_READ_TO_BASE)
+						reverse_space_type = GENE_SPACE_COLOR;
+
+					reverse_read(inb, rl, reverse_space_type);
+
 					if(qualityb[0])
-						reverse_quality(qualityb, rl- rev_offset);
+						reverse_quality(qualityb, rl);
 				}
 
 				long long int curr_rec_offset =  Curr_position*av->multi_best_reads + best_read_id;
@@ -573,8 +582,12 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 					else
 					{
 						unsigned int tmp_mapped_pos = allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].read_pos;
+						int final_qual = 200;
+						if(ginp -> space_type == GENE_SPACE_BASE)
+							final_qual = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read_txt, qual_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl, APPLY_REPEATING_PENALTY);
 
-						allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read_txt, qual_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl, APPLY_REPEATING_PENALTY);
+						allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].final_quality = final_qual;
+
 						//allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read_txt, qual_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl);
 						//allvote->results[(2*queries+read_second) * allvote -> multi_best_reads + best_read_id].edit_distance = mismatch;
 					}
@@ -637,11 +650,14 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 					else
 					{
 						int repeated_number = 0;
+						int final_qual = 200;
 
+						if(ginp -> space_type == GENE_SPACE_BASE)
+							final_qual = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1, APPLY_REPEATING_PENALTY);
 						if(APPLY_REPEATING_PENALTY)
 							repeated_number = test_big_margin(allvote, queries);
 
-						allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1, APPLY_REPEATING_PENALTY) / (1+repeated_number);
+						allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_qual / (1+repeated_number);
 						//allvote->results[queries * allvote -> multi_best_reads + best_read_id].final_quality = final_mapping_quality_edit(my_value_array_index, tmp_mapped_pos, read1_txt, qual1_txt, cigar_str, FASTQ_FORMAT, &mismatch, rl1) / (1+repeated_number);
 						allvote->results[queries * allvote -> multi_best_reads + best_read_id].edit_distance = mismatch;
 					}
@@ -1189,49 +1205,96 @@ int run_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_pre
 
 void usage(char * execname)
 {
+	SUBREADprintf("Version %s\n\n", SUBREAD_VERSION);
+
 	SUBREADputs("Usage:");
+	SUBREADputs("");
 	SUBREADputs(" ./subread-align [options] -i <index_name> -r <input> -o <output>");
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
-	SUBREADputs("    -i --index     <index>\t base name of the index.");
-	SUBREADputs("    -r --read      <input>\t name of the input file(FASTQ/FASTA format). For paired-end read data, this will be the first read file and the other read file should be provided via the -R option.");
-	SUBREADputs("    -o --output    <output>\t name of the output file(SAM format).");
+	SUBREADputs("    ");
+	SUBREADputs("    -i --index     <index>  base name of the index.");
+	SUBREADputs("   ");
+	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format). For ");
+	SUBREADputs("                            paired-end read data, this will be the first read");
+	SUBREADputs("                            file and the other read file should be provided via");
+	SUBREADputs("                            the -R option.");
+	SUBREADputs("    ");
+	SUBREADputs("    -o --output    <output> name of the output file(SAM format).");
 	SUBREADputs("");
-	SUBREADputs("Optional arguments:");
-	SUBREADputs("    -n --subreads  <int>\t number of selected subreads, 10 by default.");
-	SUBREADputs("    -m --minmatch  <int>\t consensus threshold (minimal number of consensus subreads required) for reporting a hit. If paired-end read data are provided, this gives the consensus threshold for the read which receives more votes than the other read from the same pair. 3 by default.");
-	SUBREADputs("    -T --threads   <int>\t number of threads, 1 by default.");
-	SUBREADputs("    -I --indel     <int>\t number of indels allowed, 5 by default. Up to 16 indels are allowed.");
-	SUBREADputs("    -B --multi     <int>\t Specify the maximal number of equally-best mapping locations allowed to be reported for any read. The value has to be within the range of 1 to 16. 1 by default. ");
-	SUBREADputs("    -P --phred     <3:6>\t the format of Phred scores in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
-	SUBREADputs("    -u --unique         \t reporting uniquely mapped reads only.");
-	SUBREADputs("    -Q --quality        \t using mapping quality scores to break ties when more than one best mapping locations are found.");
-	SUBREADputs("    -H --hamming        \t using Hamming distance to break ties when more than one best mapping locations are found.");
-	SUBREADputs("    -J --junction       \t mark those bases which can not be aligned together with other bases from the same read using the `S' operation in the CIGAR string (soft-clipping). This option is useful for marking exon-spanning reads and fusion reads.");
-	SUBREADputs("    -v                  \t displaying the version number.");
+	SUBREADputs("Optional general arguments:");
+	SUBREADputs("    ");
+	SUBREADputs("    -n --subreads  <int>    number of selected subreads, 10 by default.");
+	SUBREADputs("    ");
+	SUBREADputs("    -m --minmatch  <int>    consensus threshold (minimal number of consensus");
+	SUBREADputs("                            subreads required) for reporting a hit. If paired-");
+	SUBREADputs("                            end read data are provided, this gives the consensus");
+	SUBREADputs("                            threshold for the read which receives more votes");
+	SUBREADputs("                            than the other read from the same pair. 3 by default");
+	SUBREADputs("    ");
+	SUBREADputs("    -T --threads   <int>    number of threads, 1 by default.");
+	SUBREADputs("    ");
+	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default, up to 16.");
+	SUBREADputs("    ");
+	SUBREADputs("    -B --multi     <int>    Specify the maximal number of equally-best mapping");
+	SUBREADputs("                            locations allowed to be reported for any read. The");
+	SUBREADputs("                            value has to be within the range of 1 to 16. 1 by");
+	SUBREADputs("                            default. ");
+	SUBREADputs("                              ");
+	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores in input files, '3' for");
+	SUBREADputs("                            phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -u --unique             reporting uniquely mapped reads only.");
 	SUBREADputs("");
-	SUBREADputs("Arguments for paired-end reads:");
-	SUBREADputs("    -R --read2     <input>\t name of the second input file. The program will then be switched to the paired-end read mapping mode.");
-	SUBREADputs("    -p --minmatch2 <int>\t consensus threshold for the read which receives less votes than the other read from the same pair, 1 by default");
-	SUBREADputs("    -d --mindist   <int>\t minimum fragment/template length, 50bp by default.");
-	SUBREADputs("    -D --maxdist   <int>\t maximum fragment/template length, 600bp by default.");
-	SUBREADputs("    -S --order     <ff:fr:rf> \t orientation of the two read from the same pair, 'fr' by default");
+	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
+	SUBREADputs("                            than one best mapping locations are found.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
+	SUBREADputs("                            one best mapping locations are found.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -J --junction           mark those bases which can not be aligned together");
+	SUBREADputs("                            with other base from the same read using the `S' ");
+	SUBREADputs("                            operation in the CIGAR string (soft-clipping). This");
+	SUBREADputs("                            option is useful for marking exon-spanning reads and");
+	SUBREADputs("                            fusion reads.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -v                      displaying the version number.");
 	SUBREADputs("");
-	SUBREADputs("Arguments for INDEL detection:");
-	//SUBREADputs("    --cigar_len       <int>\t  maximum length of a cigar string");
-	SUBREADputs("    -G --cre_gap_penalty <int>\t gap opening penalty, default: -2");
-	SUBREADputs("    -E --ext_gap_penalty <int>\t gap extending penalty, default: 0");
-	SUBREADputs("    -X --mis_penalty     <int>\t mismatch penalty, default: 0");
-	SUBREADputs("    -Y --match_score     <int>\t match score, default: 2");
 	SUBREADputs("");
-        //SUBREADputs("Arguments for mapping bisulfite reads:");
-        //SUBREADputs("    -b --bisulfite <int>\t Number of bases 'c' allowed to be converted to 't' in each extracted subread (16bp mer), default: 1.");
-        //SUBREADputs("");
-	SUBREADputs("Example:");
-	SUBREADputs(" ./subread-align -i my_index -r reads.fastq -o my_result.sam ");
+	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
-	SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
-
+	SUBREADputs("    -R --read2     <input>  name of the second input file. The program will then");
+	SUBREADputs("                            be switched to the paired-end read mapping mode.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -p --minmatch2 <int>    consensus threshold for the read which receives less");
+	SUBREADputs("                            votes than the other read from the same pair, 1 by");
+	SUBREADputs("                            default.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
+	SUBREADputs("");
+	SUBREADputs("    -D --maxdist   <int>    maximum fragment/template length, 600bp by default.");
+	SUBREADputs("");
+	SUBREADputs("    -S --order     <ff:fr:rf> orientation of the two read from the same pair,");
+	SUBREADputs("                            'fr' by default.");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments for INDEL detection:");
+	SUBREADputs("");
+	SUBREADputs("    -G --cre_gap_penalty <int>   gap opening penalty, default: -2");
+	SUBREADputs("");
+	SUBREADputs("    -E --ext_gap_penalty <int>   gap extending penalty, default: 0");
+	SUBREADputs("");
+	SUBREADputs("    -X --mis_penalty     <int>   mismatch penalty, default: 0");
+	SUBREADputs("");
+	SUBREADputs("    -Y --match_score     <int>   match score, default: 2");
+	SUBREADputs("    ");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments for color-space read mapping:");
+	SUBREADputs("");
+	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
+	SUBREADputs("                            bases.");
+	SUBREADputs("");
+	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
+	SUBREADputs("");
 }
 
 static struct option long_options[] =
@@ -1240,7 +1303,8 @@ static struct option long_options[] =
 	{"unique", no_argument, &REPORT_ONLY_UNIQUE, 1},
 	{"hamming", no_argument, &USE_BASEINDEX_BREAK_TIE, 1},
 	{"allow-repeating", no_argument, &APPLY_REPEATING_PENALTY, 0},
-	{"bisulfite ", required_argument, 0, 'b'},
+	{"color-convert", no_argument, &CONVERT_COLOR_READ_TO_BASE, 1},
+	{"methylation", required_argument, 0, 'M'},
 	{"phred", required_argument, 0, 'P'},
 	{"index", required_argument, 0, 'i'},
 	{"read",  required_argument, 0, 'r'},
@@ -1292,6 +1356,7 @@ int main_align(int argc,char ** argv)
 	multi_best_reads = 1;
 	TOTAL_SUBREADS = 10;
 	ACCEPT_SUBREADS = 3;
+	CONVERT_COLOR_READ_TO_BASE = 0;
 	ACCEPT_MINOR_SUBREADS = 1;
 	INDEX_THRESHOLD = 1024;
 	INDEL_TOLERANCE = 6;
@@ -1310,7 +1375,7 @@ int main_align(int argc,char ** argv)
 
 
 
-	while ((c = getopt_long (argc, argv, "vQJuHB:S:d:D:n:m:p:f:R:r:i:o:T:E:I:A:P:G:X:b:Y:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vQJbuHB:S:d:D:n:m:p:f:R:r:i:o:T:E:I:A:P:G:X:M:Y:?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'v':
@@ -1321,6 +1386,9 @@ int main_align(int argc,char ** argv)
 				multi_best_reads = max(1, min(16, atoi(optarg)));
 				break;
 			case 'b':
+				CONVERT_COLOR_READ_TO_BASE = 1;
+				break;
+			case 'M':
 				MAX_METHYLATION_C_NUMBER = atoi(optarg);
 				break;
 			case 'H':
@@ -1460,15 +1528,9 @@ int main_align(int argc,char ** argv)
 	SUBREADprintf("Number of selected subreads = %d\n", TOTAL_SUBREADS);
 	SUBREADprintf("Consensus threshold = %d\n", ACCEPT_SUBREADS);
 	SUBREADprintf("Number of threads=%d\n", ALL_THREADS);
-	if(multi_best_reads)
-		SUBREADprintf ("Number of positions reported per multi-mapping read=%d\n", multi_best_reads);
 	if(INDEL_TOLERANCE)
 		SUBREADprintf("Number of indels allowed=%d\n", INDEL_TOLERANCE-1);
-	if (QUALITY_SCALE==QUALITY_SCALE_LINEAR)
-		SUBREADputs("Quality scale=linear\n\n");
-	else if (QUALITY_SCALE==QUALITY_SCALE_LOG)
-		SUBREADputs("Quality scale=exponential\n\n");
-	else 	SUBREADputs("\n");
+	SUBREADputs("\n");
 
 	if (read2_file[0])
 	{

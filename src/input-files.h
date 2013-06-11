@@ -115,4 +115,7 @@ int break_SAM_file(char * in_SAM_file, char * temp_location, unsigned int * real
 int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, gene_offset_t* offsets );
 
 int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_start);
+
+void colorread2base(char * read_buffer, int read_len);
+
 #endif

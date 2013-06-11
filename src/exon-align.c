@@ -4185,45 +4185,58 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 void exon_usage(char * execname)
 {
+	SUBREADprintf("Version %s\n\n", SUBREAD_VERSION);
 	SUBREADputs("Usage:");
+	SUBREADputs("");
 	SUBREADputs(" ./subjunc [options] -i <index_name> -r <input> -o <output>");
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
-	SUBREADputs("    -i --index     <index>\t base name of the index.");
-	SUBREADputs("    -r --read      <input>\t name of the input file(FASTQ/FASTA format). Both base-space and color-space read data are supported. For paired-end reads, this gives the first read file and the other read file should be specified using the -R option.");
-	SUBREADputs("    -o --output    <output>\t name of the output file(SAM format).");
 	SUBREADputs("");
-	SUBREADputs("Optional arguments:");
-	SUBREADputs("    -n --subreads  <int>\t number of selected subreads, 14 by default.");
-	SUBREADputs("       --singleSAM <input>\t using as input file a SAM file which includes mapping results for single-end reads (e.g. 'subread-align' output).");
-	SUBREADputs("       --pairedSAM <input>\t using as input file a SAM file which includes mapping results for paired-end reads.");
-	//SUBREADputs("    -x --fusion	   \t enabling the detection of fusion events.");
-	//SUBREADputs("    -A --nosam	   \t disabling the SAM output for the reads. Only discovered exon junction locations will be reported (BED file).");
-	//SUBREADputs("    -H --hamming	\t passed to subread-align program.");
-	//SUBREADputs("    -Q --quality	\t passed to subread-align program.");
-	//SUBREADputs("    -u --unique	\t passed to subread-align program.");
-	//SUBREADputs("    -L --halflen   <int>\t minimal distance allowed between the junction location and the end base (first or last) of the read or the segment, 0 by default.");
-	SUBREADputs("    -T --threads   <int>\t number of threads/CPUs used, 1 by default.");
-	SUBREADputs("    -I --indel     <int>\t number of INDEL bases allowed, 5 by default.");
-	SUBREADputs("    -P --phred     <3:6>\t the format of Phred scores used in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
-	SUBREADputs("    -v                  \t displaying the version number.");
+	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("");
-	SUBREADputs("Arguments for paired-end reads:");
-	SUBREADputs("    -R --read2     <input>\t name of the second input file from paired-end data. The program will then be switched to paired-end read mapping mode.");
-	//SUBREADputs("       --jreadonly	\t only report junction reads in SAM file.");
-	SUBREADputs("    -d --mindist   <int>\t minimum fragment/template length, 50bp by default.");
-	SUBREADputs("    -D --maxdist   <int>\t maximum fragment/template length, 600bp by default.");
-	SUBREADputs("    -S --order     <ff:fr:rf> \t specifying if the first/second reads are forward or reversed, 'fr' by default");
+	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format). Both ");
+	SUBREADputs("                            base-space and color-space read data are supported. ");
+	SUBREADputs("                            For paired-end reads, this gives the first read file");
+	SUBREADputs("                            and the other read file should be specified using");
+	SUBREADputs("                            the -R option.");
 	SUBREADputs("");
-	//SUBREADputs("Arguments for mapping bisulfite reads:");
-	//SUBREADputs("    -b --bisulfite <int>\t Number of bases 'c' allowed to be converted to 't' in each extracted subread (16bp mer), 1 by default");
-	//SUBREADputs("");
-	SUBREADputs("Example:");
-	SUBREADputs(" ./subjunc -i my_index -r reads.fastq -o my_result.sam ");
+	SUBREADputs("    -o --output    <output> name of the output file(SAM format).");
 	SUBREADputs("");
+	SUBREADputs("Optional general arguments:");
 	SUBREADputs("");
-	SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
-
+	SUBREADputs("    -n --subreads  <int>    number of selected subreads, 14 by default.");
+	SUBREADputs("");
+	SUBREADputs("       --singleSAM <input>  using the input file as a SAM file which includes");
+	SUBREADputs("                            mapping results for single-end reads (e.g. 'subread-");
+	SUBREADputs("                            align' output).");
+	SUBREADputs("");
+	SUBREADputs("       --pairedSAM <input>  using the input file as a SAM file which includes");
+	SUBREADputs("                            mapping results for paired-end reads.");
+	SUBREADputs("");
+	SUBREADputs("    -T --threads   <int>    number of threads/CPUs used, 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("    -I --indel     <int>    number of INDEL bases allowed, 5 by default.");
+	SUBREADputs("");
+	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
+	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("");
+	SUBREADputs("    -v                      displaying the version number.");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments for paired-end reads:");
+	SUBREADputs("");
+	SUBREADputs("    -R --read2     <input>  name of the second input file from paired-end data. ");
+	SUBREADputs("                            The program will then be switched to paired-end read");
+	SUBREADputs("                            mapping mode.");
+	SUBREADputs("");
+	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
+	SUBREADputs("");
+	SUBREADputs("    -D --maxdist   <int>    maximum fragment/template length, 600bp by default.");
+	SUBREADputs("");
+	SUBREADputs("    -S --order     <ff:fr:rf>  specifying if the first/second reads are forward");
+	SUBREADputs("                            or reversed, 'fr' by default");
+	SUBREADputs("");
+	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
+	SUBREADputs("");
 }
 
 static struct option long_options[] =
@@ -4633,12 +4646,13 @@ int main_junction(int argc,char ** argv)
 		if(xx>=0) strcat(cwd,"/");
 		else cwd[0]=0;
 
+		SUBREADputs("Call subread-align to map reads...");
 
 		if(read2_file[0])
 			sprintf(command, "%ssubread-align -J --allow-repeating  -T %d -i '%s' -r '%s' -R '%s' -o '%s' -P %d -d %d -D %d %s %s -I %d -b %d ",cwd, EXON_ALL_THREADS, index_prefix, read_file, read2_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6, EXON_MIN_PAIRED_DISTANCE, EXON_MAX_PAIRED_DISTANCE, EXON_QUALITY_SCALE?"-Q":"", using_base_distance?"-H":"", EXON_INDEL_TOLERANCE-1, EXON_MAX_METHYLATION_C_NUMBER);
 		else
 			sprintf(command, "%ssubread-align  -J --allow-repeating  -T %d -i '%s' -r '%s' -o '%s' -P %d %s %s -I %d -b %d",cwd, EXON_ALL_THREADS, index_prefix, read_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6 , EXON_QUALITY_SCALE?"-Q":"", using_base_distance?"-H":"", EXON_INDEL_TOLERANCE-1, EXON_MAX_METHYLATION_C_NUMBER);
-		SUBREADputs(command);
+		//SUBREADputs(command);
 		is_successful = system(command);
 
 		strcpy(read_file, tmpfile);
@@ -4650,21 +4664,23 @@ int main_junction(int argc,char ** argv)
 			IS_SAM_INPUT=2;
 		}
 		EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+		reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
+		if(reads_density<0)
+		{
+			SUBREADputs("Subjunc is terminated because subread could not map the reads.");
+			return -1;
+		}
 	}
 	else
-		tmpfile[0]=0;
-
-
-
-	if(!EXON_USE_VALUE_ARRAY_INDEX)
 	{
-		SUBREADprintf("Detecting junction reads must reference to the base-wise indel. Please enable the '-b' option while building the index.\n");
-		return -1;
-	}
+		tmpfile[0]=0;
+		reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
   
-	reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
-	if(reads_density<0)
-		SUBREADprintf("Input file '%s' is not found or is in an incorrect format.\n", read_file);
+		if(reads_density<0)
+			SUBREADprintf("Input file '%s' is not found or is in an incorrect format.\n", read_file);
+	}
+
+	SUBREADputs("Detect exon-exon junctions and map reads...");
 
 	if(IS_SAM_INPUT==0)
 	{
