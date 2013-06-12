@@ -703,13 +703,14 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 		int nch;
 		fseeko(warn_fp, back_search_ptr, SEEK_SET);
 		nch = fgetc(warn_fp);
-		fseeko(warn_fp, back_search_ptr, SEEK_SET);
 		if(nch == '\n') brs++;
-
 		if(brs >2) break;
+		fseeko(warn_fp, back_search_ptr, SEEK_SET);
 	}
 
-	int print_line_no = line_no - brs;
+	if(back_search_ptr<=0)brs++;
+
+	int print_line_no = line_no - brs + 1;
 	while(1)
 	{
 		char * ret = fgets(line_buf, MAX_READ_LENGTH, warn_fp);
@@ -766,7 +767,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	{
 		FILE * in_fp = fopen(input_fas[inp_file_no],"r");
 		long long int last_read_head_pos = 0;
-		unsigned int last_read_line_no = 0;
+		unsigned int last_read_line_no = 1;
 
 		if(!in_fp)
 		{
