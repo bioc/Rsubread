@@ -700,7 +700,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
-		if(is_second_read) is_this_negative_strand = !is_this_negative_strand;
+		int is_second_read_in_pair = alignment_masks & SAM_FLAG_SECOND_READ_IN_PAIR;
+		if(is_second_read_in_pair) is_this_negative_strand = !is_this_negative_strand;
 
 
 		char last_chr_chr, second_chr_chr;
