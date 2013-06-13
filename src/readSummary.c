@@ -687,7 +687,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(!global_context -> is_multi_mapping_allowed)
 		{
-			char * NH_pos = strstr(tmp_tok_ptr, "\tNH:i:");
+			char * NH_pos = strstr(tmp_tok_ptr,"\tNH:i:");
+			
 			if(NH_pos)
 			{
 				if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
