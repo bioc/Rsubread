@@ -1157,6 +1157,8 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 	int my_range_start , my_range_end;
 
+	if(thread_id==0)
+		SUBREADprintf("Realigning junction reads:\n");
 	int mapping_quality=0, mapping_flags=0;
 	double reads_per_thread = processed_reads*(1+(ginp2!=NULL)) * 1.0 / EXON_ALL_THREADS;
 	my_range_start = max(0,(int)(reads_per_thread * thread_id - 0.5));
@@ -1213,7 +1215,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 
 		if(i % 10000 ==0 && i>1 && thread_id==0)
-			print_text_scrolling_bar("Second Iteration", i*EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i*EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		if(halves_record->best_vote1_list[i] >=MAX_QUALITY_TO_EXPLORER_JUNCTION) 
 		{
@@ -1603,6 +1605,9 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			halves_record -> half_marks_list[i] |= IS_FINALISED_PROCESSING;
 		i+=1;
 	}
+
+	if(thread_id==0)
+		SUBREADprintf("\n");
 }
 
 
@@ -2376,6 +2381,9 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 	unsigned int my_range_start , my_range_end;
 	gene_value_index_t * my_value_array_index;
 
+	if(thread_id==0)
+		SUBREADprintf("Detecting junctions:\n");
+
 	double reads_per_thread = processed_reads*(1+(ginp2!=NULL)) * 1.0 / EXON_ALL_THREADS;
 	my_range_start = max((int)(reads_per_thread * thread_id - 0.5),0);
 	my_range_end = min((int)(reads_per_thread*(1+thread_id) + 0.5), processed_reads*(1+(ginp2!=NULL)));
@@ -2414,7 +2422,7 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 			reverse_read(inb, rl, ginp->space_type);*/
 
 		if(i % 10000 ==0 && i>1 && !thread_id)
-			print_text_scrolling_bar("First Iteration", i* EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i* EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
 		unsigned int pos2 = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos2_list[i]:halves_record -> best_pos1_list[i];
@@ -2644,6 +2652,8 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 
 		i++;
 	}
+	if(thread_id==0)
+		SUBREADprintf("\n");
 }
 
 
@@ -2792,6 +2802,8 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 	int i=0, ic=0 ;
 	int mapping_quality=0, mapping_flags=0;
 
+
+	SUBREADprintf("%u reads were processed. Saving the results for them:\n", processed_reads);
 	if(ftello(out_fp)<1)
 	{
 		unsigned int last_offset = 0;
@@ -2815,7 +2827,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Saving results", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		old_line[0]=0;
 
@@ -2937,7 +2949,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 		i++;
 
 	}
-
+	SUBREADprintf("\n");
 }
 
 
@@ -2961,6 +2973,8 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 	}
 
 	i=0;
+
+	SUBREADprintf("%u fragments were processed. Saving the results for them:\n", processed_reads);
 
 	while (1)
 	{
@@ -3386,6 +3400,8 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 
 	}
 
+	SUBREADprintf("\n");
+
 }
 
 
@@ -3561,6 +3577,8 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 	int read_len = 0, read2_len = 0, sam_qual1=0, sam_qual2=0, sam_flag1=0, sam_flag2=0;
 	is_reversed = 0;
 
+	if(my_thread_no==0)
+		SUBREADprintf("Processing %s:\n", ginp2?"fragments":"reads");
 	//SUBREADprintf ("I'm the %d-th thread RRRR\n", my_thread_no);return 0;
 
 	if (ginp2)
@@ -3973,6 +3991,8 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 	free(vote_p1);
 	free(vote_p2);
 	free(vote_p3);
+	if(my_thread_no==0)
+		SUBREADprintf("\n");
 	return 0;
 }
 
@@ -4022,7 +4042,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 		if (IS_DEBUG)
 			SUBREADprintf ("@LOG Loading table from %s\n", table_fn);
 		else
-			SUBREADprintf ("Loading the %02d-th index file ...					      \r", tabno+1);
+			SUBREADprintf ("Loading the %02d-th index file ...					      \n", tabno+1);
 		SUBREADfflush(stdout);
 
 		if(gehash_load(my_table, table_fn)) return -1;
@@ -4752,8 +4772,8 @@ int main_junction(int argc,char ** argv)
 		}
 
 		SUBREADprintf ("Performing paired-end alignment:\n");
-		SUBREADprintf ("Maximum distance between reads=%d\n", EXON_MAX_PAIRED_DISTANCE);
-		SUBREADprintf ("Minimum distance between reads=%d\n", EXON_MIN_PAIRED_DISTANCE);
+		SUBREADprintf ("Maximum fragment length=%d\n", EXON_MAX_PAIRED_DISTANCE);
+		SUBREADprintf ("Minimum fragment length=%d\n", EXON_MIN_PAIRED_DISTANCE);
 		SUBREADprintf ("Threshold on number of subreads for a successful mapping (the minor end in the pair)=%d\n", ACCEPT_MINOR_SUBREADS);
 		SUBREADprintf ("The directions of the two input files are: %s, %s\n\n", EXON_FIRST_READ_REVERSE?"reversed":"forward", EXON_SECOND_READ_REVERSE?"reversed":"forward");
 	}
@@ -4826,7 +4846,7 @@ int main_junction(int argc,char ** argv)
 	if(IS_DEBUG)
 		SUBREADprintf("@LOG THE END. \n");
 	else
-		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, read2_file[0]?"read pairs":"reads", miltime()-begin_ftime, junction_number, support_number );
+		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, read2_file[0]?"fragments":"reads", miltime()-begin_ftime, junction_number, support_number );
 
 	if(out_fp)
 		fclose(out_fp);

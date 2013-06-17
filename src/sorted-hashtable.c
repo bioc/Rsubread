@@ -494,7 +494,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 						//SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u and %u\n", vote->max_position , kv);
 						if(vote->max_position > kv)
 							go_replace=1;
-						vote->max_mask |= IS_BREAKEVEN_READ ;
+						//vote->max_mask |= IS_BREAKEVEN_READ ;
 					}
 					if(go_replace)
 					{
@@ -966,7 +966,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		gehash_data_t tmp_val;
 
 
-		if(i % 200 == 0)
+		if(i % 3000 == 0)
 			print_text_scrolling_bar("Saving index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 

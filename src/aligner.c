@@ -83,6 +83,8 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 	load_offsets (&offsets, index_prefix);
 	//printf("NS=%d\n", offsets.total_offsets);
 
+	SUBREADprintf("%u %s were processed. Saving the mapping results for them:\n", processed_reads, ginp2?"fragments":"reads");
+	
 	if(all_processed_reads ==0)
 	{
 		unsigned int last_offset = 0;
@@ -388,11 +390,9 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Saving results", i*1./processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i*1./processed_reads, 80, &ic);
 	}
-	if (paired_match)
-		SUBREADprintf("\nReads referencing paired-end info: %u\n", paired_match);
-	//else
+	SUBREADprintf("\n");
 	//	SUBREADprintf("\nNo reads are mapped in pairs.\b");
 
 	destroy_offsets (&offsets);
@@ -432,6 +432,9 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 
 	short ** dynamic_align_short;
 	char ** dynamic_align_char ;
+
+	if(my_thread_no==0)
+		SUBREADprintf("Detecting indels: \n");
 
 	dynamic_align_short = (short **) malloc(sizeof(short*) * MAX_READ_LENGTH);
 	dynamic_align_char  = (char  **) malloc(sizeof(char *) * MAX_READ_LENGTH);
@@ -504,7 +507,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 		}
 
 		if(my_thread_no<1 && queries % 10000 ==0 && queries>1)
-			print_text_scrolling_bar("Finalising", queries*1./segment_length, 80, &ic);
+			print_text_scrolling_bar("", queries*1./segment_length, 80, &ic);
 
 		int best_read_id;
 		int r1_reversed = 0;
@@ -675,6 +678,8 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 	free(dynamic_align_short);
 	free(dynamic_align_char);
 
+	if(my_thread_no==0)
+		SUBREADprintf("\n");
 
 }
 
@@ -709,6 +714,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 		all_reads /=2;
 
 //	SUBREADprintf ("I'm the %d-th thread\n", my_thread_no);
+	if(my_thread_no == 0)SUBREADprintf("Processing %s:\n", ginp2?"fragments":"reads");
 
 	unsigned int low_border = my_value_array_index -> start_base_offset;
 	unsigned int high_border = my_value_array_index -> start_base_offset + my_value_array_index -> length; 
@@ -952,7 +958,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 				finalise_vote(vote);
 
 				reg_big_margin_votes(vote, allvote, queries);
-				final_matchingness_scoring(USE_BASEINDEX_BREAK_TIE,InBuff, (QUALITY_SCALE == QUALITY_SCALE_NONE )?NULL:QualityBuff, is_counterpart, read_len, vote, 0, allvote, queries, my_value_array_index, ginp -> space_type, INDEL_TOLERANCE, QUALITY_SCALE, TOTAL_SUBREADS);
+				final_matchingness_scoring(USE_BASEINDEX_BREAK_TIE,InBuff, (QUALITY_SCALE == QUALITY_SCALE_NONE )?NULL:QualityBuff, is_counterpart, read_len, vote,0 , allvote, queries, my_value_array_index, ginp -> space_type, INDEL_TOLERANCE, QUALITY_SCALE, TOTAL_SUBREADS);
 				matched =1;
 				good_match += matched;
 			}
@@ -997,6 +1003,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 	}
 	free(vote_memblock_1);
 	free(vote_memblock_2);
+	if(my_thread_no == 0)SUBREADprintf("\n");
 	return 0;
 }
 
@@ -1053,7 +1060,7 @@ int run_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_pre
 		if (IS_DEBUG)
 			SUBREADprintf ("@LOG Loading table from %s\n", table_fn);
 		else
-			SUBREADprintf ("Loading the %02d-th index file ...                                              \r", tabno+1);
+			SUBREADprintf ("Loading the %02d-th index file ...                                              \n", tabno+1);
 		SUBREADfflush(stdout);
 
 		if(gehash_load(my_table, table_fn)) return -1;
@@ -1541,8 +1548,8 @@ int main_align(int argc,char ** argv)
 		}
 
 		SUBREADprintf ("Performing paired-end alignment:\n");
-		SUBREADprintf ("Maximum distance between reads=%d\n", MAX_PAIRED_DISTANCE);
-		SUBREADprintf ("Minimum distance between reads=%d\n", MIN_PAIRED_DISTANCE);
+		SUBREADprintf ("Maximum fragment length=%d\n", MAX_PAIRED_DISTANCE);
+		SUBREADprintf ("Minimum fragment length=%d\n", MIN_PAIRED_DISTANCE);
 		SUBREADprintf ("Threshold on number of subreads for a successful mapping (the minor end in the pair)=%d\n", ACCEPT_MINOR_SUBREADS);
 		if (NUMBER_OF_ANCHORS_PAIRED > -1)
 			SUBREADprintf ("Number of anchors=%d\n", NUMBER_OF_ANCHORS_PAIRED);
@@ -1592,7 +1599,7 @@ int main_align(int argc,char ** argv)
 	if(IS_DEBUG)
 		SUBREADprintf("@LOG THE END. \n");
 	else
-		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\nPercentage of mapped reads is %0.2f%%.\n\n", processed_reads, read2_file[0] ?"read pairs":"reads", miltime()-begin_ftime, succeed_reads*100.0/processed_reads/(read2_file[0]?2:1));
+		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\nPercentage of mapped %s is %0.2f%%.\n\n", processed_reads, read2_file[0] ?"fragments":"reads", miltime()-begin_ftime,  read2_file[0] ?"fragments":"reads", succeed_reads*100.0/processed_reads/(read2_file[0]?2:1));
 
 	SUBREADprintf("Done.\n");
 

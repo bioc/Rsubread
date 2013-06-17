@@ -233,7 +233,7 @@ gene_quality_score_t get_subread_quality(const char * quality_str, const char * 
 void print_running_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads, int is_pair)
 {
         char outbuff[99]; int i;
-        snprintf(outbuff, 98,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk reads/s; time left=%.1fs; total=%lluk %s", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,expected_seconds, total_reads/1000, is_pair?"pairs":"reads");
+        snprintf(outbuff, 98,"%0.2f%%; time used=%.1fs; rate=%.1fk reads/s; time left=%.1fs; total=%lluk %s", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,expected_seconds, total_reads/1000, is_pair?"pairs":"reads");
         SUBREADprintf("%s",outbuff);
         for(i=strlen(outbuff); i<105; i++)
                 SUBREADprintf(" ");
@@ -1668,7 +1668,8 @@ void final_matchingness_scoring(int use_base_scoring , const char read_str[], co
 			else		     matchingness_count = vote -> quality[i][j]; 
 
 			if((vote->votes[i][j] > current_max_vote) ||
-			   (vote->votes[i][j] == current_max_vote && matchingness_count > max_matching))
+			   (vote->votes[i][j] == current_max_vote && vote_ij_coverage > current_max_coverage)||
+			   (vote->votes[i][j] == current_max_vote && matchingness_count > max_matching && vote_ij_coverage == current_max_coverage))
 			{
 				max_matching = matchingness_count;
 				current_max_coverage = vote_ij_coverage;
@@ -1690,7 +1691,7 @@ void final_matchingness_scoring(int use_base_scoring , const char read_str[], co
 
 				for(xk3 = 1; xk3 < allvotes -> multi_best_reads; xk3++) tmp_best_records[xk3].vote_number = 0;
 			}
-			else if (vote->votes[i][j] == current_max_vote && matchingness_count == max_matching)
+			else if (vote->votes[i][j] == current_max_vote && matchingness_count == max_matching && vote_ij_coverage == current_max_coverage)
 			{
 				tmp_best_records[0].masks |= IS_BREAKEVEN_READ;
 				if(tmp_best_records_number >=  allvotes -> multi_best_reads){
