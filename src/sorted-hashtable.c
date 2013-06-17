@@ -957,6 +957,8 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
+	SUBREADprintf("Saving the current index block:\n");
+
 
 	for (i=0; i<the_table -> buckets_number; i++)
 	{
@@ -967,7 +969,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 
 
 		if(i % 3000 == 0)
-			print_text_scrolling_bar("Saving index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
+			print_text_scrolling_bar("", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 
 		if(current_bucket -> current_items>=1)
@@ -998,6 +1000,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 
 	fwrite(&(the_table -> is_small_table), sizeof(char), 1, fp);
 	fclose(fp);
+	SUBREADprintf("\n");
 	return 0;
 }
 
