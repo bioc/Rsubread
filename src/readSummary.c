@@ -663,7 +663,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(mate_chr[0]=='=' && is_first_read_negative_strand!=is_second_read_negative_strand)
 				{
-					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || (fragment_length < global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1)))
+					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance) || (fragment_length < global_context -> min_paired_end_distance)))
 					{
 						if(global_context -> SAM_output_fp)
 							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Fragment_Length\tLength=%ld\n", read_name, fragment_length);
