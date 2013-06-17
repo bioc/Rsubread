@@ -99,9 +99,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	gene_input_t ginp;
 
-	SUBREADprintf ("Index items per partition = %u\n\n", segment_size);
-
-
+//	SUBREADprintf ("Index items per partition = %u\n\n", segment_size);
 
 	if (chro_file_number > 199)
 	{
@@ -142,7 +140,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	status = NEXT_FILE;
 
-	SUBREADprintf("\nBuilding the index...\n");
+	SUBREADprintf("Building the index...\n");
 
 	{
 		char window [16], last_color_base=-1, last_last_color_base=-1;
@@ -164,7 +162,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 					geinput_close(&ginp);
 
-					SUBREADprintf ("\n Processing chromosome files ...\n");
+					SUBREADprintf ("Processing chromosome files ...\n");
 
 					sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
 					SUBREADfflush(stdout);
