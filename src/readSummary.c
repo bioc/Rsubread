@@ -943,7 +943,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					}
 				}
 				else if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguous\t%d\n", read_name, top_voters);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguous\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
 			}
 		}
 		else if(global_context -> SAM_output_fp)

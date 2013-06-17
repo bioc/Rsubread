@@ -50,9 +50,9 @@ int MARK_NONINFORMATIVE_SUBREADS = 0;
 void print_build_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads)
 {
         char outbuff[81]; int i;
-        snprintf(outbuff, 80,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum bps", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
+        snprintf(outbuff, 80,"completed=%0.1f%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum bps", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
         SUBREADprintf("%s",outbuff);
-        for(i=strlen(outbuff); i<105; i++)
+        for(i=strlen(outbuff); i<80; i++)
                 SUBREADprintf(" ");
         SUBREADprintf("\r");
 }
@@ -481,7 +481,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	SUBREADprintf("Scanning non-informative reads in the chromosomes...\n");
+	SUBREADprintf("Scanning uninformative subreads in reference sequencing ...\n");
 
 	if (chro_file_number > 199)
 	{
@@ -669,31 +669,46 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	gehash_destory(&occurance_table);
 
 
-	SUBREADprintf("\nThere are %llu non-informative subreads found in the chromosomes.\n" , huge_table -> current_items);
+	if(huge_table -> current_items)
+		SUBREADprintf("%llu uninformative subreads were found. These subreads will not be included in the index.\n" , huge_table -> current_items);
+
 	return 0;
 }
 
 
+char *rtrim(char *s)
+{
+	char* back = s + strlen(s);
+	while(isspace(*--back));
+	*(back+1) = '\0';
+	return s;
+}
+
+int ERROR_FOUND_IN_FASTA = 0;
 #define CHAR_ESC 27
-void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned line_no, int line_pos, char * msg)
+void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned line_no, int line_pos, char * msg, FILE * log_fp)
 {
 	int x1,brs=0;
 	long long int back_search_ptr;
 	char * line_buf = malloc(MAX_READ_LENGTH+1);
 
-	SUBREADprintf("\n");
+	ERROR_FOUND_IN_FASTA += 1;
 
-	SUBREADprintf("%c[33m", CHAR_ESC);
+	fprintf(log_fp,"\n");
+
+	fprintf(log_fp,"%c[33m", CHAR_ESC);
 	for(x1=0;x1<81;x1++)
-		SUBREADprintf("=");
-	SUBREADprintf("\n");
-	SUBREADprintf("%c[31m", CHAR_ESC);
-	SUBREADprintf("%s\n", msg);
-	SUBREADprintf("%c[33m", CHAR_ESC);
+		fprintf(log_fp,"=");
+	fprintf(log_fp,"\n");
+	fprintf(log_fp,"%c[32m", CHAR_ESC);
+	fprintf(log_fp,"Input file '%s':\n", FN);
+	fprintf(log_fp,"%c[31m", CHAR_ESC);
+	fprintf(log_fp,"%s\n", msg);
+	fprintf(log_fp,"%c[33m", CHAR_ESC);
 	for(x1=0;x1<81;x1++)
-		SUBREADprintf(".");
-	SUBREADprintf("\n");
-	SUBREADprintf("%c[37m", CHAR_ESC);
+		fprintf(log_fp,".");
+	fprintf(log_fp,"\n");
+	fprintf(log_fp,"%c[37m", CHAR_ESC);
 	
 
 	FILE * warn_fp = fopen(FN, "r");
@@ -716,39 +731,41 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 		char * ret = fgets(line_buf, MAX_READ_LENGTH, warn_fp);
 		if(!ret)break;
 		if(ftello(warn_fp) > fpos_line_head)
-			SUBREADprintf("%c[9m%c[31m", CHAR_ESC, CHAR_ESC);
+			fprintf(log_fp,"%c[9m%c[31m", CHAR_ESC, CHAR_ESC);
 		else
-			SUBREADprintf("%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
-		SUBREADprintf(" % 8d ", print_line_no++);
-		SUBREADprintf("%s",line_buf);
+			fprintf(log_fp,"%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
+		fprintf(log_fp," % 8d ", print_line_no++);
+
+		rtrim(line_buf);
+		
+		fprintf(log_fp,"%s%s\n",line_buf,strlen(line_buf)<16?"              ":"");
 		if(ftello(warn_fp) > fpos_line_head)
 			break;
 	}
 	for(x1=0;x1<line_pos+10;x1++)
-		SUBREADprintf(" ");
-	SUBREADprintf("^\n");
+		fprintf(log_fp," ");
+	fprintf(log_fp,"^\n");
 
-	SUBREADprintf("%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
+	fprintf(log_fp,"%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
 	for(x1=0;x1<2;x1++)
 	{
 		char * ret = fgets(line_buf, MAX_READ_LENGTH, warn_fp);
 		if(!ret)break;
-		SUBREADprintf(" % 8d ", print_line_no++);
-		SUBREADprintf("%s",line_buf);
+		fprintf(log_fp," % 8d ", print_line_no++);
+		fprintf(log_fp,"%s",line_buf);
 	}
 	fclose(warn_fp);
-	SUBREADprintf("%c[33m", CHAR_ESC);
+	fprintf(log_fp,"%c[33m", CHAR_ESC);
 	for(x1=0;x1<81;x1++)
-		SUBREADprintf("=");
-	SUBREADprintf("\n");
-	
-	SUBREADprintf("\n");
+		fprintf(log_fp,"=");
+	fprintf(log_fp,"\n");
+	fprintf(log_fp,"\n");
 
-	SUBREADprintf("%c[0m", CHAR_ESC);
+	fprintf(log_fp,"%c[0m", CHAR_ESC);
 	free(line_buf);
 }
 
-int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, unsigned int ** chrom_lens)
+int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, unsigned int ** chrom_lens, FILE * log_fp, char * log_fn)
 {
 	int is_R_warnned = 0;
 	char * line_buf = malloc(MAX_READ_LENGTH);
@@ -758,11 +775,12 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	int written_chrs = 0;
 	int chrom_lens_max_len = 100;
 	int chrom_lens_len = 0;
+	ERROR_FOUND_IN_FASTA = 0;
 
 	(*chrom_lens) = malloc(chrom_lens_max_len*sizeof(unsigned int));
 	memset((*chrom_lens), 0, chrom_lens_max_len*sizeof(unsigned int));
 	
-	SUBREADprintf("Validating the format of input FASTA files...\n");
+	SUBREADprintf("Checking the integrity of provided reference sequences ...\n");
 	for(inp_file_no = 0; inp_file_no < fa_number; inp_file_no++)
 	{
 		FILE * in_fp = fopen(input_fas[inp_file_no],"r");
@@ -771,7 +789,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 		if(!in_fp)
 		{
-			SUBREADprintf("Input file '%s' is not found or not accessible. No index was built\n", input_fas[inp_file_no]);
+			SUBREADprintf("Input file '%s' is not found or is not accessible. No index was built.\n", input_fas[inp_file_no]);
 			return -1;
 		}
 
@@ -794,7 +812,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 					if(!is_R_warnned)
 					{
 						is_R_warnned=1;
-						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, line_buf_len -1 ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.");
+						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, line_buf_len -1 ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.", log_fp);
 					}	
 				}
 				line_buf[line_buf_len-1] =0;
@@ -803,7 +821,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 			if(line_buf_len<1)
 			{
-				check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no ,0 ,"This line is empty. This is not allowed in the FASTA file.");
+				check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no ,0 ,"This line is empty. This is not allowed in the FASTA file.", log_fp);
 				continue;
 			}
 
@@ -811,7 +829,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 			{
 				if(line_no>1 &&!is_head_written)
 				{
-					check_and_convert_warn(input_fas[inp_file_no], last_read_head_pos, last_read_line_no, 0,"This sequence has less than 16 bases. It is ignored in the index because no subreads can be extracted.");
+					check_and_convert_warn(input_fas[inp_file_no], last_read_head_pos, last_read_line_no, 0,"This sequence has less than 16 bases. It is ignored in the index because no subreads can be extracted.", log_fp);
 				}
 				is_head_written = 0;
 				last_read_line_no = line_no;
@@ -824,7 +842,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 			}
 			else if(line_head_pos<1)
 			{
-				check_and_convert_warn(input_fas[inp_file_no], 0, 0, 0 ,"This file is not started with a header line. It seems not to be a FASTA file.");
+				check_and_convert_warn(input_fas[inp_file_no], 0, 0, 0 ,"This file is not started with a header line. It seems not to be a FASTA file.", log_fp);
 			}
 			else
 			{
@@ -833,12 +851,12 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 				{
 					int nextch = line_buf[xk2];
 					int lowerch = tolower(nextch);
-					if(!( lowerch == 'a' || lowerch == 't' || lowerch == 'g' || lowerch == 'c' || nextch == '.' || nextch=='-' || nextch=='N'))
+					if(!( lowerch == 'a' || lowerch == 't' || lowerch == 'g' || lowerch == 'c' || nextch == '.' || nextch=='-' || lowerch=='n'))
 					{	
-						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, xk2, "This is not a base value. It is converted to 'A'.");
+						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, xk2, "The pointed base was converted to an 'A'.", log_fp);
 						line_buf[xk2] = 'A';
 					}
-					else if(nextch == '.' || nextch=='-' )
+					else if(nextch == '.' || nextch=='-' ||  lowerch=='n')
 						line_buf[xk2] = 'A';
 					else
 						line_buf[xk2] = toupper(nextch);
@@ -886,6 +904,11 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	free(line_buf);
 	free(read_head_buf);
 	fclose(out_fp);
+
+	if(ERROR_FOUND_IN_FASTA)
+		SUBREADprintf("There were %d format issues found in the input files. The details were saved in log file '%s'.\n", ERROR_FOUND_IN_FASTA, log_fn);
+	else	SUBREADprintf("No format issues were found in the input files.\n");
+
 	return 0;
 }
 
@@ -897,7 +920,7 @@ int main_buildindex(int argc,char ** argv)
 {
 	int threshold = 24;
 	int memory_limit = 8000;	// 8000 MBytes
-	char output_file[300], c, tmp_fa_file[300];
+	char output_file[300], c, tmp_fa_file[300], log_file_name[300];
 	char *ptr_tmp_fa_file[1];
 	unsigned int * chromosome_lengths;
 	ptr_tmp_fa_file[0]=tmp_fa_file;
@@ -927,6 +950,11 @@ int main_buildindex(int argc,char ** argv)
 				strncpy(output_file, optarg, 299);
 				break;
 			case 'k':
+				if(memcmp(SUBREAD_VERSION , "1.3.",4)==0)
+				{
+					SUBREADprintf("The \"-k\" option is not supported in version 1.3.x. ");
+					return -1;
+				}
 				MARK_NONINFORMATIVE_SUBREADS = 1;
 				break;	
 			case '?':
@@ -964,7 +992,7 @@ int main_buildindex(int argc,char ** argv)
 	else
 		SUBREADprintf("Building a base-space index.\n");
 
-	SUBREADprintf("Size of memory used=%d MB\n",memory_limit);
+	SUBREADprintf("Size of memory specified=%d MB\n",memory_limit);
 	SUBREADprintf("Base name of the built index = %s\n",output_file);
 
 	SUBREADfflush(stdout);
@@ -974,7 +1002,10 @@ int main_buildindex(int argc,char ** argv)
 	sprintf(tmp_fa_file, "./subread-index-sam-%06u-XXXXXX", getpid());
 	mkstemp(tmp_fa_file);
 
-	int ret = check_and_convert_FastA(argv+optind , argc - optind, tmp_fa_file, &chromosome_lengths);
+	sprintf(log_file_name, "%s.log", output_file);
+	FILE * log_fp = fopen(log_file_name,"w");
+
+	int ret = check_and_convert_FastA(argv+optind , argc - optind, tmp_fa_file, &chromosome_lengths, log_fp, log_file_name);
 
 	if(!ret)
 	{
@@ -990,6 +1021,7 @@ int main_buildindex(int argc,char ** argv)
 
 	unlink(tmp_fa_file);
 
+	fclose(log_fp);
 	return ret;
 }
 
