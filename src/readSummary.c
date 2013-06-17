@@ -603,7 +603,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			    (((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_data && global_context -> is_both_end_required)
 			  ){
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUNMAPPED\n", read_name);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped_%s\n", read_name, global_context -> is_paired_end_data?"Fragment":"Read");
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
@@ -630,7 +630,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			{
 				if(global_context -> SAM_output_fp)
 				{
-					fprintf(global_context -> SAM_output_fp,"%s\tMAPPING_QUALITY\t%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Mapping_Quality\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
 				}
 				return;
 			}
@@ -666,7 +666,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance + thread_context->current_read_length1 -1) || (fragment_length < global_context -> min_paired_end_distance + thread_context->current_read_length1 - 1)))
 					{
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tPAIR_DISTANCE\t%ld\n", read_name, fragment_length);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Fragment_Length\tLength=%ld\n", read_name, fragment_length);
 						return;
 					}
 				}
@@ -675,7 +675,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if(global_context -> is_chimertc_disallowed)
 					{
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tPAIR_CHIMERIC\n", read_name);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimeric_Reads\n", read_name);
 						return;
 					}
 				}
@@ -694,7 +694,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
 				{
 					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tMULTI_MAPPING\n", read_name);
+						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Multimapping\n", read_name);
 					return;
 				}
 			}
@@ -776,7 +776,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-			fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
+			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
 		}
 	}
 	else if(nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0])
@@ -788,7 +788,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-			fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
+			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
 		}
 	}
 	else
@@ -904,9 +904,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					int final_gene_number = global_context -> exontable_geneid[top_voter_id];
 					unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
 					if(decision_table_items>1)
-						fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_2VOTE_%s\t%s\t%d/%d\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name, max_votes, decision_table_items);
+						// assigned by read-voting
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tVotes/All_Items=%d/%d\n", read_name, final_feture_name, max_votes, decision_table_items);
 					else
-						fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_%s\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_name);
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
 				}
 			}
 			else if(top_voters >1 || (global_context -> is_multi_overlap_allowed))
@@ -937,15 +938,16 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					{
 						int ffnn = strlen(final_feture_names);
 						if(ffnn>0) final_feture_names[ffnn-1]=0;
-						fprintf(global_context -> SAM_output_fp,"%s\tACCEPTED_MULTI_%sS\t%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON", final_feture_names);
+						// overlapped but still assigned 
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_names);
 					}
 				}
 				else if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tOVERLAPPED_%sS\t%d\n", read_name, global_context -> is_gene_level?"GENE":"EXON", top_voters);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguous\t%d\n", read_name, top_voters);
 			}
 		}
 		else if(global_context -> SAM_output_fp)
-			fprintf(global_context -> SAM_output_fp,"%s\tNOTFOUND_%s\n", read_name, global_context -> is_gene_level?"GENE":"EXON");
+			fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_No_Features\n", read_name);
 	}
 
 }
