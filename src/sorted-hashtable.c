@@ -1,3 +1,26 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
+#include "sorted-hashtable.h"
+#include "gene-algorithms.h"
 #include<assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,9 +30,6 @@
 #endif
 
 #include<math.h>
-#include "subread.h"
-#include "gene-algorithms.h"
-#include "gene-algorithms.h"
 
 #define _gehash_hash(k) ((unsigned int)(k))
 
@@ -474,7 +494,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_
 						//SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u and %u\n", vote->max_position , kv);
 						if(vote->max_position > kv)
 							go_replace=1;
-						vote->max_mask |= IS_BREAKEVEN_READ ;
+						//vote->max_mask |= IS_BREAKEVEN_READ ;
 					}
 					if(go_replace)
 					{
@@ -851,21 +871,21 @@ void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 // }
 //
 
-static inline unsigned int load_int32(FILE * fp)
+inline unsigned int load_int32(FILE * fp)
 {
 	int ret;
 	int read_length;
 	read_length = fread(&ret, sizeof(int), 1, fp);
-	if(read_length<=0)SUBREADprintf("Integer is not positive\n");
+	assert(read_length>0);
 	return ret;
 }
 
-static inline long long int load_int64(FILE * fp)
+inline long long int load_int64(FILE * fp)
 {
 	long long int ret;
 	int read_length;
 	read_length = fread(&ret, sizeof(long long int), 1, fp);
-	if(read_length<=0)SUBREADprintf("Integer is not positive\n");
+	assert(read_length>0);
 	return ret;
 }
 
@@ -937,6 +957,8 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
+	SUBREADprintf("Saving the current index block:\n");
+
 
 	for (i=0; i<the_table -> buckets_number; i++)
 	{
@@ -946,8 +968,8 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		gehash_data_t tmp_val;
 
 
-		if(i % (200*70) == 0)
-			print_text_scrolling_bar("Saving index", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
+		if(i % 3000 == 0)
+			print_text_scrolling_bar("", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 
 		if(current_bucket -> current_items>=1)
@@ -978,6 +1000,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 
 	fwrite(&(the_table -> is_small_table), sizeof(char), 1, fp);
 	fclose(fp);
+	SUBREADprintf("\n");
 	return 0;
 }
 

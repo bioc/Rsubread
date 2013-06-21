@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -19,6 +40,7 @@
 int IS_COLOR_SPACE = 0;
 int VALUE_ARRAY_INDEX = 1;
 int QUICK_BUILD = 0;
+int MARK_NONINFORMATIVE_SUBREADS = 0;
 
 #define NEXT_READ 1
 #define NEXT_FILE 2
@@ -28,16 +50,37 @@ int QUICK_BUILD = 0;
 void print_build_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads)
 {
         char outbuff[81]; int i;
-        snprintf(outbuff, 80,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum bps", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
+        snprintf(outbuff, 80,"completed=%0.1f%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum bps", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
         SUBREADprintf("%s",outbuff);
-        for(i=strlen(outbuff); i<105; i++)
+        for(i=strlen(outbuff); i<80; i++)
                 SUBREADprintf(" ");
         SUBREADprintf("\r");
 }
 
+void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_table)
+{
+	int i,j;
+	for (i=0; i< noninf_table -> buckets_number; i++)
+	{
+		struct gehash_bucket * current_bucket = &(noninf_table->buckets[i]);
+
+		if(current_bucket -> current_items>=1)
+		{
+			for (j=0; j<current_bucket -> current_items; j++)
+			{
+				unsigned int noninf_subread = current_bucket -> item_keys[j];
+				// the non-informative subreads in the index are marked as they are at 0xffffffff.
+				gehash_insert(index_table, noninf_subread, 0xffffffffu);
+			}
+		}
+	}
+
+}
+
+
 #define MAX_BASES_IN_INDEX 4294900000.0
 
-int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold, gehash_t * huge_table)
+int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold, gehash_t * huge_table, unsigned int * chro_lens)
 {
 	int file_number, table_no;
 	int status = NEXT_FILE;
@@ -47,21 +90,20 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	char fn[300];
 	double local_begin_ftime = 0.;
 
-	unsigned int read_offsets[OFFSET_TABLE_SIZE];
-	char read_names[OFFSET_TABLE_SIZE][48];
+	int chro_table_maxsize=100;
+	unsigned int * read_offsets = malloc(sizeof(unsigned int) * chro_table_maxsize);
+	char * read_names = malloc(MAX_READ_NAME_LEN * chro_table_maxsize);
 	gehash_t table;
 //	gehash_t huge_table;
 	gene_value_index_t value_array_index;
 
 	gene_input_t ginp;
 
-	SUBREADprintf ("Index items per partition = %u\n\n", segment_size);
-
-
+//	SUBREADprintf ("Index items per partition = %u\n\n", segment_size);
 
 	if (chro_file_number > 199)
 	{
-		SUBREADprintf("There too many chromosome files. You may merge them into less than 199 files.\n");
+		SUBREADprintf("There are too many chromosome files. You may merge them into less than 199 files.\n");
 		return -1;
 	}
 
@@ -79,6 +121,9 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	if(gehash_create(& table, segment_size, 0)) return 1;
 
+	if(MARK_NONINFORMATIVE_SUBREADS)
+		copy_non_informative_subread(&table, huge_table);
+
 	unsigned int size_of_array_index = (unsigned int)(min(MAX_BASES_IN_INDEX, segment_size*4.35 + MIN_READ_SPLICING));
 
 	if(VALUE_ARRAY_INDEX)
@@ -89,13 +134,13 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	table_no = 0;
 	read_no = 0;
 
-	bzero(read_offsets, OFFSET_TABLE_SIZE*sizeof(int));
+	bzero(read_offsets, chro_table_maxsize*sizeof(int));
 	sprintf(fn, "%s.files", index_prefix);
 	unlink(fn);
 
 	status = NEXT_FILE;
 
-	SUBREADprintf("\nBuilding the index...\n");
+	SUBREADprintf("Building the index...\n");
 
 	{
 		char window [16], last_color_base=-1, last_last_color_base=-1;
@@ -117,7 +162,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 					geinput_close(&ginp);
 
-					SUBREADprintf ("\n Processing chromosome files ...\n");
+					SUBREADprintf ("Processing chromosome files ...\n");
 
 					sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
 					SUBREADfflush(stdout);
@@ -148,7 +193,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					sprintf (fn, "%s.reads", index_prefix);
 					fp = fopen(fn, "w");
 					for (i=0; i<read_no; i++)
-						fprintf(fp, "%u\t%s\n", read_offsets[i], read_names[i]);
+						fprintf(fp, "%u\t%s\n", read_offsets[i], read_names+i*MAX_READ_NAME_LEN);
 
 					fclose(fp);
 
@@ -165,29 +210,21 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			if (status == NEXT_READ)
 			{
 
-				if(read_no>=OFFSET_TABLE_SIZE-1)
-				{
-					SUBREADprintf("\nThere are too many sections in the chromosome data files (more than %d sections).\n", OFFSET_TABLE_SIZE);
-					status = NEXT_FILE;
-					continue;
-				}
-
 				geinput_readline(&ginp, fn, 0);
 
 				if(read_no>0)
 					read_offsets[read_no-1] = offset;
 
 				for(i=0;(fn[i+1] != ' ' && fn[i+1] != '\0' && fn[i+1] != '\t' && i<47); i++)
-					read_names[read_no][i] = fn[i+1];
+					*(read_names + MAX_READ_NAME_LEN*read_no + i) = fn[i+1];
 
-				read_names[read_no][i] = 0;
+				*(read_names + MAX_READ_NAME_LEN*read_no + i) = 0;
 
 				sprintf(fn, "%s.files", index_prefix);
 				FILE * fname_fp = fopen(fn, "a");
-				fprintf(fname_fp, "%s\t%s\t%ld\n", read_names[read_no], ginp.filename, ftell(ginp.input_fp));
+				fprintf(fname_fp, "%s\t%s\t%ld\n", read_names+read_no*MAX_READ_NAME_LEN, ginp.filename, ftell(ginp.input_fp));
 				fclose(fname_fp);
 				
-
 				for (i=0; i<16; i++)
 				{
 					char nch = geinput_next_char(&ginp);
@@ -195,8 +232,16 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					else if (skips>0) skips--;
 					window[i] = nch;
 				}
+
 				read_len = 16;
 				read_no ++;
+
+				if(read_no >= chro_table_maxsize)
+				{
+					read_offsets = realloc(read_offsets, 2* chro_table_maxsize * sizeof(unsigned int));
+					read_names = realloc(read_names, 2* chro_table_maxsize * MAX_READ_NAME_LEN);
+					chro_table_maxsize *= 2;
+				}
 
 				if(IS_COLOR_SPACE)
 				{
@@ -252,9 +297,10 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				while(seek_back_reads)
 				{
-					fseek(ginp.input_fp, -2, SEEK_CUR);
+					fseek(ginp.input_fp, -1, SEEK_CUR);
 					char bnch = fgetc(ginp.input_fp);
-					if ((bnch >='A' && bnch <= 'Z' ) || (bnch >='a' && bnch <= 'z' ) || bnch=='.')seek_back_reads--;
+					if ((bnch >='A' && bnch <= 'Z' ) || (bnch >='a' && bnch <= 'z' ) || bnch == '-' || bnch == 'N' || bnch=='.')seek_back_reads--;
+					fseek(ginp.input_fp, -1, SEEK_CUR);
 				}
 
 				for (i=0; i<16; i++)
@@ -277,6 +323,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					array_int_key = int_key = genekey2int(window, GENE_SPACE_BASE);
 				
 				if(gehash_create(&table, segment_size, 0)) return 1;
+				if(MARK_NONINFORMATIVE_SUBREADS)
+					copy_non_informative_subread(&table, huge_table);
 				if(VALUE_ARRAY_INDEX)
 					if(gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?0:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )))) return 1;
 			}
@@ -369,6 +417,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		}
 	}
 
+	free(read_names);
+	free(read_offsets);
 	return 0;
 }
 
@@ -401,11 +451,11 @@ int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** hu
 
 int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, gehash_t *huge_table)
 {
-	int file_number, i ,j;
+	int file_number, table_no, i ,j;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
 	char fn[300];
-	float local_begin_ftime = miltime();
+	double local_begin_ftime = miltime();
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 
 	gehash_t occurance_table;
@@ -429,11 +479,11 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	SUBREADprintf("Scanning uninformative subreads(16mers) in the reference sequences \n");
+	SUBREADprintf("Scanning uninformative subreads in reference sequencing ...\n");
 
 	if (chro_file_number > 199)
 	{
-		SUBREADprintf("There too many chromosome files. You may merge them into less than 199 files.\n");
+		SUBREADprintf("There are too many chromosome files. You may merge them into less than 199 files.\n");
 		return -1;
 	}
 
@@ -442,9 +492,16 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		SUBREADprintf("The path is too long. It should not be longer than 290 chars.\n");
 		return -1;
 	}
+	if(all_bases<1)
+	{
+		SUBREADprintf("File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
+		return -1;
+	}
+
 
 	file_number = 0;
 	offset = 0;
+	table_no = 0;
 	read_no = 0;
 
 	sprintf(fn, "%s.files", index_prefix);
@@ -484,13 +541,6 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			if (status == NEXT_READ)
 			{
 
-				if(read_no>=OFFSET_TABLE_SIZE-1)
-				{
-					SUBREADprintf("\nThere are too many sections in the chromosome data files (more than %d sections).\n", OFFSET_TABLE_SIZE);
-					status = NEXT_FILE;
-					continue;
-				}
-
 				geinput_readline(&ginp, fn, 0);
 
 				for (i=0; i<16; i++)
@@ -502,7 +552,6 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				}
 				read_len = 16;
 				read_no ++;
-
 
 				if(IS_COLOR_SPACE)
 				{
@@ -618,12 +667,248 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	gehash_destory(&occurance_table);
 
 
-	SUBREADprintf("There are %llu non-informative subreads found in the chromosomes.\n" , huge_table -> current_items);
+	if(huge_table -> current_items)
+		SUBREADprintf("%llu uninformative subreads were found. These subreads will not be included in the index.\n" , huge_table -> current_items);
+
 	return 0;
 }
 
 
+char *rtrim(char *s)
+{
+	char* back = s + strlen(s);
+	while(isspace(*--back));
+	*(back+1) = '\0';
+	return s;
+}
 
+int ERROR_FOUND_IN_FASTA = 0;
+#define CHAR_ESC 27
+void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned line_no, int line_pos, char * msg, FILE * log_fp)
+{
+	int x1,brs=0;
+	long long int back_search_ptr;
+	char * line_buf = malloc(MAX_READ_LENGTH+1);
+
+	ERROR_FOUND_IN_FASTA += 1;
+
+	fprintf(log_fp,"\n");
+
+	fprintf(log_fp,"%c[33m", CHAR_ESC);
+	for(x1=0;x1<81;x1++)
+		fprintf(log_fp,"=");
+	fprintf(log_fp,"\n");
+	fprintf(log_fp,"%c[32m", CHAR_ESC);
+	fprintf(log_fp,"Input file '%s':\n", FN);
+	fprintf(log_fp,"%c[31m", CHAR_ESC);
+	fprintf(log_fp,"%s\n", msg);
+	fprintf(log_fp,"%c[33m", CHAR_ESC);
+	for(x1=0;x1<81;x1++)
+		fprintf(log_fp,".");
+	fprintf(log_fp,"\n");
+	fprintf(log_fp,"%c[37m", CHAR_ESC);
+	
+
+	FILE * warn_fp = fopen(FN, "r");
+
+	for(back_search_ptr = fpos_line_head - 1; back_search_ptr>=0; back_search_ptr--)
+	{
+		int nch;
+		fseeko(warn_fp, back_search_ptr, SEEK_SET);
+		nch = fgetc(warn_fp);
+		if(nch == '\n') brs++;
+		if(brs >2) break;
+		fseeko(warn_fp, back_search_ptr, SEEK_SET);
+	}
+
+	if(back_search_ptr<=0)brs++;
+
+	int print_line_no = line_no - brs + 1;
+	while(1)
+	{
+		char * ret = fgets(line_buf, MAX_READ_LENGTH, warn_fp);
+		if(!ret)break;
+		if(ftello(warn_fp) > fpos_line_head)
+			fprintf(log_fp,"%c[9m%c[31m", CHAR_ESC, CHAR_ESC);
+		else
+			fprintf(log_fp,"%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
+		fprintf(log_fp," % 8d ", print_line_no++);
+
+		rtrim(line_buf);
+		
+		fprintf(log_fp,"%s%s\n",line_buf,strlen(line_buf)<16?"              ":"");
+		if(ftello(warn_fp) > fpos_line_head)
+			break;
+	}
+	for(x1=0;x1<line_pos+10;x1++)
+		fprintf(log_fp," ");
+	fprintf(log_fp,"^\n");
+
+	fprintf(log_fp,"%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
+	for(x1=0;x1<2;x1++)
+	{
+		char * ret = fgets(line_buf, MAX_READ_LENGTH, warn_fp);
+		if(!ret)break;
+		fprintf(log_fp," % 8d ", print_line_no++);
+		fprintf(log_fp,"%s",line_buf);
+	}
+	fclose(warn_fp);
+	fprintf(log_fp,"%c[33m", CHAR_ESC);
+	for(x1=0;x1<81;x1++)
+		fprintf(log_fp,"=");
+	fprintf(log_fp,"\n");
+	fprintf(log_fp,"\n");
+
+	fprintf(log_fp,"%c[0m", CHAR_ESC);
+	free(line_buf);
+}
+
+int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, unsigned int ** chrom_lens, FILE * log_fp, char * log_fn)
+{
+	int is_R_warnned = 0;
+	char * line_buf = malloc(MAX_READ_LENGTH);
+	char * read_head_buf = malloc(MAX_READ_LENGTH * 3);
+	FILE * out_fp = fopen(out_fa,"w");
+	unsigned int inp_file_no, line_no;
+	int written_chrs = 0;
+	int chrom_lens_max_len = 100;
+	int chrom_lens_len = 0;
+	ERROR_FOUND_IN_FASTA = 0;
+
+	(*chrom_lens) = malloc(chrom_lens_max_len*sizeof(unsigned int));
+	memset((*chrom_lens), 0, chrom_lens_max_len*sizeof(unsigned int));
+	
+	SUBREADprintf("Checking the integrity of provided reference sequences ...\n");
+	for(inp_file_no = 0; inp_file_no < fa_number; inp_file_no++)
+	{
+		FILE * in_fp = fopen(input_fas[inp_file_no],"r");
+		long long int last_read_head_pos = 0;
+		unsigned int last_read_line_no = 1;
+
+		if(!in_fp)
+		{
+			SUBREADprintf("Input file '%s' is not found or is not accessible. No index was built.\n", input_fas[inp_file_no]);
+			return -1;
+		}
+
+		line_no = 0;
+		int is_head_written=0;
+		read_head_buf[0]=0;
+		while(!feof(in_fp))
+		{
+			long long int line_head_pos = ftello(in_fp);
+			unsigned int read_len = 0;
+			char * ret = fgets(line_buf, MAX_READ_LENGTH-1 , in_fp);
+			if(!ret) break;
+			line_no ++;
+			int line_buf_len = strlen(line_buf);
+
+			for(; line_buf[line_buf_len-1] == '\r' || line_buf[line_buf_len-1]=='\n' ;line_buf_len--)
+			{
+				if(line_buf[line_buf_len-1]=='\r')
+				{
+					if(!is_R_warnned)
+					{
+						is_R_warnned=1;
+						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, line_buf_len -1 ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.", log_fp);
+					}	
+				}
+				line_buf[line_buf_len-1] =0;
+			}
+
+
+			if(line_buf_len<1)
+			{
+				check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no ,0 ,"This line is empty. This is not allowed in the FASTA file.", log_fp);
+				continue;
+			}
+
+			if(line_buf[0]=='>')
+			{
+				if(line_no>1 &&!is_head_written)
+				{
+					check_and_convert_warn(input_fas[inp_file_no], last_read_head_pos, last_read_line_no, 0,"This sequence has less than 16 bases. It is ignored in the index because no subreads can be extracted.", log_fp);
+				}
+				is_head_written = 0;
+				last_read_line_no = line_no;
+				last_read_head_pos = line_head_pos;
+				read_len = 0;
+				read_head_buf[0]=0;
+
+				strcat(read_head_buf, line_buf);
+				strcat(read_head_buf, "\n");
+			}
+			else if(line_head_pos<1)
+			{
+				check_and_convert_warn(input_fas[inp_file_no], 0, 0, 0 ,"This file is not started with a header line. It seems not to be a FASTA file.", log_fp);
+			}
+			else
+			{
+				int xk2;
+				for(xk2=0; xk2 < line_buf_len; xk2++)
+				{
+					int nextch = line_buf[xk2];
+					int lowerch = tolower(nextch);
+					if(!( lowerch == 'a' || lowerch == 't' || lowerch == 'g' || lowerch == 'c' || nextch == '.' || nextch=='-' || lowerch=='n'))
+					{	
+						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, xk2, "The pointed base was converted to an 'A'.", log_fp);
+						line_buf[xk2] = 'A';
+					}
+					else if(nextch == '.' || nextch=='-' ||  lowerch=='n')
+						line_buf[xk2] = 'A';
+					else
+						line_buf[xk2] = toupper(nextch);
+				}
+
+				read_len += line_buf_len;
+
+				if(read_len > 16 && !is_head_written)
+				{
+					fputs(read_head_buf, out_fp);
+					written_chrs++;
+					is_head_written = 1;
+
+					chrom_lens_len++;
+					if((chrom_lens_max_len-1) <= chrom_lens_len)
+					{
+						(*chrom_lens) = realloc((*chrom_lens), 2*chrom_lens_max_len*sizeof(unsigned int));
+						chrom_lens_max_len*=2;
+					}
+				}
+
+				if(is_head_written)
+				{
+					fprintf(out_fp,"%s\n", line_buf);
+					(*chrom_lens)[chrom_lens_len-1] = read_len;
+					(*chrom_lens)[chrom_lens_len] = 0;
+				}
+				else
+				{
+					strcat(read_head_buf, line_buf);
+					strcat(read_head_buf, "\n");
+				}
+				
+			}
+		}
+
+		fclose(in_fp);
+	}
+
+
+	if(!written_chrs){
+		SUBREADprintf("No index was built because there were no subreads extracted. A chromosome needs at least 16 bases to be indexed.");
+		return 1;
+	}
+	free(line_buf);
+	free(read_head_buf);
+	fclose(out_fp);
+
+	if(ERROR_FOUND_IN_FASTA)
+		SUBREADprintf("There were %d format issues found in the input files. The details were saved in log file '%s'.\n", ERROR_FOUND_IN_FASTA, log_fn);
+	else	SUBREADprintf("No format issues were found in the input files.\n");
+
+	return 0;
+}
 
 #ifdef MAKE_STANDALONE
 int main(int argc,char ** argv)
@@ -633,13 +918,20 @@ int main_buildindex(int argc,char ** argv)
 {
 	int threshold = 24;
 	int memory_limit = 8000;	// 8000 MBytes
-	char output_file[300], c;
+	char output_file[300], c, tmp_fa_file[300], log_file_name[300];
+	char *ptr_tmp_fa_file[1];
+	unsigned int * chromosome_lengths;
+	ptr_tmp_fa_file[0]=tmp_fa_file;
 	output_file[0] = 0;
 
 	SUBREADprintf("\n");
-	while ((c = getopt (argc, argv, "cqM:o:f:D?")) != -1)
+	while ((c = getopt (argc, argv, "kvcqM:o:f:D?")) != -1)
 		switch(c)
 		{
+			case 'v':
+				print_version_info();
+				return 0;
+				break;
 			case 'q':
 				QUICK_BUILD = 1;
 				break;
@@ -655,15 +947,40 @@ int main_buildindex(int argc,char ** argv)
 			case 'o':
 				strncpy(output_file, optarg, 299);
 				break;
+			case 'k':
+				if(memcmp(SUBREAD_VERSION , "1.3.",4)==0)
+				{
+					SUBREADprintf("The \"-k\" option is not supported in version 1.3.x. ");
+					return -1;
+				}
+				MARK_NONINFORMATIVE_SUBREADS = 1;
+				break;	
 			case '?':
 				return -1 ;
 		}
 
 	if (argc == optind || !output_file[0])
 	{
+		SUBREADprintf("Version %s\n\n", SUBREAD_VERSION);
 
-                SUBREADprintf ("Usage:\n %s -o <basename> -M <int> {FASTA file1} [FASTA file2] ...\n\nArguments:\n    -o <basename>\t base name of the index to be created\n    -M <int>\t\t size of requested memory(RAM) in megabytes, 8000 by default\n    -c      \t\t build a color-space index\n\nExample:\n %s -o my_index chr1.fa chr2.fa ...\n\n", argv[0], argv[0]);
-
+		SUBREADputs("Usage:");
+		SUBREADputs("");
+		SUBREADputs(" ./subread-buildindex -o <basename> -M <int> {FASTA file1} [FASTA file2] ...");
+		SUBREADputs("");
+		SUBREADputs("Arguments:");
+		SUBREADputs("");
+		SUBREADputs("    -o <basename>   base name of the index to be created");
+		SUBREADputs("");
+		SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default");
+		SUBREADputs("");
+		SUBREADputs("    -f <int>        specify the threshold for removing uninformative subreads");
+		SUBREADputs("                    (highly repetitive 16mers in the reference). 24 by default.");
+		SUBREADputs("");
+		SUBREADputs("    -c              build a color-space index");
+		SUBREADputs("");
+		SUBREADputs("    -v              display the version number.");
+		SUBREADputs("");
+		SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
 		return -1 ;
 	}
 
@@ -673,19 +990,36 @@ int main_buildindex(int argc,char ** argv)
 	else
 		SUBREADprintf("Building a base-space index.\n");
 
-	SUBREADprintf("Size of memory used=%d MB\n",memory_limit);
+	SUBREADprintf("Size of memory specified=%d MB\n",memory_limit);
 	SUBREADprintf("Base name of the built index = %s\n",output_file);
 
 	SUBREADfflush(stdout);
 	begin_ftime = miltime();
 
 
-	gehash_t huge_table;
-	gehash_create(& huge_table, 50000000, 0);
-	if(scan_gene_index(output_file, argv+optind , argc - optind, threshold, &huge_table)) return 1;
-	if(build_gene_index(output_file, argv+optind , argc - optind,  memory_limit, threshold, &huge_table)) return 1;
-	SUBREADprintf("\nIndex %s was successfully built.\n", output_file);
+	sprintf(tmp_fa_file, "./subread-index-sam-%06u-XXXXXX", getpid());
+	mkstemp(tmp_fa_file);
 
-	return 0;
+	sprintf(log_file_name, "%s.log", output_file);
+	FILE * log_fp = fopen(log_file_name,"w");
+
+	int ret = check_and_convert_FastA(argv+optind , argc - optind, tmp_fa_file, &chromosome_lengths, log_fp, log_file_name);
+
+	if(!ret)
+	{
+		gehash_t huge_table;
+		gehash_create(& huge_table, 50000000, 0);
+		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table);
+		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths);
+		if(!ret)SUBREADprintf("\nIndex %s was successfully built.\n", output_file);
+		gehash_destory(& huge_table);
+		//     ^^^^^^^ should be destroy
+		free(chromosome_lengths);
+	}
+
+	unlink(tmp_fa_file);
+
+	fclose(log_fp);
+	return ret;
 }
 

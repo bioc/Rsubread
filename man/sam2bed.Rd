@@ -1,6 +1,6 @@
 \name{sam2bed}
 \alias{sam2bed}
-\title{Convert SAM format file to BED format}
+\title{Convert a SAM format file to a BED format file}
 \description{SAM to BED conversion}
 \usage{
 sam2bed(samfile,bedfile,readlen)
@@ -11,12 +11,10 @@ sam2bed(samfile,bedfile,readlen)
   \item{readlen}{ numeric value giving the length of reads included in the input file.}
   }
 \details{
-SAM format is the de facto standard format of output from read aligner.
-This format not only includes the mapping coordinates of the reads but also includes other using information such as mapping quality, CIGAR information and so on.  
-This function converts a SAM format file to a BED format file, which can then be displayed in a genome browser like UCSC genome browser, IGB, IGV etc.
+This function converts a SAM format file to a BED format file, which can then be displayed in a genome browser like UCSC genome browser, IGB, IGV.
 }
 \value{ 
-A BED format file.
+There is no return value, but a BED format file is created in the current working directory. This file contains six columns including chromosomal name, start position, end position, name(`.'), mapping quality score and strandness.
 }
 %\references{}
 \author{Wei Shi}

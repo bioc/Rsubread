@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <ctype.h>
 #include <errno.h>
 #include <unistd.h>
@@ -165,7 +186,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	}
 	memset(read_selection_list, 0xff, sizeof(char) * read_selection_list_size);
 
-	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * OFFSET_TABLE_SIZE);
+	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * XOFFSET_TABLE_SIZE);
 	if(!known_chromosomes)
 	{
 		fatal_memory_size();

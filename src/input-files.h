@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #ifndef __INPUT_FILES_H_
 #define __INPUT_FILES_H_
 
@@ -94,4 +115,7 @@ int break_SAM_file(char * in_SAM_file, char * temp_location, unsigned int * real
 int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, gene_offset_t* offsets );
 
 int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_start);
+
+void colorread2base(char * read_buffer, int read_len);
+int my_strcmp(const void * s1, const void * s2);
 #endif

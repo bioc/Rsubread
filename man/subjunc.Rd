@@ -3,7 +3,7 @@
 \title{Discovering exon-exon junctions from using RNA-seq data}
 \description{Use the seed-and-vote paradigm to accurately detect exon-exon junctions from RNA-seq data}
 \usage{
-subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indels=5,min_distance=50,max_distance=600,PE_orientation="fr")
+subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indels=5,minFragLength=50,maxFragLength=600,PE_orientation="fr")
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -13,8 +13,8 @@ subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indel
   \item{paired_end}{ logical, indicating whether the data is paired ended or single ended. \code{FALSE} by default.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. 1 by default.} 
   \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}
-  \item{min_distance}{ numeric value giving the minimal distance between the pair of reads. 50 by default.}
-  \item{max_distance}{ numeric value giving the maximal distance between the pair of reads. 600 by default.}
+  \item{minFragLength}{ numeric value giving the minimum fragment length. 50 by default.}
+  \item{maxFragLength}{ numeric value giving the maximum fragment length. 600 by default.}
   \item{PE_orientation}{ character string giving the orientation of the two reads in a pair. "fr" by default, which means the first read is on the forward strand and the second read is on the reverse strand.}
   }
 \details{
@@ -39,7 +39,7 @@ It calls the \emph{Subjunc} program (written in C programming language) included
 This function outputs two files: one is a SAM format file which includes the mapping results for all the reads (including both junction reads and exonic reads), and the other is a BED format file which inlcudes pairs of splicing points (exon-exon junctions) found from each junction read, number of supporting junction reads for each exon-exon junction and so on.
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi (2013), "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",  Nucleic Acids Research, Volume 41, Advance Access, April 4 [Epub ahead of print] (\url{http://nar.oxfordjournals.org/content/early/2013/04/03/nar.gkt214.abstract})
+Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}

@@ -1,3 +1,25 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -57,7 +79,7 @@ int is_gene_char(char c)
 		return GENE_SPACE_BASE;
 	if(c>='0' && c<'9')
 		return GENE_SPACE_COLOR;
-	if(c=='N' || c == '.')
+	if(c=='-' || c == '.')
 		return GENE_SPACE_BASE;
 	return 0;
 }
@@ -299,7 +321,7 @@ int geinput_next_char(gene_input_t * input)
 				return toupper(nch);
 			else
 			{
-				SUBREADprintf ("\nUnknown character in the chromosome data: %d, ignored!\n", nch);
+				SUBREADprintf ("\nUnknown character in the chromosome data: '%c' (ASCII:%02X), ignored!\n", nch, nch);
 				return 'N';
 			}		
 			last_br = 0;
@@ -672,7 +694,11 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 
 	if(space_type == GENE_SPACE_COLOR)
 	{
-		for (i=0; i<read_len/2; i++)
+		int begin_pos = 0;
+		if(isalpha(InBuff[0]))
+			begin_pos = 1;
+
+		for (i=begin_pos; i<read_len/2; i++)
 		{
 			int rll1 = read_len - 1 - i;
 			char tmp = InBuff[rll1];
@@ -761,6 +787,42 @@ int genekey2color(char last_base, char key [])
 	}
 
 	return ret;
+}
+
+void colorread2base(char * read_buffer, int read_len)
+{
+	int i;
+	char last_base = read_buffer[0];
+	for (i=1; i<read_len; i++)
+	{
+		int new_int = read_buffer[i];
+		int new_base = 0;
+		if(new_int == '0')
+			new_base=last_base;
+		else if(new_int == '1')
+		{
+			if(last_base == 'A')new_base = 'C';
+			else if(last_base == 'G')new_base = 'T';
+			else if(last_base == 'T')new_base = 'G';
+			else new_base = 'A';
+		}
+		else if(new_int == '2')
+		{
+			if(last_base == 'A')new_base = 'G';
+			else if(last_base == 'G')new_base = 'A';
+			else if(last_base == 'T')new_base = 'C';
+			else new_base = 'T';
+		}
+		else
+		{
+			if(last_base == 'A')new_base = 'T';
+			else if(last_base == 'G')new_base = 'C';
+			else if(last_base == 'T')new_base = 'A';
+			else new_base = 'G';
+		}
+		read_buffer[i] = new_base;
+		last_base = new_base;
+	}
 }
 
 int chars2color(char c1, char c2)
@@ -949,7 +1011,7 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 	}
 
 
-	fp_table = HashTableCreate( OFFSET_TABLE_SIZE / 16 );
+	fp_table = HashTableCreate( XOFFSET_TABLE_SIZE / 16 );
 	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
 	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
 	HashTableSetHashFunction(fp_table,HashTableStringHashFunction);

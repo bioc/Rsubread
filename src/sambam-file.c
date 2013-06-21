@@ -1,3 +1,22 @@
+/***************************************************************
+
+   The Subread software package is free software package: 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -153,7 +172,7 @@ int SamBam_get_alignment(SamBam_FILE * fp, SamBam_Alignment * aln)
 				SUBREADprintf("WARNING: cigar string is too long to the buffer\n");
 		}
 
-		char read_2_seq;
+		char read_2_seq = 0;
 		int seq_qual_bytes = read_len + (read_len /2)+(read_len%2);
 		int gzread_len = gzread(fp->gz_file, aln-> buff_for_seq, seq_qual_bytes);
 		if(gzread_len < seq_qual_bytes)
@@ -199,6 +218,7 @@ void SamBam_fclose(SamBam_FILE * fp)
 	else
 	{
 		gzclose(fp->gz_file);
+		free(fp -> bam_chro_table);
 		free(fp);
 	}
 }
@@ -217,6 +237,7 @@ void SamBam_read_ref_info(SamBam_FILE * ret)
 	unsigned int ref_info_size = gzread_B32(ret -> gz_file);
 
 	int xk1;
+	ret -> bam_chro_table = malloc(sizeof(SamBam_Reference_Info) * ref_info_size);
 	for(xk1=0;xk1<ref_info_size;xk1++)
 	{
 		int ref_name_len = gzread_B32(ret -> gz_file);
@@ -230,10 +251,7 @@ void SamBam_read_ref_info(SamBam_FILE * ret)
 
 		ret -> bam_chro_table[xk1].chro_length = gzread_B32(ret -> gz_file);
 
-
 		//printf("CHRO[%d] : %s [%d]\n", xk1+1, ret -> bam_chro_table[xk1].chro_name , ret -> bam_chro_table[xk1].chro_length);
-		if(xk1 >= BAM_MAX_CHROMOSOME_NUMBER)
-			SUBREADprintf("WARNING: There are too many reference sequences in the BAM file!\n"); 
 	}
 	ret ->bam_chro_table_size = ref_info_size;
 }
@@ -319,7 +337,7 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len)
 
 
 // test function
-#ifdef MAKE_STANDALONE
+#ifdef MAKE_TEST_SAMBAM
 int main(int argc , char ** argv)
 #else
 int test_bamview(int argc, char ** argv)
@@ -329,18 +347,17 @@ int test_bamview(int argc, char ** argv)
 	{
 		SamBam_FILE * fp = SamBam_fopen(argv[1], SAMBAM_FILE_BAM);
 		assert(fp);
-
+		/*
 		while(1)
 		{
 			char buf[3000];
 			char * buf2 = SamBam_fgets(fp,buf, 3000);
 			//printf(">>%s<<\n",buf);
 			//if(buf2)
-				//fwrite(buf,strlen(buf), 1, stdout);
+			//	fwrite(buf,strlen(buf), 1, stdout);
 			//else break;
-			break;
 		}
-
+		*/
 		SamBam_fclose(fp);
 	}
 	return 0;

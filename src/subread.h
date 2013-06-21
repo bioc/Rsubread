@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #ifndef _SUBREAD_H_
 #define _SUBREAD_H_
 
@@ -8,7 +29,9 @@
 #include <R.h>
 #endif
 
+#include "hashtable.h" 
 
+#define SUBREAD_VERSION "1.3.6"
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -17,6 +40,7 @@
 #define SAM_FLAG_REVERSE_STRAND_MATCHED 0x10
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
 #define SAM_FLAG_UNMAPPED 0x04
+#define SAM_FLAG_SECONDARY_ALIGNMENT 0x100
 
 #define FUSION_BREAK_POINT	2
 #define FUSION_JUNCTION		1
@@ -101,12 +125,11 @@
 
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
-//typedef float gene_quality_score_t;
-typedef int gene_quality_score_t;
+typedef unsigned int gene_quality_score_t;
 typedef char gene_vote_number_t;
 
 
-#define OFFSET_TABLE_SIZE 50000
+#define XOFFSET_TABLE_SIZE 50000
 
 #define ANCHORS_NUMBER 259
 
@@ -230,35 +253,41 @@ typedef struct{
 } gene_best_record_t;
 
 
+typedef struct{
+	unsigned int read_pos;
+	short masks;
+	char is_negative_strand;
+	gene_quality_score_t final_quality; // this varable is also used as big margin register.
+
+	gene_quality_score_t read_quality;
+	short vote_number;
+	short coverage_start;
+	short coverage_end;
+	short edit_distance;
+	
+} voting_result_t;
+
+
 
 typedef struct{
 	int max_len;
-	unsigned int * max_positions;
-	unsigned char * is_counterpart;
-	gene_vote_number_t * max_votes;
-	gene_quality_score_t * max_quality;
-	gene_quality_score_t * max_final_quality;
-	unsigned char * big_margin_votes_shared;
+	voting_result_t * results;
 
-	short * masks;
-	char * max_indel_recorder;
-	char * span_coverage;
-
-	unsigned short * edit_distance;
-
-#ifdef REPORT_ALL_THE_BEST
-	gene_best_record_t * best_records;
-#endif
-	char max_indel_tolerance;
 	short indel_recorder_length;
+	char  *all_indel_recorder;
+	unsigned int multi_best_reads;
+
+	gene_vote_t *vote_for_quality_scoring_1;
+	gene_vote_t *vote_for_quality_scoring_2;
 
 } gene_allvote_t;
 
 
 typedef struct{
 	int total_offsets;
-        char read_name[OFFSET_TABLE_SIZE][MAX_READ_NAME_LEN];
-        unsigned int read_offset[OFFSET_TABLE_SIZE];
+        char *read_names; //[MAX_READ_NAME_LEN];
+        unsigned int *read_offsets;
+	HashTable * read_name_to_index;
 } gene_offset_t;
 
 
@@ -309,7 +338,6 @@ typedef struct{
 	unsigned int pos;
 	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
-
 
 #define abs(a) 	  ((a)>=0?(a):-(a))
 #define max(a,b)  ((a)<(b)?(b):(a))

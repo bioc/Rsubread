@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/stat.h>
@@ -146,10 +167,10 @@ int main (int argc , char ** argv)
 
 	load_offsets (&_global_offsets, index_name);
 	SUBREADprintf ("Reporting threshold=%0.2f%%\n", MIN_REPORTING_RATIO*100);
-	for(i=0;i<1000;i++)
+	for(i=0;i<_global_offsets.total_offsets;i++)
 	{
-		if (!_global_offsets.read_offset[i])break;
-		SCAN_TOTAL_BASES = _global_offsets.read_offset[i];
+		if (!_global_offsets.read_offsets[i])break;
+		SCAN_TOTAL_BASES = _global_offsets.read_offsets[i];
 	}
 	SUBREADprintf ("All bases =%u\n", SCAN_TOTAL_BASES);
 	SUBREADprintf ("Scanning the full index for %s...\n\n", read_str);
@@ -157,6 +178,7 @@ int main (int argc , char ** argv)
 	full_scan_read(index_name, read_str);
 
 	SUBREADprintf ("\nFinished.\n");
+	destroy_offsets(&_global_offsets);
 
 	return 0;
 }

@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #ifndef _SAMBAM_FILE_H_
 #define _SAMBAM_FILE_H_
 
@@ -6,7 +27,6 @@ typedef unsigned short BS_uint_16;
 typedef unsigned int BS_uint_32;
 
 #define BAM_MAX_CHROMOSOME_NAME_LEN 256 
-#define BAM_MAX_CHROMOSOME_NUMBER 1024
 #define BAM_MAX_CIGAR_LEN 64
 #define BAM_MAX_READ_NAME_LEN 256
 #define BAM_MAX_READ_LEN 3000
@@ -54,7 +74,7 @@ typedef struct
 	int file_type;
 	int bam_file_stage;
 	unsigned long long bam_file_next_section_start;
-	SamBam_Reference_Info bam_chro_table[BAM_MAX_CHROMOSOME_NUMBER];
+	SamBam_Reference_Info * bam_chro_table;
 	int bam_chro_table_size;
 	SamBam_Alignment aln_buff;
 } SamBam_FILE;

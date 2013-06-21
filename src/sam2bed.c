@@ -1,3 +1,22 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,10 +38,11 @@ int sam2bed(int argc,char *argv[]){
 
   char * line = NULL;
   char * tok;
+  char strand;
   size_t len = 0;
   ssize_t z;
   char * chr;
-  int i, readlen, chr_start, chr_end;
+  int i, readlen, chr_start, chr_end, flag, mqs;
 
   int MAX_LINE_LENGTH = 100000;
   
@@ -35,12 +55,21 @@ int sam2bed(int argc,char *argv[]){
       continue;
 
     tok = strtok(line,"\t");
-    for(i=0;i<2;i++)
-       chr = strtok(NULL,"\t");
+	flag = atoi(strtok(NULL,"\t"));
+		
+	chr = strtok(NULL,"\t");
     if(chr[0] != '*'){
        chr_start = atoi(strtok(NULL,"\t")) - 1; 
        chr_end = chr_start + readlen;
-       fprintf(fp_out,"%s\t%d\t%d\n", chr, chr_start, chr_end);
+	   mqs = atoi(strtok(NULL,"\t"));
+	   
+	   if ((flag & 0x10) == 0){ 
+		 strand = '+';
+	   }
+	   else{
+		 strand = '-';
+	   }
+       fprintf(fp_out,"%s\t%d\t%d\t%s\t%d\t%c\n", chr, chr_start, chr_end, ".",mqs,strand);
     }
   }
 

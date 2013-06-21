@@ -1,3 +1,24 @@
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
@@ -882,6 +903,7 @@ void junction_tree_b_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 		group_anchor--;
 	}
 
+	int digged = 0;
 	if(next_jump && EXON_EXPLAIN_DEPTH > number_of_piece)
 	{
 		cigar_recorder [number_of_piece * 4+1] = rl - max_piece_len + max_indels;
@@ -910,6 +932,7 @@ void junction_tree_b_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 			SUBREADprintf ("DIG-IN B-SEARCH REMAIN_LEN=%d, POS_TAIL=%u\n", rl + max_indels- max_piece_len, connect_to_iii);
 			#endif
 			junction_tree_b_explorer(bed_table, pos_table, connection_table, read, rl + max_indels - max_piece_len, full_rl, connect_to_iii , 1+number_of_piece , cigar_recorder, total_matched_bases + max_matched_bases, result_total_matched_bases , result_cigar_recorder, result_number_pieces,  my_value_array_index, ginp, subread_votes_cover_start, quality_str , quality_format, match_score, total_jump_length + this_jump, max_jump_length);
+			digged = 1;
 		}
 	}
 		// the "read_tail_pos" is the exon that matches through this read; it has to be well matched to accept the read.
@@ -1028,6 +1051,7 @@ void junction_tree_f_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 		group_anchor++;
 	}
 	
+	int digged = 0;
 	if(next_jump && EXON_EXPLAIN_DEPTH > number_of_piece)
 	{
 		cigar_recorder [number_of_piece * 4+2] = full_rl - rl + max_piece_len - max_indels;
@@ -1060,6 +1084,7 @@ void junction_tree_f_explorer(HashTable * bed_table, HashTable * pos_table, Hash
 			//SUBREADprintf("F-MAXINDEL=%d ; NEXT_HEAD_MODIFY=%d ; #PIECES=%d\n", max_indels, next_head_modify, number_of_piece );
 			unsigned int this_jump_size = connect_to_iii - max_grouped_pos;
 			junction_tree_f_explorer(bed_table, pos_table, connection_table, read+max_piece_len-max_indels, rl - max_piece_len + max_indels, full_rl , connect_to_iii , 1+number_of_piece , cigar_recorder, total_matched_bases + max_matched_bases, result_total_matched_bases , result_cigar_recorder,result_number_pieces, my_value_array_index, ginp, 0 , quality_str + max_piece_len-max_indels , quality_format, match_score, total_jump_length + this_jump_size, max_jump_length);
+			digged = 1;
 		}
 	}
 		// the "read_head_pos" is the exon that matches through this read; it has to be well matched to accept the read.
@@ -1132,6 +1157,8 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 	int my_range_start , my_range_end;
 
+	if(thread_id==0)
+		SUBREADprintf("Realigning junction reads:\n");
 	int mapping_quality=0, mapping_flags=0;
 	double reads_per_thread = processed_reads*(1+(ginp2!=NULL)) * 1.0 / EXON_ALL_THREADS;
 	my_range_start = max(0,(int)(reads_per_thread * thread_id - 0.5));
@@ -1188,7 +1215,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 
 		if(i % 10000 ==0 && i>1 && thread_id==0)
-			print_text_scrolling_bar("Second Iteration", i*EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i*EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		if(halves_record->best_vote1_list[i] >=MAX_QUALITY_TO_EXPLORER_JUNCTION) 
 		{
@@ -1229,7 +1256,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 
 		unsigned int explain_buff[138], explain_result[138];
-		int result_number_pieces = 0,  result_total_matched_bases = 0, total_pieces = 0;
+		int result_number_pieces = 0,  result_total_matched_bases = 0, total_pieces = 0, total_total_matched_bases;
 		float match_score = EXON_HALF_MATCH_PERCENTAGE;
 
 		//int before_best_offset = (pos >   halves_record -> best_pos2_list[i])? halves_record -> splice_point_offset_2[i] : halves_record ->splice_point_offset_1[i];
@@ -1345,6 +1372,8 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			max_jump_length = 999999999;
 			junction_tree_f_explorer(bed_table, pos_table, connection_table, inb + f_search_head , rl - f_search_head, rl , explain_result[(total_pieces-1)*4], 0, explain_buff, 0, &result_total_matched_bases , explain_result+ 4 * (total_pieces>0?(total_pieces-1):0),  &result_number_pieces, my_value_array_index, ginp, result_head_modify, qualityb+ f_search_head,  EXON_FASTQ_FORMAT, match_score, 0 , &max_jump_length);
 
+			total_total_matched_bases = result_total_matched_bases;
+
 			total_pieces --;
 		}
 
@@ -1411,6 +1440,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			cigar_buf[0]=0;
 			if (is_settle)
 			{
+				int last_indel = 0;
 				for (j = 0; j < total_pieces; j++)
 				{
 					char cigar_piece[100];
@@ -1461,6 +1491,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 #endif
 						sprintf (cigar_piece, "%dN",explain_result[4*j+4]- (explain_result[ 4*j] + explain_result[ 4*j+2] - explain_result[4*j+1] + indel_length));
 						strcat(cigar_buf, cigar_piece);
+						last_indel = indel_length;
 
 					}
 				}
@@ -1470,7 +1501,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			int is_safeguarded= 0;
 			compress_cigar(cigar_buf, rl, inb, NULL, NULL, &is_safeguarded);
 
-			halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, explain_result[0], inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT, &mismatch, rl);
+			halves_record -> final_quality [i] = final_mapping_quality(my_value_array_index, explain_result[0], inb, qualityb[0]?qualityb:NULL, cigar_buf, EXON_FASTQ_FORMAT, &mismatch, rl, 0);
 
 
 			#ifdef QUALITY_KILL
@@ -1574,6 +1605,9 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			halves_record -> half_marks_list[i] |= IS_FINALISED_PROCESSING;
 		i+=1;
 	}
+
+	if(thread_id==0)
+		SUBREADprintf("\n");
 }
 
 
@@ -2347,6 +2381,9 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 	unsigned int my_range_start , my_range_end;
 	gene_value_index_t * my_value_array_index;
 
+	if(thread_id==0)
+		SUBREADprintf("Detecting junctions:\n");
+
 	double reads_per_thread = processed_reads*(1+(ginp2!=NULL)) * 1.0 / EXON_ALL_THREADS;
 	my_range_start = max((int)(reads_per_thread * thread_id - 0.5),0);
 	my_range_end = min((int)(reads_per_thread*(1+thread_id) + 0.5), processed_reads*(1+(ginp2!=NULL)));
@@ -2385,7 +2422,7 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 			reverse_read(inb, rl, ginp->space_type);*/
 
 		if(i % 10000 ==0 && i>1 && !thread_id)
-			print_text_scrolling_bar("First Iteration", i* EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i* EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
 		unsigned int pos2 = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos2_list[i]:halves_record -> best_pos1_list[i];
@@ -2615,6 +2652,8 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 
 		i++;
 	}
+	if(thread_id==0)
+		SUBREADprintf("\n");
 }
 
 
@@ -2763,14 +2802,16 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 	int i=0, ic=0 ;
 	int mapping_quality=0, mapping_flags=0;
 
+
+	SUBREADprintf("%u reads were processed. Saving the results for them:\n", processed_reads);
 	if(ftello(out_fp)<1)
 	{
 		unsigned int last_offset = 0;
 		i=0;
-		while(_global_offsets.read_offset[i])
+		while(_global_offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_name[i], _global_offsets.read_offset[i] - last_offset+16);
-			last_offset = _global_offsets.read_offset[i];
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_READ_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
+			last_offset = _global_offsets.read_offsets[i];
 			i++;
 		}
 	}
@@ -2786,7 +2827,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 
 
 		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("Saving results", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
+			print_text_scrolling_bar("", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		old_line[0]=0;
 
@@ -2908,7 +2949,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 		i++;
 
 	}
-
+	SUBREADprintf("\n");
 }
 
 
@@ -2923,15 +2964,17 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 	{
 		unsigned int last_offset = 0;
 		i=0;
-		while(_global_offsets.read_offset[i])
+		while(_global_offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_name[i], _global_offsets.read_offset[i] - last_offset+16);
-			last_offset = _global_offsets.read_offset[i];
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_READ_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
+			last_offset = _global_offsets.read_offsets[i];
 			i++;
 		}
 	}
 
 	i=0;
+
+	SUBREADprintf("%u fragments were processed. Saving the results for them:\n", processed_reads);
 
 	while (1)
 	{
@@ -3012,8 +3055,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 					k++;
 
 				}
-				if(field == 11)qualityb[ci]=0;
-				if(field == 10 && ci>0)qualityb[ci]=0;
+				if(ci>0)qualityb[ci]=0;
 
 				if(j)
 				{
@@ -3035,7 +3077,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			old_inb2_reversed = (old_flag2 & 0x10)?1:0;
 
 			#ifdef QUALITY_KILL_SUBREAD
-				if(old_quality1 <= QUALITY_KILL_SUBREAD)
+				if(old_quality1 <= QUALITY_KILL_SUBREAD || (old_flag1 & SAM_FLAG_UNMAPPED))
 				{
 					/*
 					if(old_inb1_reversed)
@@ -3048,14 +3090,14 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 					*/
 
 					old_chro1[0]=0;
-					old_flag1=4;
+					old_flag1=SAM_FLAG_UNMAPPED;
 					old_quality1=0;
 					old_cigar1[0]=0;
 					old_pos1=0;
 				}
 
 
-				if(old_quality2 <= QUALITY_KILL_SUBREAD)
+				if(old_quality2 <= QUALITY_KILL_SUBREAD || (old_flag2 & SAM_FLAG_UNMAPPED))
 				{
 					/*
 
@@ -3071,7 +3113,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 
 
 					old_chro2[0]=0;
-					old_flag2=4;
+					old_flag2=SAM_FLAG_UNMAPPED;
 					old_quality2=0;
 					old_cigar2[0]=0;
 					old_pos2=0;
@@ -3267,13 +3309,12 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 		{
 			char mate_for_1[120], mate_for_2[120];
 			int tlen = 0;
-			if(strcmp(old_chro1, old_chro2) == 0)
+			if(old_chro1[0] && (strcmp(old_chro1, old_chro2) == 0))
 			{
 				long long int pair_dist = old_pos1;
 				pair_dist -= old_pos2;
-				tlen = pair_dist;
-				pair_dist = abs(pair_dist);
-				if(pair_dist >= EXON_MIN_PAIRED_DISTANCE && pair_dist <= EXON_MAX_PAIRED_DISTANCE)
+				tlen = abs(pair_dist) + (tlen>0?rl1:rl2);
+				if(tlen >= EXON_MIN_PAIRED_DISTANCE && tlen <= EXON_MAX_PAIRED_DISTANCE)
 				{
 					old_flag1 |= SAM_FLAG_MATCHED_IN_PAIR;
 					old_flag2 |= SAM_FLAG_MATCHED_IN_PAIR;
@@ -3285,18 +3326,23 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 				}
 				strcpy(mate_for_1,"=");
 				strcpy(mate_for_2,"=");
-				tlen = abs(tlen) + (tlen>0?rl1:rl2);
 			}
 			else
 			{
 				if(old_chro2[0])
 					strcpy(mate_for_1,old_chro2);
-				else	strcpy(mate_for_1,"*");
-
+				else{
+					strcpy(mate_for_1,"*");
+					old_pos2=0;
+				}
 				
-				if(old_chro2[1])
+				if(old_chro1[0])
 					strcpy(mate_for_2,old_chro1);
-				else	strcpy(mate_for_2,"*");
+				else
+				{
+					strcpy(mate_for_2,"*");
+					old_pos1=0;
+				}
 
 				old_flag1 &= ~SAM_FLAG_MATCHED_IN_PAIR;
 				old_flag2 &= ~SAM_FLAG_MATCHED_IN_PAIR;
@@ -3330,9 +3376,6 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			else
 			{
 				strcpy(old_chro1,"*");
-				//strcpy(mate_for_1,"*");
-				strcpy(mate_for_2,"*");
-				old_pos1=0;
 				tlen = 0;
 			}
 
@@ -3340,10 +3383,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 			else
 			{
 				strcpy(old_chro2,"*");
-				strcpy(mate_for_1,"*");
-				//strcpy(mate_for_2,"*");
 				tlen = 0;
-				old_pos2=0;
 			}
 
 			if(!old_cigar1[0])
@@ -3359,6 +3399,8 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 		}
 
 	}
+
+	SUBREADprintf("\n");
 
 }
 
@@ -3535,6 +3577,8 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 	int read_len = 0, read2_len = 0, sam_qual1=0, sam_qual2=0, sam_flag1=0, sam_flag2=0;
 	is_reversed = 0;
 
+	if(my_thread_no==0)
+		SUBREADprintf("Processing %s:\n", ginp2?"fragments":"reads");
 	//SUBREADprintf ("I'm the %d-th thread RRRR\n", my_thread_no);return 0;
 
 	if (ginp2)
@@ -3559,13 +3603,13 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 
 	// if this block of index is not the last one
 
-	if(_global_offsets.read_offset[ _global_offsets.total_offsets ] > high_border+10)
+	if(_global_offsets.read_offsets[ _global_offsets.total_offsets ] > high_border+10)
 		for(i=0; i< _global_offsets.total_offsets; i++)
 		{
-			if(_global_offsets.read_offset[i] > index_valid_range)
+			if(_global_offsets.read_offsets[i] > index_valid_range)
 			{
-				if(i>0 && _global_offsets.read_offset[i-1] > index_valid_range-2000000)
-					index_valid_range = _global_offsets.read_offset[i-1] ;
+				if(i>0 && _global_offsets.read_offsets[i-1] > index_valid_range-2000000)
+					index_valid_range = _global_offsets.read_offsets[i-1] ;
 				else
 					index_valid_range = index_valid_range-2000000 ;
 				break;
@@ -3801,7 +3845,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 			{
 				finalise_vote(vote_p1);
 				finalise_vote(vote_p2);
-				int is_paired_match = select_positions(vote_p1, vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, 3, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven);
+				int is_paired_match = select_positions_exons(vote_p1, vote_p2, &numvote_read1, &numvote_read2, &sum_quality, &qual_r1, &qual_r2, &pos_read1, &pos_read2, record_index1, record_index2, EXON_MAX_PAIRED_DISTANCE, EXON_MIN_PAIRED_DISTANCE, 3, ACCEPT_MINOR_SUBREADS, is_reversed, EXON_NUMBER_OF_ANCHORS_PAIRED,  EXON_INDEL_TOLERANCE, &is_breakeven, read_len, read2_len);
 				for (is_second_read = 0; is_second_read <2; is_second_read ++)
 				{
 					gene_vote_t * current_vote = is_second_read?vote_p2: vote_p1;
@@ -3947,6 +3991,8 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 	free(vote_p1);
 	free(vote_p2);
 	free(vote_p3);
+	if(my_thread_no==0)
+		SUBREADprintf("\n");
 	return 0;
 }
 
@@ -3977,6 +4023,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 	unsigned long long int current_fp = ftello(ginp -> input_fp);
 	unsigned long long int last_fp_pos =  0;
 	struct stat filestat;
+	int last_table = 0;
 	int stat_ret;
 	char table_fn [300];
 	gehash_t my_raw_table;
@@ -3995,7 +4042,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 		if (IS_DEBUG)
 			SUBREADprintf ("@LOG Loading table from %s\n", table_fn);
 		else
-			SUBREADprintf ("Loading the %02d-th index file ...					      \r", tabno+1);
+			SUBREADprintf ("Loading the %02d-th index file ...					      \n", tabno+1);
 		SUBREADfflush(stdout);
 
 		if(gehash_load(my_table, table_fn)) return -1;
@@ -4014,6 +4061,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 			if(gvindex_load(&value_array_index,table_fn)) return -1;
 		}
 		processed_reads = 0;
+		last_table = tabno;
 
 // Run the search algorithm on a part of the index
 		if(EXON_ALL_THREADS <2)
@@ -4157,44 +4205,58 @@ int run_exon_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * inde
 
 void exon_usage(char * execname)
 {
+	SUBREADprintf("Version %s\n\n", SUBREAD_VERSION);
 	SUBREADputs("Usage:");
+	SUBREADputs("");
 	SUBREADputs(" ./subjunc [options] -i <index_name> -r <input> -o <output>");
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
-	SUBREADputs("    -i --index     <index>\t base name of the index.");
-	SUBREADputs("    -r --read      <input>\t name of the input file(FASTQ/FASTA format). Both base-space and color-space read data are supported. For paired-end reads, this gives the first read file and the other read file should be specified using the -R option.");
-	SUBREADputs("    -o --output    <output>\t name of the output file(SAM format).");
 	SUBREADputs("");
-	SUBREADputs("Optional arguments:");
-	SUBREADputs("    -n --subreads  <int>\t number of selected subreads, 14 by default.");
-	SUBREADputs("       --singleSAM <input>\t using as input file a SAM file which includes mapping results for single-end reads (e.g. 'subread-align' output).");
-	SUBREADputs("       --pairedSAM <input>\t using as input file a SAM file which includes mapping results for paired-end reads.");
-	//SUBREADputs("    -x --fusion	   \t enabling the detection of fusion events.");
-	//SUBREADputs("    -A --nosam	   \t disabling the SAM output for the reads. Only discovered exon junction locations will be reported (BED file).");
-	//SUBREADputs("    -H --hamming	\t passed to subread-align program.");
-	//SUBREADputs("    -Q --quality	\t passed to subread-align program.");
-	//SUBREADputs("    -u --unique	\t passed to subread-align program.");
-	//SUBREADputs("    -L --halflen   <int>\t minimal distance allowed between the junction location and the end base (first or last) of the read or the segment, 0 by default.");
-	SUBREADputs("    -T --threads   <int>\t number of threads/CPUs used, 1 by default.");
-	SUBREADputs("    -I --indel     <int>\t number of INDEL bases allowed, 5 by default.");
-	SUBREADputs("    -P --phred     <3:6>\t the format of Phred scores used in input files, '3' for phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("");
-	SUBREADputs("Arguments for paired-end reads:");
-	SUBREADputs("    -R --read2     <input>\t name of the second input file from paired-end data. The program will then be switched to paired-end read mapping mode.");
-	//SUBREADputs("       --jreadonly	\t only report junction reads in SAM file.");
-	SUBREADputs("    -d --mindist   <int>\t the minimum distance between two reads in a pair, 50 by default");
-	SUBREADputs("    -D --maxdist   <int>\t the maximum distance between two reads in a pair, 600 by default");
-	SUBREADputs("    -S --order     <ff:fr:rf> \t specifying if the first/second reads are forward or reversed, 'fr' by default");
+	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format). Both ");
+	SUBREADputs("                            base-space and color-space read data are supported. ");
+	SUBREADputs("                            For paired-end reads, this gives the first read file");
+	SUBREADputs("                            and the other read file should be specified using");
+	SUBREADputs("                            the -R option.");
 	SUBREADputs("");
-	//SUBREADputs("Arguments for mapping bisulfite reads:");
-	//SUBREADputs("    -b --bisulfite <int>\t Number of bases 'c' allowed to be converted to 't' in each extracted subread (16bp mer), 1 by default");
-	//SUBREADputs("");
-	SUBREADputs("Example:");
-	SUBREADputs(" ./subjunc -i my_index -r reads.fastq -o my_result.sam ");
+	SUBREADputs("    -o --output    <output> name of the output file(SAM format).");
 	SUBREADputs("");
+	SUBREADputs("Optional general arguments:");
 	SUBREADputs("");
-	SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
-
+	SUBREADputs("    -n --subreads  <int>    number of selected subreads, 14 by default.");
+	SUBREADputs("");
+	SUBREADputs("       --singleSAM <input>  using the input file as a SAM file which includes");
+	SUBREADputs("                            mapping results for single-end reads (e.g. 'subread-");
+	SUBREADputs("                            align' output).");
+	SUBREADputs("");
+	SUBREADputs("       --pairedSAM <input>  using the input file as a SAM file which includes");
+	SUBREADputs("                            mapping results for paired-end reads.");
+	SUBREADputs("");
+	SUBREADputs("    -T --threads   <int>    number of threads/CPUs used, 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("    -I --indel     <int>    number of INDEL bases allowed, 5 by default.");
+	SUBREADputs("");
+	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
+	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("");
+	SUBREADputs("    -v                      displaying the version number.");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments for paired-end reads:");
+	SUBREADputs("");
+	SUBREADputs("    -R --read2     <input>  name of the second input file from paired-end data. ");
+	SUBREADputs("                            The program will then be switched to paired-end read");
+	SUBREADputs("                            mapping mode.");
+	SUBREADputs("");
+	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
+	SUBREADputs("");
+	SUBREADputs("    -D --maxdist   <int>    maximum fragment/template length, 600bp by default.");
+	SUBREADputs("");
+	SUBREADputs("    -S --order     <ff:fr:rf>  specifying if the first/second reads are forward");
+	SUBREADputs("                            or reversed, 'fr' by default");
+	SUBREADputs("");
+	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
+	SUBREADputs("");
 }
 
 static struct option long_options[] =
@@ -4453,9 +4515,13 @@ int main_junction(int argc,char ** argv)
 	//	SUBREADprintf ("I'm the %d-th thread RRRKK\n", -9999);return 0;
 
 
-	while ((c = getopt_long (argc, argv, "xS:L:AH:d:D:n:m:p:f:P:R:r:i:l:o:T:Q:I:1:2:t:B:b:F?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vxS:L:AH:d:D:n:m:p:f:P:R:r:i:l:o:T:Q:I:1:2:t:B:b:F?", long_options, &option_index)) != -1)
 		switch(c)
 		{
+			case 'v':
+				print_version_info();
+				return 0;
+				break;
 			case 'A':
 				REPORT_SAM_FILE = 0;
 				break;
@@ -4600,15 +4666,14 @@ int main_junction(int argc,char ** argv)
 		if(xx>=0) strcat(cwd,"/");
 		else cwd[0]=0;
 
+		SUBREADputs("Call subread-align to map reads...");
 
 		if(read2_file[0])
 			sprintf(command, "%ssubread-align -J --allow-repeating  -T %d -i '%s' -r '%s' -R '%s' -o '%s' -P %d -d %d -D %d %s %s -I %d -b %d ",cwd, EXON_ALL_THREADS, index_prefix, read_file, read2_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6, EXON_MIN_PAIRED_DISTANCE, EXON_MAX_PAIRED_DISTANCE, EXON_QUALITY_SCALE?"-Q":"", using_base_distance?"-H":"", EXON_INDEL_TOLERANCE-1, EXON_MAX_METHYLATION_C_NUMBER);
 		else
 			sprintf(command, "%ssubread-align  -J --allow-repeating  -T %d -i '%s' -r '%s' -o '%s' -P %d %s %s -I %d -b %d",cwd, EXON_ALL_THREADS, index_prefix, read_file, tmpfile, EXON_FASTQ_FORMAT == FASTQ_PHRED33?3:6 , EXON_QUALITY_SCALE?"-Q":"", using_base_distance?"-H":"", EXON_INDEL_TOLERANCE-1, EXON_MAX_METHYLATION_C_NUMBER);
-		SUBREADputs(command);
+		//SUBREADputs(command);
 		is_successful = system(command);
-
-		if(!is_successful) SUBREADprintf("We have a very unlikely error.\n");
 
 		strcpy(read_file, tmpfile);
 		IS_SAM_INPUT=1;
@@ -4619,21 +4684,23 @@ int main_junction(int argc,char ** argv)
 			IS_SAM_INPUT=2;
 		}
 		EXON_FASTQ_FORMAT = FASTQ_PHRED33;
+		reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
+		if(reads_density<0)
+		{
+			SUBREADputs("Subjunc is terminated because subread could not map the reads.");
+			return -1;
+		}
 	}
 	else
-		tmpfile[0]=0;
-
-
-
-	if(!EXON_USE_VALUE_ARRAY_INDEX)
 	{
-		SUBREADprintf("Detecting junction reads must reference to the base-wise indel. Please enable the '-b' option while building the index.\n");
-		return -1;
-	}
+		tmpfile[0]=0;
+		reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
   
-	reads_density = guess_reads_density(read_file, IS_SAM_INPUT);
-	if(reads_density<0)
-		SUBREADprintf("Input file '%s' is not found or is in an incorrect format.\n", read_file);
+		if(reads_density<0)
+			SUBREADprintf("Input file '%s' is not found or is in an incorrect format.\n", read_file);
+	}
+
+	SUBREADputs("Detect exon-exon junctions and map reads...");
 
 	if(IS_SAM_INPUT==0)
 	{
@@ -4705,8 +4772,8 @@ int main_junction(int argc,char ** argv)
 		}
 
 		SUBREADprintf ("Performing paired-end alignment:\n");
-		SUBREADprintf ("Maximum distance between reads=%d\n", EXON_MAX_PAIRED_DISTANCE);
-		SUBREADprintf ("Minimum distance between reads=%d\n", EXON_MIN_PAIRED_DISTANCE);
+		SUBREADprintf ("Maximum fragment length=%d\n", EXON_MAX_PAIRED_DISTANCE);
+		SUBREADprintf ("Minimum fragment length=%d\n", EXON_MIN_PAIRED_DISTANCE);
 		SUBREADprintf ("Threshold on number of subreads for a successful mapping (the minor end in the pair)=%d\n", ACCEPT_MINOR_SUBREADS);
 		SUBREADprintf ("The directions of the two input files are: %s, %s\n\n", EXON_FIRST_READ_REVERSE?"reversed":"forward", EXON_SECOND_READ_REVERSE?"reversed":"forward");
 	}
@@ -4779,7 +4846,7 @@ int main_junction(int argc,char ** argv)
 	if(IS_DEBUG)
 		SUBREADprintf("@LOG THE END. \n");
 	else
-		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, read2_file[0]?"read pairs":"reads", miltime()-begin_ftime, junction_number, support_number );
+		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, read2_file[0]?"fragments":"reads", miltime()-begin_ftime, junction_number, support_number );
 
 	if(out_fp)
 		fclose(out_fp);
@@ -4788,5 +4855,6 @@ int main_junction(int argc,char ** argv)
 	if(tmpfile[0])
 		unlink(tmpfile);
 	destory_halves_record(&halves_record);
+	destroy_offsets (&_global_offsets);
 	return 0;
 }

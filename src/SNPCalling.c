@@ -1,4 +1,24 @@
-#include "subread.h"
+/***************************************************************
+
+   The Subread and Rsubread software packages are free
+   software packages:
+ 
+   you can redistribute it and/or modify it under the terms
+   of the GNU General Public License as published by the 
+   Free Software Foundation, either version 3 of the License,
+   or (at your option) any later version.
+
+   Subread is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty
+   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+   
+   See the GNU General Public License for more details.
+
+   Authors: Drs Yang Liao and Wei Shi
+
+  ***************************************************************/
+  
+  
 #include <ctype.h>
 #include <math.h>
 #include <errno.h>
@@ -7,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "subread.h"
 #include "gene-algorithms.h"
 #include "SNPCalling.h"
 #include "input-files.h"
@@ -146,14 +167,11 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		char qual[MAX_READ_LENGTH];
 		char base_neighbour_test[MAX_READ_LENGTH];
 		char base_used[MAX_READ_LENGTH];
-		int rret;
 
-		rret=fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
-		rret=fread(&read_len, sizeof(short), 1, tmp_fp);
-		rret=fread(read, sizeof(char), read_len, tmp_fp);
-		rret=fread(qual, sizeof(char), read_len, tmp_fp);
-
-		if(rret<1)SUBREADprintf("Warning: reads are not loaded.\n");
+		fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
+		fread(&read_len, sizeof(short), 1, tmp_fp);
+		fread(read, sizeof(char), read_len, tmp_fp);
+		fread(qual, sizeof(char), read_len, tmp_fp);
 
 		first_base_pos = read_rec.pos - block_no * BASE_BLOCK_LENGTH;
 
@@ -411,7 +429,7 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 	}
 
 
-	for(chro_no=0;chro_no < OFFSET_TABLE_SIZE; chro_no++)
+	for(chro_no=0;chro_no < XOFFSET_TABLE_SIZE; chro_no++)
 	{
 		if(!chromosomes[chro_no].chromosome_name[0]) break;
 		if(strcmp(chro_name , chromosomes[chro_no].chromosome_name)==0)
@@ -422,7 +440,6 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 	}
 
 	SUBREADprintf("Processing chromosome %s in FASTA file; expected length is %u.\n", chro_name, chro_len);
-	
 	SUBREADfflush(stdout);
 	if(!chro_len)
 	{
@@ -536,7 +553,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		precalculated_factorial[i] = 0.; 
 		
 
-	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * OFFSET_TABLE_SIZE);
+	known_chromosomes = (chromosome_t *) SUBREAD_malloc(sizeof(chromosome_t) * XOFFSET_TABLE_SIZE);
 	if(!known_chromosomes)
 	{
 		fatal_memory_size();
@@ -639,9 +656,6 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'p':
-				break;
-		/*
-			case 'p':
 				if(parameters.neighbour_filter_testlen > 0)
 				{
 					SUBREADprintf("You cannot use both neighbour filtering and Fisher's exact test.\n");
@@ -665,7 +679,6 @@ int main_snp_calling_test(int argc,char ** argv)
 				}
 				break;
 
-		*/
 			case 'q':
 				parameters.min_phred_score = atoi(optarg);
 				break;
