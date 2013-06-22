@@ -871,7 +871,7 @@ void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 // }
 //
 
-inline unsigned int load_int32(FILE * fp)
+unsigned int load_int32(FILE * fp)
 {
 	int ret;
 	int read_length;
@@ -880,7 +880,7 @@ inline unsigned int load_int32(FILE * fp)
 	return ret;
 }
 
-inline long long int load_int64(FILE * fp)
+long long int load_int64(FILE * fp)
 {
 	long long int ret;
 	int read_length;
