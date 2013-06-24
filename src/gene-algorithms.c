@@ -248,9 +248,9 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 	dash_width = min(dash_width, bar_width - 1);
 	int space_width = bar_width - 1 - dash_width;
 
-	for (i=0; i<width; i++);
-		SUBREADputchar(' ');
-	SUBREADprintf("\r");
+	//for (i=0; i<width; i++);
+	//	SUBREADputchar(' ');
+	//SUBREADprintf("\r");
 
  
 	switch ((*internal_counter) % 4)
@@ -270,15 +270,18 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 	}
 
 	(*internal_counter) ++;
+	char linebuf[100];
 
-	SUBREADprintf (" %c %s [", fan, hint);
+	sprintf (linebuf," %c %s [", fan, hint);
 	for(i = 0; i< dash_width; i++)
-		SUBREADputchar('=');
-	SUBREADputchar('>');
+		strcat(linebuf, "=");
+	strcat(linebuf, ">");
 	for(i = 0; i< space_width; i++)
-		SUBREADputchar(' ');
-	SUBREADprintf("]\r");
-	
+		strcat(linebuf, " ");
+	strcat(linebuf, "]\r");
+	SUBREADprintf("%s", linebuf);
+	//SUBREADprintf(" [ %.1f%% finished ]    \r", 100*percentage);
+
 	SUBREADfflush(stdout);
 }
 

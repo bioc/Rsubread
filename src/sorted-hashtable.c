@@ -957,7 +957,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
-	SUBREADprintf("Saving the current index block:\n");
+	SUBREADprintf("Saving the current block; this can take hours...\n");
 
 
 	for (i=0; i<the_table -> buckets_number; i++)
