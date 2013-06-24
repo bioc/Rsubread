@@ -384,7 +384,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 			break;
 		}
 
-		if(i % (processed_reads/10) ==0 )
+		if(i % (processed_reads/10/ALL_THREADS) ==0 )
 			print_text_scrolling_bar("", i*1./processed_reads, 80, &ic);
 		//if((!ginp2) || ginp2 == Curr_ginp)
 		i++;
@@ -994,7 +994,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 
 			long long int all_steps = (read_fsize*1.0/reads_density) * all_tables;
 			if(all_steps<1)all_steps=1;
-			else progress_bar_interval = min((read_fsize*1.0/reads_density), all_reads)/10; 
+			else progress_bar_interval = min((read_fsize*1.0/reads_density), all_reads)/15/ALL_THREADS; 
 
 			int remaining_load_libs = (all_tables - table_no);
 			remaining_load_libs +=  all_tables * (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads);

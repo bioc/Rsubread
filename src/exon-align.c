@@ -1219,7 +1219,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 		scrolling_queires++;
 		if(thread_id==0)
 		{
-			if(scrolling_queires > 500000)
+			if(scrolling_queires > 500000/EXON_ALL_THREADS)
 			{
 				print_text_scrolling_bar("", i*EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 				scrolling_queires = 0;
@@ -2436,7 +2436,7 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 		scrolling_queires++;
 		if(!thread_id)
 		{
-			if(scrolling_queires>500000)
+			if(scrolling_queires>500000/EXON_ALL_THREADS)
 			{
 				print_text_scrolling_bar("", i* EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 				scrolling_queires=0;
@@ -3585,7 +3585,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 	int queries = 0, i;
 	double t0=miltime();
 	int is_reversed;
-	int good_match = 0, scr_interval = 10000, scr_queries = 99999999;
+	int good_match = 0, scr_interval = 10000/EXON_ALL_THREADS, scr_queries = 0;
 	float subread_step; // = EXON_SUBREAD_GAP+.0001;
 	struct stat read_fstat;
 	stat (ginp->filename, &read_fstat);
@@ -3658,9 +3658,9 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 			double finished_rate = finished_steps*1.0 / all_steps;
 			double reads_per_second =  queries*1.0 / all_tables / (miltime()- local_begin_ftime);
 			double expected_seconds = ((1.-finished_rate) * all_steps)/all_tables / reads_per_second + remaining_load_libs * 50 + (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads)*100;
-			scr_interval = min(all_reads, (read_fsize*1.0/reads_density))/15;
-			//if(queries>1)
-			print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2 != NULL);
+			scr_interval = min(all_reads, (read_fsize*1.0/reads_density))/15/EXON_ALL_THREADS;
+			if(queries>1)
+				print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2 != NULL);
 			scr_queries=0;
 
 			SUBREADfflush(stdout);
