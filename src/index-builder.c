@@ -391,7 +391,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					array_int_key = int_key;
 				}
 
-				if (offset % 25000000 == 0)
+				if (offset % (all_bases/12) == 0)
 				{
 					if (offset>1)
 					{
@@ -619,7 +619,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				read_len ++;
 
 
-				if (offset % 25000000 == 0)
+				if (offset % (all_bases/12) == 0)
 				{
 					if (offset>1)
 					{

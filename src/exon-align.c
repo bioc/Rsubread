@@ -1210,7 +1210,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 			}
 	
 			if(thread_id==0)
-				print_text_scrolling_bar("", 100, 80, &ic);
+				print_text_scrolling_bar("", 1.0, 80, &ic);
 			break;
 		}
 
@@ -2424,7 +2424,7 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 		if (rl<0){
 
 			if(thread_id==0)
-				print_text_scrolling_bar("", 100, 80, &ic);
+				print_text_scrolling_bar("", 1.0, 80, &ic);
 			if(ginp1_end_pos)
 				*ginp1_end_pos = ftello(ginp->input_fp);
 			break;
@@ -3661,6 +3661,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 			scr_interval = min(all_reads, (read_fsize*1.0/reads_density))/10;
 			if(queries>1)
 				print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2 != NULL);
+			scr_queries=0;
 
 			SUBREADfflush(stdout);
 			t0 = miltime();

@@ -491,7 +491,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 		if (rl1<0)
 		{
 			if(my_thread_no<1)
-				print_text_scrolling_bar("", 100, 80, &ic);
+				print_text_scrolling_bar("", 1.0, 80, &ic);
 			break;
 		}
 
