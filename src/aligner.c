@@ -384,13 +384,13 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 			break;
 		}
 
+		if(i % (processed_reads/10) ==0 )
+			print_text_scrolling_bar("", i*1./processed_reads, 80, &ic);
 		//if((!ginp2) || ginp2 == Curr_ginp)
 		i++;
 		if(i >= processed_reads)break;
 
 
-		if(i % 10000 ==0 && i>1)
-			print_text_scrolling_bar("", i*1./processed_reads, 80, &ic);
 	}
 	SUBREADprintf("\n");
 	//	SUBREADprintf("\nNo reads are mapped in pairs.\b");
@@ -429,6 +429,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 	int queries = 0, rl1 = 0, rl2 = 0, i, ic=0;
 	int all_reads = allvote -> max_len;
 	int array_index_set_len = 0;
+	int scrolling_queires = 99999999;
 
 	short ** dynamic_align_short;
 	char ** dynamic_align_char ;
@@ -488,7 +489,11 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 			pthread_spin_unlock(input_lock);
 
 		if (rl1<0)
+		{
+			if(my_thread_no<1)
+				print_text_scrolling_bar("", 100, 80, &ic);
 			break;
+		}
 
 		if (ginp->space_type == GENE_SPACE_COLOR && read1_txt[0]>='A' && read1_txt[0]<='Z')
 		{
@@ -506,8 +511,16 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 	
 		}
 
-		if(my_thread_no<1 && queries % 10000 ==0 && queries>1)
-			print_text_scrolling_bar("", queries*1./segment_length, 80, &ic);
+
+		scrolling_queires ++;
+		if(my_thread_no<1)
+		{
+			if(scrolling_queires > all_reads / 10)
+			{
+				print_text_scrolling_bar("", queries*1./segment_length, 80, &ic);
+				scrolling_queires=0;
+			}
+		}
 
 		int best_read_id;
 		int r1_reversed = 0;
@@ -712,6 +725,9 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 	is_counterpart = 0;
 	if (ginp2)
 		all_reads /=2;
+	int progress_bar_interval = 10000;
+
+	int progress_bar_queries = 0;
 
 //	SUBREADprintf ("I'm the %d-th thread\n", my_thread_no);
 	if(my_thread_no == 0)SUBREADprintf("Processing %s:\n", ginp2?"fragments":"reads");
@@ -967,7 +983,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 		}
 
 
-		if (my_thread_no==0 && queries % 10000 == 0 && !is_counterpart)
+		if (my_thread_no==0 && progress_bar_queries > progress_bar_interval && !is_counterpart)
 		{
 			if(table_no == 0)
 			{
@@ -975,26 +991,27 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 				long long int fpos = ftello(ginp->input_fp);
 				reads_density = fpos*1.0/current_reads; 
 			}
-			if(IS_DEBUG && queries % 100000==0)
-				SUBREADprintf("@LOG Done %d/%d, good %d, last time %f\n",queries, table_no, good_match, miltime() - t0);
-			else
-			{
-				long long int all_steps = (read_fsize*1.0/reads_density) * all_tables;
-				int remaining_load_libs = (all_tables - table_no);
-				remaining_load_libs +=  all_tables * (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads);
-				long long int finished_steps =  ((section_length)*table_no + base_number*all_tables+queries);
-				double finished_rate = finished_steps*1.0 / all_steps;
-				double reads_per_second =  queries*1.0 / all_tables / (miltime()- local_begin_ftime);
-				double expected_seconds = ((1.-finished_rate) * all_steps)/all_tables / reads_per_second + remaining_load_libs * 50 + (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads)*100;
-				if(queries>1)
-				print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2!=NULL);
-			}
+
+			long long int all_steps = (read_fsize*1.0/reads_density) * all_tables;
+			if(all_steps<1)all_steps=1;
+			else progress_bar_interval = min((read_fsize*1.0/reads_density), all_reads)/10; 
+
+			int remaining_load_libs = (all_tables - table_no);
+			remaining_load_libs +=  all_tables * (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads);
+			long long int finished_steps =  ((section_length)*table_no + base_number*all_tables+queries);
+			double finished_rate = finished_steps*1.0 / all_steps;
+			double reads_per_second =  queries*1.0 / all_tables / (miltime()- local_begin_ftime);
+			double expected_seconds = ((1.-finished_rate) * all_steps)/all_tables / reads_per_second + remaining_load_libs * 50 + (int)(((read_fsize*1.0/reads_density) - base_number)/all_reads)*100;
+			print_running_log(finished_rate, reads_per_second, expected_seconds, (unsigned long long int)all_steps / all_tables, ginp2!=NULL);
+
 			SUBREADfflush(stdout);
 			t0 = miltime();
+			progress_bar_queries = 0;
 		}
 	
 		if (is_counterpart)
 		{
+			progress_bar_queries++;
 			if(queries >= all_reads)
 				break;
 		}

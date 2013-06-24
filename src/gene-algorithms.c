@@ -242,59 +242,7 @@ void print_running_log(double finished_rate, double read_per_second, double expe
 
 void print_text_scrolling_bar(char * hint, float percentage, int width, int * internal_counter)
 {
-	char fan = '-';
-	int bar_width = width - 7 - strlen(hint) , i;
-	int dash_width = (int)(bar_width * percentage+0.5);
-	dash_width = min(dash_width, bar_width - 1);
-	int space_width = bar_width - 1 - dash_width;
-
-	//for (i=0; i<width; i++);
-	//	SUBREADputchar(' ');
-	//SUBREADprintf("\r");
-
- 
-	switch ((*internal_counter) % 4)
-	{
-		case 0:
-			fan='-';
-			break;
-		case 1:
-			fan='\\';
-			break;
-		case 2:
-			fan='|';
-			break;
-		case 3:
-			fan='/';
-			break;
-	}
-
-	(*internal_counter) ++;
-	/*
-	char linebuf[100];
-
-	sprintf (linebuf," %c %s [", fan, hint);
-	for(i = 0; i< dash_width; i++)
-		strcat(linebuf, "=");
-	strcat(linebuf, ">");
-	for(i = 0; i< space_width; i++)
-		strcat(linebuf, " ");
-	strcat(linebuf, "]\n");
-	SUBREADprintf("%s", linebuf);
-	
-	*/
-	//SUBREADprintf(" [ %.1f%% finished ]    \r", 100*percentage);
-
-	SUBREADprintf (" %c %s [", fan, hint);
-	for(i = 0; i< dash_width; i++)
-		SUBREADputchar('=');
-	SUBREADputchar('>');
-	for(i = 0; i< space_width; i++)
-		SUBREADputchar(' ');
-	SUBREADputchar(']');
-	SUBREADputchar('\n');
-
-	SUBREADfflush(stdout);
+	SUBREADprintf("  [ %.1f%% finished ]\n", percentage*100);
 }
 
 
