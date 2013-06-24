@@ -54,7 +54,7 @@ void print_build_log(double finished_rate, double read_per_second, double expect
         SUBREADprintf("%s",outbuff);
         for(i=strlen(outbuff); i<80; i++)
                 SUBREADprintf(" ");
-        SUBREADprintf("\r");
+        SUBREADprintf("\n");
 }
 
 void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_table)

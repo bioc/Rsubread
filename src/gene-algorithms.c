@@ -237,7 +237,7 @@ void print_running_log(double finished_rate, double read_per_second, double expe
         SUBREADprintf("%s",outbuff);
         for(i=strlen(outbuff); i<105; i++)
                 SUBREADprintf(" ");
-        SUBREADprintf("\r");
+        SUBREADprintf("\n");
 }
 
 void print_text_scrolling_bar(char * hint, float percentage, int width, int * internal_counter)
@@ -270,6 +270,7 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 	}
 
 	(*internal_counter) ++;
+	/*
 	char linebuf[100];
 
 	sprintf (linebuf," %c %s [", fan, hint);
@@ -278,9 +279,20 @@ void print_text_scrolling_bar(char * hint, float percentage, int width, int * in
 	strcat(linebuf, ">");
 	for(i = 0; i< space_width; i++)
 		strcat(linebuf, " ");
-	strcat(linebuf, "]\r");
+	strcat(linebuf, "]\n");
 	SUBREADprintf("%s", linebuf);
+	
+	*/
 	//SUBREADprintf(" [ %.1f%% finished ]    \r", 100*percentage);
+
+	SUBREADprintf (" %c %s [", fan, hint);
+	for(i = 0; i< dash_width; i++)
+		SUBREADputchar('=');
+	SUBREADputchar('>');
+	for(i = 0; i< space_width; i++)
+		SUBREADputchar(' ');
+	SUBREADputchar(']');
+	SUBREADputchar('\n');
 
 	SUBREADfflush(stdout);
 }
