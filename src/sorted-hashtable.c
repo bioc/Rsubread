@@ -871,7 +871,7 @@ void gehash_insert_sorted(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 // }
 //
 
-inline unsigned int load_int32(FILE * fp)
+unsigned int load_int32(FILE * fp)
 {
 	int ret;
 	int read_length;
@@ -880,7 +880,7 @@ inline unsigned int load_int32(FILE * fp)
 	return ret;
 }
 
-inline long long int load_int64(FILE * fp)
+long long int load_int64(FILE * fp)
 {
 	long long int ret;
 	int read_length;
@@ -957,7 +957,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
-	SUBREADprintf("Saving the current index block:\n");
+	SUBREADprintf("Saving the current block of index ...\n");
 
 
 	for (i=0; i<the_table -> buckets_number; i++)
@@ -968,7 +968,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		gehash_data_t tmp_val;
 
 
-		if(i % 3000 == 0)
+		if(i % (the_table -> buckets_number/15) == 0)
 			print_text_scrolling_bar("", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
 
 

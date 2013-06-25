@@ -54,7 +54,7 @@ void print_build_log(double finished_rate, double read_per_second, double expect
         SUBREADprintf("%s",outbuff);
         for(i=strlen(outbuff); i<80; i++)
                 SUBREADprintf(" ");
-        SUBREADprintf("\r");
+        SUBREADprintf("\n");
 }
 
 void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_table)
@@ -391,7 +391,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					array_int_key = int_key;
 				}
 
-				if (offset % 5000000 == 0)
+				if (offset % (all_bases/12) == 0)
 				{
 					if (offset>1)
 					{
@@ -479,7 +479,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	SUBREADprintf("Scanning uninformative subreads in reference sequencing ...\n");
+	SUBREADprintf("Scanning uninformative subreads in reference sequences ...\n");
 
 	if (chro_file_number > 199)
 	{
@@ -619,7 +619,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				read_len ++;
 
 
-				if (offset % 5000000 == 0)
+				if (offset % (all_bases/12) == 0)
 				{
 					if (offset>1)
 					{
@@ -668,7 +668,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 
 	if(huge_table -> current_items)
-		SUBREADprintf("%llu uninformative subreads were found. These subreads will not be included in the index.\n" , huge_table -> current_items);
+		SUBREADprintf("%llu uninformative subreads were found and they were excluded from the index.\n" , huge_table -> current_items);
 
 	return 0;
 }
@@ -905,7 +905,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 	if(ERROR_FOUND_IN_FASTA)
 		SUBREADprintf("There were %d format issues found in the input files. The details were saved in log file '%s'.\n", ERROR_FOUND_IN_FASTA, log_fn);
-	else	SUBREADprintf("No format issues were found in the input files.\n");
+	//else	SUBREADprintf("No format issues were found in the input files.\n");
 
 	return 0;
 }
@@ -1011,7 +1011,7 @@ int main_buildindex(int argc,char ** argv)
 		gehash_create(& huge_table, 50000000, 0);
 		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table);
 		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths);
-		if(!ret)SUBREADprintf("\nIndex %s was successfully built.\n", output_file);
+		if(!ret)SUBREADprintf("Index %s was successfully built.\n", output_file);
 		gehash_destory(& huge_table);
 		//     ^^^^^^^ should be destroy
 		free(chromosome_lengths);
