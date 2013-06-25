@@ -195,7 +195,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 				flags |= SAM_FLAG_PAIRED_TASK;
 				mate_index = i*2+(Curr_ginp!=ginp2);
 				Mate_result = av->results + mate_index*av->multi_best_reads + best_read_id;
-				is_mate_ok = ((Mate_result -> vote_number>0 && Curr_result -> vote_number>0 && (Curr_result->masks & IS_PAIRED_MATCH)) ||Mate_result->vote_number  >= ACCEPT_SUBREADS) &&  ((!REPORT_ONLY_UNIQUE) ||  !(Curr_result->masks & IS_BREAKEVEN_READ));
+				is_mate_ok = ((Mate_result -> vote_number>0 && Curr_result -> vote_number>0 && (Curr_result->masks & IS_PAIRED_MATCH)) ||Mate_result->vote_number  >= ACCEPT_SUBREADS) &&  ((!REPORT_ONLY_UNIQUE) ||  !(Mate_result->masks & IS_BREAKEVEN_READ));
 
 
 				if (Curr_ginp==ginp2)
