@@ -1158,7 +1158,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 	int my_range_start , my_range_end, scrolling_queires=99999999;
 
 	if(thread_id==0)
-		SUBREADprintf("Realigning junction reads:\n");
+		SUBREADprintf("Realigning junction reads ...\n");
 	int mapping_quality=0, mapping_flags=0;
 	double reads_per_thread = processed_reads*(1+(ginp2!=NULL)) * 1.0 / EXON_ALL_THREADS;
 	my_range_start = max(0,(int)(reads_per_thread * thread_id - 0.5));
@@ -1837,7 +1837,7 @@ void remove_neighbours(HashTable * bed_table, HashTable * connection_table, Hash
 		}
 	}
 
-	SUBREADprintf("\n There are %d low-confidence junction table items.\n", removed_keys);
+	//SUBREADprintf("\n There are %d low-confidence junction table items.\n", removed_keys);
 
 	int i,j;
 	for(i=0; i<removed_keys; i++)
@@ -2391,7 +2391,7 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 	gene_value_index_t * my_value_array_index;
 
 	if(thread_id==0)
-		SUBREADprintf("Detecting junctions:\n");
+		SUBREADprintf("Detecting junctions ...\n");
 
 	double reads_per_thread = processed_reads*(1+(ginp2!=NULL)) * 1.0 / EXON_ALL_THREADS;
 	my_range_start = max((int)(reads_per_thread * thread_id - 0.5),0);
@@ -2822,7 +2822,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 	int mapping_quality=0, mapping_flags=0;
 
 
-	SUBREADprintf("%u reads were processed. Saving the results for them:\n", processed_reads);
+	SUBREADprintf("%u reads were processed.\nSaving the mapping results for these reads ...\n", processed_reads);
 	if(ftello(out_fp)<1)
 	{
 		unsigned int last_offset = 0;
@@ -3597,7 +3597,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 	is_reversed = 0;
 
 	if(my_thread_no==0)
-		SUBREADprintf("Processing %s:\n", ginp2?"fragments":"reads");
+		SUBREADprintf("Processing %s ...\n", ginp2?"fragments":"reads");
 	//SUBREADprintf ("I'm the %d-th thread RRRR\n", my_thread_no);return 0;
 
 	if (ginp2)
@@ -4058,11 +4058,7 @@ int run_exon_search_index_tolerable(gene_input_t * ginp, gene_input_t * ginp2, c
 		if (stat_ret !=0)
 			break;
 
-		if (IS_DEBUG)
-			SUBREADprintf ("@LOG Loading table from %s\n", table_fn);
-		else
-			SUBREADprintf ("Loading the %02d-th index file ...					      \n", tabno+1);
-		SUBREADfflush(stdout);
+		SUBREADprintf ("Loading the %02d-th index file ...					      \n", tabno+1);
 
 		if(gehash_load(my_table, table_fn)) return -1;
 		if(EXON_USE_VALUE_ARRAY_INDEX)
@@ -4709,6 +4705,7 @@ int main_junction(int argc,char ** argv)
 			SUBREADputs("Subjunc is terminated because subread could not map the reads.");
 			return -1;
 		}
+		SUBREADputs("Detect exon-exon junctions and map reads...");
 	}
 	else
 	{
@@ -4718,8 +4715,6 @@ int main_junction(int argc,char ** argv)
 		if(reads_density<0)
 			SUBREADprintf("Input file '%s' is not found or is in an incorrect format.\n", read_file);
 	}
-
-	SUBREADputs("Detect exon-exon junctions and map reads...");
 
 	if(IS_SAM_INPUT==0)
 	{
@@ -4771,15 +4766,14 @@ int main_junction(int argc,char ** argv)
 
 
 	//SUBREADprintf("Number of subreads selected for each read=%d\n", TOTAL_SUBREADS);
-	SUBREADprintf("Threshold on number of subreads for a successful mapping=%f\n", EXON_MAJOR_HALF_VOTES_RATE);
+	//SUBREADprintf("Threshold on number of subreads for a successful mapping=%f\n", EXON_MAJOR_HALF_VOTES_RATE);
 	SUBREADprintf("Number of threads=%d\n", EXON_ALL_THREADS);
 	if (EXON_INDEL_TOLERANCE)
-		SUBREADprintf("Tolerance for Indel=%d\n", EXON_INDEL_TOLERANCE-1);
+		SUBREADprintf("Maximum number of indels allowed=%d\n", EXON_INDEL_TOLERANCE-1);
 	if (EXON_QUALITY_SCALE==QUALITY_SCALE_LINEAR)
-		SUBREADputs("Quality scale=linear\n\n");
+		SUBREADputs("Quality scale=linear");
 	else if (EXON_QUALITY_SCALE==QUALITY_SCALE_LOG)
-		SUBREADputs("Quality scale=exponential\n\n");
-	else 	SUBREADputs("\n");
+		SUBREADputs("Quality scale=exponential");
 
 
 	if (read2_file[0] || IS_SAM_INPUT==2)
@@ -4865,11 +4859,11 @@ int main_junction(int argc,char ** argv)
 	if(IS_DEBUG)
 		SUBREADprintf("@LOG THE END. \n");
 	else
-		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\n There are %llu junction pairs found, supported by %llu reads.\n\n", processed_reads, read2_file[0]?"fragments":"reads", miltime()-begin_ftime, junction_number, support_number );
+		SUBREADprintf(" %llu %s were processed in %.1f seconds.\n %llu exon-exon junctions were discovered, supported by %llu reads.\n\n", processed_reads, read2_file[0]?"fragments":"reads", miltime()-begin_ftime, junction_number, support_number );
 
 	if(out_fp)
 		fclose(out_fp);
-	SUBREADprintf("\n\nCompleted successfully.\n");
+	SUBREADprintf("Completed successfully.\n");
 
 	if(tmpfile[0])
 		unlink(tmpfile);

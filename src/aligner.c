@@ -83,7 +83,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 	load_offsets (&offsets, index_prefix);
 	//printf("NS=%d\n", offsets.total_offsets);
 
-	SUBREADprintf("%u %s were processed. Saving the mapping results for them:\n", processed_reads, ginp2?"fragments":"reads");
+	SUBREADprintf("%u %s were processed.\nSaving mapping results for these %s ...\n", processed_reads, ginp2?"fragments":"reads", ginp2?"fragments":"reads");
 	
 	if(all_processed_reads ==0)
 	{
@@ -435,7 +435,7 @@ void run_final_stage(gene_value_index_t * array_index_set ,  gene_allvote_t * al
 	char ** dynamic_align_char ;
 
 	if(my_thread_no==0)
-		SUBREADprintf("Detecting indels: \n");
+		SUBREADprintf("Detecting indels ...\n");
 
 	dynamic_align_short = (short **) malloc(sizeof(short*) * MAX_READ_LENGTH);
 	dynamic_align_char  = (char  **) malloc(sizeof(char *) * MAX_READ_LENGTH);
@@ -730,7 +730,7 @@ int run_search(gehash_t * my_table, gene_value_index_t * my_value_array_index , 
 	int progress_bar_queries = 0;
 
 //	SUBREADprintf ("I'm the %d-th thread\n", my_thread_no);
-	if(my_thread_no == 0)SUBREADprintf("Processing %s:\n", ginp2?"fragments":"reads");
+	if(my_thread_no == 0)SUBREADprintf("\nProcessing %s ...\n", ginp2?"fragments":"reads");
 
 	unsigned int low_border = my_value_array_index -> start_base_offset;
 	unsigned int high_border = my_value_array_index -> start_base_offset + my_value_array_index -> length; 
@@ -1074,11 +1074,7 @@ int run_search_index(gene_input_t * ginp, gene_input_t * ginp2, char * index_pre
 		if (stat_ret !=0)
 			break;
 
-		if (IS_DEBUG)
-			SUBREADprintf ("@LOG Loading table from %s\n", table_fn);
-		else
-			SUBREADprintf ("Loading the %02d-th index file ...                                              \n", tabno+1);
-		SUBREADfflush(stdout);
+		SUBREADprintf ("Loading the %02d-th index file ...                \n", tabno+1);
 
 		if(gehash_load(my_table, table_fn)) return -1;
 		if(USE_VALUE_ARRAY_INDEX)
@@ -1554,7 +1550,6 @@ int main_align(int argc,char ** argv)
 	SUBREADprintf("Number of threads=%d\n", ALL_THREADS);
 	if(INDEL_TOLERANCE)
 		SUBREADprintf("Number of indels allowed=%d\n", INDEL_TOLERANCE-1);
-	SUBREADputs("\n");
 
 	if (read2_file[0])
 	{
@@ -1616,9 +1611,9 @@ int main_align(int argc,char ** argv)
 	if(IS_DEBUG)
 		SUBREADprintf("@LOG THE END. \n");
 	else
-		SUBREADprintf("\n\n %llu %s were processed in %.1f seconds.\nPercentage of mapped %s is %0.2f%%.\n\n", processed_reads, read2_file[0] ?"fragments":"reads", miltime()-begin_ftime,  read2_file[0] ?"fragments":"reads", succeed_reads*100.0/processed_reads/(read2_file[0]?2:1));
+		SUBREADprintf(" %llu %s were processed in %.1f seconds.\n Percentage of mapped %s is %0.2f%%.\n\n", processed_reads, read2_file[0] ?"fragments":"reads", miltime()-begin_ftime,  read2_file[0] ?"fragments":"reads", succeed_reads*100.0/processed_reads/(read2_file[0]?2:1));
 
-	SUBREADprintf("Done.\n");
+	SUBREADprintf(" Done.\n");
 
 	fclose(out_fp);
 	destory_allvote(&allvote );
