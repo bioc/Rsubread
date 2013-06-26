@@ -223,6 +223,10 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 				if(!is_mate_ok)
 					flags|=SAM_FLAG_MATE_UNMATCHED;
+				
+				if(is_mate_ok && Mate_result -> is_negative_strand + (Curr_ginp!=ginp2) == 1)
+					flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
+				remove_backslash(nameb);
 
 			}
 
@@ -267,6 +271,8 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 				lpos += offset_pos;
 
+
+
 				if(!locate_gene_position_max(lpos, &offsets, &read_name, &read_pos, rl + rl_adj - offset_pos))
 				{
 
@@ -277,13 +283,6 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 
 					if (is_counterpart + (Curr_ginp==ginp2) == 1)
 						flags |= SAM_FLAG_REVERSE_STRAND_MATCHED; 
-
-					if(ginp2)
-					{
-						if(is_mate_ok && Mate_result -> is_negative_strand + (Curr_ginp!=ginp2) == 1)
-							flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
-						remove_backslash(nameb);
-					}
 
 					if (ginp2 && is_mate_ok)
 					{
