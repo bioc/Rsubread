@@ -24,13 +24,10 @@ write.Rsubread(GR)
   }
 }
 \value{
-  None.
+  A data frame with five columns named \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Strand}.
 }
 \author{
   Tim Triche, Jr. and Wei Shi
-}
-\seealso{
-  transcripts, exons, features, import.bed, subjunc 
 }
 \examples{
 \dontrun{
