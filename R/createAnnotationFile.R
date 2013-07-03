@@ -1,26 +1,23 @@
-createAnnotationFile <- function(GR, fname=NULL) {
+createAnnotationFile <- function(GR) {
 
-  if(!(is(GR, 'GRanges'))) { # {{{
+  if(!(is(GR, 'GRanges'))) {
     message('To create Rsubread annotations from a TranscriptDb or FeatureDb,')
     message('extract a GRanges using exons(), transcripts(), or features().')
     stop('Aborting.')
-  } # }}}
-  if(!('id' %in% names(values(GR)))) { # {{{
+  }
+  
+  if(!('id' %in% names(values(GR)))) {
     message('Your GRanges elementMetadata must contain a column called "id".')
     stop('Aborting.')
-  } # }}}
-  if(is.null(fname)) { # {{{
-    fname = paste(as.character(match.call()["GR"]), 'annot', 'txt', sep='.')
-  } # }}}
+  }
 
-  values(GR)[,'id'] <- as.numeric(as.factor(unlist(values(GR)[,'id'])))
-  write.table(sep="\t", quote=FALSE, file=fname, row.names=FALSE,
-              data.frame(entrezid=values(GR)[,'id'],
-                         chromosome=as(seqnames(GR), 'character'), 
-                         chr_start=start(GR),
-                         chr_end=end(GR))
-              ) 
-  message(paste('Annotations were sucessfully written to', fname))
+  annot <- data.frame(GeneID=as.character(unlist(values(GR)[,'id'])),
+                         Chr=as.character(seqnames(GR)), 
+                         Start=start(GR),
+                         End=end(GR),
+						 Strand=as.character(strand(GR)),
+						 stringsAsFactors=FALSE)
+  return(annot)
 }
 
 # an alias for backward compatibility:
