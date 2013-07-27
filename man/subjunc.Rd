@@ -15,7 +15,7 @@ subjunc(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indel
   \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. 5 by default.}
   \item{minFragLength}{ numeric value giving the minimum fragment length. 50 by default.}
   \item{maxFragLength}{ numeric value giving the maximum fragment length. 600 by default.}
-  \item{PE_orientation}{ character string giving the orientation of the two reads in a pair. "fr" by default, which means the first read is on the forward strand and the second read is on the reverse strand.}
+  \item{PE_orientation}{ character string giving the orientation of the two reads from the same pair. It has three possible values including \code{fr}, \code{ff} and \code{rf}. Letter \code{f} denotes the forward strand and letter \code{r} the reverse strand. \code{fr} by default (ie. the first read in the pair is on the forward strand and the second read on the reverse strand).}
   }
 \details{
 The RNA-seq technology provides a unique opportunity to identify the alternative splicing events that occur during the gene transcription process.
