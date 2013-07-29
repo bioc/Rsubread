@@ -1,4 +1,4 @@
-align <- function(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
+align <- function(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",color2base=FALSE,DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
 {
 	opt <- paste("-i",index,"-r",readfile1,"-o",output_file,"-n",nsubreads,"-m",TH1,"-T",nthreads,"-I",indels,"-B",nBestLocations,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
 
@@ -11,13 +11,15 @@ align <- function(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,
 		opt <- paste(opt,"-Q",sep=",")
 	if(tieBreakHamming)
 		opt <- paste(opt,"-H",sep=",")
+	if(color2base)
+		opt <- paste(opt,"-b",sep=",")
 	if(unique)
 		opt <- paste(opt,"-u",sep=",")
 
-        if(phredOffset == 33)
-                opt <- paste(opt,"-P",3,sep=",")
-        else
-                opt <- paste(opt,"-P",6,sep=",")
+	if(phredOffset == 33)
+		opt <- paste(opt,"-P",3,sep=",")
+	else
+		opt <- paste(opt,"-P",6,sep=",")
 
 	cmd <- paste("subread-align",opt,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
