@@ -6,7 +6,7 @@
 featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE)
 }
 \arguments{
-  \item{files}{ a character vector giving names of SAM format files.}
+  \item{files}{ a character vector giving names of SAM/BAM format files.}
   \item{file.type}{ a character string giving the type of files provided. \code{SAM} and \code{BAM} formats are supported. \code{SAM} by default.}
   \item{annot}{ a data frame containing user-provided annotation. If provided, this annotation will take precedence over the in-built annotation specified via the \code{genome} parameter. See below for the supported annotation formats.}
   \item{genome}{ a character string specifying which in-built annotation should be used for the summarization. It has three possible values including \code{mm9}, \code{mm10} and \code{hg}, corresponding to the NCBI RefSeq annotations for genomes `mm9', `mm10' and `hg19', respectively. \code{mm9} by default.}
