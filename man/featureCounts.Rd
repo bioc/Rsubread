@@ -81,8 +81,8 @@ Note that if the two reads from the same fragment do not meet the fragment lengt
 \value{ 
 A list with the following components:
 \tabular{ll}{
-  \code{counts}:\tab a data matrix containing read counts for each feature in each library\cr
-  \code{annotation}:\tab a data frame including columns named \code{GeneID}, \code{Chr}, \code{Start} and \code{End}. The \code{GeneID} column includes Entrez gene identifiers when the in-built annotations are used.\cr
+  \code{counts}:\tab a data matrix containing read counts for each feature in each library.\cr
+  \code{annotation}:\tab a data frame including annotation information such as gene identifiers (\code{GeneID}) and gene/exon length (\code{Length}). The \code{GeneID} column includes Entrez gene identifiers when the in-built annotations are used.\cr
   \code{targets}:\tab a character vector giving sample information.
 }
 }
