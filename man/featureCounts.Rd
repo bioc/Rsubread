@@ -3,16 +3,16 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE)
+featureCounts(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE)
 }
 \arguments{
   \item{files}{ a character vector giving names of SAM/BAM format files.}
   \item{file.type}{ a character string giving the type of files provided. \code{SAM} and \code{BAM} formats are supported. \code{SAM} by default.}
-  \item{annot}{ a data frame containing user-provided annotation. If provided, this annotation will take precedence over the in-built annotation specified via the \code{genome} parameter. See below for the supported annotation formats.}
-  \item{genome}{ a character string specifying which in-built annotation should be used for the summarization. It has three possible values including \code{mm9}, \code{mm10} and \code{hg}, corresponding to the NCBI RefSeq annotations for genomes `mm9', `mm10' and `hg19', respectively. \code{mm9} by default.}
-  \item{isGTFAnnotationFile}{ logical indicating if the annotation file provided via \code{annot} is in GTF format. \code{FALSE} by default. If \code{isGTFAnnotationFile} is \code{TRUE}, a GTF format annotation file must be provided via \code{annot} argument.}
-  \item{GTF.featureType}{ a character string giving the feature type. Only rows which have the matched feature type in the provided GTF annotation file will be included for read counting. \code{exon} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
-  \item{GTF.attrType}{ a character string giving the attribute type (in the GTF annotation) which will be used to group features (eg. exons) into meta-features (eg. genes). \code{gene_id} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. This attribute type is usually the gene identifier.}
+  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has three possible values including \code{mm9}, \code{mm10} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm9', `mm10' and `hg19', respectively. \code{mm9} by default. The in-built annotation has a SAF format (see below).}
+  \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. See below for more details about SAF format annotation. \code{annot.ext} will override \code{annot.inbuilt} if they are both provided.}
+  \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
+  \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{exon} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
+  \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{gene_id} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
   \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features using their values in the ``GeneID" column or using the ``gene_id" attribute in the GTF-format annotation file, and reads will assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
@@ -29,8 +29,8 @@ featureCounts(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.
 
-This function takes as input a set of files containing read mapping results output from a read aligner (e.g. \code{\link{align}}), and then assigns the mapped reads to the genomic features.
-The acceptable formats of the input files are SAM and BAM.
+This function takes as input a set of files containing read mapping results output from a read aligner (e.g. \code{\link{align}}), and then assigns mapped reads to genomic features.
+Both SAM and BAM format input files are accepted.
 
 The argument \code{useMetaFeatures} specifies the read summarization should be performed at the feature level or at the meta-feature level.
 Each entry in the annotation data is a feature, which for example could be an exon.
@@ -45,18 +45,12 @@ A read overlaps a meta-feature if it overlaps at least one of the features belon
 
 \code{gene} and \code{exon} are typically used when summarizing RNA-seq read data, which will yield read counts for genes and exons, respectively.
 
-In-built annotation files for a few model organisms are included in the \code{Rsubread} package and these annotations can be easily used with this function to summarize reads for genes and exons.
-These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}) and then processed to remove redundant chromosomal regions within each gene.
-The resulting annotations contain non-overlapping exon regions for each gene.
-Users can use these in-built annotation files simply by setting the parameter \code{genome} to a proper value (\code{mm9}, \code{mm10} or \code{hg}).
-The format of in-built annotation files is the same as that of an example format shown below (a data frame provided by users).
+The in-built annotations for human and mouse genomes (\code{hg19}, \code{mm9} and \code{mm10}) provided in this function can be conveniently used for read summarization.
+These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}) and were then postprocessed by removing redundant chromosomal regions within each gene and combining adjacent CDS and UTR sequences. 
+The in-built annotations use the SAF annotation format (see below) and their content can be retrieved using the \code{\link{getInBuiltAnnotation}} function.
 
-This function supports the use of GTF format annotation file.
-Users should be provide the name of the annotation file via the \code{annot} argument and set the argument \code{isGTFAnnotationFile} to be \code{TRUE}.
-This function uses the `gene_id' attribute to group features to form meta-features if meta-feature level read summarization is needed.
-
-Alternatively, users may create a data frame including the annotation information and then provide that data frame to this function via the \code{annot} parameter for read summarization.
-The data frame must have the following format:
+Users may also choose to provide their own annotation for summarization.
+If users provide a SAF (Simplified Annotation Format) annotation, the annotation should have the following format:
 
 \preformatted{
 GeneID		Chr	Start	End	Strand
@@ -69,8 +63,18 @@ GeneID		Chr	Start	End	Strand
 ...
 }
 
-The \code{GeneID} column may include numbers or character strings.
-Note that the chromosomal names included in the \code{Chr} column must match the chromosomal names used in the sequences of the reference genome to which the reads were mapped, otherwise reads cannot be assigned to the features.
+The SAF annotation format has five required columns, including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Strand}.
+These columns can be in any order.
+More columns can be included in the annotation.
+Columns are tab-delimited.
+Column names are case insensitive.
+\code{GeneID} column may contain integers or character strings.
+Chromosomal names included in the \code{Chr} column must match those used inclued in the mapping results, otherwise reads will fail to be assigned. 
+Users may provide a SAF annotation in the form of a data frame or a file using the \code{annot.ext} argument.
+
+Users may also provide a GTF/GFF format annotation via \code{annot.ext} argument.
+But GTF/GFF annotation can only be provided as a file, and the \code{isGTFAnnotationFile} needs to be set to \code{TRUE} when such a annotation is provided.
+\code{featureCounts} function uses the `gene_id' attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level. 
  
 When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, fragments will be counted for each feature/meta-feature instead of reads.
 For RNA-seq data, the observed lengths of some fragments could be much greater than their nominal fragment length when they span two or more exons.
@@ -90,7 +94,8 @@ A list with the following components:
 %}
 \author{Wei Shi and Yang Liao}
 %\note{}
-%\seealso{}
+\seealso{
+\code{\link{getInBuiltAnnotation}}}
 \examples{\dontrun{
 library(Rsubread)
 

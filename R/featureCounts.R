@@ -1,9 +1,9 @@
-featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE)
+featureCounts <- function(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE)
 {
 	flag <- FALSE
 
-	if(is.null(annot)){
-	  switch(tolower(as.character(genome)),
+	if(is.null(annot.ext)){
+	  switch(tolower(as.character(annot.inbuilt)),
 	    mm9={
 	      ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 37.2 is used.\n")
@@ -12,23 +12,23 @@ featureCounts <- function(files,file.type="SAM",annot=NULL,genome="mm9",isGTFAnn
 	      ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
 	      cat("Mouse annotation NCBI Build 38.1 is used.\n")
 		 },
-	    hg={
+	    hg19={
 	      ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
 	      cat("Human annotation NCBI Build 37.2 is used.\n")
 	       },
 	       {
-		stop("In-built annotation for ", genome, " is not available.\n")
+		stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
 	       }
 	  ) # end switch
 	}
 	else{
-	  if(is.character(annot)){
-	    ann <- annot
+	  if(is.character(annot.ext)){
+	    ann <- annot.ext
 	  }
 	  else{
-	    annot_df <- as.data.frame(annot,stringsAsFactors=FALSE)
+	    annot_df <- as.data.frame(annot.ext,stringsAsFactors=FALSE)
 	    if(sum(c("geneid","chr","start","end", "strand") %in% tolower(colnames(annot_df))) != 5)
-	      stop("The format of the provided annotation data is incorrect. Please refer to the help page for the correct data format.\n")
+	      stop("One or more required columns are missing in the provided annotation data. Please refer to help page for annotation format.\n")
 		colnames(annot_df) <- tolower(colnames(annot_df))
 		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)		
 	    annot_df$chr <- as.character(annot_df$chr)
