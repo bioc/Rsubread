@@ -70,17 +70,13 @@ Columns are tab-delimited.
 Column names are case insensitive.
 \code{GeneID} column may contain integers or character strings.
 Chromosomal names included in the \code{Chr} column must match those used inclued in the mapping results, otherwise reads will fail to be assigned. 
-Users may provide a SAF annotation in the form of a data frame or a file using the \code{annot.ext} argument.
+Users may provide a SAF annotation in the form of a data frame or a file using the \code{annot.ext} argument.\cr\cr
 
 Users may also provide a GTF/GFF format annotation via \code{annot.ext} argument.
-But GTF/GFF annotation can only be provided as a file, and the \code{isGTFAnnotationFile} needs to be set to \code{TRUE} when such a annotation is provided.
-\code{featureCounts} function uses the `gene_id' attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level. 
+But GTF/GFF annotation should only be provided as a file, and \code{isGTFAnnotationFile} should be set to \code{TRUE} when such a annotation is provided.
+\code{featureCounts} function uses the `gene_id' attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level.\cr\cr
  
-When paired-end read data are provided and the argument \code{isPairedEnd} is set to \code{TRUE}, fragments will be counted for each feature/meta-feature instead of reads.
-For RNA-seq data, the observed lengths of some fragments could be much greater than their nominal fragment length when they span two or more exons.
-Such fragments can be counted when a large value of the argument \code{maxFragLength} is used.
-Note that if the two reads from the same fragment do not meet the fragment length criteria, the Subread (\code{\link{align}}) and Subjunc (\code{\link{subjunc}}) aligners will treat them as single-end reads and map them individually.
- 
+When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of reads will be counted.
 }
 \value{ 
 A list with the following components:
@@ -100,31 +96,31 @@ A list with the following components:
 library(Rsubread)
 
 # Summarizing single-end reads using built-in RefSeq annotation for mouse genome mm9:
-featureCounts(files="mapping_results_SE.sam",genome="mm9")
+featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm9")
 
 # Summarizing single-end reads using a user-provided GTF annotation file:
-featureCounts(files="mapping_results_SE.sam",annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
 
 # Summarizing single-end reads using 5 threads:
-featureCounts(files="mapping_results_SE.sam",nthreads=5,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_SE.sam",nthreads=5)
 
 # Summarizing BAM format single-end read data:
-featureCounts(files="mapping_results_SE.bam",file.type="BAM",annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_SE.bam",file.type="BAM")
 
 # Performing strand-specific read counting (strandSpecific=2 if reversely stranded):
-featureCounts(files="mapping_results_SE.sam",strandSpecific=1,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_SE.sam",strandSpecific=1)
 
 # Summarizing paired-end reads and counting fragments (instead of reads):
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE)
 
 # Counting fragments satisfying the fragment length criteria, eg. [50bp, 600bp]:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,checkFragLength=TRUE,minFragLength=50,maxFragLength=600,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,checkFragLength=TRUE,minFragLength=50,maxFragLength=600)
 
 # Counting fragments that have both ends successfully aligned without checking the fragment length:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,requireBothEndsMapped=TRUE,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,requireBothEndsMapped=TRUE)
 
-# Excluding chimeric fragments from the fragment counting:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,countChimericFragments=FALSE,annot="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+# Excluding chimeric fragments from fragment counting:
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,countChimericFragments=FALSE)
 }}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
