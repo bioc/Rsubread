@@ -47,8 +47,8 @@
 /********************************************************************/
 /********************************************************************/
 /********************************************************************/
-#define FEATURE_NAME_LENGTH 48
-#define CHROMOSOME_NAME_LENGTH 48
+#define FEATURE_NAME_LENGTH 100 
+#define CHROMOSOME_NAME_LENGTH 100
 #define MAX_LINE_LENGTH 100000
 #define FILE_TYPE_RSUBREAD 10
 #define FILE_TYPE_GTF 100
