@@ -32,8 +32,6 @@ featureCounts <- function(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NU
 		colnames(annot_df) <- tolower(colnames(annot_df))
 		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)		
 	    annot_df$chr <- as.character(annot_df$chr)
-	    if(any(nchar(annot_df$chr) > 40))
-	      annot_df$chr <- substring(annot_df$chr,1,40)
 	    fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
 	    write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
 	    ann <- fout_annot
