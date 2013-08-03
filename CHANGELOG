@@ -1,6 +1,6 @@
-2 Aug, 2013
-(1) Documentation improvement for featureCounts.
-(2) Remove chromosome length restriction for featureCounts function when the annotation input is a SAF data frame.
+3 Aug, 2013 - 1.11.11
+(1) The maximum allowed length of chromosome names and gene identifiers was increased to 100 for featureCounts function.
+(2) Documentation improvement for featureCounts.
 
 1 Aug, 2013 - 1.11.10
 (1) Added getInBuiltAnnotation function.
