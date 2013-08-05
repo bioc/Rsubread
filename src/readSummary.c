@@ -855,7 +855,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			{
 				for(xk1=0;xk1<nhits;xk1++)
 				{
-					long exon_id = global_context -> exontable_geneid[hits_indices[xk1]];
+					long exon_id = hits_indices[xk1];
 					int is_fresh = 1;
 					if(decision_table_items >= MAX_HIT_NUMBER) break;
 					for(xk2=0; xk2<decision_table_items; xk2++)
