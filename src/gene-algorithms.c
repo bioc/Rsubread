@@ -27,8 +27,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+
 #include <sys/stat.h>
+#ifndef FREEBSD
 #include <sys/timeb.h>
+#endif
+
+
 #include "subread.h"
 #include "input-files.h"
 #include "gene-algorithms.h"
@@ -1512,15 +1518,30 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	return 0;
 }
 
+
 double miltime(){
-        struct timeb trp;
         double ret;
+        #ifdef FREEBSD
+        struct timeval tp;
+        struct timezone tz;
+        tz.tz_minuteswest=0;
+        tz.tz_dsttime=0;
 
+        gettimeofday(&tp,&tz);
+
+        ret = tp.tv_sec+ 0.001*0.001* tp.tv_usec;
+
+        #else
+
+        struct timeb trp;
         ftime(&trp);
-
         ret = trp.time*1.0+(trp.millitm*1.0/1000.0);
+        #endif
+
         return ret;
 }
+
+
 
 #define front2(str, bias)	(*((str)+(bias))+*((str)+1+(bias)))
 #define front4(str, bias)	(front2(str, bias)+front2(str, bias+2))

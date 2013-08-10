@@ -27,6 +27,8 @@
 #define MAX_CHR 200
 #define STR 100
 
+typedef int int32_t;
+
 typedef struct an_exon{
 	int32_t start, end;
 	char orientation;

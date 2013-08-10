@@ -10,6 +10,9 @@ if test  $UNAME = "Linux"
 then
 	# This is a Linux machine! 
 	cp src/Makevars.Linux src/Makevars
+elif test $UNAME = "FreeBSD"
+then
+	cp src/Makevars.FreeBSD src/Makevars
 else
 	cp src/Makevars.MacOS src/Makevars
 fi

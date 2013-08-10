@@ -23,6 +23,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <R.h>
+typedef int int32_t;
 
 /*	INPUT: 	SAM FILE
  * 			GENE(EXON) ANNOTATION FILE BINSIZE=2000 WITH GC CONTENT

@@ -23,6 +23,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <R.h>
+typedef int int32_t;
+
 
 /*	Constants */
 
