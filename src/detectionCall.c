@@ -23,7 +23,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <R.h>
-typedef int int32_t;
+//typedef int int;
 
 /*	INPUT: 	SAM FILE
  * 			GENE(EXON) ANNOTATION FILE BINSIZE=2000 WITH GC CONTENT
@@ -71,7 +71,7 @@ double timediff;
 /*	Data Structure */
 
 typedef struct an_node{
-	int32_t start, end, gene;
+	int start, end, gene;
 	int read, nnum, gcnum, atnum;
 	struct an_node *next;
 }node;
@@ -138,7 +138,7 @@ make_empty_node_map(void){
 void
 build_exon_data_structure_map(void){
 	FILE *fin;
-	int32_t read_start, read_end, read_entrezid, read_n, read_gc, read_at;
+	int read_start, read_end, read_entrezid, read_n, read_gc, read_at;
 	char chr_id[STR];
 	node *cnode=NULL;
 	char current_chr_id[STR];
@@ -173,7 +173,7 @@ build_exon_data_structure_map(void){
 void
 build_ir_data_structure_map(void){
 	FILE *fin;
-	int32_t read_start, read_end, read_entrezid, read_n, read_gc, read_at;
+	int read_start, read_end, read_entrezid, read_n, read_gc, read_at;
 	char chr_id[STR];
 	node *cnode=NULL;
 	char current_chr_id[STR];
@@ -241,7 +241,7 @@ read_mapping(void){
 	/* local variables */
 	FILE *fread;
 	char read_chr[STR];
-	int32_t read_pos, count;
+	int read_pos, count;
 	int chr_pos;
 	node *cnode;
 
@@ -418,11 +418,11 @@ void
 sort_reads(void){
 	FILE *freadin;
 	FILE *freadout;
-	int32_t pos[MAXREADSPERCHR];
+	int pos[MAXREADSPERCHR];
 	int i;
 	char read_chr[STR];
-	int32_t read_pos;
-	int32_t count;
+	int read_pos;
+	int count;
 	int j;
 	freadout = fopen(sorted_simplified_SAM_file,"w");
 	for (i=0; i<24; i++){

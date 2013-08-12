@@ -27,10 +27,10 @@
 #define MAX_CHR 200
 #define STR 100
 
-typedef int int32_t;
+//typedef int int;
 
 typedef struct an_exon{
-	int32_t start, end;
+	int start, end;
 	char orientation;
 	struct an_exon *next;
 }exon;
@@ -41,7 +41,7 @@ typedef struct a_chr{
 }chr;
 
 typedef struct a_gene{
-	int32_t id;
+	int id;
 	int chr_index;
 	int chr_num;
 	char *current_chr;
@@ -57,7 +57,7 @@ int gene_num;
 //gene gene_array[MAX_GENE];
 gene * gene_array;
 
-int32_t current_gene_id;
+int current_gene_id;
 
 char *exon_file;
 char *gene_file;
@@ -90,10 +90,10 @@ make_empty(void)
 void print_list(FILE *fout, FILE *fgene, int x, int y){
 
 	char *chromosome = gene_array[x].chr_array[y].id;
-	int32_t gene = gene_array[x].id;
+	int gene = gene_array[x].id;
 	exon *list = gene_array[x].chr_array[y].exon_list;;
 	list = list->next;
-	int32_t gene_s, gene_e;
+	int gene_s, gene_e;
 	gene_s = list->start;
 		
 	while (list !=NULL){
@@ -107,7 +107,7 @@ void print_list(FILE *fout, FILE *fgene, int x, int y){
 
 
 void
-insert_new_exon(void *pt, int32_t start, int32_t end){
+insert_new_exon(void *pt, int start, int end){
 	exon *node = (exon *)pt;
 	exon *new_node;
 	new_node = (exon *)(malloc(sizeof(exon)));
@@ -119,7 +119,7 @@ insert_new_exon(void *pt, int32_t start, int32_t end){
 
 
 void
-insert_exon(void *pt, int32_t start, int32_t end){
+insert_exon(void *pt, int start, int end){
 	exon *node = (exon *)pt;
 
 	while (node ->next != NULL){
@@ -198,7 +198,7 @@ void output_exons_to_file(){
 
 
 int
-find_gene(int32_t target_gene_id){
+find_gene(int target_gene_id){
 	// already know that target_gene_id != current_gene_id
 	gene_index = gene_num-1;
 
@@ -250,7 +250,7 @@ find_chr(int gene_pos, char *chr_id){
 
 
 void *
-find_list(int32_t gene_id, char *chr_id){
+find_list(int gene_id, char *chr_id){
 	int p_gene=0;
 	int p_chr=0;
 	// locate gene array index
@@ -277,7 +277,7 @@ find_list(int32_t gene_id, char *chr_id){
 void
 processExons(char **utr_cds, char **fexon, char** fgene){
 	FILE *fin;
-	int32_t start, end, gene_id;
+	int start, end, gene_id;
 	char chr_id[20];
 	char ori;
 	exon *dh;

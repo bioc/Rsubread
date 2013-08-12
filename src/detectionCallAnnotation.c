@@ -23,7 +23,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <R.h>
-typedef int int32_t;
+//typedef int int32_t;
 
 
 /*	Constants */
@@ -35,7 +35,7 @@ typedef int int32_t;
 /*	Data Structure */
 
 typedef struct an_node{
-	int32_t start, end, gene;
+	int start, end, gene;
 	int read, nnum, gcnum, atnum;
 	struct an_node *next;
 }node;
@@ -80,7 +80,7 @@ make_empty_node(void){
 void
 build_exon_data_structure(void){
 	FILE *fin;
-	int32_t read_start, read_end, read_entrezid;
+	int read_start, read_end, read_entrezid;
 	char chr_id[STR];
 	node *cnode=NULL;
 	char current_chr_id[STR];
@@ -114,7 +114,7 @@ build_exon_data_structure(void){
 void
 build_ir_data_structure(void){
 	FILE *fin;
-	int32_t read_start, read_end, read_length;
+	int read_start, read_end, read_length;
 	char chr_id[STR];
 	node *cnode=NULL;
 	char current_chr_id[STR];
@@ -149,9 +149,9 @@ void
 breakIntegenicRegion(){
 	FILE *fin;
 	FILE *fout;
-	int32_t read_entrezid, read_start, read_end, read_length;
+	int read_entrezid, read_start, read_end, read_length;
 	char chr_id[STR];
-	int32_t	binnum = 0;
+	int binnum = 0;
 	fin = fopen(ir_file, "r");
 	fout = fopen(binned_ir_file, "w");
 
@@ -177,7 +177,7 @@ void
 calculateExonGCContent(void){
 	int i,j;
 	FILE *fseq;
-	int32_t pos;
+	int pos;
 	char line[200];
 	int len;
 	node *bin;
@@ -265,7 +265,7 @@ calculateIRGCContent(void){
 
 	int i,j;
 	FILE *fseq;
-	int32_t pos;
+	int pos;
 	char line[200];
 	int len;
 	node *bin;
