@@ -1,3 +1,6 @@
+12 Aug, 2013 - 1.11.13
+(1) Added support for freeBSD.
+
 8 Aug, 2013 - 1.11.12
 (1) Remove -T parameter from removeDupReads function
 (2) Fixes a bug in featureCounts.
