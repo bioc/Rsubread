@@ -373,7 +373,7 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 			else
 				*pos = linear - offsets->read_offsets[n-1];
 
-			*chro_name = offsets->read_names+n*MAX_READ_NAME_LEN;
+			*chro_name = offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
 
 			return 0;
 		}
