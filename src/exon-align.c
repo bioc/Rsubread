@@ -2829,7 +2829,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 		i=0;
 		while(_global_offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_READ_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_CHROMOSOME_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
 			last_offset = _global_offsets.read_offsets[i];
 			i++;
 		}
@@ -2985,7 +2985,7 @@ void print_exon_res_paired(gene_value_index_t *array_index , halves_record_t * h
 		i=0;
 		while(_global_offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_READ_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", _global_offsets.read_names + i*MAX_CHROMOSOME_NAME_LEN, _global_offsets.read_offsets[i] - last_offset+16);
 			last_offset = _global_offsets.read_offsets[i];
 			i++;
 		}

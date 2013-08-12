@@ -250,7 +250,7 @@ int main_repeated_test(int argc,char ** argv)
 		print_usage_rrr(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "i:o:r:t:c:?")) != -1)
+	while ((c = getopt (argc, argv, "i:o:r:t:c:T:?")) != -1)
 	{
 		switch (c)
 		{
@@ -262,11 +262,9 @@ int main_repeated_test(int argc,char ** argv)
 				strncpy(output_SAM_file, optarg,299);
 				break;
 
-
 			case 't':
 				strncpy(temp_path,  optarg,299);
 				break;
-
 
 			case 'T':
 				threads = atoi(optarg);
