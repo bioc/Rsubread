@@ -91,7 +91,7 @@ void print_res(gene_value_index_t *array_index , gene_allvote_t *av, gene_input_
 		i=0;
 		while(offsets.read_offsets[i])
 		{
-			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", offsets.read_names+i*MAX_READ_NAME_LEN, offsets.read_offsets[i] - last_offset+16);
+			fprintf(out_fp, "@SQ\tSN:%s\tLN:%u\n", offsets.read_names+i*MAX_CHROMOSOME_NAME_LEN, offsets.read_offsets[i] - last_offset+16);
 			last_offset = offsets.read_offsets[i];
 			i++;
 		}
