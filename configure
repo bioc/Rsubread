@@ -13,6 +13,9 @@ then
 elif test $UNAME = "FreeBSD"
 then
 	cp src/Makevars.FreeBSD src/Makevars
+elif test $UNAME = "SunOS"
+then
+	cp src/Makevars.SunOS src/Makevars
 else
 	cp src/Makevars.MacOS src/Makevars
 fi
