@@ -87,7 +87,6 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	unsigned int offset, read_no;
 	unsigned int segment_size = (int)(memory_megabytes * 1024.0 / 9.15) * 1024 ;
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
-	char fn[300];
 	double local_begin_ftime = 0.;
 
 	int chro_table_maxsize=100;
@@ -135,6 +134,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	read_no = 0;
 
 	bzero(read_offsets, chro_table_maxsize*sizeof(int));
+
+	char *fn = malloc(3100);
 	sprintf(fn, "%s.files", index_prefix);
 	unlink(fn);
 
@@ -417,6 +418,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		}
 	}
 
+	free(fn);
 	free(read_names);
 	free(read_offsets);
 	return 0;
@@ -454,7 +456,6 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	int file_number, table_no, i ,j;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
-	char fn[300];
 	double local_begin_ftime = miltime();
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 
@@ -479,7 +480,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	SUBREADprintf("Scanning uninformative subreads in reference sequences ...\n");
+	SUBREADprintf("Scanning uninformative subreads in reference sequencing ...\n");
 
 	if (chro_file_number > 199)
 	{
@@ -504,6 +505,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	table_no = 0;
 	read_no = 0;
 
+	char * fn = malloc(3100);
 	sprintf(fn, "%s.files", index_prefix);
 	unlink(fn);
 
@@ -644,6 +646,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 
 
+	free(fn);
 
 
 	for (i=0; i<occurance_table.buckets_number; i++)
@@ -668,7 +671,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 
 	if(huge_table -> current_items)
-		SUBREADprintf("%llu uninformative subreads were found and they were excluded from the index.\n" , huge_table -> current_items);
+		SUBREADprintf("%llu uninformative subreads were found. These subreads will not be included in the index.\n" , huge_table -> current_items);
 
 	return 0;
 }
@@ -905,7 +908,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 	if(ERROR_FOUND_IN_FASTA)
 		SUBREADprintf("There were %d format issues found in the input files. The details were saved in log file '%s'.\n", ERROR_FOUND_IN_FASTA, log_fn);
-	//else	SUBREADprintf("No format issues were found in the input files.\n");
+	else	SUBREADprintf("No format issues were found in the input files.\n");
 
 	return 0;
 }
@@ -1011,7 +1014,7 @@ int main_buildindex(int argc,char ** argv)
 		gehash_create(& huge_table, 50000000, 0);
 		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table);
 		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths);
-		if(!ret)SUBREADprintf("Index %s was successfully built.\n", output_file);
+		if(!ret)SUBREADprintf("\nIndex %s was successfully built.\n", output_file);
 		gehash_destory(& huge_table);
 		//     ^^^^^^^ should be destroy
 		free(chromosome_lengths);
