@@ -1214,7 +1214,7 @@ void explorer_junc_exonbed(HashTable * bed_table, HashTable * pos_table, HashTab
 
 
 
-		if(i % 10000 ==0 && i>1 && thread_id==0)
+		if(i % (processed_reads/14) ==0 && i>1 && thread_id==0)
 			print_text_scrolling_bar("", i*EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		if(halves_record->best_vote1_list[i] >=MAX_QUALITY_TO_EXPLORER_JUNCTION) 
@@ -2440,7 +2440,7 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 		/*if (ginp2 && (i % 2))
 			reverse_read(inb, rl, ginp->space_type);*/
 
-		if(i % 10000 ==0 && i>1 && !thread_id)
+		if(i % (processed_reads/14) ==0 && i>1 && !thread_id)
 			print_text_scrolling_bar("", i* EXON_ALL_THREADS*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		unsigned int pos = ( IS_R1_CLOSE_TO_5 & halves_record -> half_marks_list[i] ) ?halves_record -> best_pos1_list[i]:halves_record -> best_pos2_list[i];
@@ -2845,7 +2845,7 @@ void print_exon_res_single(gene_value_index_t *array_index , halves_record_t * h
 		if(i >= processed_reads*(1+(ginp2!=NULL)))break;
 
 
-		if(i % 10000 ==0 && i>1)
+		if(i % (processed_reads/14) ==0 && i>1)
 			print_text_scrolling_bar("", i*1./(1+(ginp2!=NULL))/processed_reads, 80, &ic);
 
 		old_line[0]=0;
@@ -3641,7 +3641,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 		char namebuf[200];
 
 
-		if (my_thread_no==0 && queries % 10000 == 0 && !is_reversed)
+		if (my_thread_no==0 && queries % (all_reads / 14) == 0 && !is_reversed)
 		{
 			if(table_no == 0)
 			{
@@ -3650,7 +3650,7 @@ int run_exon_search(HashTable * bed_table, HashTable * pos_table, HashTable * co
 				reads_density = fpos*1.0/current_reads; 
 				//SUBREADprintf ("\nDENS=%.5f, POS=%llu, fsize=%llu\n", reads_density, fpos, read_fsize);
 			}
-			if(IS_DEBUG && queries % 100000==0)
+			if(IS_DEBUG && queries % (all_reads/14)==0)
 				SUBREADprintf("@LOG Done %d/%d, good %d, last time %f\n",queries, table_no, good_match, miltime() - t0);
 			else
 			{

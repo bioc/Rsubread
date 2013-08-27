@@ -563,7 +563,7 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 	}
 
 	#define MYESC_CHAR 0x1b
-	SUBREADprintf("%c[31mThe %u %c[33;5mfeatures are sorted.%c[0m\n",MYESC_CHAR, sort_i,  MYESC_CHAR, MYESC_CHAR);
+	SUBREADprintf("The %u features are sorted.\n",sort_i);
 	free(old_info_ptr);
 	free(tmp_chro_info_ptrs);
 	free(chro_feature_ptr);
