@@ -766,6 +766,7 @@ int test_donor(char *read, int read_len, unsigned int pos1, unsigned int pos2, i
 							min_x = score;
 							best_break = bps_pos_x;
 							*is_GTAG = 1==((is_reversed) + (h1_2ch[0]=='G' || h1_2ch[1]=='G'));	//"GT" or "AG"
+							//printf("FL CC=%s\tCC2=%s\tis_GTAG=%d\tREV=%d\n",h1_2ch,h2_2ch,*is_GTAG, is_reversed);
 							*best_donor_score = score;
 						}
 					}
@@ -2065,6 +2066,7 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 {
 	char inb[1201], qualityb[1201];
 	if ( (rl <= EXON_LONG_READ_LENGTH ) && (!EXON_EXTENDING_SCAN)) return;
+	//return;
 
 	strcpy(inb, inb0);
 	strcpy(qualityb, qualityb0);
@@ -2167,7 +2169,7 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 				get_chro_2base(cc, base_index, pos_small + splice_point -2, 0);
 				if(is_donar_chars_part(cc))
 				{
-					// EXON---|CC2---INTRON---CC|---EXON
+					// <<< EXON---|CC2---INTRON---CC|---EXON
 					get_chro_2base(cc2, base_index, new_pos + splice_point, 0);
 					if(is_donar_chars_part(cc2) && paired_chars_part(cc2 , cc, 0)) 
 					{
@@ -2182,7 +2184,8 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 						if(matched_in_exon_new < splice_point || matched_in_exon_old < SHORT_EXON_WINDOW ) 
 							continue;
 
-						max_is_GTAG = (cc2[0]=='G');
+						max_is_GTAG = (cc2[0]=='G' || cc2[1]=='G');
+						//printf("EX CC=%s\tCC2=%s\tis_GTAG=%d\n",cc,cc2,max_is_GTAG);
 						best_j1_edge = new_pos + splice_point;
 						best_j2_edge = pos_small + splice_point;
 					}
@@ -2210,7 +2213,10 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 		//	SUBREADprintf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
 		exon_junction_t *search_res = (exon_junction_t*) HashTableGet(bed_table, &search_key);
 		if(search_res)
+		{
+			assert(search_res -> strand != max_is_GTAG);
 			search_res -> feed_supporting_reads ++;
+		}
 		else
 		{
 			search_res = (exon_junction_t *)malloc(sizeof(exon_junction_t));
@@ -2280,6 +2286,7 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 	}
 
 	best_j1_edge = 0;
+	max_is_GTAG = 0;
 
 	if(need_to_test)
 	{
@@ -2287,7 +2294,6 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 		if(test_end > base_index -> length + base_index -> start_point) test_end = base_index -> length + base_index -> start_point;
 
 		unsigned int new_pos = pos_big +rl - SHORT_EXON_MIN_LENGTH +16;
-		int max_is_GTAG = 0;
 
 		while(1)
 		{
@@ -2322,8 +2328,8 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 						if(matched_in_exon_new < (rl - splice_point) || matched_in_exon_old < SHORT_EXON_WINDOW)
 							continue;
 
-						// EXON ---|CC---INTRON---CC2|--- EXON 
-						max_is_GTAG = 1==(cc[0]=='G');
+						// EXON ---|CC---INTRON---CC2|--- EXON >>>
+						max_is_GTAG = (cc[0]=='G'|| cc[1]=='G');
 						best_j1_edge = pos_big + splice_point;
 						best_j2_edge = new_pos_tail;
 					}
@@ -2352,7 +2358,10 @@ void search_short_exons(char * inb0, char * qualityb0, int rl, HashTable * conne
 		//	SUBREADprintf("FOUND IN STEP 4: %u %u\n", pos_R1, pos_R2);
 		exon_junction_t *search_res = (exon_junction_t*) HashTableGet(bed_table, &search_key);
 		if(search_res)
+		{
 			search_res -> feed_supporting_reads ++;
+			assert(search_res -> strand == !max_is_GTAG);
+		}
 		else
 		{
 			search_res = (exon_junction_t *)malloc(sizeof(exon_junction_t));
@@ -2640,7 +2649,10 @@ void feed_exonbed(HashTable * bed_table, HashTable * pos_table, HashTable * conn
 
 				exon_junction_t *search_res = (exon_junction_t*) HashTableGet(bed_table, &search_key);
 				if(search_res)
+				{
 					search_res -> feed_supporting_reads ++;
+					assert(search_res -> strand != best_GTAG);
+				}
 				else
 				{
 					search_res = (exon_junction_t *)malloc(sizeof(exon_junction_t));
