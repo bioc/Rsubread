@@ -1,3 +1,7 @@
+28 Aug, 2013 - 1.11.15
+(1) Fixed a bug for processing long head lines in index building.
+(2) Fixed a bug for reporting strands for junctions discovered from long reads. 
+
 17 Aug, 2013 - 1.11.14
 (1) Added support for SunOS.
 
