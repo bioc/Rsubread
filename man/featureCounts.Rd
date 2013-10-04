@@ -79,6 +79,8 @@ But GTF/GFF annotation should only be provided as a file, and \code{isGTFAnnotat
 \code{featureCounts} function uses the `gene_id' attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level.\cr\cr
  
 When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of reads will be counted.
+When counting fragments, \code{featureCounts} function requires reads from the same pair to be adjacent to each other in the input file.
+If the input does not satisfy this requirement (eg. reads might be sorted by their mapped locations in the output of some aligners), users should use option \code{PEReadsReordering} to instruct \code{featureCounts} to re-order reads so that reads from the same pair can be placed together.
 }
 \value{ 
 A list with the following components:
