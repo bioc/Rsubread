@@ -2118,10 +2118,12 @@ void print_usage()
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional parameters:"); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -A <input>\tSpecify the chromosome name alias file. Each line in this file");
-	SUBREADputs("              \tdefines the map from a chromosome name in the annotation to");
-	SUBREADputs("              \tthe chromosome name in the SAM or BAM file, split by a comma."); 
-	SUBREADputs("              \tThe line format is: chro_annot,chro_SAM");
+	SUBREADputs("    -A <input>\tSpecify the name of a file including aliases of chromosome");
+	SUBREADputs("              \tnames. The file should be a comma delimited text file that");
+	SUBREADputs("              \tincludes two columns. The first column gives the chromosome");
+	SUBREADputs("              \tnames used in the annotation and the second column gives the");
+	SUBREADputs("              \tchromosome names used by reads. This file should not contain");
+	SUBREADputs("              \theader lines. Names included in this file are case sensitive.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -F <input>\tSpecify the format of the annotation file. Acceptable formats");
 	SUBREADputs("              \tinclude `GTF' and `SAF'. `GTF' by default. Please refer to the");

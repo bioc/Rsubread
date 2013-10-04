@@ -3326,6 +3326,11 @@ void init_global_context(global_context_t * context)
 	context->config.output_prefix[0] = 0;
 	context->config.medium_result_prefix[0] = 0;
 
+	context->config.DP_penalty_create_gap = -1;
+	context->config.DP_penalty_extend_gap = 0;
+	context->config.DP_match_score = 2;
+	context->config.DP_mismatch_penalty = 0;
+
 	context->config.max_insertion_at_junctions=0;
 	context->config.check_donor_at_junctions=1;
 
@@ -3361,6 +3366,11 @@ int core_dynamic_align(global_context_t * global_context, thread_context_t * thr
 {
 	int max_indel = min(16 , global_context->config.max_indel_length);
 	int i,j;
+
+	CORE_DPALIGN_CREATEGAP_PENALTY = global_context -> config.DP_penalty_create_gap;
+	CORE_DPALIGN_EXTENDGAP_PENALTY = global_context -> config.DP_penalty_extend_gap;
+	CORE_DPALIGN_MATCH_SCORE = global_context -> config.DP_match_score;
+	CORE_DPALIGN_MISMATCH_PENALTY = global_context -> config.DP_mismatch_penalty;
 
 	if(read_len < 3 || abs(expected_offset) > max_indel)
 		return 0;

@@ -177,8 +177,18 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	{
 		switch(c)
 		{
-			case 'G': case 'Y': case 'E': case 'X': break;
-
+			case 'G':
+				global_context->config.DP_penalty_create_gap = atoi(optarg);
+				break;
+			case 'Y':
+				global_context->config.DP_match_score = atoi(optarg);
+				break;
+			case 'E':
+				global_context->config.DP_penalty_extend_gap = atoi(optarg);
+				break;
+			case 'X':
+				global_context->config.DP_mismatch_penalty = atoi(optarg);
+				break;
 			case '3':
 				global_context->config.read_trim_3 = atoi(optarg); 
 				break;

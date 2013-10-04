@@ -160,6 +160,10 @@ typedef struct{
 	int use_dynamic_programming_indel;
 	int use_bitmap_event_table;
 	int flanking_subread_indel_mismatch;
+	int DP_penalty_create_gap;
+	int DP_penalty_extend_gap;
+	int DP_match_score;
+	int DP_mismatch_penalty;
 
 } configuration_t;
 
