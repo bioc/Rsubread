@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -23,15 +21,17 @@
 #define _SUBREAD_H_
 
 #include <stdlib.h>
+#include <pthread.h>
 #include <stdio.h>
 
 #ifndef MAKE_STANDALONE
+#ifndef RUNNING_ENV
 #include <R.h>
+#endif
 #endif
 
 #include "hashtable.h" 
 
-#define SUBREAD_VERSION "1.3.6"
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -39,8 +39,8 @@
 #define SAM_FLAG_MATCHED_IN_PAIR 0x02
 #define SAM_FLAG_REVERSE_STRAND_MATCHED 0x10
 #define SAM_FLAG_MATE_REVERSE_STRAND_MATCHED 0x20
+#define SAM_FLAG_SECONDARY_MAPPING 0x100
 #define SAM_FLAG_UNMAPPED 0x04
-#define SAM_FLAG_SECONDARY_ALIGNMENT 0x100
 
 #define FUSION_BREAK_POINT	2
 #define FUSION_JUNCTION		1
@@ -52,16 +52,22 @@
 
 
 #define MAX_PIECE_JUNCTION_READ 7
-#define MAX_READ_LENGTH 1200
-#define MAX_READ_NAME_LEN 80
+#define MAX_READ_LENGTH 1210
+#define MAX_READ_NAME_LEN 100 
 #define MAX_CHROMOSOME_NAME_LEN 100 
+#define MAX_FILE_NAME_LENGTH 300
 
+#define EXON_LONG_READ_LENGTH 120
 #define EXON_MAX_CIGAR_LEN 48
-#define BASE_BLOCK_LENGTH 15000000
+#define MAX_INDEL_SECTIONS 7
+//#define XBIG_MARGIN_RECORD_SIZE 24 
+#define MAX_INSERTION_LENGTH 200
+//#define BASE_BLOCK_LENGTH 15000000
+//#define NEED_SUBREAD_STATISTIC
 
 
 #define IS_MIN_POS_NEGATIVE_STRAND 4
-#define IS_MAX_POS_NEGATIVE_STRAND 8
+#define IS_MAX_POS_NEGATIVE_STRAND 12 
 #define IS_PAIRED_HINTED 16
 #define IS_R1_CLOSE_TO_5 1
 #define IS_REVERSED_HALVES 2
@@ -78,34 +84,44 @@
 #define	IS_BREAKEVEN_READ (8192*4)
 #define IS_R1R2_EQUAL_LEN 1024
 
-#ifdef MACOS
+#if defined(MACOS) || defined(FREEBSD)
+typedef pthread_mutex_t subread_lock_t;
 #define pthread_spinlock_t pthread_mutex_t
 #define pthread_spin_lock pthread_mutex_lock
 #define pthread_spin_unlock pthread_mutex_unlock
 #define pthread_spin_init(a, b) pthread_mutex_init(a, NULL)
 #define pthread_spin_destroy(a) pthread_mutex_destroy(a) 
 #define strnlen(a,l) strlen(a)
+#else
+typedef pthread_spinlock_t subread_lock_t;
 #endif
 
-#ifdef MAKE_STANDALONE 
-#define SUBREADprintf printf
-#define SUBREADputs puts
-#define SUBREADputchar putchar
+#ifdef WINDOWS
+#define ftello ftello64
+#define fseeko fseeko64
+
+#endif
+
+#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+#define SUBREADprintf(...) fprintf(stderr, __VA_ARGS__)
+#define SUBREADputs(x) fprintf(stderr, "%s\n", x)
+#define SUBREADputchar(x) fputc(x, stderr)
 #define SUBREADfflush(x) fflush(x)
-#define fatal_memory_size(a) puts(MESSAGE_OUT_OF_MEMORY);
+#define CORE_SOFT_BR_CHAR '\n'
 #else
 #define SUBREADprintf Rprintf
 #define SUBREADputs(x) Rprintf("%s\n",(x))
 #define SUBREADputchar(X) Rprintf("%c",(X)) 
 #define SUBREADfflush(X) 
-#define fatal_memory_size(a) Rprintf("%s\n",MESSAGE_OUT_OF_MEMORY);
+#define CORE_SOFT_BR_CHAR '\n'
+
 #endif
 
 #ifndef NONONO_DONOTDEF
 
 #define QUALITY_KILL	198
 #define QUALITY_KILL_SUBREAD	160
-#define MAX_QUALITY_TO_CALL_JUNCTION 195
+#define MAX_QUALITY_TO_CALL_JUNCTION 2195
 #define MAX_QUALITY_TO_EXPLORER_JUNCTION 209
 
 #else
@@ -117,6 +133,7 @@
 #define SNP_CALLING_ONLY_HIGHQUAL 1
 
 #define MESSAGE_OUT_OF_MEMORY "Out of memory. If you are using Rsubread in R, please save your working environment and restart R. \n"
+#define fatal_memory_size(a) puts(MESSAGE_OUT_OF_MEMORY);
 
 //#define QUALITY_KILL	175
 //#define QUALITY_KILL_SUBREAD	150
@@ -125,11 +142,12 @@
 
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
-typedef unsigned int gene_quality_score_t;
+//typedef float gene_quality_score_t;
+typedef int gene_quality_score_t;
 typedef char gene_vote_number_t;
 
 
-#define XOFFSET_TABLE_SIZE 50000
+#define XOFFSET_TABLE_SIZE 250000
 
 #define ANCHORS_NUMBER 259
 
@@ -139,17 +157,21 @@ typedef char gene_vote_number_t;
 #define SEARCH_BACK 0
 #define SEARCH_FRONT 1
 
-//#define GENE_VOTE_SPACE 64 
-
-#define GENE_VOTE_SPACE 32 
-#define GENE_VOTE_TABLE_SIZE 293
+#define GENE_VOTE_SPACE 8
+#define GENE_VOTE_TABLE_SIZE 61
 
 #define MAX_ANNOTATION_EXONS 30000 
 #define MAX_EXONS_PER_GENE 400 
 #define MAX_EXON_CONNECTIONS 10
 
 #define MAX_GENE_NAME_LEN 12
-#define MAX_INDEL_TOLERANCE 16
+#define MAX_INDEL_TOLERANCE 7
+
+#define SUBINDEX_VER0 100
+#define SUBINDEX_VER1 200
+
+
+#define CHAR_ESC 27
 
 //#define base2int(c) ((c)=='A'?0:((c)=='T'?3:((c)=='C'?2:1)))
 #define base2int(c) ((c)<'G'?((c)=='A'?0:2):((c)=='G'?1:3))
@@ -206,11 +228,16 @@ typedef struct{
 struct gehash_bucket {
 	int current_items;
 	int space_size;
-	gehash_key_t * item_keys;
+	union
+	{
+		short * new_item_keys;
+		gehash_key_t * item_keys;
+	};
 	gehash_data_t * item_values;
 };
 
 typedef struct {
+	int version_number;
 	unsigned long long int current_items;
 	int buckets_number;
 	char is_small_table;
@@ -225,16 +252,18 @@ typedef struct {
 	char max_indel_recorder[MAX_INDEL_TOLERANCE*3];
 	char * max_tmp_indel_recorder;
 	short max_mask;
+	unsigned char all_used_subreads;
+	unsigned char noninformative_subreads;
 
-        unsigned short items[GENE_VOTE_TABLE_SIZE];
+        unsigned char items[GENE_VOTE_TABLE_SIZE];
         unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-
         gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 
 	#ifdef MAKE_FOR_EXON
 	short coverage_start [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
@@ -245,6 +274,15 @@ typedef struct {
 	#endif
 } gene_vote_t ;
 
+typedef struct{
+	unsigned int pos;
+	char len;
+} indel_record_t;
+
+typedef struct{
+	int count;
+	int support;
+} indel_result_t;
 
 typedef struct{
 	unsigned char best_len;
@@ -253,39 +291,31 @@ typedef struct{
 } gene_best_record_t;
 
 
-typedef struct{
-	unsigned int read_pos;
-	short masks;
-	char is_negative_strand;
-	gene_quality_score_t final_quality; // this varable is also used as big margin register.
-
-	gene_quality_score_t read_quality;
-	short vote_number;
-	short coverage_start;
-	short coverage_end;
-	short edit_distance;
-	
-} voting_result_t;
-
-
 
 typedef struct{
 	int max_len;
-	voting_result_t * results;
-
+	unsigned int * max_positions;
+	unsigned char * is_counterpart;
+	gene_vote_number_t * max_votes;
+	gene_quality_score_t * max_quality;
+	gene_quality_score_t * max_final_quality;
+	short * masks;
+	char * max_indel_recorder;
+	char * span_coverage;
+#ifdef REPORT_ALL_THE_BEST
+	gene_best_record_t * best_records;
+#endif
+	char max_indel_tolerance;
 	short indel_recorder_length;
-	char  *all_indel_recorder;
-	unsigned int multi_best_reads;
 
-	gene_vote_t *vote_for_quality_scoring_1;
-	gene_vote_t *vote_for_quality_scoring_2;
+	unsigned char *repeated_regions;
 
 } gene_allvote_t;
 
 
 typedef struct{
 	int total_offsets;
-        char *read_names; //[MAX_READ_NAME_LEN];
+        char *read_names;
         unsigned int *read_offsets;
 	HashTable * read_name_to_index;
 } gene_offset_t;
@@ -311,6 +341,7 @@ typedef struct {
 	int space_type ;
 	int file_type ;
 	FILE * input_fp;
+	unsigned int read_chunk_start;
 } gene_input_t;
 
 
@@ -336,8 +367,33 @@ typedef struct{
 typedef struct{
 	unsigned int read_number;
 	unsigned int pos;
+	unsigned short read_pos;
+	unsigned short read_len;
+	unsigned char  mapping_quality;
 	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
+
+
+struct explorer_section_t
+{
+	unsigned int start_pos;
+
+	short read_pos_start;
+	short read_pos_end;
+
+	char is_neg_strand;
+	short indels;
+	short indel_pos;
+
+	short all_indel_poses[10];
+	short all_indels[10];
+};
+
+struct explorer_record_t
+{
+	struct explorer_section_t cigar_record[6];
+	short b_search_tail;
+};
 
 #define abs(a) 	  ((a)>=0?(a):-(a))
 #define max(a,b)  ((a)<(b)?(b):(a))

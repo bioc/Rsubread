@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -22,6 +20,7 @@
 #ifndef __GENE_VALUE_INDEX_
 #define __GENE_VALUE_INDEX_
 
+#include "hashtable.h"
 #include "subread.h"
 #include "sorted-hashtable.h"
 
@@ -56,6 +55,9 @@ int match_chro_wronglen(char * read, gene_value_index_t * index, unsigned int po
 
 int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point,int max_indel_number, int max_test_len);
 int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point,int max_indel_number, int min_test_offset);
+
+int match_indel_table_to_front(HashTable * indel_table , char * read, gene_value_index_t * index, unsigned int pos, int test_len, short * indels, short * indel_point, int max_indel_number, int min_test_offset, struct explorer_section_t * sec);
+int match_indel_table_to_back(HashTable * indel_table , char * read, gene_value_index_t * index, unsigned int pos, int test_len, short * indels, short * indel_point, int max_indel_number, int min_test_offset, struct explorer_section_t * sec);
 
 unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned int pos, int read_len, int search_length, int search_to_back);
 #endif

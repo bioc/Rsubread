@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -27,13 +25,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-
 #include <sys/stat.h>
+#include <sys/types.h>
+
 #ifndef FREEBSD
 #include <sys/timeb.h>
 #endif
-
 
 #include "subread.h"
 #include "input-files.h"
@@ -44,6 +41,34 @@ void non_func(const char * fmt, ...)
 {
 }
 
+
+void subread_lock_release(subread_lock_t * lock)
+{
+	#ifdef MACOS
+	pthread_mutex_unlock(lock);
+	#else
+	pthread_spin_unlock(lock);
+	#endif
+}
+void subread_lock_occupy(subread_lock_t * lock)
+{
+
+	#ifdef MACOS
+	pthread_mutex_lock(lock);
+	#else
+	pthread_spin_lock(lock);
+	#endif
+}
+
+void subread_init_lock(subread_lock_t * lock)
+{
+	#ifdef MACOS
+	pthread_mutex_init(lock, NULL);
+	#else
+	pthread_spin_init(lock, PTHREAD_PROCESS_PRIVATE);
+	#endif
+
+}
 
 //int EXON_MAX_CIGAR_LEN = 26;
 
@@ -62,55 +87,6 @@ void non_func(const char * fmt, ...)
 
 
 double begin_ftime;
-
-int test_big_margin(gene_allvote_t * allvote, int qid)
-{
-
-	unsigned char * big_margin_rec = (unsigned char *)&(allvote->results[qid * allvote -> multi_best_reads].final_quality);
-	int current_best = big_margin_rec[0];
-
-	int xxx, ret=0;
-
-	
-	/*22
-	for (xxx=0; xxx<4; xxx++)
-		printf("%02X ", big_margin_rec[xxx]);
-	*/
-	for (xxx=1; xxx<4; xxx++)
-		if(big_margin_rec[xxx]>current_best-2) ret++;
-	//printf ("REP=%d\n",ret);
-	return ret;
-}
-
-void reg_big_margin_votes(gene_vote_t * vote, gene_allvote_t * allvote, int query_id)
-{
-	unsigned char * big_margin_rec = (unsigned char *)&(allvote->results[allvote->multi_best_reads * query_id + 0].final_quality);
-	int current_worst = big_margin_rec[3];
-
-	if(vote ->max_vote <= current_worst)return;
-
-	int i, j;
-
-	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
-	{
-		for(j=0; j< vote->items[i]; j++)
-		{
-			int vote_n = vote->votes[i][j];
-			if(vote_n >current_worst)
-			{ 
-				int replace_id, xxx;
-				for(replace_id=0; replace_id<4;replace_id++)
-					if(big_margin_rec[replace_id]< vote_n)
-						break;
-				for(xxx=3; xxx>replace_id; xxx--)
-					big_margin_rec[xxx] = big_margin_rec[xxx-1];
-				big_margin_rec[replace_id] = vote_n;
-				current_worst = big_margin_rec[3];
-			}
-		}
-	}
-	
-}
 
 unsigned char get_next_char(FILE * fp)
 {
@@ -238,19 +214,124 @@ gene_quality_score_t get_subread_quality(const char * quality_str, const char * 
 
 void print_running_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads, int is_pair)
 {
-        char outbuff[99]; int i;
-        snprintf(outbuff, 98,"%0.2f%%; time used=%.1fs; rate=%.1fk reads/s; time left=%.1fs; total=%lluk %s", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,expected_seconds, total_reads/1000, is_pair?"pairs":"reads");
-        SUBREADprintf("%s",outbuff);
-        for(i=strlen(outbuff); i<105; i++)
-                SUBREADprintf(" ");
-        SUBREADprintf("\n");
+	char outbuff[99]; int i;
+	snprintf(outbuff, 98,"completed=%0.2f%%; time used=%.1fs; rate=%.1fk reads/s; time left=%.1fs; total=%lluk %s", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,expected_seconds, total_reads/1000, is_pair?"pairs":"reads");
+	fputs(outbuff, stdout);
+	for(i=strlen(outbuff); i<105; i++)
+		SUBREADprintf(" ");
+	SUBREADprintf("%c",CORE_SOFT_BR_CHAR);
 }
+
+
+void print_window_scrolling_bar(char * hint, float percentage, int width, int * internal_counter)
+{
+	/*
+	char fan = '-';
+	int bar_width = width - 7 - strlen(hint) , i;
+	int dash_width = (int)(bar_width * percentage+0.5);
+	dash_width = min(dash_width, bar_width - 1);
+	int space_width = bar_width - 1 - dash_width;
+	
+	char out_buf[100];
+
+	switch ((*internal_counter) % 4)
+	{
+		case 0:
+			fan='-';
+			break;
+		case 1:
+			fan='\\';
+			break;
+		case 2:
+			fan='|';
+			break;
+		case 3:
+			fan='/';
+			break;
+	}
+
+	(*internal_counter) ++;
+
+	sprintf (out_buf," %c %s [", fan, hint);
+	for(i = 0; i< dash_width; i++)
+		strcat(out_buf,"=");
+	strcat(out_buf,">");
+	for(i = 0; i< space_width; i++)
+		strcat(out_buf," ");
+	strcat(out_buf,"]");
+	
+	print_in_box(80,0,0,"%s%c",out_buf,CORE_SOFT_BR_CHAR);
+
+	*/
+	print_in_box(81,0,0," [ %.1f%%%% finished ]    %c",percentage*100, CORE_SOFT_BR_CHAR);
+}
+
+
+
 
 void print_text_scrolling_bar(char * hint, float percentage, int width, int * internal_counter)
 {
-	SUBREADprintf("  [ %.1f%% finished ]\n", percentage*100);
+	char fan = '-';
+	int bar_width = width - 7 - strlen(hint) , i;
+	int dash_width = (int)(bar_width * percentage+0.5);
+	dash_width = min(dash_width, bar_width - 1);
+	int space_width = bar_width - 1 - dash_width;
+
+	/*
+	for (i=0; i<width; i++);
+		putchar(' ');
+	SUBREADprintf("\r");
+	*/
+ 
+	switch ((*internal_counter) % 4)
+	{
+		case 0:
+			fan='-';
+			break;
+		case 1:
+			fan='\\';
+			break;
+		case 2:
+			fan='|';
+			break;
+		case 3:
+			fan='/';
+			break;
+	}
+
+	(*internal_counter) ++;
+
+	
+	char lbuf[100];
+	sprintf (lbuf," %c %s [", fan, hint);
+	for(i = 0; i< dash_width; i++)
+		strcat(lbuf, "=");
+	strcat(lbuf, ">");
+	for(i = 0; i< space_width; i++)
+		strcat(lbuf, " ");
+	strcat(lbuf, "]");
+	SUBREADprintf("%s%c",lbuf,CORE_SOFT_BR_CHAR);
+	
 }
 
+
+void add_repeated_numbers(int qid, gene_vote_t * vote, unsigned char * repeated_regions)
+{
+
+	int i,j;
+
+	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+		for(j=0; j< vote->items[i]; j++)
+		{
+			int v_2 ;
+			if(vote-> votes[i][j] >=2)
+			{
+				v_2 = vote-> votes[i][j] - 2;
+				if(repeated_regions[v_2 + qid  * 16] < 255) repeated_regions[v_2 + qid  * 16]++;
+			}
+
+		}
+}
 
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_threshold)
 {
@@ -288,7 +369,7 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 				if(val_c>199999)
 				{
 					SUBREADprintf("\nThere are too many items in a bucket; you may reduce the threshold of non-informative subreads to eliminate this problem.\n");
-					return (-1);
+					exit(-1);
 				}
 				else
 				{
@@ -327,7 +408,9 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 	unsigned int ret = 0 ;
 	int n;
 
+
 	n = HashTableGet(offsets -> read_name_to_index, chro_name)-NULL;
+	//printf("NAME INDEL : %ld  ; n=%d\n", offsets -> read_name_to_index -> numOfElements, n );
 	if(n<1) return 0xffffffff;
 
 	if(n>1)
@@ -358,9 +441,6 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 		GENE_LOCATE_JUMP /=4;
 	}
 
-
-
-
 	for (; offsets->read_offsets[n]; n++)
 	{
 		if (offsets->read_offsets[n] > linear)
@@ -373,12 +453,11 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 			else
 				*pos = linear - offsets->read_offsets[n-1];
 
-			*chro_name = offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
+			*chro_name = (char *)offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
 
 			return 0;
 		}
 	}
-
 	return 1;
 }
 
@@ -392,12 +471,12 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 #define _index_vote(key) (((unsigned int)key)%GENE_VOTE_TABLE_SIZE)
 
 int vv=0;
-void add_gene_vote(gene_vote_t* vote, int key , int add_new)
+inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
 {
 	add_gene_vote_weighted(vote, key, add_new, 1);
 }
 
-void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int w)
+inline void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int w)
 {
 	int offset = _index_vote(key);
 	int datalen = vote -> items[offset];
@@ -465,33 +544,55 @@ int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 
 void clear_allvote(gene_allvote_t* allvote)
 {
-	unsigned long long int multi_best = allvote->multi_best_reads; 
-	bzero(allvote -> results,  multi_best * sizeof(voting_result_t) * allvote -> max_len);
+	bzero(allvote -> max_votes,  allvote -> max_len* sizeof(*allvote -> max_votes));
+	bzero(allvote -> masks,  allvote -> max_len* sizeof(*allvote -> masks));
+	bzero(allvote -> span_coverage ,  allvote -> max_len* sizeof(char));
 }
 
 void destory_allvote(gene_allvote_t* allvote)
 {
-	free(allvote -> results);
-	free(allvote -> all_indel_recorder);
-	free(allvote -> vote_for_quality_scoring_1);
-	free(allvote -> vote_for_quality_scoring_2);
+	free(allvote -> max_positions);
+	free(allvote -> max_votes);
+	free(allvote -> max_quality);
+	free(allvote -> max_final_quality);
+	free(allvote -> masks);
+	#ifdef REPORT_ALL_THE_BEST
+	free(allvote -> best_records);
+	#endif
+	free(allvote -> is_counterpart);
+	free(allvote -> span_coverage);
+	if(allvote -> max_indel_recorder)
+		free(allvote -> max_indel_recorder);
 }
 
-int init_allvote(gene_allvote_t* allvote, int expected_len, unsigned int multi_best_reads, int allowed_indels)
+int init_allvote(gene_allvote_t* allvote, int expected_len, int allowed_indels)
 {
 	int is_OK = 0;
-	unsigned long long int multi_best = multi_best_reads; 
 	allvote -> max_len = expected_len; 
-	allvote -> multi_best_reads = multi_best_reads;
-	allvote -> indel_recorder_length = max(3*(allowed_indels+1)+1, 28);
+	allvote -> max_positions = (unsigned int *) malloc(sizeof(int)*expected_len);
+	allvote -> max_votes = (gene_vote_number_t *) calloc(sizeof(gene_vote_number_t), expected_len);
+	allvote -> max_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
+	allvote -> max_final_quality = (gene_quality_score_t *) calloc(sizeof(gene_quality_score_t), expected_len);
+	allvote -> masks = (short *) calloc(sizeof(short), expected_len);
+#ifdef REPORT_ALL_THE_BEST
+	allvote -> best_records = (gene_best_record_t *) malloc(sizeof(gene_best_record_t)* expected_len);
+#endif
+	allvote -> is_counterpart = (unsigned char *) malloc(expected_len);
 
-	allvote -> results = calloc(sizeof(voting_result_t), multi_best * expected_len);
-	allvote -> all_indel_recorder = malloc(sizeof(char) * allvote -> indel_recorder_length * multi_best * expected_len);
-	allvote -> vote_for_quality_scoring_1 = malloc(sizeof(gene_vote_t) * 64);
-	allvote -> vote_for_quality_scoring_2 = malloc(sizeof(gene_vote_t) * 64);
+	allvote -> max_indel_tolerance = allowed_indels;
+	allvote	-> indel_recorder_length = max(3*(allowed_indels+1)+1, 28);
+	allvote -> span_coverage = (char *)calloc(sizeof(char), expected_len);
+	allvote -> repeated_regions = (unsigned char *)calloc(sizeof(unsigned char), 16 * expected_len);
 
-	if(allvote ->all_indel_recorder)
+	if((allvote -> max_quality &&  allvote -> max_positions  && allvote -> max_votes  && allvote -> max_final_quality && allvote -> masks && allvote -> is_counterpart && allvote -> span_coverage))
 		is_OK = 1;
+
+	if(allowed_indels && is_OK)
+	{
+		allvote -> max_indel_recorder = (char *)malloc( allvote -> indel_recorder_length *expected_len);
+		is_OK = (allvote -> max_indel_recorder!=NULL);
+	}
+	else	allvote -> max_indel_recorder =  NULL;
 
 	if(is_OK)
 		return 0;
@@ -504,7 +605,7 @@ int init_allvote(gene_allvote_t* allvote, int expected_len, unsigned int multi_b
 
 
 // rl_adjust >0: "D" in read; rl_adjust<0: "I" in read
-void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset, int *rl_adjust, int * is_safegurded)
+void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset, int *rl_adjust)
 {
 	char tmp[200];
 	char cigar_piece [10];
@@ -540,22 +641,18 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		}
 		else
 		{
-			if(tmpv==0)
-				cigar_length = -99999999;
-						
 			if(is_first_M && pos_offset && cc=='S')
 				*pos_offset = tmpv;
 			else if(cc=='M') is_first_M = 0;
 				
 			if((cc!=last_operation) && (last_operation!='X'))
 			{
-				if(last_operation == 'M' || last_operation == 'S' || last_operation == 'N' ||  last_operation == 'B')
+				if(last_operation == 'M' || last_operation == 'S' || last_operation == 'N' ||  last_operation == 'B' || last_operation == 'J' || last_operation == 'j' || last_operation == 'b')
 				{
 					if(delta_i)
 					{
 						sprintf(cigar_piece,"%dI", delta_i); 
 						strcat(tmp, cigar_piece);
-						cigar_length += delta_i;
 					}
 					delta_i = 0;
 
@@ -569,10 +666,10 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 
 					sprintf(cigar_piece,"%lld%c", last_tmpv, last_operation); 
 					strcat(tmp, cigar_piece);
-					if(last_operation == 'M' || last_operation == 'S' )
-						cigar_length += last_tmpv;
 				}
 
+				if(last_operation == 'M' || last_operation == 'S' || last_operation == 'I')
+					cigar_length += last_tmpv;
 
 				last_tmpv = 0;
 			}
@@ -603,7 +700,6 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		{
 			sprintf(cigar_piece,"%dI", delta_i); 
 			strcat(tmp, cigar_piece);
-			cigar_length += delta_i;
 		}
 		if(delta_d)
 		{
@@ -617,24 +713,24 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		{
 			sprintf(cigar_piece,"%lld%c", tmpv+last_tmpv, last_operation); 
 			strcat(tmp, cigar_piece);
-			cigar_length += tmpv+last_tmpv;
 		}
+
+		if(last_operation == 'M' || last_operation == 'S' || last_operation == 'I')
+			cigar_length += tmpv+last_tmpv;
 	}
 	if(cigar_length == total_length)
 	{
 		if(rl_adjust)(*rl_adjust)=delta_rl;
 		strcpy(cigar, tmp);
-		(*is_safegurded)=0;
 	}
 	else
 	{
-		(*is_safegurded)=1;
 		sprintf(cigar, "%dM", total_length);
 	}
 }
 
 // adjust_len <0: "I" in read; adjust_len>0: "D" in read
-void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read, int * pos_offset, int * adjust_len, int * is_safegurded)
+void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read, int * pos_offset, int * adjust_len)
 {
 	int i, is_error = 0;
 	int last_end=0, last_offset = 0, cursor = 0;
@@ -649,7 +745,7 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		else
 		{
 			strncpy(buf, info+1, 98);
-			compress_cigar(buf, len, read, pos_offset, adjust_len, is_safegurded);
+			compress_cigar(buf, len, read, pos_offset, adjust_len);
 		}
 		return;
 	}
@@ -691,53 +787,44 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		cursor = base_end;
 		//if (dist >0)cursor += dist;
 	}
-	compress_cigar(buf, len, read, pos_offset, adjust_len, is_safegurded);
+	compress_cigar(buf, len, read, pos_offset, adjust_len);
 //	if(cursor < len)
 //		sprintf(buf+strlen(buf), "%dM", len-cursor);
 //	if(is_error)
 //		strcat(buf, "XX");
 }
 
-
-void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short ,  char ** dynamic_programming_char, int use_hamming_dist)
-{
-	return;
-}
-/*
+void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short ,  char ** dynamic_programming_char)
 {
 
 //	SUBREADprintf("Ospan=%d Nspan=%d\n", allvote -> span_coverage[qid], span_coverage);
 
 	int is_add_new = 0;
-	if(use_hamming_dist)
+	if((votes > allvote -> max_votes[qid] ) || (votes  == allvote -> max_votes[qid]  && span_coverage > allvote -> span_coverage[qid]) || (votes == allvote -> max_votes[qid] && (span_coverage == allvote -> span_coverage[qid]) && quality > allvote -> max_quality[qid]))
 	{
-		if((votes > allvote -> max_votes[qid] ) || (votes  == allvote -> max_votes[qid]  && quality > allvote -> max_quality[qid]))
-		{
-			is_add_new = 1;
-		}
-		else if (votes == allvote -> max_votes[qid] && quality == allvote -> max_quality[qid])
-		{
-			allvote -> masks[qid]|= IS_BREAKEVEN_READ;
-			if(pos < allvote -> max_positions[qid] ) is_add_new=1;
-		}
-
+		is_add_new = 1;
 	}
-	else
+	else if (votes == allvote -> max_votes[qid] && quality == allvote -> max_quality[qid] && span_coverage == allvote -> span_coverage[qid])
 	{
-		if((votes > allvote -> max_votes[qid] ) || (votes  == allvote -> max_votes[qid]  && span_coverage > allvote -> span_coverage[qid]) || (votes == allvote -> max_votes[qid] && (span_coverage == allvote -> span_coverage[qid]) && quality > allvote -> max_quality[qid]))
-		{
-			is_add_new = 1;
-		}
-		else if (votes == allvote -> max_votes[qid] && quality == allvote -> max_quality[qid] && span_coverage == allvote -> span_coverage[qid])
-		{
-			allvote -> masks[qid]|= IS_BREAKEVEN_READ;
-			if(pos < allvote -> max_positions[qid] ) is_add_new=1;
-		}
+		allvote -> masks[qid]|= IS_BREAKEVEN_READ;
+		if(pos < allvote -> max_positions[qid] ) is_add_new=1;
 	}
-
 
 	if(is_add_new)
 	{
+
+#ifdef REPORT_ALL_THE_BEST
+		if(votes > allvote -> max_votes[qid])
+			allvote -> best_records [qid].best_len = 0;
+
+		if(allvote -> best_records [qid].best_len < BEXT_RESULT_LIMIT)
+		{
+			int bestlen = allvote -> best_records [qid].best_len;
+			allvote -> best_records [qid].offsets[bestlen] = pos;
+			allvote -> best_records [qid].is_reverse[bestlen] = is_counterpart;
+			allvote -> best_records [qid].best_len ++;
+		}
+#endif
 		allvote -> is_counterpart[qid] = is_counterpart;
 		allvote -> max_positions[qid] = pos;
 		allvote -> max_votes[qid] = votes;
@@ -747,128 +834,162 @@ void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t
 
 		if(allvote -> max_indel_recorder)
 			indel_recorder_copy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length, max_indel_recorder);
+
+		/*if(mask & IS_BREAKEVEN_READ)		SUBREADprintf("ADD2\n");
+		else SUBREADprintf("NOADD3\n");*/
+	
 		return;
-	}
 
-}
-*/
+		/*
+		int mismatch=0;
 
-float EXON_RECOVER_MATCHING_RATE = 0.9;
-float EXON_INDEL_MATCHING_RATE_TAIL = 0.8;
-float EXON_INDEL_MATCHING_RATE_HEAD = 0.8;
-
-void find_and_explain_indel(gene_allvote_t* allvote,int result_av_offset, int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction,  int is_head_high_quality, char * qual_txt, int phred_version , short ** dynamic_programming_short,  char **dynamic_programming_char)
-{
-	//PNT111
-	short head_indel_pos=-1 , tail_indel_pos=-1;
-	int head_indel_movement=0, tail_indel_movement=0;
-	if (array_index)
-	{
-		int k;
-		if (max_indel_recorder[0])
+		if(max_indel>0)
 		{
-			int cover_start = find_subread_end(read_len, total_subreads, max_indel_recorder[0]-1)- 15;
+			find_and_explain_indel(allvote, qid, pos, votes, quality, is_counterpart, mask, max_indel_recorder, array_index, read_txt, read_len, max_indel, total_subreads, space_type, report_junction, is_head_high_quality, qual_txt, phred_version, dynamic_programming_short, dynamic_programming_char);
 
-			for (k=0; max_indel_recorder[k]; k+=3);
-			int cover_end = find_subread_end(read_len, total_subreads, max_indel_recorder[k-2]-1) + max(0,-max_indel_recorder[k-1]);
-
-			int head_qual = is_head_high_quality?0x7fffffff:0, tail_qual = is_head_high_quality?0:0x7fffffff;
-
-
-			if(qual_txt && qual_txt[0])
+			if(allvote -> max_indel_recorder)
 			{
-				int j;
-				head_qual = 0;
-				tail_qual = 0;
-				for (j = 0; j<cover_start; j++)
-				{
-					if(FASTQ_PHRED64 == phred_version)
-					{
-						head_qual += (1000000-get_base_error_prob64i(qual_txt[j]));
-					}
-					else
-					{
-						head_qual += (1000000-get_base_error_prob33i(qual_txt[j]));
-					}
-				}
-				for (j = 0; j<read_len - cover_end; j++)
-				{
-					if(FASTQ_PHRED64 == phred_version)
-					{
-						tail_qual += (1000000-get_base_error_prob64i(qual_txt[read_len - j -1]));
-					}
-					else
-					{
-						tail_qual += (1000000-get_base_error_prob33i(qual_txt[read_len - j -1]));
-					}
-				}
+				char cigar_str [100];
+				cigar_str[0]=0;
+				show_cigar(allvote->max_indel_recorder + qid * allvote -> indel_recorder_length, read_len, is_counterpart, cigar_str, max_indel, total_subreads, read_txt, NULL, NULL);
+				allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version, &mismatch);
 			}
-
-			int head_must_correct = 4;
-			if(cover_start > 0)
-			{
-				if (head_qual / cover_start < 850000)
-				{
-					EXON_INDEL_MATCHING_RATE_HEAD = 0.75;
-					head_must_correct =2;
-				}
-				else if (head_qual / cover_start < 950000 )
-				{
-					EXON_INDEL_MATCHING_RATE_HEAD = 0.85;
-					head_must_correct =3;
-				}
-				else EXON_INDEL_MATCHING_RATE_HEAD = 0.92;
-			}else	EXON_INDEL_MATCHING_RATE_HEAD = 9999;
-
-
-			int tail_must_correct = 4;
-			if(read_len-cover_end > 0)
-			{
-				if (tail_qual / (read_len-cover_end) < 850000)
-				{
-					EXON_INDEL_MATCHING_RATE_TAIL = 0.75;
-					tail_must_correct =2;
-				}
-				else if (tail_qual / (read_len-cover_end) < 950000)
-				{
-					EXON_INDEL_MATCHING_RATE_TAIL = 0.85;
-					tail_must_correct =3;
-				}
-				else EXON_INDEL_MATCHING_RATE_TAIL = 0.92;
-			}else	EXON_INDEL_MATCHING_RATE_TAIL = 9999;
-
-
-			
-
-			int is_full_covered = 0;
-			is_full_covered = extend_covered_region(array_index, pos, read_txt, read_len, cover_start, cover_end, 4, head_must_correct, tail_must_correct,  max_indel, space_type, max_indel_recorder[k-1], &head_indel_pos, &head_indel_movement, &tail_indel_pos, &tail_indel_movement, is_head_high_quality, qual_txt, phred_version);
-			if(head_indel_movement)
-			{
-				pos += head_indel_movement;
-				allvote -> results[result_av_offset].read_pos = pos; 
-			}
-			if(is_full_covered == 3)
-			{
-				allvote -> results[result_av_offset].masks &= ~IS_RECOVERED_JUNCTION_READ;
-			}
-			else	allvote -> results[result_av_offset].masks |= IS_RECOVERED_JUNCTION_READ;
 		}
+		else
+		{
+			char cigar_str [100];
+			sprintf(cigar_str,"%dM", read_len);	
+			allvote->max_final_quality[qid] = final_mapping_quality(array_index, allvote -> max_positions[qid], read_txt, qual_txt, cigar_str, phred_version, &mismatch);
+		}
+
+		*/
 	}
 
-	long long int multi_best =result_av_offset;
-	multi_best *= allvote -> indel_recorder_length;
-	allvote -> all_indel_recorder[multi_best]=0xff;
-
-	if ((max_indel_recorder[3] || head_indel_pos>=0 || tail_indel_pos>0)){
-		int head_pos = 0;
-		if((head_indel_pos>=0 && report_junction) || head_indel_movement)head_pos = head_indel_pos ;//- max(0,head_indel_movement);
-		int tail_pos = read_len;
-		if((tail_indel_pos>0 && report_junction) || tail_indel_movement)tail_pos = tail_indel_pos ;//- min(0, tail_indel_movement);
-		explain_indel_in_middle(allvote, result_av_offset, pos, max_indel_recorder,  array_index, read_txt, read_len,  max_indel, total_subreads, head_pos, tail_pos , head_indel_movement, tail_indel_movement, report_junction, dynamic_programming_short, dynamic_programming_char);
-	}
 }
 
-void explain_indel_in_middle(gene_allvote_t* allvote, int result_av_offset, int pos, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int head_start_point, int tail_end_point, int head_indel_movement, int tail_indel_movement, int report_junction, short ** dynamic_programming_short ,  char ** dynamic_programming_char)
+
+float CORE_RECOVER_MATCHING_RATE = 0.9;
+float CORE_INDEL_MATCHING_RATE_TAIL = 0.8;
+float CORE_INDEL_MATCHING_RATE_HEAD = 0.8;
+
+void find_and_explain_indel(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, char mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction,  int is_head_high_quality, char * qual_txt, int phred_version , short ** dynamic_programming_short,  char **dynamic_programming_char)
+{
+	//unsigned int pos0 = pos;
+	if(allvote -> max_indel_recorder)
+	{
+		//PNT111
+		short head_indel_pos=-1 , tail_indel_pos=-1;
+		int head_indel_movement=0, tail_indel_movement=0;
+		if (array_index)
+		{
+			int k;
+			if (max_indel_recorder[0])
+			{
+				int cover_start = find_subread_end(read_len, total_subreads, max_indel_recorder[0]-1)- 15;
+
+				for (k=0; max_indel_recorder[k]; k+=3);
+				int cover_end = find_subread_end(read_len, total_subreads, max_indel_recorder[k-2]-1) + max(0,-max_indel_recorder[k-1]);
+
+				int head_qual = is_head_high_quality?0x7fffffff:0, tail_qual = is_head_high_quality?0:0x7fffffff;
+
+
+				if(qual_txt && qual_txt[0])
+				{
+					int j;
+					head_qual = 0;
+					tail_qual = 0;
+					for (j = 0; j<cover_start; j++)
+					{
+						if(FASTQ_PHRED64 == phred_version)
+						{
+							head_qual += (1000000-get_base_error_prob64i(qual_txt[j]));
+						}
+						else
+						{
+							head_qual += (1000000-get_base_error_prob33i(qual_txt[j]));
+						}
+					}
+					for (j = 0; j<read_len - cover_end; j++)
+					{
+						if(FASTQ_PHRED64 == phred_version)
+						{
+							tail_qual += (1000000-get_base_error_prob64i(qual_txt[read_len - j -1]));
+						}
+						else
+						{
+							tail_qual += (1000000-get_base_error_prob33i(qual_txt[read_len - j -1]));
+						}
+					}
+				}
+
+				int head_must_correct = 4;
+				if(cover_start > 0)
+				{
+					if (head_qual / cover_start < 850000)
+					{
+						CORE_INDEL_MATCHING_RATE_HEAD = 0.75;
+						head_must_correct =2;
+					}
+					else if (head_qual / cover_start < 950000 )
+					{
+						CORE_INDEL_MATCHING_RATE_HEAD = 0.85;
+						head_must_correct =3;
+					}
+					else CORE_INDEL_MATCHING_RATE_HEAD = 0.92;
+				}else	CORE_INDEL_MATCHING_RATE_HEAD = 9999;
+	
+
+				int tail_must_correct = 4;
+				if(read_len-cover_end > 0)
+				{
+					if (tail_qual / (read_len-cover_end) < 850000)
+					{
+						CORE_INDEL_MATCHING_RATE_TAIL = 0.75;
+						tail_must_correct =2;
+					}
+					else if (tail_qual / (read_len-cover_end) < 950000)
+					{
+						CORE_INDEL_MATCHING_RATE_TAIL = 0.85;
+						tail_must_correct =3;
+					}
+					else CORE_INDEL_MATCHING_RATE_TAIL = 0.92;
+				}else	CORE_INDEL_MATCHING_RATE_TAIL = 9999;
+
+
+				
+
+				int is_full_covered = 0;
+				is_full_covered = extend_covered_region(array_index, pos, read_txt, read_len, cover_start, cover_end, 4, head_must_correct, tail_must_correct,  max_indel, space_type, max_indel_recorder[k-1], &head_indel_pos, &head_indel_movement, &tail_indel_pos, &tail_indel_movement, is_head_high_quality, qual_txt, phred_version, CORE_INDEL_MATCHING_RATE_HEAD, CORE_INDEL_MATCHING_RATE_TAIL);
+				if(head_indel_movement)
+				{
+					pos += head_indel_movement;
+					allvote -> max_positions[qid] = pos; 
+				}
+				if(is_full_covered == 3)
+				{
+					allvote -> masks[qid] &= ~IS_RECOVERED_JUNCTION_READ;
+				}
+				else	allvote -> masks[qid] |= IS_RECOVERED_JUNCTION_READ;
+			}
+		}
+
+		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xff ;
+
+
+		if ((max_indel_recorder[3] || head_indel_pos>=0 || tail_indel_pos>0)){
+			int head_pos = 0;
+			if((head_indel_pos>=0 && report_junction) || head_indel_movement)head_pos = head_indel_pos ;//- max(0,head_indel_movement);
+			int tail_pos = read_len;
+			if((tail_indel_pos>0 && report_junction) || tail_indel_movement)tail_pos = tail_indel_pos ;//- min(0, tail_indel_movement);
+			explain_indel_in_middle(allvote, qid , pos, max_indel_recorder,  array_index, read_txt, read_len,  max_indel, total_subreads, head_pos, tail_pos , head_indel_movement, tail_indel_movement, report_junction, dynamic_programming_short, dynamic_programming_char);
+			//if(*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) != 0xfd ) allvote -> max_positions[qid] = pos0;
+		}
+
+	}
+
+}
+
+void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int head_start_point, int tail_end_point, int head_indel_movement, int tail_indel_movement, int report_junction, short ** dynamic_programming_short ,  char ** dynamic_programming_char)
 {
 
 	char indel_operations[1500];
@@ -972,7 +1093,6 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int result_av_offset, int 
 
 				last_operation = current_operation; 
 			} 
-//	printf("\nCIGAR_CURRENT2=%s; MOVES=%d\n", tmp_cigar, moves);
 		}
 		else
 		{
@@ -997,16 +1117,14 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int result_av_offset, int 
 		last_operation = 0;
 		current_pos = black_base_end;
 			
+		
 	}
-
 
 	int vpos = strlen(tmp_cigar);
 	if (vpos > EXON_MAX_CIGAR_LEN-9 )
 	{
-		long long int multi_best = result_av_offset;
-		multi_best *=  allvote -> indel_recorder_length;
-		allvote -> all_indel_recorder[multi_best]=0xfd;
-		memcpy(allvote -> all_indel_recorder + multi_best + 1, max_indel_recorder, 3 * max_indel - 1);
+		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xfd; 
+		memcpy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length+1, max_indel_recorder, 3 * max_indel);
 	}
 	else
 	{
@@ -1029,11 +1147,11 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int result_av_offset, int 
 					sprintf(tmp_cigar+vpos, "%dS",read_len - tail_end_point );
 			}
 		}
+	//	if (head_start_point >0 || tail_end_point < read_len)
+	//		strcat(tmp_cigar,"X");
 
-		long long int multi_best = result_av_offset;
-		multi_best *= allvote -> indel_recorder_length;
-		allvote -> all_indel_recorder[multi_best]=0xfe;
-		strncpy(allvote -> all_indel_recorder + multi_best+ 1, tmp_cigar, allvote -> indel_recorder_length - 2);
+		*(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length) = 0xfe ;
+		strncpy(allvote -> max_indel_recorder + qid * allvote -> indel_recorder_length+1, tmp_cigar, allvote -> indel_recorder_length - 2);
 	}
 }
 
@@ -1071,11 +1189,11 @@ int evaluate_piece(char * piece_str, int chron, int offset, int is_counterpart, 
 				if (piece_str[99-i] == 'A' && next_char == 'T')
 					ret ++;
 				else if (piece_str[99-i] == 'G' && next_char == 'C')
-                                        ret ++;
+					ret ++;
 				else if (piece_str[99-i] == 'T' && next_char == 'A')
-                                        ret ++;
+					ret ++;
 				else if (piece_str[99-i] == 'C' && next_char == 'G')
-                                        ret ++;
+					ret ++;
 			}
 			else if(piece_str[i] == next_char)
 				ret ++;
@@ -1093,17 +1211,21 @@ int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, 
 
 	int ret = 0;
 	int tali = 0;
-	int last_section_end = 0;
+	int last_section_end = 0, last_section_indels=0;
 
 	for(tali = 0; indel_recorder[tali*3] && tali<MAX_INDEL_TOLERANCE; tali++)
 	{
 		int section_last_subread = indel_recorder[tali*3+1] - 1;
 		int section_offset = indel_recorder[tali*3+2];
-		int this_section_end = find_subread_end(test_len , total_subreads, section_last_subread); 
+		int this_section_end = find_subread_end(test_len , total_subreads, section_last_subread)+6; 
 		if(!indel_recorder[tali*3+3]) this_section_end = test_len;
+
+		this_section_end = min(test_len, this_section_end);
+		this_section_end = max(this_section_end, last_section_end);
 
 		ret += match_chro(read + last_section_end - min(0, section_offset), index, pos + last_section_end + max(0, section_offset), this_section_end - last_section_end + min(0, section_offset), is_negative_strand, space_type);
 		last_section_end = this_section_end;
+		last_section_indels = section_offset;
 	}
 
 	//ret = match_chro(read , index, pos , test_len, is_negative_strand, space_type);
@@ -1113,8 +1235,23 @@ int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, 
 }
 
 
+int match_chro_indel_old(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int indel_size)
+{
 
-void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, gene_vote_t * src, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int min_minor, const char quality_str [], int quality_scale, int is_negative_strand, int total_subreads)
+	int i;
+	int ret = 0;
+	for (i = -indel_size; i<=indel_size ; i++)
+	{
+		if (pos +i + test_len < index -> start_base_offset + index -> length && pos > -i)
+			ret += match_chro(read, index, pos + i, test_len, is_negative_strand, space_type);
+	}
+	return ret;
+
+}
+
+
+
+void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, gene_vote_t * src, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int min_minor, const char quality_str [], int quality_scale, int is_negative_strand)
 {
 	int i, j;
 
@@ -1127,10 +1264,10 @@ void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, g
 		for(j=0; j< src->items[i]; j++)
 		{
 			unsigned int potential_position = src-> pos[i][j];
-			int matchingness_count = 0;
+			float matchingness_count = 0;
 			if (src -> votes [i][j]>= min_minor)
 				//matchingness_count = match_read(read_str, read_len, potential_position, my_array_index, color_space, indel_tolerance, quality_str, quality_scale);
-				matchingness_count = match_chro_indel(read_str, my_array_index, potential_position, read_len, 0, color_space, indel_tolerance, src -> indel_recorder[i][j], total_subreads);
+				matchingness_count = 1.*match_chro_indel(read_str, my_array_index, potential_position, read_len, 0, color_space, indel_tolerance, NULL, 0);
 	
 			dest -> pos[i][j] = potential_position;
 			dest -> quality[i][j] = matchingness_count;
@@ -1154,26 +1291,20 @@ void mark_votes_array_index(char * read_str, int read_len, gene_vote_t * dest, g
 	}
 }
 
-int select_positions_array(int use_bases_scoring, int qid, gene_allvote_t * allvotes, short current_masks, char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, const char quality_str1 [], const char quality_str2 [], int quality_scale, int total_subreads, int thread_no)
+int select_positions_array(char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2,  gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2, char * r1_recorder, char * r2_recorder, gehash_data_t * pos_read1, gehash_data_t * pos_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int number_of_anchors_quality, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int * is_break_even)
 {
-	gene_vote_t * used_vote_1 = vote_read1;
-	gene_vote_t * used_vote_2 = vote_read2;
-	if(use_bases_scoring)
-	{
-		used_vote_1 = allvotes->vote_for_quality_scoring_1 + thread_no;
-		used_vote_2 = allvotes->vote_for_quality_scoring_2 + thread_no;
+	gene_vote_t base_vote_1 , base_vote_2;
 
-		mark_votes_array_index(read1_str, read1_len, used_vote_1, vote_read1, my_array_index, color_space, indel_tolerance, min_minor, quality_str1, quality_scale, is_negative_strand, total_subreads);
-		mark_votes_array_index(read2_str, read2_len, used_vote_2, vote_read2, my_array_index, color_space, indel_tolerance, min_minor, quality_str2, quality_scale, is_negative_strand, total_subreads);
-	}
+	mark_votes_array_index(read1_str, read1_len, &base_vote_1, vote_read1, my_array_index, color_space, indel_tolerance, min_minor, quality_str1, quality_scale, is_negative_strand);
+	mark_votes_array_index(read2_str, read2_len, &base_vote_2, vote_read2, my_array_index, color_space, indel_tolerance, min_minor, quality_str2, quality_scale, is_negative_strand);
 
 //	SUBREADprintf("Q=%.3f\n", *qual_r2);
 
-	return select_positions(allvotes, qid, current_masks, used_vote_1, used_vote_2 ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, indel_tolerance, read1_len, read2_len);
+	return select_positions(&base_vote_1, &base_vote_2, numvote_read1, numvote_read2, sum_quality, qual_r1, qual_r2,  pos_read1, pos_read2, r1_recorder , r2_recorder ,max_pair_dest,  min_pair_dest,  min_major,  min_minor, is_negative_strand, number_of_anchors_quality,max_indel_len, is_break_even);
 }
 
 
-int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, gene_vote_t * vote_read1, gene_vote_t * vote_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int max_indel_len, int read1_len, int read2_len)
+int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven)
 {
 
 	int k, i, j, anchors = 0;
@@ -1186,17 +1317,12 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 	int anchors_buckets [ANCHORS_NUMBER];
 	int anchors_index [ANCHORS_NUMBER];
 
-	int ret = 0;
 	gene_vote_number_t minor_votes [ANCHORS_NUMBER];
 	gene_quality_score_t minor_quality [ANCHORS_NUMBER];
 	gehash_data_t minor_position [ANCHORS_NUMBER];
 	int minor_buckets [ANCHORS_NUMBER];
 	int minor_index [ANCHORS_NUMBER];
 	char is_minor_breakeven [ANCHORS_NUMBER];
-
-	voting_result_t *tmp_best_records_r1, *tmp_best_records_r2;
-
-	int tmp_best_records_r1_number = 0, tmp_best_records_r2_number = 0;
 
 	if(anchor_votes < min_major)
 		return 0;
@@ -1210,7 +1336,7 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 			for(j=0; j< current_vote->items[i]; j++)
 			{
-				if(current_vote->votes[i][j] >= anchor_votes -            0)
+				if(current_vote->votes[i][j] >= anchor_votes -	    0)
 				{
 					anchors_position[anchors] = current_vote->pos[i][j];
 					anchors_votes   [anchors] = current_vote->votes[i][j];
@@ -1223,6 +1349,7 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 
 					if(anchors >= ANCHORS_NUMBER)
 					{
+	//					SUBREADprintf("Abnormally too many anchors [%d, %d] %f\n", i, j, anchor_votes);
 						anchors --;
 					}
 				}
@@ -1233,9 +1360,6 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 	bzero(minor_votes, ANCHORS_NUMBER*sizeof(gene_vote_number_t));
 	bzero(minor_quality, ANCHORS_NUMBER*sizeof(gene_quality_score_t));
 	bzero(is_minor_breakeven, ANCHORS_NUMBER);
-
-	// k == 1 : current is read2
-	// k == 0 : current is read1
 	for (k=0; k<2; k++)
 	{
 		gene_vote_t * current_vote = k?vote_read2:vote_read1;
@@ -1257,30 +1381,22 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 
 						long long int abdist = current_vote->pos[i][j];
 						abdist -= anchors_position[l];
-						
-						if (abdist < 0)
-						{
+
+						if((anchor_read[l] && !is_negative_strand) ||
+						    ((!anchor_read[l]) && is_negative_strand))
 							abdist = -abdist;
-							abdist += (anchor_read[l]?read2_len:read1_len);
-						}
-						else
-							abdist += (anchor_read[l]?read1_len:read2_len);
+
+						if (abdist < 0)
+						//#warning WGSIM generates paired-end data in a wrong way; abdist is given its absolute value in such a case.
+							abdist = -abdist;
+						//	continue;
 
 						long long int abdist_old = minor_position[l];
 						abdist_old -=  anchors_position[l];
-
-						if(abdist_old <0)
-						{
-							abdist_old = -abdist_old;
-							abdist_old += (anchor_read[l]?read2_len:read1_len);
-						}
-						else
-							abdist_old += (anchor_read[l]?read1_len:read2_len);
-
-
+						if(abdist_old <0) abdist_old=-abdist_old;
 						if (	(minor_votes[l] < current_vote->votes[i][j] ||
 							(minor_votes[l] == current_vote->votes[i][j] && current_vote->quality [i][j] > minor_quality[l]) ||
-							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<1 && abdist < abdist_old))&& 
+							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<0.0001 && abdist < abdist_old))&& 
 							(abdist <= max_pair_dest) &&
 							(abdist >= min_pair_dest) 
 						   )
@@ -1297,24 +1413,17 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 
 	}
 
+	gene_vote_number_t selection_minor_vote = 0;
+	gene_vote_number_t selection_major_vote = 0;
+	gehash_data_t selection_minor_pos = 0;
+	gehash_data_t selection_major_pos = 0;
 
-	tmp_best_records_r1 = allvotes -> results+qid * 2 * allvotes -> multi_best_reads;
-	tmp_best_records_r2 = allvotes -> results+(qid * 2+1) * allvotes -> multi_best_reads;
-	unsigned int max_R1R2_total_votes = allvotes -> results[qid * 2 * allvotes -> multi_best_reads].vote_number + allvotes -> results [(qid * 2+1) * allvotes -> multi_best_reads].vote_number; 
-	unsigned int max_R1R2_total_quality = allvotes -> results[qid * 2 * allvotes -> multi_best_reads].read_quality + allvotes -> results [(qid * 2+1) * allvotes -> multi_best_reads].read_quality; 
-	long long int max_R1R2_dist = allvotes -> results[qid * 2 * allvotes -> multi_best_reads].read_pos;
-	max_R1R2_dist -= allvotes -> results[(qid * 2 +1)* allvotes -> multi_best_reads].read_pos;
-	if(max_R1R2_dist<0)max_R1R2_dist=0;
-	if(0 == (allvotes -> results[qid * 2 * allvotes -> multi_best_reads].masks & IS_PAIRED_MATCH))
-	{
-		max_R1R2_total_votes = 0;
-		max_R1R2_total_quality = 0;
-		max_R1R2_dist=0x7fffffff;
-	}
-	for(tmp_best_records_r1_number=0; tmp_best_records_r1_number<allvotes -> multi_best_reads; tmp_best_records_r1_number++)
-		if(tmp_best_records_r1[tmp_best_records_r1_number].vote_number == 0)break;
-	tmp_best_records_r2_number=tmp_best_records_r1_number;
-	
+	int selected_major_index=0, selected_major_bucket=0, selected_minor_bucket=0, selected_minor_index=0;
+
+	*sum_quality = 0;
+
+	unsigned char selection_major_read_no = 0;
+	//int reason = 0;
 
 	for (k=0; k<anchors; k++)
 	{
@@ -1322,122 +1431,66 @@ int select_positions(gene_allvote_t * allvotes, int qid, short current_masks, ge
 			continue;
 
 		int need_replace = 0;
-		int is_breakeven = 0;
-		long long int K_R1R2_dist = anchors_position[k];
-		K_R1R2_dist -= minor_position[k];
-		if(K_R1R2_dist<0)K_R1R2_dist=-K_R1R2_dist;
 
-		// need_replace and is_breakeven cannot be true at the same time.
 
-		if ((minor_votes[k]+anchors_votes[k]) > (max_R1R2_total_votes) ||
-	   	       ((minor_votes[k]+anchors_votes[k]) == (max_R1R2_total_votes) &&
-		 	 minor_quality[k] + anchors_quality[k] > max_R1R2_total_quality) ||
-			((minor_votes[k]+anchors_votes[k]) == (max_R1R2_total_votes) && minor_quality[k] + anchors_quality[k]==max_R1R2_total_quality&& K_R1R2_dist<max_R1R2_dist ))
+		if ((minor_votes[k]+anchors_votes[k]) > (selection_minor_vote+selection_major_vote) ||
+	   	       ((minor_votes[k]+anchors_votes[k]) == (selection_minor_vote+selection_major_vote) &&
+		 	 minor_quality[k] + anchors_quality[k] > *sum_quality))
 		{
 			need_replace = 1;
 		}
-		else if (minor_votes[k]+anchors_votes[k] == max_R1R2_total_votes &&
-		 	 minor_quality[k] + anchors_quality[k] == max_R1R2_total_quality && (K_R1R2_dist== max_R1R2_dist))
+		else if (minor_votes[k]+anchors_votes[k] == selection_minor_vote+selection_major_vote &&
+		 	 minor_quality[k] + anchors_quality[k] == *sum_quality)
 		{
-			int is_pos1_used = 0, is_pos2_used = 0;
-			int xk1;
-
-			for(xk1=0; xk1<tmp_best_records_r1_number; xk1++)
+			if (selection_minor_pos != minor_position[k] && minor_position[k] != selection_major_pos)
 			{
-				if(minor_position[k] == tmp_best_records_r1[xk1].read_pos || anchors_position[k] == tmp_best_records_r1[xk1].read_pos )
-					is_pos1_used = 1;
-				if(minor_position[k] == tmp_best_records_r2[xk1].read_pos || anchors_position[k] == tmp_best_records_r2[xk1].read_pos )
-					is_pos2_used = 1;
+				* is_breakeven = 1;
+				if (selection_major_pos >  anchors_position[k]) need_replace = 1;
 			}
-			if (!(is_pos1_used && is_pos2_used))
-				is_breakeven = 1;
 		}
 
-		if(need_replace || is_breakeven)
-		{
-			if(need_replace || (allvotes->multi_best_reads==1 &&  anchors_position[k] < tmp_best_records_r1[0].read_pos ))
-			{
-				tmp_best_records_r1_number=0;
-				tmp_best_records_r2_number=0;
-			}
-
-			if(tmp_best_records_r1_number < allvotes->multi_best_reads-1)
-				tmp_best_records_r1[tmp_best_records_r1_number+1].vote_number = 0;
-			if(tmp_best_records_r1_number < allvotes->multi_best_reads-1)
-				tmp_best_records_r2[tmp_best_records_r2_number+1].vote_number = 0;
-
-			max_R1R2_total_votes = minor_votes[k] + anchors_votes[k];
-			max_R1R2_total_quality = minor_quality[k] + anchors_quality[k];
-			max_R1R2_dist = K_R1R2_dist;
-
-			if(tmp_best_records_r1_number<allvotes->multi_best_reads)
-			{
-				tmp_best_records_r1[tmp_best_records_r1_number].is_negative_strand = is_negative_strand;
-				tmp_best_records_r2[tmp_best_records_r2_number].is_negative_strand = is_negative_strand;
-
-				long long int offset_indel_rec1 = (qid * 2   + tmp_best_records_r1_number) * allvotes -> multi_best_reads;
-				offset_indel_rec1 *= allvotes -> indel_recorder_length;
-				long long int offset_indel_rec2 = ((qid*2+1) + tmp_best_records_r2_number) * allvotes -> multi_best_reads;
-				offset_indel_rec2 *= allvotes -> indel_recorder_length;
-
-				if(anchor_read[k])	// major is on read 2 
-				{
-					tmp_best_records_r1[tmp_best_records_r1_number].read_pos = minor_position[k];
-					tmp_best_records_r2[tmp_best_records_r2_number].read_pos = anchors_position[k];
-					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec1, vote_read1 -> indel_recorder[minor_buckets[k]][minor_index[k]]);
-					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec2, vote_read2 -> indel_recorder[anchors_buckets[k]][anchors_index[k]]);
-					tmp_best_records_r1[tmp_best_records_r1_number].vote_number = minor_votes[k];
-					tmp_best_records_r2[tmp_best_records_r2_number].vote_number = anchors_votes[k];
-					tmp_best_records_r1[tmp_best_records_r1_number].coverage_start = vote_read1 -> coverage_start[minor_buckets[k]][minor_index[k]];
-					tmp_best_records_r2[tmp_best_records_r2_number].coverage_start = vote_read2 -> coverage_start[anchors_buckets[k]][anchors_index[k]];
-					tmp_best_records_r1[tmp_best_records_r1_number].coverage_end = vote_read1 -> coverage_end[minor_buckets[k]][minor_index[k]];
-					tmp_best_records_r2[tmp_best_records_r2_number].coverage_end = vote_read2 -> coverage_end[anchors_buckets[k]][anchors_index[k]];
-					tmp_best_records_r1[tmp_best_records_r1_number].read_quality = minor_quality[k];
-					tmp_best_records_r2[tmp_best_records_r2_number].read_quality = anchors_quality[k];
-
-					tmp_best_records_r1[tmp_best_records_r1_number].masks = (~IS_BREAKEVEN_READ) &(vote_read1 -> masks[minor_buckets[k]][minor_index[k]] | current_masks| IS_PAIRED_MATCH);
-					tmp_best_records_r2[tmp_best_records_r2_number].masks = (~IS_BREAKEVEN_READ) &(vote_read2 -> masks[anchors_buckets[k]][anchors_index[k]] | current_masks| IS_PAIRED_MATCH);
-				}
-				else
-				{
-					tmp_best_records_r1[tmp_best_records_r1_number].read_pos = anchors_position[k];
-					tmp_best_records_r2[tmp_best_records_r2_number].read_pos = minor_position[k];
-					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec1, vote_read1 -> indel_recorder[anchors_buckets[k]][anchors_index[k]]);
-					indel_recorder_copy(allvotes->all_indel_recorder+offset_indel_rec2, vote_read2 -> indel_recorder[minor_buckets[k]][minor_index[k]]);
-					tmp_best_records_r1[tmp_best_records_r1_number].vote_number = anchors_votes[k];
-					tmp_best_records_r2[tmp_best_records_r2_number].vote_number = minor_votes[k];
-					tmp_best_records_r1[tmp_best_records_r1_number].coverage_start = vote_read1 -> coverage_start[anchors_buckets[k]][anchors_index[k]];
-					tmp_best_records_r2[tmp_best_records_r2_number].coverage_start = vote_read2 -> coverage_start[minor_buckets[k]][minor_index[k]];
-					tmp_best_records_r1[tmp_best_records_r1_number].coverage_end = vote_read1 -> coverage_end[anchors_buckets[k]][anchors_index[k]];
-					tmp_best_records_r2[tmp_best_records_r2_number].coverage_end = vote_read2 -> coverage_end[minor_buckets[k]][minor_index[k]];
-					tmp_best_records_r1[tmp_best_records_r1_number].read_quality = anchors_quality[k];
-					tmp_best_records_r2[tmp_best_records_r2_number].read_quality = minor_quality[k];
-
-					tmp_best_records_r1[tmp_best_records_r1_number].masks = (~IS_BREAKEVEN_READ) &(vote_read1 -> masks[anchors_buckets[k]][anchors_index[k]]| current_masks| IS_PAIRED_MATCH);
-					tmp_best_records_r2[tmp_best_records_r2_number].masks = (~IS_BREAKEVEN_READ) &(vote_read2 -> masks[minor_buckets[k]][minor_index[k]]| current_masks | IS_PAIRED_MATCH);
-				}
-				ret = 1;
-			}
-			if(is_breakeven)
-			{
-				tmp_best_records_r1[0].masks |= IS_BREAKEVEN_READ;
-		 		tmp_best_records_r2[0].masks |= IS_BREAKEVEN_READ;
-				if(tmp_best_records_r1_number<allvotes->multi_best_reads)
-				{
-					tmp_best_records_r1[tmp_best_records_r1_number].masks |= IS_BREAKEVEN_READ;
-		 			tmp_best_records_r2[tmp_best_records_r2_number].masks |= IS_BREAKEVEN_READ;
-				}
-			}
-			tmp_best_records_r1_number++;
-			tmp_best_records_r2_number++;
-			if(tmp_best_records_r1_number<allvotes->multi_best_reads)
-			{
-				tmp_best_records_r1[tmp_best_records_r1_number].vote_number =0;
-				tmp_best_records_r2[tmp_best_records_r2_number].vote_number =0;
-			}
+		if(need_replace){
+			selection_minor_pos = minor_position[k];
+			selection_major_pos = anchors_position[k];
+			selection_minor_vote = minor_votes[k];
+			selection_major_vote = anchors_votes[k];
+			selection_major_read_no = anchor_read[k];
+			selected_major_bucket = anchors_buckets[k];
+			selected_minor_bucket = minor_buckets[k];
+			selected_major_index = anchors_index[k];
+			selected_minor_index = minor_index[k];
+			* is_breakeven = is_minor_breakeven[k];
+			* qual_r1 = anchor_read[k] ? minor_quality[k]:anchors_quality[k];
+			* qual_r2 = anchor_read[k] ? anchors_quality[k]: minor_quality[k];
+			* sum_quality = minor_quality[k] + anchors_quality[k];
+	
 		}
 	}
-	return ret;
+
+	if(selection_minor_vote > 0)
+	{
+		if(selection_major_read_no)	// major is on read 2
+		{
+			*numvote_read1 = selection_minor_vote;
+			*numvote_read2 = selection_major_vote;
+			*pos_read1 = selection_minor_pos;
+			*pos_read2 = selection_major_pos ;
+			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
+			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_major_bucket][selected_major_index]);
+		}
+		else
+		{
+			*numvote_read1 = selection_major_vote;
+			*numvote_read2 = selection_minor_vote;
+			*pos_read1 = selection_major_pos;
+			*pos_read2 = selection_minor_pos;
+			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_major_bucket][selected_major_index]);
+			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
+		}
+		return 1;
+	}
+
+	return 0;
 }
 
 void destroy_offsets(gene_offset_t* offsets)
@@ -1464,13 +1517,15 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	}
 
 	int current_max_n = 100;
-	offsets->read_names = malloc(current_max_n * MAX_CHROMOSOME_NAME_LEN);
-	offsets->read_offsets = malloc(current_max_n * sizeof(int));
+	offsets->read_names = malloc(current_max_n * MAX_READ_NAME_LEN);
+	offsets->read_offsets= malloc(current_max_n * sizeof(int));
 	offsets->read_name_to_index = HashTableCreate(5000);
 
 	HashTableSetKeyComparisonFunction(offsets->read_name_to_index, my_strcmp);
 	HashTableSetHashFunction(offsets->read_name_to_index ,HashTableStringHashFunction);
 	HashTableSetDeallocationFunctions(offsets->read_name_to_index ,free, NULL);
+
+
 
 	while (!feof(fp))
 	{
@@ -1490,8 +1545,8 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 			{
 				if(j<MAX_CHROMOSOME_NAME_LEN-1)
 				{
-					*(offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN + (j++)) = fn[i];
-					*(offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN + j) =0;
+					*(offsets->read_names+MAX_CHROMOSOME_NAME_LEN*n + (j++)) = fn[i];
+					*(offsets->read_names+MAX_CHROMOSOME_NAME_LEN*n + j) = 0;
 				}
 			}
 			i++;
@@ -1500,7 +1555,11 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 		char * read_name_mem = malloc(MAX_CHROMOSOME_NAME_LEN);
 		strcpy(read_name_mem, offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN);
 
+
+		//printf("PUT OFFSET: %s,%u\n", read_name_mem , n);
 		HashTablePut(offsets->read_name_to_index, read_name_mem , NULL + 1 + n);
+	
+
 		n++;
 		if(n >= current_max_n)
 		{
@@ -1508,6 +1567,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 			offsets->read_offsets = realloc(offsets->read_offsets, 2*current_max_n * sizeof(int));
 			current_max_n*=2;
 		}
+
 
 		offsets->read_offsets[n] = 0;
 
@@ -1518,30 +1578,27 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	return 0;
 }
 
-
 double miltime(){
-        double ret;
-        #ifdef FREEBSD
-        struct timeval tp;
-        struct timezone tz;
-        tz.tz_minuteswest=0;
-        tz.tz_dsttime=0;
+	double ret;
+	#ifdef FREEBSD
+	struct timeval tp;
+	struct timezone tz;
+	tz.tz_minuteswest=0;
+	tz.tz_dsttime=0;
 
-        gettimeofday(&tp,&tz);
+	gettimeofday(&tp,&tz);
 
-        ret = tp.tv_sec+ 0.001*0.001* tp.tv_usec;
+	ret = tp.tv_sec+ 0.001*0.001* tp.tv_usec; 
 
-        #else
+	#else
 
-        struct timeb trp;
-        ftime(&trp);
-        ret = trp.time*1.0+(trp.millitm*1.0/1000.0);
-        #endif
+	struct timeb trp;
+	ftime(&trp);
+	ret = trp.time*1.0+(trp.millitm*1.0/1000.0);
+	#endif
 
-        return ret;
+	return ret;
 }
-
-
 
 #define front2(str, bias)	(*((str)+(bias))+*((str)+1+(bias)))
 #define front4(str, bias)	(front2(str, bias)+front2(str, bias+2))
@@ -1623,93 +1680,36 @@ float match_read(const char read_str[], int read_len, unsigned int potential_pos
 	return  ret;
 }
 
-void final_matchingness_scoring(int use_base_scoring , const char read_str[], const char quality_str[], unsigned char is_negative_strand, int read_len, gene_vote_t * vote, unsigned short current_masks, gene_allvote_t * allvotes, unsigned  int qid, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, int total_subreads)
+
+void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, char * max_indel_recorder, int * max_coverage_start, int * max_coverage_end)
 {
-	int i, j, xk3;
-	int max_matching = -1;
+	int i, j;
+	gene_quality_score_t max_matching = -1.0;
 
-	int current_max_vote = allvotes -> results[qid * allvotes -> multi_best_reads + 0].vote_number;
+	*max_vote = vote -> max_vote; 
 
-	gene_quality_score_t old_max_quality = allvotes -> results[qid * allvotes -> multi_best_reads + 0].read_quality;
-	max_matching = old_max_quality;
-
-	voting_result_t *tmp_best_records = allvotes -> results + qid * allvotes -> multi_best_reads;
-	int tmp_best_records_number = 0, current_max_coverage = allvotes -> results[qid * allvotes -> multi_best_reads + 0].coverage_end - allvotes -> results[qid * allvotes -> multi_best_reads + 0].coverage_start;
-
-	for(tmp_best_records_number=0;tmp_best_records_number<qid * allvotes -> multi_best_reads; tmp_best_records_number++)
-		if(tmp_best_records[tmp_best_records_number].vote_number == 0)break;
-
-
-	for(i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< vote->items[i]; j++)
 		{
-			if( vote->votes[i][j]  < current_max_vote) continue;
-			int vote_ij_coverage = vote -> coverage_end[i][j] - vote-> coverage_start[i][j];
+			if( vote->votes[i][j]  < vote -> max_vote -1 ) continue;
+
 			unsigned int potential_position = vote -> pos[i][j];
-			int matchingness_count;
-
-			if(use_base_scoring) matchingness_count = match_chro_indel((char *)read_str, my_array_index, potential_position, read_len, 0, space_type, indel_tolerance, vote -> indel_recorder[i][j], total_subreads);
-			else		     matchingness_count = vote -> quality[i][j]; 
-
-			if((vote->votes[i][j] > current_max_vote) ||
-			   (vote->votes[i][j] == current_max_vote && vote_ij_coverage > current_max_coverage)||
-			   (vote->votes[i][j] == current_max_vote && matchingness_count > max_matching && vote_ij_coverage == current_max_coverage))
+			gene_quality_score_t matchingness_count = 1.*match_chro_indel((char *)read_str, my_array_index, potential_position, read_len, 0, space_type, indel_tolerance, NULL, 0);
+			if(matchingness_count > max_matching)
 			{
 				max_matching = matchingness_count;
-				current_max_coverage = vote_ij_coverage;
+				*max_position = potential_position;
+				*max_mask = vote -> masks[i][j];
+				*max_coverage_start = vote-> coverage_start[i][j];
+				*max_coverage_end = vote -> coverage_end[i][j];
+				indel_recorder_copy(max_indel_recorder, vote-> indel_recorder[i][j]);
 
-				current_max_vote = vote->votes[i][j];
-
-				long long int indel_rec_offset = 0+allvotes -> multi_best_reads*qid;
-				indel_rec_offset *= allvotes -> indel_recorder_length;
-
-				tmp_best_records_number = 1;
-				tmp_best_records[0].read_pos = potential_position;
-				tmp_best_records[0].vote_number = current_max_vote;
-				tmp_best_records[0].is_negative_strand = is_negative_strand; 
-				tmp_best_records[0].read_quality = max_matching;
-				tmp_best_records[0].masks= vote-> masks[i][j] | current_masks;
-				tmp_best_records[0].coverage_start = vote-> coverage_start[i][j];
-				tmp_best_records[0].coverage_end = vote -> coverage_end[i][j];
-				indel_recorder_copy(allvotes -> all_indel_recorder+indel_rec_offset, vote-> indel_recorder[i][j]);
-
-				for(xk3 = 1; xk3 < allvotes -> multi_best_reads; xk3++) tmp_best_records[xk3].vote_number = 0;
+				* max_quality = max_matching;
 			}
-			else if (vote->votes[i][j] == current_max_vote && matchingness_count == max_matching && vote_ij_coverage == current_max_coverage)
+			else if (matchingness_count == max_matching)
 			{
-				tmp_best_records[0].masks |= IS_BREAKEVEN_READ;
-				if(tmp_best_records_number >=  allvotes -> multi_best_reads){
-					if(tmp_best_records[0].read_pos  >  potential_position)
-					{
-						tmp_best_records[0].read_pos = potential_position;
-						tmp_best_records[0].vote_number = current_max_vote;
-						tmp_best_records[0].is_negative_strand = is_negative_strand; 
-						tmp_best_records[0].read_quality = max_matching;
-						tmp_best_records[0].masks= vote-> masks[i][j] |IS_BREAKEVEN_READ| current_masks;
-						tmp_best_records[0].coverage_start = vote-> coverage_start[i][j];
-						tmp_best_records[0].coverage_end = vote -> coverage_end[i][j];
-						long long int indel_rec_offset = 0+allvotes -> multi_best_reads*qid;
-						indel_rec_offset *= allvotes -> indel_recorder_length;
-						indel_recorder_copy(allvotes -> all_indel_recorder+indel_rec_offset, vote-> indel_recorder[i][j]);
-					}
-				}
-				else
-				{
-					tmp_best_records[tmp_best_records_number].read_pos = potential_position;
-					tmp_best_records[tmp_best_records_number].vote_number = current_max_vote;
-					tmp_best_records[tmp_best_records_number].read_quality = max_matching;
-					tmp_best_records[tmp_best_records_number].is_negative_strand = is_negative_strand; 
-					tmp_best_records[tmp_best_records_number].masks= vote-> masks[i][j]| IS_BREAKEVEN_READ | current_masks;
-					tmp_best_records[tmp_best_records_number].coverage_start = vote-> coverage_start[i][j];
-					tmp_best_records[tmp_best_records_number].coverage_end = vote -> coverage_end[i][j];
-					long long int indel_rec_offset = tmp_best_records_number+allvotes -> multi_best_reads*qid;
-					indel_rec_offset *= allvotes -> indel_recorder_length;
-					indel_recorder_copy(allvotes -> all_indel_recorder+indel_rec_offset, vote-> indel_recorder[i][j]);
-
-					tmp_best_records_number ++;
-
-					for(xk3 = tmp_best_records_number; xk3 < allvotes -> multi_best_reads; xk3++) tmp_best_records[xk3].vote_number = 0;
-				}
+//				SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position, vote -> pos[i][j]);
+				(*max_mask) |= IS_BREAKEVEN_READ ;
 			}
 		}
 }
@@ -1725,6 +1725,8 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 {
 
 	if (1499 - out_pos > (read_len <<2) || (*all_steps) > 3000 + (read_len << 3) || (*all_steps) > 33000){
+		/*ddprintf("\nTOO MANY STEPS: rl = %d    len=%d    steps=%d\n", read_len, 1499 - out_pos, *all_steps);
+		ddfflush(stdout) ;*/
 		return 0;
 	}
 	if(path_j < 0 || path_i < 0)
@@ -1770,12 +1772,16 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 	{
 		movement_buffer[out_pos] = 1;
 		(*all_steps) ++;
+		//ddprintf ("Path_i = %d ; Path_j = %d ; Offset = %d => 1\n", path_i, path_j, current_offset);
+		//ddfflush(stdout) ;
 		found =search_DP_branch (read, read_len, index, begin_position, path_i , path_j -1, table  , table_mask, max_indel, movement_buffer, expected_offset, left_score, out_pos -1, current_offset - ((path_i >= init_read_offset && path_i <= shutdown_read_offset)?1:0),  init_read_offset, shutdown_read_offset, all_steps); 
 	}
 	if ((!found )&& ( table_mask_i_1 || (current_score == 0 && table_mask2_i_1)))
 	{
 		movement_buffer[out_pos] = 2;
 		(*all_steps) ++;
+		//ddprintf ("Path_i = %d ; Path_j = %d ; Offset = %d => 2\n", path_i, path_j, current_offset);
+		//ddfflush(stdout) ;
 		found =search_DP_branch (read, read_len, index, begin_position, path_i -1 , path_j , table , table_mask , max_indel, movement_buffer, expected_offset, upper_score, out_pos -1, current_offset + ((path_i >= init_read_offset && path_i <= shutdown_read_offset)?1:0),  init_read_offset, shutdown_read_offset, all_steps); 
 	}
 	if((!found )&& (is_matched_ij + (upperleft_score - current_score) == 0))
@@ -1802,6 +1808,8 @@ int window_indel_align(char * read, int read_len, gene_value_index_t * index, un
 	memset(indel_windows,0, 32*sizeof(short));
 
 	windows_number = abs(expected_offset)+1;
+	//ddprintf ("\nWindow size = %d ; ExpOffset = %d\n", windows_number , expected_offset);
+	ddfflush(stdout) ;
 	for (i=0; i< read_len; i++)
 		for (j=0; j< windows_number; j++)
 		{
@@ -1912,7 +1920,7 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 	#ifdef indel_debug
 	int ii, jj;
 	for(ii = 0; ii<read_len - expected_offset; ii++)
-		SUBREADputchar(gvindex_get(index, begin_position + ii));
+		putchar(gvindex_get(index, begin_position + ii));
 
 	SUBREADprintf ("\n%s\n", read);
 	#endif
@@ -1926,7 +1934,7 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 			{
 				table[i][j]=-9999;
 			#ifdef indel_debug
-				SUBREADputchar('\t');
+				putchar('\t');
 			#endif
 				continue;
 			}
@@ -1946,7 +1954,7 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 
 			short from_upperleft;
 			if (i>0 && j>0) from_upperleft = table[i-1][j-1] + is_matched_ij;
-			else            from_upperleft = is_matched_ij; 
+			else	    from_upperleft = is_matched_ij; 
 			if ((i ==0 || j ==0) && (i+j>0)) from_upperleft += DPALIGN_CREATEGAP_PENALTY;
 
 			if (from_upperleft <=from_left || from_upperleft <= from_upper)
@@ -2005,16 +2013,16 @@ int dynamic_align(char * read, int read_len, gene_value_index_t * index, unsigne
 
 }
 
-int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int req_match_5end , int req_match_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_txt, int qual_format)
+int extend_covered_region(gene_value_index_t *array_index, unsigned int read_start_pos, char * read, int read_len, int cover_start, int cover_end, int window_size, int req_match_5end , int req_match_3end, int indel_tolerance, int space_type, int tail_indel, short * head_indel_pos, int * head_indel_movement, short * tail_indel_pos, int * tail_indel_movement, int is_head_high_quality, char * qual_txt, int qual_format, float head_matching_rate, float tail_matching_rate)
 {
 	int ret = 0;
 	*head_indel_pos = -1;
 	*tail_indel_pos = -1;
-	if (cover_start >= window_size && EXON_INDEL_MATCHING_RATE_HEAD < 1.0001) 
+	if (cover_start >= window_size && head_matching_rate < 1.0001) 
 	{
 		int head_test_len =  cover_start;
 		int roughly_mapped = match_chro(read, array_index, read_start_pos, head_test_len , 0, space_type);
-		if (roughly_mapped >= head_test_len  * EXON_RECOVER_MATCHING_RATE - 0.0001)
+		if (roughly_mapped >= head_test_len  * CORE_RECOVER_MATCHING_RATE - 0.0001)
 		{
 			ret |= 1;
 		}
@@ -2035,7 +2043,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 				else
 				{
 					roughly_mapped = match_chro(read, array_index, read_start_pos, window_end_pos - right_match_number , 0, space_type);
-					if (roughly_mapped < (int)(0.5+ (window_end_pos - right_match_number)  * EXON_RECOVER_MATCHING_RATE))
+					if (roughly_mapped < (int)(0.5+ (window_end_pos - right_match_number)  * CORE_RECOVER_MATCHING_RATE))
 					{
 						// the quality of this window is too low (at most 1 base is matched). I must consider if it is an indel.
 						int indel_movement_i ;
@@ -2056,7 +2064,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 							int test_start =0;// window_end_pos - max(0, indel_movement) -  right_match_number - test_length;
 
 							int matched_bases_after_indel = match_chro_support(read +test_start, array_index, read_start_pos + indel_movement +test_start, test_length,0, space_type, qual_txt, qual_format);
-							float test_rate = EXON_INDEL_MATCHING_RATE_HEAD;
+							float test_rate = head_matching_rate;
 							
 							if(test_length < 3) test_rate = 1;
 
@@ -2090,11 +2098,11 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 
 
 
-	if (cover_end <= read_len - window_size && EXON_INDEL_MATCHING_RATE_TAIL < 1.0001) 
+	if (cover_end <= read_len - window_size && tail_matching_rate < 1.0001) 
 	{
 		int tail_test_len = read_len - cover_end;
 		int roughly_mapped = match_chro(read + cover_end, array_index, read_start_pos + cover_end + tail_indel, tail_test_len , 0, space_type);
-		if (roughly_mapped >= tail_test_len  * EXON_RECOVER_MATCHING_RATE - 0.0001)
+		if (roughly_mapped >= tail_test_len  * CORE_RECOVER_MATCHING_RATE - 0.0001)
 		{
 			ret |= 2;
 		}
@@ -2116,7 +2124,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 				{
 					roughly_mapped = match_chro(read+window_start_pos + left_match_number, array_index, read_start_pos + window_start_pos + tail_indel + left_match_number, read_len - window_start_pos - left_match_number , 0, space_type);
 
-					if (roughly_mapped < (int)(0.5+(read_len - window_start_pos -left_match_number )  * EXON_RECOVER_MATCHING_RATE))
+					if (roughly_mapped < (int)(0.5+(read_len - window_start_pos -left_match_number )  * CORE_RECOVER_MATCHING_RATE))
 					{
 						// the quality of this window is too low (at most 1 base is matched). I must consider if it is an indel.
 						int indel_movement_i ;
@@ -2137,7 +2145,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 
 							int matched_bases_after_indel = match_chro_support(read + window_start_pos - min(0, indel_adjustment) + left_match_number, array_index, read_start_pos + window_start_pos  + max(0,indel_movement) +left_match_number , test_length,0, space_type, qual_txt +  window_start_pos - min(0, indel_adjustment) + left_match_number , qual_format);
 
-							float test_rate = EXON_INDEL_MATCHING_RATE_TAIL;
+							float test_rate = tail_matching_rate;
 							
 							if(test_length < 3) test_rate = 1;
 
@@ -2173,19 +2181,31 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 }
 
 
-
-
-float match_base_quality_edit(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch)
+float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int ql_kill)
 {
 	int i;
 	int ret =0;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
 		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+	//	exit(-1);
 		return 100;
 	}
 	for(i=0; i<read_len; i++)
 	{
-		char true_chr = gvindex_get(array_index, pos + i);
+		char true_chr;
+		if(is_negative)
+		{
+			true_chr = gvindex_get(array_index, pos + read_len - i - 1);
+			if(true_chr == 'A') true_chr = 'T';
+			else if(true_chr == 'G') true_chr = 'C';
+			else if(true_chr == 'C') true_chr = 'G';
+			else  true_chr = 'A';
+		}
+		else
+			true_chr = gvindex_get(array_index, pos + i);
+
+		//printf("%c vs %c\n", true_chr , read_txt[i]);
+
 		if (true_chr == read_txt[i])
 		{
 			if(!qual_txt)
@@ -2209,184 +2229,63 @@ float match_base_quality_edit(gene_value_index_t *array_index, char * read_txt, 
 					ql = get_base_error_prob64i(qual_txt[i]);
 				else
 					ql = get_base_error_prob33i(qual_txt[i]);
-				(*high_qual_unmatch)++;
-
-				ret += ql-1000000;
-			}
-		}
-	}
-	//printf ("SECTION QUAL = %.4f LEN = %d\n", ret, read_len);
-	return ret/1000000.;
-}
-
-
-
-
-
-float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch)
-{
-	int i;
-	int ret =0;
-	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
-		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
-		return 100;
-	}
-	for(i=0; i<read_len; i++)
-	{
-		char true_chr = gvindex_get(array_index, pos + i);
-		if (true_chr == read_txt[i])
-		{
-			if(!qual_txt)
-				ret += 1000000;
-			else if(FASTQ_PHRED64 == phred_version)
-				ret += (1000000-get_base_error_prob64i(qual_txt[i]));
-			else
-				ret += (1000000-get_base_error_prob33i(qual_txt[i]));
-		}
-		else
-		{
-			if(!qual_txt)
-			{
-				ret -= 1000000;
-				(*high_qual_unmatch)++;
-			}
-			else
-			{
-				int ql ;
-				if(FASTQ_PHRED64 == phred_version)
-					ql = get_base_error_prob64i(qual_txt[i]);
-				else
-					ql = get_base_error_prob33i(qual_txt[i]);
-                                #ifdef QUALITY_KILL
-                                        #if QUALITY_KILL > 196
-                                                #define QL_MIN 999000
-                                        #endif
-                                #endif
-        
-                                #ifndef QL_MIN
-                                        #define QL_MIN 200000
-                                #endif
-
-
-				if( ql < QL_MIN) (*high_qual_unmatch)++;
-
-				ret += ql-1000000;
-			}
-		}
-	}
-	//printf ("SECTION QUAL = %.4f LEN = %d\n", ret, read_len);
-	return ret/1000000.;
-}
-
-
-
-
-
-
-float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl, int apply_repeat_penalty)
-{
-	int cigar_cursor = 0;
-	int read_cursor = 0;
-	long long int chromosome_cursor = pos, x;
-	int cigar_length = strlen(cigar_txt);
-	int ret = 0;
-
-	x= 0;
-	while(cigar_cursor < cigar_length)
-	{
-		if(cigar_txt[cigar_cursor] =='X')
-		{
-			cigar_cursor++;
-			continue;
-		}
-		if(cigar_txt[cigar_cursor]>='0' && cigar_txt[cigar_cursor]<='9')
-			x = x*10+ (cigar_txt[cigar_cursor]-'0');
-		else
-		{
-			if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S') 
-			{
-				float nret = match_base_quality(array_index, read_txt + read_cursor, chromosome_cursor , (qual_txt && qual_txt[0])?qual_txt + read_cursor:NULL, x, phred_version, mismatch);
-				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
-
-				ret += (int)(nret*1000000);
-			
-				if(apply_repeat_penalty && x<10) ret -= 19999999;
-				chromosome_cursor +=x;
-				read_cursor +=x;
-			}
-			else if(cigar_txt[cigar_cursor] == 'I')
-			{
-				read_cursor +=x;
-				
-				if(apply_repeat_penalty)
-					ret -= 19999999;
-			}
-			else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N')
-			{
-				chromosome_cursor +=x;
-				if(apply_repeat_penalty && cigar_txt[cigar_cursor] == 'D' )
-					ret -= 19999999;
-			}
-			else if(cigar_txt[cigar_cursor] == 'B')
-				chromosome_cursor -=x;
-
-			x= 0;
-		}
-		cigar_cursor++;
-	}
-	if(read_cursor != rl)
-	{
-		*mismatch = 9999;
-		return 0.;
-	}
-	//printf("S=%.5f, LEN=%d\n", ret , read_cursor);
-	return max(min(200,(ret/10000.) / read_cursor+100.),1);
-}
-
-
-
-
-
-
-
-float final_mapping_quality_edit(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl)
-{
-	int cigar_cursor = 0;
-	int read_cursor = 0;
-	long long int chromosome_cursor = pos, x;
-	int cigar_length = strlen(cigar_txt);
-	int ret = 0;
-
-	x= 0;
-	while(cigar_cursor < cigar_length)
-	{
-		if(cigar_txt[cigar_cursor] =='X')
-		{
-			cigar_cursor++;
-			continue;
-		}
-		if(cigar_txt[cigar_cursor]>='0' && cigar_txt[cigar_cursor]<='9')
-			x = x*10+ (cigar_txt[cigar_cursor]-'0');
-		else
-		{
-			if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S') 
-			{
-				float nret = match_base_quality_edit(array_index, read_txt + read_cursor, chromosome_cursor , (qual_txt && qual_txt[0])?qual_txt + read_cursor:NULL, x, phred_version, mismatch);
-				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
-
-				ret += (int)(nret*1000000);
-				if(x < 10) ret -= 40000001;
-				chromosome_cursor +=x;
-				read_cursor +=x;
-			}
-			else if(cigar_txt[cigar_cursor] == 'I')
-			{
-				(*mismatch)+=x;
-				read_cursor +=x;
 				/*
+				#ifdef QUALITY_KILL
+					#if QUALITY_KILL > 196
+						#define QL_MIN 999000
+					#endif
+				#endif
+	
+				#ifndef QL_MIN
+					#define QL_MIN 200000
+				#endif*/
+
+				if( ql < ql_kill) (*high_qual_unmatch)++;
+
+				ret += ql-1000000;
+			}
+		}
+	}
+	//printf ("SECTION QUAL = %d LEN = %d\n", ret, read_len);
+	return ret/1000000.;
+}
+
+float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, char * read_txt, char * qual_txt, char * cigar_txt, int phred_version, int * mismatch, int rl, char * refined_cigar, unsigned int * new_pos)
+{
+	int cigar_cursor = 0;
+	int read_cursor = 0;
+	long long int chromosome_cursor = pos, x;
+	int cigar_length = strlen(cigar_txt);
+	int i;
+	int ret = 0;
+
+	x= 0;
+	while(cigar_cursor < cigar_length)
+	{
+		if(cigar_txt[cigar_cursor] =='X')
+		{
+			cigar_cursor++;
+			continue;
+		}
+		if(cigar_txt[cigar_cursor]>='0' && cigar_txt[cigar_cursor]<='9')
+			x = x*10+ (cigar_txt[cigar_cursor]-'0');
+		else
+		{
+			if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S') 
+			{
+				float nret = match_base_quality(array_index, read_txt + read_cursor, chromosome_cursor , (qual_txt && qual_txt[0])?qual_txt + read_cursor:NULL, x, 0, phred_version, mismatch, 200000);
+				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
+
+				ret += (int)(nret*1000000);
+				chromosome_cursor +=x;
+				read_cursor +=x;
+			}
+			else if(cigar_txt[cigar_cursor] == 'I')
+			{
 				if(!qual_txt)
 				{
 					ret += x*1000000;
+					read_cursor +=x;
 				}
 				else if(FASTQ_PHRED64 == phred_version)
 				{
@@ -2404,18 +2303,10 @@ float final_mapping_quality_edit(gene_value_index_t *array_index, unsigned int p
 						ret += (1000000-get_base_error_prob33i(qchar));
 					}
 				}
-				*/
-				ret -= 20000001;
 			}
-			else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N')
-			{
-				if(cigar_txt[cigar_cursor] == 'D'){
-					(*mismatch)+=x;
-					ret -= 20000001;
-				}
+			else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N'|| cigar_txt[cigar_cursor] == 'j' || cigar_txt[cigar_cursor] == 'J')
 				chromosome_cursor +=x;
-			}
-			else if(cigar_txt[cigar_cursor] == 'B')
+			else if(cigar_txt[cigar_cursor] == 'B' || cigar_txt[cigar_cursor] == 'b')
 				chromosome_cursor -=x;
 
 			x= 0;
@@ -2428,7 +2319,162 @@ float final_mapping_quality_edit(gene_value_index_t *array_index, unsigned int p
 		return 0.;
 	}
 	//printf("S=%.5f, LEN=%d\n", ret , read_cursor);
-	return max(1., (ret/10000.) / read_cursor+100.);
+
+	float match_rate = (ret/10000.) / read_cursor+100.;
+
+	if(refined_cigar && match_rate < 190)
+	{
+		char read_data[1250];
+		chromosome_cursor = pos;
+		read_cursor = 0;
+		cigar_cursor = 0;
+		x=0;
+
+		while(cigar_cursor < cigar_length)
+		{
+			if(cigar_txt[cigar_cursor] =='X')
+			{
+				cigar_cursor++;
+				continue;
+			}
+			if(cigar_txt[cigar_cursor]>='0' && cigar_txt[cigar_cursor]<='9')
+				x = x*10+ (cigar_txt[cigar_cursor]-'0');
+			else
+			{
+				if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S') 
+				{
+					gvindex_get_string(read_data + read_cursor  ,  array_index ,  chromosome_cursor , x , 0);
+					chromosome_cursor +=x;
+					read_cursor +=x;
+				}
+				else if(cigar_txt[cigar_cursor] == 'I')
+				{
+					int xk;
+					for(xk=read_cursor;xk<read_cursor+x; xk++)
+						read_data[cigar_cursor] = 'I';
+					read_cursor +=x;
+				}
+				else if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N'|| cigar_txt[cigar_cursor] == 'j' || cigar_txt[cigar_cursor] == 'J')
+					chromosome_cursor +=x;
+				else if(cigar_txt[cigar_cursor] == 'B' || cigar_txt[cigar_cursor] == 'b')
+					chromosome_cursor -=x;
+
+				x= 0;
+			}
+			cigar_cursor++;
+		}
+		
+		int window_matched = 0;
+		int is_match_begin = 0;
+		int last_confirmed_read_pos = 99999;
+		int REFINE_WINDOW_SIZE = 10;
+		for(read_cursor = - REFINE_WINDOW_SIZE; read_cursor < rl - REFINE_WINDOW_SIZE; read_cursor++)
+		{
+
+//			printf("MMM %c =?= %c\n", read_txt[read_cursor+REFINE_WINDOW_SIZE] , read_data[read_cursor+REFINE_WINDOW_SIZE]);
+			window_matched += (read_txt[read_cursor+REFINE_WINDOW_SIZE] == read_data[read_cursor+REFINE_WINDOW_SIZE] || read_txt[read_cursor+REFINE_WINDOW_SIZE] =='I');
+			if(read_cursor>=0)
+			{
+				if(window_matched >= REFINE_WINDOW_SIZE -1)
+					if(read_txt[read_cursor+REFINE_WINDOW_SIZE] == read_data[read_cursor+REFINE_WINDOW_SIZE])
+						last_confirmed_read_pos = read_cursor+REFINE_WINDOW_SIZE+1;
+				window_matched -= (read_txt[read_cursor] == read_data[read_cursor] || read_txt[read_cursor] == 'I');
+			}
+		} 
+
+
+		window_matched = 0;
+		is_match_begin = 0;
+		int first_confirmed_read_pos = 99999;
+		for(read_cursor = rl -1 ; read_cursor >=0 ; read_cursor--)
+		{
+
+			window_matched += (read_txt[read_cursor] == read_data[read_cursor]|| read_txt[read_cursor] == 'I');
+			if(read_cursor <= rl- REFINE_WINDOW_SIZE - 1)
+			{
+				if(window_matched >= REFINE_WINDOW_SIZE -1)
+					if(read_txt[read_cursor] == read_data[read_cursor])
+						first_confirmed_read_pos = read_cursor;
+				window_matched -= (read_txt[read_cursor+REFINE_WINDOW_SIZE] == read_data[read_cursor+REFINE_WINDOW_SIZE] || read_txt[read_cursor + REFINE_WINDOW_SIZE] == 'I');
+			}
+		} 
+	
+
+		cigar_cursor = 0;
+		read_cursor = 0;
+		refined_cigar[0]=0;
+		x=0;
+		int begin_copy  =0;
+		chromosome_cursor = pos;
+
+		if(first_confirmed_read_pos<99990 && last_confirmed_read_pos<99990)
+		{
+			if(first_confirmed_read_pos>0)
+				sprintf(refined_cigar,"%dS",first_confirmed_read_pos);
+			while(cigar_cursor < cigar_length)
+			{
+				if(cigar_txt[cigar_cursor] =='X')
+				{
+					cigar_cursor++;
+					continue;
+				}
+				if(cigar_txt[cigar_cursor]>='0' && cigar_txt[cigar_cursor]<='9')
+					x = x*10+ (cigar_txt[cigar_cursor]-'0');
+				else
+				{
+					if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S' || cigar_txt[cigar_cursor] == 'I') 
+					{
+						int out_len = 0;
+						if(read_cursor < first_confirmed_read_pos && read_cursor + x >= first_confirmed_read_pos)
+							out_len = read_cursor + x - first_confirmed_read_pos;
+						else if(first_confirmed_read_pos <= read_cursor)
+							out_len = x;
+
+						if(out_len)
+						{
+							if(!begin_copy)
+								*new_pos = chromosome_cursor - read_cursor; 
+							if(read_cursor >= last_confirmed_read_pos) out_len=0;
+							else if(read_cursor < last_confirmed_read_pos && read_cursor +x>last_confirmed_read_pos)
+								out_len -= (read_cursor +x - last_confirmed_read_pos);
+						}
+
+						if(out_len)
+						{
+							sprintf(refined_cigar+strlen(refined_cigar), "%d%c", out_len, cigar_txt[cigar_cursor]);
+							begin_copy=1;
+						}
+						if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S')
+							chromosome_cursor +=x;
+
+						read_cursor +=x;
+						if(read_cursor >= last_confirmed_read_pos) break;
+					}
+					else
+					{
+						if(begin_copy)
+							sprintf(refined_cigar+strlen(refined_cigar), "%lld%c", x, cigar_txt[cigar_cursor]);
+
+						if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N'|| cigar_txt[cigar_cursor] == 'j' || cigar_txt[cigar_cursor] == 'J')
+							chromosome_cursor +=x;
+						else if(cigar_txt[cigar_cursor] == 'B' || cigar_txt[cigar_cursor] == 'b')
+							chromosome_cursor -=x;
+
+
+					} 
+
+					x= 0;
+				}
+				cigar_cursor++;
+			}
+			if(last_confirmed_read_pos<=rl-1)
+				sprintf(refined_cigar+strlen(refined_cigar),"%dS",rl-last_confirmed_read_pos);
+		}
+		else if(new_pos)*new_pos=pos;
+	} 
+	else if(new_pos)*new_pos=pos;
+
+	return match_rate;
 }
 
 
@@ -2447,10 +2493,10 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 
 	SUBREADprintf("Max votes = %d , Position is %s,%u\n", vote->max_vote, chrname, chrpos );
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
-                for(j=0; j< vote->items[i]; j++)
-                {
+		for(j=0; j< vote->items[i]; j++)
+		{
 			locate_gene_position(vote -> pos[i][j], &offsets, &chrname, &chrpos);
-			SUBREADprintf("\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) %s\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j], vote -> masks[i][j] & IS_NEGATIVE_STRAND?"NEG":"POS");
+			SUBREADprintf("\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) %s\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j], (vote -> masks[i][j] & IS_NEGATIVE_STRAND)?"NEG":"POS");
 		}
 	
 
@@ -2476,214 +2522,115 @@ static int PROB_QUAL_INT_TABLE[] = { 1000000 , 794328 , 630957 , 501187 , 398107
 
 int get_base_error_prob33i(char v)
 {
-        return PROB_QUAL_INT_TABLE[v-'!'];
+	return PROB_QUAL_INT_TABLE[v-'!'];
 }
 int get_base_error_prob64i(char v)
 {
-        return PROB_QUAL_INT_TABLE[v-'@'];
+	return PROB_QUAL_INT_TABLE[v-'@'];
 }
 
-
-
-
-
-int select_positions_exons(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1, gene_quality_score_t * qual_r2 , gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char * read2_indel_recorder, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, int number_of_anchors_quality, int max_indel_len, int * is_breakeven, int read1_len, int read2_len)
+void reverse_cigar(char * cigar)
 {
-
-	int k, i, j, anchors = 0;
-	gehash_data_t anchors_position [ANCHORS_NUMBER];
-	unsigned char anchor_read [ANCHORS_NUMBER];
-
-	gene_vote_number_t anchor_votes = max(vote_read1->max_vote, vote_read2->max_vote);
-	gene_vote_number_t anchors_votes [ANCHORS_NUMBER];
-	gene_quality_score_t anchors_quality [ANCHORS_NUMBER];
-	int anchors_buckets [ANCHORS_NUMBER];
-	int anchors_index [ANCHORS_NUMBER];
-
-	gene_vote_number_t minor_votes [ANCHORS_NUMBER];
-	gene_quality_score_t minor_quality [ANCHORS_NUMBER];
-	gehash_data_t minor_position [ANCHORS_NUMBER];
-	int minor_buckets [ANCHORS_NUMBER];
-	int minor_index [ANCHORS_NUMBER];
-	char is_minor_breakeven [ANCHORS_NUMBER];
-
-	if(anchor_votes < min_major)
-		return 0;
-
-	for (k=0; k<2; k++)
+	int cigar_cursor = 0;
+	long long int tmpv=0;
+	char ncg[100];
+	ncg[0]=0;
+	while(cigar[cigar_cursor])
 	{
-		gene_vote_t * current_vote = k?vote_read2:vote_read1;
-		if (current_vote->max_vote < anchor_votes)
-			continue;
-
-		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
-			for(j=0; j< current_vote->items[i]; j++)
-			{
-				if(current_vote->votes[i][j] >= anchor_votes -            0)
-				{
-					anchors_position[anchors] = current_vote->pos[i][j];
-					anchors_votes   [anchors] = current_vote->votes[i][j];
-					anchors_quality [anchors] = current_vote->quality[i][j];
-					anchor_read	[anchors] = k;
-					anchors_buckets [anchors] = i;
-					anchors_index   [anchors] = j;
-
-					anchors++;
-
-					if(anchors >= ANCHORS_NUMBER)
-					{
-	//					SUBREADprintf("Abnormally too many anchors [%d, %d] %f\n", i, j, anchor_votes);
-						anchors --;
-					}
-				}
-			}
-
-	}
-
-	bzero(minor_votes, ANCHORS_NUMBER*sizeof(gene_vote_number_t));
-	bzero(minor_quality, ANCHORS_NUMBER*sizeof(gene_quality_score_t));
-	bzero(is_minor_breakeven, ANCHORS_NUMBER);
-	for (k=0; k<2; k++)
-	{
-		gene_vote_t * current_vote = k?vote_read2:vote_read1;
-		gene_vote_t * current_vote2 = k?vote_read1:vote_read2;
-
-		if (current_vote2->max_vote < anchor_votes)
-			continue;
-
-		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
-			for(j=0; j< current_vote->items[i]; j++)
-			{
-				if(current_vote->votes[i][j] >= min_minor)
-				{
-					int l;
-					for (l=0; l<anchors; l++)
-					{
-
-						if(anchor_read[l]==k)continue;
-
-						long long int abdist = current_vote->pos[i][j];
-						abdist -= anchors_position[l];
-
-	
-						if (abdist < 0)
-						{
-							abdist = -abdist;
-							abdist += (anchor_read[l]?read2_len:read1_len);
-						}
-						else
-							abdist += (anchor_read[l]?read1_len:read2_len);
-
-						long long int abdist_old = minor_position[l];
-						abdist_old -=  anchors_position[l];
-
-						if(abdist_old <0)
-						{
-							abdist_old = -abdist_old;
-							abdist_old += (anchor_read[l]?read2_len:read1_len);
-						}
-						else
-							abdist_old += (anchor_read[l]?read1_len:read2_len);
-
-
-
-						if (	(minor_votes[l] < current_vote->votes[i][j] ||
-							(minor_votes[l] == current_vote->votes[i][j] && current_vote->quality [i][j] > minor_quality[l]) ||
-							(minor_votes[l] == current_vote->votes[i][j] && abs(current_vote->quality [i][j] - minor_quality[l])<1 && abdist < abdist_old))&& 
-							(abdist <= max_pair_dest) &&
-							(abdist >= min_pair_dest) 
-						   )
-						{
-							minor_votes[l] = current_vote->votes[i][j];
-							minor_position[l] = current_vote->pos[i][j];
-							minor_quality[l] = current_vote->quality [i][j];
-							minor_buckets[l] = i;
-							minor_index[l] = j;
-						}
-					}
-				}
-			}
-
-	}
-
-	gene_vote_number_t selection_minor_vote = 0;
-	gene_vote_number_t selection_major_vote = 0;
-	gehash_data_t selection_minor_pos = 0;
-	gehash_data_t selection_major_pos = 0;
-
-	int selected_major_index=0, selected_major_bucket=0, selected_minor_bucket=0, selected_minor_index=0;
-
-	*sum_quality = 0;
-
-	unsigned char selection_major_read_no = 0;
-	//int reason = 0;
-
-	for (k=0; k<anchors; k++)
-	{
-		if(minor_votes[k]==0)
-			continue;
-
-		int need_replace = 0;
-
-
-		if ((minor_votes[k]+anchors_votes[k]) > (selection_minor_vote+selection_major_vote) ||
-	   	       ((minor_votes[k]+anchors_votes[k]) == (selection_minor_vote+selection_major_vote) &&
-		 	 minor_quality[k] + anchors_quality[k] > *sum_quality))
+		char cc = cigar[cigar_cursor];
+		if(isdigit(cc))
 		{
-			need_replace = 1;
+			tmpv=tmpv*10+(cc-'0');
 		}
-		else if (minor_votes[k]+anchors_votes[k] == selection_minor_vote+selection_major_vote &&
-		 	 minor_quality[k] + anchors_quality[k] == *sum_quality)
+		else if((cc>='A'&&cc<='Z')||(cc>='a'&&cc<='z')) 
 		{
-			if (selection_minor_pos != minor_position[k] && minor_position[k] != selection_major_pos)
-			{
-				* is_breakeven = 1;
-				if (selection_major_pos >  anchors_position[k]) need_replace = 1;
-			}
-		}
-
-		if(need_replace){
-			selection_minor_pos = minor_position[k];
-			selection_major_pos = anchors_position[k];
-			selection_minor_vote = minor_votes[k];
-			selection_major_vote = anchors_votes[k];
-			selection_major_read_no = anchor_read[k];
-			selected_major_bucket = anchors_buckets[k];
-			selected_minor_bucket = minor_buckets[k];
-			selected_major_index = anchors_index[k];
-			selected_minor_index = minor_index[k];
-			* is_breakeven = is_minor_breakeven[k];
-			* qual_r1 = anchor_read[k] ? minor_quality[k]:anchors_quality[k];
-			* qual_r2 = anchor_read[k] ? anchors_quality[k]: minor_quality[k];
-			* sum_quality = minor_quality[k] + anchors_quality[k];
-	
-		}
-	}
-
-	if(selection_minor_vote > 0)
-	{
-		if(selection_major_read_no)	// major is on read 2
-		{
-			*numvote_read1 = selection_minor_vote;
-			*numvote_read2 = selection_major_vote;
-			*pos_read1 = selection_minor_pos;
-			*pos_read2 = selection_major_pos ;
-			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
-			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_major_bucket][selected_major_index]);
+			char ncg2[100];
+			sprintf(ncg2, "%lld%c", tmpv, cc);
+			strcat(ncg2, ncg);
+			strcpy(ncg, ncg2);
+			tmpv=0;
 		}
 		else
 		{
-			*numvote_read1 = selection_major_vote;
-			*numvote_read2 = selection_minor_vote;
-			*pos_read1 = selection_major_pos;
-			*pos_read2 = selection_minor_pos;
-			indel_recorder_copy(read1_indel_recorder, vote_read1 -> indel_recorder[selected_major_bucket][selected_major_index]);
-			indel_recorder_copy(read2_indel_recorder, vote_read2 -> indel_recorder[selected_minor_bucket][selected_minor_index]);
+			char ncg2[100];
+			sprintf(ncg2, "%c%s",cc,ncg);
+			strcpy(ncg, ncg2);
+			tmpv=0;
 		}
-		return 1;
+		cigar_cursor++;
+	}
+	strcpy(cigar, ncg);
+}
+
+int debug_main()
+{
+	char cg[100];
+	sprintf(cg,"10M8H20M9I100N30M");
+	reverse_cigar(cg);
+	printf("%s\n",cg);
+	return 0;
+}
+
+void remove_indel_neighbours(HashTable * indel_table)
+{
+
+	unsigned int * to_delete;
+	char * to_delete_len;
+	int xi;
+	KeyValuePair * cursor;
+	return;
+
+	to_delete=(unsigned int* )malloc(sizeof(int)*400000);
+	to_delete_len=(char* )malloc(sizeof(char)*400000);
+	int num_delete=0, bucket;
+
+	for(bucket=0; bucket<indel_table -> numOfBuckets; bucket++)
+	{
+		cursor = indel_table -> bucketArray[bucket];
+		while (1)
+		{
+			if(!cursor) break;
+			indel_record_t * p = (indel_record_t *) cursor -> key;
+			indel_result_t * pv = (indel_result_t *)cursor -> value;
+
+			indel_record_t p_nb;
+			p_nb.len = p->len;
+
+			for(xi=-5;xi<=5;xi++)
+			{
+				if(!xi)continue;
+
+				p_nb.pos = p->pos+xi;
+				indel_result_t * p_nbv = (indel_result_t *)HashTableGet(indel_table, &p_nb);
+				if(p_nbv && (p_nbv->support > pv->support || (p_nbv->support == pv->support && xi>0)))
+				{
+					if(num_delete<399999)
+					{
+						to_delete_len[num_delete]=p->len;
+						to_delete[num_delete++]= p->pos+xi;
+					}
+					break;
+				}
+			}
+
+			cursor = cursor->next;
+		}
+	}
+	
+	
+	for(xi=0;xi<num_delete;xi++)
+	{
+		indel_record_t p;
+		p.len = to_delete_len[xi];
+		p.pos = to_delete[xi];
+		HashTableRemove(indel_table, &p);
 	}
 
-	return 0;
+
+	printf("\n %d low-confidence indels have been removed.", num_delete);
+	free(to_delete);
+	free(to_delete_len);
+
 }
 
 void print_version_info()
@@ -2692,3 +2639,32 @@ void print_version_info()
 	SUBREADprintf("http://www.sourceforge.net/projects/subread/\n");
 	SUBREADprintf("\n");
 }
+
+int fc_strcmp_chro(const void * s1, const void * s2)
+{
+
+//	// we can compare the 3-th and 4-th bytes because we know that the buffers have enough lengths.
+//	if(((char *)s1)[4] != ((char *)s2)[4] || ((char *)s1)[3] != ((char *)s2)[3] )
+//		return 1;
+	return strcmp((char*)s1, (char*)s2);
+}
+
+
+
+unsigned long fc_chro_hash(const void *key) {
+	const unsigned char *str = (const unsigned char *) key;
+
+	int xk1;
+	unsigned long hashValue = 0;
+
+	for(xk1=0; str[xk1]; xk1++)
+	{
+		unsigned long ch = str[xk1];
+		hashValue += (ch + xk1) << (ch & 0xf);
+	}
+		
+
+	return hashValue;
+}
+
+

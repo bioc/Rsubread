@@ -15,12 +15,9 @@
    Authors: Drs Yang Liao and Wei Shi
 
   ***************************************************************/
-  
-  
-#ifndef __SINGLE_NUCLEODITE_POLYMOREPHISM_H_
-#define __SINGLE_NUCLEODITE_POLYMOREPHISM_H_
 
+#ifndef __INTERVAL_MERGE_H_
+#define __INTERVAL_MERGE_H_
 
-
-
+int mergeIntervals(unsigned int * intervals, unsigned int * result_ints, int nints);
 #endif

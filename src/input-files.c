@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -19,8 +17,9 @@
   ***************************************************************/
   
   
-
 #include <stdio.h>
+#include <signal.h>
+#include <dirent.h> 
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -31,7 +30,10 @@
 #include <assert.h>
 #include "input-files.h"
 #include "gene-algorithms.h"
+#include "sublog.h"
 
+unsigned int BASE_BLOCK_LENGTH = 15000000;
+int is_R_warnned = 0;
 
 void fastq_64_to_33(char * qs)
 {
@@ -42,10 +44,15 @@ void fastq_64_to_33(char * qs)
 
 double guess_reads_density(char * fname, int is_sam)
 {
+	return guess_reads_density_format(fname, is_sam, NULL);
+}
+double guess_reads_density_format(char * fname, int is_sam, int * phred_format)
+{
 	gene_input_t ginp;
 	long long int fpos =0, fpos2 = 0;
 	int i;
-	char buff[1200] ;
+	char max_qual_chr = 0, min_qual_chr = 127;
+	char buff[MAX_READ_LENGTH] , qbuf[MAX_READ_LENGTH];
 
 	if(is_sam == 0)
 	{
@@ -64,8 +71,29 @@ double guess_reads_density(char * fname, int is_sam)
 
 	for(i=0; i<1000; i++)
 	{
-		if(geinput_next_read(&ginp, NULL, buff, NULL)<0) break;
+		if(geinput_next_read(&ginp, NULL, buff, qbuf)<0) break;
+		if(qbuf[0])
+		{
+			int xk=0;
+			while(qbuf[xk])
+			{
+				min_qual_chr = min(min_qual_chr,qbuf[xk]);
+				max_qual_chr = max(max_qual_chr,qbuf[xk++]);
+			}
+		}
+			
 	}
+
+	if(phred_format)
+	{
+		if(max_qual_chr<'M')
+			*phred_format = FASTQ_PHRED33;
+		else if(min_qual_chr>='@' && max_qual_chr<'k')
+			*phred_format = FASTQ_PHRED64;
+		//else
+		//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_WARNING, "The fastq file is broken : %d %d.", min_qual_chr , max_qual_chr);
+
+	}	
 	fpos2 = ftello(ginp.input_fp) - fpos;
 	geinput_close(&ginp);
 
@@ -75,12 +103,12 @@ double guess_reads_density(char * fname, int is_sam)
 int is_gene_char(char c)
 {
 	//if(c== 'M' || c == 'm' || c == 'U' || c == 'u' || c == 'A' || c=='a' || c=='G' || c=='g' || c=='C' || c=='c' || c=='T' || c=='t' || c=='N' || c=='n')
+	if(c=='-' || c == '.' || c == 'N')
+		return GENE_SPACE_BASE;
 	if((c>='A' && c<'Z') || (c>='a' && c<='z'))
 		return GENE_SPACE_BASE;
 	if(c>='0' && c<'9')
 		return GENE_SPACE_COLOR;
-	if(c=='-' || c == '.')
-		return GENE_SPACE_BASE;
 	return 0;
 }
 
@@ -95,7 +123,10 @@ long long int guess_gene_bases(char ** files, int file_number)
 		struct stat statbuf;
 
 		if (stat(fname , &statbuf))
+		{
+			//printf("NOT FOUND!!%s\n", fname);
 			return -i-1;
+		}
 
 		ret += statbuf.st_size;
 		ret -= 150;
@@ -113,6 +144,9 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 		while(1)
 		{
 			char ch = fgetc(fp);
+			#ifdef WINDOWS
+			if(ch == '\r') continue;
+			#endif
 			if(ch == '\n' || ch == EOF) break;
 			if(ret < max_read_len-1)
 				buff[ret++] = toupper(ch);
@@ -123,6 +157,9 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 		while(1)
 		{
 			char ch = fgetc(fp);
+			#ifdef WINDOWS
+			if(ch == '\r') continue;
+			#endif
 			if (ch == '\n' || ch == EOF) break;
 			buff[ret++] = ch;
 		}
@@ -202,7 +239,7 @@ int is_read(char * in_buff)
 
 int geinput_open_sam(const char * filename, gene_input_t * input, int half_number)
 {
-	input->input_fp = fopen(filename, "r");
+	input->input_fp = fopen(filename, "rb");
 
 	strcpy(input->filename, filename);
 
@@ -232,6 +269,7 @@ int geinput_open_sam(const char * filename, gene_input_t * input, int half_numbe
 			if (tab_no<10)return 1;
 			input->space_type = is_read(read_buf);
 			if (GENE_INPUT_SAM_PAIR_2 != input -> file_type) fseeko(input -> input_fp , current_pos, SEEK_SET);
+			input -> read_chunk_start = ftell(input -> input_fp);
 			break;
 		}
 	}	
@@ -247,12 +285,13 @@ int geinput_open(const char * filename, gene_input_t * input)
 		return 1;
 
 	strcpy(input->filename, filename);
-	input->input_fp = fopen(filename, "r");
+	input->input_fp = fopen(filename, "rb");
 
 	if(input->input_fp == NULL)	
 		return 1;
 
 	while (1){
+		long long int last_pos = ftello(input->input_fp);
 		int rlen = read_line(1200, input->input_fp, in_buff, 0);
 		if (rlen<=0)
 			return 1;
@@ -261,33 +300,38 @@ int geinput_open(const char * filename, gene_input_t * input)
 		{
 			input->file_type = GENE_INPUT_PLAIN;
 			input->space_type = is_read(in_buff);
-			fseek(input->input_fp,0,SEEK_SET);
+			fseek(input->input_fp,last_pos,SEEK_SET);
 			break;
 		}
 		if(in_buff[0]=='>')
 		{
 			input->file_type = GENE_INPUT_FASTA;
+		//	printf("FILE %s OPENED AS FATSA.\n", filename);
 			rlen += read_line(1200, input->input_fp, in_buff, 0);
 			input->space_type = is_read(in_buff);
-
-			fseek(input->input_fp,-rlen-2,SEEK_CUR);
+			
+			fseek(input->input_fp,last_pos,SEEK_SET);
 			break;
 		}
 		if(in_buff[0]=='@')
 		{
 			input->file_type = GENE_INPUT_FASTQ;
+		//	printf("FILE %s OPENED AS FATSQ.\n", filename);
 
 			rlen += read_line(1200, input->input_fp, in_buff, 0);
 			input->space_type = is_read(in_buff);
 
-			fseek(input->input_fp,-rlen-2,SEEK_CUR);
+
+			fseek(input->input_fp, last_pos,SEEK_SET);
 			break;
 		}		
 		line_no++;
 	}
 
+	input -> read_chunk_start  = 0;
 	return 0;
 }
+
 
 int geinput_next_char(gene_input_t * input)
 {
@@ -301,7 +345,13 @@ int geinput_next_char(gene_input_t * input)
 				return -2;
 			else if (nch < 0 || nch > 126)SUBREADprintf("\nUnrecognised char = #%d\n", nch);
 
-			if (nch == '\r' || nch == '\n')
+			if (nch == '\r')
+			{
+				is_R_warnned = 1; 
+				SUBREADprintf("The input FASTA file contains \\r characters. This should not result in any problem but we suggest to use UNIX-style line breaks.\n");
+				continue;
+			}
+			if (nch == '\n')
 			{
 				last_br = 1;
 				continue;
@@ -321,8 +371,45 @@ int geinput_next_char(gene_input_t * input)
 				return toupper(nch);
 			else
 			{
-				SUBREADprintf ("\nUnknown character in the chromosome data: '%c' (ASCII:%02X), ignored!\n", nch, nch);
-				return 'N';
+				long long int fpos = ftello(input->input_fp);
+				int back_search_len =2;
+				int is_empty_seq = 0;
+				char *out_buf = malloc(2000);
+
+				while( fpos >= back_search_len )
+				{
+					fseeko(input->input_fp, fpos - back_search_len, SEEK_SET);
+					int bc_nch = fgetc(input->input_fp);
+					if(bc_nch=='\n')
+					{
+						if(nch == '>' && back_search_len==2) is_empty_seq=1;
+						break;
+					}
+					back_search_len++;
+				}
+
+				fgets(out_buf, 1999,input->input_fp);
+
+				if(is_empty_seq)
+				{
+					if(strlen(out_buf)>0)
+						out_buf[strlen(out_buf)-1]=0;
+					SUBREADprintf ("\nEmpty chromosome sequence before '%s'. The file offset is %llu\n",out_buf, fpos);
+					free(out_buf);
+					return -1;
+				}
+				else
+				{
+					SUBREADprintf ("\nUnknown character in the chromosome data: '%c' (ASCII:%02X), ignored. The file offset is %llu\n", nch, nch, fpos);
+					SUBREADprintf("%s", out_buf);
+					for(; back_search_len>2; back_search_len--)
+						SUBREADprintf(" ");
+					SUBREADprintf("^\n");
+
+					fseeko(input->input_fp, fpos, SEEK_SET);
+					free(out_buf);
+					return 'N';
+				}
 			}		
 			last_br = 0;
 		}
@@ -363,13 +450,24 @@ void geinput_jump_read(gene_input_t * input)
 		}
 		
 		SKIP_LINE
-		//if(input->file_type != GENE_INPUT_SAM_SINGLE)
-		//	SKIP_LINE
+		if(input->file_type != GENE_INPUT_SAM_SINGLE)
+			SKIP_LINE
 	}
 	else if(input->file_type == GENE_INPUT_FASTA)
 	{
 		SKIP_LINE
-		SKIP_LINE
+		while(1)
+		{
+			SKIP_LINE
+			nch = fgetc(input->input_fp); 
+			if(nch == EOF)
+				break;
+			if(nch=='>')
+			{
+				fseek(input->input_fp, -1, SEEK_CUR);
+				break;
+			}
+		}
 	}
 	else if(input->file_type == GENE_INPUT_FASTQ)
 	{
@@ -490,7 +588,47 @@ int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_st
 	return ret;
 
 }
+
+int trim_read_inner(char * read_text, char * qual_text, int rlen, short t_5, short t_3)
+{
+
+	if(rlen > t_5)
+	{
+		int xk1;
+		for(xk1 = 0; xk1 < rlen - t_5 ; xk1++)
+			read_text[xk1] = read_text[xk1+t_5];
+
+		if(qual_text)
+			for(xk1 = 0; xk1 < rlen - t_5 ; xk1++)
+				qual_text[xk1] = qual_text[xk1+t_5];
+	}
+	else{
+		read_text[0]=0;
+		if(qual_text)qual_text[0]=0;
+		return 0;
+	}
+
+	if(rlen - t_5 > t_3)
+	{
+		read_text[rlen - t_5 - t_3]=0;
+		if(qual_text)qual_text[rlen - t_5 - t_3]=0;
+	}
+	else{
+		read_text[0]=0;
+		if(qual_text)qual_text[0]=0;
+		return 0;
+	}
+
+
+
+	return max(0, rlen - t_5 - t_3);
+}
+
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string)
+{
+	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0);
+}
+int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3)
 {
 	if(input->file_type == GENE_INPUT_PLAIN)
 	{
@@ -498,6 +636,8 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		if(quality_string) *quality_string=0;
 
 		if(ret <3)return -1;
+
+		if(trim_5 || trim_3) ret = trim_read_inner(read_string, NULL, ret, trim_5, trim_3);
 		return ret;
 	}
 	else if(input->file_type >= GENE_INPUT_SAM_SINGLE)
@@ -557,23 +697,30 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 				reverse_quality(quality_string, ret);
 			reverse_read(read_string, ret, input->space_type);
 		}
-		//if(input->file_type != GENE_INPUT_SAM_SINGLE)
+		if(input->file_type > GENE_INPUT_SAM_SINGLE)
 			// skip a line if not single-end
-		//	read_line(1, input->input_fp, in_buff, 0);
+			read_line(1, input->input_fp, in_buff, 0);
+		if(trim_5 || trim_3) ret = trim_read_inner(read_string, quality_string, ret, trim_5, trim_3);
 		return ret;
 	}
 	else if(input->file_type == GENE_INPUT_FASTA)
 	{
 		int ret;
-		while(1)
+		if(quality_string) (*quality_string)=0;
+
+		while(1) // fetch read name
 		{
 			ret = read_line(1200, input->input_fp, read_string, 0);
-			if(ret <1)return -1;
+			if(ret <1)
+			{
+				sublog_printf(SUBLOG_STAGE_RELEASED,SUBLOG_LEVEL_DEBUG, "The input file normally exhausted.");
+				return -1;
+			}
 
-			int cursor = 2;
+			int cursor = 0;
 			while(read_string[cursor])
 			{
-				if(read_string[cursor] == ' ' || read_string[cursor] == '\t')
+				if(cursor >=2 &&(read_string[cursor] == ' ' || read_string[cursor] == '\t'))
 				{
 					read_string [cursor] = 0;
 					break;	
@@ -583,30 +730,29 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 
 			if(read_string[0]=='>'){
 				if (read_name != NULL)
-					strncpy(read_name, read_string+1, 100);
+					strncpy(read_name, read_string+1, MAX_READ_NAME_LEN);
 				break;
 			}
+			else
+				sublog_printf(SUBLOG_STAGE_RELEASED,SUBLOG_LEVEL_FATAL,"The input file may be broken.");
 		}
 		ret = 0;
-		while(1)
+		while(1) // fetch read text
 		{
 			char nch;
 			ret += read_line(1200-ret, input->input_fp, read_string+ret, 1);
 
-			while(1){
-				nch = fgetc(input->input_fp);
-				if (nch!='\n')break;
-			}
-			fseek(input->input_fp, -1, SEEK_CUR);
-			if (nch<1)
-				break;
-			if(nch =='>') 
+			nch = fgetc(input->input_fp);
+
+			if(nch!=EOF)
+				fseek(input->input_fp, -1, SEEK_CUR);
+		
+			if(nch == '>'||nch<1 || nch == EOF)
 				break;
 		}
-
-		if(quality_string) (*quality_string)=0;
-
+//		printf("LOAD R=|%s|\nRETV=%d\n", read_string, ret);
 		if(ret <1)return -1;
+		if(trim_5 || trim_3) ret = trim_read_inner(read_string, quality_string, ret, trim_5, trim_3);
 		return ret;
 		
 	}
@@ -625,9 +771,16 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		{
 			nch = fgetc(input->input_fp);
 			if(nch==EOF) return -1;
+			#ifdef WINDOWS
+			if(nch=='\r')
+			{
+				nch = fgetc(input->input_fp);
+				if(nch==EOF) return -1;
+			}
+			#endif
 			if(nch=='@')
 			{
-				read_line(1200, input->input_fp, read_name, 0);
+				read_line(MAX_READ_NAME_LEN, input->input_fp, read_name, 0);
 				int cursor = 1;
 				while(read_name[cursor])
 				{
@@ -641,7 +794,7 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 			}
 			else
 			{
-				SUBREADprintf("WARNING: unexpected line: %s\nFASTQ file may be damaged.\n", read_string);
+				SUBREADprintf("WARNING: unexpected line: `%s', POS=%llu\nFASTQ file may be damaged.\n", read_string, (long long int)ftello(input->input_fp));
 				return -1;
 			}
 
@@ -678,6 +831,9 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 		}
 		#endif
 
+//		printf("LOAD R=|%s|\nRETV=%d\n", read_string, ret);
+		
+		if(trim_5 || trim_3) ret = trim_read_inner(read_string, quality_string, ret, trim_5, trim_3);
 		return ret;
 		
 	}else return -1;
@@ -687,6 +843,7 @@ void geinput_close(gene_input_t * input)
 	fclose(input->input_fp);
 }
 
+char * __converting_char_table = "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTNGNNNCNNNNNNNNNNNNAANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTNGNNNCNNNNNNNNNNNNAANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN  ";
 
 void reverse_read(char * InBuff, int read_len, int space_type)
 {
@@ -694,11 +851,7 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 
 	if(space_type == GENE_SPACE_COLOR)
 	{
-		int begin_pos = 0;
-		if(isalpha(InBuff[0]))
-			begin_pos = 1;
-
-		for (i=begin_pos; i<read_len/2; i++)
+		for (i=0; i<read_len/2; i++)
 		{
 			int rll1 = read_len - 1 - i;
 			char tmp = InBuff[rll1];
@@ -711,24 +864,15 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 		for (i=0; i<read_len/2; i++)
 		{
 			int rll1 = read_len - 1 - i;
-			char tmp = InBuff[rll1];
+			unsigned char tmp = InBuff[rll1];
 
-			if(InBuff[i]=='A')InBuff[rll1]='T';
-			else if(InBuff[i]=='G')InBuff[rll1]='C';
-			else if(InBuff[i]=='C')InBuff[rll1]='G';
-			else if(InBuff[i]=='T' || InBuff[i]=='U')InBuff[rll1]='A';
+			InBuff[rll1] = *(__converting_char_table+InBuff[i]);
+			InBuff[i] = *(__converting_char_table+tmp);
 
-			if(tmp=='A')InBuff[i]='T';
-			else if(tmp=='G')InBuff[i]='C';
-			else if(tmp=='C')InBuff[i]='G';
-			else if(tmp=='T' || tmp=='U')InBuff[i]='A';
 		}
 		if(i*2 == read_len-1)
 		{
-			if(InBuff[i]=='A')InBuff[i]='T';
-			else if(InBuff[i]=='G')InBuff[i]='C';
-			else if(InBuff[i]=='C')InBuff[i]='G';
-			else if(InBuff[i]=='T' || InBuff[i]=='U')InBuff[i]='A';
+			InBuff[i] = *(__converting_char_table+InBuff[i]);
 		}
 	}
 
@@ -739,15 +883,42 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 void reverse_quality(char * InBuff, int read_len)
 {
 	int i;
+	if(!InBuff) return;
 	if(!InBuff[0]) return;
 	for (i=0; i<read_len/2; i++)
 	{
 		char tmp;
 		tmp = InBuff[i];
 		InBuff[i] = InBuff[read_len -1-i];
-		InBuff[read_len -1-i] = tmp;		
+		InBuff[read_len -1-i] = tmp;
 	}
 }
+
+
+int genekey2intX(char * key,int space_type)
+{
+	int i;
+	int ret;
+
+	ret = 0;
+	if(space_type == GENE_SPACE_BASE)
+		for (i=30; i>=0; i-=2)
+		{
+			char kv = *(key++);
+			ret |= base2int(kv)<<i;
+		}
+	else
+		for (i=0; i<16; i++)
+		{
+			ret = ret << 2;
+			ret |= color2int (key[i]);
+		}
+
+//	printf("RET=%u\n",ret);
+	
+	return ret;
+}
+
 
 int genekey2int(char key [],int space_type)
 {
@@ -768,6 +939,7 @@ int genekey2int(char key [],int space_type)
 			ret |= color2int (key[i]);
 		}
 	
+//	printf("RET=%u\n",ret);
 	return ret;
 }
 
@@ -861,18 +1033,35 @@ int chars2color(char c1, char c2)
 
 int find_subread_end(int len, int TOTAL_SUBREADS, int subread)
 {
+	/*
 	float step = max(3.00001, (len-16-GENE_SLIDING_STEP)*1.0/(TOTAL_SUBREADS-1)+0.00001);
 	return (int) (step * subread) + 15;
-	//return (int)((1.*len-16.)/TOTAL_SUBREADS * subread+15);
+	*/
+
+	if(len<= EXON_LONG_READ_LENGTH)
+	{
+		int subread_step =  ((len<<16) - (19<<16))/(TOTAL_SUBREADS -1);
+		return ((subread_step*(subread))>>16)+15;
+	}
+	else
+	{
+		int subread_step;
+		
+		subread_step = 6<<16;
+		if(((len - 18)<<16) / subread_step > 62)
+			subread_step = ((len - 18)<<16)/62;
+		return ((subread_step*(subread))>>16)+15;
+	}
 }
 
 
 //This function returns 0 if the line is a mapped read; -1 if the line is in a wrong format and 1 if the read is unmapped.
-int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, char * sequence , char * quality_string, int * rl)
+int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, unsigned int * pair_dist, char * sequence , char * quality_string, int * rl, int * repeated)
 {
 	char cc;
-	int ci = 0, k=0, field=0, ret_quality = 0, ret_flag = 0;
+	int ci = 0, k=0, field=0, ret_quality = 0, ret_flag = 0, ret_pairdist=0;
 	unsigned int ret_pos = 0;
+	int is_rep = 0;
 	
 	while( (cc = sam_line[k]) )
 	{
@@ -890,6 +1079,7 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 			}
 			else if(field == 11)quality_string[ci]=0;
 			ci=0;
+			is_rep = 0;
 			continue;
 		}
 		if(field == 9)
@@ -900,9 +1090,14 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 			read_name[ci++] = cc;
 		else if(field == 1)
 			ret_flag = ret_flag*10 + (cc-'0');
+		else if(field == 8)
+		{
+			if(cc!='-')
+				ret_pairdist = ret_pairdist*10 + (cc-'0');
+		}
 		else if(field == 2)
 		{
-			if(ci == 0 && cc == '*') return 1;
+			//if(ci == 0 && cc == '*') return 1;
 			chro[ci++] = cc;
 		}
 		else if(field == 3)
@@ -911,16 +1106,34 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 			ret_quality = ret_quality * 10 + (cc-'0');
 		else if(field == 5)
 			cigar[ci++] = cc;
+		else if(field > 10)
+		{
+			if(cc == 'I' && ci==0) is_rep = 1;
+			if(cc != 'H' && ci==1 ) is_rep = 0;
+			if(is_rep && ci == 4) *repeated = 0;
+			if(is_rep && ci>4)
+				(*repeated)=(*repeated)*10+(cc-'0'); 
+			ci++;
+			
+		}
 		k++;
 
 	}
 
+	//printf("REP=%d\n", *repeated);
+
 	if(field == 10 && ci>0)quality_string[ci]=0;
 	else if(field < 10) return -1;
 	
-	(*mapping_quality) = ret_quality;
+	if(ret_flag & 4)
+		(*mapping_quality) = 0;
+	else
+		(*mapping_quality) = ret_quality;
 	(*pos) = ret_pos;
 	(*flags) = ret_flag;
+	(*pair_dist) = ret_pairdist;
+	//printf("FLAG=%d\n", (*flags));
+	if(((*flags) & 4) == 4) return 1;
 	return 0;
 	
 }
@@ -962,7 +1175,8 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 		if(!key_name)
 			return NULL;
 		strcpy(key_name, temp_file_name);
-		temp_file_pointer = fopen(key_name,"a");
+		temp_file_pointer = fopen(key_name,"wb");
+		if(!temp_file_pointer) SUBREADprintf("File cannot be opened: '%s' !!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
 		assert(temp_file_pointer);
 
 		HashTablePut(fp_table, key_name ,temp_file_pointer);
@@ -981,12 +1195,21 @@ int my_strcmp(const void * s1, const void * s2)
 	return strcmp((char*)s1, (char*)s2);
 }
 
-void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand)
+void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len)
 {
 	base_block_temp_read_t datum;
 	datum.read_number = read_number;
 	datum.pos = pos;
 	datum.strand = strand;
+	datum.read_pos = read_pos;
+	datum.read_len = read_len;
+	datum.mapping_quality = mapping_quality;
+
+	if(rl < 1 || rl > 300)
+	{
+		printf("READ TOO LONG:%d\n", rl);
+		return;
+	}
 
 	fwrite(&datum, sizeof(datum), 1, temp_fp);
 	if(is_sequence_needed)
@@ -998,23 +1221,12 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 	}
 }
 
-int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * real_read_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail)
+
+int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes)
 {
-	FILE * fp = fopen(in_SAM_file,"r");
 	int i;
-	HashTable * fp_table;
-	unsigned int read_number = 0;
+	FILE * fp = fopen(in_SAM_file,"rb");
 
-	if(!fp){
-		SUBREADprintf("SAM file does not exist or is not accessible: '%s'\n", in_SAM_file);
-		return 1;
-	}
-
-
-	fp_table = HashTableCreate( XOFFSET_TABLE_SIZE / 16 );
-	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
-	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
-	HashTableSetHashFunction(fp_table,HashTableStringHashFunction);
 	while(!feof(fp))
 	{
 		char line_buffer [3000];
@@ -1026,10 +1238,211 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 			if(line_buffer[1]!='S' || line_buffer[2]!='Q' || line_buffer[3]!='\t' ) continue;
 
 			while(known_chromosomes[chro_numb].chromosome_name[0]!=0) chro_numb++;
+			if(chro_numb > XOFFSET_TABLE_SIZE-1)
+			{
+				SUBREADprintf("FATAL ERROR: the number of chromosomes excessed %d\n. Program terminated.\n", XOFFSET_TABLE_SIZE);
+				return -1;
+			}
 			known_chromosomes[chro_numb].known_length = 0;
 			for(i=0; i< linelen; i++)
 			{
 				char cc = line_buffer[i];
+
+				if(cc == '\r' || cc=='\n') continue;
+
+				if(cc == '\t')
+				{
+					if(field == 1)
+						known_chromosomes[chro_numb].chromosome_name[ci]=0;
+					ci = 0;
+					ciw = 0;
+					field ++;
+				}
+				else if(field == 1)
+				{
+					if(ci >2)
+						known_chromosomes[chro_numb].chromosome_name[ciw++]=cc;
+					ci++;
+				}
+				else if(field == 2)
+				{
+					if(ci >2)
+						known_chromosomes[chro_numb].known_length = known_chromosomes[chro_numb].known_length * 10 + (cc - '0');
+					ci++;
+				}
+			}
+		}
+		else
+			break;
+	}
+	fclose(fp);
+	return 0;
+}
+
+void add_cigar_indel_event(HashTable * event_table_ptr, char * chro, unsigned int chro_pos, int indels , char * ins_seq)
+{
+	if(abs(indels)>100) return;
+
+	char event_token[100];
+	snprintf(event_token, 99,"%s\t%u", chro, chro_pos);
+	int x1;
+	unsigned int indel_event_id = 0xffffffff, token_len;
+
+	int exist_indel_count = HashTableGet(event_table_ptr, event_token) - NULL;
+	unsigned short * app2_ptr =  event_table_ptr->appendix2;
+
+	if(exist_indel_count)
+		for(x1 = 0; x1< exist_indel_count; x1++)
+		{
+			snprintf(event_token, 99,"%s\t%u\t%d", chro, chro_pos, x1);
+			long long int t64v =  (HashTableGet(event_table_ptr, event_token)-NULL);
+			long long int indel_len = (t64v&0xff) - 0x80;
+			if(indel_len == indels){
+				indel_event_id = 0xffffff&(t64v >> 8) ;
+				if(app2_ptr[indel_event_id]<65000)
+					app2_ptr[indel_event_id] +=1;
+				return;
+			}
+		}
+
+
+	if(event_table_ptr->counter2<0xffff00)
+	{
+		unsigned int event_space_max_size = event_table_ptr-> counter1;
+		indel_event_id = event_table_ptr->counter2 ++;
+
+		if(indel_event_id >= event_space_max_size)
+		{
+			event_table_ptr->appendix1 = realloc(event_table_ptr->appendix1 , sizeof(char *) * event_space_max_size*2);
+			event_table_ptr->appendix2 = realloc(event_table_ptr->appendix2 , sizeof(short) * event_space_max_size*2);
+			memset(event_table_ptr->appendix2 + event_space_max_size * sizeof(short), 0, sizeof(short) * event_space_max_size);
+			event_table_ptr-> counter1 = event_space_max_size*2;
+			app2_ptr =  event_table_ptr->appendix2;
+		}
+
+		token_len=snprintf(event_token, 99,"%s\t%u", chro, chro_pos);
+		if(exist_indel_count<1)
+		{
+			char * token_1 = malloc(token_len+1);
+			strcpy(token_1, event_token);
+			HashTablePut(event_table_ptr, token_1, NULL+1);
+		}
+		else
+		{
+			HashTablePutReplace(event_table_ptr, event_token, NULL+exist_indel_count+1, 0);
+		}
+
+		token_len=snprintf(event_token, 99,"%s\t%u\t%d", chro, chro_pos, exist_indel_count);
+		char * token_2 = malloc(token_len+1);
+		strcpy(token_2, event_token);
+		long long int indel_event_id_long = indel_event_id;
+		app2_ptr[indel_event_id] +=1;
+
+		HashTablePut(event_table_ptr, token_2, NULL + ((0xff & (0x80 + indels)) | ((indel_event_id_long&0xffffff) << 8)));
+		if(indels<0)
+		{
+			char * ins_seq_2 = malloc(-indels), ** app1_ptrptr = event_table_ptr->appendix1;
+			memcpy(ins_seq_2, ins_seq, -indels);
+			app1_ptrptr[indel_event_id] = ins_seq_2;
+		}
+	}
+}
+
+void destroy_cigar_event_table(HashTable * event_table)
+{
+	int bucket;
+	KeyValuePair * cursor;
+	char ** seq_tab = event_table->appendix1;
+	for(bucket=0; bucket<event_table -> numOfBuckets; bucket++)
+	{
+		cursor = event_table -> bucketArray[bucket];
+		while (1)
+		{
+			int xk1, tabs;
+			if (!cursor) break;
+			
+			char * token = (char *)cursor -> key;
+			tabs = 0;
+			for(xk1=0; token[xk1]; xk1++) 
+				if(token[xk1]=='\t') tabs++;
+			long long int tmpv = cursor -> value - NULL;
+			//printf("%s\t%lld\n", token, tmpv);
+
+			if(tabs==3)
+			{
+				unsigned int event_id = (tmpv>>8)&0xffffff;
+				free(seq_tab[event_id]);
+			}
+			free(token);
+			cursor = cursor->next;
+		}
+	}
+
+	free(event_table->appendix1);
+	free(event_table->appendix2);
+	HashTableDestroy(event_table);
+}
+
+
+int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_mapped_bases, HashTable * event_table)
+{
+	int i,x;
+	HashTable * fp_table;
+	unsigned int read_number = 0;
+	unsigned long long quality_count [128];
+	char line_buffer [3000];
+	SamBam_FILE  * sambam_reader;
+
+	sambam_reader = SamBam_fopen(in_SAM_file, is_BAM_file?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
+	 
+	if(!sambam_reader){
+		SUBREADprintf("SAM file does not exist or is not accessible: '%s'\n", in_SAM_file);
+		return 1;
+	}
+
+	memset(quality_count,0 , sizeof(long long)*128);
+	fp_table = HashTableCreate( 11011 );
+	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
+	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
+	HashTableSetHashFunction(fp_table,HashTableStringHashFunction);
+
+	if(event_table!=NULL && event_table->appendix1==NULL)
+	{
+		event_table->appendix1 = malloc(sizeof(char *) * 100);
+		event_table->appendix2 = malloc(sizeof(unsigned short) * 100);
+		memset(event_table->appendix2, 0, sizeof(unsigned short) * 100);
+		event_table->counter1 = 100;
+		event_table->counter2 = 0;
+	}
+
+	sprintf(line_buffer, "%s.qStatic", temp_file_prefix);
+	FILE *qual_fp = fopen(line_buffer,"wb");
+	while(1)
+	{
+		//unsigned long long int file_position = ftello(fp);
+		//int linelen = read_line(2999, fp, line_buffer, 0);
+		char * is_ret = SamBam_fgets(sambam_reader, line_buffer, 2999, 1);
+
+		if(!is_ret) break;
+
+		if(line_buffer[0]=='@')
+		{
+			int chro_numb=0, field = 0, ci=0, ciw = 0;
+			if(line_buffer[1]!='S' || line_buffer[2]!='Q' || line_buffer[3]!='\t' ) continue;
+
+			while(known_chromosomes[chro_numb].chromosome_name[0]!=0) chro_numb++;
+
+			if(chro_numb > XOFFSET_TABLE_SIZE-1)
+			{
+				SUBREADprintf("FATAL ERROR: the number of chromosomes excessed %d\n. Program terminated.\n", XOFFSET_TABLE_SIZE);
+				return -1;
+			}
+
+			known_chromosomes[chro_numb].known_length = 0;
+			for(i=0; ; i++)
+			{
+				char cc = line_buffer[i];
+				if(!cc) break;
 
 				if(cc == '\r' || cc=='\n') continue;
 
@@ -1061,23 +1474,81 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 			char read_name[MAX_READ_NAME_LEN], chro[MAX_CHROMOSOME_NAME_LEN], cigar[EXON_MAX_CIGAR_LEN], sequence[MAX_READ_LENGTH+1], quality_string[MAX_READ_LENGTH+1];
 			int flags = 0, mapping_quality = 0, rl=0;
 			char is_negative_strand = 0;
-			unsigned int pos = 0;
+			unsigned int pos = 0, pairdist = 0;
 			char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
 			char temp_file_name[MAX_CHROMOSOME_NAME_LEN+20+300];
 			FILE * temp_fp;
+			int repeated = -1;
 
-			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, sequence , quality_string, &rl);
-			if(line_parse_result || (flags & SAM_FLAG_UNMAPPED) )
+			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, &pairdist, sequence , quality_string, &rl, &repeated);
+
+			if(strlen(quality_string)<2)
 			{
+				int xk1;
+				for(xk1=0; xk1<rl; xk1++)
+				{
+					quality_string[xk1]='I';
+				}
+				quality_string[xk1]=0;
+			}
+
+			//if(line_parse_result || (flags & SAM_FLAG_UNMAPPED))//|| (((flags & SAM_FLAG_PAIRED_TASK) && !(flags & SAM_FLAG_MATCHED_IN_PAIR))) || (repeated>=0 && repeated !=1 ))
+			if(line_parse_result || (flags & SAM_FLAG_UNMAPPED)|| (((flags & SAM_FLAG_PAIRED_TASK) && (pairdist ==0 || pairdist > 2000))))
+			{
+
+			//	printf("%s\nREJ:%d\n", line_buffer, pairdist);
 				read_number ++;
 				continue;
 			}
+
+			/*
+			if(repeated>=0 && repeated !=1)
+			{
+
+				read_number ++;
+				continue;
+			}
+			*/
+			/*
+
+
+				int j=0, indels=0;
+
+				for(j=0; cigar[j]; j++)
+					if(cigar[j]=='I'||cigar[j]=='D') indels++;
+
+				if(indels>1)
+				{
+					read_number ++;
+					continue;
+				}
+
+
+			*/
+			if(array_index)
+			{
+				int mismatch = 0;
+
+				unsigned int linear_pos = linear_gene_position(offsets , chro, pos)-1;
+				float match_rate = final_mapping_quality(array_index, linear_pos, sequence, quality_string, cigar, FASTQ_PHRED33,  & mismatch,  rl, NULL, NULL);
+				//printf("R %u : Rate=%.7f; Mis=%d\n", read_number , match_rate  , mismatch);
+				if(mismatch>8 || match_rate < 160)
+				{
+					read_number ++;
+					continue;
+				}
+			}
+			//printf("ACC:%d\n", repeated);
 
 			is_negative_strand = (flags & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0;
 
 			// if the read block is not determinable, do nothing.
 
-			if(is_sequence_needed)
+			if(is_sequence_needed == 2)
+			{
+				
+			}
+			else if(is_sequence_needed == 1)
 			{
 				int read_cursor = 0;
 				int is_first_S = 1;
@@ -1124,13 +1595,19 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 									else if(read_cursor +insert_length >= (rl - base_ignored_head_tail))
 										insert_length = (rl - base_ignored_head_tail) - read_cursor;
 								}
+//								printf("INST: RL=%d; INSL=%d; READ_CUR=%d; IGNORE=%d\n", rl, insert_length, read_cursor , base_ignored_head_tail);
 
-								if(need_write)
+								if(need_write && insert_length >= 5)
 								{
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
 									assert(temp_fp);
-									write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand);
+									if(all_mapped_bases)
+										(*all_mapped_bases) += insert_length;
+									write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl);
+									for(x=0; x<insert_length; x++)
+										quality_count[quality_string[read_cursor + x] - '!']++;
+									
 								}
 								insertion_cursor += insert_length;
 								read_cursor += insert_length;
@@ -1146,11 +1623,21 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 					}
 					else if(cc == 'D' || cc == 'N')
 					{
+						// the left edge ( last WANTED base ) is chromosome_cursor-1
+						// the indel length is tmpv;
+						// now we add this into the event table.
+						if(event_table && cc=='D')
+							add_cigar_indel_event(event_table, chro, chromosome_cursor-1, tmpv, NULL);
 						chromosome_cursor += tmpv;
-						tmpv = 0;					
+						tmpv = 0;
 					}
 					else if(cc == 'I' )
 					{
+						// the left edge ( last WANTED base ) is chromosome_cursor-1
+						// the indel length is -tmpv;
+						// now we add this into the event table.
+						if(event_table)
+							add_cigar_indel_event(event_table, chro, chromosome_cursor-1, -tmpv, sequence + read_cursor);
 						read_cursor += tmpv;
 						tmpv = 0;
 					}
@@ -1170,14 +1657,22 @@ int break_SAM_file(char * in_SAM_file, char * temp_file_prefix, unsigned int * r
 				temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
 				assert(temp_fp);
 
-				write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand);
+				write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand, 0,rl);
 			}
 			read_number ++;
 		}
 	}
 
+	for(x=0;x<128;x++)
+	{
+		fprintf(qual_fp,"%d\t%llu\n",x,quality_count[x]);
+	}
+
+	if(block_count)
+		(*block_count) = fp_table->numOfElements;
 	HashTableDestroy(fp_table);
-	fclose(fp);
+	SamBam_fclose(sambam_reader);
+	fclose(qual_fp);
 	(*real_read_count) = read_number;
 	return 0;
 }
@@ -1209,7 +1704,7 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 {
 	int line_len, gene_number = 0, exons = 0;
 	char old_gene_name[MAX_GENE_NAME_LEN];
-	FILE * fp = fopen(annotation_file_name, "r");
+	FILE * fp = fopen(annotation_file_name, "rb");
 
 	if(!fp)
 	{
@@ -1299,3 +1794,583 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 	fclose(fp);
 	return 0;
 }
+
+int does_file_exist(char * path)
+{
+	int ret ;
+	FILE * fp = fopen(path, "rb");
+	ret = fp!=NULL;
+	if(fp)fclose(fp);
+
+	return ret;
+}
+
+unsigned long long int sort_SAM_hash(char * str)
+{
+	unsigned long long int hash = 5381;
+	int c, xk1=0;
+
+	while (1)
+	{
+		c = str[xk1++];
+		if(!c)break;
+		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+	}
+	return hash;
+}
+
+
+char * _SAMSORT_SNP_delete_temp_prefix = NULL;
+void SAM_SORT_SIGINT_hook(int param)
+{
+	int xk1, last_slash = -1;
+	if(_SAMSORT_SNP_delete_temp_prefix != NULL)
+	{
+		char del2[300], del_suffix[200], del_name[400];
+		SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
+		for(xk1=0; _SAMSORT_SNP_delete_temp_prefix[xk1]; xk1++)
+		{
+			if(_SAMSORT_SNP_delete_temp_prefix[xk1]=='/') last_slash = xk1;
+			else if(_SAMSORT_SNP_delete_temp_prefix[xk1]=='\\')
+			{
+				SUBREADprintf("The file name is unknown.\n");
+				return;
+			}
+		}
+		if(last_slash>=0)
+		{
+			memcpy(del2, _SAMSORT_SNP_delete_temp_prefix, last_slash);
+			del2[last_slash] = 0;
+			strcpy(del_suffix , _SAMSORT_SNP_delete_temp_prefix + last_slash + 1);
+		}
+		else
+		{
+			strcpy(del2,".");
+			strcpy(del_suffix , _SAMSORT_SNP_delete_temp_prefix);
+		}
+	
+		if(strlen(del_suffix)>8)
+		{
+			DIR           *d;
+			struct dirent *dir;
+
+			d = opendir(del2);
+			if (d)
+			{
+				while ((dir = readdir(d)) != NULL)
+				{
+					if(strstr(dir->d_name, del_suffix))
+					{
+						//printf("%s\n", dir->d_name);
+						strcpy(del_name, del2);
+						strcat(del_name, "/");
+						strcat(del_name, dir->d_name);
+						unlink(del_name);
+					}
+				}
+			}
+		}
+			
+	}
+
+	exit(param);
+}
+
+
+void * old_sig_TERM = NULL, * old_sig_INT = NULL;
+
+int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_path)
+{
+	char tmp_fname[MAX_FILE_NAME_LENGTH+40];
+	memset(writer, 0, sizeof(SAM_sort_writer));
+
+	old_sig_TERM = signal (SIGTERM, SAM_SORT_SIGINT_hook);
+	old_sig_INT = signal (SIGINT, SAM_SORT_SIGINT_hook);
+
+	sprintf(writer -> tmp_path, "%s/temp-sort-%06u-%08X-", tmp_path, getpid(), rand());
+	_SAMSORT_SNP_delete_temp_prefix = writer -> tmp_path;
+
+	sprintf(tmp_fname, "%s%s", writer -> tmp_path, "headers.txt");
+	writer -> all_chunks_header_fp = fopen(tmp_fname,"w");
+	if(!writer -> all_chunks_header_fp) return -1;
+	fclose(writer -> all_chunks_header_fp);
+	unlink(tmp_fname);
+
+	writer -> out_fp = fopen(output_file,"w");
+	if(!writer -> out_fp) return -1;
+
+	return 0;
+}
+
+void sort_SAM_finalise(SAM_sort_writer * writer)
+{
+	int x1_chunk, x1_block;
+	int xk1;
+	for(xk1=0;xk1<SAM_SORT_BLOCKS;xk1++)
+	{
+		if(writer -> current_block_fp_array[xk1])
+			fclose(writer -> current_block_fp_array[xk1]);
+	}
+	memset(writer -> current_block_fp_array, 0, sizeof(FILE *)*SAM_SORT_BLOCKS);
+	writer -> current_chunk_size = 0;
+	writer -> current_chunk++;
+
+	for(x1_block = 0; x1_block <SAM_SORT_BLOCKS; x1_block++){  
+		HashTable * first_read_name_table;
+		first_read_name_table = HashTableCreate(SAM_SORT_BLOCK_SIZE / 100 );
+		HashTableSetKeyComparisonFunction(first_read_name_table , fc_strcmp_chro);
+		HashTableSetDeallocationFunctions(first_read_name_table , free, free);
+		HashTableSetHashFunction(first_read_name_table, HashTableStringHashFunction);
+
+		for(x1_chunk = 0; x1_chunk < writer -> current_chunk; x1_chunk++)
+		{
+			char tmpfname[MAX_FILE_NAME_LENGTH+40];
+			sprintf(tmpfname, "%sCHK%08d-BLK%03d.bin", writer -> tmp_path, x1_chunk , x1_block);
+
+			FILE * bbfp = fopen(tmpfname,"rb");
+			if(!bbfp) continue;
+
+			while(!feof(bbfp))
+			{
+				char * read_name = NULL;
+				short flags;
+				short read_name_len;
+				short read_len;
+				int ret = fread(&flags, 2,1 , bbfp);
+				if(ret<1) break;
+				fread(&read_name_len, 2,1 , bbfp);
+				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+					fseek(bbfp, read_name_len, SEEK_CUR); 
+				else
+				{
+					read_name = malloc(read_name_len+1);
+					fread(read_name, 1, read_name_len, bbfp);
+					read_name[read_name_len] = 0;
+				}
+				fread(&read_len,2,1,bbfp);
+				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+					fseek(bbfp, read_len, SEEK_CUR); 
+				else
+				{
+					char * new_line_mem = malloc(read_len+1);
+					fread(new_line_mem, 1, read_len, bbfp);
+					new_line_mem[read_len] = 0;
+					HashTablePut(first_read_name_table, read_name, new_line_mem);
+					//if( first_read_name_table -> numOfElements<4)printf("RV=%s\n", read_name);
+				}
+			}
+
+			fclose(bbfp);
+		}
+
+		//printf("BLK=%d; CKS=%d; READS=%llu\n", x1_block, x1_chunk, first_read_name_table -> numOfElements);
+		unsigned long long int finished_second_reads = 0;
+
+		for(x1_chunk = 0; x1_chunk < writer -> current_chunk; x1_chunk++)
+		{
+			char tmpfname[MAX_FILE_NAME_LENGTH+40];
+			sprintf(tmpfname, "%sCHK%08d-BLK%03d.bin", writer -> tmp_path, x1_chunk , x1_block);
+
+			FILE * bbfp = fopen(tmpfname,"rb");
+			if(!bbfp) continue;
+
+			char * read_line_buf = malloc(3000);
+			char * read_name_buf = malloc(MAX_READ_NAME_LEN+1);
+
+			while(!feof(bbfp))
+			{
+				short flags;
+				short read_name_len;
+				short read_len;
+				int ret = fread(&flags, 2,1 , bbfp);
+				if(ret<1) break;
+
+				fread(&read_name_len, 2,1 , bbfp);
+				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+				{
+					fread(read_name_buf, 1, read_name_len, bbfp);
+					read_name_buf[read_name_len] = 0;
+					//printf("RR=%s\n", read_name_buf);
+				}
+				else	fseek(bbfp, read_name_len, SEEK_CUR);
+				fread(&read_len, 2,1 , bbfp);
+				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+				{
+					fread(read_line_buf, 1, read_len, bbfp);
+					read_line_buf[read_len] = 0;
+				}
+				else	fseek(bbfp, read_len, SEEK_CUR);
+
+				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+				{
+					char * first_read_text = HashTableGet(first_read_name_table, read_name_buf);
+					if(first_read_text)
+					{
+						fputs(first_read_text, writer->out_fp);
+						fputs(read_line_buf, writer->out_fp);
+						finished_second_reads ++;
+					}
+					else writer -> unpaired_reads +=1;
+
+					//else SUBREADprintf("WARNING: Unpaired read found in file:%s\n", read_name_buf);
+				}
+			}
+			if(finished_second_reads <= first_read_name_table -> numOfElements)
+				writer -> unpaired_reads += (first_read_name_table -> numOfElements-finished_second_reads);
+
+			fclose(bbfp);
+			unlink(tmpfname);
+			free(read_name_buf);
+			free(read_line_buf);
+		}
+
+		HashTableDestroy(first_read_name_table);
+	}
+	fclose(writer -> out_fp);
+	signal (SIGTERM, old_sig_TERM);
+	signal (SIGINT, old_sig_INT);
+}
+
+void sort_SAM_check_chunk(SAM_sort_writer * writer)
+{
+	if(writer -> current_chunk_size > SAM_SORT_BLOCK_SIZE * SAM_SORT_BLOCKS)
+	{
+		int xk1;
+		for(xk1=0;xk1<SAM_SORT_BLOCKS;xk1++)
+		{
+			if(writer -> current_block_fp_array[xk1])
+				fclose(writer -> current_block_fp_array[xk1]);
+		}
+		memset(writer -> current_block_fp_array, 0, sizeof(FILE *)*SAM_SORT_BLOCKS);
+		writer -> current_chunk_size = 0;
+		writer -> current_chunk++;
+	}
+}
+
+// the SAM_line includes "\n" at the tail!
+// line_len = strlen(SAM_line)
+int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
+{
+	assert(writer -> all_chunks_header_fp);
+	if(line_len<3) return 0;
+	if(SAM_line[0]=='@')
+		fputs(SAM_line, writer -> out_fp);
+	else
+	{
+		char read_name[MAX_READ_NAME_LEN];
+		int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
+
+		sort_SAM_check_chunk(writer);
+
+		while(line_cursor < line_len)
+		{
+			char nch = SAM_line[line_cursor++];
+			if(nch == '\t')
+			{
+				field_cursor = 0;
+				tabs++;
+				if(tabs>1) break;
+			}
+			else if(tabs == 0)
+			{
+				read_name[field_cursor++] = nch;
+				assert(MAX_READ_NAME_LEN>field_cursor);
+				read_name[field_cursor] = 0;
+			}
+			else if(tabs == 1)
+				flags = flags*10+(nch-'0');
+		}
+
+		//int is_second_read = (flags & 0x80) ? 1:0;
+		for(field_cursor = 0; read_name[field_cursor] ; field_cursor++)
+			if(read_name[field_cursor] == '/') read_name[field_cursor] = 0;
+
+		int read_name_len = strlen(read_name);
+		unsigned long long int read_line_hash = sort_SAM_hash(read_name);
+
+		int block_id = read_line_hash % SAM_SORT_BLOCKS;
+		if(!writer -> current_block_fp_array[block_id])
+		{
+			char tmpfname[MAX_FILE_NAME_LENGTH+40];
+			sprintf(tmpfname,"%sCHK%08d-BLK%03d.bin", writer -> tmp_path , writer -> current_chunk , block_id);
+			writer -> current_block_fp_array[block_id] = fopen(tmpfname, "wb");
+		}
+
+		fwrite(&flags, 2, 1, writer -> current_block_fp_array[block_id]);
+		fwrite(&read_name_len, 2, 1, writer -> current_block_fp_array[block_id]);
+		fwrite(read_name, 1, read_name_len, writer -> current_block_fp_array[block_id]);
+		fwrite(&line_len, 2, 1, writer -> current_block_fp_array[block_id]);
+		fwrite(SAM_line, 1, line_len, writer -> current_block_fp_array[block_id]);
+
+		writer -> output_file_size += line_len;
+		writer -> current_chunk_size += line_len;
+		writer -> written_reads ++;
+	}
+
+	return 0;
+}
+
+int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, unsigned long long int read_no)
+{
+	char read_name[MAX_READ_NAME_LEN];
+	int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
+
+	while(1)
+	{
+		char nch = SAM_line[line_cursor++];
+		if(!nch)break;
+		if(nch == '\t')
+		{
+			field_cursor = 0;
+			tabs++;
+			if(tabs>1) break;
+		}
+		else if(tabs == 0)
+		{
+			read_name[field_cursor++] = nch;
+			assert(MAX_READ_NAME_LEN>field_cursor);
+			read_name[field_cursor] = 0;
+		}
+		else if(tabs == 1)
+			flags = flags*10+(nch-'0');
+	}
+
+		//int is_second_read = (flags & 0x80) ? 1:0;
+	for(field_cursor = 0; read_name[field_cursor] ; field_cursor++)
+		if(read_name[field_cursor] == '/') read_name[field_cursor] = 0;
+
+
+	(*tmp_flag) = flags;
+	if(!(flags &1)) return 0;
+	if(read_no % 2 == 0)
+	{
+		if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)return 1;
+		strcpy(tmp_read_name , read_name);
+	}
+	else
+	{
+		if(flags & SAM_FLAG_FIRST_READ_IN_PAIR) return 1;
+		if(strcmp(tmp_read_name, read_name))return 1;
+	}
+
+	return 0;
+}
+
+int probe_file_type(char * fname);
+int warning_file_type(char * fname, int expected_type)
+{
+	int read_type = probe_file_type(fname);
+
+	if(read_type == FILE_TYPE_NONEXIST)
+	{
+		print_in_box(80,0,0,"WARNING file '%s' is inaccessible.", fname);
+		return 1;
+	}
+	else if((expected_type == FILE_TYPE_FAST_ && (read_type!= FILE_TYPE_FASTQ && read_type!= FILE_TYPE_FASTA))||
+		(expected_type != FILE_TYPE_FAST_ && expected_type != read_type))
+	{
+		print_in_box(80,0,0,"WARNING format issue in file '%s':", fname);
+		print_in_box(80,0,0,"        The required format is : %s", expected_type==FILE_TYPE_SAM?"SAM":(expected_type==FILE_TYPE_BAM?"BAM":(expected_type==FILE_TYPE_FAST_?"FASTQ or FASTA":"???")));
+		if(read_type == FILE_TYPE_UNKNOWN)
+			print_in_box(80,0,0,"        The file format is unknown.");
+		else
+			print_in_box(80,0,0,"        The real format seems to be : %s", read_type==FILE_TYPE_SAM?"SAM":(read_type==FILE_TYPE_BAM?"BAM":(read_type==FILE_TYPE_FASTA?"FASTA":"FASTQ")));
+		print_in_box(80,0,0,"A wrong format may result in wrong results or crash the program.");
+		print_in_box(80,0,0,"Please refer to the manual for file format options.");
+		print_in_box(80,0,0,"If the file is in the correct format, please ignore this message.");
+		print_in_box(80,0,0,"");
+
+		return 1;
+	}
+	return 0;
+}
+
+int probe_file_type(char * fname)
+{
+	FILE * fp = fopen(fname, "rb");
+	if(!fp) return FILE_TYPE_NONEXIST;
+
+	int ret = FILE_TYPE_UNKNOWN; 
+	int nch;
+	char *test_buf=malloc(5000);
+
+	nch = fgetc(fp);
+	if(nch == '@')	// FASTQ OR SAM
+	{
+		char * rptr = fgets(test_buf, 4999, fp);
+		int second_line_len = 0;
+		if(rptr)
+		{
+			rptr = fgets(test_buf, 4999, fp);
+			if(rptr)
+			{
+				second_line_len = strlen(test_buf);
+				int tabs = 0, x1;
+				for(x1=0;x1<4999;x1++)
+				{
+					if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+					if(test_buf[x1]=='\t'){
+						tabs++;
+						continue;
+					}
+
+					if(tabs == 1)
+						if(!isdigit(test_buf[x1]))break;
+				}
+				if(rptr[0]=='@' || tabs>7)
+					ret = FILE_TYPE_SAM;
+			}
+		}
+		if(ret == FILE_TYPE_UNKNOWN)
+		{
+			rptr = fgets(test_buf, 4999, fp);
+			if(rptr[0] == '+')
+			{
+				rptr = fgets(test_buf, 4999, fp);
+				if(rptr && second_line_len == strlen(test_buf))
+					ret = FILE_TYPE_FASTQ;
+			}
+		}
+	}
+	else if(nch == '>') // FASTA
+	{
+		char * rptr = fgets(test_buf, 4999, fp);
+		int x1;
+		if(rptr)
+		{
+			ret = FILE_TYPE_FASTA;
+			for(x1=0;x1<4999;x1++)
+			{
+				if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+				nch = toupper(test_buf[x1]);
+				if(nch < ' ' || nch>127)
+				{
+					ret = FILE_TYPE_UNKNOWN;
+					break;
+				}
+			}
+			rptr = fgets(test_buf, 4999, fp);
+			if(rptr && ret == FILE_TYPE_FASTA)
+			{
+				for(x1=0;x1<4999;x1++)
+				{
+					if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+					nch = toupper(test_buf[x1]);
+					if(nch == 'A' || nch == 'T' || nch == 'G' || nch == 'C' || nch == 'N' || nch == '.' || (nch >='0' && nch <= '3'))
+						;
+					else
+					{
+						ret = FILE_TYPE_UNKNOWN;
+						break;
+					}
+				}
+
+				if(x1==0) ret = FILE_TYPE_UNKNOWN;
+			}
+		}
+	}
+	else if(nch == 31) // BAM
+	{
+		nch = fgetc(fp);
+		if(nch == 139)
+		{
+			fclose(fp);
+			fp=NULL;
+			gzFile zfp = gzopen(fname, "rb");
+			if(zfp)
+			{
+				int rlen = gzread(zfp, test_buf,10);
+				if(rlen == 10 && memcmp(test_buf,"BAM\1",4)==0)
+					ret = FILE_TYPE_BAM;
+			}
+		}
+	}
+	else if(nch >= 0x20 && nch <= 0x7f) // SAM without headers
+	{
+		int tabs = 0, x1;
+		char * rptr = fgets(test_buf, 4999, fp);
+		if(rptr)
+			for(x1=0;x1<4999;x1++)
+			{
+				if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+				if(test_buf[x1]=='\t'){
+					tabs++;
+					continue;
+				}
+				if(tabs == 1)
+					if(!isdigit(test_buf[x1]))break;
+			}
+		if(tabs>7)
+			ret = FILE_TYPE_SAM;
+
+	}
+
+	free(test_buf);
+	if(fp)fclose(fp);
+	return ret;
+}
+
+#ifdef MAKE_INPUTTEST
+int main(int argc, char ** argv)
+{
+	FILE * ifp;
+	unsigned long long int rno=0;
+	short tmp_flags, is_sorted = 1;
+	char buff[3000], tmp_rname[100];
+
+	ifp = fopen(argv[1],"r");
+	while(1)
+	{
+		char * rr = fgets(buff,2999, ifp);
+		if(!rr) break;
+		if(buff[0]=='@')continue;
+		if(is_SAM_unsorted(buff, tmp_rname, &tmp_flags, rno))
+		{
+			printf("The input file is unsorted.\n");
+			is_sorted = 0;
+			break;
+		}
+		rno++;
+	}
+	
+	fclose(ifp);
+
+	if(is_sorted) return 0;
+
+	ifp = fopen(argv[1],"r");
+	SAM_sort_writer writer;
+	if(sort_SAM_create(&writer, argv[2], ".")){
+		printf("ERROR: unable to create the writer!\n");
+		return -1;
+	}
+
+	while(1)
+	{
+		char * rr = fgets(buff,2999, ifp);
+		if(!rr) break;
+		int line_len = strlen(buff);
+		sort_SAM_add_line(&writer, buff, line_len);
+	}
+	fclose(ifp);
+	sort_SAM_finalise(&writer);
+	printf("WRITTEN=%llu\nUNPAIR=%llu\n", writer.written_reads, writer.unpaired_reads);
+}
+#endif
+#ifdef MAKE_TYPETEST
+
+
+int main(int argc, char ** argv)
+{
+	char * fn = argv[1];
+	int type = probe_file_type(fn);
+	switch(type)
+	{
+		case FILE_TYPE_FASTQ: printf("Type: FASTQ\n"); break;
+		case FILE_TYPE_FASTA: printf("Type: FASTA\n"); break;
+		case FILE_TYPE_SAM  : printf("Type: SAM\n"); break;
+		case FILE_TYPE_BAM  : printf("Type: BAM\n"); break;
+		default: printf("Unknown type!\n");
+	}
+}
+
+#endif

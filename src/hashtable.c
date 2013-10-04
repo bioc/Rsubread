@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.1 2012/05/22 03:40:14 cvs Exp $
+ * $Id: hashtable.c,v 9999.9 2013/06/20 07:26:26 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -60,6 +60,13 @@ HashTable *HashTableCreate(long numOfBuckets) {
     if (hashTable == NULL)
         return NULL;
 
+    hashTable->appendix1=NULL;
+    hashTable->appendix2=NULL;
+    hashTable->appendix3=NULL;
+
+    hashTable->counter1=0;
+    hashTable->counter2=0;
+    hashTable->counter3=0;
 
     hashTable->bucketArray = (KeyValuePair **)
                         malloc(numOfBuckets * sizeof(KeyValuePair *));
@@ -198,6 +205,9 @@ int HashTableContainsValue(const HashTable *hashTable, const void *value) {
 \*--------------------------------------------------------------------------*/
 
 int HashTablePut(HashTable *hashTable, const void *key, void *value) {
+	return HashTablePutReplace(hashTable, key, value, 1);
+}
+int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key) {
     long hashValue;
     KeyValuePair *pair;
 
@@ -214,9 +224,10 @@ int HashTablePut(HashTable *hashTable, const void *key, void *value) {
 
     if (pair) {
         if (pair->key != key) {
-            if (hashTable->keyDeallocator != NULL)
+            if (replace_key==0 && hashTable->keyDeallocator != NULL)
                 hashTable->keyDeallocator((void *) pair->key);
-            pair->key = key;
+            if(replace_key)
+                pair->key = key;
         }
         if (pair->value != value) {
             if (hashTable->valueDeallocator != NULL)
@@ -680,7 +691,7 @@ static int pointercmp(const void *pointer1, const void *pointer2) {
 }
 
 static unsigned long pointerHashFunction(const void *pointer) {
-    return ((unsigned long) pointer) >> 4;
+    return ((unsigned long) pointer) ;
 }
 
 static int isProbablePrime(long oddNumber) {
@@ -707,3 +718,24 @@ static long calculateIdealNumOfBuckets(HashTable *hashTable) {
     return idealNumOfBuckets;
 }
 
+
+void free_values_destroy(HashTable * tab)
+{
+
+	KeyValuePair * cursor;
+	int bucket;
+	
+	for(bucket=0; bucket< tab -> numOfBuckets; bucket++)
+	{
+		cursor = tab -> bucketArray[bucket];
+		while (1)
+		{
+			if(!cursor) break;
+			char * read_txt = (char *) cursor ->value;
+			free(read_txt);
+			cursor = cursor->next;
+		}
+	}
+
+	HashTableDestroy(tab);
+}

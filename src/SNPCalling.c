@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -19,38 +17,80 @@
   ***************************************************************/
   
   
+
+#include <dirent.h> 
 #include <ctype.h>
 #include <math.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
+#include <pthread.h>
 #include <assert.h>
 #include "subread.h"
 #include "gene-algorithms.h"
 #include "SNPCalling.h"
 #include "input-files.h"
 
+#define USE_HUGE_PILE 0
+#define HUGE_PILE_HEIGHT 300
+
+#define SNP_INTERVAL_SUP 0
+
+extern unsigned int BASE_BLOCK_LENGTH;
+
+float LOG_10_2 ;
+
+int (*snp_progress_report_callback) (int,int,int);
+
 struct SNP_Calling_Parameters{
 
 	float supporting_read_rate;
+	int empty_blocks;
 	int max_supporting_read_number;
 	int min_supporting_read_number;
+	int min_alternative_read_number;
 
 	int neighbour_filter_testlen;
 	float neighbour_filter_rate;
 	int bases_ignored_head_tail;
+	int all_blocks;
+	int is_phred_64;
+	int is_BAM_file_input;
 
-	float fisher_exact_p_threshold;
 	int fisher_exact_testlen;
 
 	int min_phred_score;
+	int excellent_phred_score;
+	int final_phred_score;
 	int test_two_strands;
+	int neighbour_abundance_test;
+	int snp_interval;
+	float cutoff_multiplex ; 
+	float cutoff_upper_bound ; 
 
+	pthread_spinlock_t * output_fp_lock;
+
+	char pile_file_name[300];
+	int delete_piles;
+
+	char subread_index[300];
+	gene_offset_t * subread_index_offsets;
+	gene_value_index_t * subread_index_array;
+	HashTable * cigar_event_table;
+
+	unsigned long long int all_mapped_bases;
+	unsigned int fisher_normalisation_target; 
+
+	double start_time;
+	unsigned int real_read_count;
+	unsigned int reported_SNPs;
+	unsigned int reported_indels;
 };
 
-#define PRECALCULATE_FACTORIAL 50000
+#define PRECALCULATE_FACTORIAL 150000
 
 double * precalculated_factorial;// [PRECALCULATE_FACTORIAL];
 
@@ -99,11 +139,15 @@ double fisherSub(int a, int b, int c, int d)
  * @date   2000/04/23
  */
 
-float fisher_exact_test(int a, int b, int c, int d)
+#define LINEAR_STEP 300000
+
+double fisher_exact_test(int a, int b, int c, int d)
 {
 
 	if(a*1./c < b*1./d)	return 1.1;
 		// the abnormal level at this base should be at least as the noise level.
+
+	//printf("FET: %d %d %d %d\n", a, b, c, d);
 
 	if (a * d > b * c) {
             a = a + b; b = a - b; a = a - b; 
@@ -114,15 +158,32 @@ float fisher_exact_test(int a, int b, int c, int d)
         if (b > c) { b = b + c; c = b - c; b = b - c; }
 
         double p_sum = 0.0;
-        double p = fisherSub(a, b, c, d);
 
 
-        while (a >= 0) {
-            p_sum += p;
-            if (a == 0) break;
-            --a; ++b; ++c; --d;
-            p = fisherSub(a, b, c, d);
-        }
+	if(a<=LINEAR_STEP*4)
+	{
+        	double p = fisherSub(a, b, c, d);
+		while (a >= 0) {
+		    p_sum += p;
+		    if (a == 0) break;
+		    --a; ++b; ++c; --d;
+		    p = fisherSub(a, b, c, d);
+		}
+	}
+	else
+	{
+		//a-=LINEAR_STEP/2; b+=LINEAR_STEP/2; c+=LINEAR_STEP/2; d-=LINEAR_STEP/2;
+                a=max(0,a);d=max(0,d);
+        	double p = LINEAR_STEP*fisherSub(a, b, c, d);
+		while (a >= 0) {
+		    p_sum += p;
+		    if (a <= 0) break;
+		    a-= LINEAR_STEP; b+=LINEAR_STEP; c+=LINEAR_STEP; d-=LINEAR_STEP;
+                    a=max(0,a);d=max(0,d);
+		    p = min(a,LINEAR_STEP)*fisherSub(a, b, c, d);
+		}
+	
+	}
 
 	return p_sum;
 }
@@ -134,29 +195,82 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 	int block_no = (offset -1) / BASE_BLOCK_LENGTH, i;
 	char temp_file_name[300];
 	FILE *tmp_fp;
-	unsigned int * snp_voting_table_Pos, *snp_voting_table_Neg;	// offset * 4 + "A/C/G/T"[0,1,2,3]
-	float * snp_fisher_raws;
+	unsigned int * snp_voting_table_Pos_midNexcellent, *snp_voting_table_Neg_midNexcellent;	// offset * 4 + "A/C/G/T"[0,1,2,3]
+	unsigned int * snp_voting_table_Pos_excellent, *snp_voting_table_Neg_excellent;	// offset * 4 + "A/C/G/T"[0,1,2,3]
+	unsigned int * snp_voting_table_Pos_low, *snp_voting_table_Neg_low;	// offset * 4 + "A/C/G/T"[0,1,2,3]
+	unsigned long long base_density_distribution [ 287];
+	double multiplex_base = parameters -> fisher_normalisation_target / parameters -> cutoff_multiplex;
+
+	memset(base_density_distribution, 0 , sizeof( unsigned long long)* 287);
+
+	float * snp_fisher_raw, *pcutoff_list;
+	unsigned short * snp_filter_background_unmatched;
+	unsigned short * snp_filter_background_matched;
+	float * quality_pile;
+	long long int reference_len_long = reference_len;
+	char * sprint_line;
+	unsigned int sprint_pos=0, sprint_midNexcellent_sup=0;
+	unsigned char * huge_piles = NULL;
 
 	sprintf(temp_file_name , "%s%s-%04u.bin", temp_prefix, chro_name, block_no);
 	tmp_fp = fopen(temp_file_name, "rb");
 
 	// if no temp file is here, do nothing 
-	if(!tmp_fp)return 0;
+	if(!tmp_fp){
+		parameters->empty_blocks ++;
+		return 0;
+	}
 
-	snp_voting_table_Pos = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
-	snp_voting_table_Neg = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
-	snp_fisher_raws = (float *)SUBREAD_malloc(sizeof(float)  * reference_len);
-	if((!snp_voting_table_Neg) || (!snp_fisher_raws))
+
+	sprint_line = malloc(1000);
+	sprint_line[0]=0;
+	LOG_10_2 = log(2) / log(10);
+
+
+	//printf("I %s %d\n", chro_name, offset);
+
+	if(USE_HUGE_PILE)
+	{
+		huge_piles = (unsigned char *) SUBREAD_malloc(sizeof(char) * reference_len * HUGE_PILE_HEIGHT);
+		memset(huge_piles,0,sizeof(char) * reference_len * HUGE_PILE_HEIGHT);
+	}
+
+	quality_pile = (float *) SUBREAD_malloc(sizeof(float) * reference_len*4);	// A !AX !A ; T !TX !T ...
+
+	snp_voting_table_Pos_excellent = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
+	snp_voting_table_Neg_excellent = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
+
+	snp_voting_table_Pos_midNexcellent = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
+	snp_voting_table_Neg_midNexcellent = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
+
+	snp_voting_table_Pos_low = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
+	snp_voting_table_Neg_low = (unsigned int *)SUBREAD_malloc(sizeof(unsigned int) * reference_len*4); 
+
+	snp_filter_background_matched = (unsigned short *)SUBREAD_malloc(sizeof(unsigned short) * reference_len*4);
+	snp_filter_background_unmatched = (unsigned short *)SUBREAD_malloc(sizeof(unsigned short) * reference_len*4);
+
+	pcutoff_list = (float *)SUBREAD_malloc(sizeof(float)  * reference_len);
+	snp_fisher_raw = (float *)SUBREAD_malloc(sizeof(float)  * reference_len);
+	if((!snp_voting_table_Neg_low) || (!snp_fisher_raw))
 	{
 		fatal_memory_size();
 		return -1;
 	}
 
-	memset(snp_voting_table_Pos,0 ,sizeof(unsigned int) * reference_len*4);
-	memset(snp_voting_table_Neg,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(snp_voting_table_Pos_excellent,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(snp_voting_table_Neg_excellent,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(snp_voting_table_Pos_midNexcellent,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(snp_voting_table_Neg_midNexcellent,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(snp_voting_table_Pos_low,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(snp_voting_table_Neg_low,0 ,sizeof(unsigned int) * reference_len*4);
+	memset(quality_pile , 0 , sizeof(float) * reference_len*4);
 
 	for(i=0; i<reference_len; i++)
-		snp_fisher_raws[i]=-1.;
+	{
+		snp_fisher_raw[i]=-1.;
+		pcutoff_list[i]=-1.;
+	}
+
 
 	while(!feof(tmp_fp))
 	{
@@ -172,8 +286,8 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		fread(&read_len, sizeof(short), 1, tmp_fp);
 		fread(read, sizeof(char), read_len, tmp_fp);
 		fread(qual, sizeof(char), read_len, tmp_fp);
-
 		first_base_pos = read_rec.pos - block_no * BASE_BLOCK_LENGTH;
+
 
 
 		if(first_base_pos + read_len -1> reference_len || first_base_pos<1)
@@ -182,17 +296,23 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 			continue;
 		}
 
-		if(parameters->neighbour_filter_testlen)
+
+
+		memset(base_used,1,MAX_READ_LENGTH);
+		if(0*parameters->neighbour_filter_testlen)
 		{
 			int j;
-			memset(base_used,1,MAX_READ_LENGTH);
 			for(i=0;i<read_len;i++)
 			{
 				char true_value = referenced_genome[i + first_base_pos -1];
-				base_neighbour_test[i]=0;
-				if(qual[i] >='!'+ parameters->min_phred_score)
+				base_neighbour_test[i]=1;
+				if(qual[i] >= (parameters -> is_phred_64?'@':'!')+ parameters->min_phred_score)
+				{
 					if(true_value == read[i])
 						base_neighbour_test[i]=1;
+				}
+			//	else
+			//		base_neighbour_test[i]=0;
 			}
 
 			for(i=0;i<read_len;i++)
@@ -200,25 +320,22 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 				int correct=0, wrong=0;
 				for(j=max(0, i-parameters->neighbour_filter_testlen); j<min(read_len, i+parameters->neighbour_filter_testlen); j++)
 				{
-					if(base_neighbour_test[j])correct++;
+					//if(j==i || base_neighbour_test[i]==2)continue;
+					if(base_neighbour_test[j]==1)correct++;
 					else wrong++;
 				}
-				if(correct*1./(correct+wrong)<parameters->neighbour_filter_rate)
+				if((correct+1)*1./(correct+wrong)<parameters->neighbour_filter_rate)
 					base_used[i]=0;
 			}
 		}
+
+
 		for(i=0;i<read_len;i++)
 		{
-			char base_int = 3;
+			char base_int = -1;
 
-			if(qual[i] < '!'+parameters->min_phred_score)continue;
-			if(parameters->neighbour_filter_testlen &&  !base_used[i])continue;
-
-			if(i+first_base_pos > reference_len  || i+first_base_pos<1)
-			{
-				SUBREADprintf("Warning: read out of boundary: %u >= %u\n", i+first_base_pos, reference_len);
-				break;
-			}
+			char true_value = referenced_genome[i + first_base_pos -1];
+			//int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 
 			switch(read[i])
 			{
@@ -230,40 +347,138 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					break;
 				case 'G':
 					base_int = 2;
+					break;
+				case 'T':
+					base_int = 3;
+			}
+
+			if(huge_piles)
+			{
+				unsigned int from_addr = HUGE_PILE_HEIGHT * (i + first_base_pos -1);
+				unsigned int j;
+				for(j=from_addr; j< from_addr+HUGE_PILE_HEIGHT; j++)
+				{
+					if(!huge_piles[j])
+						break;
+				}
+				if(j<from_addr+HUGE_PILE_HEIGHT-1)
+				{
+					huge_piles[j] = ( base_int << 6 )| (1+qual[i] - (parameters -> is_phred_64?'@':'!'));
+				}
+			}
+
+			//if(qual[i] < '!'+parameters->min_phred_score)continue;
+			if(parameters->neighbour_filter_testlen &&  !base_used[i])continue;
+
+			if(true_value=='N' || true_value=='.') continue;
+
+
+			if(i+first_base_pos > reference_len  || i+first_base_pos<1)
+			{
+				SUBREADprintf("Warning: read out of boundary: %u >= %u\n", i+first_base_pos, reference_len);
+				break;
 			}
 			int j;
 			unsigned int supporting_bases = 0;
+
+			quality_pile [(first_base_pos+i-1)*4+base_int] += (qual[i]- (parameters -> is_phred_64?'@':'!')); 
+
 			for(j=0; j<4; j++)
 			{
-				supporting_bases += snp_voting_table_Neg[(first_base_pos+i-1)*4+j];
-				supporting_bases += snp_voting_table_Pos[(first_base_pos+i-1)*4+j];
+				supporting_bases += snp_voting_table_Neg_midNexcellent[(first_base_pos+i-1)*4+j];
+				supporting_bases += snp_voting_table_Pos_midNexcellent[(first_base_pos+i-1)*4+j];
 			}
 			if(supporting_bases < parameters->max_supporting_read_number)
 			{
-				if(read_rec.strand)
-					snp_voting_table_Neg[(first_base_pos+i-1)*4+base_int]++;
+				if(qual[i] <  (parameters -> is_phred_64?'@':'!')+parameters->min_phred_score) 	// low quality bases
+				{
+					if(qual[i]>3+(parameters -> is_phred_64?'@':'!'))
+					{
+						if(read_rec.strand)
+							snp_voting_table_Neg_low[(first_base_pos+i-1)*4+base_int]+=1;
+						else
+							snp_voting_table_Pos_low[(first_base_pos+i-1)*4+base_int]+=1;
+					}
+				}
 				else
-					snp_voting_table_Pos[(first_base_pos+i-1)*4+base_int]++;
+				{
+					if(read_rec.strand)
+						snp_voting_table_Neg_midNexcellent[(first_base_pos+i-1)*4+base_int]+=1;
+					else
+						snp_voting_table_Pos_midNexcellent[(first_base_pos+i-1)*4+base_int]+=1;
+				}
+
+				if(qual[i] >=  (parameters -> is_phred_64?'@':'!')+parameters->excellent_phred_score) 	// very high quality bases
+				{
+					if(read_rec.strand)
+						snp_voting_table_Neg_excellent[(first_base_pos+i-1)*4+base_int]+=1;
+					else
+						snp_voting_table_Pos_excellent[(first_base_pos+i-1)*4+base_int]+=1;
+				}
 			}
 		}
 	}
 	fclose(tmp_fp);
 
-	unlink(temp_file_name);
+	if (parameters -> delete_piles)
+		unlink(temp_file_name);
 	// Finding SNPs from the finished voting table
 
 	char * base_is_reliable = NULL;
 
 
-	if(parameters -> fisher_exact_testlen || parameters -> test_two_strands)
+	if(parameters -> fisher_exact_testlen || parameters -> test_two_strands || parameters->neighbour_abundance_test || 1)
 	{
 		base_is_reliable = (char *)malloc(sizeof(char) * reference_len);
 		memset(base_is_reliable,1 , sizeof(char) * reference_len);
 	}
 
+
+	if(parameters->neighbour_abundance_test)
+	{
+		int window_size = 7;
+		int window_no = 0;
+		for(i= -window_size;i<reference_len_long; i++)
+		{
+			int j;
+			int BOI_no = 0;
+
+			if(i<reference_len_long-window_size)
+				for(j=0;j<4;j++)
+				{
+					window_no+=snp_voting_table_Pos_midNexcellent[(window_size+i)*4+j];
+					window_no+=snp_voting_table_Neg_midNexcellent[(window_size+i)*4+j];
+				}
+
+			if(0 && i>=0)
+			{
+				for(j=0;j<4;j++)
+				{
+					BOI_no+=snp_voting_table_Pos_midNexcellent[i*4+j];
+					BOI_no+=snp_voting_table_Neg_midNexcellent[i*4+j];
+				}
+				int window_size_used = min(i,window_size) + min(reference_len_long-i, window_size);
+				//printf("AT %u : window = %d , BOI = %d\n", i, window_no, BOI_no);
+				if(BOI_no * (window_size_used)>1.9*(window_no - BOI_no) || BOI_no * (window_size_used)<(1/1.9)*(window_no - BOI_no))
+					base_is_reliable[i]=0;
+			}
+
+			if(i>=window_size)
+				for(j=0;j<4;j++)
+				{
+					window_no-=snp_voting_table_Pos_midNexcellent[(i-window_size)*4+j];
+					window_no-=snp_voting_table_Neg_midNexcellent[(i-window_size)*4+j];
+				}
+
+
+			
+		}
+		
+	}
+
 	if(parameters -> test_two_strands)
 	{
-		for(i= 0;i<reference_len; i++)
+		for(i= 0;i<reference_len_long; i++)
 		{
 			int j;
 			int pos_match=0, pos_unmatch=0, neg_match=0, neg_unmatch=0;
@@ -275,22 +490,92 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 			{
 				if(j==true_value_int)
 				{
-					pos_match += snp_voting_table_Pos[i*4+j];
-					neg_match += snp_voting_table_Neg[i*4+j];
+					pos_match += snp_voting_table_Pos_midNexcellent[i*4+j];
+					neg_match += snp_voting_table_Neg_midNexcellent[i*4+j];
 				}
 				else
 				{
-					pos_unmatch += snp_voting_table_Pos[i*4+j];
-					neg_unmatch += snp_voting_table_Neg[i*4+j];
+					pos_unmatch += snp_voting_table_Pos_midNexcellent[i*4+j];
+					neg_unmatch += snp_voting_table_Neg_midNexcellent[i*4+j];
 				}
 
 			}
 
 			float p_diff = fisher_exact_test(pos_match, neg_match, pos_unmatch, neg_unmatch);
-			if(p_diff<0.1)
+			if(p_diff<0.15)
 				base_is_reliable[i]=0;
 		}
 	}
+
+
+
+	if(parameters -> neighbour_filter_testlen )
+	{
+		int j;
+		int a=0, b=0, c=0, d=0;
+		long long int reference_len_long = reference_len;
+		/**    | This | All_Window 
+		 * ----+------+-------
+		 * #mm |  a   |  b
+		 * #pm |  c   |  d
+		 **/
+
+
+		for(i= - parameters -> neighbour_filter_testlen;i<reference_len_long; i++)
+		{
+			a=0; c=0;
+			for(j=0;j<4;j++)
+			{
+				if(i+parameters -> neighbour_filter_testlen < reference_len_long)
+				{
+					char true_value = referenced_genome[i + parameters -> neighbour_filter_testlen];
+					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+					if(j == true_value_int)
+						d += snp_voting_table_Pos_midNexcellent[ (i+parameters -> neighbour_filter_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> neighbour_filter_testlen) *4 + j ];
+					else
+						b += snp_voting_table_Pos_midNexcellent[ (i+parameters -> neighbour_filter_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> neighbour_filter_testlen) *4 + j ];
+				}
+				
+				if(i>=0)
+				{
+					char true_value = referenced_genome[i];
+					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+
+					if(j == true_value_int)
+						c  =  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
+					else
+						a +=  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
+				}
+
+			}
+		
+			// test the middle base
+			if(i>=0 && a > 0){
+
+				float window_correct_rate = (d-c)*1./(d+b-a-c);
+				if(window_correct_rate < parameters->neighbour_filter_rate)
+				{
+					base_is_reliable[i] = 0;
+				}
+				
+			}
+
+			for(j=0;j<4;j++)
+				if(i >= parameters -> neighbour_filter_testlen)
+				{
+					char true_value = referenced_genome[i - parameters -> neighbour_filter_testlen];
+					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+					if(j == true_value_int)
+						d -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> neighbour_filter_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> neighbour_filter_testlen) *4 + j ];
+					else
+						b -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> neighbour_filter_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> neighbour_filter_testlen) *4 + j ];
+				}
+	
+		}
+	}
+
+
+	
 
 	if(parameters -> fisher_exact_testlen)
 	{
@@ -307,6 +592,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		for(i= - parameters -> fisher_exact_testlen;i<reference_len_long; i++)
 		{
 			a=0; c=0;
+			unsigned int dens_loci=0;
 			for(j=0;j<4;j++)
 			{
 				if(i+parameters -> fisher_exact_testlen < reference_len_long)
@@ -314,33 +600,83 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					char true_value = referenced_genome[i + parameters -> fisher_exact_testlen];
 					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 					if(j == true_value_int)
-						d += snp_voting_table_Pos[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg[ (i+parameters -> fisher_exact_testlen) *4 + j ];
+						d += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
 					else
-						b += snp_voting_table_Pos[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg[ (i+parameters -> fisher_exact_testlen) *4 + j ];
+						b += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
 				}
 				
 				if(i>=0)
 				{
 					char true_value = referenced_genome[i];
 					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+					dens_loci += snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
 
 					if(j == true_value_int)
-						c  =  snp_voting_table_Pos[ i * 4 + j ] + snp_voting_table_Neg[ i * 4 + j ];
+						c  =  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
 					else
-						a +=  snp_voting_table_Pos[ i * 4 + j ] + snp_voting_table_Neg[ i * 4 + j ];
+						a +=  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
 				}
 
+			}
+			if(i>=0 && dens_loci>0)
+			{
+				dens_loci =min(287-1, dens_loci/5);
+				base_density_distribution[dens_loci]++;
 			}
 		
 			// test the middle base
 			if(i>=0 && a > 0){
+
+				/*
+				if(block_no == 4 && i > 2806900 && i < 2986960)
+				{
+				}*/
+
+
+				float observed_coverage = (b+d) *1./(1. + 2 * parameters -> fisher_exact_testlen) ;
+				double p_cutoff = pow(10, -(observed_coverage/multiplex_base));
+				//p_cutoff = max(1E-26, p_cutoff);
+				//p_cutoff = min(7E-3, p_cutoff);
+				p_cutoff = min(parameters -> cutoff_upper_bound, p_cutoff);
+
+
+
+
+
+				//printf("FISH TEST AT %u : %d/%d vs %d/%d\n", block_no*BASE_BLOCK_LENGTH+1 +i, a, c, b-a, d-c);
+				//float p_middle = fisher_exact_test(a, b-a, max(1,c/(2*parameters -> fisher_exact_testlen)), max(1, (d-c)/ (2*parameters -> fisher_exact_testlen)));
+
+
+				//normalisation_parameter = pow(normalisation_parameter ,0.5);
+
+
 				float p_middle = fisher_exact_test(a, b-a, c, d-c);
-				if(p_middle > parameters->fisher_exact_p_threshold)
-					snp_fisher_raws [i] = - 2.0;
-				else
-					snp_fisher_raws [i] = p_middle;
+
+				/*
+
+				double normalisation_parameter = (parameters -> fisher_normalisation_target *(1. + 2 * parameters -> fisher_exact_testlen)) / (b+d);
+
+				#define calc_normPOI(x)  ((int)(0.5+1.*(x) * normalisation_parameter))
+				#define calc_normWIN(x)  ((int)(0.5+1.*(x) * normalisation_parameter / (2 * parameters -> fisher_exact_testlen)))
+
+
+				int aa = calc_normPOI(a);
+				int bb = calc_normWIN(b-a);
+				int cc = calc_normPOI(c);
+				int dd = calc_normWIN(d-c);
+
+				float p_norm_middle = fisher_exact_test(aa, bb, cc, dd);
+				*/
+				// 10 ^ -(OC/TC * 6)
+
+				if( p_middle < p_cutoff && (d-c)*20>(d+b-a-c)*16) 
+					snp_fisher_raw [i] = p_middle;
+				else	snp_fisher_raw [i] = -999;
+
+				snp_filter_background_unmatched[i] = b-a;
+				snp_filter_background_matched[i] = d-c;
+
 				fisher_test_size ++;
-			
 			}
 
 			for(j=0;j<4;j++)
@@ -349,71 +685,166 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					char true_value = referenced_genome[i - parameters -> fisher_exact_testlen];
 					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 					if(j == true_value_int)
-						d -= snp_voting_table_Pos[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg[ (i-parameters -> fisher_exact_testlen) *4 + j ];
+						d -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
 					else
-						b -= snp_voting_table_Pos[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg[ (i-parameters -> fisher_exact_testlen) *4 + j ];
+						b -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
 				}
 	
 		}
 	}
 
+	float median_density = 0;
+	unsigned long long all_bases_in_block = 0, accumulate_bases=0;
+	double dense_prob [287]; 
 
-	
+	for(i=0; i<287; i++)
+		all_bases_in_block += base_density_distribution[i];
+
+	for(i=0; i<287; i++)
+	{
+		accumulate_bases += base_density_distribution[i];
+		if(accumulate_bases<all_bases_in_block/2) median_density = i*5.0 + 2.5;
+		dense_prob[i]=accumulate_bases*1./all_bases_in_block;
+	}
+
+
 
 	for(i=0;i<reference_len; i++)
 	{
 		char true_value = referenced_genome[i];
+		int true_value_int = (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 		int tested_int;
 		int all_reads = 0;
 		char base_list[10], supporting_list[55], snps=0;
 
-		for(tested_int=0; tested_int <4; tested_int ++)
-			all_reads += snp_voting_table_Pos[i*4+tested_int] + snp_voting_table_Neg[i*4+tested_int];
-
-		if(all_reads<parameters->min_supporting_read_number) continue;
-		if(base_is_reliable && !(base_is_reliable[i])) continue;
-		base_list[0]=0;
-		supporting_list[0]=0;
+		if(true_value == 'N') continue;
 
 		for(tested_int=0; tested_int <4; tested_int ++)
+			all_reads += snp_voting_table_Pos_midNexcellent[i*4+tested_int] + snp_voting_table_Neg_midNexcellent[i*4+tested_int];
+
+		//int all_reads_index = min(287-1, all_reads/5);
+		if(all_reads<parameters->min_supporting_read_number || !all_reads) continue;
+		//if(base_is_reliable && !(base_is_reliable[i])) continue;
+
+		if(all_reads >= HUGE_PILE_HEIGHT || !huge_piles)
 		{
-			if(tested_int != (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3))))
-				if((snp_voting_table_Pos[i*4+tested_int]+snp_voting_table_Neg[i*4+tested_int]) *1.0 / all_reads >= parameters->supporting_read_rate)
-				{
-					char int_buf[9];
-					sprintf(int_buf, "%u", snp_voting_table_Pos[i*4+tested_int] + snp_voting_table_Neg[i*4+tested_int]);
-					if(snps>0)
-					{
-						base_list[snps*2-1] = '/';
-						base_list[snps*2] = tested_int==0?'A':(tested_int == 1?'C':(tested_int == 2?'G':'T'));
-						base_list[snps*2+1] = 0;
-						strcat(supporting_list,"/");
-						strcat(supporting_list,int_buf);
-					}
-					else
-					{
-						base_list[0] = tested_int==0?'A':(tested_int == 1?'C':(tested_int == 2?'G':'T'));
-						base_list[1] = 0;
-						strcpy(supporting_list, int_buf);
-					}
-					snps++;
-					
-				}
-		}
-		if(snps)
-			fprintf(out_fp, "%s\t%u\t%c\t%s\t%s\t%d\t%.9f\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, supporting_list , all_reads, snp_fisher_raws[i]);
+			base_list[0]=0;
+			supporting_list[0]=0;
 
+			for(tested_int=0; tested_int <4; tested_int ++)
+			{
+				if(tested_int != true_value_int)
+				{
+					int midNexcellent_sup = snp_voting_table_Pos_midNexcellent[i*4+tested_int]+snp_voting_table_Neg_midNexcellent[i*4+tested_int];
+					//int excellent_sup = snp_voting_table_Pos_excellent[i*4+tested_int]+snp_voting_table_Neg_excellent[i*4+tested_int];
+					//int low_sup = midNexcellent_sup + (snp_voting_table_Pos_low[i*4+tested_int]+snp_voting_table_Neg_low[i*4+tested_int]);
+
+					//float sup_qual = quality_pile[i*4+tested_int]/midNexcellent_sup;
+					if( (midNexcellent_sup *1.0 / all_reads >= parameters->supporting_read_rate && midNexcellent_sup >= parameters->min_alternative_read_number))
+						// || (midNexcellent_sup>0 &&   low_sup  *1.0 / all_reads >= parameters->supporting_read_rate && low_sup >= parameters->min_alternative_read_number) )
+					{
+						char int_buf[12];
+						sprintf(int_buf, "%u", midNexcellent_sup);
+						if(snps>0)
+						{
+							base_list[snps*2-1] = ',';
+							base_list[snps*2] = tested_int==0?'A':(tested_int == 1?'C':(tested_int == 2?'G':'T'));
+							base_list[snps*2+1] = 0;
+							strcat(supporting_list,",");
+							strcat(supporting_list,int_buf);
+						}
+						else
+						{
+							base_list[0] = tested_int==0?'A':(tested_int == 1?'C':(tested_int == 2?'G':'T'));
+							base_list[1] = 0;
+							strcpy(supporting_list, int_buf);
+						}
+						snps++;
+							
+					}
+				}
+			}
+			if(snps)
+			{
+				float fisher_density_adj = snp_fisher_raw[i];// / dense_prob[all_reads_index];
+
+				if(fisher_density_adj >= 0. )
+				{
+					snprintf(sprint_line,999, "%s\t%u\t.\t%c\t%s\t%.3f\t.\tDP=%d;WINMIM=%d;WINTOT=%d;ALTNUMBER=%s\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, -10*log(max(1E-40,fisher_density_adj))/log(10), all_reads, snp_filter_background_unmatched[i], snp_filter_background_matched[i]+snp_filter_background_unmatched[i], supporting_list);
+					if(parameters->output_fp_lock)
+						subread_lock_occupy(parameters->output_fp_lock);
+					fwrite(sprint_line, 1, strlen(sprint_line),out_fp);
+					parameters->reported_SNPs++;
+					if(parameters->output_fp_lock)
+						subread_lock_release(parameters->output_fp_lock);
+
+				}
+				sprint_midNexcellent_sup = all_reads;
+				sprint_pos=i;
+			}
+
+
+			// check the indels right after the POI location
+			char event_token[100];
+			char event_token2[100];
+			snprintf(event_token, 99, "%s\t%u", chro_name, BASE_BLOCK_LENGTH*block_no + 1 + i);
+			long long int indel_no = HashTableGet(parameters -> cigar_event_table, event_token) - NULL;
+			for(tested_int = 0; tested_int < indel_no; tested_int ++)
+			{
+				snprintf(event_token2, 99, "%s\t%u\t%d", chro_name, BASE_BLOCK_LENGTH*block_no + 1 + i, tested_int);
+				long long int tmpv = HashTableGet(parameters -> cigar_event_table, event_token2) - NULL;
+				long long int event_id = 0xffffff&(tmpv >> 8);
+
+				int indels = (tmpv & 0xff) - 0x80;
+
+				if(parameters->output_fp_lock)
+					subread_lock_occupy(parameters->output_fp_lock);
+
+				fprintf(out_fp, "%s\t.\t", event_token);
+
+				fwrite(referenced_genome + i, max(0, indels) + 2, 1, out_fp);
+
+				fwrite("\t", 1, 1, out_fp);
+				if(indels<0)
+				{
+					char ** seq_tab = (char **)parameters -> cigar_event_table-> appendix1;
+					char * ins_seq = seq_tab[event_id];
+					fwrite(referenced_genome + i, 1, 1, out_fp);
+					fwrite(ins_seq, 1, -indels, out_fp);
+				}
+				else
+					fwrite(referenced_genome + i, 1, 1, out_fp);
+				fwrite(referenced_genome + 1 + i + max(0,indels), 1, 1, out_fp);
+				unsigned short * indel_sups = parameters -> cigar_event_table-> appendix2;
+				fprintf(out_fp, "\t1.0\t.\tINDEL;DP=%d\n",indel_sups[event_id]);
+
+				parameters->reported_indels++;
+				if(parameters->output_fp_lock)
+					subread_lock_release(parameters->output_fp_lock);
+			}
+		}
 	}
 
+
 	if(base_is_reliable) free(base_is_reliable);
-	free(snp_voting_table_Pos);
-	free(snp_voting_table_Neg);
-	free(snp_fisher_raws);
+	if(huge_piles) free(huge_piles);
+	free(snp_filter_background_matched);
+	free(snp_filter_background_unmatched);
+	free(snp_voting_table_Pos_low);
+	free(snp_voting_table_Neg_low);
+	free(snp_voting_table_Pos_excellent);
+	free(snp_voting_table_Neg_excellent);
+	free(snp_voting_table_Pos_midNexcellent);
+	free(snp_voting_table_Neg_midNexcellent);
+	free(snp_fisher_raw);
+	free(pcutoff_list);
+	free(quality_pile);
+	free(sprint_line);
 	return 0;
 }
 
 
-int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * temp_prefix, chromosome_t * chromosomes , struct SNP_Calling_Parameters* parameters)
+int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * temp_prefix, chromosome_t * chromosomes , struct SNP_Calling_Parameters* parameters, int * task_no, int thread_no, int all_threads)
 {
 	int chro_no;
 	unsigned int offset=0, all_offset = 0;
@@ -421,7 +852,7 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 	unsigned int chro_len=0;
 	char * referenced_base;
 
-	referenced_base = (char *) SUBREAD_malloc(sizeof(char)* BASE_BLOCK_LENGTH);
+	referenced_base = (char *) SUBREAD_malloc(sizeof(char)* BASE_BLOCK_LENGTH + 10000);
 	if(!referenced_base)
 	{
 		fatal_memory_size();
@@ -439,45 +870,87 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 		}
 	}
 
-	SUBREADprintf("Processing chromosome %s in FASTA file; expected length is %u.\n", chro_name, chro_len);
-	SUBREADfflush(stdout);
-	if(!chro_len)
+
+	//if (all_threads>1)
+	//	SUBREADprintf("Thread #%d is processing chromosome %s in FASTA file; expected length is %u.\n", thread_no, chro_name, chro_len);
+	if(chro_len)
 	{
-		SUBREADprintf("Unknown chromosome name in FASTA file: %s\n", chro_name);
-		free(referenced_base);
-		return 1;
+		//SUBREADprintf("Processing chromosome %s in FASTA file; expected length is %u.\n", chro_name, chro_len);
+		while( 1 || all_offset <= chro_len - 1)
+		{
+			char nc = fgetc(in_fp);
+
+			if(nc == ' ' || nc == '\r' || nc == '\n') continue;
+			if(nc == '>')
+				fseek(in_fp, -1, SEEK_CUR);
+
+			if(nc != EOF && nc != '>')
+			{
+				nc = toupper(nc);
+				referenced_base[offset++] = (nc=='A' || nc == 'G' || nc == 'C')?nc:'T';
+				all_offset ++;
+			}
+
+			if((nc == '>'||nc == EOF) && all_offset < chro_len)
+				SUBREADprintf("WARNING: Chromosome is shorter than expected: %s\n", chro_name);
+
+			if(offset == BASE_BLOCK_LENGTH || nc == EOF || nc == '>')
+			{
+				if(nc!=EOF && nc!='>')
+				{
+					long long int back_seek = ftello(in_fp);
+					int xk2;
+					for(xk2=0; xk2<10000; xk2++)
+					{
+						char ncx = fgetc(in_fp);
+						if(ncx == EOF || ncx == '>') break;
+						if(ncx == '\r' || ncx=='\n') continue;
+						referenced_base[offset+xk2] = (ncx=='A' || ncx == 'G' || ncx == 'C')?ncx:'T';
+					}
+
+					fseeko(in_fp, back_seek, SEEK_SET);
+				}
+
+
+				if( (*task_no) % all_threads == thread_no && all_offset <= chro_len)
+				{
+					process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
+					print_in_box(89,0,0,"processed block %c[36m%s@%d%c[0m by thread %d/%d [block number=%d/%d]", CHAR_ESC, chro_name, all_offset, CHAR_ESC , thread_no+1, all_threads, 1+(*task_no)-parameters->empty_blocks, parameters->all_blocks);
+				}
+				else if((*task_no) % all_threads == thread_no)
+					printf("Ignored in: %s@%d by thr %d/%d [tid=%d]\n", chro_name, all_offset, thread_no, all_threads, *task_no);
+				offset = 0;
+				(*task_no)++;
+			}
+
+			if(nc == EOF || nc == '>'){
+				if(nc == '>') fseek(in_fp, -1, SEEK_CUR);
+				break;
+			}
+
+		}
+		//printf("Current indels=%ld\n", parameters->cigar_event_table->numOfElements);
 	}
-
-	
-	while(all_offset <= chro_len)
+	else
 	{
-		char nc = fgetc(in_fp);
-
-		if(nc == ' ' || nc == '\r' || nc == '\n') continue;
-		if(nc == '>')
-			fseek(in_fp, -1, SEEK_CUR);
-
-		if(nc != EOF && nc != '>')
+		if(thread_no==0)
+			print_in_box(89,0,0,"WARNING chromosome %c[36m%s%c[0m is not in the SAM header.", CHAR_ESC, chro_name, CHAR_ESC);
+		while(!feof(in_fp))
 		{
-			nc = toupper(nc);
-			referenced_base[offset++] = (nc=='A' || nc == 'G' || nc == 'C')?nc:'T';
-			all_offset ++;
+			long long int fp0 = ftello(in_fp);
+			
+			char * ret = fgets(referenced_base, 2000, in_fp);
+			if(!ret) break;
+
+			if(referenced_base[0]=='>')
+			{
+				fseeko(in_fp, fp0, SEEK_SET);
+				break;
+			}
 		}
-
-		if((nc == '>'||nc == EOF) && all_offset < chro_len)
-			SUBREADprintf("WARNING: Chromosome is shorter than expected: %s\n", chro_name);
-
-		if(offset == BASE_BLOCK_LENGTH || nc == EOF || nc == '>')
-		{
-			process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
-			offset = 0;
-		}
-
-		if(nc == EOF || nc == '>') break;
 	}
 
 	free(referenced_base);
-	
 
 	return 0;
 }
@@ -489,9 +962,11 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 int parse_read_lists(char * in_FASTA_file, FILE * out_fp, char * temp_prefix, chromosome_t * chromosomes, struct SNP_Calling_Parameters * parameters, int all_threads, int thread_no)
 {
 	char line_buffer [3000];
-
+	int task_no = 0;
 
 	FILE *fp = fopen(in_FASTA_file,"r");
+
+	long long int FASTA_size = ftello(fp);
 
 	if(!fp)
 	{
@@ -502,6 +977,7 @@ int parse_read_lists(char * in_FASTA_file, FILE * out_fp, char * temp_prefix, ch
 	while(!feof(fp))
 	{
 		int linelen = read_line(2999, fp, line_buffer, 0);
+		
 		if(line_buffer[0] == '>')
 		{
 			char chro_name [MAX_CHROMOSOME_NAME_LEN];
@@ -510,10 +986,15 @@ int parse_read_lists(char * in_FASTA_file, FILE * out_fp, char * temp_prefix, ch
 			{
 				if(line_buffer[i+1] == ' ' || line_buffer[i+1] == '|' || line_buffer[i+1] == '\t')
 					break;
-				else chro_name[i] = line_buffer[i+1];
+				else chro_name[i] = line_buffer[min(MAX_CHROMOSOME_NAME_LEN-1,i+1)];
 			}
-			chro_name[i]=0;
-			if(run_chromosome_search(fp, out_fp, chro_name , temp_prefix, chromosomes, parameters)) return -1;
+			chro_name[min(MAX_CHROMOSOME_NAME_LEN-1,i)]=0;
+	//		if(strcmp(chro_name,"chr20")==0)
+			if(run_chromosome_search(fp, out_fp, chro_name , temp_prefix, chromosomes, parameters, &task_no, thread_no, all_threads)) return -1;
+
+			float finished_rate = ftello(fp)*1./FASTA_size;
+			if(snp_progress_report_callback)
+				snp_progress_report_callback(40,10,3000+finished_rate*7000);
 		}
 	}
 	fclose(fp);
@@ -521,19 +1002,193 @@ int parse_read_lists(char * in_FASTA_file, FILE * out_fp, char * temp_prefix, ch
 	return 0;
 }
 
+struct parse_read_thread_context
+{
+	int thread_id;
+	int all_threads;
+
+	struct SNP_Calling_Parameters* parameters;
+	char * temp_prefix;
+	char * in_FASTA_file;
+	chromosome_t * chromosomes;
+
+	pthread_spinlock_t init_lock;
+	FILE * out_fp;	
+};
+
+void *parse_read_lists_wrapper(void * vparam)
+{
+	struct parse_read_thread_context *param = (struct parse_read_thread_context *)vparam;
+	int my_thread_id = param -> thread_id;
+	pthread_spin_unlock(&param -> init_lock);
+
+
+	parse_read_lists(param -> in_FASTA_file, param -> out_fp, param -> temp_prefix, param -> chromosomes, param -> parameters , param -> all_threads, my_thread_id);
+
+	return NULL;
+}
+
 int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, char * temp_prefix, chromosome_t * chromosomes, struct SNP_Calling_Parameters* parameters, int all_threads)
 {
+
 	FILE * out_fp = fopen(out_BED_file,"w");
-	int ret;
+	int ret=0;
 	if(!out_fp){
 		SUBREADprintf("Cannot open the output file: '%s'\n", out_BED_file);
 	}
-	fputs("chr\tpos\tref\talt\tfreq\tdepth\n", out_fp);
-	ret =  parse_read_lists(in_FASTA_file, out_fp, temp_prefix, chromosomes, parameters , all_threads, 0);
-	fprintf(out_fp, "## Fisher_Test_Size=%u\n",fisher_test_size);
+	fputs("##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n", out_fp);
+	fputs("##INFO=<ID=WINMIM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the windows\">\n", out_fp);
+	fputs("##INFO=<ID=WINTOT,Number=1,Type=Integer,Description=\"Total number of bases in the windows\">\n", out_fp);
+	fputs("##INFO=<ID=ALTNUMBER,Number=1,Type=String,Description=\"Number of supporting reads for each alternative allele\">\n", out_fp);
+	fputs("##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n", out_fp);
+	fputs("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n", out_fp);
+	if(all_threads < 2)
+	{
+		ret =  parse_read_lists(in_FASTA_file, out_fp, temp_prefix, chromosomes, parameters , all_threads, 0);
+	}
+	else
+	{
+		pthread_t runners [200];
+		struct parse_read_thread_context param;
+		param.parameters = parameters;		
+		pthread_spin_init(&param.init_lock, PTHREAD_PROCESS_PRIVATE);
+		pthread_spin_lock(&param.init_lock);
+		param.out_fp = out_fp;
+		param.in_FASTA_file = in_FASTA_file;
+		param.chromosomes = chromosomes;
+		param.all_threads = all_threads;
+		param.temp_prefix = temp_prefix;
+		parameters -> output_fp_lock = malloc(sizeof(*parameters -> output_fp_lock));
+		pthread_spin_init(parameters -> output_fp_lock ,  PTHREAD_PROCESS_PRIVATE);
+
+		int i;
+		for(i=0; i<all_threads; i++)
+		{
+			param.thread_id = i;
+			pthread_create(runners+i, NULL,  parse_read_lists_wrapper, &param);
+			pthread_spin_lock(&param.init_lock);
+		}
+
+		
+		for (i=0; i< all_threads; i++)
+		{
+			pthread_join(*(runners+i), NULL);
+		}
+		free((void *)parameters -> output_fp_lock);
+	}
+	//fprintf(out_fp, "## Fisher_Test_Size=%u\n",fisher_test_size);
 	fclose(out_fp);
 	return ret;
+
 }
+
+int guess_quality_threshold(char * qual_file, float percentage)
+{
+	char buff[100];
+	unsigned long long readns [100], all_readn = 0;
+	FILE * qfp = fopen(qual_file, "r");
+	int lineno = 0;
+
+	if(!qfp)
+	{
+		SUBREADprintf("Unable to open file: %s\n", qual_file);
+		return 0;
+	}
+
+	memset(readns, 0, 100*sizeof(long long));
+
+	while(!feof(qfp))
+	{
+		int pos=0;
+		unsigned long long readn = 0;
+		read_line(100, qfp, buff, 0);	
+
+		while(buff[pos]!='\t')pos++;
+		pos++;
+
+		for(;buff[pos] && buff[pos]!='\n'; pos++)
+		{
+			readn *=10;
+			readn += buff[pos]-'0';
+		}
+		readns[lineno]=readn;
+		all_readn += readn;
+
+		lineno ++;
+		if(lineno>64)break;
+	}
+
+	fclose(qfp);
+	long long read_threshold = all_readn * percentage;
+
+	for(lineno=99; lineno>1; lineno--)
+	{
+		read_threshold -= readns[lineno]; 
+		if(read_threshold<=0){
+			SUBREADprintf("Phred score threshold has been shifted to %d\n", lineno);
+			return lineno;
+		}
+	}
+
+	return 0;
+}
+
+char * _EXSNP_SNP_delete_temp_prefix = NULL;
+void EXSNP_SIGINT_hook(int param)
+{
+	int xk1, last_slash = -1;
+	if(_EXSNP_SNP_delete_temp_prefix != NULL)
+	{
+		char del2[300], del_suffix[200], del_name[400];
+		SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
+		for(xk1=0; _EXSNP_SNP_delete_temp_prefix[xk1]; xk1++)
+		{
+			if(_EXSNP_SNP_delete_temp_prefix[xk1]=='/') last_slash = xk1;
+			else if(_EXSNP_SNP_delete_temp_prefix[xk1]=='\\')
+			{
+				SUBREADprintf("The file name is unknown.\n");
+				return;
+			}
+		}
+		if(last_slash>=0)
+		{
+			memcpy(del2, _EXSNP_SNP_delete_temp_prefix, last_slash);
+			del2[last_slash] = 0;
+			strcpy(del_suffix , _EXSNP_SNP_delete_temp_prefix + last_slash + 1);
+		}
+		else
+		{
+			strcpy(del2,".");
+			strcpy(del_suffix , _EXSNP_SNP_delete_temp_prefix);
+		}
+	
+		if(strlen(del_suffix)>8)
+		{
+			DIR           *d;
+			struct dirent *dir;
+
+			d = opendir(del2);
+			if (d)
+			{
+				while ((dir = readdir(d)) != NULL)
+				{
+					if(strstr(dir->d_name, del_suffix))
+					{
+						//printf("%s\n", dir->d_name);
+						strcpy(del_name, del2);
+						strcat(del_name, "/");
+						strcat(del_name, dir->d_name);
+						unlink(del_name);
+					}
+				}
+			}
+		}
+			
+	}
+
+	exit(param);
+}
+
 
 int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, char * temp_location, unsigned int known_read_count, int threads, struct SNP_Calling_Parameters* parameters)
 {
@@ -545,6 +1200,11 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 	unsigned short rand48_seed[3];
 
 	int i, fpos;
+
+	signal (SIGTERM, EXSNP_SIGINT_hook);
+	signal (SIGINT, EXSNP_SIGINT_hook);
+
+	parameters -> output_fp_lock = NULL;
 
 	fisher_test_size = 0;
 
@@ -562,29 +1222,82 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	known_chromosomes[0].chromosome_name[0]=0;
 
-	SUBREADprintf("Spliting SAM file\n");
-	SUBREADfflush(stdout);
-	//Step 1:The SAM file is scanned to create a number of temp files "temp-snps-chrX-21-00000000-XXXXXX" and the related read positions/sequences are written into them (in 2-bit base coding). A read can contribute to two blocks if it crosses the border of the blocks. If there are indels in a read, each continuously mapped section is individually written into the temporary file. The quality scores are written companying the bases. The hierarchy of the data is: block -> read -> sections {bases, phred scores, CIGAR string, reported mapping quality}
-	memcpy(rand48_seed, &start_time, 6);
-	seed48(rand48_seed);
-	sprintf(temp_file_prefix, "%s/temp-snps-%06u-%08lX-", temp_location==NULL?".":temp_location, getpid(), lrand48());
+	if(snp_progress_report_callback)
+		snp_progress_report_callback(40,10,3000);
 
-
-	fpos=0;
-	while(1)
+	if(parameters->subread_index[0])
 	{
-		int fpos0 = fpos;
-		char one_fn [300];
-		while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
-			fpos++;
-		strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
-		one_fn[fpos-fpos0]=0;
+		char table_fn[350];
+		parameters -> subread_index_offsets = (gene_offset_t*)malloc(sizeof(gene_offset_t));
+		load_offsets (parameters -> subread_index_offsets, parameters->subread_index);
 
-		if(break_SAM_file(one_fn, temp_file_prefix, &real_read_count, known_chromosomes, 1 /* This 0 means that the sequence/quality/cigar fields are needed in the temp files*/, parameters -> bases_ignored_head_tail)) return -1;
-
-		if(!in_SAM_file[fpos]) break;
-		fpos++;
+		sprintf(table_fn,"%s.00.b.array", parameters->subread_index);
+		parameters -> subread_index_array = (gene_value_index_t*) malloc(sizeof(gene_value_index_t));
+		if(gvindex_load(parameters -> subread_index_array,table_fn)) return -1;
 	}
+
+	//Step 1:The SAM file is scanned to create a number of temp files "temp-snps-chrX-21-00000000-XXXXXX" and the related read positions/sequences are written into them (in 2-bit base coding). A read can contribute to two blocks if it crosses the border of the blocks. If there are indels in a read, each continuously mapped section is individually written into the temporary file. The quality scores are written companying the bases. The hierarchy of the data is: block -> read -> sections {bases, phred scores, CIGAR string, reported mapping quality}
+
+	if(parameters->pile_file_name[0])
+	{
+		fpos=0;
+		while(1)
+		{
+			int fpos0 = fpos;
+			char one_fn [300];
+			while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
+				fpos++;
+			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
+			one_fn[fpos-fpos0]=0;
+
+			if(get_known_chromosomes(one_fn, known_chromosomes)) return -1;
+
+			if(!in_SAM_file[fpos]) break;
+			fpos++;
+		}
+		strcpy(temp_file_prefix, parameters->pile_file_name);
+	}	
+	else
+	{	
+		parameters-> cigar_event_table = HashTableCreate(11011);
+		HashTableSetHashFunction(parameters-> cigar_event_table ,HashTableStringHashFunction);
+		HashTableSetDeallocationFunctions(parameters-> cigar_event_table, NULL, NULL);
+		HashTableSetKeyComparisonFunction(parameters-> cigar_event_table, my_strcmp);
+
+		memcpy(rand48_seed, &start_time, 6);
+		srand(time(NULL));
+		if(temp_location)
+			strcpy(temp_file_prefix, temp_location);
+		else
+			sprintf(temp_file_prefix, "./temp-snps-%06u-%08X-", getpid(), rand());
+		_EXSNP_SNP_delete_temp_prefix = temp_file_prefix;
+
+		print_in_box(89,0,0,"Splitting %s file into %c[36m%s*%c[0m ..." , parameters -> is_BAM_file_input?"BAM":"SAM" , CHAR_ESC, temp_file_prefix, CHAR_ESC);
+
+		fpos=0;
+		while(1)
+		{
+			int fpos0 = fpos;
+			char one_fn [300];
+			while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
+				fpos++;
+			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
+			one_fn[fpos-fpos0]=0;
+
+			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table)) return -1;
+
+			if(!in_SAM_file[fpos]) break;
+			fpos++;
+		}
+	}
+
+	parameters -> real_read_count = real_read_count;
+
+	char qfname[330];
+	sprintf(qfname, "%s.qStatic", temp_file_prefix);
+	parameters -> final_phred_score = 0;
+	if (parameters -> delete_piles)
+		unlink(qfname);
 
 	//Step 2:Each base blocks are load from the FASTA file into memory, then each temp file is scanned to create the SNP voting table. The sections in the temp files are scanned to create the SNP voting table. The voting table is compared with the sequences in the FASTA file to determine if each base is a SNP. The result is written into the bed file immediatly.
 	if(parse_read_lists_maybe_threads(in_FASTA_file, out_BED_file, temp_file_prefix, known_chromosomes, parameters, threads)) return -1;
@@ -592,7 +1305,15 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 	free(known_chromosomes);
 
 	free(precalculated_factorial);
-	SUBREADprintf("Finished.\n");
+
+	if(parameters->subread_index_array)
+	{
+		gvindex_destory(parameters->subread_index_array);
+		free(parameters->subread_index_array);
+		free(parameters->subread_index_offsets);
+	}
+
+	destroy_cigar_event_table(parameters-> cigar_event_table);
 
 	return 0;
 }
@@ -600,17 +1321,74 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 void print_usage_snp(char * myname)
 {
-	SUBREADprintf("Usage: %s -i <input_SAM_file> -g <single_genome_FASTA_file> -o <output_BED_file> {-r threshold (float)} {-t temp_path} {-c max_read_number} {-n read_threshold_min} {-m read_threshold_max} {-q min_phred_score} {-N neighbour_test_len,matching_rate} {-S} {-p Len,Pvalue for Fisher's Exact Test} {-I number of first/last bases ignored from each read}\n\t-q\t ignoring low-quality bases in reads\n\t-N\t using neighbour filtering to remove wrongly mapped read segments\n", myname);
+
+	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
+	SUBREADputs("Usage:");
+	SUBREADputs("");
+	SUBREADputs("  ./exactSNP [options] -i input -g reference_genome -o output ");
+	SUBREADputs("");
+	SUBREADputs("Required arguments:");
+	SUBREADputs("");
+	SUBREADputs("  -i <file>  Specify name of an input file including read mapping results. The");
+	SUBREADputs(" [-b if BAM] format of input file can be SAM or BAM (-b needs to be specified");
+	SUBREADputs("             if a BAM file is provided).");
+	SUBREADputs("");
+	SUBREADputs("  -g <file>  Specify name of the file including all reference sequences. Only");
+	SUBREADputs("             one single FASTA format file should be provided.");
+	SUBREADputs("");
+	SUBREADputs("  -o <file>  Specify name of the output file. This program outputs a VCF format");
+	SUBREADputs("             file that includes discovered SNPs.");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments:");
+	SUBREADputs("");
+	SUBREADputs("  -b         Indicate the input file provided via -i is in BAM format.");
+	SUBREADputs("");
+	SUBREADputs("  -Q <int>   Specify the q-value cutoff for SNP calling at sequencing depth of");
+	SUBREADputs("             50X. 12 by default. The corresponding p-value cutoff is 10^(-1*Q).");
+	SUBREADputs("             Note that this program automatically adjusts the q-value cutoff");
+	SUBREADputs("             according to the sequencing depth at each chromosomal location.");
+	SUBREADputs("");
+	SUBREADputs("  -f <float> Specify the minimum fraction of mis-matched bases a SNP-containing");
+	SUBREADputs("             location must have. Its value must between 0 and 1. 0 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -n <int>   Specify the minimum number of mis-matched bases a SNP-containing");
+	SUBREADputs("             location must have. 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -r <int>   Specify the minimum number of mapped reads a SNP-containing");
+	SUBREADputs("             location must have (ie. the minimum coverage). 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -x <int>   Specify the maximum number of mapped reads a SNP-containing");
+	SUBREADputs("             location could have. 3000 by default. Any location having more than");
+	SUBREADputs("             the threshold number of reads will not be considered for SNP");
+	SUBREADputs("             calling. This option is useful for removing PCR artefacts.");
+	SUBREADputs("");
+	SUBREADputs("  -s <int>   Specify the cutoff for base calling quality scores (Phred scores)");
+	SUBREADputs("             read bases must satisfy to be used for SNP calling. 13 by default.");
+	SUBREADputs("             Read bases that have Phred scores lower than the cutoff value will");
+	SUBREADputs("             be excluded from the analysis.");
+	SUBREADputs("");
+	SUBREADputs("  -t <int>   Specify the number of bases trimmed off from each end of the read.");
+	SUBREADputs("             3 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -T <int>   Specify the number of threads. 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("Example:");
+	SUBREADputs("");
+	SUBREADputs("  ./exactSNP -i my-alignment.sam -g mm10.fa -o my-SNPs.txt");
+	SUBREADputs("");
 }
 
 
 
 #ifdef MAKE_STANDALONE
 int main(int argc,char ** argv)
+{
+	snp_progress_report_callback = NULL;
 #else
 int main_snp_calling_test(int argc,char ** argv)
-#endif
 {
+#endif
+
 	char c;
 	char in_SAM_file[5000];
 	char out_BED_file[300];
@@ -622,76 +1400,84 @@ int main_snp_calling_test(int argc,char ** argv)
 	unsigned int read_count;
 
 	in_SAM_file [0] = 0;
+	in_FASTA_file [0] = 0;
 	out_BED_file[0] = 0;
 	temp_path[0] = 0;
 
 	read_count = 0;
-	threads = 0;
-	parameters.supporting_read_rate = 0.5;
-	parameters.min_supporting_read_number = 5;
-	parameters.max_supporting_read_number = 10000;
-	parameters.neighbour_filter_testlen = 0;
-	parameters.neighbour_filter_rate = 0.5;
-	parameters.min_phred_score = 0;
-	parameters.fisher_exact_p_threshold = -1;
-	parameters.fisher_exact_testlen = 0;
-	parameters.test_two_strands = 0;
+	threads = 1;
 
-	parameters.bases_ignored_head_tail = 0;
+	parameters.start_time = miltime();
+	parameters.empty_blocks = 0;
+	parameters.reported_SNPs = 0;
+	parameters.reported_indels = 0;
+
+	parameters.supporting_read_rate = 0.;
+	parameters.min_supporting_read_number = 1;
+	parameters.min_alternative_read_number = 1;
+	parameters.max_supporting_read_number = 3000;
+	parameters.neighbour_filter_testlen = -1; 
+	parameters.neighbour_filter_rate = 0.000000001;
+	parameters.min_phred_score = 13;
+	parameters.fisher_exact_testlen = 5;
+	parameters.test_two_strands = 0;
+	parameters.snp_interval = 0;
+	parameters.excellent_phred_score = 39;
+
+	parameters.bases_ignored_head_tail = 3;
+	parameters.neighbour_abundance_test = 0;
+
+	parameters.pile_file_name[0]=0;
+	parameters.delete_piles = 1;
+
+	parameters.subread_index[0]=0;
+	parameters.subread_index_offsets=NULL;
+	parameters.subread_index_array=NULL;
+	parameters.is_phred_64 = 0;
+	parameters.is_BAM_file_input = 0;
+
+	parameters.cutoff_multiplex = 12.f;
+	parameters.cutoff_upper_bound = 5E-3f;
+	parameters.all_mapped_bases = 0;
+	parameters.fisher_normalisation_target = 50;
 
 	if(argc<2)
 	{
 		print_usage_snp(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "N:I:p:q:i:o:r:t:g:n:c:m:?S")) != -1)
+	while ((c = getopt (argc, argv, "i:g:o:bQ:p:f:n:r:x:w:s:t:T:")) != -1)
 	{
 		switch (c)
 		{
-			case 'I':
+			case 'b':
+				parameters.is_BAM_file_input = 1;
+				break;
+			case 'Q':
+				parameters.cutoff_multiplex = 1.0*atoi(optarg);
+				break;
+			case 'p':
+				parameters.cutoff_upper_bound = atof(optarg);
+				break;
+			case 'n':
+				parameters.min_alternative_read_number = atoi(optarg);
+				break;
+			case '4':	// UNUSED
+				parameters.is_phred_64 = 1;
+				break;
+			case '2':	// UNUSED
+				parameters.neighbour_abundance_test=0;
+				break;
+			case 't':
 				parameters.bases_ignored_head_tail = atoi(optarg);
 				break;
-			case 'S':
-				parameters.test_two_strands = 1;
+			case 'w':
+				parameters.fisher_exact_testlen = atoi(optarg);
 				break;
-
-			case 'p':
-				if(parameters.neighbour_filter_testlen > 0)
-				{
-					SUBREADprintf("You cannot use both neighbour filtering and Fisher's exact test.\n");
-					return -1;
-				}
-
-				k=strlen(optarg);
-				for(t=0;t<k;t++)
-					if(optarg[t]==',')
-					{
-						optarg[t]=0;
-						break;
-					}
-
-				if(t==k)
-					SUBREADprintf("Warning: the Fisher's exact test parameter is unparseable. It should be like \"-p 5,0.5\".\n");
-				else
-				{
-					parameters.fisher_exact_testlen = atoi(optarg);
-					parameters.fisher_exact_p_threshold = atof(optarg+t+1);
-				}
-				break;
-
-			case 'q':
+			case 's':
 				parameters.min_phred_score = atoi(optarg);
 				break;
-
-			case 'N':
-
-				if(parameters.fisher_exact_p_threshold >= -0.00001)
-				{
-					SUBREADprintf("You cannot use both neighbour filtering and Fisher's exact test.\n");
-					return -1;
-				}
-	
-
+			case '3':	// UNUSED
 				k=strlen(optarg);
 				for(t=0;t<k;t++)
 					if(optarg[t]==',')
@@ -720,29 +1506,43 @@ int main_snp_calling_test(int argc,char ** argv)
 				strncpy(out_BED_file, optarg,299);
 				break;
 
-			case 't':
+			case '9':	// UNUSED
 				strncpy(temp_path,  optarg,299);
 				break;
 
 			case 'T':
 				threads = atoi(optarg);
+				if(!threads)threads=1;
 				break;
 
-			case 'r':
+			case 'f':
 				parameters.supporting_read_rate = atof(optarg);
 				break;
 
-			case 'm':
+			case 'x':
 				parameters.max_supporting_read_number = atof(optarg);
 				break;
 
-			case 'n':
+			case 'r':
 				parameters.min_supporting_read_number = atof(optarg);
 				break;
 
-			case 'c':
+			case '8':	// UNUSED
 				read_count = atoi(optarg);
 				break;
+
+			case '7':	// UNUSED
+				strcpy(parameters.pile_file_name, optarg);
+				break;
+
+			case '6':	// UNUSED
+				strcpy(parameters.subread_index, optarg);
+				break;
+
+			case '5':	// UNUSED
+				parameters.delete_piles = 0;
+				break;				
+
 
 			case '?':
 			default:
@@ -750,8 +1550,87 @@ int main_snp_calling_test(int argc,char ** argv)
 		}
 	}
 
-	SUBREADprintf("Parameters: \nneighbour_filter_testlen = %d\nneighbour_filter_rate = %.4f\nmin_supporting_read_number = %d\nsupporting_read_rate = %.4f\nmin_phred_score = %d\nFisher's exact test len = %d\nFisher's exact test maximum p-valie = %.5f\n\n", parameters.neighbour_filter_testlen , parameters.neighbour_filter_rate, parameters.min_supporting_read_number, parameters.supporting_read_rate, parameters.min_phred_score, parameters.fisher_exact_testlen , parameters.fisher_exact_p_threshold);
-	
-	return SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
+	if(out_BED_file[0]==0 || in_FASTA_file[0]==0 || in_SAM_file[0]==0)
+	{
+		SUBREADprintf("The names of the input file, the output file and the reference sequence file must be specified using -i, -o and -g options.\n");
+		return -1;
+	}
+
+	FILE * tfp = fopen(out_BED_file,"w");
+	if(!tfp)
+	{
+		SUBREADprintf("Cannot write the output file. Please check if the disk has space and you can create file in the current directory.\n");
+		return -1;
+	}
+	fclose(tfp);
+
+	tfp = fopen(in_FASTA_file,"r");
+	if(!tfp)
+	{
+		SUBREADprintf("Cannot open the reference sequence file: %s\n", in_FASTA_file); 
+		return -1;
+	}
+	fclose(tfp);
+
+	tfp = fopen(in_SAM_file,"r");
+	if(!tfp)
+	{
+		SUBREADprintf("Cannot open the input file: %s\n", in_SAM_file); 
+		return -1;
+	}
+	fclose(tfp);
+
+
+
+
+	SUBREADputs("");
+	print_subread_logo();
+	SUBREADputs("");
+
+
+	print_in_box(80,1,1,"ExactSNP");
+	print_in_box(80,0,1,"");
+	print_in_box(80,0,0,"             Input file : %s (%s)", in_SAM_file, parameters.is_BAM_file_input?"BAM":"SAM");
+	print_in_box(80,0,0,"            Output file : %s", out_BED_file);
+	print_in_box(80,0,0,"       Reference genome : %s", in_FASTA_file);
+	print_in_box(80,0,1,"");
+	print_in_box(80,0,0,"                Threads : %d", threads);
+	print_in_box(80,0,0,"     Min support read # : %d", parameters.min_supporting_read_number);
+	print_in_box(80,0,0,"     Max support read # : %d", parameters.max_supporting_read_number);
+	print_in_box(81,0,0,"  Min support read rate : %.1f%%%%", 100* parameters.supporting_read_rate);
+	print_in_box(80,0,0,"   Min base phred score : %d", parameters.min_phred_score);
+	print_in_box(80,0,0,"          Trimmed bases : %d", parameters.bases_ignored_head_tail);
+	print_in_box(80,0,1,"");
+	print_in_box(80,0,0,"         Q value cutoff : 10E-%.1f", parameters.cutoff_multiplex);
+	print_in_box(80,0,0,"    P value upper bound : %.5f", parameters.cutoff_upper_bound);
+	print_in_box(80,0,0,"   Flanking windows len : %d", parameters.fisher_exact_testlen);
+	print_in_box(80,0,1,"");
+	print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	SUBREADputs("");
+
+
+	char tbuf[90];
+	char_strftime(tbuf);
+
+	print_in_box(80,1,1,"Running (%s)", tbuf);
+	print_in_box(80,0,1,"");
+	warning_file_type(in_SAM_file, parameters.is_BAM_file_input?FILE_TYPE_BAM:FILE_TYPE_SAM);
+	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
+	int ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
+	print_in_box(80,0,1,"");
+	print_in_box(80,2,1,"");
+	SUBREADputs("");
+
+	print_in_box(80,1,1,"Finished");
+	print_in_box(80,0,1,"");
+	print_in_box(80,0,0,"        Processed reads : %u", parameters.real_read_count);
+	print_in_box(80,0,0,"          Reported SNPs : %u", parameters.reported_SNPs);
+	print_in_box(80,0,0,"        Reported indels : %u", parameters.reported_indels);
+	print_in_box(80,0,1,"");
+	print_in_box(80,0,0,"              Time cost : %.1f minutes", (miltime() - parameters.start_time)/60);
+	print_in_box(80,0,1,"");
+	print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	SUBREADputs("");
+	return ret;
 	
 }

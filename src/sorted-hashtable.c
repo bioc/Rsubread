@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -26,14 +24,21 @@
 #include <string.h>
 
 #ifndef MACOS
+#ifndef FREEBSD
 #include <malloc.h>
+#endif
 #endif
 
 #include<math.h>
+#include"core.h"
 
 #define _gehash_hash(k) ((unsigned int)(k))
 
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table)
+{
+	return gehash_create_ex(the_table, expected_size, is_small_table, SUBINDEX_VER0);
+}
+int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number)
 {
 	int expected_bucket_number;
 	int i;
@@ -43,7 +48,15 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
 
 	// calculate the number of buckets for creating the data structure
 	expected_bucket_number = expected_size / GEHASH_BUCKET_LENGTH; 
-	if(expected_bucket_number < 10111)expected_bucket_number = 10111;
+
+	if(SUBINDEX_VER0 == version_number)
+	{
+		if(expected_bucket_number < 10111 && !is_small_table)expected_bucket_number = 10111;
+	}
+	else
+	{
+		if(expected_bucket_number < 140003 )expected_bucket_number = 140003;
+	}
 
 	for (;;expected_bucket_number++)
 	{
@@ -60,6 +73,7 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
 			break;
 	}
 
+	the_table -> version_number = version_number;
 	the_table -> current_items = 0;
 	the_table -> is_small_table = is_small_table;
 	the_table -> buckets_number = expected_bucket_number;
@@ -88,30 +102,123 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 {
 	int new_bucket_length;
 	struct gehash_bucket * current_bucket = &(the_table -> buckets [bucket_no]);
-	gehash_key_t * new_item_keys;
+	gehash_key_t * new_item_keys = NULL;
+	short * new_new_item_keys = NULL;
 	gehash_data_t * new_item_values;
 
 	if (current_bucket->space_size<1)
 	{
 		if(is_small_table)
-			new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*1.5);
 		else
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.+3.*pow((rand()*1./RAND_MAX),30)));
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH);
 
+		if(the_table->version_number == SUBINDEX_VER0)
+			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
+		else
+			new_new_item_keys = (short *) malloc(sizeof(short)*new_bucket_length);
 
-		new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
 		new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
 
-		if(!(new_item_keys && new_item_values))
+		if(!((new_item_keys|| new_new_item_keys) && new_item_values))
 		{
 			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
 		}
 
-		bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+		/*if(the_table->version_number == SUBINDEX_VER0)
+			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+		else
+			bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+
+		bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+		*/
+
+
+		if(the_table->version_number == SUBINDEX_VER0)
+			current_bucket->item_keys = new_item_keys;
+		else
+			current_bucket->new_item_keys = new_new_item_keys;
+
+		current_bucket->item_values = new_item_values;
+		current_bucket->space_size = new_bucket_length;
+
+
+	}
+	else
+	{
+		if(is_small_table)
+			//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+			new_bucket_length = (int)(current_bucket->space_size*5);
+		else
+			new_bucket_length = (int)(current_bucket->space_size*1.5);
+
+		if(the_table->version_number == SUBINDEX_VER0)
+			current_bucket->item_keys = (gehash_key_t *) realloc(current_bucket->item_keys ,  sizeof(gehash_key_t) * new_bucket_length);
+		else
+			current_bucket->new_item_keys = (short *) realloc(current_bucket->new_item_keys, sizeof(short)*new_bucket_length);
+
+		 current_bucket->item_values = (gehash_data_t *) realloc(current_bucket->item_values, sizeof(gehash_data_t) * new_bucket_length);
+
+
+		if(!((current_bucket->new_item_keys||current_bucket->new_item_keys) && current_bucket->item_values))
+		{
+			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+			return 1;
+		}
+
+		current_bucket->space_size = new_bucket_length;
+	}
+	return 0;
+
+}
+int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_small_table)
+{
+	int new_bucket_length;
+	struct gehash_bucket * current_bucket = &(the_table -> buckets [bucket_no]);
+	gehash_key_t * new_item_keys = NULL;
+	short * new_new_item_keys = NULL;
+	gehash_data_t * new_item_values;
+
+	if (current_bucket->space_size<1)
+	{
+		if(is_small_table)
+			//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.5+3.*pow((rand()*1./RAND_MAX),30)));
+		else
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.+3.*pow((rand()*1./RAND_MAX),30)));
+
+
+	//	printf("NS1=%d\nNS2=%d\n", new_bucket_length, new_bucket_length);
+		if(the_table->version_number == SUBINDEX_VER0)
+		{
+			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
+		}
+		else
+		{
+			new_new_item_keys = (short *) malloc(sizeof(short)*new_bucket_length);
+		}
+
+		new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
+
+		if(!((new_item_keys|| new_new_item_keys) && new_item_values))
+		{
+			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+			return 1;
+		}
+
+		if(the_table->version_number == SUBINDEX_VER0)
+			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+		else
+			bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+
 		bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
 
-		current_bucket->item_keys = new_item_keys;
+		if(the_table->version_number == SUBINDEX_VER0)
+			current_bucket->item_keys = new_item_keys;
+		else
+			current_bucket->new_item_keys = new_new_item_keys;
+
 		current_bucket->item_values = new_item_values;
 		current_bucket->space_size = new_bucket_length;
 
@@ -134,16 +241,27 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 			if(the_table-> buckets[i].space_size > current_bucket->current_items+1 && current_bucket->space_size > the_table-> buckets[i].current_items+1 && current_bucket->current_items > the_table-> buckets[i].current_items)
 			{
 				int j;
-				gehash_key_t t_key;
 				gehash_data_t t_d;
 
 				for (j=0; j<current_bucket->current_items; j++)
 				{
 					if (j< the_table -> buckets[i].current_items)
 					{
-						t_key = current_bucket->item_keys[j];
-						current_bucket->item_keys[j] = the_table-> buckets[i].item_keys[j];
-						the_table-> buckets[i].item_keys[j] = t_key;
+						if(the_table->version_number == SUBINDEX_VER0)
+						{
+							gehash_key_t t_key;
+							t_key = current_bucket->item_keys[j];
+							current_bucket->item_keys[j] = the_table-> buckets[i].item_keys[j];
+							the_table-> buckets[i].item_keys[j] = t_key;
+						}
+						else
+						{
+
+							short t_key;
+							t_key = current_bucket->new_item_keys[j];
+							current_bucket->new_item_keys[j] = the_table-> buckets[i].new_item_keys[j];
+							the_table-> buckets[i].new_item_keys[j] = t_key;
+						}
 
 
 						t_d = current_bucket->item_values[j];
@@ -152,18 +270,29 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 					}
 					else
 					{
-						the_table-> buckets[i].item_keys[j] = current_bucket->item_keys[j];
+						if(the_table->version_number == SUBINDEX_VER0)
+							the_table-> buckets[i].item_keys[j] = current_bucket->item_keys[j];
+						else
+							the_table-> buckets[i].new_item_keys[j] = current_bucket->new_item_keys[j];
 						the_table-> buckets[i].item_values[j] = current_bucket->item_values[j];
 					}
 				}
 
 				gehash_key_t * p_key;
+				short * ps_key;
 				gehash_data_t * p_d;
 				int i_size;
 
-				p_key = the_table-> buckets[i].item_keys ;
-				the_table-> buckets[i].item_keys = current_bucket->item_keys;
-				current_bucket->item_keys = p_key;
+				if(the_table->version_number == SUBINDEX_VER0)
+				{
+					p_key = the_table-> buckets[i].item_keys ;
+					the_table-> buckets[i].item_keys = current_bucket->item_keys;
+					current_bucket->item_keys = p_key;
+				}else{
+					ps_key = the_table-> buckets[i].new_item_keys ;
+					the_table-> buckets[i].new_item_keys = current_bucket->new_item_keys;
+					current_bucket->new_item_keys = ps_key;
+				}
 
 				p_d = the_table-> buckets[i].item_values ;
 				the_table-> buckets[i].item_values = current_bucket->item_values;
@@ -180,29 +309,52 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 		if(need_allowc)
 		{
 			if(is_small_table)
-				new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+				//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
+				new_bucket_length = (int)(current_bucket->space_size*5);
 			else
 				new_bucket_length = (int)(current_bucket->space_size*1.5);
-			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
+
+	//		printf("NSS1=%d\nNSS2=%d\n", new_bucket_length, new_bucket_length);
+			if(the_table->version_number == SUBINDEX_VER0)
+				new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
+			else
+				new_new_item_keys = (short *) malloc(sizeof(short) * new_bucket_length);
+
 			new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
 
 
-			if(!(new_item_keys && new_item_values))
+			if(!((new_item_keys||new_new_item_keys) && new_item_values))
 			{
 				SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 				return 1;
 			}
 
-			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+			if(the_table->version_number == SUBINDEX_VER0)
+				bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+			else
+				bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+
 			bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
 
-			memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
+			if(the_table->version_number == SUBINDEX_VER0)
+				memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
+			else
+				memcpy(new_new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(short));
+
 			memcpy(new_item_values, current_bucket->item_values, current_bucket->current_items*sizeof(gehash_data_t));
 
-			free(current_bucket->item_keys);
+			if(the_table->version_number == SUBINDEX_VER0)
+				free(current_bucket->item_keys);
+			else
+				free(current_bucket->new_item_keys);
+
 			free(current_bucket->item_values);
 
-			current_bucket->item_keys = new_item_keys;
+			if(the_table->version_number == SUBINDEX_VER0)
+				current_bucket->item_keys = new_item_keys;
+			else
+				current_bucket->new_item_keys = new_new_item_keys;
+
 			current_bucket->item_values = new_item_values;
 			current_bucket->space_size = new_bucket_length;
 
@@ -216,6 +368,9 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 struct gehash_bucket * _gehash_get_bucket(gehash_t * the_table, gehash_key_t key)
 {
 	int bucket_number;
+
+	//if(key == 0x18528918)
+	//	printf("bnumber = %d\n", _gehash_hash(key) % the_table -> buckets_number);
 	bucket_number = _gehash_hash(key) % the_table -> buckets_number;
 	return  &(the_table -> buckets [bucket_number]);
 }
@@ -226,24 +381,84 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 	int is_fault = 0;
 
 	current_bucket = _gehash_get_bucket (the_table, key);
-	if (current_bucket->current_items >= current_bucket->space_size)
+
+	if(the_table->version_number == SUBINDEX_VER0)
 	{
+		if (current_bucket->current_items >= current_bucket->space_size)
+		{
 
-		int bucket_number;
-		bucket_number = _gehash_hash(key) % the_table -> buckets_number;
+			int bucket_number;
 
-		is_fault = _gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
-		if(is_fault)
-			return 1;
+			bucket_number = _gehash_hash(key) % the_table -> buckets_number;
+			is_fault = _gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
+			if(is_fault)
+				return 1;
+		}
+		current_bucket->item_keys[current_bucket->current_items] = key;
 	}
-	current_bucket->item_keys[current_bucket->current_items] = key;
+	else
+	{
+		short step_number = key/the_table -> buckets_number;
+
+		if (current_bucket->current_items >= current_bucket->space_size)
+		{
+
+			int bucket_number;
+			bucket_number = _gehash_hash(key) % the_table -> buckets_number;
+
+			is_fault = _gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
+			if(is_fault)
+				return 1;
+		}
+		current_bucket->new_item_keys[current_bucket->current_items] = step_number;
+
+	}
 	current_bucket->item_values[current_bucket->current_items] = data;
 	current_bucket->current_items ++;
 	the_table ->current_items ++;
 	return 0;
 }
 
-#define INDEL_SEGMENT_SIZE 6
+int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t data, int limit, int replace_prob)
+{
+	struct gehash_bucket * current_bucket;
+	int occurance = 0, xk1 ;
+
+	assert(the_table->version_number == SUBINDEX_VER0);
+	current_bucket = _gehash_get_bucket (the_table, key);
+	
+
+	for(xk1=0; xk1<current_bucket->current_items ; xk1++)
+		if(current_bucket->item_keys[xk1]==key) occurance++;
+
+	if(occurance >= limit) 
+	{
+
+		if(rand()%32768 < replace_prob)
+			return 1;
+		int replacement_id = rand()%occurance;
+		occurance = 0;
+		for(xk1=0; xk1<current_bucket->current_items ; xk1++)
+			if(current_bucket->item_keys[xk1]==key)
+			{
+				if(occurance == replacement_id)
+				{
+					current_bucket->item_values[xk1]=data;
+					return 0;
+				}
+				occurance++;
+			}
+
+	}
+
+	gehash_insert(the_table, key, data);
+	return 0;
+}
+	
+
+
+
+#define INDEL_SEGMENT_SIZE 5
 
 #define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
 #define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_VOTE_TABLE_SIZE)
@@ -251,14 +466,14 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 
 #define is_quality_subread(scr)	((scr)>15?1:0)
 
-size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int is_add, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, unsigned int low_border, unsigned int high_border)
+size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, int subread_len, unsigned int low_border, unsigned int high_border)
 {
 	char error_pos_stack[10];	// max error bases = 10;
 
 	gehash_key_t mutation_key;
 	int ret = 0;
 
-	ret+=gehash_go_q(the_table, key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
+	ret+=gehash_go_q(the_table, key, offset, read_len, is_reversed, vote,  quality , indel_tolerance, subread_number, low_border, high_border);
 	int error_bases ;
 	for (error_bases=1; error_bases <= max_error_bases; error_bases++)
 	{
@@ -290,7 +505,7 @@ size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset,
 							mutation_stack[j] = 0;
 						is_end2 = 0;
 						if(key != mutation_key)
-							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
+							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote,  quality , indel_tolerance, subread_number, low_border, high_border);
 						mutation_stack[i] ++;
 						break;
 					}
@@ -300,7 +515,7 @@ size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset,
 
 			int is_end = 1;
 			for (i = error_bases-1; i>=0; i--)
-				if (error_pos_stack[i] < 16 - (error_bases - i))
+				if (error_pos_stack[i] < subread_len - (error_bases - i))
 				{
 					error_pos_stack[i] ++;
 					for (j = i+1; j<error_bases; j++)
@@ -316,7 +531,7 @@ size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset,
 }
 
 
-size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int is_add, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, unsigned int low_border, unsigned int high_border)
+size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, unsigned int low_border, unsigned int high_border)
 {
 	int error_pos_stack[10];	// max error bases = 10;
 	int C_poses[16];
@@ -325,7 +540,7 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 	gehash_key_t mutation_key;
 	int ret = 0,i;
 
-	ret+=gehash_go_q(the_table, key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
+	ret+=gehash_go_q(the_table, key, offset, read_len, is_reversed, vote,  quality , indel_tolerance, subread_number, low_border, high_border);
 	int error_bases ;
 
 	for(i=0; i<16; i++)
@@ -372,7 +587,7 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 						is_end2 = 0;
 
 						if(key != mutation_key)
-							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, is_add,  weight,  quality , max_match_number, indel_tolerance, subread_number, low_border, high_border);
+							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote,  quality , indel_tolerance, subread_number, low_border, high_border);
 						mutation_stack[i] ++;
 						break;
 					}
@@ -398,314 +613,475 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 }
 
 
-#define JUMP_GAP 4
-
-
-size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int is_add, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border)
+void assign_best_vote(gene_vote_t * vote, int i, int j)
 {
-	struct gehash_bucket * current_bucket;
-	int i, items;
-	gehash_key_t * keyp, *endkp, *endp12;
-	int match_start, match_end;
-	int ii_end = (indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
+	vote->max_mask = vote->masks[i][j];
+	vote->max_vote = vote->votes[i][j];
+	vote->max_position =vote->pos[i][j];
+	vote->max_quality = vote->quality[i][j];
+	vote->max_coverage_start = vote->coverage_start [i][j];
+	vote->max_coverage_end = vote->coverage_end [i][j];
+	memcpy(vote->max_indel_recorder, vote->indel_recorder[i][j], 3*MAX_INDEL_TOLERANCE);
+}
 
-	current_bucket = _gehash_get_bucket (the_table, key);
-	items = current_bucket -> current_items;
 
-	int citems = items/4;
+size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int read_len, int is_reversed, gene_vote_t * vote, gene_quality_score_t quality, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border)
+{
 
-	gehash_key_t * last_acceptable = current_bucket -> item_keys;
-
-	keyp = last_acceptable + items/2;
-	endkp = keyp;
-	for(i=0; i<6; i++)
+	if(the_table->version_number == SUBINDEX_VER0)
 	{
-		if(*(keyp) < key)
+		gehash_key_t key = raw_key;
+		struct gehash_bucket * current_bucket;
+		int i=0, items;
+
+		gehash_key_t  *current_keys;//, *endp12;
+
+		vote -> all_used_subreads++;
+		current_bucket = _gehash_get_bucket (the_table, key);
+		items = current_bucket -> current_items;
+		current_keys = current_bucket -> item_keys;
+		
+		if(!items) return 0;
+
+		#define SPEED_UP_DENOMINAOR 3
+		int jump_step = items / SPEED_UP_DENOMINAOR;
+		int last_accepted_index = 0;
+
+		if(jump_step<1) jump_step=1;
+
+		if(key > current_keys[0])
 		{
-			last_acceptable = keyp;
-			keyp += citems;
-		}
-		else if(*(keyp) >= key)
-			keyp -= citems;
-
-		citems = citems/2;
-	}
-
-	if(*(keyp) >= key)
-		keyp = last_acceptable;
-
-	endkp = current_bucket -> item_keys  + items;
-	endp12 = endkp - JUMP_GAP;
-
-	while(keyp < endp12 && *(keyp+JUMP_GAP) < key)
-		keyp += JUMP_GAP;
-
-	while(*keyp < key && keyp < endkp)
-		keyp ++;
-
-	if(keyp == endkp || *keyp>key)return 0;
-
-	match_start = keyp - current_bucket -> item_keys;
-
-	while(keyp < endkp && *keyp == key)
-		keyp ++;
-
-	match_end = keyp - current_bucket -> item_keys;
-
-	endkp = current_bucket -> item_values+match_end;
-
-	short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
-
-	if (indel_tolerance <1)
-		for (keyp = current_bucket -> item_values+match_start; keyp < endkp ; keyp++)
-		{
-		//add_gene_vote_weighted(vote, (*keyp) - offset, is_add, weight);
-			unsigned int kv = (*keyp) - offset;
-			int offsetX = _index_vote(kv);
-			int datalen = vote -> items[offsetX];
-			unsigned int * dat = vote -> pos[offsetX];
-
-			if ((*keyp ) < offset)
-				continue;
-
-			if (kv < low_border || kv > high_border)
-				continue;
-
-			for (i=0;i<datalen;i++)
+			while(1)
 			{
-				if (dat[i] == kv)
+				while(1)
 				{
-					gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-					test_max += weight;
-					vote->votes[offsetX][i] = test_max;
-					vote->quality[offsetX][i] += quality;
-					if (offset_from_5 <  vote->coverage_start [offsetX][i])
-						vote->coverage_start [offsetX][i] = offset_from_5;
-					if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
-						vote->coverage_end [offsetX][i] = offset_from_5+16;
-
-					int new_test_dist = vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i];
-
-					int go_replace = 0;
-					if( (test_max > vote->max_vote) ||(test_max == vote->max_vote && (new_test_dist > vote ->max_coverage_end - vote ->max_coverage_start)) || (test_max == vote->max_vote && (new_test_dist == vote ->max_coverage_end - vote ->max_coverage_start) && vote->quality[offsetX][i] > vote->max_quality))
-						go_replace = 1;
-					else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (new_test_dist == vote ->max_coverage_end - vote ->max_coverage_start))
-					{
-						//SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u and %u\n", vote->max_position , kv);
-						if(vote->max_position > kv)
-							go_replace=1;
-						//vote->max_mask |= IS_BREAKEVEN_READ ;
-					}
-					if(go_replace)
-					{
-							vote->max_mask = vote->masks[offsetX][i];
-							vote->max_vote = test_max;
-							vote->max_position = kv;
-							vote->max_quality = vote->quality[offsetX][i];
-							vote->max_coverage_start = vote->coverage_start [offsetX][i];
-							vote->max_coverage_end = vote->coverage_end [offsetX][i];
-					}
-					i = 9999999;
+					int next_p = last_accepted_index + jump_step;
+					if(next_p >= items) break;
+					if(current_keys[next_p]>=key) break; 
+					last_accepted_index = next_p;
 				}
+				if(jump_step>SPEED_UP_DENOMINAOR)
+					jump_step /= SPEED_UP_DENOMINAOR;
+				else if(jump_step>1)
+					jump_step = 1;
+				else
+					break;
 			}
-
-			if (i < 9999999 && is_add && datalen<GENE_VOTE_SPACE)
-			{
-				vote -> items[offsetX] ++;
-				dat[i] = kv;
-				vote->votes[offsetX][i]=weight;
-				vote->quality[offsetX][i]=quality;
-				vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
-				vote->coverage_start [offsetX][i] = offset_from_5;
-				vote->coverage_end [offsetX][i] = offset_from_5+16;
-
-				if(vote->max_vote==0)
-				{
-					vote->max_coverage_start = offset_from_5;
-					vote->max_coverage_end = offset_from_5+16;
-					vote->max_mask =  (is_reversed?IS_NEGATIVE_STRAND:0);
-					vote->max_vote = weight;
-					vote->max_position = kv;
-					vote->max_quality = quality;
-				}
-			}
+			last_accepted_index++;
 		}
-	else
-		// We duplicated all codes for indel_tolerance >= 1 for the minimal impact to performance.
-		for (keyp = current_bucket -> item_values+match_start; keyp < endkp ; keyp++)
+
+		if(current_keys[last_accepted_index]!=key) return 0;
+
+		short offset_from_5 = offset;
+		//short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
+
+		if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
 		{
-			unsigned int kv = (*keyp);
-			int iix;
+			// assumed to be non-informative subread.
+			vote -> noninformative_subreads++;
+			return 0;
+		}
 
-			/*if ((*keyp ) < offset)
-				continue;*/
-
-			if (kv < low_border || kv > high_border)
-				continue;
-
-			kv -= offset;
-
-			for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
+		if (indel_tolerance <1)
+			for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
 			{
-				int offsetX = _index_vote_tol(kv+iix);
+				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
+				int offsetX = _index_vote(kv);
 				int datalen = vote -> items[offsetX];
-				if(!datalen)continue;
-
 				unsigned int * dat = vote -> pos[offsetX];
 
+				if (kv > 0xffff0000)
+					continue;
 				for (i=0;i<datalen;i++)
 				{
-					int di = dat[i];
-					int dist0 = kv-di;
-					if(abs(dist0) <= indel_tolerance)
+					if (dat[i] == kv)
 					{
-
-						if (vote -> last_offset[offsetX][i]== offset)
-							continue;
-
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-						test_max += weight;
-						vote -> votes[offsetX][i] = test_max;
-						vote -> quality[offsetX][i] += quality;
-						vote -> last_offset[offsetX][i]=offset;
-
-
+						test_max += 1;
+						vote->votes[offsetX][i] = test_max;
+						vote->quality[offsetX][i] += quality;
 						if (offset_from_5 <  vote->coverage_start [offsetX][i])
-						{
 							vote->coverage_start [offsetX][i] = offset_from_5;
-						}
 						if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
-						{
 							vote->coverage_end [offsetX][i] = offset_from_5+16;
-						}
 
-						int toli;
-						for(toli=0; toli<indel_tolerance*3-3; toli+=3)
-						{
-							if (! vote -> indel_recorder[offsetX][i][toli+3])break;
-						}
-	
-
-
-						if (dist0 !=  vote->current_indel_cursor[offsetX][i])
-						{
-							toli +=3;
-							if (toli < indel_tolerance*3)
-							{
-								vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-								vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-									
-								if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-							}
-							vote->current_indel_cursor [offsetX][i] = (char)dist0;
-						}
-						vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-
-						int go_replace = 0;
-
-						if(test_max >= vote->max_vote)
-						{
-							if(test_max > vote->max_vote || (test_max == vote->max_vote && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] > vote->max_coverage_end - vote->max_coverage_start )) ||( (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start)&& vote -> quality[offsetX][i] > vote->max_quality))
-								go_replace = 1;
-							else if (test_max == vote->max_vote && vote->quality[offsetX][i] == vote->max_quality && (vote->coverage_end [offsetX][i] - vote->coverage_start [offsetX][i] == vote->max_coverage_end - vote->max_coverage_start))
-							{
-								//SUBREADprintf("\nBREAK EVEN DETECTED AT SORTED TABLE: %u (kept) and %u\n", vote->max_position , kv);
-								vote->max_mask |= IS_BREAKEVEN_READ ;
-								if(vote->max_position >  di)
-									go_replace = 1;
-							}
-						}
-						if(go_replace)
-						{
-							#ifdef MAKE_FOR_EXON
-							vote->max_coverage_start = vote->coverage_start [offsetX][i];
-							vote->max_coverage_end = vote->coverage_end [offsetX][i];
-							#endif
-
-							vote->max_tmp_indel_recorder = vote->indel_recorder[offsetX][i];
-							vote->max_vote = test_max;
-							vote->max_quality = vote -> quality[offsetX][i];
-
-							vote->max_position = di;
-							vote->max_mask = vote->masks[offsetX][i];
-							
-						}
+						vote->max_vote = max(vote->max_vote , test_max);
 						i = 9999999;
 					}
 				}
-				if (i>=9999999){
-					break;
+
+				if (i < 9999999 && datalen<GENE_VOTE_SPACE)
+				{
+
+					if (kv < low_border || kv > high_border)
+						continue;
+
+
+					vote -> items[offsetX] ++;
+					dat[i] = kv;
+					vote->votes[offsetX][i]=1;
+					vote->quality[offsetX][i]=quality;
+					vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
+					vote->coverage_start [offsetX][i] = offset_from_5;
+					vote->coverage_end [offsetX][i] = offset_from_5+16;
+
+					if(vote->max_vote==0)
+						vote->max_vote = 1;
 				}
 			}
+		else
+		{
+			// We duplicated all codes for indel_tolerance >= 1 for the minimal impact to performance.
+			//int ii_end = (indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
 
-			if (i < 9999999)
+			for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
 			{
-				//SUBREADprintf("\nFOUND-NEW! %u\n", kv);
-				int offsetX2 = _index_vote_tol(kv);
-				int datalen2 = vote -> items[offsetX2];
-				unsigned int * dat2 = vote -> pos[offsetX2];
+				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
+				int ii_end = (indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
+				int iix;
+				i=0;
 
-				if (is_add && datalen2<GENE_VOTE_SPACE)
+				for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
 				{
-					vote -> items[offsetX2] ++;
-					dat2[datalen2] = kv;
-					vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
-					vote -> quality[offsetX2][datalen2]=quality;
-					vote -> votes[offsetX2][datalen2]=weight;
-					vote -> last_offset[offsetX2][datalen2]=offset;
+					int offsetX = _index_vote_tol(kv+iix);
+					int datalen = vote -> items[offsetX];
+					if(!datalen)continue;
 
-					// data structure of recorder:
-					// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
-					// All subread numbers are added with 1 for not being 0.
+					unsigned int * dat = vote -> pos[offsetX];
 
-					vote -> indel_recorder[offsetX2][datalen2][0] = subread_number+1;
-					vote -> indel_recorder[offsetX2][datalen2][1] = subread_number+1;
-					vote -> indel_recorder[offsetX2][datalen2][2] = 0;
-					vote -> indel_recorder[offsetX2][datalen2][3] = 0;
-					vote->current_indel_cursor [offsetX2][datalen2] = 0;
-					#ifdef MAKE_FOR_EXON
-					vote->coverage_start [offsetX2][datalen2] = offset_from_5;
-					vote->coverage_end [offsetX2][datalen2] = offset_from_5+16;
-					#endif
-
-					if (vote->max_vote==0)
+					for (i=0;i<datalen;i++)
 					{
-						#ifdef MAKE_FOR_EXON
-						vote->max_coverage_start = offset_from_5;
-						vote->max_coverage_end = offset_from_5+16;
-						#endif
-	
-						vote->max_vote = weight;
-						vote->max_position = kv;
-						vote->max_mask = (is_reversed?IS_NEGATIVE_STRAND:0);
-						vote->max_quality = quality;
-						vote->max_tmp_indel_recorder = vote->indel_recorder[offsetX2][datalen2];
+						int di = dat[i];
+						int dist0 = kv-di;
+						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
+						{
+							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+							test_max += 1;
+							vote -> votes[offsetX][i] = test_max;
+							vote -> quality[offsetX][i] += quality;
+
+
+							/*
+							if (offset_from_5 <  vote->coverage_start [offsetX][i])
+							{
+								vote->coverage_start [offsetX][i] = offset_from_5;
+							}*/
+							if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
+							{
+								vote->coverage_end [offsetX][i] = offset_from_5+16;
+							}
+
+							int toli =  vote -> toli[offsetX][i];
+
+							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+							{
+								toli +=3;
+								if (toli < indel_tolerance*3)
+								{
+									vote -> toli[offsetX][i] = toli;
+									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+										
+									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+								}
+								vote->current_indel_cursor [offsetX][i] = (char)dist0;
+							}
+							else
+								vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+
+							vote->max_vote = max(vote->max_vote , test_max);
+							i = 9999999;
+						}
+					}
+					if (i>=9999999){
+						break;
+					}
+				}
+
+				if (i < 9999999)
+				{
+					if (kv < low_border || kv > high_border)
+						continue;
+
+					int offsetX2 = _index_vote_tol(kv);
+					int datalen2 = vote -> items[offsetX2];
+					unsigned int * dat2 = vote -> pos[offsetX2];
+
+					if (datalen2<GENE_VOTE_SPACE)
+					{
+						vote -> items[offsetX2] ++;
+						dat2[datalen2] = kv;
+						vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
+						vote -> quality[offsetX2][datalen2]=quality;
+						vote -> votes[offsetX2][datalen2]=1;
+						vote -> toli[offsetX2][datalen2]=0;
+
+						// data structure of recorder:
+						// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
+						// All subread numbers are added with 1 for not being 0.
+
+						vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number+1;
+						vote -> indel_recorder[offsetX2][datalen2][2] = 0;
+						vote -> indel_recorder[offsetX2][datalen2][3] = 0;
+						vote->current_indel_cursor [offsetX2][datalen2] = 0;
+						vote->coverage_start [offsetX2][datalen2] = offset_from_5;
+						vote->coverage_end [offsetX2][datalen2] = offset_from_5+16;
+
+						if (vote->max_vote==0)
+							vote->max_vote = 1;
 					}
 				}
 			}
-		}
-	
+		}	
+			
+		return 1;
+		//return match_end-match_start;
+	}
+	else
+	{
+
+		// VER_1
+
+		struct gehash_bucket * current_bucket;
+		int i = 0, items;
+
+		short *current_keys;//, *endp12;
+		short key = raw_key / the_table->buckets_number;
+
+		#ifdef NEED_SUBREAD_STATISTIC
+		vote -> all_used_subreads++;
+		#endif
+
+		current_bucket = _gehash_get_bucket (the_table, raw_key);
+		items = current_bucket -> current_items;
+		current_keys = current_bucket -> new_item_keys;
 		
-	return 1;
-	//return match_end-match_start;
+		if(!items) return 0;
+
+		int imin=0, imax=items;
+		int last_accepted_index;
+
+		while(1)
+		{
+			last_accepted_index=(imin+imax)/2;
+			short current_key = current_keys[last_accepted_index];
+			if(current_key>key)
+			{
+				imax = last_accepted_index - 1;
+			}
+			else if(current_key<key)
+			{
+				imin = last_accepted_index + 1;
+			}
+			else
+				break;
+
+			if(imax<imin)
+				return 0;
+			
+		}
+
+		while(last_accepted_index){
+			if(current_keys[last_accepted_index-1] == key) last_accepted_index-=1;
+			else break;
+		}
+
+		#ifdef NEED_SUBREAD_STATISTIC
+		if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
+		{
+			// assumed to be non-informative subread.
+			vote -> noninformative_subreads++;
+			return 0;
+		}
+		#endif
+
+		{
+			int ii_end = INDEL_SEGMENT_SIZE;
+			if(indel_tolerance>5) ii_end=(indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
+
+			for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
+			{
+				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
+				int iix, offsetX2, offsetX, datalen, datalen2;
+				offsetX2 = offsetX = _index_vote_tol(kv);
+				datalen = datalen2 = vote -> items[offsetX2];
+				unsigned int * dat2, *dat;
+				dat = dat2 = vote -> pos[offsetX2];
+
+				/*
+				{
+
+					for (i=0;i<datalen;i++)
+					{
+						unsigned int di = dat[i];
+						int dist0 = 0;
+						if( kv == di )
+						{
+							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+							test_max += 1;
+							vote -> votes[offsetX][i] = test_max;
+							vote -> quality[offsetX][i] += quality;
+
+							if (offset +16 > vote->coverage_end [offsetX][i])
+								vote->coverage_end [offsetX][i] = offset+16;
+
+							int toli =  vote -> toli[offsetX][i];
+
+							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+							{
+								toli +=3;
+								if (toli < indel_tolerance*3)
+								{
+									vote -> toli[offsetX][i] = toli;
+									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+										
+									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+								}
+								vote->current_indel_cursor [offsetX][i] = (char)dist0;
+							}
+							else
+								vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+
+							vote->max_vote = max(vote->max_vote , test_max);
+							i = 9999999;
+						}
+					}
+
+
+				}
+
+				if(i < 9999999)
+				*/
+					for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
+					{
+						if(iix>0)
+						{
+							offsetX = _index_vote_tol(kv+iix);
+							datalen = vote -> items[offsetX];
+							dat = vote -> pos[offsetX];
+						}
+
+
+						if(!datalen)continue;
+
+						for (i=0;i<datalen;i++)
+						{
+							int di = dat[i];
+							int dist0 = kv-di;
+							if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
+							{
+								gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+								test_max += 1;
+								vote -> votes[offsetX][i] = test_max;
+								vote -> quality[offsetX][i] += quality;
+
+								if (offset +16 > vote->coverage_end [offsetX][i])
+									vote->coverage_end [offsetX][i] = offset+16;
+
+								int toli =  vote -> toli[offsetX][i];
+
+								if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+								{
+									toli +=3;
+									if (toli < indel_tolerance*3)
+									{
+										vote -> toli[offsetX][i] = toli;
+										vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+										vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+										vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+											
+										if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+									}
+									vote->current_indel_cursor [offsetX][i] = (char)dist0;
+								}
+								else
+									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+
+								vote->max_vote = max(vote->max_vote , test_max);
+								i = 9999999;
+							}
+						}
+						if (i>=9999999){
+							break;
+						}
+
+					}
+
+				if (i < 9999999)
+				{
+					if (kv < low_border || kv > high_border)
+						continue;
+
+					if (datalen2<GENE_VOTE_SPACE)
+					{
+						vote -> items[offsetX2] ++;
+						dat2[datalen2] = kv;
+						vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
+						vote -> quality[offsetX2][datalen2]=quality;
+						vote -> votes[offsetX2][datalen2]=1;
+						vote -> toli[offsetX2][datalen2]=0;
+
+						// data structure of recorder:
+						// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
+						// All subread numbers are added with 1 for not being 0.
+
+						vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number+1;
+						vote -> indel_recorder[offsetX2][datalen2][2] = 0;
+						vote -> indel_recorder[offsetX2][datalen2][3] = 0;
+						vote->current_indel_cursor [offsetX2][datalen2] = 0;
+						vote->coverage_start [offsetX2][datalen2] = offset;
+						vote->coverage_end [offsetX2][datalen2] = offset+16;
+
+						if (vote->max_vote==0)
+							vote->max_vote = 1;
+					}
+				}
+				else i=0;
+			}
+		}	
+		return 1;
+	}
 }
 
-void indel_recorder_copy(char *dst, char * src)
+void select_best_vote(gene_vote_t * vote)
 {
+	int i,j;
+	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
+		for(j=0; j< vote->items[i]; j++)
+		{
+			if(vote -> votes[i][j] == vote->max_vote)
+			{
+				vote -> max_position = vote -> pos[i][j];
+				vote -> max_quality = vote -> quality[i][j];
+				vote -> max_mask = vote -> masks[i][j];
+				vote -> max_coverage_start = vote->coverage_start[i][j];
+				vote -> max_coverage_end = vote->coverage_end[i][j];
+			}
+		}
+}
+
+short indel_recorder_copy(char *dst, char * src)
+{
+	short all_indels = 0;
 //	memcpy(dst, src, 3*MAX_INDEL_TOLERANCE);  return;
 
 
 	int i=0;
-	while(src[i] && (i<3*MAX_INDEL_TOLERANCE))
+	while(src[i] && (i<3*MAX_INDEL_TOLERANCE-2))
 	{
 		dst[i] = src[i];
 		i++;
 		dst[i] = src[i];
 		i++;
 		dst[i] = src[i];
+		all_indels = dst[i]; 
 		i++;
 	}
 	dst[i] = 0;
+	return all_indels;
 
 }
 
@@ -724,6 +1100,7 @@ int gehash_exist(gehash_t * the_table, gehash_key_t key)
 	int  items;
 	gehash_key_t * keyp, *endkp;
 
+	assert(the_table->version_number == SUBINDEX_VER0);
 	current_bucket = _gehash_get_bucket (the_table, key);
 	items = current_bucket -> current_items;
 
@@ -749,6 +1126,7 @@ size_t gehash_update(gehash_t * the_table, gehash_key_t key, gehash_data_t data_
 	int items;
 	gehash_key_t * keyp, *endkp;
 
+	assert(the_table->version_number == SUBINDEX_VER0);
 	current_bucket = _gehash_get_bucket (the_table, key);
 
 	matched = 0;
@@ -780,6 +1158,7 @@ size_t gehash_get(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_r
 	if(max_result_space<1)
 		return 0;
 
+	assert(the_table->version_number == SUBINDEX_VER0);
 	current_bucket = _gehash_get_bucket (the_table, key);
 
 	matched = 0;
@@ -812,6 +1191,7 @@ size_t gehash_remove(gehash_t * the_table, gehash_key_t key)
 	int i;
 	size_t removed;
 
+	assert(the_table->version_number == SUBINDEX_VER0);
 	current_bucket = _gehash_get_bucket (the_table, key);	
 
 	if(current_bucket -> current_items < 1)
@@ -895,6 +1275,8 @@ long long int load_int64(FILE * fp)
 int gehash_load(gehash_t * the_table, const char fname [])
 {
 	int i, read_length;
+	char magic_chars[8];
+	magic_chars[7]=0;
 
 	FILE * fp = fopen(fname, "rb");
 	if (!fp)
@@ -903,74 +1285,112 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		return 1;
 	}
 
-	the_table -> current_items = load_int64(fp);
-	the_table -> buckets_number = load_int32(fp);
-	the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
-	if(!the_table -> buckets)
-	{
-		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
-		return 1;
-	}
+	fread(magic_chars,1,8,fp);
 
-	for (i=0; i<the_table -> buckets_number; i++)
+	if(memcmp(magic_chars+1, "subindx",7)==0)
 	{
-		struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
-		current_bucket -> current_items = load_int32(fp);
-		current_bucket -> space_size = load_int32(fp);
-		current_bucket -> space_size = current_bucket -> current_items;
-		current_bucket -> item_keys = (gehash_key_t *) malloc ( sizeof(gehash_key_t) * current_bucket -> space_size);
-		current_bucket -> item_values = (gehash_data_t *) malloc ( sizeof(gehash_data_t) * current_bucket -> space_size);
+		if('1'==magic_chars[0])
+			the_table -> version_number = SUBINDEX_VER1;
+		else	assert(0);
 
-		if(!(current_bucket -> item_keys&&current_bucket -> item_values))
+		the_table -> current_items = load_int64(fp);
+		the_table -> buckets_number = load_int32(fp);
+		the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
+		if(!the_table -> buckets)
 		{
 			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
-
 		}
 
-		if(current_bucket -> current_items > 0)
+		for (i=0; i<the_table -> buckets_number; i++)
 		{
-			read_length = fread(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
-			assert(read_length>0);
-			read_length = fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
-			assert(read_length>0);
+			struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
+			current_bucket -> current_items = load_int32(fp);
+			current_bucket -> space_size = load_int32(fp);
+			current_bucket -> space_size = current_bucket -> current_items;
+			current_bucket -> new_item_keys = (short *) malloc ( sizeof(short) * current_bucket -> space_size);
+			current_bucket -> item_values = (gehash_data_t *) malloc ( sizeof(gehash_data_t) * current_bucket -> space_size);
+
+			if(!(current_bucket -> new_item_keys&&current_bucket -> item_values))
+			{
+				SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+				return 1;
+
+			}
+
+			if(current_bucket -> current_items > 0)
+			{
+				read_length = fread(current_bucket -> new_item_keys, sizeof(short), current_bucket -> current_items, fp);
+				assert(read_length>0);
+				read_length = fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
+				assert(read_length>0);
+			}
+
 		}
+
+		read_length = fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
+		assert(read_length>0);
+		fclose(fp);
+		return 0;
 
 	}
+	else
+	{
+		fclose(fp);
+		fp = fopen(fname, "rb");
+		the_table -> version_number = SUBINDEX_VER0;
+		the_table -> current_items = load_int64(fp);
+		the_table -> buckets_number = load_int32(fp);
+		the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
+		if(!the_table -> buckets)
+		{
+			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+			return 1;
+		}
 
-	read_length = fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
-	assert(read_length>0);
-	fclose(fp);
-	return 0;
+		for (i=0; i<the_table -> buckets_number; i++)
+		{
+			struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
+			current_bucket -> current_items = load_int32(fp);
+			current_bucket -> space_size = load_int32(fp);
+			current_bucket -> space_size = current_bucket -> current_items;
+			current_bucket -> item_keys = (gehash_key_t *) malloc ( sizeof(gehash_key_t) * current_bucket -> space_size);
+			current_bucket -> item_values = (gehash_data_t *) malloc ( sizeof(gehash_data_t) * current_bucket -> space_size);
+
+			if(!(current_bucket -> item_keys&&current_bucket -> item_values))
+			{
+				SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+				return 1;
+
+			}
+
+			if(current_bucket -> current_items > 0)
+			{
+				read_length = fread(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
+				assert(read_length>0);
+				read_length = fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
+				assert(read_length>0);
+			}
+
+		}
+
+		read_length = fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
+		assert(read_length>0);
+		fclose(fp);
+		return 0;
+	}
 }
 
-int gehash_dump(gehash_t * the_table, const char fname [])
+
+void gehash_sort(gehash_t * the_table)
 {
-	int i, scroll_counter = 0;
-	FILE * fp = fopen(fname, "wb");
-	if (!fp)
-	{
-		SUBREADprintf ("Table file `%s' is not able to open.\n", fname);
-		return -1;
-	}
-
-	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
-	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
-
-	SUBREADprintf("Saving the current block of index ...\n");
-
-
+	int i;
 	for (i=0; i<the_table -> buckets_number; i++)
 	{
 		struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
 		int ii, jj;
 		gehash_key_t tmp_key;
 		gehash_data_t tmp_val;
-
-
-		if(i % (the_table -> buckets_number/15) == 0)
-			print_text_scrolling_bar("", 1.0*i/the_table -> buckets_number, 80, &scroll_counter);
-
 
 		if(current_bucket -> current_items>=1)
 		{
@@ -991,16 +1411,185 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 				}
 			}
 		}
+	}
+}
+
+int gehash_dump(gehash_t * the_table, const char fname [])
+{
+	int ii, jj, xx;
+	int i, scroll_counter = 0;
+	FILE * fp = fopen(fname, "wb");
+	int maximum_bucket_size = 0;
+	if (!fp)
+	{
+		SUBREADprintf ("Table file `%s' is not able to open.\n", fname);
+		return -1;
+	}
+
+	if(the_table->version_number == SUBINDEX_VER1)
+		fwrite("1subindx",1,8,fp);
+
+	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
+	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
+
+	print_in_box(80,0,0,"Saving index block...              ");
+
+	for (i=0; i<the_table -> buckets_number; i++)
+	{
+		struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
+		if(current_bucket -> current_items > maximum_bucket_size)
+			maximum_bucket_size = current_bucket -> current_items;
+	}
+
+	#define SORT_LANE_NUMBER 16
+	short * sort_space_new_key[SORT_LANE_NUMBER];
+	gehash_data_t * sort_space_data [SORT_LANE_NUMBER];
+	int items_in_sort[SORT_LANE_NUMBER] ;
+	int items_in_merge[SORT_LANE_NUMBER] ;
+	if(the_table->version_number == SUBINDEX_VER1)
+	{
+		for(xx=0;xx<SORT_LANE_NUMBER;xx++)
+		{
+			sort_space_new_key[xx] = (short *)malloc(sizeof(short)*(maximum_bucket_size/SORT_LANE_NUMBER+2));
+			sort_space_data[xx] = (gehash_data_t *)malloc(sizeof(gehash_data_t)*(maximum_bucket_size/SORT_LANE_NUMBER+2));
+		}
+	}
+
+	for (i=0; i<the_table -> buckets_number; i++)
+	{
+		struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
+		gehash_data_t tmp_val=0;
+
+		if(i % (the_table -> buckets_number/10) == 0)
+			print_window_scrolling_bar("", 1.0*i/the_table -> buckets_number, 74, &scroll_counter);
+
+		if(current_bucket -> current_items>=1)
+		{
+			if(the_table->version_number == SUBINDEX_VER0)
+			{
+				for(ii=0;ii<current_bucket -> current_items -1; ii++)
+				{
+					gehash_key_t tmp_key;
+					for (jj = ii+1; jj < current_bucket -> current_items; jj++)
+					{
+						
+						if (current_bucket -> item_keys[ii] > current_bucket -> item_keys[jj])
+						{
+							tmp_key = current_bucket -> item_keys[ii];
+							current_bucket -> item_keys[ii] = current_bucket -> item_keys[jj];
+							current_bucket -> item_keys[jj] = tmp_key;
+
+							tmp_val = current_bucket -> item_values[ii];
+							current_bucket -> item_values[ii] = current_bucket -> item_values[jj];
+							current_bucket -> item_values[jj] = tmp_val;
+						}
+					}
+				}
+			}
+			else
+			{
+
+				if(0){
+					for(ii=0;ii<current_bucket -> current_items -1; ii++)
+					{
+						short tmp_key;
+						for (jj = ii+1; jj < current_bucket -> current_items; jj++)
+						{
+							
+							if (current_bucket -> new_item_keys[ii] > current_bucket -> new_item_keys[jj])
+							{
+								tmp_key = current_bucket -> new_item_keys[ii];
+								current_bucket -> new_item_keys[ii] = current_bucket -> new_item_keys[jj];
+								current_bucket -> new_item_keys[jj] = tmp_key;
+
+								tmp_val = current_bucket -> item_values[ii];
+								current_bucket -> item_values[ii] = current_bucket -> item_values[jj];
+								current_bucket -> item_values[jj] = tmp_val;
+							}
+						}
+					}
+				}
+				if(1){
+					memset(items_in_sort, 0, sizeof(int)*SORT_LANE_NUMBER);
+					for(ii=0;ii<current_bucket -> current_items;ii++)
+					{
+						int sort_lane_no = ii%SORT_LANE_NUMBER;
+						int xx_th_item = items_in_sort[sort_lane_no] ++;
+						sort_space_new_key[sort_lane_no][xx_th_item] = current_bucket -> new_item_keys[ii];
+						sort_space_data[sort_lane_no][xx_th_item] = current_bucket -> item_values[ii];
+					}
+					for(xx=0;xx<SORT_LANE_NUMBER;xx++)
+					{
+						for(ii=0;ii<items_in_sort[xx]-1; ii++)
+						{
+							for(jj = ii+1; jj < items_in_sort[xx]; jj++)
+							{
+								short tmp_key;
+								if(sort_space_new_key[xx][ii] > sort_space_new_key[xx][jj])
+								{
+									tmp_key = sort_space_new_key[xx][ii];
+									sort_space_new_key[xx][ii] = sort_space_new_key[xx][jj];
+									sort_space_new_key[xx][jj] = tmp_key;
+
+									tmp_val = sort_space_data[xx][ii];
+									sort_space_data[xx][ii]=sort_space_data[xx][jj];
+									sort_space_data[xx][jj]=tmp_val;
+								}
+							}
+						}
+					}
+
+
+					memset(items_in_merge, 0, sizeof(int)*SORT_LANE_NUMBER);
+					for(ii=0;ii<current_bucket -> current_items;ii++)
+					{
+						int tmp_key=0x7fffffff;
+						int selected_lane = 0;
+						for(xx=0;xx<SORT_LANE_NUMBER;xx++)
+						{
+							int ii_in_xx = items_in_merge[xx];
+							if(ii_in_xx >= items_in_sort[xx]) continue;
+
+							if(tmp_key>sort_space_new_key[xx][ii_in_xx])
+							{
+								selected_lane=xx;
+								tmp_key = sort_space_new_key[xx][ii_in_xx];
+							}
+						}
+
+						assert(tmp_key<0x10000);
+						current_bucket -> new_item_keys[ii] = (short)tmp_key;
+						current_bucket -> item_values[ii] = sort_space_data[selected_lane][items_in_merge[selected_lane]];
+
+						items_in_merge[selected_lane]++;
+						//printf("V [%d] [%d] =%d\n",i , ii, tmp_key);
+					}
+				}
+			}
+		}
 
 		fwrite(& (current_bucket -> current_items), sizeof(int), 1, fp);
 		fwrite(& (current_bucket -> space_size), sizeof(int), 1, fp);
-		fwrite(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
+		if(the_table->version_number == SUBINDEX_VER0)
+			fwrite(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
+		else
+			fwrite(current_bucket -> new_item_keys, sizeof(short), current_bucket -> current_items, fp);
 		fwrite(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
 	}
 
+	if(the_table->version_number == SUBINDEX_VER1)
+	{
+		for(xx=0;xx<SORT_LANE_NUMBER;xx++)
+		{
+			free(sort_space_new_key[xx]);
+			free(sort_space_data[xx]);
+		}
+	}
+
+
 	fwrite(&(the_table -> is_small_table), sizeof(char), 1, fp);
 	fclose(fp);
-	SUBREADprintf("\n");
+	print_in_box(80,0,0,"");
 	return 0;
 }
 

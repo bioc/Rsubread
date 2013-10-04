@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -22,11 +20,13 @@
 #ifndef _SAMBAM_FILE_H_
 #define _SAMBAM_FILE_H_
 
+#include <zlib.h>
+
 typedef unsigned char BS_uint_8;
 typedef unsigned short BS_uint_16;
 typedef unsigned int BS_uint_32;
 
-#define BAM_MAX_CHROMOSOME_NAME_LEN 256 
+#define BAM_MAX_CHROMOSOME_NAME_LEN 100 
 #define BAM_MAX_CIGAR_LEN 64
 #define BAM_MAX_READ_NAME_LEN 256
 #define BAM_MAX_READ_LEN 3000
@@ -37,6 +37,9 @@ typedef unsigned int BS_uint_32;
 #define BAM_FILE_STAGE_HEADER 10
 #define BAM_FILE_STAGE_ALIGNMENT 20
 
+
+#define SAMBAM_COMPRESS_LEVEL 5
+#define SAMBAM_GZIP_WINDOW_BITS -15
 
 typedef struct
 {
@@ -55,6 +58,7 @@ typedef struct
 	unsigned int mate_chro_offset;
 	int templete_length;
 	unsigned char mapping_quality;
+	int NH_number;
 
 	char cigar[BAM_MAX_CIGAR_LEN];
 	char sequence[BAM_MAX_READ_LEN];
@@ -80,9 +84,43 @@ typedef struct
 } SamBam_FILE;
 
 
+typedef struct
+{
+	FILE * bam_fp;
+	z_stream output_stream;
+	char * chunk_buffer;
+	char * compressed_chunk_buffer;
+	char * header_plain_text_buffer;
+	int header_plain_text_buffer_used;
+	int header_plain_text_buffer_max;
+	int chunk_buffer_used;
+	int writer_state;
+	unsigned int crc0;
+	
+	HashTable * chromosome_name_table;
+	HashTable * chromosome_id_table;
+	HashTable * chromosome_len_table;
+} SamBam_Writer;
+
+// This function reads the next BAM section from the bam_fp. The buffer has a variable length but should be at least 64K bytes.
+// I recommend you to allocate 80KB of memory.
+// This function returns the size of the compressed data ( CDATA ). It returns < 0 if EOF.
+int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsigned int * real_len);
+
+// load the header of a BAM file (the header is important to load BAM reads)
+// this function puts the File Pointer to the first read chunk in the BAM.
+// It returns 0 if finished loading, or non-zero if wrong.
+int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab);
+
+
+// load a new line from the BAM buffer (chunk) at chunk_ptr.
+// if seq_needed==0, then no sequence nor quality str will be loaded.
+// it returns the length (without "\0" after the tail) of the SAM string.
+int PBam_chunk_gets(char * chunk, int *chunk_ptr, SamBam_Reference_Info * bam_chro_table, char * buff , int buff_len, SamBam_Alignment*aln, int seq_needed);
+
 // This function opens a file, either SAM or BAM, in read-only mode.
 // The "file_type" parameter specifies which type of file it is: SAMBAM_FILE_BAM or SAMBAM_FILE_SAM.
-SamBam_FILE * SamBam_fopen(const char * fname , int file_type);
+SamBam_FILE * SamBam_fopen(char * fname , int file_type);
 
 // This function closes any opened file and releases memory footprint. It works just like "fclose()".
 void SamBam_fclose(SamBam_FILE * fp);
@@ -107,6 +145,16 @@ int SamBam_feof(SamBam_FILE * fp);
  * }
  * SamBam_fclose(fp);
  */
-char * SamBam_fgets(SamBam_FILE * fp , char * buff , int buff_len );
+char * SamBam_fgets(SamBam_FILE * fp , char * buff , int buff_len , int seq_needed);
+
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname);
+
+int SamBam_writer_close(SamBam_Writer * writer);
+
+int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text);
+
+int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length);
+
+int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns);
 
 #endif

@@ -17,10 +17,26 @@
   ***************************************************************/
   
   
-#ifndef __SINGLE_NUCLEODITE_POLYMOREPHISM_H_
-#define __SINGLE_NUCLEODITE_POLYMOREPHISM_H_
+#ifndef _SUBLOG_H_
+#define _SUBLOG_H_
 
+#define SUBLOG_STAGE_DEV1		16
+#define SUBLOG_STAGE_DEV_ALPHA	256
+#define SUBLOG_STAGE_DEV_BETA	4096
+#define SUBLOG_STAGE_DEV_RC		65536
+#define SUBLOG_STAGE_RELEASED	1048576	
 
+#define SUBLOG_LEVEL_NIL		10
+#define SUBLOG_LEVEL_DEBUG		20
+#define SUBLOG_LEVEL_DETAILS	110
+#define SUBLOG_LEVEL_INFO		120
+#define SUBLOG_LEVEL_ABNORMAL	210
+#define SUBLOG_LEVEL_WARNING	220
+#define SUBLOG_LEVEL_ERROR		310
+#define SUBLOG_LEVEL_FATAL		900
 
+void sublog_printf(int stage, int level, const char * pattern, ...);
+void sublog_fwrite(int stage, int level, const char * pattern, ...);
+int sambamout_fprintf(FILE * fp, const char * pattern, ...);
 
 #endif

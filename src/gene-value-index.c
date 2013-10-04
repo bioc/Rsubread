@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -210,7 +208,7 @@ int match_chro_wronglen(char * read, gene_value_index_t * index, unsigned int po
 	return ret;
 }
 
-#define INDEL_TEST_WINDOW 3
+#define INDEL_TEST_WINDOW 5
 #define MIN_INDEL_SEARCH_MATCH_SCORE 8500
 
 int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number, int max_test_length)
@@ -218,21 +216,22 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 	int offset = 0;
 	int i;
 	int ret = 0;
+	int bast_match_score_remailing=-1;
 
-	for(i=0; i < test_len+min(0,offset); i++)
+	for(i=0; i < test_len; i++)
 	{
-		unsigned int npos = pos + i + max(0, offset);
+		unsigned int npos = pos + i +  offset;
 		char tt;
 		tt = gvindex_get (index, npos);
 
 		//if(i-min(0,offset) >= max_test_length)break;
 
-		if(read[i-min(0,offset)]==tt)ret++;
-		else if(i + offset < test_len - INDEL_TEST_WINDOW - 3 && i >0)
+	//	printf("Xi=%d  POS=%u INDEL=%d MATCH=%d TT vs R = %c , %c ; IPOS=%d\n", i,  npos, offset, read[i] ==tt, tt,  read[i], *indel_point);
+		if(read[i]==tt)ret++;
+		else if((i + offset < test_len - INDEL_TEST_WINDOW - 3 && i >0))
 		{
 			// if there is a base unmatched, it is potentially an indel from here.
-			int bast_match_score_remailing=-1;
-			int window_match = match_chro(read+i-min(0,offset), index, pos+i+ max(0, offset), INDEL_TEST_WINDOW ,0,GENE_SPACE_BASE);
+			int window_match = match_chro(read+i, index, pos+i+ offset, INDEL_TEST_WINDOW ,0,GENE_SPACE_BASE);
 
 			if(window_match < INDEL_TEST_WINDOW -1)
 			{
@@ -243,10 +242,10 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 					int indel_test = (indel_test_i+1)/2*(indel_test_i%2?1:-1);
 					if(abs(indel_test)>max_indel_number) continue;
 
-					if(indel_test > 0)	//insertion 
+					if(indel_test < 0)	//insertion 
 					{
-						int matched_tail = match_chro(read+i, index, pos+i+indel_test, test_len - i,0,GENE_SPACE_BASE);
-						int matched_score = matched_tail * 10000 / ( test_len - i);
+						int matched_tail = match_chro(read+i-indel_test, index, pos+i, test_len - i+indel_test,0,GENE_SPACE_BASE);
+						int matched_score = matched_tail * 10000 / ( test_len - i + indel_test);
 						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
@@ -254,8 +253,8 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 						}
 					}else	// deletion
 					{
-						int matched_tail = match_chro(read+i - indel_test, index, pos+i, test_len - i + indel_test ,0,GENE_SPACE_BASE);
-						int matched_score = matched_tail * 10000 / (test_len - i + indel_test);
+						int matched_tail = match_chro(read+i, index, pos+i+indel_test, test_len - i ,0,GENE_SPACE_BASE);
+						int matched_score = matched_tail * 10000 / (test_len - i);
 						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
@@ -268,16 +267,16 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 			{
 				if(offset > 0)//deletion
 				{
+					*indel_point  = i;
 					npos = pos + i + offset;
 					tt = gvindex_get (index, npos);
 					ret += read[i] == tt;
 				}
-				else
+				else if(offset<0)
 				{
-					ret += read[i - offset] == tt;
+					*indel_point  = i;
+					i-=offset+1;
 				}
-				*indel_point  = i;
-				
 			}
 		}
 	}
@@ -287,15 +286,338 @@ int match_indel_chro_to_front(char * read, gene_value_index_t * index, unsigned 
 }
 
 
+int find_all_indels(HashTable *indel_table, unsigned long pos, indel_record_t * ret, int search_to_back)
+{
+	int max_test_indels = 16;
+
+	int xi, iret=0;
+
+	
+	if(!search_to_back)
+	{
+		int mask_pos = (pos>>3)& 0x1fffffff;
+		if(!((char *)indel_table->appendix1)[mask_pos]) return 0;
+
+		int mask_off = pos %8;
+		if(!(((char *)indel_table->appendix1)[mask_pos] & (1<<mask_off)))
+			return 0;
+	}
+
+	for(xi = -max_test_indels; xi<=max_test_indels; xi++)
+	{
+		if(!xi)continue;
+
+		unsigned int search_pos = pos;
+
+		if(search_to_back)
+		{
+			if(xi>0)search_pos-= xi;
+			search_pos--;
+		}
+
+
+		if(search_to_back)
+		{
+			int mask_pos = (search_pos>>3)& 0x1fffffff;
+			if(!((char *)indel_table->appendix1)[mask_pos]) continue;
+
+			int mask_off = search_pos %8;
+			if(!(((char *)indel_table->appendix1)[mask_pos] & (1<<mask_off)))
+				continue;
+		}
+
+
+
+		indel_record_t key;
+		key.pos = search_pos;
+		key.len = xi;
+
+
+		indel_result_t * res = HashTableGet(indel_table, &key);
+		if(res)
+		{
+			memcpy(ret+iret, &key, sizeof(indel_record_t));
+			iret++;
+			if(iret>9)break;
+		}
+	}
+	//printf("%u has %d indel for %d\n", pos, iret, search_to_back);
+	return iret;
+}
+
+
+void match_indel_table_to_front_in(HashTable * indel_table , char * read, int read_pos_first_base, gene_value_index_t * index, unsigned int first_base_pos, int test_len, short * total_indels, short * indel_point, int max_indel_number, int min_test_offset, short * indels, short * indel_poses, int sofar_matched_bases, short * best_indels, short * best_indel_poses, int * best_matching_bases, int level);
+// This function iterates all possible combinations of indels, and select the one that has the highest matched base number as the final result.
+// The final result will be written in *sec
+
+int match_indel_table_to_front(HashTable * indel_table , char * read, gene_value_index_t * index, unsigned int first_base_pos, int test_len, short * indels, short * indel_point, int max_indel_number, int min_test_offset, struct explorer_section_t * sec)
+{
+	short tmp_indel_rec[10], tmp_indel_pos_rec[10];
+	memset(tmp_indel_rec, 0, sizeof(short)*10);
+	memset(tmp_indel_pos_rec, 0, sizeof(short)*10);
+
+	short *best_indel_rec=NULL, *best_indel_pos_rec=NULL;
+
+	if(sec)
+	{
+		best_indel_rec = sec -> all_indels ;
+		best_indel_pos_rec = sec -> all_indel_poses;
+	
+		memset(best_indel_rec, 0, sizeof(short)*10);
+		memset(best_indel_pos_rec, 0, sizeof(short)*10);
+	}
+	int best_matching_bases = -1;
+
+	match_indel_table_to_front_in(indel_table, read, 0, index, first_base_pos, test_len , indels , indel_point , max_indel_number , min_test_offset , tmp_indel_rec , tmp_indel_pos_rec , 0, best_indel_rec, best_indel_pos_rec , &best_matching_bases , 0);
+
+	return best_matching_bases;
+
+}
+
+#define TEST_TARGET "AGGAAAGTGAGACCATGCTCAGGAAAACAGAAGGCAACAGAAACTATGACAAATTCCAGACATCGGATTAACAGACAAAGACAG"
+
+
+void match_indel_table_to_front_in(HashTable * indel_table , char * read, int read_pos_first_base, gene_value_index_t * index, unsigned int first_base_pos, int test_len, short * total_indels, short * indel_point, int max_indel_number, int min_test_offset, short * indels, short * indel_poses, int sofar_matched_bases, short * best_indels, short * best_indel_poses, int * best_matching_bases, int level)
+{
+
+	unsigned int xi;
+	int xj, xk;
+	unsigned int index_low_boundary = index -> start_base_offset;
+	unsigned int index_up_boundary = index -> start_base_offset + index -> length;
+
+	if(first_base_pos <= index_low_boundary)return;
+	if(first_base_pos + test_len >= index_up_boundary)return;
+
+
+	if(level >9)return;
+
+	if(0&&memcmp(read + test_len - 1 - 30, TEST_TARGET +strlen(TEST_TARGET) -1 - 30, 30)==0)
+		printf("FRONT-IN: %d ; LEV=%d ; FBP=%u\n", test_len, level, first_base_pos);
+	for(xi = 1; xi < test_len; xi++)
+	{
+		indel_record_t found_records[20];
+		int section_matched_bases = 0 ,  num_records = find_all_indels(indel_table , xi + first_base_pos, found_records, 0);
+		if(num_records >0)
+			section_matched_bases = match_chro(read, index, first_base_pos, xi ,0,GENE_SPACE_BASE);
+//		if(num_records) printf("XI %d   FOUND %d INDELS AT %u ; SECMATCH=%d\n",xi, num_records , first_base_pos + xi, section_matched_bases);
+		for(xj=0; xj<num_records; xj++)
+		{
+			indel_record_t * this_record = &found_records[xj];
+
+			unsigned int next_first_base_pos = xi + first_base_pos;
+			if(this_record -> len >0) next_first_base_pos += this_record -> len; // if this is a deletion, jump the gap.
+
+			char * next_read = read + xi;
+			if(this_record -> len <0) next_read -= this_record -> len ;
+
+			int remainder_testlen = test_len - xi;
+			if(this_record -> len <0) remainder_testlen += this_record -> len ;
+
+			indels[level] = this_record -> len;
+			indel_poses[level] = read_pos_first_base + xi;
+
+			int next_read_pos_first_base = read_pos_first_base + xi;
+			if(this_record -> len <0) next_read_pos_first_base -= this_record -> len;
+
+			if(remainder_testlen>0 && (remainder_testlen<test_len -5))
+				match_indel_table_to_front_in(indel_table, next_read, next_read_pos_first_base, index, next_first_base_pos , remainder_testlen , total_indels, indel_point, max_indel_number, min_test_offset, indels, indel_poses, sofar_matched_bases + section_matched_bases, best_indels, best_indel_poses, best_matching_bases, level+1) ;
+
+			for(xk=level;xk<10;xk++)
+			{
+				indels[xk]=0;
+				indel_poses[xk]=0;
+			}
+		}
+	} 
+	
+	
+	// test the number of matched bases if no indels are in this section
+
+
+	int onepiece_matched_bases = match_chro(read, index, first_base_pos, test_len ,0,GENE_SPACE_BASE);
+
+	//if(onepiece_matched_bases * 1. / test_len < 0.85) onepiece_matched_bases = 0;
+
+
+
+	if(onepiece_matched_bases + sofar_matched_bases > *best_matching_bases)
+	{
+
+	if(0&&memcmp(read + test_len - 1 - 30, TEST_TARGET + strlen(TEST_TARGET) - 31, 30)==0)
+	{
+		for(xk=0; xk<level; xk++)
+		{
+			printf("%+d@%d ; ", indels[xk], indel_poses[xk]);
+		}
+
+
+		printf("FRONT FINAL LEVEL %d : MATCHED=%d+%d=%d\n", level, onepiece_matched_bases , sofar_matched_bases, onepiece_matched_bases + sofar_matched_bases );
+	}
+
+
+
+
+		if(best_indels)
+		{
+			memcpy(best_indels, indels, sizeof(short)*10);
+			memcpy(best_indel_poses, indel_poses, sizeof(short)*10);
+		}
+
+		*best_matching_bases = onepiece_matched_bases + sofar_matched_bases;
+		xk=0;
+
+		int ret_indels=0;
+		while(indels[xk])
+			ret_indels += indels[xk++];
+		*total_indels = ret_indels;
+
+		if(indels[0])
+			*indel_point = indel_poses[0];
+		else
+			*indel_point = 0;
+	}
+}
+
+
+
+void match_indel_table_to_back_in(HashTable * indel_table , char * read, gene_value_index_t * index, unsigned int last_base_pos, int test_len, short * total_indels, short * indel_point, int max_indel_number, int min_test_offset, short * indels, short * indel_poses, int sofar_matched_bases, short * best_indels, short * best_indel_poses, int * best_matching_bases, int level);
+int match_indel_table_to_back(HashTable * indel_table, char * read, gene_value_index_t * index, unsigned int last_base_pos, int test_len, short * indels, short * indel_point, int max_indel_number, int min_test_offset, struct explorer_section_t * sec)
+{
+	short tmp_indel_rec[10], tmp_indel_pos_rec[10];
+	memset(tmp_indel_rec, 0, sizeof(short)*10);
+	memset(tmp_indel_pos_rec, 0, sizeof(short)*10);
+
+	short best_indel_rec [10] , best_indel_pos_rec [10];
+	memset(best_indel_rec, 0, sizeof(short)*10);
+	memset(best_indel_pos_rec, 0, sizeof(short)*10);
+	int best_matching_bases = -1;
+
+	match_indel_table_to_back_in(indel_table, read, index, last_base_pos, test_len , indels , indel_point , max_indel_number , min_test_offset , tmp_indel_rec , tmp_indel_pos_rec , 0, best_indel_rec, best_indel_pos_rec , &best_matching_bases , 0);
+
+	int xi;
+	if(sec)
+	{
+		int retv=0;
+		while(best_indel_rec[retv])retv++;
+		//printf("BACK-OUT NO.INDEL=%d\n", retv);
+
+		for(xi=0;xi<retv;xi++)
+		{
+			sec->all_indels[xi] = best_indel_rec[retv-xi-1];
+			sec->all_indel_poses[xi] = best_indel_pos_rec[retv-xi-1];
+		}
+		for(xi=retv;xi<10;xi++)
+			sec->all_indels[xi] = 0;
+
+	}
+	return best_matching_bases;
+}
+
+void match_indel_table_to_back_in(HashTable * indel_table , char * read, gene_value_index_t * index, unsigned int last_base_pos, int test_len, short * total_indels, short * indel_point, int max_indel_number, int min_test_offset, short * indels, short * indel_poses, int sofar_matched_bases, short * best_indels, short * best_indel_poses, int * best_matching_bases, int level)
+{
+
+	unsigned int xi;
+	int xj, xk;
+	unsigned int index_low_boundary = index -> start_base_offset;
+	unsigned int index_up_boundary = index -> start_base_offset + index -> length;
+
+	if(last_base_pos - test_len <= index_low_boundary)return;
+	if(last_base_pos >= index_up_boundary)return;
+
+	if(level >9)return;
+	if(0&&memcmp(read, TEST_TARGET, 60)==0)
+		printf("BACK-OUT: %s, LEV=%d, LEN=%d, TAILPOS=%u\n",read, level, test_len, last_base_pos);
+	for(xi = 1 ; xi < test_len-1 ; xi++)
+	{
+		indel_record_t found_records[20];
+		int section_matched_bases, num_records = find_all_indels(indel_table , last_base_pos - xi, found_records, 1);
+
+		if(num_records>0)
+			section_matched_bases = match_chro(read + test_len - xi, index, last_base_pos - xi, xi ,0,GENE_SPACE_BASE);
+	//	if(num_records) printf("XI %d   FOUND %d INDELS AT %u ; SECMATCH=%d\n",xi, num_records , last_base_pos - xi, section_matched_bases);
+
+		for(xj=0; xj<num_records; xj++)
+		{
+			indel_record_t * this_record = &found_records[xj];
+
+			unsigned int next_last_base_pos = last_base_pos - xi -1;
+			if(this_record -> len >0) next_last_base_pos -= this_record -> len; // if this is a deletion, jump the gap.
+
+			int remainder_testlen = test_len - xi -1;
+			if(this_record -> len <0) remainder_testlen += this_record -> len ;
+
+
+			indels[level] = this_record -> len;
+			indel_poses[level] = test_len - xi -1;
+			if(this_record -> len <0) indel_poses[level] +=  this_record -> len ;
+
+			if(remainder_testlen> 0  &&remainder_testlen<test_len -5)
+				match_indel_table_to_back_in(indel_table, read, index, next_last_base_pos , remainder_testlen , total_indels, indel_point, max_indel_number, min_test_offset, indels, indel_poses, sofar_matched_bases + section_matched_bases, best_indels, best_indel_poses, best_matching_bases, level+1) ;
+
+			for(xk=level;xk<10;xk++)
+			{
+				indels[xk]=0;
+				indel_poses[xk]=0;
+			}
+		}
+	} 
+	
+	
+	// test the number of matched bases if no indels are in this section
+
+
+	int onepiece_matched_bases = match_chro(read, index, last_base_pos - test_len, test_len ,0,GENE_SPACE_BASE);
+	//if(onepiece_matched_bases *1. / test_len < 0.85)onepiece_matched_bases = 0;
+
+
+
+
+	if(onepiece_matched_bases + sofar_matched_bases > *best_matching_bases)
+	{
+	if(0&&memcmp(read, TEST_TARGET, 60)==0)
+	{
+		for(xk=0; xk<level; xk++)
+		{
+			printf("%+d@%d ; ", indels[xk], indel_poses[xk]);
+		}
+
+
+		printf("BACK FINAL LEVEL %d : MATCHED=%d+%d=%d\n", level, onepiece_matched_bases , sofar_matched_bases, onepiece_matched_bases + sofar_matched_bases );
+	}
+
+
+		memcpy(best_indels, indels, sizeof(short)*10);
+		memcpy(best_indel_poses, indel_poses, sizeof(short)*10);
+		*best_matching_bases = onepiece_matched_bases + sofar_matched_bases;
+		xk=0;
+
+		int ret_indels=0;
+		while(best_indels[xk])
+			ret_indels += best_indels[xk++];
+		*total_indels = ret_indels;
+
+		if(best_indels[0])
+			*indel_point = best_indel_poses[0];
+		else
+			*indel_point = 0;
+	}
+}
+
+
+
+
+
 // "pos" here is the expected position of the head of the read , but it is not the final position. If indels are found in the read, the head position must be offset.
 // Only certain is pos+test_len is the EXACT position of the TAIL of the read.
-int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int * indels, int * indel_point, int max_indel_number, int min_test_offset)
+int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned int pos /*_of_the_first_base (assumed)*/, int test_len, int * indels, int * indel_point, int max_indel_number, int min_test_offset)
 {
 	//return  match_chro(read, index, pos, test_len, 0, 1);
 	//SUBREADprintf("TEST_INDEL_CHRO %s VS %u LEN=%d\n", read, pos, test_len);
 	int offset = 0;
 	int i;
 	int ret = 0;
+	unsigned int tail_pos = pos  + test_len;
+	int bast_match_score_remailing=-1;
 
 
 	if(pos > 0xffff0000 || pos + test_len>= index-> length + index->start_point) 
@@ -303,29 +625,26 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 		*indels = 0;
 		return 0;
 	}
+	
 
-	for(i=test_len-1 ; i >=0/*max(0,offset)*/; i--)
+	// i is the distance from the tail.
+	for(i=1 ; i < test_len /*max(0,offset)*/; i++)
 	{
-		unsigned int npos = pos + i - max(0, offset);
+		unsigned int npos = tail_pos - i - 1 -  offset;
 		char tt;
 
 		tt = gvindex_get (index, npos);
 
-		#ifdef TEST_TARGET
-		if(memcmp(read, TEST_TARGET, 15)==0)
-			SUBREADprintf("%c=?=%c OFF=%d\n",read[i+min(0,offset)], tt, offset);
-		#endif
+		//printf("POS=%u INDEL=%d MATCH=%d\n",  npos, offset, read[test_len - i - 1] ==tt);
 
-		//if(i+min(0,offset) < min_test_offset) break;
-		if(read[i+min(0,offset)]==tt)ret++;
-		else if(i + offset >INDEL_TEST_WINDOW +3 && i < test_len-1)
+		if(read[test_len - i - 1] ==tt)ret++;
+		else if(test_len - i - 1 > INDEL_TEST_WINDOW +1 && i > 1)
 		{
 			// if there is a base unmatched, it is potentially an indel from here.
-			int bast_match_score_remailing=-1;
-			int window_match = match_chro(read+i-min(0,offset)-INDEL_TEST_WINDOW, index, pos+i+ max(0, offset)-INDEL_TEST_WINDOW, INDEL_TEST_WINDOW ,0,GENE_SPACE_BASE);
+			int window_match = match_chro(read + test_len - i  - INDEL_TEST_WINDOW, index, tail_pos - i  - offset - INDEL_TEST_WINDOW, INDEL_TEST_WINDOW ,0,GENE_SPACE_BASE);
 
-			if(window_match < INDEL_TEST_WINDOW-1)
-			{
+			if(window_match < INDEL_TEST_WINDOW - 1)
+			{	
 				// if the window is badly matched, it is very likely to be an indel from this base.
 				int indel_test_i;
 				for(indel_test_i =0; indel_test_i < 7; indel_test_i++)
@@ -334,13 +653,8 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 					if(abs(indel_test)>max_indel_number) continue;
 					if(indel_test > 0)	//deletion 
 					{
-						int matched_tail = match_chro(read , index, pos-indel_test, i ,0,GENE_SPACE_BASE);
-						int matched_score = matched_tail * 10000 / ( i );
-
-						#ifdef TEST_TARGET
-						if(memcmp(read, TEST_TARGET, 15)==0)
-							SUBREADprintf("INDEL_DEL_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score , pos-indel_test );
-						#endif
+						int matched_tail = match_chro(read , index, tail_pos - test_len - indel_test , test_len - i ,0,GENE_SPACE_BASE);
+						int matched_score = matched_tail * 10000 / ( test_len - i );
 
 						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
@@ -349,12 +663,9 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 						}
 					}else	//insertion 
 					{
-						int matched_tail = match_chro(read, index, pos - indel_test, i ,0,GENE_SPACE_BASE);
-						int matched_score = matched_tail * 10000 / (i + indel_test);
-						#ifdef TEST_TARGET
-						if(memcmp(read, TEST_TARGET, 15)==0)
-							SUBREADprintf("INDEL_INS_TEST i=%d: Indel=%d, Score=%f, HEADPOS=%u\n",i, indel_test,matched_score  , pos + indel_test);
-						#endif
+						int matched_tail = match_chro(read, index, tail_pos - test_len - indel_test , test_len - i + indel_test ,0,GENE_SPACE_BASE);
+						int matched_score = matched_tail * 10000 / (test_len - i + indel_test);
+
 						if(matched_score >  bast_match_score_remailing &&  matched_score > MIN_INDEL_SEARCH_MATCH_SCORE)
 						{
 							offset = indel_test;
@@ -365,21 +676,19 @@ int match_indel_chro_to_back(char * read, gene_value_index_t * index, unsigned i
 			}
 			if(bast_match_score_remailing>0)
 			{
-				#ifdef TEST_TARGET
-				if(memcmp(read, TEST_TARGET, 15)==0)
-					SUBREADprintf("PIECE_LEN=%d ; INDEL AT %d ; INDEL=%d\n", test_len , i + min(0, offset) , offset);
-				#endif
-				if(offset > 0)//insertion
+				if(offset < 0)//insertion
 				{
-					ret += read[i-offset] == tt;
+					//ret += read[i+offset] == tt;
+					*indel_point  = test_len - i + offset ;
+					i -= offset + 1;
 				}
-				else	//deletion
+				else if(offset >0)	//deletion
 				{
-					npos = (pos + i - offset);
-					tt = gvindex_get (index, pos + i - offset);
-					ret += read[i] == tt;
+					npos = (tail_pos - i - offset) ;
+					tt = gvindex_get (index, npos);
+					ret += read[test_len - i - 1] == tt;
+					*indel_point  = test_len - i ;
 				}
-				*indel_point  = i + min(0, offset);
 			}
 		}
 	}
@@ -480,6 +789,9 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 				char tt = gvindex_get (index, pos +i);
 				int is_correct =read[i] == tt; 
 				
+
+				//printf("i=%d/%d\t%c==%c  : %d\n",i, test_len, tt, read[i], is_correct);
+
 				all_qual += (1000000);
 
 				if(is_correct)
@@ -489,7 +801,6 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 
 	//SUBREADprintf("%d\n", test_len);
 	//if(all_qual < 3100000) return 0;
-	if(all_qual < 3100000) return 0;
 	return supported_qual*1. / all_qual * test_len;
 }
 
@@ -545,9 +856,11 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 		if(space_type == GENE_SPACE_BASE)
 		{
 			unsigned int offset_byte, offset_bit;
+	//puts("P1");
 
 			gvindex_baseno2offset_m(pos, index , offset_byte, offset_bit);
 
+	//printf("OB=%d; V=%016llX\n", offset_byte, (long long )index->values);
 			if(offset_byte >= index-> values_bytes)return 0;
 			char int_value = index->values [offset_byte];
 
@@ -579,6 +892,7 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 					offset_bit = 0;
 				}
 			}
+	//puts("P3");
 		}
 		else
 		{

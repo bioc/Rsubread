@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -28,6 +26,7 @@
 #include "subread.h"
 #include "removeDupReads.h"
 #include "input-files.h"
+extern unsigned int BASE_BLOCK_LENGTH;
 
 int is_read_selected(char *read_selection_list , unsigned int read_number)
 {
@@ -201,7 +200,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	seed48(rand48_seed);
 	sprintf(temp_file_prefix, "%s/temp-delrep-%06u-%08lX-", temp_location==NULL?".":temp_location, getpid(), lrand48());
 
-	if(break_SAM_file(in_SAM_file, temp_file_prefix, &real_read_count, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0)) return -1;
+	if(break_SAM_file(in_SAM_file, 0, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL)) return -1;
 
 	// Step 2: initialize the read voting table, scanning each temporary file. Each read in the temporary file is a vote to a location in the voting table. Then, each read in the temporary file is scanned again against the voting table. If the mapping location of this read receives >=threshold votes in the table, the read is removed from the read selection list.
 
@@ -250,7 +249,7 @@ int main_repeated_test(int argc,char ** argv)
 		print_usage_rrr(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "i:o:r:t:c:T:?")) != -1)
+	while ((c = getopt (argc, argv, "i:o:r:t:c:?")) != -1)
 	{
 		switch (c)
 		{
@@ -262,9 +261,11 @@ int main_repeated_test(int argc,char ** argv)
 				strncpy(output_SAM_file, optarg,299);
 				break;
 
+
 			case 't':
 				strncpy(temp_path,  optarg,299);
 				break;
+
 
 			case 'T':
 				threads = atoi(optarg);

@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -38,10 +36,17 @@
 
 // This function creates a new hash table. The invoter may provide the expected size of the table or -1 for a default size (2 billions)
 // This function returns 0 if success or an errno
+// The version of the hash table created by this function must be SUBINDEX_VER0.
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table);
+
+// The EX version creates a hashtable with the given version number
+int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number);
 
 // This function puts a data item into the table. If there is duplication, it insert another copy into the table but do not overlap on the old one.
 int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data);
+
+// This function does what gehash_insert does, but insert nothing if the key has occured max_key_occurance times.
+int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t data, int max_key_occurance, int prob_replace);
 
 // This function queries the table and put the matched data item into data_result.
 // This function returns 0 if not found, or the number of matched items.
@@ -53,11 +58,11 @@ size_t gehash_get(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_r
 int gehash_exist(gehash_t * the_table, gehash_key_t key);
 
 
-size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
+size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
 
-size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
+size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, int subread_len, unsigned int low_border, unsigned int high_border);
 
-size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int is_add, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border);
+size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_quality_score_t quality, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border);
 
 // This function performs the same functionality, but runs only on AMD-64 cpus, and the length of each key must be 4 bytes.
 size_t gehash_get_hpc(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_result, size_t max_result_space);
@@ -83,5 +88,10 @@ void gehash_prealloc(gehash_t * the_table);
 
 size_t gehash_update(gehash_t * the_table, gehash_key_t key, gehash_data_t data_new);
 
-void indel_recorder_copy(char *dst, char * src);
+short indel_recorder_copy(char *dst, char * src);
+
+void assign_best_vote(gene_vote_t * vote, int i, int j);
+
+void select_best_vote(gene_vote_t * vote);
+void gehash_sort(gehash_t * the_table);
 #endif

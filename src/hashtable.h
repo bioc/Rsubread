@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.1 2012/05/22 03:40:14 cvs Exp $
+ * $Id: hashtable.h,v 9999.6 2013/06/20 07:26:26 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -31,6 +31,13 @@ typedef struct {
     unsigned long (*hashFunction)(const void *key);
     void (*keyDeallocator)(void *key);
     void (*valueDeallocator)(void *value);
+
+    void * appendix1;
+    void * appendix2;
+    void * appendix3;
+    long long int counter1;
+    long long int counter2;
+    long long int counter3;
 } HashTable;
 
 /*--------------------------------------------------------------------------*\
@@ -139,6 +146,7 @@ int HashTableContainsValue(const HashTable *hashTable, const void *value);
 \*--------------------------------------------------------------------------*/
 
 int HashTablePut(HashTable *hashTable, const void *key, void *value);
+int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -434,5 +442,7 @@ void HashTableSetDeallocationFunctions(HashTable *hashTable,
 
 unsigned long HashTableStringHashFunction(const void *key);
 
+void free_values_destroy(HashTable * tab);
 #endif /* _HASHTABLE_H */
+
 
