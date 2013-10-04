@@ -153,7 +153,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	opterr = 1;
 	optopt = 63;
 
-
 	global_context->config.max_mismatch_exonic_reads = 2000;
 	global_context->config.use_dynamic_programming_indel = 1;
 	global_context->config.extending_search_indels = 1 ;
@@ -165,10 +164,21 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 		return -1;
 	}
 
-	while ((c = getopt_long (argc, argv, "ExsJS:L:AHd:D:n:m:p:P:R:r:i:l:o:T:I:t:B:bFcuUfMQ1:2:3:5:?", long_options, &option_index)) != -1)
+/*
+
+	for(c = 0; c<argc; c++)
+	{
+		printf("[%d]\t\t%s\n", c , argv[c]);
+	}
+
+*/
+
+	while ((c = getopt_long (argc, argv, "xsJS:L:AHd:D:n:m:p:G:E:X:Y:P:R:r:i:l:o:T:I:t:B:bFcuUfMQ1:2:3:5:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
+			case 'G': case 'Y': case 'E': case 'X': break;
+
 			case '3':
 				global_context->config.read_trim_3 = atoi(optarg); 
 				break;
@@ -321,6 +331,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case '?':
 			default:
+				SUBREADprintf("Unknown option: -%c",c);
 				print_usage_core_aligner();
 				return -1 ;
 		}
