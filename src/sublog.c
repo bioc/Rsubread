@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <assert.h>
 #include <string.h>
 #include "subread.h"
 #include "sublog.h"
@@ -148,7 +149,11 @@ int sambamout_fprintf(FILE * fp, const char * pattern, ...)
 	va_start(args , pattern);
 
 	//printf("FP=%llu\n", (long long)fp);
+	#ifdef MAKE_STANDALONE
 	if(fp == NULL) fp = stdout;
+	#endif
+	assert(fp);
+	
 	ret = vfprintf(fp, pattern , args);
 	va_end(args);
 	return ret;

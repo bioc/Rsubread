@@ -136,7 +136,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	status = NEXT_FILE;
 
-	print_in_box(80,0,0,"Building the index...");
+	print_in_box(80,0,0,"Build the index...");
 
 	{
 		char window [16], last_color_base=-1, last_last_color_base=-1;
@@ -473,11 +473,11 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	gene_input_t ginp;
 
-	print_in_box(80,0,0,"Scanning uninformative subreads in reference sequencing ...");
+	print_in_box(80,0,0,"Scan uninformative subreads in reference sequences ...");
 
 	if (chro_file_number > 199)
 	{
-		SUBREADprintf("There are too many chromosome files. You may merge them into less than 199 files.\n");
+		SUBREADprintf("There are too many FASTA files. You may merge them into less than 199 files.\n");
 		return -1;
 	}
 
@@ -662,7 +662,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	if(huge_table -> current_items)
 	{
 		print_in_box(80,0,0,"%llu uninformative subreads were found.", huge_table -> current_items);
-		print_in_box(80,0,0,"These subreads will not be included in the index.");
+		print_in_box(80,0,0,"These subreads were excluded from index building.");
 	}
 
 	return 0;
@@ -776,7 +776,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	(*chrom_lens) = malloc(chrom_lens_max_len*sizeof(unsigned int));
 	memset((*chrom_lens), 0, chrom_lens_max_len*sizeof(unsigned int));
 	
-	print_in_box( 80,0,0,"Checking the integrity of provided reference sequences ...");
+	print_in_box( 80,0,0,"Check the integrity of provided reference sequences ...");
 	for(inp_file_no = 0; inp_file_no < fa_number; inp_file_no++)
 	{
 		FILE * in_fp = fopen(input_fas[inp_file_no],"r");
@@ -906,7 +906,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 		print_in_box( 80,0,0,"There were %d format issues found in the input files.", ERROR_FOUND_IN_FASTA);
 		print_in_box( 89,0,0,"The details were saved in log file %c[36m'%s'%c[0m.", CHAR_ESC, log_fn, CHAR_ESC);
 	}
-	else	print_in_box( 80,0,0,"No format issues were found in the input files.");
+	else	print_in_box( 80,0,0,"No format issues were found");
 
 	return 0;
 }
@@ -915,6 +915,7 @@ char * tmp_file_for_signal;
 
 void SIGINT_hook(int param)
 {
+	#ifdef MAKE_STANDALONE
 	if(tmp_file_for_signal[0])
 	{
 		unlink(tmp_file_for_signal);
@@ -922,6 +923,7 @@ void SIGINT_hook(int param)
 	}
 
 	exit(param);
+	#endif
 }
 
 #ifdef MAKE_STANDALONE
@@ -1009,9 +1011,9 @@ int main_buildindex(int argc,char ** argv)
 	print_subread_logo();
 
 	SUBREADputs("");
-	print_in_box(80, 1, 1, "Index Builder");
+	print_in_box(80, 1, 1, "indexBuilder setting");
 	print_in_box(80, 0, 1, "");
-	print_in_box(80, 0, 0, "             Output index : %s", output_file);
+	print_in_box(80, 0, 0, "               Index name : %s", output_file);
 	print_in_box(80, 0, 0, "              Index space : %s", IS_COLOR_SPACE?"color-space":"base-space");
 	if(memory_limit > 12000)
 	{
@@ -1020,9 +1022,9 @@ int main_buildindex(int argc,char ** argv)
 	}
 	else
 		print_in_box(80, 0, 0, "                   Memory : %u Mbytes", memory_limit);
-	print_in_box(80, 0, 0, " Subread repeat threshold : %d", threshold);
+	print_in_box(80, 0, 0, "         Repeat threshold : %d repeats", threshold);
 	print_in_box(80, 0, 0, "");
-	print_in_box(80, 0, 0, "              Input files : %d files in total",  argc - optind);
+	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
 	int x1;
 	for(x1=0;x1< argc - optind; x1++)
@@ -1056,7 +1058,7 @@ int main_buildindex(int argc,char ** argv)
 		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table);
 		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths);
 		if(!ret){
-			print_in_box(80, 0, 1, "Time cost: %.1f minutes.", (miltime()-begin_ftime)/60);
+			print_in_box(80, 0, 1, "Total running time: %.1f minutes.", (miltime()-begin_ftime)/60);
 			print_in_box(89, 0, 1, "Index %c[36m%s%c[0m was successfully built!", CHAR_ESC, output_file, CHAR_ESC);
 		}
 		gehash_destory(& huge_table);

@@ -133,7 +133,7 @@ typedef pthread_spinlock_t subread_lock_t;
 #define SNP_CALLING_ONLY_HIGHQUAL 1
 
 #define MESSAGE_OUT_OF_MEMORY "Out of memory. If you are using Rsubread in R, please save your working environment and restart R. \n"
-#define fatal_memory_size(a) puts(MESSAGE_OUT_OF_MEMORY);
+#define fatal_memory_size(a) SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 
 //#define QUALITY_KILL	175
 //#define QUALITY_KILL_SUBREAD	150

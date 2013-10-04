@@ -1432,7 +1432,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
-	print_in_box(80,0,0,"Saving index block...              ");
+	print_in_box(80,0,0,"Save current index block...              ");
 
 	for (i=0; i<the_table -> buckets_number; i++)
 	{

@@ -218,7 +218,7 @@ int finalise_sam_index(HashTable * chromosome_size_table, char * output_file_pre
 			unsigned int chro_offset = 0;
 
 
-			printf(" === %s : 0 ~ %u === \n", chro_name , chro_max_length);
+			SUBREADprintf(" === %s : 0 ~ %u === \n", chro_name , chro_max_length);
 
 			for(chro_offset = 0; chro_offset < chro_max_length; chro_offset += BASE_BLOCK_LENGTH_INDEX)
 			{
@@ -226,7 +226,7 @@ int finalise_sam_index(HashTable * chromosome_size_table, char * output_file_pre
 				sprintf(temp_file_name,"%s@%s-%04u.bin", temp_file_prefix, chro_name , chro_offset / BASE_BLOCK_LENGTH_INDEX );
 
 				unsigned int total_reads = transform_pillup_to_index(chro_name, chro_offset, temp_file_name, L1index_fp, L2index_fp);
-				printf("%s has %d reads\n", temp_file_name, total_reads);
+				SUBREADprintf("%s has %d reads\n", temp_file_name, total_reads);
 			}
 			free(chro_name);
 			cursor = cursor->next;
@@ -464,7 +464,7 @@ int transfer_SAM_to_position_table(char * sam_file)
 		allreads++;
 
 	}
-	printf("Processed %d reads; %d mapped.\n", allreads, mapped);
+	SUBREADprintf("Processed %d reads; %d mapped.\n", allreads, mapped);
 
 	destroy_pileup_table(local_reassembly_pileup_files);
 

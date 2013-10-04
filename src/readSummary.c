@@ -221,51 +221,59 @@ unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str,
 void print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport)
 {
 	char * tmp_ptr1 , * next_fn, *sam_used = malloc(strlen(sam)+1);
+	int nfiles=1,x1=0;
 
 	strcpy(sam_used, sam);
 
 	SUBREADputs("");
 	print_subread_logo();
 	SUBREADputs("");
-	print_in_box(80,1,1,"FeatureCounts");
+	print_in_box(80,1,1,"featureCounts setting");
 	print_in_box(80,0,0,"");
 	
-	next_fn = strtok_r(sam_used, ";", &tmp_ptr1);
-	print_in_box(94,0,0,"          Input files : %c[32mo%c[36m %s (%s) %c[0m",CHAR_ESC, CHAR_ESC, next_fn, is_sam?"SAM":"BAM", CHAR_ESC);
+	while(sam_used[x1])
+	{
+		if(sam_used[x1]==';') nfiles++;
+		x1++;
+	}
+	
+	print_in_box(80,0,0,"            Input files : %d %s file%s", nfiles, is_sam?"SAM":"BAM", nfiles>1?"s":"", CHAR_ESC);
+	nfiles=0;
 
 	while(1)
 	{
-		(*n_input_files)++;
-		next_fn = strtok_r(NULL, ";", &tmp_ptr1);
+		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
-		print_in_box(94,0,0,"                        %c[32mo%c[36m %s%c[0m",CHAR_ESC,CHAR_ESC, next_fn,CHAR_ESC);
+		print_in_box(94,0,0,"                          %c[32mo%c[36m %s%c[0m",CHAR_ESC,CHAR_ESC, next_fn,CHAR_ESC);
+		nfiles++;
 	}
 
+	(*n_input_files) = nfiles;
 	print_in_box(80,0,0,"");
-	print_in_box(80,0,0,"          Output file : %s", out);
-	print_in_box(80,0,0,"          Annotations : %s (%s)", annot, is_GTF?"GTF":"SAF");
+	print_in_box(80,0,0,"            Output file : %s", out);
+	print_in_box(80,0,0,"            Annotations : %s (%s)", annot, is_GTF?"GTF":"SAF");
 	if(isReadSummaryReport)
-		print_in_box(80,0,0,"   Assignment details : %s.reads", out);
+		print_in_box(80,0,0,"     Assignment details : %s.reads", out);
 
 	if(global_context -> alias_file_name[0])
-		print_in_box(80,0,0,"Chromosome alias file : %s", global_context -> alias_file_name);
+		print_in_box(80,0,0,"  Chromosome alias file : %s", global_context -> alias_file_name);
 
 	print_in_box(80,0,0,"");
-	print_in_box(80,0,0,"              Threads : %d", global_context->thread_number);
-	print_in_box(80,0,0,"    Aggregation level : %s", global_context->is_gene_level?"meta-features":"features");
-	print_in_box(80,0,0,"           Paired-end : %s", global_context->is_paired_end_data?"yes":"no");
-	print_in_box(80,0,0,"     Strand sensitive : %s", global_context->is_strand_checked?(global_context->is_strand_checked==1?"yes":"inversed"):"no");
-	print_in_box(80,0,0," Multimapping allowed : %s", global_context->is_multi_mapping_allowed?"yes":"no");
-	print_in_box(80,0,0," Multioverlap allowed : %s", global_context->is_multi_overlap_allowed?"yes":"no");
+	print_in_box(80,0,0,"                Threads : %d", global_context->thread_number);
+	print_in_box(80,0,0,"                  Level : %s level", global_context->is_gene_level?"meta-feature":"feature");
+	print_in_box(80,0,0,"             Paired-end : %s", global_context->is_paired_end_data?"yes":"no");
+	print_in_box(80,0,0,"        Strand specific : %s", global_context->is_strand_checked?(global_context->is_strand_checked==1?"yes":"inversed"):"no");
+	print_in_box(80,0,0,"     Multimapping reads : %s", global_context->is_multi_mapping_allowed?"counted":"not counted");
+	print_in_box(80,0,0,"Multi-overlapping reads : %s", global_context->is_multi_overlap_allowed?"counted":"not counted");
 
 	if(global_context->is_paired_end_data)
 	{
 		print_in_box(80,0,0,"");
-		print_in_box(80,0,0,"     Chimeric allowed : %s", global_context->is_chimertc_disallowed?"no":"yes");
-		print_in_box(80,0,0,"    Both end required : %s", global_context->is_both_end_required?"yes":"no");
+		print_in_box(80,0,0,"         Chimeric reads : %s", global_context->is_chimertc_disallowed?"not counted":"counted");
+		print_in_box(80,0,0,"       Both ends mapped : %s", global_context->is_both_end_required?"required":"not required");
 
 		if(global_context->is_PE_distance_checked)
-			print_in_box(80,0,0,"      Fragment length : %d - %d", global_context -> min_paired_end_distance, global_context -> max_paired_end_distance);
+			print_in_box(80,0,0,"        Fragment length : %d - %d", global_context -> min_paired_end_distance, global_context -> max_paired_end_distance);
 	}
 
 	print_in_box(80,0,0,"");
@@ -281,29 +289,35 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 
 void print_FC_results(fc_thread_global_context_t * global_context)
 {
-	print_in_box(80,0,0,"");
-	print_in_box(80,2,1,"");
-	SUBREADputs("");
-	print_in_box(80,1,1,"Summary");
-	print_in_box(80,0,0,"");
-	if(global_context->is_paired_end_data)
-		print_in_box(80,0,0,"        All fragments : %llu", global_context -> all_reads);
-	else
-		print_in_box(80,0,0,"            All reads : %llu", global_context -> all_reads);
-
-	if(global_context->is_gene_level)
-		print_in_box(80,0,0,"        Meta-features : %lu", global_context -> gene_name_table -> numOfElements);
-	else
-		print_in_box(80,0,0,"             Features : %u", global_context -> exontable_exons);
-
-	if(global_context->is_paired_end_data)
-		print_in_box(80,0,0,"   Assigned fragments : %llu", global_context -> assigned_reads);
-	else
-	 	print_in_box(80,0,0,"       Assigned reads : %llu", global_context -> assigned_reads);
-
-	print_in_box(80,0,0,"            Time cost : %.3f minutes", (miltime() - global_context -> start_time)/60);
+	print_in_box(89,0,1,"%c[36mRead assignment finished.%c[0m", CHAR_ESC, CHAR_ESC);
 	print_in_box(80,0,0,"");
 	print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	SUBREADputs("");
+	return;
+
+
+	if(0){
+		print_in_box(80,1,1,"Summary");
+		print_in_box(80,0,0,"");
+		if(global_context->is_paired_end_data)
+			print_in_box(80,0,0,"        All fragments : %llu", global_context -> all_reads);
+		else
+			print_in_box(80,0,0,"            All reads : %llu", global_context -> all_reads);
+
+		if(global_context->is_gene_level)
+			print_in_box(80,0,0,"        Meta-features : %lu", global_context -> gene_name_table -> numOfElements);
+		else
+			print_in_box(80,0,0,"             Features : %u", global_context -> exontable_exons);
+
+		if(global_context->is_paired_end_data)
+			print_in_box(80,0,0,"   Assigned fragments : %llu", global_context -> assigned_reads);
+		else
+			print_in_box(80,0,0,"       Assigned reads : %llu", global_context -> assigned_reads);
+
+		print_in_box(80,0,0,"            Time cost : %.3f minutes", (miltime() - global_context -> start_time)/60);
+		print_in_box(80,0,0,"");
+		print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	}
 	SUBREADputs("");
 }
 
@@ -571,7 +585,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	global_context -> exontable_nchrs = (int)chro_name_table-> numOfElements;
 	global_context -> exontable_chro_table = chro_name_table;
 
-	print_in_box(80,0,0,"There are %d features loaded from the annotation file.\n", features);
+	print_in_box(80,0,0,"   Number of features is %d\n", features);
 	if(features < 1)
 	{
 		print_in_box(80,0,0,"WARNING no features were loaded in format %s.", file_type == FILE_TYPE_GTF?"GTF":"SAF");
@@ -811,7 +825,7 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 	(*block_min_start_pos) = ret_block_min_start;
 	(*block_max_end_pos) = ret_block_max_end;
 
-	print_in_box(80, 0,0,"The %u features are sorted.\n", sort_i);
+	//print_in_box(80, 0,0,"The %u features are sorted.\n", sort_i);
 	free(old_info_ptr);
 	free(tmp_chro_info_ptrs);
 	free(chro_feature_ptr);
@@ -831,6 +845,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 	int is_second_read;
 	int first_read_quality_score = 0;
+
+	thread_context->all_reads++;
 
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++)
 	{
@@ -1297,7 +1313,7 @@ void * feature_count_worker(void * vargs)
 							curr_line_buff[buffer_read_bytes] = nch;
 							if(buffer_read_ptr == global_context->input_buffer_max_size)
 								buffer_read_ptr = 0; 
-							if(nch=='\n'){
+							if(nch=='\n' || buffer_read_ptr>2998){
 								curr_line_buff[buffer_read_bytes+1]=0;
 								break;
 							}
@@ -1401,7 +1417,6 @@ void * feature_count_worker(void * vargs)
 									pthread_spin_lock(&global_context -> orphan_table_lock);
 									HashTableRemove(global_context -> orphan_table, NULL+1+ thread_context -> parent_chunks[ppi]);
 									pthread_spin_unlock(&global_context -> orphan_table_lock);
-									thread_context -> all_reads ++;
 									thread_context -> parents --;
 									//printf("Removed : T%d\n",  thread_context -> thread_id);
 								}
@@ -1536,7 +1551,6 @@ void * feature_count_worker(void * vargs)
 
 				}
 			}
-			thread_context -> all_reads += qid;
 
 			unsigned int final_try_start =time(NULL);
 
@@ -1561,7 +1575,6 @@ void * feature_count_worker(void * vargs)
 							pthread_spin_lock(&global_context -> orphan_table_lock);
 							HashTableRemove(global_context -> orphan_table, NULL+1+ thread_context -> parent_chunks[ppi]);
 							pthread_spin_unlock(&global_context -> orphan_table_lock);
-							thread_context -> all_reads ++;
 							thread_context -> parents --;
 							//printf("Removed : T%d\n", thread_context -> thread_id);
 						}
@@ -1592,21 +1605,32 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 {
 	int xk1, xk2;
 
+	long long int total_input_reads = 0 ;
+
+	(*nreads_mapped_to_exon)=0;
+
 	for(xk1=0; xk1<global_context-> thread_number; xk1++)
 	{
 		for(xk2=0; xk2<global_context -> exontable_exons; xk2++)
 		{
 			nreads[xk2]+=global_context -> thread_contexts[xk1].count_table[xk2];
 		}
-
-		if(global_context->thread_number>1)
-			print_in_box(80,0,0,"The %d-th thread assigned %llu %s in : %s\n", 1+ xk1, global_context -> thread_contexts[xk1].nreads_mapped_to_exon, global_context->is_paired_end_data?"fragments":"reads", global_context -> input_file_name);
-		else
-			print_in_box(80,0,0,"%llu %s were assigned in : %s\n", global_context -> thread_contexts[xk1].nreads_mapped_to_exon, global_context->is_paired_end_data?"fragments":"reads", global_context -> input_file_name);
+		total_input_reads += global_context -> thread_contexts[xk1].all_reads;
 		(*nreads_mapped_to_exon) += global_context -> thread_contexts[xk1].nreads_mapped_to_exon;
+
 		if((!global_context->is_SAM_file) || global_context-> thread_number>1)
 			global_context->all_reads += global_context -> thread_contexts[xk1].all_reads;
 	}
+
+	char pct_str[10];
+	if(total_input_reads>0)
+		sprintf(pct_str,"(%.1f%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
+	else	pct_str[0]=0;
+
+	print_in_box(80,0,0,"   Total number of reads is : %llu", total_input_reads); 
+	print_in_box(80,0,0,"   Number of successfully assigned reads is : %llu %s", *nreads_mapped_to_exon,pct_str); 
+	print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
+	print_in_box(80,0,0,"");
 }
 
 HashTable * load_alias_table(char * fname)
@@ -1848,7 +1872,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		if(!next_fn||strlen(next_fn)<1) break;
 		if(column_numbers[i_files])
 		{
-			fprintf(fp_out,"\tCount_%s", next_fn);
+			fprintf(fp_out,"\t%s", next_fn);
 			non_empty_files ++;
 		}
 		next_fn = strtok_r(NULL, ";", &tmp_ptr);
@@ -2041,7 +2065,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 	while(1){
 		if(!next_fn||strlen(next_fn)<1) break;
 		if(column_numbers[i_files])
-			fprintf(fp_out,"\tCount_%s", next_fn);
+			fprintf(fp_out,"\t%s", next_fn);
 		next_fn = strtok_r(NULL, ";", &tmp_ptr);
 		i_files++;
 	}
@@ -2235,8 +2259,6 @@ int readSummary(int argc,char *argv[]){
 	char *  alias_file_name = NULL, * cmd_rebuilt = NULL;
 
 	int isMultiOverlapAllowed, isGeneLevel;
-	double time_start = miltime();
-
 
 	isCVersion = ((argv[0][0]=='C')?1:0);
 
@@ -2300,7 +2322,6 @@ int readSummary(int argc,char *argv[]){
 	unsigned int buffer_size = 1024*1024*6;
 
 	fc_thread_global_context_t global_context;
-	global_context.start_time = time_start;
 	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size);
 	print_FC_configuration(&global_context, argv[1], argv[2], argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport);
 
@@ -2308,6 +2329,7 @@ int readSummary(int argc,char *argv[]){
 	// Loading the annotations.
 	// Nothing is done if the annotation does not exist.
 	fc_feature_info_t * loaded_features;
+	print_in_box(84,0,0,"Load annotation file : %s %c[0m...", argv[1], CHAR_ESC);
 	nexons = load_feature_info(&global_context,argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
 		SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect, or it contains no '%s' features.\n",argv[1], nameFeatureTypeColumn);
@@ -2315,11 +2337,15 @@ int readSummary(int argc,char *argv[]){
 	}
 
 	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &anno_chr_2ch, &anno_chrs, &anno_chr_head, & block_end_index, & block_min_start, & block_max_end);
+	print_in_box(80,0,0,"   Number of meta-features is %d", global_context . gene_name_table -> numOfElements);
+	print_in_box(80,0,0,"   Number of chromosomes is %d", global_context . exontable_nchrs);
+
+	print_in_box(80,0,0,"");
+
 	global_context.exontable_exons = nexons;
 	unsigned int * nreads = (unsigned int *) calloc(nexons,sizeof(int));
 
 
-	print_in_box(80,0,0,"Number of chromosomes in the annotation is \%d\n", global_context . exontable_nchrs);
 
 
 
@@ -2425,7 +2451,9 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	FILE *fp_in = NULL;
 	int read_length = 0;
 	char * line = (char*)calloc(MAX_LINE_LENGTH, 1);
+	global_context -> start_time = miltime();
 
+	print_in_box(84,0,0,"Process : %s %c[0m..." , global_context->input_file_name, CHAR_ESC);
 
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
@@ -2433,7 +2461,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		if(!exist_fp)
 		{
 			print_in_box(80,0,0,"Failed to open file : %s",  global_context->input_file_name);
-			print_in_box(80,0,0,"This file was ignored from the output");
+			print_in_box(80,0,0,"No counts were generated for this file.");
 			return -1;
 		}
 		fclose(exist_fp);
@@ -2685,7 +2713,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	if(global_context->thread_number > 1 || !isSAM)
 		fc_thread_wait_threads(global_context);
 
-	unsigned long long int nreads_mapped_to_exon;
+	unsigned long long int nreads_mapped_to_exon = 0;
 
 	fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon);
 

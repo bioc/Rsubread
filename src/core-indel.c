@@ -3185,6 +3185,7 @@ void destroy_pileup_table(HashTable* local_reassembly_pileup_files)
 char * _COREMAIN_delete_temp_prefix = NULL;
 void COREMAIN_SIGINT_hook(int param)
 {
+	#ifdef MAKE_STANDALONE
 	int xk1, last_slash = -1;
 	if(_COREMAIN_delete_temp_prefix != NULL)
 	{
@@ -3236,6 +3237,7 @@ void COREMAIN_SIGINT_hook(int param)
 	}
 
 	exit(param);
+	#endif
 }
 
 

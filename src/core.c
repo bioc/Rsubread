@@ -167,23 +167,22 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80,0,1,"");
 	print_in_box(80,2,1,"");
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
-	print_in_box(80, 1,1,"Finished");
+	print_in_box(80, 1,1,"Summary");
 	print_in_box(80, 0,1,"");
 	print_in_box(80, 0,0,"         Processed : %llu %s" , global_context -> all_processed_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
-	print_in_box(80, 0,0,"            Mapped : %llu %s", global_context -> all_mapped_reads/ (global_context->input_reads.is_paired_end_reads?2:1), global_context->input_reads.is_paired_end_reads?"fragments":"reads");
+	print_in_box(81, 0,0,"            Mapped : %llu %s (%.1f%%%%)", global_context -> all_mapped_reads/ (global_context->input_reads.is_paired_end_reads?2:1), global_context->input_reads.is_paired_end_reads?"fragments":"reads" ,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads / (global_context->input_reads.is_paired_end_reads?2:1));
 	if(global_context->input_reads.is_paired_end_reads)
-		print_in_box(80, 0,0,"     Correct pairs : %llu fragments", global_context -> all_correct_PE_reads);
-	print_in_box(80, 0,0,"        Mappablity : %.1f percent", global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads / (global_context->input_reads.is_paired_end_reads?2:1));
+		print_in_box(80, 0,0,"  Correctly paired : %llu fragments", global_context -> all_correct_PE_reads);
 
 	if(global_context->config.output_prefix[0])
 	{
 		if(global_context->config.is_rna_seq_reads)
-			print_in_box(80, 0,0," De novo junctuons : %u", global_context -> all_junctions);
-		print_in_box(80, 0,0,"    De novo indels : %u", global_context -> all_indels);
+			print_in_box(80, 0,0,"         Junctuons : %u", global_context -> all_junctions);
+		print_in_box(80, 0,0,"            Indels : %u", global_context -> all_indels);
 	}
 	
 	print_in_box(80, 0,1,"");
-	print_in_box(80, 0,0,"         Time cost : %.1f minutes", (miltime()-global_context->start_time)*1./60);
+	print_in_box(80, 0,0,"      Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);
 	print_in_box(80, 0,1,"");
 	print_in_box(80, 2,1,"http://subread.sourceforge.net/");
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
@@ -196,7 +195,7 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 {
 	if(thread_context&&thread_context->thread_id)
 	{
-		puts("show_progress can only be called by thread#0\n");
+		SUBREADputs("show_progress can only be called by thread#0\n");
 		return;
 	}
 
@@ -555,9 +554,9 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 	SamBam_fclose(sambam_reader);
 	print_in_box(80,0,0,"The input %s file contains %s-end reads.", is_bam?"BAM":"SAM",  global_context->input_reads.is_paired_end_reads?"paired":"single");
 	if(!is_file_sorted)
-		print_in_box(80,0,0,"The input %s file is unsorted. Reordering...", is_bam?"BAM":"SAM");
+		print_in_box(80,0,0,"The input %s file is unsorted. Reorder it...", is_bam?"BAM":"SAM");
 	else if(is_bam)
-		print_in_box(80,0,0,"Converting the input BAM file...");
+		print_in_box(80,0,0,"Convert the input BAM file...");
 
 	if(is_bam || (global_context->input_reads.is_paired_end_reads && !is_file_sorted))
 	{
@@ -1188,7 +1187,7 @@ int do_iteration_three(global_context_t * global_context, thread_context_t * thr
 	//unsigned int low_index_border = global_context -> current_value_index -> start_base_offset;
 	//unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length; 
 
-	print_in_box(80,0,0,"Preparing long indel deleteion...");
+	print_in_box(80,0,0,"Prepare for long indel deleteion...");
 	init_chunk_scanning_parameters(global_context,thread_context, & ginp1, & ginp2, & read_block_start, & reads_to_be_done);
 	sqr_interval = global_context -> processed_reads_in_chunk/10/ global_context -> config.all_threads;
 
@@ -1660,11 +1659,11 @@ int run_maybe_threads(global_context_t *global_context, int task)
 	int ret_value =0;
 
 	if(task==STEP_VOTING)
-		print_in_box(80,0,0, "Mapping %s...", global_context->input_reads.is_paired_end_reads?"fragments":"reads");
+		print_in_box(80,0,0, "Map %s...", global_context->input_reads.is_paired_end_reads?"fragments":"reads");
 	else if(task == STEP_ITERATION_ONE)
-		print_in_box(80,0,0, "Detecting indels%s...", global_context->config.is_rna_seq_reads?" and junctions":"");
+		print_in_box(80,0,0, "Detect indels%s...", global_context->config.is_rna_seq_reads?" and junctions":"");
 	else if(task == STEP_ITERATION_TWO)
-		print_in_box(80,0,0, "Realigning %s...", global_context->input_reads.is_paired_end_reads?"fragments":"reads");
+		print_in_box(80,0,0, "Realign %s...", global_context->input_reads.is_paired_end_reads?"fragments":"reads");
 
 	if(global_context->config.all_threads<2)
 	{
@@ -1755,7 +1754,7 @@ unsigned int split_read_files(global_context_t * global_context)
 	if(global_context->input_reads.is_paired_end_reads)
 		read_position_2 = (unsigned long long*)malloc(global_context->config.reads_per_chunk * sizeof(long long));
 
-	print_in_box(80,0,0, "Scanning read files for multi-threaded alignment...");
+	print_in_box(80,0,0, "Scan read files for multi-threaded alignment...");
 	while(1)
 	{
 		if(processed_reads >= chunk_reads || feof(global_context->input_reads.first_read_file.input_fp))
@@ -1854,7 +1853,7 @@ int read_chunk_circles(global_context_t *global_context)
 		{
 			char tmp_fname[MAX_FILE_NAME_LENGTH];
 			sprintf(tmp_fname, "%s.%02d.%c.tab", global_context->config.index_prefix, global_context->current_index_block_number,  global_context->config.space_type == GENE_SPACE_COLOR?'c':'b');
-			print_in_box(80,0,0, "Loading the %d-th index block...",1+ global_context->current_index_block_number);
+			print_in_box(80,0,0, "Load the %d-th index block...",1+ global_context->current_index_block_number);
 
 
 			if(gehash_load(global_context -> current_index, tmp_fname)) return -1;
@@ -1926,7 +1925,7 @@ int read_chunk_circles(global_context_t *global_context)
 		if(global_context -> config.report_sam_file)
 		{
 			reward_read_files(global_context, SEEK_SET);
-			print_in_box(80, 0, 0, "%u %s were processed. Saving the mapping results for them...", global_context ->processed_reads_in_chunk, global_context -> input_reads.is_paired_end_reads?"fragments":"reads");
+			print_in_box(80, 0, 0, "%u %s were processed. Save the mapping results for them...", global_context ->processed_reads_in_chunk, global_context -> input_reads.is_paired_end_reads?"fragments":"reads");
 			ret = ret || write_chunk_results(global_context);
 			if('\r' == CORE_SOFT_BR_CHAR)
 				sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"");
@@ -1998,7 +1997,7 @@ int print_configuration(global_context_t * context)
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
 	print_subread_logo();
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
-	print_in_box(80, 1, 1, context->config.is_rna_seq_reads?"Subjunc":"Subread-align");
+	print_in_box(80, 1, 1, context->config.is_rna_seq_reads?"subjunc setting":"subread-align setting");
 	print_in_box(80, 0, 1, "");
 
 	if(context->config.is_rna_seq_reads)
@@ -2025,17 +2024,17 @@ int print_configuration(global_context_t * context)
 	print_in_box(80, 0, 1, "");
 	if( context->config.second_read_file[0])
 	{
-		print_in_box(80, 0, 0, "   Min major votes : %d", context->config.minimum_subread_for_first_read);
-		print_in_box(80, 0, 0, "   Min minor votes : %d", context->config.minimum_subread_for_second_read);
-		print_in_box(80, 0, 0, "  Max fragment len : %d", context->config.maximum_pair_distance);
-		print_in_box(80, 0, 0, "  Min fragment len : %d", context->config.minimum_pair_distance);
+		print_in_box(80, 0, 0, "   Min read1 votes : %d", context->config.minimum_subread_for_first_read);
+		print_in_box(80, 0, 0, "   Min read2 votes : %d", context->config.minimum_subread_for_second_read);
+		print_in_box(80, 0, 0, " Max fragment size : %d", context->config.maximum_pair_distance);
+		print_in_box(80, 0, 0, " Min fragment size : %d", context->config.minimum_pair_distance);
 		print_in_box(80, 0, 1, "");
 	}
 	else
 		print_in_box(80, 0, 0, "         Min votes : %d", context->config.minimum_subread_for_first_read);
 
 	print_in_box(80, 0, 0,         "        Max indels : %d", context->config.max_indel_length);
-	print_in_box(80, 0, 0,         "     #Best mapping : %d", context->config.multi_best_reads);
+	print_in_box(80, 0, 0,         " # of Best mapping : %d", context->config.multi_best_reads);
 	print_in_box(80, 0, 0,         "    Unique mapping : %s", context->config.report_multi_mapping_reads?"no":"yes");
 	print_in_box(80, 0, 0,         "      Hamming dist : %s", context->config.use_hamming_distance_break_ties?"yes":"no");
 

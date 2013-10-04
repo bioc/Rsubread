@@ -84,6 +84,7 @@ int mergeIntervals(unsigned int * intervals, unsigned int * result_ints, int nin
     return stock_pointer;
 }
  
+#ifdef MAKE_TEST_INTERVL_MERGE
 void print_gaps(unsigned int * gaps, int gapn)
 {
 	int ii;
@@ -91,12 +92,10 @@ void print_gaps(unsigned int * gaps, int gapn)
 		printf("{%d,%d}  ", gaps[ii*2], gaps[ii*2+1]);
 	printf("\n");
 }
+#endif
 
 #ifdef MAKE_TEST_INTERVL_MERGE
 int main()
-#else
-int INTV_not_a_main()
-#endif
 {
 	unsigned int inbuff[30];
 	unsigned int outbuff[30];
@@ -129,3 +128,4 @@ int INTV_not_a_main()
 
     return 0;
 }
+#endif

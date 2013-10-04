@@ -1307,8 +1307,6 @@ int main(int argc , char ** argv)
 {
 	test_bam_compress();
 }
-#else
-#endif
 
 
 void test_bam_compress()
@@ -1324,3 +1322,4 @@ void test_bam_compress()
 	SamBam_writer_add_read(& writer, "Read2", 16, "chr2", 200000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "NM:i:1	XX:i:8172736	RG:Z:nxnmn	XY:i:33999	XZ:Z:Zuzuzu");
 	SamBam_writer_close(&writer);
 }
+#endif

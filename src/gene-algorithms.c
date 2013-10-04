@@ -210,7 +210,6 @@ gene_quality_score_t get_subread_quality(const char * quality_str, const char * 
 {
 	return quality_chr - '@';
 }
-*/
 
 void print_running_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads, int is_pair)
 {
@@ -222,6 +221,7 @@ void print_running_log(double finished_rate, double read_per_second, double expe
 	SUBREADprintf("%c",CORE_SOFT_BR_CHAR);
 }
 
+*/
 
 void print_window_scrolling_bar(char * hint, float percentage, int width, int * internal_counter)
 {
@@ -369,7 +369,11 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 				if(val_c>199999)
 				{
 					SUBREADprintf("\nThere are too many items in a bucket; you may reduce the threshold of non-informative subreads to eliminate this problem.\n");
+					#ifdef MAKE_STANDALONE
 					exit(-1);
+					#else
+					return -1;
+					#endif
 				}
 				else
 				{
@@ -2567,7 +2571,7 @@ int debug_main()
 	char cg[100];
 	sprintf(cg,"10M8H20M9I100N30M");
 	reverse_cigar(cg);
-	printf("%s\n",cg);
+	SUBREADprintf("%s\n",cg);
 	return 0;
 }
 
@@ -2627,7 +2631,7 @@ void remove_indel_neighbours(HashTable * indel_table)
 	}
 
 
-	printf("\n %d low-confidence indels have been removed.", num_delete);
+	SUBREADprintf("\n %d low-confidence indels have been removed.", num_delete);
 	free(to_delete);
 	free(to_delete_len);
 

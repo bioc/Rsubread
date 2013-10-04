@@ -1207,7 +1207,7 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 
 	if(rl < 1 || rl > 300)
 	{
-		printf("READ TOO LONG:%d\n", rl);
+		SUBREADprintf("READ TOO LONG:%d\n", rl);
 		return;
 	}
 
@@ -1823,6 +1823,7 @@ unsigned long long int sort_SAM_hash(char * str)
 char * _SAMSORT_SNP_delete_temp_prefix = NULL;
 void SAM_SORT_SIGINT_hook(int param)
 {
+	#ifdef MAKE_STANDALONE
 	int xk1, last_slash = -1;
 	if(_SAMSORT_SNP_delete_temp_prefix != NULL)
 	{
@@ -1874,6 +1875,7 @@ void SAM_SORT_SIGINT_hook(int param)
 	}
 
 	exit(param);
+	#endif
 }
 
 

@@ -918,7 +918,7 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 					print_in_box(89,0,0,"processed block %c[36m%s@%d%c[0m by thread %d/%d [block number=%d/%d]", CHAR_ESC, chro_name, all_offset, CHAR_ESC , thread_no+1, all_threads, 1+(*task_no)-parameters->empty_blocks, parameters->all_blocks);
 				}
 				else if((*task_no) % all_threads == thread_no)
-					printf("Ignored in: %s@%d by thr %d/%d [tid=%d]\n", chro_name, all_offset, thread_no, all_threads, *task_no);
+					print_in_box(80,0,0,"Ignored in: %s@%d by thr %d/%d [tid=%d]\n", chro_name, all_offset, thread_no, all_threads, *task_no);
 				offset = 0;
 				(*task_no)++;
 			}
@@ -1136,6 +1136,7 @@ int guess_quality_threshold(char * qual_file, float percentage)
 char * _EXSNP_SNP_delete_temp_prefix = NULL;
 void EXSNP_SIGINT_hook(int param)
 {
+	#ifdef MAKE_STANDALONE
 	int xk1, last_slash = -1;
 	if(_EXSNP_SNP_delete_temp_prefix != NULL)
 	{
@@ -1187,6 +1188,7 @@ void EXSNP_SIGINT_hook(int param)
 	}
 
 	exit(param);
+	#endif
 }
 
 
@@ -1272,7 +1274,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 			sprintf(temp_file_prefix, "./temp-snps-%06u-%08X-", getpid(), rand());
 		_EXSNP_SNP_delete_temp_prefix = temp_file_prefix;
 
-		print_in_box(89,0,0,"Splitting %s file into %c[36m%s*%c[0m ..." , parameters -> is_BAM_file_input?"BAM":"SAM" , CHAR_ESC, temp_file_prefix, CHAR_ESC);
+		print_in_box(89,0,0,"Split %s file into %c[36m%s*%c[0m ..." , parameters -> is_BAM_file_input?"BAM":"SAM" , CHAR_ESC, temp_file_prefix, CHAR_ESC);
 
 		fpos=0;
 		while(1)
@@ -1588,22 +1590,21 @@ int main_snp_calling_test(int argc,char ** argv)
 	SUBREADputs("");
 
 
-	print_in_box(80,1,1,"ExactSNP");
+	print_in_box(80,1,1,"exactSNP setting");
 	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"             Input file : %s (%s)", in_SAM_file, parameters.is_BAM_file_input?"BAM":"SAM");
-	print_in_box(80,0,0,"            Output file : %s", out_BED_file);
-	print_in_box(80,0,0,"       Reference genome : %s", in_FASTA_file);
+	print_in_box(80,0,0,"                  Input file : %s (%s)", in_SAM_file, parameters.is_BAM_file_input?"BAM":"SAM");
+	print_in_box(80,0,0,"                 Output file : %s", out_BED_file);
+	print_in_box(80,0,0,"            Reference genome : %s", in_FASTA_file);
 	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"                Threads : %d", threads);
-	print_in_box(80,0,0,"     Min support read # : %d", parameters.min_supporting_read_number);
-	print_in_box(80,0,0,"     Max support read # : %d", parameters.max_supporting_read_number);
-	print_in_box(81,0,0,"  Min support read rate : %.1f%%%%", 100* parameters.supporting_read_rate);
-	print_in_box(80,0,0,"   Min base phred score : %d", parameters.min_phred_score);
-	print_in_box(80,0,0,"          Trimmed bases : %d", parameters.bases_ignored_head_tail);
+	print_in_box(80,0,0,"                     Threads : %d", threads);
+	print_in_box(80,0,0,"        Min supporting reads : %d", parameters.min_supporting_read_number);
+	print_in_box(81,0,0,"Min pct. of supporting reads : %.1f%%%%", 100* parameters.supporting_read_rate);
+	print_in_box(80,0,0,"      Min base quality score : %d", parameters.min_phred_score);
+	print_in_box(80,0,0,"     Number of trimmed bases : %d", parameters.bases_ignored_head_tail);
 	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"         Q value cutoff : 10E-%.1f", parameters.cutoff_multiplex);
-	print_in_box(80,0,0,"    P value upper bound : %.5f", parameters.cutoff_upper_bound);
-	print_in_box(80,0,0,"   Flanking windows len : %d", parameters.fisher_exact_testlen);
+	print_in_box(80,0,0,"              Q value cutoff : 10E-%.1f", parameters.cutoff_multiplex);
+	print_in_box(80,0,0,"         P value upper bound : %.5f", parameters.cutoff_upper_bound);
+	print_in_box(80,0,0,"       Flanking windows size : %d", parameters.fisher_exact_testlen);
 	print_in_box(80,0,1,"");
 	print_in_box(80,2,1,"http://subread.sourceforge.net/");
 	SUBREADputs("");
@@ -1621,13 +1622,13 @@ int main_snp_calling_test(int argc,char ** argv)
 	print_in_box(80,2,1,"");
 	SUBREADputs("");
 
-	print_in_box(80,1,1,"Finished");
+	print_in_box(80,1,1,"Summary");
 	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"        Processed reads : %u", parameters.real_read_count);
-	print_in_box(80,0,0,"          Reported SNPs : %u", parameters.reported_SNPs);
-	print_in_box(80,0,0,"        Reported indels : %u", parameters.reported_indels);
+	print_in_box(80,0,0,"             Processed reads : %u", parameters.real_read_count);
+	print_in_box(80,0,0,"               Reported SNPs : %u", parameters.reported_SNPs);
+	print_in_box(80,0,0,"             Reported indels : %u", parameters.reported_indels);
 	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"              Time cost : %.1f minutes", (miltime() - parameters.start_time)/60);
+	print_in_box(80,0,0,"                Running time : %.1f minutes", (miltime() - parameters.start_time)/60);
 	print_in_box(80,0,1,"");
 	print_in_box(80,2,1,"http://subread.sourceforge.net/");
 	SUBREADputs("");
