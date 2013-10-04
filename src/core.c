@@ -1122,6 +1122,7 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 			{
 				alignment_result_t *current_result = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, best_read_id); 
 				if(current_result -> selected_votes<1) break;
+				if(!global_context->config.report_multi_mapping_reads)if(current_result -> result_flags & CORE_IS_BREAKEVEN) continue;
 
 				char * current_read =  is_second_read?read_text_2 : read_text_1;
 				char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
@@ -1315,6 +1316,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			{
 				alignment_result_t *current_result = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, best_read_id);
 				if(best_read_id > 0 && current_result -> selected_votes==0)break;
+				if(!global_context->config.report_multi_mapping_reads)if(current_result -> result_flags & CORE_IS_BREAKEVEN) continue;
+
 				char * current_read_name =  is_second_read?read_name_2 : read_name_1;
 				char * current_read =  is_second_read?read_text_2 : read_text_1;
 				char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
