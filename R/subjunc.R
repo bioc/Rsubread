@@ -32,8 +32,3 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_f
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 }
-
-
-#is it ok to pass on paired_end paramters (-d -D ...) for single end reads?
-#color2base?
-#markJunctionBases?
