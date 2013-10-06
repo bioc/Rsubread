@@ -85,8 +85,8 @@ If the input does not satisfy this requirement (eg. reads might be sorted by the
 \value{ 
 A list with the following components:
 \tabular{ll}{
-  \code{counts}:\tab a data matrix containing read counts for each feature in each library.\cr
-  \code{annotation}:\tab a data frame including annotation information such as gene identifiers (\code{GeneID}) and gene/exon length (\code{Length}). The \code{GeneID} column includes Entrez gene identifiers when the in-built annotations are used.\cr
+  \code{counts}:\tab a data matrix containing read counts for each feature or meta-feature for each library.\cr
+  \code{annotation}:\tab a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the in-built annotations are used.\cr
   \code{targets}:\tab a character vector giving sample information.
 }
 }

@@ -1,13 +1,39 @@
-subjunc <- function(index,samfile,output_file,nsubreads=14,paired_end=FALSE,nthreads=1,indels=5,minFragLength=50,maxFragLength=600,PE_orientation="fr")
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,isPairedEnd=FALSE,nthreads=1,indels=5,phredOffset=33,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE)
 {
-	opt <- paste("-i",index,"-o",output_file,"-n",nsubreads,"-T",nthreads,"-I",indels,sep=",")
+	opt <- paste("-i",index,"-r",readfile1,sep=",")
+	if(!is.null(readfile2)) 
+		opt <- paste(opt,"-R",readfile2,sep=",")	
+	if(tolower(input_format) == "sam")
+	  opt <- paste(opt,"--SAMinput",sep=",")
+	if(tolower(input_format) == "bam")
+	  opt <- paste(opt,"--BAMinput",sep=",")	
+	opt <- paste(opt,"-o",output_file,sep=",")	
+	if(tolower(output_format) == "bam")
+	  opt <- paste(opt,"--BAMoutput",sep=",")	  
+	opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-T",nthreads,"-I",indels,sep=",")	
+	if(tieBreakHamming)
+	  opt <- paste(opt,"-H",sep=",")
+	if(unique)
+	  opt <- paste(opt,"-u",sep=",")
+	opt <- paste(opt,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")	
+	if(!is.null(readGroupID))
+	  opt <- paste(opt,"--rg-id",readGroupID,sep=",")
+	if(!is.null(readGroup))
+	  opt <- paste(opt,"--rg",readGroup,sep=",")
+	if(color2base)
+		opt <- paste(opt,"-b",sep=",")
 
-	if(paired_end) 
-	  opt <- paste(opt,"-2",samfile,"-d",minFragLength,"-D",maxFragLength,sep=",")
+	if(phredOffset == 33)
+		opt <- paste(opt,"-P",3,sep=",")
 	else
-	  opt <- paste(opt,"-1",samfile,sep=",")
+		opt <- paste(opt,"-P",6,sep=",")	
 
 	cmd <- paste("subjunc",opt,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 }
+
+#isPairedEnd?
+#is it ok to pass on paired_end paramters (-d -D ...) for single end reads?
+#color2base?
+#markJunctionBases?
