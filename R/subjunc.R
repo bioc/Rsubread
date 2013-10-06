@@ -1,4 +1,4 @@
-subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,isPairedEnd=FALSE,nthreads=1,indels=5,phredOffset=33,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE)
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE)
 {
 	opt <- paste("-i",index,"-r",readfile1,sep=",")
 	if(!is.null(readfile2)) 
@@ -33,7 +33,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_f
 	C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 }
 
-#isPairedEnd?
+
 #is it ok to pass on paired_end paramters (-d -D ...) for single end reads?
 #color2base?
 #markJunctionBases?

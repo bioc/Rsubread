@@ -4,8 +4,8 @@
 \title{Read mapping for genomic DNA-seq and RNA-seq data via seed-and-vote (Subread and Subjunc)}
 \description{Subread and Subjunc are fast and accurate read aligners. They adopt a new mapping read mapping paradigm called ``seed-and-vote". Seed-and-vote enables highly scalable, efficient and accurate read mapping to be performed.}
 \usage{
-align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,markJunctionReads=TRUE,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",color2base=FALSE,DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
-subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,isPairedEnd=FALSE,nthreads=1,indels=5,phredOffset=33,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE)
+align(index,readfile1,readfile2=NULL,output_file,nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",color2base=FALSE,DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
+subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -17,11 +17,9 @@ subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_f
   \item{nsubreads}{ numeric value giving the number of subreads extracted from each read.} 
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This threshold will be applied to the first read if paired-end read data are provided.}
   \item{TH2}{ numeric value giving the consensus threhold for the second read in a pair.}
-  \item{isPairedEnd}{ logical indicating if paired end reads are provided. \code{FALSE} by default.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.} 
   \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. \code{5} by default.}
   \item{phredOffset}{ numeric value added to the phred score of each base in each read. \code{33} by default.}
-  \item{markJunctionReads}{ a logical value indicating whether the unmapped bases of discovered junction reads should be marked by "S" operations in their CIGAR strings in the SAM output file. The unmapped bases should originate from an exon which is different from the one the corresponding read was mapped to. 'Subjunc' program can then be called to discover exon junction locations. This options is only applicable to RNAseq data. \code{TRUE} by default.}
   \item{tieBreakQS}{logical. If \code{TRUE}, use quality scores to break ties when more than one best locations were found. \code{FALSE} by default. }
   \item{tieBreakHamming}{ logical. If \code{TRUE}, use Hamming distance to break ties when more than one best locations were found (to use this option, the index must be built with reference sequence included).}
   \item{unique}{ logical. If \code{TRUE}, only uniquely mapped reads will be reported (reads mapped to multiple locations in the reference genome will not be reported). This option can be used together with option \code{tieBreakQS} or \code{tieBreakHamming}.}
