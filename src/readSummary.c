@@ -1627,7 +1627,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 
 	char pct_str[10];
 	if(total_input_reads>0)
-		sprintf(pct_str,"(%.1f%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
+		sprintf(pct_str,"(%.1f%%%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
 	else	pct_str[0]=0;
 
 	print_in_box(80,0,0,"   Total number of reads is : %llu", total_input_reads); 
@@ -1811,7 +1811,7 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	char * temp_file_name = malloc(300), * fline = malloc(3000);
 	SamBam_FILE * sambam_reader ;
 
-	print_in_box(80,0,0,"   Resort the input files...");
+	print_in_box(80,0,0,"   Resort the input file...");
 	sprintf(temp_file_name, "./temp-core-%06u-%08X.sam", getpid(), rand());
 	sambam_reader = SamBam_fopen(global_context-> input_file_name, global_context-> is_SAM_file?SAMBAM_FILE_SAM:SAMBAM_FILE_BAM);
 
