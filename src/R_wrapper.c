@@ -167,6 +167,9 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
 
 void R_readSummary_wrapper(int * nargs, char ** argv)
 {
+//	uintptr_t old_cstack_limit = R_CStackLimit;
+//	R_CStackLimit =(uintptr_t)-1;
+        optind = 1;
         optind = 1;
 
         char * r_argv, ** c_argv;
@@ -187,6 +190,7 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+//	R_CStackLimit = old_cstack_limit;
 }
 
 

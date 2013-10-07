@@ -1587,7 +1587,7 @@ void * feature_count_worker(void * vargs)
 				{
 					//printf("Unremoved at all : T%d C%llu\n", thread_context -> thread_id, chunk_id);
 			//		printf("Unremoved at all : T%d\n", thread_context -> thread_id);
-					usleep(tick_time*5);
+					usleep(tick_time*(2+getpid()%5));
 				}
 				if(time(NULL) - final_try_start>1)
 				{
@@ -1833,9 +1833,9 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 
 	sort_SAM_finalise(&writer);
 	if(writer.unpaired_reads)
-		print_in_box(80,0,0,"%llu unpaired reads were ignored in reordering.", writer.unpaired_reads);
+		print_in_box(80,0,0,"   %llu unpaired reads were ignored in reordering.", writer.unpaired_reads);
 	else
-		print_in_box(80,0,0,"%llu reads are sorted.", writer.written_reads);
+		print_in_box(80,0,0,"   %llu reads are sorted.", writer.written_reads);
 
 	SamBam_fclose(sambam_reader);
 	strcpy(global_context-> input_file_name, temp_file_name);
@@ -2346,7 +2346,7 @@ int readSummary(int argc,char *argv[]){
 	// Loading the annotations.
 	// Nothing is done if the annotation does not exist.
 	fc_feature_info_t * loaded_features;
-	print_in_box(84,0,0,"Load annotation file : %s %c[0m...", argv[1], CHAR_ESC);
+	print_in_box(84,0,0,"Load annotation file %s %c[0m...", argv[1], CHAR_ESC);
 	nexons = load_feature_info(&global_context,argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
 		SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect, or it contains no '%s' features.\n",argv[1], nameFeatureTypeColumn);
@@ -2389,6 +2389,7 @@ int readSummary(int argc,char *argv[]){
 			free(column_numbers);
 		}
 		else table_columns[i_files] = column_numbers;
+		global_context.is_SAM_file = isSAM;
 
 		i_files++;
 		next_fn = strtok_r(NULL, ";", &tmp_pntr);
@@ -2470,14 +2471,14 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	char * line = (char*)calloc(MAX_LINE_LENGTH, 1);
 	global_context -> start_time = miltime();
 
-	print_in_box(84,0,0,"Process : %s %c[0m..." , global_context->input_file_name, CHAR_ESC);
+	print_in_box(84,0,0,"Process %s %c[0m..." , global_context->input_file_name, CHAR_ESC);
 
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
 		FILE * exist_fp = fopen( global_context->input_file_name,"r");
 		if(!exist_fp)
 		{
-			print_in_box(80,0,0,"Failed to open file : %s",  global_context->input_file_name);
+			print_in_box(80,0,0,"Failed to open file %s",  global_context->input_file_name);
 			print_in_box(80,0,0,"No counts were generated for this file.");
 			return -1;
 		}
