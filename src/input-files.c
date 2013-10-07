@@ -1186,10 +1186,12 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 			struct rlimit limit_st;
 			getrlimit(RLIMIT_NOFILE, & limit_st);
 			if(limit_st.rlim_max>0 && limit_st.rlim_max <= 3000)
-				limit_st.rlim_cur = limit_st.rlim_max;
+				limit_st.rlim_cur = min(limit_st.rlim_max, fp_table.numElements + 10);
 			else
-				limit_st.rlim_cur = 3000;
-			setrlimit(RLIMIT_NOFILE, & limit_st);
+				limit_st.rlim_cur = max(limit_st.rlim_cur, fp_table.numElements + 10);
+			int rl = setrlimit(RLIMIT_NOFILE, & limit_st);
+			if(rl==-1)
+				SUBREADprintf("Cannot set limit: %ld!\n", limit_st.rlim_cur);
 			temp_file_pointer = fopen(key_name,"wb");
 		}
 
