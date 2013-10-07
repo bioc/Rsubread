@@ -1174,27 +1174,31 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 	FILE * temp_file_pointer = (FILE *) HashTableGet(fp_table, temp_file_name);
 	if(!temp_file_pointer)
 	{
-		struct rlimit limit_st;
-		getrlimit(RLIMIT_NOFILE, & limit_st);
-		if(limit_st.rlim_cur < limit_st.rlim_max)
-		{
-			limit_st.rlim_cur = min(limit_st.rlim_cur + 10, limit_st.rlim_max);
-			setrlimit(RLIMIT_NOFILE, & limit_st);
-		}
-		else
-		{
-			SUBREADprintf("Temp file cannot be opened!!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n");
-			return NULL;
-		}
-	}
-	if(!temp_file_pointer)
-	{
 		char *key_name;
 		key_name = (char *)SUBREAD_malloc(300);
 		if(!key_name)
 			return NULL;
 		strcpy(key_name, temp_file_name);
 		temp_file_pointer = fopen(key_name,"wb");
+
+		if(!temp_file_pointer)
+		{
+			struct rlimit limit_st;
+			getrlimit(RLIMIT_NOFILE, & limit_st);
+			if(limit_st.rlim_cur < limit_st.rlim_max)
+			{
+				limit_st.rlim_cur = min(limit_st.rlim_cur + 10, limit_st.rlim_max);
+				setrlimit(RLIMIT_NOFILE, & limit_st);
+			}
+			else
+			{
+				SUBREADprintf("You have reached the maximum file open number (%ld)!\nTemp file cannot be opened!!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", limit_st.rlim_max);
+				return NULL;
+			}
+			temp_file_pointer = fopen(key_name,"wb");
+		}
+
+
 		if(!temp_file_pointer) SUBREADprintf("File cannot be opened: '%s' !!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
 		assert(temp_file_pointer);
 
