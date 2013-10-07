@@ -5,7 +5,7 @@ exactSNP <- function(readFile,isBAM=FALSE,refGenomeFile,outputFile,qvalueCutoff=
   if(isBAM)
     opt <- paste(opt,"-b",sep=",")
 
-  opt <- paste(opt,"-g",refGenomeFile,"-o",outputFile,"-Q",qvalueCutoff,"-f",minAllelicFraction,"-n",minAllelicBases,"-r",minReads,"-x",maxReads,"-s",minBaseQuality,"-t",nTrimmedBases,"-T",nthreads)
+  opt <- paste(opt,"-g",refGenomeFile,"-o",outputFile,"-Q",qvalueCutoff,"-f",minAllelicFraction,"-n",minAllelicBases,"-r",minReads,"-x",maxReads,"-s",minBaseQuality,"-t",nTrimmedBases,"-T",nthreads,sep=",")
 
   cmd <- paste("SNPcalling",opt,sep=",")
   n <- length(unlist(strsplit(cmd,",")))
