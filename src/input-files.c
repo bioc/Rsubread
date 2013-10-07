@@ -1185,7 +1185,10 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 		{
 			struct rlimit limit_st;
 			getrlimit(RLIMIT_NOFILE, & limit_st);
-			limit_st.rlim_cur = limit_st.rlim_max;
+			if(limit_st.rlim_max>0 && limit_st.rlim_max <= 3000)
+				limit_st.rlim_cur = limit_st.rlim_max;
+			else
+				limit_st.rlim_cur = 3000;
 			setrlimit(RLIMIT_NOFILE, & limit_st);
 			temp_file_pointer = fopen(key_name,"wb");
 		}
