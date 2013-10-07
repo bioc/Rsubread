@@ -1618,7 +1618,10 @@ int main_snp_calling_test(int argc,char ** argv)
 	warning_file_type(in_SAM_file, parameters.is_BAM_file_input?FILE_TYPE_BAM:FILE_TYPE_SAM);
 	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
 	int ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
-	if(ret != -1)
+	if(ret == -1)
+	{
+		EXSNP_SIGINT_hook(0);
+	}else
 	{
 		print_in_box(80,0,1,"");
 		print_in_box(80,2,1,"");
