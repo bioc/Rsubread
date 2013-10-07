@@ -19,9 +19,15 @@ static struct option long_options[] =
 	{"threads",  required_argument, 0, 't'},
 	{"indel",  required_argument, 0, 'I'},
 	{"phred",  required_argument, 0, 'P'},
+	{"minmatch",  required_argument, 0, 'm'},
+	{"minmatch2",  required_argument, 0, 'p'},
 	{"mindist",  required_argument, 0, 'd'},
 	{"maxdist",  required_argument, 0, 'D'},
 	{"order",  required_argument, 0, 'S'},
+	{"DPMismatch",  required_argument, 0, 'X'},
+	{"DPMatch",  required_argument, 0, 'Y'},
+	{"DPGapOpen",  required_argument, 0, 'G'},
+	{"DPGapExt",  required_argument, 0, 'E'},
 	{"junction", no_argument, 0, 'J'},
 	{"unique",  no_argument, 0, 'u'},
 	{"color-convert",  no_argument, 0, 'b'},
@@ -81,7 +87,10 @@ void print_usage_core_aligner()
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores in input files, '3' for");
 	SUBREADputs("                            phred+33 and '6' for phred+64. '3' by default.");
 	SUBREADputs("                                 ");
-	SUBREADputs("    -u --unique             reporting uniquely mapped reads only.");
+	SUBREADputs("    -u --unique             only uniquely mapped reads will be reported (reads");
+	SUBREADputs("                            mapped to multiple locations in the reference genome");
+	SUBREADputs("                            will not be reported). This option can be used");
+	SUBREADputs("                            together with option '-H' or '-Q'.");
 	SUBREADputs("");
 	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
 	SUBREADputs("                            than one best mapping locations are found.");
@@ -120,6 +129,22 @@ void print_usage_core_aligner()
 	SUBREADputs("       --BAMoutput          mapping results will be saved into a BAM format file");
 	SUBREADputs("                            instead of a SAM format file.");
 	SUBREADputs("");
+	SUBREADputs("       --DPGapOpen  <int>   a numeric value giving the penalty for opening a");
+	SUBREADputs("                            gap when using the Smith-Waterman dynamic");
+	SUBREADputs("                            programming algorithm to detect insertions and");
+	SUBREADputs("                            deletions. The Smith-Waterman algorithm is only");
+	SUBREADputs("                            applied for those reads which are found to contain");
+	SUBREADputs("                            insertions or deletions. -2 by default.");
+	SUBREADputs("");
+	SUBREADputs("       --DPGapExt   <int>   a numeric value giving the penalty for extending the");
+	SUBREADputs("                            gap, used by the Smith-Waterman algorithm. 0 by");
+	SUBREADputs("                            default.");
+	SUBREADputs("");
+	SUBREADputs("       --DPMismatch <int>   a numeric value giving the penalty for mismatches,");
+	SUBREADputs("                            used by the Smith-Waterman algorithm. 0 by default.");
+	SUBREADputs("");
+	SUBREADputs("       --DPMatch    <int>   a numeric value giving the score for matches used by");
+	SUBREADputs("                            the Smith-Waterman algorithm. 2 by default.");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
@@ -220,7 +245,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'S':
 				global_context->config.is_first_read_reversed = optarg[0]=='r'?1:0;
-				global_context->config.is_second_read_reversed = optarg[0]=='f'?0:1;
+				global_context->config.is_second_read_reversed = optarg[1]=='f'?0:1;
 				break;
 			case 'U':
 				global_context->config.report_no_unpaired_reads = 1;

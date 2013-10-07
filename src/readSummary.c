@@ -1260,7 +1260,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						int ffnn = strlen(final_feture_names);
 						if(ffnn>0) final_feture_names[ffnn-1]=0;
 						// overlapped but still assigned 
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal\t%d\n", read_name, final_feture_names, assigned_no);
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=%d\n", read_name, final_feture_names, assigned_no);
 					}
 				}
 				else if(global_context -> SAM_output_fp)
@@ -1811,7 +1811,7 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	char * temp_file_name = malloc(300), * fline = malloc(3000);
 	SamBam_FILE * sambam_reader ;
 
-	print_in_box(80,0,0,"Resorting the input files...");
+	print_in_box(80,0,0,"   Resort the input files...");
 	sprintf(temp_file_name, "./temp-core-%06u-%08X.sam", getpid(), rand());
 	sambam_reader = SamBam_fopen(global_context-> input_file_name, global_context-> is_SAM_file?SAMBAM_FILE_SAM:SAMBAM_FILE_BAM);
 
@@ -2142,11 +2142,11 @@ void print_usage()
 	SUBREADputs("              \tidentifier. This argument is useful for the meta-feature level");
 	SUBREADputs("              \tsummarization.");
 	SUBREADputs("    "); 
-	SUBREADputs("    -b        \tIndicate that the input file is in BAM format."); 
+	SUBREADputs("    -b        \tIndicate that the input read files are in BAM format."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -f        \tIf specified, read summarization will be performed at the "); 
-	SUBREADputs("              \tfeature level. By default (-f is not specified), the read"); 
-	SUBREADputs("              \tsummarization is performed at the meta-feature level."); 
+	SUBREADputs("              \tfeature level (eg. exon level). Otherwise, it is performed at");
+	SUBREADputs("              \tmeta-feature level (eg. gene level).");
 	SUBREADputs("    "); 
 	SUBREADputs("    -O        \tIf specified, reads (or fragments if -p is specified) will"); 
 	SUBREADputs("              \tbe allowed to be assigned to more than one matched meta-"); 
@@ -2161,29 +2161,34 @@ void print_usage()
 	SUBREADputs("              \treported mapping locations). The program uses the `NH' tag to");
 	SUBREADputs("              \tfind multi-mapping reads.");
 	SUBREADputs("    "); 
-	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must have so as to be");
-        SUBREADputs("              \tcounted. For paired-end reads, at least one end should satisfy");
-        SUBREADputs("              \tthis criteria. 0 by default."); 
+	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must satisfy in order");
+        SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
+        SUBREADputs("              \tsatisfy this criteria. 0 by default."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -T <int>  \tNumber of the threads. 1 by default."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -R        \tOutput the read assignment result for each read."); 
+	SUBREADputs("    -R        \tOutput read counting result for each read/fragment. The result");
+        SUBREADputs("              \tis saved to a tab-delimited file that contains four columns");
+        SUBREADputs("              \tincluding read name, status(assigned or the reason if not");
+        SUBREADputs("              \tassigned), name of target feature/meta-feature and number of");
+        SUBREADputs("              \thits if the read/fragment is counted multiple times."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional paired-end parameters:"); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -p        \tIf specified, fragments (or templates) will be counted "); 
-	SUBREADputs("              \tinstead of reads. This option is only applicable for "); 
-	SUBREADputs("              \tpaired-end reads. "); 
+	SUBREADputs("    -p        \tIf specified, fragments (or templates) will be counted instead");
+        SUBREADputs("              \tof reads. This option is only applicable for paired-end reads.");
+        SUBREADputs("              \tThe two reads from the same fragment must be adjacent to each");
+        SUBREADputs("              \tother in the provided SAM/BAM file. If SAM/BAM input does not");
+        SUBREADputs("              \tmeet this requirement, the -S option should be provided as well."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -P        \tIf specified, paired-end distance will be checked when "); 
-	SUBREADputs("              \tassigning fragments to meta-features or features. This "); 
-	SUBREADputs("              \toption is only applicable when -p is specified. The "); 
-	SUBREADputs("              \tdistance thresholds should be specified using -d and -D "); 
-	SUBREADputs("              \toptions."); 
+	SUBREADputs("    -P        \tIf specified, paired-end distance will be checked when assigning");
+        SUBREADputs("              \tfragments to meta-features or features. This option is only");
+        SUBREADputs("              \tapplicable when -p is specified. The distance thresholds should");
+        SUBREADputs("              \tbe specified using -d and -D options."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -d <int>  \tMinimal allowed paired-end distance. 50 by default."); 
+	SUBREADputs("    -d <int>  \tMinimum fragment/template length, 50 by default."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -D <int>  \tMaximal allowed paired-end distance. 600 by default."); 
+	SUBREADputs("    -D <int>  \tMaximum fragment/template length, 600 by default."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -B        \tIf specified, only fragments that have both ends "); 
 	SUBREADputs("              \tsuccessfully aligned will be considered for summarization."); 
@@ -2194,10 +2199,12 @@ void print_usage()
 	SUBREADputs("              \tNOT be included for summarization. This option is only "); 
 	SUBREADputs("              \tapplicable for paired-end read data."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -S        \tIf specified, the program will reorder the input SAM or BAM"); 
-	SUBREADputs("              \tfile according to the read names. This option should only be");
-	SUBREADputs("              \tspecified when the input contains paired-end reads and reads");
-	SUBREADputs("              \tfrom the same pair are not adjacent to each other."); 
+	SUBREADputs("    -S        \tIf specified, the program will reorder input reads according to");
+        SUBREADputs("              \ttheir names and make reads from the same pair be adjacent to");
+        SUBREADputs("              \teach other. This option should be provided when reads from the");
+        SUBREADputs("              \tsame pair are not adjacent to each other in input SAM/BAM files");
+        SUBREADputs("              \t(for instance sorting reads by chromosomal locations could");
+        SUBREADputs("              \tdecouple reads from the same pair)."); 
 
 
 }
@@ -2309,12 +2316,17 @@ int readSummary(int argc,char *argv[]){
 		isMultiMappingAllowed = atoi(argv[20]);
 	else	isMultiMappingAllowed = 1;
 	if(argc > 21)
+	{
 		alias_file_name = argv[21];
+		if(alias_file_name == NULL || alias_file_name[0]==' ' || alias_file_name[0]==0)
+			alias_file_name = NULL;
+	}
 	else	alias_file_name = NULL;
 	if(argc > 22)
 	{
 		cmd_rebuilt = argv[22];
-		if(cmd_rebuilt[0]==0)cmd_rebuilt=NULL;
+		if(cmd_rebuilt == NULL || cmd_rebuilt[0]==' '||cmd_rebuilt[0]==0)
+			cmd_rebuilt=NULL;
 	}
 	else	cmd_rebuilt = NULL;
 	if(argc>23)

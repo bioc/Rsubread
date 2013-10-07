@@ -16,6 +16,8 @@ static struct option long_options[] =
 	{"read2",  required_argument, 0, 'R'},
 	{"output",  required_argument, 0, 'o'},
 	{"subreads",  required_argument, 0, 'n'},
+	{"minmatch",  required_argument, 0, 'm'},
+	{"minmatch2",  required_argument, 0, 'p'},
 	{"singleSAM",  required_argument, 0, '1'},
 	{"pairedSAM",  required_argument, 0, '2'},
 	{"threads",  required_argument, 0, 't'},
@@ -30,9 +32,12 @@ static struct option long_options[] =
 	{"junctionIns", required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
+	{"unique",  no_argument, 0, 'u'},
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
+	{"hamming",  no_argument, 0, 'H'},
+	{"quality",  no_argument, 0, 'Q'},
 	{0, 0, 0, 0}
 };
 
@@ -62,6 +67,12 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("    -n --subreads  <int>    number of selected subreads, 14 by default.");
 	SUBREADputs("");
+	SUBREADputs("    -m --minmatch  <int>    consensus threshold (minimal number of consensus");
+	SUBREADputs("                            subreads required) for reporting a hit. If paired-");
+	SUBREADputs("                            end read data are provided, this gives the consensus");
+	SUBREADputs("                            threshold for the read which receives more votes");
+	SUBREADputs("                            than the other read from the same pair. 1 by default");
+	SUBREADputs("");
 	SUBREADputs("    -T --threads   <int>    number of threads/CPUs used, 1 by default.");
 	SUBREADputs("");
 	SUBREADputs("    -I --indel     <int>    number of INDEL bases allowed, 5 by default.");
@@ -69,6 +80,22 @@ void print_usage_core_subjunc()
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
 	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
 	SUBREADputs("");
+	SUBREADputs("    -u --unique             only uniquely mapped reads will be reported (reads");
+	SUBREADputs("                            mapped to multiple locations in the reference genome");
+	SUBREADputs("                            will not be reported). This option can be used");
+	SUBREADputs("                            together with option '-H' or '-Q'.");
+	SUBREADputs("");
+	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
+	SUBREADputs("                            than one best mapping locations are found.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
+	SUBREADputs("                            one best mapping locations are found.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -J --junction           mark those bases which can not be aligned together");
+	SUBREADputs("                            with other base from the same read using the `S' ");
+	SUBREADputs("                            operation in the CIGAR string (soft-clipping). This");
+	SUBREADputs("                            option is useful for marking exon-spanning reads and");
+	SUBREADputs("                            fusion reads.");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
@@ -100,6 +127,10 @@ void print_usage_core_subjunc()
 	SUBREADputs("    -R --read2     <input>  name of the second input file from paired-end data. ");
 	SUBREADputs("                            The program will then be switched to paired-end read");
 	SUBREADputs("                            mapping mode.");
+	SUBREADputs("");
+	SUBREADputs("    -p --minmatch2 <int>    consensus threshold for the read which receives less");
+	SUBREADputs("                            votes than the other read from the same pair, 1 by");
+	SUBREADputs("                            default.");
 	SUBREADputs("");
 	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
 	SUBREADputs("");
@@ -194,7 +225,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'S':
 				global_context->config.is_first_read_reversed = optarg[0]=='r'?1:0;
-				global_context->config.is_second_read_reversed = optarg[0]=='f'?0:1;
+				global_context->config.is_second_read_reversed = optarg[1]=='f'?0:1;
 				break;
 			case 'U':
 				global_context->config.report_no_unpaired_reads = 1;

@@ -60,7 +60,7 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 	char is_R=0, * content = malloc(200);
 
 	vsprintf(content, pattern, args);
-	int x1,content_len = strlen(content);
+	int x1,content_len = strlen(content), state, txt_len, is_cut = 0, real_lenwidth;
 
 	if(content_len>0&&content[content_len-1]=='\r'){
 		content_len--;
@@ -73,14 +73,50 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 		content[content_len] = 0;
 	}
 
-	if(content_len > line_width - 6)
+	state = 0;
+	txt_len = 0;
+	real_lenwidth = line_width;
+	for(x1 = 0; content [x1]; x1++)
 	{
-		content[line_width - 6] = 0;
-		content[line_width - 7] = '.';
-		content[line_width - 8] = '.';
-		content[line_width - 9] = '.';
-		content[line_width - 10] = ' ';
-		content_len = line_width - 6;
+		char nch = content [x1];
+		if(nch == CHAR_ESC)
+			state = 1;
+		if(state){
+			real_lenwidth --;
+		}else{
+			txt_len++;
+			
+			if(txt_len == line_width - 6)
+			{
+				is_cut = 1;
+			} 
+		}
+
+		if(nch == 'm' && state)
+			state = 0;
+	}
+
+	if(is_cut)
+	{
+		state = 0;
+		txt_len = 0;
+		for(x1 = 0; content [x1]; x1++)
+		{
+			char nch = content [x1];
+			if(nch == CHAR_ESC)
+				state = 1;
+			if(!state){
+				txt_len++;
+				if(txt_len == real_lenwidth - 9)
+				{
+					strcpy(content+x1, "\x1b[0m ...");
+					content_len = line_width - 4;
+					break;
+				} 
+			}
+			if(nch == 'm' && state)
+				state = 0;
+		}
 	}
 
 	if(content_len==0 && is_boundary)
