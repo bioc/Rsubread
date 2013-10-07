@@ -1137,7 +1137,7 @@ char * _EXSNP_SNP_delete_temp_prefix = NULL;
 void EXSNP_SIGINT_hook(int param)
 {
 	#ifndef MAKE_STANDALONE
-	if(param!=0)
+	if(param==0)
 	{
 	#endif
 	
@@ -1145,7 +1145,9 @@ void EXSNP_SIGINT_hook(int param)
 		if(_EXSNP_SNP_delete_temp_prefix != NULL)
 		{
 			char del2[300], del_suffix[200], del_name[400];
+			#ifdef MAKE_STANDALONE
 			SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
+			#endif
 			for(xk1=0; _EXSNP_SNP_delete_temp_prefix[xk1]; xk1++)
 			{
 				if(_EXSNP_SNP_delete_temp_prefix[xk1]=='/') last_slash = xk1;
