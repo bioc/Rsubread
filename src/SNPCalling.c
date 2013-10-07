@@ -1136,58 +1136,65 @@ int guess_quality_threshold(char * qual_file, float percentage)
 char * _EXSNP_SNP_delete_temp_prefix = NULL;
 void EXSNP_SIGINT_hook(int param)
 {
-	#ifdef MAKE_STANDALONE
-	int xk1, last_slash = -1;
-	if(_EXSNP_SNP_delete_temp_prefix != NULL)
+	#ifndef MAKE_STANDALONE
+	if(param!=0)
 	{
-		char del2[300], del_suffix[200], del_name[400];
-		SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
-		for(xk1=0; _EXSNP_SNP_delete_temp_prefix[xk1]; xk1++)
-		{
-			if(_EXSNP_SNP_delete_temp_prefix[xk1]=='/') last_slash = xk1;
-			else if(_EXSNP_SNP_delete_temp_prefix[xk1]=='\\')
-			{
-				SUBREADprintf("The file name is unknown.\n");
-				return;
-			}
-		}
-		if(last_slash>=0)
-		{
-			memcpy(del2, _EXSNP_SNP_delete_temp_prefix, last_slash);
-			del2[last_slash] = 0;
-			strcpy(del_suffix , _EXSNP_SNP_delete_temp_prefix + last_slash + 1);
-		}
-		else
-		{
-			strcpy(del2,".");
-			strcpy(del_suffix , _EXSNP_SNP_delete_temp_prefix);
-		}
+	#endif
 	
-		if(strlen(del_suffix)>8)
+		int xk1, last_slash = -1;
+		if(_EXSNP_SNP_delete_temp_prefix != NULL)
 		{
-			DIR           *d;
-			struct dirent *dir;
-
-			d = opendir(del2);
-			if (d)
+			char del2[300], del_suffix[200], del_name[400];
+			SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
+			for(xk1=0; _EXSNP_SNP_delete_temp_prefix[xk1]; xk1++)
 			{
-				while ((dir = readdir(d)) != NULL)
+				if(_EXSNP_SNP_delete_temp_prefix[xk1]=='/') last_slash = xk1;
+				else if(_EXSNP_SNP_delete_temp_prefix[xk1]=='\\')
 				{
-					if(strstr(dir->d_name, del_suffix))
+					SUBREADprintf("The file name is unknown.\n");
+					return;
+				}
+			}
+			if(last_slash>=0)
+			{
+				memcpy(del2, _EXSNP_SNP_delete_temp_prefix, last_slash);
+				del2[last_slash] = 0;
+				strcpy(del_suffix , _EXSNP_SNP_delete_temp_prefix + last_slash + 1);
+			}
+			else
+			{
+				strcpy(del2,".");
+				strcpy(del_suffix , _EXSNP_SNP_delete_temp_prefix);
+			}
+		
+			if(strlen(del_suffix)>8)
+			{
+				DIR           *d;
+				struct dirent *dir;
+
+				d = opendir(del2);
+				if (d)
+				{
+					while ((dir = readdir(d)) != NULL)
 					{
-						//printf("%s\n", dir->d_name);
-						strcpy(del_name, del2);
-						strcat(del_name, "/");
-						strcat(del_name, dir->d_name);
-						unlink(del_name);
+						if(strstr(dir->d_name, del_suffix))
+						{
+							//printf("%s\n", dir->d_name);
+							strcpy(del_name, del2);
+							strcat(del_name, "/");
+							strcat(del_name, dir->d_name);
+							unlink(del_name);
+						}
 					}
 				}
 			}
+				
 		}
-			
-	}
 
+	#ifdef MAKE_STANDALONE
 	exit(param);
+	#else
+	}
 	#endif
 }
 
@@ -1618,10 +1625,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	warning_file_type(in_SAM_file, parameters.is_BAM_file_input?FILE_TYPE_BAM:FILE_TYPE_SAM);
 	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
 	int ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
-	if(ret == -1)
-	{
-		EXSNP_SIGINT_hook(0);
-	}else
+	if(ret != -1)
 	{
 		print_in_box(80,0,1,"");
 		print_in_box(80,2,1,"");
@@ -1638,6 +1642,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_in_box(80,2,1,"http://subread.sourceforge.net/");
 		SUBREADputs("");
 	}
+	EXSNP_SIGINT_hook(0);
 	return ret;
 	
 }
