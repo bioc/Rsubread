@@ -1181,7 +1181,7 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 		strcpy(key_name, temp_file_name);
 		temp_file_pointer = fopen(key_name,"wb");
 
-		if(!temp_file_pointer)
+		if(0&&!temp_file_pointer)
 		{
 			struct rlimit limit_st;
 			getrlimit(RLIMIT_NOFILE, & limit_st);
