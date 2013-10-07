@@ -1631,7 +1631,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 	else	pct_str[0]=0;
 
 	print_in_box(80,0,0,"   Total number of reads is : %llu", total_input_reads); 
-	print_in_box(80,0,0,"   Number of successfully assigned reads is : %llu %s", *nreads_mapped_to_exon,pct_str); 
+	print_in_box(pct_str[0]?81:80,0,0,"   Number of successfully assigned reads is : %llu %s", *nreads_mapped_to_exon,pct_str); 
 	print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
 	print_in_box(80,0,0,"");
 }
