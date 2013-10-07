@@ -143,7 +143,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 					printf("EVENT0_type = %d\n", site_events[0]->event_type);
 			}*/
 
-			//if(explain_context -> pair_number==2074) printf("FF OFFSET=%d; LEDGE=%u; FOUND=%d\n", tested_read_pos, potential_event_pos, site_events_no);
+			//printf("FF OFFSET=%d; LEDGE=%u; FOUND=%d\n", tested_read_pos, potential_event_pos, site_events_no);
 			if(!site_events_no)continue;
 
 			unsigned int tested_chro_begin;
@@ -152,12 +152,13 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 			else
 				tested_chro_begin = read_head_abs_offset;
 
-			matched_bases_to_site = match_chro(read_text, value_index, tested_chro_begin , tested_read_pos, explain_context -> current_is_strand_jumped, global_context -> config.space_type);
+
+			matched_bases_to_site = match_chro(read_text, value_index, tested_chro_begin, tested_read_pos, explain_context -> current_is_strand_jumped, global_context -> config.space_type);
 
 
 	
 			//if(explain_context -> pair_number == 27)
-			//	printf("JUMP?%d > %d\n", (1+matched_bases_to_site)*10000 / tested_read_pos , 9000);
+			//	printf("JUMP?%d > %d    %s (%u)\n", (1+matched_bases_to_site)*10000 / tested_read_pos , 9000, read_text, tested_chro_begin);
 
 			if((1+matched_bases_to_site)*10000/tested_read_pos > 9000)
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
@@ -1164,7 +1165,12 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 				if(qual_text[0])qual_text_cur = qual_text+read_cursor;
 				else	qual_text_cur = NULL;
 
-				float section_qual = match_base_quality(current_value_index, read_text+read_cursor, current_perfect_section_abs, qual_text_cur, tmp_int, current_reversed, global_context->config.phred_score_format , mismatched_bases, global_context -> config.high_quality_base_threshold);
+				float section_qual;
+
+				if(global_context -> config.space_type == GENE_SPACE_COLOR)
+					section_qual =  match_base_quality_cs(current_value_index, read_text+read_cursor, current_perfect_section_abs, qual_text_cur, tmp_int, global_context->config.phred_score_format , mismatched_bases, global_context -> config.high_quality_base_threshold);
+				else
+					section_qual =  match_base_quality(current_value_index, read_text+read_cursor, current_perfect_section_abs, qual_text_cur, tmp_int, current_reversed, global_context->config.phred_score_format , mismatched_bases, global_context -> config.high_quality_base_threshold);
 				all_matched_bases += section_qual;
 				rebuilt_read_len += tmp_int;
 				all_perfect_length += tmp_int;
@@ -1422,11 +1428,14 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 	unsigned int final_position = explain_context -> back_search_junctions[0].abs_offset_for_start;
 	int final_qual = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases);
 
-	//if(memcmp(explain_context->read_name, "V0112_0155:7:1101:18796:1998",28) == 0)printf("POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", final_position , tmp_cigar, mismatch_bases, final_qual);
+	//if(memcmp(explain_context->read_name, "V0112_0155:7:1101:18796:1998",28) == 0)
+	//printf("POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", final_position , tmp_cigar, mismatch_bases, final_qual);
 
 	int applied_mismatch = is_junction_read? global_context->config.max_mismatch_junction_reads:global_context->config.max_mismatch_exonic_reads ;
 	if(explain_context->full_read_len > EXON_LONG_READ_LENGTH)
 		applied_mismatch = ((((explain_context->full_read_len+1)<<16) / 100) * applied_mismatch)>>16;
+
+	if(global_context -> config.space_type == GENE_SPACE_COLOR) applied_mismatch += to_be_supported_count*2;
 
 	if(mismatch_bases <= applied_mismatch)
 	{
@@ -1720,22 +1729,23 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 
 
 	//	donor_left[2]=0; donor_right[2]=0;
-	//	printf("TESTDON: %s %s; OFFSET=%d; DON_OK=%d; NORMAL=%d; LEFT_OFF=%d; RIGHT_OFF=%d\n", donor_left, donor_right, real_split_point_i, is_donor_test_ok, normally_arranged, left_indel_offset, right_indel_offset);
+		//printf("TESTDON: %s %s; OFFSET=%d; DON_OK=%d; NORMAL=%d; LEFT_OFF=%d; RIGHT_OFF=%d\n", donor_left, donor_right, real_split_point_i, is_donor_test_ok, normally_arranged, left_indel_offset, right_indel_offset);
 
 		if(is_donor_test_ok || !need_donor_test)
 		{
 			if(normally_arranged)
 			{
-				int inserted_bases;
+				int inserted_bases=0;
 
 				left_should_match = match_chro(read_text + real_split_point - JUNCTION_CONFIRM_WINDOW, value_index, left_virtualHead_abs_offset + real_split_point - JUNCTION_CONFIRM_WINDOW + left_indel_offset , JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
+				//printf("INS=%d; LM=%d\t\tLOL=%u, LOR=%u, SP=%d\n", inserted_bases, left_should_match, left_virtualHead_abs_offset, right_virtualHead_abs_offset, real_split_point);
 				if(left_should_match > JUNCTION_CONFIRM_WINDOW-2)
 				{
 					for(inserted_bases = 0; inserted_bases <= global_context->config.max_insertion_at_junctions; inserted_bases++)
 					{
 
 						right_should_match = match_chro(read_text + real_split_point + inserted_bases, value_index, right_virtualHead_abs_offset + real_split_point + right_indel_offset + inserted_bases, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
-						//printf("INS=%d; LM=%d; RM=%d\t\tLOL=%u, LOR=%u, SP=%d\n", inserted_bases, left_should_match, right_should_match, left_virtualHead_abs_offset, right_virtualHead_abs_offset, real_split_point);
+				//		printf("INS=%d; LM=%d; RM=%d\t\tLOL=%u, LOR=%u, SP=%d\n", inserted_bases, left_should_match, right_should_match, left_virtualHead_abs_offset, right_virtualHead_abs_offset, real_split_point);
 						if(right_should_match >= 2*JUNCTION_CONFIRM_WINDOW - left_should_match - 1)
 						{
 							left_should_not_match = match_chro(read_text + real_split_point + inserted_bases, value_index, left_virtualHead_abs_offset + real_split_point + left_indel_offset, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	

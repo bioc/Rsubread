@@ -26,6 +26,7 @@ static struct option long_options[] =
 	{"order",  required_argument, 0, 'S'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
+	{"color-convert",  no_argument, 0, 'b'},
 	{"junctionIns", required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
@@ -68,6 +69,10 @@ void print_usage_core_subjunc()
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
 	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
 	SUBREADputs("");
+	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
+	SUBREADputs("                            bases in the mapping output. Note that the mapping");
+	SUBREADputs("                            itself will still be performed at color-space.");
+	SUBREADputs("   ");
 	SUBREADputs("    -v                      displaying the version number.");
 	SUBREADputs("                                 ");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
@@ -141,7 +146,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 		print_usage_core_subjunc();
 		return -1;
 	}
-	while ((c = getopt_long (argc, argv, "ExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:Q:I:t:B:b:Q:FcuUfM3:5:9:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "ExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:Q:I:t:B:bQ:FcuUfM3:5:9:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
@@ -198,7 +203,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.report_multi_mapping_reads = 0;
 				break;
 			case 'b':
-				global_context->config.is_methylation_reads = 1;
+				global_context->config.convert_color_to_base = 1;
 				break;
 			case 'D':
 				global_context->config.maximum_pair_distance = atoi(optarg);

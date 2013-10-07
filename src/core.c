@@ -644,15 +644,38 @@ void relocate_geinputs(global_context_t * global_context, thread_context_t * thr
 }
 
 
-int fetch_next_read_pair(global_context_t * global_context, thread_context_t * thread_context, gene_input_t* ginp1, gene_input_t* ginp2, int *read_len_1, int *read_len_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, char * qual_text_1, char *qual_text_2)
+int fetch_next_read_pair(global_context_t * global_context, thread_context_t * thread_context, gene_input_t* ginp1, gene_input_t* ginp2, int *read_len_1, int *read_len_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, char * qual_text_1, char *qual_text_2, int remove_color_head)
 {
 	int rl1, rl2=0;
 
 	rl1 = geinput_next_read_trim(ginp1, read_name_1, read_text_1 , qual_text_1, global_context->config.read_trim_5, global_context->config.read_trim_3);
-	if(ginp2)
-		rl2 = geinput_next_read_trim(ginp2, read_name_2, read_text_2 , qual_text_2, global_context->config.read_trim_5, global_context->config.read_trim_3);
+	if(global_context->config.space_type == GENE_SPACE_COLOR && remove_color_head)
+	{
+		if(isalpha(read_text_1[0]))
+		{
+			int xk1;
+			for(xk1=1; read_text_1[xk1]; xk1++)
+				read_text_1[xk1-1]=read_text_1[xk1];
+			read_text_1[xk1-1]=0;
+		}
+	}
 
-		
+	if(ginp2)
+	{
+		rl2 = geinput_next_read_trim(ginp2, read_name_2, read_text_2 , qual_text_2, global_context->config.read_trim_5, global_context->config.read_trim_3);
+		if(global_context->config.space_type == GENE_SPACE_COLOR && remove_color_head)
+		{
+			if(isalpha(read_text_2[0]))
+			{
+				int xk1;
+				for(xk1=1; read_text_2[xk1]; xk1++)
+					read_text_2[xk1-1]=read_text_2[xk1];
+				read_text_2[xk1-1]=0;
+			}
+		}
+	}
+
+
 	if(rl1>0 && (rl2>0 || !ginp2))
 	{
 		if(global_context->config.is_first_read_reversed)
@@ -682,8 +705,12 @@ int write_final_results(global_context_t * context)
 	if(context -> config.output_prefix[0])
 	{
 		write_indel_final_results(context);
-		write_junction_final_results(context);
-		write_fusion_final_results(context);
+
+		if(context -> config.is_rna_seq_reads)
+			write_junction_final_results(context);
+
+		if(context -> config.do_fusion_detection)
+			write_fusion_final_results(context);
 	}
 	
 	return 0;
@@ -738,7 +765,7 @@ int write_chunk_results(global_context_t * global_context)
 		}
 
 		sqr_read_number ++;
-		fetch_next_read_pair(global_context, NULL, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2);
+		fetch_next_read_pair(global_context, NULL, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 0);
 
 		if(global_context -> config.convert_color_to_base)
 		{
@@ -1110,7 +1137,7 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 		int is_second_read;
 
 		sqr_read_number++;
-		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2);
+		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 1);
 		// if no more reads
 		if(ret)
 			break;
@@ -1197,7 +1224,7 @@ int do_iteration_three(global_context_t * global_context, thread_context_t * thr
 		int is_second_read;
 
 		sqr_read_number++;
-		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2);
+		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 1);
 		if(ret)
 			break;
 
@@ -1303,7 +1330,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 		int is_second_read;
 
 		sqr_read_number++;
-		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2);
+		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2,1);
 		// if no more reads
 		if(ret)
 			break;
@@ -1426,7 +1453,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		int subread_no;
 		int is_reversed;
 
-		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2);
+		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2,1);
 		if(ret)
 			break;
 
@@ -2023,7 +2050,7 @@ int print_configuration(global_context_t * context)
 
 	print_in_box(80, 0, 0,         "        Index name : %s", context->config.index_prefix);
 	print_in_box(80, 0, 0,         "      Phred offset : %d", (context->config.phred_score_format == FASTQ_PHRED33)?33:64);
-	print_in_box(80, 0, 0,         "        Space type : %s", (context->config.space_type == GENE_SPACE_COLOR)?"color-space":"base-space");
+	//print_in_box(80, 0, 0,         "        Space type : %s", (context->config.space_type == GENE_SPACE_COLOR)?"color-space":"base-space");
 	print_in_box(80, 0, 1, "");
 	if( context->config.second_read_file[0])
 	{
@@ -2161,6 +2188,9 @@ int load_global_context(global_context_t * context)
 		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
 		return -1;
 	}
+
+	context->config.space_type = context->input_reads.first_read_file.space_type;
+	print_in_box(89,0,0,"The input file contains %c[36m%s%c[0m space reads.", CHAR_ESC, context->config.space_type == GENE_SPACE_COLOR?"color":"base", CHAR_ESC);
 
 	if(context->input_reads.is_paired_end_reads)
 	{

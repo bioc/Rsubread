@@ -851,11 +851,14 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 
 	if(space_type == GENE_SPACE_COLOR)
 	{
-		for (i=0; i<read_len/2; i++)
+		int start_pos = 0;
+		if(isalpha(InBuff[0]))start_pos = 1;
+
+		for (i=0; i<(read_len - start_pos)/2; i++)
 		{
 			int rll1 = read_len - 1 - i;
 			char tmp = InBuff[rll1];
-			InBuff[rll1] = InBuff[i];
+			InBuff[rll1] = InBuff[i + start_pos];
 			InBuff[i] = tmp;
 		}
 	}

@@ -847,6 +847,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	int first_read_quality_score = 0;
 
 	thread_context->all_reads++;
+	//if(thread_context->all_reads>1000000) printf("TA=%llu\n%s\n",thread_context->all_reads, thread_context -> line_buffer1);
 
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++)
 	{
@@ -1313,11 +1314,13 @@ void * feature_count_worker(void * vargs)
 							curr_line_buff[buffer_read_bytes] = nch;
 							if(buffer_read_ptr == global_context->input_buffer_max_size)
 								buffer_read_ptr = 0; 
-							if(nch=='\n' || buffer_read_ptr>2998){
+							if(nch=='\n' || buffer_read_bytes>2998){
 								curr_line_buff[buffer_read_bytes+1]=0;
 								break;
 							}
 						}
+
+						//printf("%s\n", curr_line_buff);
 
 						//if(buffer_read_bytes + 1 > thread_context->input_buffer_remainder)
 						//	(*(int*)NULL) = 1;
@@ -1618,8 +1621,8 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 		total_input_reads += global_context -> thread_contexts[xk1].all_reads;
 		(*nreads_mapped_to_exon) += global_context -> thread_contexts[xk1].nreads_mapped_to_exon;
 
-		if((!global_context->is_SAM_file) || global_context-> thread_number>1)
-			global_context->all_reads += global_context -> thread_contexts[xk1].all_reads;
+		//if((!global_context->is_SAM_file) || global_context-> thread_number>1)
+		//	global_context->all_reads += global_context -> thread_contexts[xk1].all_reads;
 	}
 
 	char pct_str[10];
@@ -2233,7 +2236,7 @@ int readSummary(int argc,char *argv[]){
 	19: min.MappingQualityScore
 	20: as.numeric(isMultiMappingAllowed)
 	21: Annotation Chromosome Alias Name File. If the file is not specified, set this value to NULL or a zero-length string.
-	22: Command line rebuilt; RfeatureCounts should set this value to NULL or a zero-length string.
+	22: Command line for CfeatureCounts header output; RfeatureCounts should set this value to NULL or a zero-length string.
 	23: as.numeric(isInputFileResortNeeded)
 	 */
 
@@ -2666,12 +2669,15 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 				line_length = 0;
 			}
 
+			//printf("FRR=%d\n%s\n", fresh_read_no, preload_line);
+
 			if(line_length > 0)
 			{
 				while(1)
 				{
 					int is_finished = 0;
 					fc_thread_thread_context_t * thread_context = global_context->thread_contexts+current_thread_id;
+					//printf("WRT_THR_IBUF_REM [%d]=%d\n", current_thread_id , thread_context->input_buffer_remainder);
 
 					pthread_spin_lock(&thread_context->input_buffer_lock);
 					unsigned int empty_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_remainder; 
@@ -2692,6 +2698,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 
 						thread_context->input_buffer_remainder += line_length;
+						//printf("WRT_THR_IBUF_REM [%d] + %d =%d\n", current_thread_id, line_length , thread_context->input_buffer_remainder);
 						is_finished = 1;
 					}
 

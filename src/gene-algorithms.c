@@ -474,6 +474,7 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 
 #define _index_vote(key) (((unsigned int)key)%GENE_VOTE_TABLE_SIZE)
 
+#ifdef USE_SLOW_HASHTABLE_INDEX
 int vv=0;
 inline void add_gene_vote(gene_vote_t* vote, int key , int add_new)
 {
@@ -513,6 +514,8 @@ inline void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int
 	dat[i] = key;
 	vote->votes[offset][i]=w;
 }
+
+#endif
 
 int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 {
@@ -2184,6 +2187,34 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 	return ret;
 }
 
+
+float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch, int ql_kill)
+{
+	int i;
+	int ret =0;
+	char lastch;
+	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
+		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+	//	exit(-1);
+		return 100;
+	}
+	lastch = gvindex_get(array_index, pos);
+	for(i=0; i<read_len; i++)
+	{
+		char nch = gvindex_get(array_index, pos+i+1);
+		int is_matched = read_txt[i] == '0'+chars2color(lastch, nch);
+		if(is_matched){
+			ret ++;
+		}else
+		{
+			(*high_qual_unmatch)++;
+			ret --;
+		}
+
+		lastch = nch;
+	}
+	return ret*1.;
+}
 
 float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int ql_kill)
 {

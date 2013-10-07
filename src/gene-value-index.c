@@ -896,10 +896,10 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 		}
 		else
 		{
-			last_char = (pos <= index -> start_point)?'A': gvindex_get(index,pos-1);
+			last_char = (pos <= index -> start_point)?'A': gvindex_get(index,pos);
 			for (i=0;i<test_len;i++)
 			{
-				char tt = gvindex_get (index, pos +i);
+				char tt = gvindex_get (index, pos +i+1);
 				ret += read[i] == '0'+chars2color(last_char, tt);
 				last_char = tt;
 			}
