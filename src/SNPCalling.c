@@ -1618,20 +1618,23 @@ int main_snp_calling_test(int argc,char ** argv)
 	warning_file_type(in_SAM_file, parameters.is_BAM_file_input?FILE_TYPE_BAM:FILE_TYPE_SAM);
 	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
 	int ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
-	print_in_box(80,0,1,"");
-	print_in_box(80,2,1,"");
-	SUBREADputs("");
+	if(ret != -1)
+	{
+		print_in_box(80,0,1,"");
+		print_in_box(80,2,1,"");
+		SUBREADputs("");
 
-	print_in_box(80,1,1,"Summary");
-	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"             Processed reads : %u", parameters.real_read_count);
-	print_in_box(80,0,0,"               Reported SNPs : %u", parameters.reported_SNPs);
-	print_in_box(80,0,0,"             Reported indels : %u", parameters.reported_indels);
-	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"                Running time : %.1f minutes", (miltime() - parameters.start_time)/60);
-	print_in_box(80,0,1,"");
-	print_in_box(80,2,1,"http://subread.sourceforge.net/");
-	SUBREADputs("");
+		print_in_box(80,1,1,"Summary");
+		print_in_box(80,0,1,"");
+		print_in_box(80,0,0,"             Processed reads : %u", parameters.real_read_count);
+		print_in_box(80,0,0,"               Reported SNPs : %u", parameters.reported_SNPs);
+		print_in_box(80,0,0,"             Reported indels : %u", parameters.reported_indels);
+		print_in_box(80,0,1,"");
+		print_in_box(80,0,0,"                Running time : %.1f minutes", (miltime() - parameters.start_time)/60);
+		print_in_box(80,0,1,"");
+		print_in_box(80,2,1,"http://subread.sourceforge.net/");
+		SUBREADputs("");
+	}
 	return ret;
 	
 }
