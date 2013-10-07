@@ -1,4 +1,4 @@
-align <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",color2base=FALSE,DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
+align <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
 {
 	opt <- paste("-i",index,"-r",readfile1,sep=",")
 	if(!is.null(readfile2)) 
@@ -17,7 +17,11 @@ align <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_fil
 		opt <- paste(opt,"-H",sep=",")
 	if(unique)
 		opt <- paste(opt,"-u",sep=",")
-	opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,sep=",")
+	opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")
+	if(!is.null(readGroupID))
+	  opt <- paste(opt,"--rg-id",readGroupID,sep=",")
+	if(!is.null(readGroup))
+	  opt <- paste(opt,"--rg",readGroup,sep=",")
 	if(color2base)
 		opt <- paste(opt,"-b",sep=",")
 	opt <- paste(opt,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
