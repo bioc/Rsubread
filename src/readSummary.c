@@ -1811,7 +1811,7 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	char * temp_file_name = malloc(300), * fline = malloc(3000);
 	SamBam_FILE * sambam_reader ;
 
-	print_in_box(80,0,0,"   Resort the input file...");
+	print_in_box(80,0,0,"   Resort the input file ...");
 	sprintf(temp_file_name, "./temp-core-%06u-%08X.sam", getpid(), rand());
 	sambam_reader = SamBam_fopen(global_context-> input_file_name, global_context-> is_SAM_file?SAMBAM_FILE_SAM:SAMBAM_FILE_BAM);
 

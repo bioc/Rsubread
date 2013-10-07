@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -1173,6 +1174,21 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 	FILE * temp_file_pointer = (FILE *) HashTableGet(fp_table, temp_file_name);
 	if(!temp_file_pointer)
 	{
+		struct rlimit limit_st;
+		getrlimit(RLIMIT_NOFILE, & limit_st);
+		if(limit_st.rlim_cur < limit_st.rlim_max)
+		{
+			limit_st.rlim_cur = min(limit_st.rlim_cur + 10, limit_st.rlim_max);
+			setrlimit(RLIMIT_NOFILE, & limit_st);
+		}
+		else
+		{
+			SUBREADprintf("Temp file cannot be opened!!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n");
+			return NULL;
+		}
+	}
+	if(!temp_file_pointer)
+	{
 		char *key_name;
 		key_name = (char *)SUBREAD_malloc(300);
 		if(!key_name)
@@ -1604,7 +1620,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 								{
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
-									assert(temp_fp);
+									if(!temp_fp) return -1;
 									if(all_mapped_bases)
 										(*all_mapped_bases) += insert_length;
 									write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl);
