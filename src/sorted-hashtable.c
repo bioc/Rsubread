@@ -909,14 +909,23 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 				unsigned int * dat2, *dat;
 				dat = dat2 = vote -> pos[offsetX2];
 
-				/*
+				for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
 				{
+					if(iix)
+					{
+						offsetX = _index_vote_tol(kv+iix);
+						datalen = vote -> items[offsetX];
+						dat = vote -> pos[offsetX];
+					}
+
+
+					if(!datalen)continue;
 
 					for (i=0;i<datalen;i++)
 					{
-						unsigned int di = dat[i];
-						int dist0 = 0;
-						if( kv == di )
+						int di = dat[i];
+						int dist0 = kv-di;
+						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
 						{
 							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 							test_max += 1;
@@ -949,66 +958,11 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 							i = 9999999;
 						}
 					}
-
+					if (i>=9999999){
+						break;
+					}
 
 				}
-
-				if(i < 9999999)
-				*/
-					for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
-					{
-						if(iix>0)
-						{
-							offsetX = _index_vote_tol(kv+iix);
-							datalen = vote -> items[offsetX];
-							dat = vote -> pos[offsetX];
-						}
-
-
-						if(!datalen)continue;
-
-						for (i=0;i<datalen;i++)
-						{
-							int di = dat[i];
-							int dist0 = kv-di;
-							if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
-							{
-								gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-								test_max += 1;
-								vote -> votes[offsetX][i] = test_max;
-								vote -> quality[offsetX][i] += quality;
-
-								if (offset +16 > vote->coverage_end [offsetX][i])
-									vote->coverage_end [offsetX][i] = offset+16;
-
-								int toli =  vote -> toli[offsetX][i];
-
-								if (dist0 !=  vote->current_indel_cursor[offsetX][i])
-								{
-									toli +=3;
-									if (toli < indel_tolerance*3)
-									{
-										vote -> toli[offsetX][i] = toli;
-										vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-										vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-										vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-											
-										if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-									}
-									vote->current_indel_cursor [offsetX][i] = (char)dist0;
-								}
-								else
-									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-
-								vote->max_vote = max(vote->max_vote , test_max);
-								i = 9999999;
-							}
-						}
-						if (i>=9999999){
-							break;
-						}
-
-					}
 
 				if (i < 9999999)
 				{

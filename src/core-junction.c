@@ -1749,13 +1749,13 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 						if(right_should_match >= 2*JUNCTION_CONFIRM_WINDOW - left_should_match - 1)
 						{
 							left_should_not_match = match_chro(read_text + real_split_point + inserted_bases, value_index, left_virtualHead_abs_offset + real_split_point + left_indel_offset, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
-							right_should_not_match = match_chro(read_text + real_split_point + JUNCTION_CONFIRM_WINDOW, value_index, right_virtualHead_abs_offset  + real_split_point + right_indel_offset - JUNCTION_CONFIRM_WINDOW + inserted_bases, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
+							right_should_not_match = match_chro(read_text + real_split_point - JUNCTION_CONFIRM_WINDOW, value_index, right_virtualHead_abs_offset  + real_split_point + right_indel_offset - JUNCTION_CONFIRM_WINDOW + inserted_bases, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
 
 
 							if(left_should_not_match <= JUNCTION_CONFIRM_WINDOW -5 && right_should_not_match <= JUNCTION_CONFIRM_WINDOW -5)
 							{
 								int test_score ; 
-								if( global_context->config.max_insertion_at_junctions)
+								if(global_context->config.max_insertion_at_junctions)
 									test_score = 100*(is_donor_test_ok*3000+left_should_match + right_should_match) - (left_should_not_match + right_should_not_match) - 20*inserted_bases;
 								else
 									test_score = 100*(is_donor_test_ok*3000+left_should_match + right_should_match - left_should_not_match - right_should_not_match);
@@ -1789,7 +1789,10 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 				if(left_should_match +right_should_match >= 2*JUNCTION_CONFIRM_WINDOW-1 && 
 					left_should_not_match <= JUNCTION_CONFIRM_WINDOW -5 && right_should_not_match <= JUNCTION_CONFIRM_WINDOW -5)
 				{
-					int test_score = 100*(is_donor_test_ok*3000+left_should_match + right_should_match - left_should_not_match - right_should_not_match);
+					
+					int test_score;
+
+					test_score = 100*(is_donor_test_ok*3000+left_should_match + right_should_match - left_should_not_match - right_should_not_match);
 					if(test_score > best_score)
 					{
 						selected_junction_strand = (donor_left[0]=='G' || donor_right[1]=='G');

@@ -372,6 +372,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 		}
 	}
 
+				global_context->config.show_soft_cliping = 0;
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;
 
 	return 0;
