@@ -1282,7 +1282,6 @@ void * feature_count_worker(void * vargs)
 
 	free(vargs);
 
-
 	if(global_context -> is_SAM_file)
 	{
 		while (1)
@@ -1301,6 +1300,9 @@ void * feature_count_worker(void * vargs)
 					else
 						buffer_read_ptr = thread_context->input_buffer_write_ptr + global_context->input_buffer_max_size - thread_context->input_buffer_remainder;
 
+					//if(buffer_read_ptr>= global_context->input_buffer_max_size)
+					//	if(buffer_read_ptr>6*1024*1024) printf("REALLY BIG PTR:%u = %u + %u - %u\n", buffer_read_ptr, thread_context->input_buffer_write_ptr , global_context->input_buffer_max_size, thread_context->input_buffer_remainder);
+
 					for(is_second_read = 0; is_second_read < (global_context->is_paired_end_data ? 2:1); is_second_read++)
 					{
 						char * curr_line_buff = is_second_read?thread_context -> line_buffer2:thread_context -> line_buffer1;
@@ -1310,9 +1312,11 @@ void * feature_count_worker(void * vargs)
 						
 						for(buffer_read_bytes=0; ; buffer_read_bytes++)
 						{
+							//printf("%p + %d\n", thread_context->input_buffer, buffer_read_ptr);
+							//if(buffer_read_ptr>6*1024*1024) printf("VERY BIG PTR:%u > %u\n", buffer_read_ptr , global_context->input_buffer_max_size);
 							char nch =  thread_context->input_buffer[buffer_read_ptr ++];
 							curr_line_buff[buffer_read_bytes] = nch;
-							if(buffer_read_ptr == global_context->input_buffer_max_size)
+							if(buffer_read_ptr >= global_context->input_buffer_max_size)
 								buffer_read_ptr = 0; 
 							if(nch=='\n' || buffer_read_bytes>2998){
 								curr_line_buff[buffer_read_bytes+1]=0;
@@ -1630,8 +1634,8 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 		sprintf(pct_str,"(%.1f%%%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
 	else	pct_str[0]=0;
 
-	print_in_box(80,0,0,"   Total number of reads is : %llu", total_input_reads); 
-	print_in_box(pct_str[0]?81:80,0,0,"   Number of successfully assigned reads is : %llu %s", *nreads_mapped_to_exon,pct_str); 
+	print_in_box(80,0,0,"   Total number of %s is : %llu", global_context -> is_paired_end_data?"fragments":"reads", total_input_reads); 
+	print_in_box(pct_str[0]?81:80,0,0,"   Number of successfully assigned %s is : %llu %s", global_context -> is_paired_end_data?"fragments":"reads", *nreads_mapped_to_exon,pct_str); 
 	print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
 	print_in_box(80,0,0,"");
 }
@@ -2665,6 +2669,13 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 					if(!ret) break;
 
 					int curr_line_len = strlen(preload_line+preload_line_ptr);
+					if(curr_line_len >= MAX_LINE_LENGTH || preload_line[preload_line_ptr + curr_line_len-1]!='\n')
+					{
+						print_in_box(80,0,0,"ERROR: the lines are too long. Please check the input format!!\n");
+						ret = NULL;
+						preload_line_ptr = 0;
+						break;
+					}
 					preload_line_ptr += curr_line_len;
 
 					fresh_read_no++;
@@ -2675,6 +2686,11 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			}
 
 			int line_length = preload_line_ptr;
+			if(line_length >= global_context->input_buffer_max_size-1)
+			{
+				SUBREADprintf("ERROR: the lines are too long. Please check the input format!!\n");
+				break;
+			}
 			if(isPE && (fresh_read_no%2>0))
 			{
 				// Safegarding -- it should not happen if the SAM file has a correct format.
@@ -2759,8 +2775,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 
 	if(sb_header_tab) free(sb_header_tab);
-	if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
-		unlink(global_context->input_file_name);
+	//if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
+	//	unlink(global_context->input_file_name);
 	free(line);
 	return 0;
 }

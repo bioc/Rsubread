@@ -514,68 +514,74 @@ int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_st
 	int current_str_pos = 0;
 	int i;
 	int ret = -1;
-	int linelen = read_line(3000, input->input_fp, in_buff, 0);
 	int in_sam_reverse = 0;
 	int mapping_flags = 0;
 	int mapping_quality = 0;
 	char chro[MAX_CHROMOSOME_NAME_LEN];
 	unsigned int chro_pos = 0;
 
-	if(linelen <1)return -1;
-	if(read_name)
-		*read_name = 0;
-	if(quality_string)
-		*quality_string = 0;
-	*read_string = 0;
 
-	for(i=0; i<linelen+1; i++)
+	while(1)
 	{
-		if(in_buff[i]=='\t'|| i ==linelen)
-		{
-			if(tabs == 0 && read_name)read_name[current_str_pos] = 0;
-			if(tabs == 2)
+			int linelen = read_line(3000, input->input_fp, in_buff, 0);
+			if(linelen <1)return -1;
+			if(read_name)
+				*read_name = 0;
+			if(quality_string)
+				*quality_string = 0;
+			*read_string = 0;
+			mapping_flags = 0;
+			mapping_quality = 0;
+			for(i=0; i<linelen+1; i++)
 			{
-				chro[current_str_pos] = 0;
+				if(in_buff[i]=='\t'|| i ==linelen)
+				{
+					if(tabs == 0 && read_name)read_name[current_str_pos] = 0;
+					if(tabs == 2)
+					{
+						chro[current_str_pos] = 0;
+					}
+					if(tabs == 1)
+					{
+						in_sam_reverse = (mapping_flags & 16 )?1:0;
+					}
+					if(tabs == 9){
+						read_string[current_str_pos] = 0;
+						ret = current_str_pos;
+					}
+					if(tabs == 10 && quality_string){
+						quality_string[current_str_pos] = 0;
+						break;
+					}
+
+					current_str_pos = 0;
+					tabs +=1;
+				}
+				else
+				{
+					if(tabs == 9)// read
+						read_string[current_str_pos++] = in_buff[i];
+					else if(tabs == 10 && quality_string)// quality string
+						quality_string[current_str_pos++] = in_buff[i];
+					else if(tabs == 0 && read_name)// name
+						read_name[current_str_pos++] = in_buff[i];
+					else if(tabs == 1)
+						mapping_flags = mapping_flags*10+(in_buff[i]-'0');
+					else if(tabs == 2)
+						chro[current_str_pos++] = in_buff[i];
+					else if(tabs == 3)
+						chro_pos = chro_pos*10+(in_buff[i]-'0');
+					else if(tabs == 4)
+						mapping_quality = mapping_quality*10+(in_buff[i]-'0');
+					else if(tabs == 5)
+						if(in_buff[i]=='S')	mapping_quality = 0;
+				}
 			}
-			if(tabs == 1)
-			{
-				in_sam_reverse = (mapping_flags & 16 )?1:0;
-				*flags=mapping_flags;
-			}
-			if(tabs == 9){
-				read_string[current_str_pos] = 0;
-				ret = current_str_pos;
-			}
-			if(tabs == 10 && quality_string){
-				quality_string[current_str_pos] = 0;
+			if(0==(mapping_flags & SAM_FLAG_SECONDARY_MAPPING))
 				break;
-			}
-
-			current_str_pos = 0;
-			tabs +=1;
-		}
-		else
-		{
-			if(tabs == 9)// read
-				read_string[current_str_pos++] = in_buff[i];
-			else if(tabs == 10 && quality_string)// quality string
-				quality_string[current_str_pos++] = in_buff[i];
-			else if(tabs == 0 && read_name)// name
-				read_name[current_str_pos++] = in_buff[i];
-			else if(tabs == 1)
-				mapping_flags = mapping_flags*10+(in_buff[i]-'0');
-			else if(tabs == 2)
-				chro[current_str_pos++] = in_buff[i];
-			else if(tabs == 3)
-				chro_pos = chro_pos*10+(in_buff[i]-'0');
-			else if(tabs == 4)
-				mapping_quality = mapping_quality*10+(in_buff[i]-'0');
-			else if(tabs == 5)
-				if(in_buff[i]=='S')	mapping_quality = 0;
-		}
 	}
-
 	*quality = mapping_quality;
+	*flags=mapping_flags;
 	if(offsets)
 		*pos= linear_gene_position(offsets , chro, chro_pos-1);
 		
@@ -645,62 +651,81 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 	{
 		char in_buff [3001];
 		int tabs = 0;
-		int current_str_pos = 0;
+		int current_str_pos;
 		int i;
 		int ret = -1;
-		int linelen = read_line(3000, input->input_fp, in_buff, 0);
-		int need_reverse = 0;
+		int need_reverse;
 		char mask_buf[5];
-		if(linelen <1)return -1;
-		if(read_name)
-			*read_name = 0;
-		if(quality_string)
-			*quality_string = 0;
-		*read_string = 0;
 
-		for(i=0; i<linelen+1; i++)
+
+
+		while(1)
 		{
-			if(in_buff[i]=='\t'|| i ==linelen)
-			{
-				if(tabs == 0 && read_name)read_name[current_str_pos] = 0;
-				if(tabs == 1)
-				{
-					mask_buf[current_str_pos] = 0;
-					need_reverse = (atoi(mask_buf) & 16 )?1:0;
-				}
-				if(tabs == 9){
-					read_string[current_str_pos] = 0;
-					ret = current_str_pos;
-				}
-				if(tabs == 10 && quality_string){
-					quality_string[current_str_pos] = 0;
-					break;
-				}
+				int is_second_map = 0;
+				int linelen = read_line(3000, input->input_fp, in_buff, 0);
+				if(linelen <1)return -1;
+				if(read_name)
+					*read_name = 0;
+				if(quality_string)
+					*quality_string = 0;
+				*read_string = 0;
+				need_reverse = 0;
+				current_str_pos = 0;
 
-				current_str_pos = 0 ;
-				tabs +=1;
-			}
-			else
-			{
-				if(tabs == 9)// read
-					read_string[current_str_pos++] = in_buff[i];
-				else if(tabs == 10 && quality_string)// quality string
-					quality_string[current_str_pos++] = in_buff[i];
-				else if(tabs == 0 && read_name)// name
-					read_name[current_str_pos++] = in_buff[i];
-				else if(tabs == 1)
-					mask_buf[current_str_pos++] = in_buff[i];
-			}
+				for(i=0; i<linelen+1; i++)
+				{
+					if(in_buff[i]=='\t'|| i ==linelen)
+					{
+						if(tabs == 0 && read_name)read_name[current_str_pos] = 0;
+						if(tabs == 1)
+						{
+							mask_buf[current_str_pos] = 0;
+							int flags = atoi(mask_buf) ;
+							if(flags & SAM_FLAG_SECONDARY_MAPPING) 
+							{
+								is_second_map = 1;
+								break;
+							}
+							need_reverse = ( flags & SAM_FLAG_REVERSE_STRAND_MATCHED )?1:0;
+							
+						}
+						if(tabs == 9){
+							read_string[current_str_pos] = 0;
+							ret = current_str_pos;
+						}
+						if(tabs == 10 && quality_string){
+							quality_string[current_str_pos] = 0;
+							break;
+						}
+
+						current_str_pos = 0 ;
+						tabs +=1;
+					}
+					else
+					{
+						if(tabs == 9)// read
+							read_string[current_str_pos++] = in_buff[i];
+						else if(tabs == 10 && quality_string)// quality string
+							quality_string[current_str_pos++] = in_buff[i];
+						else if(tabs == 0 && read_name)// name
+							read_name[current_str_pos++] = in_buff[i];
+						else if(tabs == 1)
+							mask_buf[current_str_pos++] = in_buff[i];
+					}
+				}
+				if(input->file_type > GENE_INPUT_SAM_SINGLE)
+					// skip a line if not single-end
+					read_line(1, input->input_fp, in_buff, 0);
+
+				if(!is_second_map)break;
 		}
+
 		if(need_reverse)
 		{
 			if(quality_string)
 				reverse_quality(quality_string, ret);
 			reverse_read(read_string, ret, input->space_type);
 		}
-		if(input->file_type > GENE_INPUT_SAM_SINGLE)
-			// skip a line if not single-end
-			read_line(1, input->input_fp, in_buff, 0);
 		if(trim_5 || trim_3) ret = trim_read_inner(read_string, quality_string, ret, trim_5, trim_3);
 		return ret;
 	}
@@ -1189,9 +1214,9 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 				limit_st.rlim_cur = min(limit_st.rlim_max, fp_table->numOfElements + 10);
 			else
 				limit_st.rlim_cur = max(limit_st.rlim_cur, fp_table->numOfElements + 10);
-			int rl = setrlimit(RLIMIT_NOFILE, & limit_st);
-			if(rl==-1)
-				SUBREADprintf("Cannot set limit: %ld!\n", limit_st.rlim_cur);
+			setrlimit(RLIMIT_NOFILE, & limit_st);
+			//if(rl==-1)
+			//	SUBREADprintf("Cannot set limit: %d!\n", limit_st.rlim_cur);
 			temp_file_pointer = fopen(key_name,"wb");
 		}
 
