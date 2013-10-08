@@ -132,6 +132,7 @@ typedef struct
 	int is_multi_mapping_allowed;
 	int is_input_file_resort_needed;
 	int is_SAM_file;
+	int is_read_details_out;
 
 	int min_mapping_quality_score;
 	int min_paired_end_distance;
@@ -253,7 +254,7 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	print_in_box(80,0,0,"            Output file : %s", out);
 	print_in_box(80,0,0,"            Annotations : %s (%s)", annot, is_GTF?"GTF":"SAF");
 	if(isReadSummaryReport)
-		print_in_box(80,0,0,"     Assignment details : %s.reads", out);
+		print_in_box(80,0,0,"     Assignment details : <input_file>.featureCounts");
 
 	if(global_context -> alias_file_name[0])
 		print_in_box(80,0,0,"  Chromosome alias file : %s", global_context -> alias_file_name);
@@ -1686,6 +1687,8 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> input_buffer_max_size = buffer_size;
 	global_context -> all_reads = 0;
 
+
+	global_context -> is_read_details_out = is_sam_out;
 	global_context -> is_multi_overlap_allowed = is_overlap_allowed;
 	global_context -> is_paired_end_data = is_PE_data;
 	global_context -> is_gene_level = is_gene_level;
@@ -1722,17 +1725,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> thread_number = threads;
 	global_context -> line_length = line_length;
 
-	if(is_sam_out)
-	{
-		char tmp_fname[350];
-		sprintf(tmp_fname, "%s.reads", global_context -> output_file_name);
-		global_context -> SAM_output_fp = fopen(tmp_fname, "w");
-	}
-	else
-		global_context -> SAM_output_fp = NULL;
-
-
-
 
 }
 int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, long * et_anno_chr_heads, long * et_bk_end_index, long * et_bk_min_start, long * et_bk_max_end, int read_length)
@@ -1740,6 +1732,16 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	int xk1;
 
 	global_context -> read_length = read_length;
+
+
+	if(global_context -> is_read_details_out)
+	{
+		char tmp_fname[350];
+		sprintf(tmp_fname, "%s.featureCounts", global_context -> input_file_name);
+		global_context -> SAM_output_fp = fopen(tmp_fname, "w");
+	}
+	else
+		global_context -> SAM_output_fp = NULL;
 
 	global_context -> exontable_geneid = et_geneid;
 	global_context -> exontable_chr = et_chr;
@@ -1789,6 +1791,12 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_context)
 {
 	int xk1;
+	if(global_context -> is_read_details_out)
+	{
+		fclose(global_context -> SAM_output_fp);
+		global_context -> SAM_output_fp = NULL;
+	}
+
 	for(xk1=0; xk1<global_context-> thread_number; xk1++)
 	{
 		//printf("CHRR_FREE\n");
@@ -2176,11 +2184,14 @@ void print_usage()
 	SUBREADputs("    "); 
 	SUBREADputs("    -T <int>  \tNumber of the threads. 1 by default."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -R        \tOutput read counting result for each read/fragment. The result");
-        SUBREADputs("              \tis saved to a tab-delimited file that contains four columns");
-        SUBREADputs("              \tincluding read name, status(assigned or the reason if not");
-        SUBREADputs("              \tassigned), name of target feature/meta-feature and number of");
-        SUBREADputs("              \thits if the read/fragment is counted multiple times."); 
+	SUBREADputs("    -R        \tOutput read counting result for each read/fragment. For each");
+	SUBREADputs("              \tinput read file, read counting results for reads/fragments will");
+	SUBREADputs("              \tbe saved to a tab-delimited file that contains four columns");
+	SUBREADputs("              \tincluding read name, status(assigned or the reason if not");
+	SUBREADputs("              \tassigned), name of target feature/meta-feature and number of");
+	SUBREADputs("              \thits if the read/fragment is counted multiple times. Name of");
+	SUBREADputs("              \tthe file is the same as name of the input read file except a");
+	SUBREADputs("              \tsuffix `.featureCounts' is added.");
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional paired-end parameters:"); 
 	SUBREADputs("    "); 
