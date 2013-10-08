@@ -2113,7 +2113,6 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		char read_name[MAX_READ_NAME_LEN];
 		int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
 
-		sort_SAM_check_chunk(writer);
 
 		while(line_cursor < line_len)
 		{
@@ -2136,6 +2135,9 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 				flags = flags*10+(nch-'0');
 		}
 
+		if(flags & SAM_FLAG_SECONDARY_MAPPING) return 0;
+
+		sort_SAM_check_chunk(writer);
 		//int is_second_read = (flags & 0x80) ? 1:0;
 		for(field_cursor = 0; read_name[field_cursor] ; field_cursor++)
 			if(read_name[field_cursor] == '/') read_name[field_cursor] = 0;
