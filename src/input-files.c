@@ -510,7 +510,7 @@ unsigned int read_numbers(gene_input_t * input)
 int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_string, char * quality_string, gene_offset_t* offsets, unsigned int *pos, int * quality, int * flags, int need_reversed)
 {
 	char in_buff [3001];
-	int tabs = 0;
+	int tabs ;
 	int current_str_pos = 0;
 	int i;
 	int ret = -1;
@@ -531,6 +531,7 @@ int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_st
 				*quality_string = 0;
 			*read_string = 0;
 			mapping_flags = 0;
+			tabs=0;
 			mapping_quality = 0;
 			for(i=0; i<linelen+1; i++)
 			{
@@ -650,7 +651,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 	else if(input->file_type >= GENE_INPUT_SAM_SINGLE)
 	{
 		char in_buff [3001];
-		int tabs = 0;
+		int tabs;
 		int current_str_pos;
 		int i;
 		int ret = -1;
@@ -671,6 +672,8 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 				*read_string = 0;
 				need_reverse = 0;
 				current_str_pos = 0;
+				ret = -1;
+				tabs=0;
 
 				for(i=0; i<linelen+1; i++)
 				{
@@ -718,6 +721,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 					read_line(1, input->input_fp, in_buff, 0);
 
 				if(!is_second_map)break;
+				//printf("Repeated read skipped : %s\n", read_name);
 		}
 
 		if(need_reverse)

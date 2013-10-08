@@ -2775,8 +2775,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 
 	if(sb_header_tab) free(sb_header_tab);
-	//if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
-	//	unlink(global_context->input_file_name);
+	if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
+		unlink(global_context->input_file_name);
 	free(line);
 	return 0;
 }
