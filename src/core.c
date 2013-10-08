@@ -614,7 +614,13 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 			if(!is_ret) break;
 			if(is_file_sorted)
 				fputs(fline, sam_fp);
-			else	sort_SAM_add_line(&writer, fline, strlen(fline));
+			else{
+				int ret = sort_SAM_add_line(&writer, fline, strlen(fline));
+				if(ret<0) {
+					print_in_box(80,0,0,"ERROR: read name is too long; check input format.");
+					break;
+				}
+			}
 		}
 
 		if(is_file_sorted) 

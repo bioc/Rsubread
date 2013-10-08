@@ -2127,7 +2127,9 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 			else if(tabs == 0)
 			{
 				read_name[field_cursor++] = nch;
-				assert(MAX_READ_NAME_LEN>field_cursor);
+				if(MAX_READ_NAME_LEN<=field_cursor){
+					return -1;
+				}
 				read_name[field_cursor] = 0;
 			}
 			else if(tabs == 1)

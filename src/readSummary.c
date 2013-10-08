@@ -1831,7 +1831,12 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	{
 		char * is_ret = SamBam_fgets(sambam_reader, fline, 2999, 1);
 		if(!is_ret) break;
-		sort_SAM_add_line(&writer, fline, strlen(fline));
+		int ret = sort_SAM_add_line(&writer, fline, strlen(fline));
+		if(ret<0) 
+		{
+			print_in_box(80,0,0,"ERROR: read name is too long; check the input format.");
+			break;
+		}
 	//printf("N1=%llu\n",  writer.unpaired_reads);
 	}
 
