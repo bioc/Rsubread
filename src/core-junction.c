@@ -894,6 +894,10 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 					int r1_used_subreads = max(vote_1 -> all_used_subreads, alignment_1_best->used_subreads_in_vote );
 					int r2_used_subreads = max(vote_2 -> all_used_subreads, alignment_2_best->used_subreads_in_vote );
 
+
+				//if(strcmp("S:chr6:6564539:82M5039N18M:J1", read_name_1) == 0)
+				//	printf("BEST_POS_PE=%u at %d ; RES=%u\n", read_1_anchors[i].piece_main_abs_offset,  read_1_anchors[i].piece_main_votes , pair_number);
+
 					set_alignment_result(global_context, pair_number, 0, best_read_id_r1, read_1_anchors[i].piece_main_abs_offset, read_1_anchors[i].piece_main_votes , read_1_anchors[i].piece_main_indel_record, read_1_anchors[i].piece_main_coverage_start, read_1_anchors[i].piece_main_coverage_end, 0!=(read_1_anchors[i].piece_main_masks & IS_NEGATIVE_STRAND), read_1_anchors[i].piece_minor_abs_offset, read_1_anchors[i].piece_minor_votes, read_1_anchors[i].piece_minor_coverage_start, read_1_anchors[i].piece_minor_coverage_end, read_1_anchors[i].split_point, read_1_anchors[i].inserted_bases, read_1_anchors[i].is_strand_jumped, read_1_anchors[i].is_donor_found?read_1_anchors[i].is_GT_AG_donors:-1, r1_used_subreads, vote_1-> noninformative_subreads, read_1_anchors[i].piece_main_indels, read_1_anchors[i].piece_minor_indel_offset);
 					set_alignment_result(global_context, pair_number, 1, best_read_id_r2, read_2_anchors[j].piece_main_abs_offset, read_2_anchors[j].piece_main_votes , read_2_anchors[j].piece_main_indel_record, read_2_anchors[j].piece_main_coverage_start, read_2_anchors[j].piece_main_coverage_end, 0!=(read_2_anchors[j].piece_main_masks & IS_NEGATIVE_STRAND), read_2_anchors[j].piece_minor_abs_offset, read_2_anchors[j].piece_minor_votes, read_2_anchors[j].piece_minor_coverage_start, read_2_anchors[j].piece_minor_coverage_end, read_2_anchors[j].split_point, read_2_anchors[j].inserted_bases, read_2_anchors[j].is_strand_jumped, read_2_anchors[j].is_donor_found?read_2_anchors[j].is_GT_AG_donors:-1, r2_used_subreads, vote_2-> noninformative_subreads, read_2_anchors[j].piece_main_indels, read_2_anchors[j].piece_minor_indel_offset);
 
@@ -945,8 +949,8 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 
 				alignment_1_best -> Score_H = read_1_anchors[i].Score_H;
 				alignment_1_best -> Score_L = read_1_anchors[i].Score_L;
-
-				//printf("BEST_ID_R1=%d\n",best_read_id_r1);
+				//if(strcmp("S:chr6:6564539:82M5039N18M:J1", read_name_1) == 0)
+				//	printf("BEST_POS1=%u at %d ; RES=%u\n", read_1_anchors[i].piece_main_abs_offset,  read_1_anchors[i].piece_main_votes , pair_number);
 
 				// TODO: add result at best_read_id_r1
 				alignment_result_t * r1_result = _global_retrieve_alignment_ptr(global_context, pair_number, 0, best_read_id_r1);
@@ -1045,6 +1049,8 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.is_second_read = is_second_read ;
 	explain_context.best_read_id = best_read_id;
 
+	//if(strcmp(explain_context.read_name, "S:chr6:6564539:82M5039N18M:J1")==0)
+	//	printf("ORIPOS=%u VOTE=%d ;; PAIR#=%u\n", current_result -> selected_position, current_result->selected_votes, pair_number);
 
 	unsigned int back_search_tail_position, front_search_start_position;
 	unsigned short back_search_read_tail, front_search_read_start;
@@ -1429,7 +1435,8 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 	int final_qual = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases);
 
 	//if(memcmp(explain_context->read_name, "V0112_0155:7:1101:18796:1998",28) == 0)
-	//printf("POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", final_position , tmp_cigar, mismatch_bases, final_qual);
+	//if(strcmp(explain_context->read_name, "S:chr6:6564539:82M5039N18M:J1")==0)
+	//	printf("POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", final_position , tmp_cigar, mismatch_bases, final_qual);
 
 	int applied_mismatch = is_junction_read? global_context->config.max_mismatch_junction_reads:global_context->config.max_mismatch_exonic_reads ;
 	if(explain_context->full_read_len > EXON_LONG_READ_LENGTH)

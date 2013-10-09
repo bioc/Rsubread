@@ -34,6 +34,8 @@ void remove_ESC_effects(char * txt)
 	int state = 0;
 	int trimmed = 0;
 
+//	return 0;
+
 	for(x1=0;x1<1199;x1++)
 	{
 		if(!txt[x1])break;
@@ -104,6 +106,7 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 {
 	va_list args;
 	va_start(args , pattern);
+
 	if(level<MINIMUM_LOG_LEVEL) return;
 
 	#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
@@ -133,8 +136,8 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 
 		vsnprintf(vsbuf, 1199, pattern , args);
 		remove_ESC_effects(vsbuf);
-
-		Rprintf("%s",vsbuf);
+		if(strlen(vsbuf)>0)
+			Rprintf("%s",vsbuf);
 
 		free(vsbuf);
 

@@ -948,9 +948,8 @@ int main_buildindex(int argc,char ** argv)
 		switch(c)
 		{
 			case 'v':
-				print_version_info();
+				core_version_number("Subread-buildindex");
 				return 0;
-				break;
 			case 'q':
 				QUICK_BUILD = 1;
 				break;
@@ -997,7 +996,7 @@ int main_buildindex(int argc,char ** argv)
 		SUBREADputs("");
 		SUBREADputs("    -c              build a color-space index");
 		SUBREADputs("");
-		SUBREADputs("    -v              display the version number.");
+		SUBREADputs("    -v              output version of the program.");
 		SUBREADputs("");
 		SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
 		return -1 ;

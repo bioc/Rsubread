@@ -86,41 +86,37 @@ void print_usage_core_subjunc()
 	SUBREADputs("                            together with option '-H' or '-Q'.");
 	SUBREADputs("");
 	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
-	SUBREADputs("                            than one best mapping locations are found.");
+	SUBREADputs("                            than one best mapping location is found.");
 	SUBREADputs("                                 ");
 	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
-	SUBREADputs("                            one best mapping locations are found.");
+	SUBREADputs("                            one best mapping location is found.");
 	SUBREADputs("                                 ");
-	SUBREADputs("    -J --junction           mark those bases which can not be aligned together");
-	SUBREADputs("                            with other base from the same read using the `S' ");
-	SUBREADputs("                            operation in the CIGAR string (soft-clipping). This");
-	SUBREADputs("                            option is useful for marking exon-spanning reads and");
-	SUBREADputs("                            fusion reads.");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("   ");
-	SUBREADputs("    -v                      displaying the version number.");
-	SUBREADputs("                                 ");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
 	SUBREADputs("                                 ");
 	SUBREADputs("       --trim3     <int>    trim off <int> number of bases from 3' end of each");
 	SUBREADputs("                            read. 0 by default.");
 	SUBREADputs("                                 ");
-	SUBREADputs("       --rg-id     <string> specify the read group ID. It will be added to the");
-	SUBREADputs("                            read group header field and also be added to each");
-	SUBREADputs("                            read. ");
+	SUBREADputs("       --rg-id     <string> specify the read group ID. If specified,the read");
+	SUBREADputs("                            group ID will be added to the read group header");
+	SUBREADputs("                            field and also to each read in the mapping output.");
 	SUBREADputs("                                 ");
-	SUBREADputs("       --rg        <string> add a <tag:value> to  the read group (RG) header. ");
+	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
+	SUBREADputs("                            in the mapping output.");
 	SUBREADputs("                                 ");
-	SUBREADputs("       --SAMinput           the input read data are in SAM format.");
+	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
 	SUBREADputs("                                 ");
-	SUBREADputs("       --BAMinput           the input read data are in BAM format.");
+	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
 	SUBREADputs("                                 ");
-	SUBREADputs("       --BAMoutput          mapping results will be saved into a BAM format file");
-	SUBREADputs("                            instead of a SAM format file.");
+	SUBREADputs("       --BAMoutput          specify that mapping results are saved into a BAM");
+	SUBREADputs("                            format file.");
 	SUBREADputs("");
+	SUBREADputs("    -v                      output version of the program.");
+	SUBREADputs("                                 ");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
@@ -177,12 +173,13 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 		print_usage_core_subjunc();
 		return -1;
 	}
-	while ((c = getopt_long (argc, argv, "ExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:Q:I:t:B:bQ:FcuUfM3:5:9:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:Q:I:t:B:bQ:FcuUfM3:5:9:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
-
-
+			case 'v':
+				core_version_number("Subjunc");
+				return -1;
 			case '3':
 				global_context->config.read_trim_3 = atoi(optarg); 
 				break;

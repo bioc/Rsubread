@@ -100,8 +100,11 @@ typedef struct
 
 	char * parent_sequences;
 	char * chro_name_buff;
+	z_stream * strm_buffer;
 	unsigned int * parent_chunks;
 	unsigned int parents;
+
+	SamBam_Alignment aln_buffer;
 } fc_thread_thread_context_t;
 
 #define REVERSE_TABLE_BUCKET_LENGTH 131072
@@ -133,6 +136,9 @@ typedef struct
 	int is_input_file_resort_needed;
 	int is_SAM_file;
 	int is_read_details_out;
+	int is_unpaired_warning_shown;
+	int is_stake_warning_shown;
+	int isCVersion;
 
 	int min_mapping_quality_score;
 	int min_paired_end_distance;
@@ -838,7 +844,7 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
 
-	char * read_chr, *tmp_tok_ptr, *CIGAR_str , *read_name = NULL;
+	char * read_chr, *tmp_tok_ptr, *CIGAR_str , *read_name = NULL, *read_name1 = NULL;
 	long read_pos, fragment_length = 0;
 	unsigned int search_start = 0, search_end;
 	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
@@ -859,6 +865,43 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		//printf("LINE_BUF=%s\n",line);
 
 		read_name = strtok_r(line,"\t", &tmp_tok_ptr);	// read name
+		if(!read_name)return;
+
+		if(is_second_read)
+		{
+			if(read_name)
+			{
+				int x1;
+				for(x1=0; read_name[x1]; x1++)
+				{
+					if(read_name[x1]=='/')
+					{
+						read_name[x1]=0;
+						read_name1[x1]=0;
+						break;
+					}
+				}
+				//printf("R1=%s; R2=%s\n",read_name,read_name1 );
+				if(strcmp(read_name,read_name1)!=0)
+				{
+					//printf("WARN:%d [%d]\n", global_context->is_unpaired_warning_shown, thread_context -> thread_id);
+					if(!global_context->is_unpaired_warning_shown)
+					{
+						global_context->is_unpaired_warning_shown=1;
+						print_in_box(80,0,0,"");
+						print_in_box(85,0,1,"%c[31m============= WARNING ============", CHAR_ESC);
+						print_in_box(80,0,0,"Reads from the same pair are not adjacent to each other in the input!");
+						print_in_box(80,0,0,"This can make the program very slow and result in wrong counts.");
+						print_in_box(80,0,0,"You may need to specify the %s option.", global_context->isCVersion?"-S":"PEReadsReordering");
+						print_in_box(80,0,1,"==================================");
+						print_in_box(80,0,0,"");
+					}
+				}
+			}
+		}
+		else
+				read_name1 = read_name;
+
 		char * mask_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
 		if((!mask_str) || !isdigit(mask_str[0])) return;
 
@@ -880,6 +923,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 
 		read_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);
+		if(!read_chr) return;
 		char * read_pos_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
 		if(!read_pos_str) return;
 
@@ -1283,6 +1327,11 @@ void * feature_count_worker(void * vargs)
 
 	free(vargs);
 
+
+	//printf("QQQ0:T%d\n", thread_context->thread_id);
+	//Rprintf("QQQ1:T%d\n", thread_context->thread_id);
+	//printf("QQQ2:T%d\n", thread_context->thread_id);
+
 	if(global_context -> is_SAM_file)
 	{
 		while (1)
@@ -1355,7 +1404,7 @@ void * feature_count_worker(void * vargs)
 	{	// if is BAM: decompress the chunk and process reads.
 		char * chunk_in_buffer = malloc(65540);
 		char * PDATA = malloc(70000);
-		z_stream strm;
+		z_stream * strm = thread_context -> strm_buffer;
 
 		while(1)
 		{
@@ -1453,46 +1502,45 @@ void * feature_count_worker(void * vargs)
 			}
 
 
-			strm.zalloc = Z_NULL;
-			strm.zfree = Z_NULL;
-			strm.opaque = Z_NULL;
-			strm.avail_in = 0;
-			strm.next_in = Z_NULL;
-			int ret = inflateInit2(&strm,-15);
+			strm->zalloc = Z_NULL;
+			strm->zfree = Z_NULL;
+			strm->opaque = Z_NULL;
+			strm->avail_in = 0;
+			strm->next_in = Z_NULL;
+			int ret = inflateInit2(strm,-15);
 			if (ret != Z_OK)
 			{
 				SUBREADprintf("Unable to decompress the GZ stream!\n");
 				return NULL;
 			}
-			strm.avail_in = (unsigned int)cdata_size;
-			strm.next_in = (unsigned char *)chunk_in_buffer;
+			strm->avail_in = (unsigned int)cdata_size;
+			strm->next_in = (unsigned char *)chunk_in_buffer;
 
 
-			strm.avail_out = 70000;
-			strm.next_out = (unsigned char *)PDATA;
-			ret = inflate(&strm, Z_FINISH);
+			strm->avail_out = 70000;
+			strm->next_out = (unsigned char *)PDATA;
+			ret = inflate(strm, Z_FINISH);
 			if(ret != Z_STREAM_END )
 			{
 				SUBREADprintf("Unable to decompress the BAM file! Please check the format of the BAM file!\nCODE=%d ; CSIZE=%d\n", ret, cdata_size);
 				return NULL;
 			}
 
-			int PDATA_len = 70000 - strm.avail_out, PDATA_ptr=0;
+			int PDATA_len = 70000 - strm->avail_out, PDATA_ptr=0;
 			if(PDATA_len > 66000)
 			{
 				SUBREADprintf("The BAM chunk is longer than the limit!\n");
 				return NULL;
 			}
-			inflateEnd(&strm);
+			inflateEnd(strm);
 
 			int qid=0;
 			if(PDATA_len>1)
 			{
 				while(1)
 				{
-					SamBam_Alignment  aln;
-
-					thread_context->current_read_length1 = PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer1 , 2999, &aln, 0);
+					SamBam_Alignment * aln = &thread_context->aln_buffer;
+					thread_context->current_read_length1 = PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer1 , 2999, aln, 0);
 					if(qid==0 && global_context->is_paired_end_data)
 					{
 						int xk1 = 0, tabs=0, x_flag = 0;
@@ -1512,6 +1560,7 @@ void * feature_count_worker(void * vargs)
 						}
 						if( ( atoi(str_flag) & SAM_FLAG_FIRST_READ_IN_PAIR) == 0)// not the first read
 						{
+							//printf("QQQ0 [%d]: UNPAIR ORPHAN!!\n", thread_context -> thread_id);
 							char * saved_line = malloc(thread_context->current_read_length1+1);
 							unsigned int parent_chunk = ((chunk_id-1) & 0x7fffffff) + 1;
 							term_strncpy(saved_line ,  thread_context -> line_buffer1 , thread_context->current_read_length1+1);
@@ -1519,7 +1568,7 @@ void * feature_count_worker(void * vargs)
 							HashTablePut(global_context -> orphan_table, NULL+parent_chunk , saved_line);
 							pthread_spin_unlock(&global_context -> orphan_table_lock);
 							if(PDATA_ptr >= PDATA_len) break;
-							PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer1 , global_context->line_length-1, &aln, 0);
+							PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer1 , global_context->line_length-1, aln, 0);
 						}
 					}
 
@@ -1532,6 +1581,7 @@ void * feature_count_worker(void * vargs)
 							{
 								if( *(thread_context -> parent_sequences + ppi * global_context->line_length )==0)
 								{
+									//printf("QQQ0 [%d]: UNPAIR PARENT!!\n", thread_context -> thread_id);
 									term_strncpy(thread_context -> parent_sequences + ppi * global_context->line_length, thread_context -> line_buffer1 , global_context->line_length-1);
 									*(thread_context -> parent_sequences + ppi * global_context->line_length + global_context->line_length-1) = 0;
 									thread_context -> parent_chunks[ppi] = (unsigned int )(chunk_id & 0x7fffffff);
@@ -1543,8 +1593,9 @@ void * feature_count_worker(void * vargs)
 						}
 
 
-						thread_context->current_read_length2 = PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer2 , 2999, &aln, 0);
+						thread_context->current_read_length2 = PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer2 , 2999, aln, 0);
 						qid++;
+						//printf("%s\n%s\n", thread_context -> line_buffer1,thread_context -> line_buffer2);
 						process_line_buffer(global_context, thread_context);
 						if(PDATA_ptr >= PDATA_len) break;
 					}
@@ -1560,7 +1611,7 @@ void * feature_count_worker(void * vargs)
 				}
 			}
 
-			unsigned int final_try_start =time(NULL);
+			double final_try_start = miltime();
 
 			while(thread_context -> parents >= global_context -> max_parent_number - 1)
 			{
@@ -1594,11 +1645,14 @@ void * feature_count_worker(void * vargs)
 			//		printf("Unremoved at all : T%d\n", thread_context -> thread_id);
 					usleep(tick_time*(2+getpid()%5));
 				}
-				if(time(NULL) - final_try_start>1)
+				if( miltime() - final_try_start>1)
 				{
-					print_in_box(80,0,0,"WARNING : the input reads seemed not sorted by names.");
-					print_in_box(80,0,0,"You can use the '-S' option to resort them.");
-					print_in_box(80,0,0,"Or, you can run featureCounts on the single-end mode.");
+					if(global_context -> is_stake_warning_shown == 0)
+					{
+						global_context -> is_stake_warning_shown =1;
+						print_in_box(80,0,0,"Items in the stack: %d.", thread_context -> parents);
+						print_in_box(80,0,0,"The running time will be substantially increased.");
+					}
 					break;
 				}
 			}
@@ -1681,13 +1735,14 @@ HashTable * load_alias_table(char * fname)
 	return ret;
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion)
 {
 
 	global_context -> input_buffer_max_size = buffer_size;
 	global_context -> all_reads = 0;
 
 
+	global_context -> isCVersion = isCVersion;
 	global_context -> is_read_details_out = is_sam_out;
 	global_context -> is_multi_overlap_allowed = is_overlap_allowed;
 	global_context -> is_paired_end_data = is_PE_data;
@@ -1698,7 +1753,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
 	global_context -> is_multi_mapping_allowed = is_multi_mapping_allowed;
 	global_context -> is_SAM_file = is_SAM;
-	global_context -> max_parent_number = 30 * threads;
+	global_context -> max_parent_number = 10 * threads;
 	global_context -> thread_number = threads;
 	global_context -> min_mapping_quality_score = min_map_qual_score;
 	global_context -> unistr_buffer_size = 1024*1024*2;
@@ -1708,6 +1763,8 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> cmd_rebuilt = cmd_rebuilt;
 	global_context -> is_input_file_resort_needed = is_input_file_resort_needed;
 	global_context -> feature_block_size = feature_block_size;
+	global_context -> is_unpaired_warning_shown = 0;
+	global_context -> is_stake_warning_shown = 0;
 
 	if(alias_file_name && alias_file_name[0])
 	{
@@ -1776,6 +1833,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].line_buffer1 = malloc(global_context -> line_length + 2);
 		global_context -> thread_contexts[xk1].line_buffer2 = malloc(global_context -> line_length + 2);
 		global_context -> thread_contexts[xk1].chro_name_buff = malloc(CHROMOSOME_NAME_LENGTH);
+		global_context -> thread_contexts[xk1].strm_buffer = malloc(sizeof(z_stream));
+
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 		void ** thread_args = malloc(sizeof(void *)*2);
 		thread_args[0] = global_context;
@@ -1807,6 +1866,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		free(global_context -> thread_contexts[xk1].parent_sequences);
 		free(global_context -> thread_contexts[xk1].parent_chunks);
 		free(global_context -> thread_contexts[xk1].chro_name_buff);
+		free(global_context -> thread_contexts[xk1].strm_buffer);
 		pthread_spin_destroy(&global_context -> thread_contexts[xk1].input_buffer_lock);
 	}
 	free(global_context -> thread_contexts);
@@ -2179,8 +2239,8 @@ void print_usage()
 	SUBREADputs("              \tfind multi-mapping reads.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must satisfy in order");
-        SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
-        SUBREADputs("              \tsatisfy this criteria. 0 by default."); 
+    SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
+    SUBREADputs("              \tsatisfy this criteria. 0 by default."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -T <int>  \tNumber of the threads. 1 by default."); 
 	SUBREADputs("    "); 
@@ -2196,15 +2256,15 @@ void print_usage()
 	SUBREADputs("    Optional paired-end parameters:"); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -p        \tIf specified, fragments (or templates) will be counted instead");
-        SUBREADputs("              \tof reads. This option is only applicable for paired-end reads.");
-        SUBREADputs("              \tThe two reads from the same fragment must be adjacent to each");
-        SUBREADputs("              \tother in the provided SAM/BAM file. If SAM/BAM input does not");
-        SUBREADputs("              \tmeet this requirement, the -S option should be provided as well."); 
+	SUBREADputs("              \tof reads. This option is only applicable for paired-end reads.");
+	SUBREADputs("              \tThe two reads from the same fragment must be adjacent to each");
+	SUBREADputs("              \tother in the provided SAM/BAM file. If SAM/BAM input does not");
+	SUBREADputs("              \tmeet this requirement, the -S option should be provided as well."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -P        \tIf specified, paired-end distance will be checked when assigning");
-        SUBREADputs("              \tfragments to meta-features or features. This option is only");
-        SUBREADputs("              \tapplicable when -p is specified. The distance thresholds should");
-        SUBREADputs("              \tbe specified using -d and -D options."); 
+	SUBREADputs("              \tfragments to meta-features or features. This option is only");
+	SUBREADputs("              \tapplicable when -p is specified. The distance thresholds should");
+	SUBREADputs("              \tbe specified using -d and -D options."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -d <int>  \tMinimum fragment/template length, 50 by default."); 
 	SUBREADputs("    "); 
@@ -2220,11 +2280,14 @@ void print_usage()
 	SUBREADputs("              \tapplicable for paired-end read data."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -S        \tIf specified, the program will reorder input reads according to");
-        SUBREADputs("              \ttheir names and make reads from the same pair be adjacent to");
-        SUBREADputs("              \teach other. This option should be provided when reads from the");
-        SUBREADputs("              \tsame pair are not adjacent to each other in input SAM/BAM files");
-        SUBREADputs("              \t(for instance sorting reads by chromosomal locations could");
-        SUBREADputs("              \tdecouple reads from the same pair)."); 
+	SUBREADputs("              \ttheir names and make reads from the same pair be adjacent to");
+	SUBREADputs("              \teach other. This option should be provided when reads from the");
+	SUBREADputs("              \tsame pair are not adjacent to each other in input SAM/BAM files");
+	SUBREADputs("              \t(for instance sorting reads by chromosomal locations could");
+	SUBREADputs("              \tdecouple reads from the same pair)."); 
+	SUBREADputs("    "); 
+	SUBREADputs("    -v        \toutput version of the program.");
+	SUBREADputs("    "); 
 
 
 }
@@ -2359,7 +2422,7 @@ int readSummary(int argc,char *argv[]){
 	unsigned int buffer_size = 1024*1024*6;
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion);
 	print_FC_configuration(&global_context, argv[1], argv[2], argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport);
 
 
@@ -2509,7 +2572,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	int isInputFileResortNeeded = global_context->is_input_file_resort_needed;
 
 	if(strcmp(global_context->input_file_name,"STDIN")!=0)
-		warning_file_type(global_context->input_file_name, global_context->is_SAM_file?FILE_TYPE_SAM:FILE_TYPE_BAM);
+		if(warning_file_type(global_context->input_file_name, global_context->is_SAM_file?FILE_TYPE_SAM:FILE_TYPE_BAM))
+			global_context->is_unpaired_warning_shown=1;
 	if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
 		if(resort_input_file( global_context)) return -1;
 	int isSAM = global_context->is_SAM_file;
@@ -2865,7 +2929,7 @@ int feature_count_main(int argc, char ** argv)
 				is_Multi_Mapping_Allowed = 1;
 				break;
 			case 'v':
-				print_version_info();
+				core_version_number("featureCounts");
 				return 0;
 			case 'Q':
 				min_qual_score = atoi(optarg);

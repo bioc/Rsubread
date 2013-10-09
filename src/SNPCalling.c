@@ -1383,6 +1383,8 @@ void print_usage_snp(char * myname)
 	SUBREADputs("");
 	SUBREADputs("  -T <int>   Specify the number of threads. 1 by default.");
 	SUBREADputs("");
+	SUBREADputs("  -v         output version of the program.");
+	SUBREADputs("");
 	SUBREADputs("Example:");
 	SUBREADputs("");
 	SUBREADputs("  ./exactSNP -i my-alignment.sam -g mm10.fa -o my-SNPs.txt");
@@ -1457,10 +1459,13 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_usage_snp(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "i:g:o:bQ:p:f:n:r:x:w:s:t:T:")) != -1)
+	while ((c = getopt (argc, argv, "i:g:o:bQ:p:f:n:r:x:w:s:t:T:v")) != -1)
 	{
 		switch (c)
 		{
+			case 'v':
+				core_version_number("exactSNP");
+				return 0;
 			case 'b':
 				parameters.is_BAM_file_input = 1;
 				break;

@@ -362,4 +362,6 @@ void char_strftime(char * tbuf);
 int term_strncpy(char * dst, char * src, int max_dst_memory);
 
 int is_result_in_PE(alignment_result_t * aln);
+
+void core_version_number(char * program);
 #endif

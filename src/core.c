@@ -53,19 +53,30 @@ int is_result_in_PE(alignment_result_t *al)
 	return 0;
 }
 
+void core_version_number(char * program)
+{
+	SUBREADprintf("\n%s v%s\n\n" , program, SUBREAD_VERSION);
+}
+
 void print_in_box(int line_width, int is_boundary, int is_center, char * pattern,...)
 {
 	va_list args;
 	va_start(args , pattern);
-	char is_R=0, * content = malloc(200);
+	char is_R_linebreak=0, * content;
 
+	content= malloc(1000);
 	vsprintf(content, pattern, args);
-	int x1,content_len = strlen(content), state, txt_len, is_cut = 0, real_lenwidth;
+	int is_R_code,x1,content_len = strlen(content), state, txt_len, is_cut = 0, real_lenwidth;
+
+	is_R_code = 1;
+	#ifdef MAKE_STANDALONE
+		is_R_code = 0;
+	#endif
 
 	if(content_len>0&&content[content_len-1]=='\r'){
 		content_len--;
 		content[content_len] = 0;
-		is_R = 1;
+		is_R_linebreak = 1;
 	}
 
 	if(content_len>0&&content[content_len-1]=='\n'){
@@ -155,33 +166,57 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 
 	right_spaces = line_width - 4 - content_len- left_spaces; 
 
-	sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"||");
-	for(x1=0;x1<left_spaces;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
+	char spaces[81];
+	memset(spaces , ' ', 80);
+	spaces[0]='|';
+	spaces[1]='|';
+	spaces[80]=0;
 
-	int col1w=-1;
-	for(x1=0; content[x1]; x1++)
+	//sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"||");
+	
+	//for(x1=0;x1<left_spaces;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
+
+	spaces[left_spaces+2] = 0;
+	sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,spaces);
+
+	if(is_R_code)
 	{
-		if(content[x1]==':')
-		{
-			col1w=x1;
-			break;
-		}
-	}
-	if(col1w>0 && col1w < content_len-1)
-	{
-		content[col1w+1]=0;
 		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[36m", CHAR_ESC);
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content+col1w+2);
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[0m", CHAR_ESC);
 	}
-	else	sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
-	for(x1=0;x1<right_spaces - 1;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
-	if(is_R)
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %c[0m||%c", CHAR_ESC,CORE_SOFT_BR_CHAR);
 	else
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %c[0m||", CHAR_ESC);
+	{
+		int col1w=-1;
+		for(x1=0; content[x1]; x1++)
+		{
+			if(content[x1]==':')
+			{
+				col1w=x1;
+				break;
+			}
+		}
+		if(col1w>0 && col1w < content_len-1)
+		{
+			content[col1w+1]=0;
+			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
+			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
+			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[36m", CHAR_ESC);
+			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content+col1w+2);
+			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[0m", CHAR_ESC);
+		}
+		else
+			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
+	}
+//	for(x1=0;x1<right_spaces - 1;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
+	
+	memset(spaces , ' ', 80);
+	spaces[79]='|';
+	spaces[78]='|';
+	
+	right_spaces = max(1,right_spaces);
+	if(is_R_linebreak)
+		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %c[0m%s%c", CHAR_ESC, spaces + (78 - right_spaces + 1) ,CORE_SOFT_BR_CHAR);
+	else
+		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %c[0m%s", CHAR_ESC , spaces + (78 - right_spaces + 1));
 	free(content);
 }
 
@@ -960,29 +995,32 @@ int write_chunk_results(global_context_t * global_context)
 				else
 				{
 					mask |= SAM_FLAG_UNMAPPED;
+					int this_should_nagetive = is_second_read;
 
 					if(global_context -> input_reads.is_paired_end_reads && global_context -> config.report_unmapped_using_mate_pos&& is_mate_ok)
 					{
 						current_chro_name = mate_chro_name;
 						current_chro_offset = mate_chro_offset;
-						int this_should_nagetive = (mate_result->result_flags & CORE_IS_NEGATIVE_STRAND)?0:1;
+						this_should_nagetive = (mate_result->result_flags & CORE_IS_NEGATIVE_STRAND)?0:1;
 						if(this_should_nagetive + is_second_read ==1)
 							mask |= SAM_FLAG_REVERSE_STRAND_MATCHED;
 						else
 							mask &= ~SAM_FLAG_REVERSE_STRAND_MATCHED;
-
-						if(this_should_nagetive + (*current_has_reversed) == 1)
-						{
-							reverse_read(current_read_text, current_read_len, global_context -> config.space_type);
-							reverse_quality(current_qual_text , current_read_len);
-							(*current_has_reversed)=!(*current_has_reversed);
-						}
 					}
 					else
 					{
 						current_chro_name = "*";
 						current_chro_offset = 0;
 					}
+
+
+					if(this_should_nagetive + (*current_has_reversed) == 1)
+					{
+						reverse_read(current_read_text, current_read_len, global_context -> config.space_type);
+						reverse_quality(current_qual_text , current_read_len);
+						(*current_has_reversed)=!(*current_has_reversed);
+					}
+
 
 					current_CIGAR = "*";
 					current_final_quality=0;
@@ -1190,6 +1228,12 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 			for(best_read_id = 0; best_read_id < global_context -> config.multi_best_reads; best_read_id++)
 			{
 				alignment_result_t *current_result = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, best_read_id); 
+
+		//if(strcmp("S:chr6:6564539:82M5039N18M:J1", read_name_1) == 0)
+		//	printf("IDR=%u   VOT=%d  PAIR#=%u\n", current_result->selected_position, current_result->selected_votes, current_read_number);
+
+
+
 				if(current_result -> selected_votes<1) break;
 				if(!global_context->config.report_multi_mapping_reads)if(current_result -> result_flags & CORE_IS_BREAKEVEN) continue;
 
@@ -1499,6 +1543,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		if(ret)
 			break;
 
+		//printf("%s\t%d\n%s\t%d\n", read_name_1, thread_context -> thread_id, read_name_2,  thread_context -> thread_id);
 
 		for(is_reversed = 0; is_reversed<2; is_reversed++)
 		{
@@ -1822,26 +1867,75 @@ unsigned int split_read_files(global_context_t * global_context)
 	unsigned int processed_reads = 0;
 	unsigned long long * read_position_1;
 	unsigned long long * read_position_2 = NULL;
+	char * read_line_buf = malloc(3002);
 	read_position_1 = (unsigned long long*)malloc(global_context->config.reads_per_chunk * sizeof(long long));
 	if(global_context->input_reads.is_paired_end_reads)
 		read_position_2 = (unsigned long long*)malloc(global_context->config.reads_per_chunk * sizeof(long long));
 
 	print_in_box(80,0,0, "Scan read files for multi-threaded alignment...");
-	while(1)
+
+	if(global_context->config.is_SAM_file_input)
 	{
-		if(processed_reads >= chunk_reads || feof(global_context->input_reads.first_read_file.input_fp))
-			break;
+		unsigned long long fhead_pos1;
+		unsigned long long fhead_pos2=0;
 
-		read_position_1[processed_reads] = ftello(global_context->input_reads.first_read_file.input_fp);
-		if(global_context->input_reads.is_paired_end_reads)
-			read_position_2[processed_reads] = ftello(global_context->input_reads.second_read_file.input_fp);
+		while(1)
+		{
+			char * tok_tmp, * flag;
+			if(processed_reads >= chunk_reads || feof(global_context->input_reads.first_read_file.input_fp))
+				break;
 
-		processed_reads++;
+			fhead_pos1 = ftello(global_context->input_reads.first_read_file.input_fp); 
+			if(global_context->input_reads.is_paired_end_reads)
+				fhead_pos2 = ftello(global_context->input_reads.second_read_file.input_fp); 
 
-		geinput_jump_read(&global_context->input_reads.first_read_file);
-		if(global_context->input_reads.is_paired_end_reads)
-			geinput_jump_read(&global_context->input_reads.second_read_file);
+			/*char * is_ret = */fgets(read_line_buf, 3000, global_context->input_reads.first_read_file.input_fp);
+			if(global_context->input_reads.is_paired_end_reads)
+				fgets(read_line_buf, 3000, global_context->input_reads.second_read_file.input_fp);
+
+			//if(!is_ret) break;
+
+			flag = strtok_r(read_line_buf,"\t",&tok_tmp);
+			if(!flag) break;
+
+			flag = strtok_r(NULL,"\t",&tok_tmp);
+			if(!flag) break;
+
+			if((atoi(flag) & 0x100) == 0)
+			{
+				read_position_1[processed_reads] = fhead_pos1;
+				if(global_context->input_reads.is_paired_end_reads)
+					read_position_2[processed_reads] = fhead_pos2;
+				processed_reads++;
+			}
+			if(global_context->input_reads.is_paired_end_reads)
+			{
+				fgets(read_line_buf, 3000, global_context->input_reads.first_read_file.input_fp);
+				fgets(read_line_buf, 3000, global_context->input_reads.second_read_file.input_fp);
+			}
+		}
+		//printf("PPPP=%llu\n", processed_reads);
+		
 	}
+	else{
+		while(1)
+		{
+			if(processed_reads >= chunk_reads || feof(global_context->input_reads.first_read_file.input_fp))
+				break;
+
+			read_position_1[processed_reads] = ftello(global_context->input_reads.first_read_file.input_fp);
+			if(global_context->input_reads.is_paired_end_reads)
+				read_position_2[processed_reads] = ftello(global_context->input_reads.second_read_file.input_fp);
+
+			processed_reads++;
+
+			geinput_jump_read(&global_context->input_reads.first_read_file);
+			if(global_context->input_reads.is_paired_end_reads)
+				geinput_jump_read(&global_context->input_reads.second_read_file);
+		}
+	}
+
+	free(read_line_buf);
 
 	int thread_no;
 	for(thread_no = 0; thread_no < global_context->config.all_threads; thread_no++)
