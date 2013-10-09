@@ -3260,7 +3260,7 @@ void init_global_context(global_context_t * context)
 	context->config.do_fusion_detection = 0;
 	context->config.do_big_margin_filtering_for_reads = 0;
 	context->config.do_big_margin_filtering_for_junctions = 0;
-	context->config.do_big_margin_reporting = 0;
+	context->config.do_big_margin_reporting = 1;
 	context->config.maximum_intron_length = 500000;
 	context->config.use_hamming_distance_in_exon = 0;
 	context->config.is_third_iteration_running = 0;
@@ -3315,7 +3315,7 @@ void init_global_context(global_context_t * context)
 	context->config.limited_tree_scan = 0;
 	context->config.high_quality_base_threshold = 500000;
 	context->config.init_max_event_number = 50000;
-	context->config.show_soft_cliping = 0;
+	context->config.show_soft_cliping = 1;
 	context->config.big_margin_record_size = 9;
 
 	context->config.read_group_id[0] = 0;

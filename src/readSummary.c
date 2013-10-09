@@ -1763,8 +1763,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> cmd_rebuilt = cmd_rebuilt;
 	global_context -> is_input_file_resort_needed = is_input_file_resort_needed;
 	global_context -> feature_block_size = feature_block_size;
-	global_context -> is_unpaired_warning_shown = 0;
-	global_context -> is_stake_warning_shown = 0;
 
 	if(alias_file_name && alias_file_name[0])
 	{
@@ -1789,6 +1787,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	int xk1;
 
 	global_context -> read_length = read_length;
+	global_context -> is_unpaired_warning_shown = 0;
+	global_context -> is_stake_warning_shown = 0;
 
 
 	if(global_context -> is_read_details_out)
@@ -2774,7 +2774,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			if(isPE && (fresh_read_no%2>0))
 			{
 				// Safegarding -- it should not happen if the SAM file has a correct format.
-				SUBREADprintf("WARNING! THE LAST READ IS UNPAIRED!!\nIGNORED!\n");
 				line_length = 0;
 			}
 

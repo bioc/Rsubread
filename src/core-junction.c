@@ -1033,7 +1033,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	if(global_context -> config.do_big_margin_reporting || global_context -> config.do_big_margin_filtering_for_reads)
 	{
 		int current_repeated_times = is_ambiguous_voting(global_context, pair_number, is_second_read, current_result->selected_votes, current_result->confident_coverage_start, current_result->confident_coverage_end, read_len, (current_result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0);
-		if(current_repeated_times>1) return 0;
+		if( global_context -> config.do_big_margin_filtering_for_reads && current_repeated_times>1) return 0;
 	}
 	
 
@@ -1237,10 +1237,12 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 		}
 	}
 
-	assert(rebuilt_read_len == read_len);
-
-
-	if(global_context -> config.show_soft_cliping && (head_soft_clipped>0 || tail_soft_clipped>0))
+	if(rebuilt_read_len != read_len){
+		(*mismatched_bases)=99999;
+		all_matched_bases = 0;
+		sprintf(cigar_string, "%dM", read_len);
+	}
+	else if(global_context -> config.show_soft_cliping && (head_soft_clipped>0 || tail_soft_clipped>0))
 	{
 		char new_cigar_tmp[100];
 		is_First_M=1;

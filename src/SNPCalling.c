@@ -1146,7 +1146,8 @@ void EXSNP_SIGINT_hook(int param)
 		{
 			char del2[300], del_suffix[200], del_name[400];
 			#ifdef MAKE_STANDALONE
-			SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
+			if(param)
+				SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
 			#endif
 			for(xk1=0; _EXSNP_SNP_delete_temp_prefix[xk1]; xk1++)
 			{
