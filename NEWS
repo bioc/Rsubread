@@ -1,3 +1,27 @@
+CHANGES IN VERSION 1.12.0
+------------------------
+
+NEW FEATURES
+
+    o Added a number of new features for featureCounts read summarization function, including reordering of reads in BAM files to make reads from the same pair be adjacent to each other, support for chromosome aliases and output of complete annotation data for meta-feature level summarization.
+
+    o It is described in more details on how featureCounts program summarizes reads in the Users Guide.
+
+    o Improved short indel detection for both Subread and Subjunc aligners, by building a consensus indel table and realigning the reads. Discovered indels are reported in addition to the read mapping results. 
+
+    o Detection of long indels (up to 200bp) was added in Subread. When value of '-I' option is greater than 16, Subread will perform read assembly to detect long insertions and deletions.
+	
+    o Subread and Subjunc aligners can take FASTQ/FASTA, SAM and BAM files as input, output mapping results in SAM or BAM format.
+
+    o Subjunc can now directly operate on raw read data (it previously took the output of Subread as input), reducing running time by nearly half.
+
+    o Subjunc can be instructed to output uniquely mapped reads. Hamming distance and mapping quality scores can be used to break ties when more than one best location was found by Subjunc.
+
+    o More options were provided in exactSNP program to provided users more control on SNP calling. The documentation for exactSNP was also greatly improved.
+
+    o A number of bug fixes.
+
+
 CHANGES IN VERSION 1.10.0
 ------------------------
 

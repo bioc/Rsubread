@@ -1,3 +1,6 @@
+10 Oct, 2013 - 1.11.17
+(1) Updated NEWS and vignette
+
 6 Oct, 2013 - 1.11.16
 (1) Updated C code with Subread v1.4.0
 (2) Modified arguments for exactSNPs, featureCounts and Subjunc.
