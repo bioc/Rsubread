@@ -2416,6 +2416,12 @@ int load_global_context(global_context_t * context)
 		sprintf(tmp_fname, "%s.%02d.%c.tab", context->config.index_prefix, context->index_block_number, context->config.space_type == GENE_SPACE_COLOR?'c':'b');
 		if(!does_file_exist(tmp_fname))break;
 		context->index_block_number ++;
+		if(context->config.max_indel_length > 16)
+		{
+			print_in_box(80,0,0,"ERROR You cannot use multi-block index for very-long indel detection!");
+			print_in_box(80,0,0,"Please set the maximum indel length <= 16.");
+			return -1;
+		}
 	}
 
 	context->current_index_block_number = 0;
