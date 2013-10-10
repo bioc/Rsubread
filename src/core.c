@@ -2156,7 +2156,7 @@ void print_subread_logo()
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m     ====   %c[0m%c[36m   \\___ \\| |  | |  _ <|  _  /|  __|   / /\\ \\ | |  | |", CHAR_ESC, CHAR_ESC, CHAR_ESC);
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m       ==== %c[0m%c[36m   ____) | |__| | |_) | | \\ \\| |____ / ____ \\| |__| |", CHAR_ESC, CHAR_ESC, CHAR_ESC);
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m ========== %c[0m%c[36m  |_____/ \\____/|____/|_|  \\_\\______/_/    \\_\\_____/%c[0m", CHAR_ESC, CHAR_ESC, CHAR_ESC, CHAR_ESC);
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"        v%s",SUBREAD_VERSION);
+	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"          v%s",SUBREAD_VERSION);
 }
 int print_configuration(global_context_t * context)
 {
@@ -2202,7 +2202,8 @@ int print_configuration(global_context_t * context)
 	print_in_box(80, 0, 0,         "        Max indels : %d", context->config.max_indel_length);
 	print_in_box(80, 0, 0,         " # of Best mapping : %d", context->config.multi_best_reads);
 	print_in_box(80, 0, 0,         "    Unique mapping : %s", context->config.report_multi_mapping_reads?"no":"yes");
-	print_in_box(80, 0, 0,         "      Hamming dist : %s", context->config.use_hamming_distance_break_ties?"yes":"no");
+	print_in_box(80, 0, 0,         "  Hamming distance : %s", context->config.use_hamming_distance_break_ties?"yes":"no");
+	print_in_box(80, 0, 0,         "    Quality scores : %s", context->config.use_quality_score_break_ties?"yes":"no");
 
 	if(context->config.max_insertion_at_junctions)
 		print_in_box(80, 0, 0,         "Insertions at junc : %d", context->config.max_insertion_at_junctions);
@@ -2327,6 +2328,11 @@ int load_global_context(global_context_t * context)
 
 	context->config.space_type = context->input_reads.first_read_file.space_type;
 	print_in_box(89,0,0,"The input file contains %c[36m%s%c[0m space reads.", CHAR_ESC, context->config.space_type == GENE_SPACE_COLOR?"color":"base", CHAR_ESC);
+	if(context->config.space_type == GENE_SPACE_COLOR && context->config.is_BAM_output && !context->config.convert_color_to_base)
+	{
+		print_in_box(80,0,0,"The color-space bases will be converted into base space in the BAM output.");
+		context->config.convert_color_to_base=1;
+	}
 
 	if(context->input_reads.is_paired_end_reads)
 	{

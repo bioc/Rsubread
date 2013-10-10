@@ -173,7 +173,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 		print_usage_core_subjunc();
 		return -1;
 	}
-	while ((c = getopt_long (argc, argv, "vExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:Q:I:t:B:bQ:FcuUfM3:5:9:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:I:t:B:bQFcuUfM3:5:9:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
@@ -196,9 +196,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.show_soft_cliping = 1;
 				break;
 			case 'Q':
-				global_context->config.multi_best_reads = atoi(optarg); 
-				if(global_context->config.multi_best_reads <1)
-					global_context->config.multi_best_reads=1;
+				global_context->config.use_quality_score_break_ties = 1;
 				break;
 			case 'H':
 				global_context->config.use_hamming_distance_break_ties = 1;
