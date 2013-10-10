@@ -2894,7 +2894,8 @@ int feature_count_main(int argc, char ** argv)
 	char annot_name[300];
 	char * out_name = malloc(300);
 	char * alias_file_name = malloc(300);
-	char * cmd_rebuilt = malloc(2000);
+	int cmd_rebuilt_size = 200;
+	char * cmd_rebuilt = malloc(cmd_rebuilt_size);
 	char nameFeatureTypeColumn[66];
 	char nameGeneIDColumn[66];
 	int min_qual_score = 0;
@@ -2923,7 +2924,7 @@ int feature_count_main(int argc, char ** argv)
 	char nthread_str[4];
 	int option_index = 0;
 	int c;
-	int very_long_file_names_size = 300;
+	int very_long_file_names_size = 200;
 	very_long_file_names = malloc(very_long_file_names_size);
 	very_long_file_names [0] = 0;
 
@@ -2936,7 +2937,14 @@ int feature_count_main(int argc, char ** argv)
 
 	cmd_rebuilt[0]=0;
 	for(c = 0; c<argc;c++)
+	{
+		if(strlen(cmd_rebuilt) + 300 > cmd_rebuilt_size)
+		{
+			cmd_rebuilt_size*=2;
+			cmd_rebuilt = realloc(cmd_rebuilt, cmd_rebuilt_size);
+		}
 		sprintf(cmd_rebuilt+strlen(cmd_rebuilt), "\"%s\" ", argv[c]);
+	}
 
 	while ((c = getopt_long (argc, argv, "A:g:t:T:o:a:d:D:L:Q:pbF:fs:SCBPMORv?", long_options, &option_index)) != -1)
 		switch(c)
@@ -3036,7 +3044,8 @@ int feature_count_main(int argc, char ** argv)
 		if( very_long_file_names_size - curr_strlen <300)
 		{
 			very_long_file_names_size *=2;
-			very_long_file_names=realloc( very_long_file_names , very_long_file_names_size);
+			//printf("CL=%d ; NS=%d\n", curr_strlen , very_long_file_names_size);
+			very_long_file_names=realloc(very_long_file_names , very_long_file_names_size);
 		}
 
 		strcat(very_long_file_names, argv[optind]);

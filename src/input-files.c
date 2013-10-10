@@ -1212,7 +1212,6 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 
 		if(0&&!temp_file_pointer)
 		{
-		
 			struct rlimit limit_st;
 			getrlimit(RLIMIT_NOFILE, & limit_st);
 			if(limit_st.rlim_max>0 && limit_st.rlim_max <= 3000)
