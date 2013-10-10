@@ -6,16 +6,21 @@ UNAME=`uname`
 
 echo @@@@@ The operating system is $UNAME.
 
+version_no=`cat DESCRIPTION |grep Version|cut -f2 -d' '`
+
+echo "PKG_CFLAGS+= -DSUBREAD_VERSION=\"\\\\\"Rsubread $version_no\\\\\"\"" > src/Makevars
+
 if test  $UNAME = "Linux" 
 then
 	# This is a Linux machine! 
-	cp src/Makevars.Linux src/Makevars
+	cat src/Makevars.Linux >> src/Makevars
 elif test $UNAME = "FreeBSD"
 then
-	cp src/Makevars.FreeBSD src/Makevars
+	cat src/Makevars.FreeBSD >> src/Makevars
 elif test $UNAME = "SunOS"
 then
-	cp src/Makevars.SunOS src/Makevars
+	cat src/Makevars.SunOS >> src/Makevars
 else
-	cp src/Makevars.MacOS src/Makevars
+	cat src/Makevars.MacOS >> src/Makevars
 fi
+
