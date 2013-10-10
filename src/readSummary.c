@@ -451,7 +451,22 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 			ret_features[xk1].chro_name_pos_delta = chro_name_pos - ret_features[xk1].feature_name_pos;
 			ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
+			if(ret_features[xk1].start<0 || ret_features[xk1].start>0x7fffffff)
+			{
+				ret_features[xk1].start = 0;
+				print_in_box(80,0,0,"WARNING the %d-th line has a negative chro coordinate.", lineno);
+			}
+
 			ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
+			if(ret_features[xk1].end<0 || ret_features[xk1].end>0x7fffffff)
+			{
+				ret_features[xk1].end = 0;
+				print_in_box(80,0,0,"WARNING the %d-th line has a negative chro coordinate.", lineno);
+			}
+
+
+
+
 			char * strand_str = strtok_r(NULL,"\t", &token_temp); 
 			if(strand_str == NULL)
 				ret_features[xk1].is_negative_strand = 0;
@@ -484,8 +499,9 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				ret_features[xk1].start = atoi(strtok_r(NULL,"\t", &token_temp));// start 
 				ret_features[xk1].end = atoi(strtok_r(NULL,"\t", &token_temp));//end 
 
-				if(ret_features[xk1].start < 1 || ret_features[xk1].end<1 || ret_features[xk1].start > ret_features[xk1].end)
+				if(ret_features[xk1].start < 1 || ret_features[xk1].end<1 ||  ret_features[xk1].start > 0x7fffffff ||  ret_features[xk1].end > 0x7fffffff || ret_features[xk1].start > ret_features[xk1].end)
 					SUBREADprintf("\nWarning: the feature on the %d-th line has zero coordinate or zero lengths\n\n", lineno);
+
 
 				strtok_r(NULL,"\t", &token_temp);// score 
 				ret_features[xk1].is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand 
