@@ -966,8 +966,11 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			if(!is_half_mapped)
 			{
 				char * mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
+				if(!mate_chr) return;
 				strtok_r(NULL,"\t", &tmp_tok_ptr);	// mate_pos
+				if(!tmp_tok_ptr) return;
 				char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
+				if(!tmp_tok_ptr) return;
 
 				fragment_length = abs(atoi(frag_len_str)); //get the fragment length
 
@@ -995,7 +998,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
-
+		if(!tmp_tok_ptr) return;
 
 		if(SAM_FLAG_UNMAPPED & alignment_masks) continue;
 

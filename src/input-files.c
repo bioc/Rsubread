@@ -1256,9 +1256,10 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 	datum.read_len = read_len;
 	datum.mapping_quality = mapping_quality;
 
-	if(rl < 1 || rl > 300)
+	if(rl < 1|| rl > 1200)
 	{
-		SUBREADprintf("READ TOO LONG:%d\n", rl);
+		
+		SUBREADprintf("READ IS TOO LONG:%d\n", rl);
 		return;
 	}
 

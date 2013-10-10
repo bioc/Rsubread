@@ -1255,7 +1255,7 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 
 				if(locate_current_value_index(global_context, thread_context, current_result, current_rlen))
 				{
-					sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR, "Read position excesses index boundary : %u (%s : %s). V=%d", current_result -> selected_position, current_read_name, is_second_read?"SECOND":"FIRST", current_result -> selected_votes);
+					//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR, "Read position excesses index boundary : %u (%s : %s). V=%d", current_result -> selected_position, current_read_name, is_second_read?"SECOND":"FIRST", current_result -> selected_votes);
 					continue;
 				}
 
@@ -1445,7 +1445,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				}
 				if(locate_current_value_index(global_context, thread_context, current_result, current_rlen))
 				{
-					sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR, "Read position excesses index boundary.");
+					//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR, "Read position excesses index boundary.");
 					continue;
 				}
 
