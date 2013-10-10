@@ -1310,14 +1310,18 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 							if(global_context -> SAM_output_fp)
 							{
-								int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
-								unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-								strncat(final_feture_names, (char *)final_feture_name, 999);
-								strncat(final_feture_names, ",", 999);
-								assigned_no++;
+								if(strlen(final_feture_names)<700) 
+								{
+										int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
+										unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+										strncat(final_feture_names, (char *)final_feture_name, 999);
+										strncat(final_feture_names, ",", 999);
+										assigned_no++;
+								}
 							}
 						}
 					}
+					final_feture_names[999]=0;
 					thread_context->nreads_mapped_to_exon++;
 					if(global_context -> SAM_output_fp)
 					{
