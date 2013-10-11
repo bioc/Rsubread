@@ -1538,7 +1538,7 @@ void * feature_count_worker(void * vargs)
 			}
 			strm->avail_in = (unsigned int)cdata_size;
 			strm->next_in = (unsigned char *)chunk_in_buffer;
-
+			//printf("NIN=%d\n", strm->avail_in );
 
 			strm->avail_out = 70000;
 			strm->next_out = (unsigned char *)PDATA;
@@ -1563,7 +1563,7 @@ void * feature_count_worker(void * vargs)
 				while(1)
 				{
 					SamBam_Alignment * aln = &thread_context->aln_buffer;
-					thread_context->current_read_length1 = PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer1 , 2999, aln, 0);
+					thread_context->current_read_length1 = PBam_chunk_gets(PDATA, &PDATA_ptr, PDATA_len, global_context ->sambam_chro_table , thread_context -> line_buffer1 , 2999, aln, 0);
 					if(qid==0 && global_context->is_paired_end_data)
 					{
 						int xk1 = 0, tabs=0, x_flag = 0;
@@ -1591,14 +1591,14 @@ void * feature_count_worker(void * vargs)
 							HashTablePut(global_context -> orphan_table, NULL+parent_chunk , saved_line);
 							pthread_spin_unlock(&global_context -> orphan_table_lock);
 							if(PDATA_ptr >= PDATA_len) break;
-							PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer1 , global_context->line_length-1, aln, 0);
+							PBam_chunk_gets(PDATA, &PDATA_ptr, PDATA_len, global_context ->sambam_chro_table , thread_context -> line_buffer1 , global_context->line_length-1, aln, 0);
 						}
 					}
 
 					if(global_context->is_paired_end_data)
 					{
 
-						if(PDATA_ptr >= PDATA_len){
+						if(PDATA_ptr == PDATA_len){
 							int ppi;
 							for(ppi = 0; ppi < global_context -> max_parent_number; ppi++)
 							{
@@ -1614,12 +1614,18 @@ void * feature_count_worker(void * vargs)
 							}
 							break;
 						}
+						else if(PDATA_ptr > PDATA_len)
+						{
+							SUBREADprintf("Unknown format issue! the file seemed not to be a compressed BAM file!\n");
+						}
 
 
-						thread_context->current_read_length2 = PBam_chunk_gets(PDATA, &PDATA_ptr, global_context ->sambam_chro_table , thread_context -> line_buffer2 , 2999, aln, 0);
+						thread_context->current_read_length2 = PBam_chunk_gets(PDATA, &PDATA_ptr, PDATA_len, global_context ->sambam_chro_table , thread_context -> line_buffer2 , 2999, aln, 0);
 						qid++;
 						//printf("%s\n%s\n", thread_context -> line_buffer1,thread_context -> line_buffer2);
-						process_line_buffer(global_context, thread_context);
+						if(thread_context->current_read_length2 >0 && thread_context->current_read_length2<1200)
+							process_line_buffer(global_context, thread_context);
+
 						if(PDATA_ptr >= PDATA_len) break;
 					}
 					else

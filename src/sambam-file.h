@@ -116,7 +116,7 @@ int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab);
 // load a new line from the BAM buffer (chunk) at chunk_ptr.
 // if seq_needed==0, then no sequence nor quality str will be loaded.
 // it returns the length (without "\0" after the tail) of the SAM string.
-int PBam_chunk_gets(char * chunk, int *chunk_ptr, SamBam_Reference_Info * bam_chro_table, char * buff , int buff_len, SamBam_Alignment*aln, int seq_needed);
+int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Reference_Info * bam_chro_table, char * buff , int buff_len, SamBam_Alignment*aln, int seq_needed);
 
 // This function opens a file, either SAM or BAM, in read-only mode.
 // The "file_type" parameter specifies which type of file it is: SAMBAM_FILE_BAM or SAMBAM_FILE_SAM.
