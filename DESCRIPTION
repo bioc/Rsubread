@@ -1,7 +1,7 @@
 Package: Rsubread
 Type: Package
 Title:  Rsubread: a took kit for analyzing next-gen sequencing read data
-Version: 1.11.18
+Version: 1.12.0
 Author: Wei Shi and Yang Liao with contributions from Jenny Zhiyin Dai and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>
 Description: This R package provides easy-to-use tools for analyzing next-gen sequencing read data. Functions of these tools include quality assessment, read alignment, read summarization, exon-exon junction detection, absolute expression calling and SNP calling. These tools are highly efficient and accurate. They can be used to anlayze data generated from all major sequencing platforms such as Illumina GA/HiSeq/MiSeq, Roche GS-FLX, ABI SOLiD and LifeTech Ion PGM/Proton sequencers. This package can be installed on multiple operating systems incluidng Linux, Mac OS X, FreeBSD and Solaris.
