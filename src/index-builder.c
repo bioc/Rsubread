@@ -730,7 +730,7 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 		else
 			fprintf(log_fp,"%c[29m%c[37m", CHAR_ESC, CHAR_ESC);
 		*/
-		fprintf(log_fp," % 8d ", print_line_no++);
+		fprintf(log_fp," % 9d ", print_line_no++);
 
 		rtrim(line_buf);
 		
@@ -738,7 +738,7 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 		if(ftello(warn_fp) > fpos_line_head)
 			break;
 	}
-	for(x1=0;x1<line_pos+10;x1++)
+	for(x1=0;x1<line_pos+11;x1++)
 		fprintf(log_fp," ");
 	fprintf(log_fp,"^\n");
 
@@ -747,7 +747,7 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 	{
 		char * ret = fgets(line_buf, MAX_READ_LENGTH, warn_fp);
 		if(!ret)break;
-		fprintf(log_fp," % 8d ", print_line_no++);
+		fprintf(log_fp," % 9d ", print_line_no++);
 		fprintf(log_fp,"%s",line_buf);
 	}
 	fclose(warn_fp);
@@ -903,8 +903,8 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 	if(ERROR_FOUND_IN_FASTA)
 	{
-		print_in_box( 80,0,0,"There were %d format issues found in the input files.", ERROR_FOUND_IN_FASTA);
-		print_in_box( 89,0,0,"The details were saved in log file %c[36m'%s'%c[0m.", CHAR_ESC, log_fn, CHAR_ESC);
+		print_in_box( 80,0,0,"There were %d notes for reference sequences.", ERROR_FOUND_IN_FASTA);
+		print_in_box( 89,0,0,"The notes can be found in the log file, %c[36m'%s'%c[0m.", CHAR_ESC, log_fn, CHAR_ESC);
 	}
 	else	print_in_box( 80,0,0,"No format issues were found");
 
@@ -985,9 +985,11 @@ int main_buildindex(int argc,char ** argv)
 		SUBREADputs("");
 		SUBREADputs(" ./subread-buildindex -o <basename> -M <int> {FASTA file1} [FASTA file2] ...");
 		SUBREADputs("");
-		SUBREADputs("Arguments:");
+		SUBREADputs("Required arguments:");
 		SUBREADputs("");
 		SUBREADputs("    -o <basename>   base name of the index to be created");
+		SUBREADputs("");
+		SUBREADputs("Optional arguments:");
 		SUBREADputs("");
 		SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default");
 		SUBREADputs("");

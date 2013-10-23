@@ -127,7 +127,7 @@ int get_base_error_prob33i(char v);
 int get_base_error_prob64i(char v);
 
 void add_repeated_numbers(int qid, gene_vote_t * vote, unsigned char * repeated_regions);
-void reverse_cigar(char * cigar);
+void bad_reverse_cigar(char * cigar);
 
 void subread_lock_occupy(subread_lock_t * lock);
 void subread_init_lock(subread_lock_t * lock);

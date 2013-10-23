@@ -77,9 +77,10 @@ void print_usage_core_aligner()
 	SUBREADputs("    ");
 	SUBREADputs("    -T --threads   <int>    number of threads, 1 by default.");
 	SUBREADputs("    ");
-	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default, up to 16.");
+	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default. Indels of up");
+	SUBREADputs("                            to 200bp long can be detected.");
 	SUBREADputs("    ");
-	SUBREADputs("    -B --multi     <int>    Specify the maximal number of equally-best mapping");
+	SUBREADputs("    -B --multi     <int>    specify the maximal number of equally-best mapping");
 	SUBREADputs("                            locations allowed to be reported for any read. The");
 	SUBREADputs("                            value has to be within the range of 1 to 16. 1 by");
 	SUBREADputs("                            default. ");

@@ -2564,7 +2564,7 @@ int get_base_error_prob64i(char v)
 	return PROB_QUAL_INT_TABLE[v-'@'];
 }
 
-void reverse_cigar(char * cigar)
+void bad_reverse_cigar(char * cigar)
 {
 	int cigar_cursor = 0;
 	long long int tmpv=0;
@@ -2597,11 +2597,15 @@ void reverse_cigar(char * cigar)
 	strcpy(cigar, ncg);
 }
 
+#ifdef TEST_WHATCIGARREVERSE
+int main()
+#else
 int debug_main()
+#endif
 {
 	char cg[100];
 	sprintf(cg,"10M8H20M9I100N30M");
-	reverse_cigar(cg);
+	bad_reverse_cigar(cg);
 	SUBREADprintf("%s\n",cg);
 	return 0;
 }

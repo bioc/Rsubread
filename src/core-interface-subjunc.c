@@ -28,6 +28,7 @@ static struct option long_options[] =
 	{"order",  required_argument, 0, 'S'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
+	{"fusion", no_argument, 0, 'f'},
 	{"color-convert",  no_argument, 0, 'b'},
 	{"junctionIns", required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
@@ -75,7 +76,8 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("    -T --threads   <int>    number of threads/CPUs used, 1 by default.");
 	SUBREADputs("");
-	SUBREADputs("    -I --indel     <int>    number of INDEL bases allowed, 5 by default.");
+	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default. Indels of up");
+	SUBREADputs("                            to 200bp long can be detected.");
 	SUBREADputs("");
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
 	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
@@ -90,6 +92,8 @@ void print_usage_core_subjunc()
 	SUBREADputs("                                 ");
 	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
 	SUBREADputs("                            one best mapping location is found.");
+	SUBREADputs("                                 ");
+	SUBREADputs("    -f --fusion             perform fusion detection and generate fusion table.");
 	SUBREADputs("                                 ");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
@@ -177,6 +181,11 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	{
 		switch(c)
 		{
+			case 'f':
+				global_context->config.do_fusion_detection =1;
+				global_context->config.report_multi_mapping_reads = 1;
+				global_context->config.do_big_margin_filtering_for_junctions = 0;
+				break;
 			case 'v':
 				core_version_number("Subjunc");
 				return -1;

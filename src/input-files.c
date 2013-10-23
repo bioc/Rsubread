@@ -882,14 +882,55 @@ void reverse_read(char * InBuff, int read_len, int space_type)
 	if(space_type == GENE_SPACE_COLOR)
 	{
 		int start_pos = 0;
-		if(isalpha(InBuff[0]))start_pos = 1;
+		char last_base = InBuff[0];
+
+		//printf("CLRLEN0=%d\nS0=%s\n", read_len, InBuff);
+		if(isalpha(last_base))
+		{
+			read_len ++;
+
+			for (i=1; i<read_len; i++)
+			{
+				int new_int = InBuff[i];
+				int new_base = 0;
+				if(new_int == '0')
+					new_base=last_base;
+				else if(new_int == '1')
+				{
+					if(last_base == 'A')new_base = 'C';
+					else if(last_base == 'G')new_base = 'T';
+					else if(last_base == 'T')new_base = 'G';
+					else new_base = 'A';
+				}
+				else if(new_int == '2')
+				{
+					if(last_base == 'A')new_base = 'G';
+					else if(last_base == 'G')new_base = 'A';
+					else if(last_base == 'T')new_base = 'C';
+					else new_base = 'T';
+				}
+				else
+				{
+					if(last_base == 'A')new_base = 'T';
+					else if(last_base == 'G')new_base = 'C';
+					else if(last_base == 'T')new_base = 'A';
+					else new_base = 'G';
+				}
+				last_base = new_base;
+			//	putchar(last_base);
+			}	
+			//puts("");
+			InBuff[0] = *(__converting_char_table+last_base);
+			start_pos = 1;
+		}
+		else read_len--;
 
 		for (i=0; i<(read_len - start_pos)/2; i++)
 		{
 			int rll1 = read_len - 1 - i;
 			char tmp = InBuff[rll1];
 			InBuff[rll1] = InBuff[i + start_pos];
-			InBuff[i] = tmp;
+			InBuff[i + start_pos] = tmp;
 		}
 	}
 	else
@@ -998,6 +1039,7 @@ void colorread2base(char * read_buffer, int read_len)
 {
 	int i;
 	char last_base = read_buffer[0];
+	//printf("C2B:%s\n",read_buffer);
 	for (i=1; i<read_len; i++)
 	{
 		int new_int = read_buffer[i];
@@ -1028,6 +1070,35 @@ void colorread2base(char * read_buffer, int read_len)
 		read_buffer[i] = new_base;
 		last_base = new_base;
 	}
+	//printf("CBX:%s\n",read_buffer);
+}
+
+char color2char(char clr, char c1)
+{
+	if(clr == '0')return c1;
+	else if(clr == '1')
+	{
+		if(c1 == 'A') return 'C';
+		else if(c1 == 'T') return 'G';
+		else if(c1 == 'G') return 'T';
+		else return 'A';
+	}
+	else if(clr == '2') 
+	{
+		if(c1 == 'A') return 'G';
+		else if(c1 == 'T') return 'C';
+		else if(c1 == 'G') return 'A';
+		else return 'T';
+	}
+	else if(clr == '3') 
+	{
+		if(c1 == 'A') return 'T';
+		else if(c1 == 'T') return 'A';
+		else if(c1 == 'G') return 'C';
+		else return 'G';
+	}
+
+	return 'N';	
 }
 
 int chars2color(char c1, char c2)

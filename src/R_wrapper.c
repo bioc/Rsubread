@@ -174,16 +174,22 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
         optind = 1;
 
         char * r_argv, ** c_argv;
-        int i,n;
+        int i,n, arg_len;
 
-        r_argv = (char *)calloc(1000, sizeof(char));
+	arg_len = strlen(*argv);
+        r_argv = (char *)calloc(1+arg_len, sizeof(char));
         strcpy(r_argv,*argv);
 
         n = *nargs;
         c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(200,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+
+	for(i=0; i<n; i++)
+	{
+		char * current_arg = strtok(i?NULL:r_argv,",");
+		arg_len = strlen(current_arg);
+		c_argv[i] = (char *)calloc(1+arg_len,sizeof(char));
+		strcpy(c_argv[i], current_arg);
+	}
 
         readSummary(n,c_argv);
 
