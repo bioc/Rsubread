@@ -2927,7 +2927,7 @@ unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar)
 		if(cigar [cigar_cursor] == 0)break;
 	}
 
-	printf("REV CIGAR: %s  =>  %s\n", cigar, new_cigar);
+	//printf("REV CIGAR: %s  =>  %s\n", cigar, new_cigar);
 	return ret;
 }
 
