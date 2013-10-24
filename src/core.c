@@ -922,6 +922,7 @@ int write_chunk_results(global_context_t * global_context)
 				int is_current_ok = (current_result -> result_flags & CORE_IS_FULLY_EXPLAINED)?1:0;
 				int current_repeated_times = 0;
 				float current_final_quality = current_result -> final_quality;
+				int current_soft_clipping_movement  =0, mate_soft_clipping_movement = 0;
 
 				current_linear_pos = current_result -> selected_position;
 				current_strand = (current_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
@@ -966,7 +967,6 @@ int write_chunk_results(global_context_t * global_context)
 					{
 
 						int is_jumped = 0;
-						int soft_clipping_movement = 0;
 						char * mate_CIGAR;
 						if( mate_result -> cigar_string[0] == -1)
 						{
@@ -992,7 +992,7 @@ int write_chunk_results(global_context_t * global_context)
 						if(locate_gene_position_max(mate_linear_pos, &global_context -> chromosome_table, & mate_chro_name, & mate_chro_offset, mate_read_len))
 							is_mate_ok = 0;
 
-						soft_clipping_movement = get_soft_clipping_length(mate_CIGAR);
+						mate_soft_clipping_movement = get_soft_clipping_length(mate_CIGAR);
 						if(global_context -> config.space_type == GENE_SPACE_COLOR)
 						{
 							if( (!is_second_read)  +  mate_strand == 1 )
@@ -1001,7 +1001,7 @@ int write_chunk_results(global_context_t * global_context)
 							}
 
 						}
-						mate_chro_offset += soft_clipping_movement;
+						mate_chro_offset += mate_soft_clipping_movement;
 
 					}
 					if(is_mate_ok)
@@ -1109,9 +1109,8 @@ int write_chunk_results(global_context_t * global_context)
 					}
 					current_chro_offset++;
 
-					int soft_clipping_movement = 0;
-					soft_clipping_movement = get_soft_clipping_length(current_CIGAR);
-					current_chro_offset += soft_clipping_movement;
+					current_soft_clipping_movement = get_soft_clipping_length(current_CIGAR);
+					current_chro_offset += current_soft_clipping_movement;
 				}
 				else
 				{
@@ -1197,15 +1196,15 @@ int write_chunk_results(global_context_t * global_context)
 
 				if(is_current_ok && global_context -> input_reads.is_paired_end_reads && is_mate_ok)
 				{
-					mate_distance = mate_chro_offset;
-					mate_distance -= current_chro_offset;
+					mate_distance = mate_chro_offset - mate_soft_clipping_movement;
+					mate_distance -= current_chro_offset - current_soft_clipping_movement;
 					mate_distance = abs(mate_distance);
 					if(current_chro_offset >mate_chro_offset)
 						mate_distance += current_read_len; 
 					else
 						mate_distance += mate_read_len; 
 
-					if(current_chro_offset > mate_chro_offset) mate_distance = -mate_distance;
+					if(current_chro_offset - current_soft_clipping_movement > mate_chro_offset - mate_soft_clipping_movement) mate_distance = -mate_distance;
 
 					if(mate_distance>0)
 					{
