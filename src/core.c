@@ -332,7 +332,7 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 	//fprintf(stderr, "FINISHED=%llu, FINISHED_READS=%llu, ALL=%llu, ALLREADS=%llu, ALLCHUNKREADS=%llu; BEFORE_CHUK=%llu; CUR-BLK=%d; IND-BLK=%d\n", finished_steps, reads_finished_in_this_chunk, guessed_all_steps, guessed_all_reads,guessed_this_chunk_all_reads, guessed_all_reads_before_this_chunk,  global_context -> current_index_block_number , global_context -> index_block_number );
 
 	if(current_read_no>1000 && !progress_report_callback)
-		print_in_box(81,0,0, "%2d%%%% completed, %3d mins elapsed, total=%dk %s, speed=%2.1fk/s      \r", (int)(finished_rate*100), (int)((miltime() - global_context -> start_time)/60),(int)(guessed_all_reads*1./1000), global_context -> input_reads.is_paired_end_reads?"frags":"reads", reads_per_second/1000, reads_finished_in_this_chunk);
+		print_in_box(81,0,0, "%4d%%%% completed, %3d mins elapsed, total=%dk %s, speed=%2.1fk/s      \r", (int)(finished_rate*100), (int)((miltime() - global_context -> start_time)/60),(int)(guessed_all_reads*1./1000), global_context -> input_reads.is_paired_end_reads?"frags":"reads", reads_per_second/1000, reads_finished_in_this_chunk);
 
 	if(progress_report_callback)
 	{
@@ -2343,7 +2343,12 @@ int print_configuration(global_context_t * context)
 	print_in_box(80, 0, 1, "");
 
 	if(context->config.is_rna_seq_reads)
-		print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection");
+	{
+		if(context->config.do_fusion_detection)
+			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection");
+		else
+			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection");
+	}
 	else
 		print_in_box(80, 0, 0,         "          Function : Read alignment");
 	print_in_box(80, 0, 0,         "           Threads : %d", context->config.all_threads);
