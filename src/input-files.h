@@ -168,4 +168,6 @@ int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_pat
 void colorread2base(char * read_buffer, int read_len);
 
 int warning_file_type(char * fname, int expected_type);
+char color2char(char clr, char c1);
+
 #endif

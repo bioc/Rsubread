@@ -364,4 +364,14 @@ int term_strncpy(char * dst, char * src, int max_dst_memory);
 int is_result_in_PE(alignment_result_t * aln);
 
 void core_version_number(char * program);
+
+
+// This assumes the first part of Cigar has differet strandness to the main part of the cigar.
+// Pos is the LAST WANTED BASE location before the first strand jump (split by 'b' or 'n').
+// The first base in the read actually has a larger coordinate than Pos. 
+unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
+
+int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
+
+void warning_file_limit();
 #endif

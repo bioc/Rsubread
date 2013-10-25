@@ -55,7 +55,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		if(max_event_no<=event_no)
 		{
 			//printf("T REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
-			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.5;
+			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
 			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
 				realloc(((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) * 
 					((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number);
@@ -68,7 +68,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		if(max_event_no<=event_no)
 		{
 			//printf("G REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
-			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.5;
+			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic =
 				realloc(((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) *
 					((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number); 
@@ -139,9 +139,10 @@ void remove_neighbour(global_context_t * global_context)
 	int xk1;
 	int * to_be_removed_ids;
 	int to_be_removed_number = 0, all_junctions = 0;
+	int maxinum_removed_events = global_context-> config.do_fusion_detection? 9999999:999999;
 
 
-	to_be_removed_ids = malloc(sizeof(int) * 100000);
+	to_be_removed_ids = malloc(sizeof(int) * (1+maxinum_removed_events));
 	for(xk1=0; xk1<indel_context->total_events; xk1++)
 	{
 		chromosome_event_t * event_body = &event_space[xk1];
@@ -155,7 +156,7 @@ void remove_neighbour(global_context_t * global_context)
 				int neighbour_range = 10;
 				if(event_body->event_type != CHRO_EVENT_TYPE_INDEL) continue;
 
-				if(to_be_removed_number >= 99999) break;
+				if(to_be_removed_number >= maxinum_removed_events) break;
 
 				if(is_ambiguous_indel_score(event_body))to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 				else for(xk2=-neighbour_range; xk2<=neighbour_range; xk2++)
@@ -169,7 +170,7 @@ void remove_neighbour(global_context_t * global_context)
 
 					for(xk3 = 0; xk3<found_events; xk3++)
 					{
-						if(to_be_removed_number>=99999) break;
+						if(to_be_removed_number>=maxinum_removed_events) break;
 						chromosome_event_t * tested_neighbour = search_return[xk3];
 						long long int length_diff = tested_neighbour -> indel_length;
 						length_diff -=  event_body -> indel_length;
@@ -207,7 +208,7 @@ void remove_neighbour(global_context_t * global_context)
 						int xk3, found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return);
 						for(xk3 = 0; xk3<found_events; xk3++)
 						{
-							if(to_be_removed_number>=99999) break;
+							if(to_be_removed_number>=maxinum_removed_events) break;
 							chromosome_event_t * tested_neighbour = search_return[xk3];
 
 							if(tested_neighbour -> indel_at_junction > event_body -> indel_at_junction) continue;
@@ -217,6 +218,21 @@ void remove_neighbour(global_context_t * global_context)
 								to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 						}
 					}
+
+				if(global_context->config.do_fusion_detection)
+				{
+					for(xk2=-100 ; xk2 < 100 ; xk2++)
+					{
+						if(!xk2)continue;
+						if(to_be_removed_number>=maxinum_removed_events) break;
+
+						unsigned int test_pos_small = event_body -> event_small_side + xk2;
+						chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
+						int  found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_BOTH_SIDES, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return); 
+						if(found_events)
+							to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
+					}
+				}
 			}
 		}
 	}
@@ -236,6 +252,7 @@ void remove_neighbour(global_context_t * global_context)
 			id_list[xk3] = 0;
 		}
 
+		//printf("NBR_REMOVED=%u - %u\n", deleted_event -> event_small_side , deleted_event -> event_large_side);
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
 	}
 
@@ -440,7 +457,13 @@ int finalise_indel_thread(global_context_t * global_context, thread_context_t * 
 			}
 
 			if(matched_old_event)
+			{
 				matched_old_event -> supporting_reads += event_body -> supporting_reads;
+				if(event_body->inserted_bases && event_body -> event_type == CHRO_EVENT_TYPE_INDEL  && event_body -> indel_length<0){
+					//printf("FREED INDEL\n");
+					free(event_body->inserted_bases);
+				}
+			}
 			else
 			{
 				int new_event_no = indel_context -> total_events++;
@@ -483,14 +506,21 @@ int finalise_indel_thread(global_context_t * global_context, thread_context_t * 
 
 int there_are_events_in_range(char * bitmap, unsigned int pos, int sec_len)
 {
+	int ret = 0;
 	if(!bitmap) return 1;
 	unsigned int offset = pos >> 3;
 	unsigned int offset_end = (pos + sec_len) >> 3;
 	unsigned int offset_byte = (offset >> 3)&0x3ffffff;
 	unsigned int offset_byte_end =1+((offset_end >> 3)&0x3ffffff);
 	for(; offset_byte < offset_byte_end ; offset_byte++)
-		if(bitmap[offset_byte]) return 1;
-	return 0;
+	{
+		if(bitmap[offset_byte]){
+			ret = 1;
+			break;
+		}
+	}
+//	printf("TEST_JUMP: THERE ARE %d at %u\n" , ret , pos);
+	return ret;
 	
 }
 // bitmap has 64M bytes.
@@ -2976,7 +3006,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 								continue;
 							}
 
-							if(abs(indels) <= 16){
+							if(0&&abs(indels) <= 16){
 								continue;
 							}
 
@@ -3004,7 +3034,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 							if(is_fresh)
 							{
 				
-								//printf("PUTLONG: %d\n", indels);
+					//			printf("PUTLONG: %d\n", indels);
 								put_long_indel_event(global_context, best_pos,  indels, quality_of_this_indel, full_rebuilt_window + indels_read_positions[xk2], CHRO_EVENT_TYPE_LONG_INDEL);
 
 								int write_cursor;
@@ -3314,7 +3344,7 @@ void init_global_context(global_context_t * context)
 	context->config.report_no_unpaired_reads = 0;
 	context->config.limited_tree_scan = 0;
 	context->config.high_quality_base_threshold = 500000;
-	context->config.init_max_event_number = 50000;
+	context->config.init_max_event_number = 70000;
 	context->config.show_soft_cliping = 1;
 	context->config.big_margin_record_size = 9;
 

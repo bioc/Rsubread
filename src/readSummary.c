@@ -2509,7 +2509,7 @@ int readSummary(int argc,char *argv[]){
 
 	free(file_list_used);
 
-	if(isCVersion && isGeneLevel)
+	if(isGeneLevel)
 		fc_write_final_gene_results(&global_context, geneid, chr, start, stop, sorted_strand, argv[3], nexons,  table_columns, argv[2], n_input_files , loaded_features, isCVersion);
 	else
 		fc_write_final_results(&global_context, argv[3], nexons, table_columns, argv[2], n_input_files ,loaded_features, isCVersion);
