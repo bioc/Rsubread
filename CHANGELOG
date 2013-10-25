@@ -1,5 +1,7 @@
 25 Oct, 2013 - 1.13.1
 (1) Fixed a bug for featureCounts
+(2) Changed inst/doc to vignettes/
+
 
 14 Oct, 2013 - 1.11.18
 (1) Updated users guide.
