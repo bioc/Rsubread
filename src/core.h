@@ -372,4 +372,6 @@ void core_version_number(char * program);
 unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
 
 int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
+
+void warning_file_limit();
 #endif

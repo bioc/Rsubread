@@ -55,7 +55,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		if(max_event_no<=event_no)
 		{
 			//printf("T REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
-			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.5;
+			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
 			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
 				realloc(((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) * 
 					((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number);
@@ -68,7 +68,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		if(max_event_no<=event_no)
 		{
 			//printf("G REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
-			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.5;
+			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic =
 				realloc(((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) *
 					((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number); 
@@ -457,7 +457,13 @@ int finalise_indel_thread(global_context_t * global_context, thread_context_t * 
 			}
 
 			if(matched_old_event)
+			{
 				matched_old_event -> supporting_reads += event_body -> supporting_reads;
+				if(event_body->inserted_bases && event_body -> event_type == CHRO_EVENT_TYPE_INDEL  && event_body -> indel_length<0){
+					//printf("FREED INDEL\n");
+					free(event_body->inserted_bases);
+				}
+			}
 			else
 			{
 				int new_event_no = indel_context -> total_events++;
@@ -3338,7 +3344,7 @@ void init_global_context(global_context_t * context)
 	context->config.report_no_unpaired_reads = 0;
 	context->config.limited_tree_scan = 0;
 	context->config.high_quality_base_threshold = 500000;
-	context->config.init_max_event_number = 50000;
+	context->config.init_max_event_number = 70000;
 	context->config.show_soft_cliping = 1;
 	context->config.big_margin_record_size = 9;
 

@@ -76,7 +76,7 @@ typedef struct{
 
 struct reassmebly_window_allele
 {
-	char rebuilt_window[1500];
+	char rebuilt_window[2500];
 	float allele_quality;
 	int rebuilt_size;
 };
@@ -96,13 +96,13 @@ typedef struct{
 	gene_vote_t * vote_list_rectify;
 	short * read_rectify_space;
 
-	char rebuilt_window[1500];
+	char rebuilt_window[2500];
 	int rebuilt_window_size;
 
 
 	struct reassmebly_window_allele * final_alleles;
 
-	unsigned int used_read_ids[1000];
+	unsigned int used_read_ids[2000];
 	int used_read_number;
 
 

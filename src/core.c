@@ -30,8 +30,9 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <sys/types.h>
-#include <sys/stat.h>
+#include <sys/resource.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <ctype.h>
 
 
@@ -62,6 +63,23 @@ int is_result_in_PE(alignment_result_t *al)
 void core_version_number(char * program)
 {
 	SUBREADprintf("\n%s v%s\n\n" , program, SUBREAD_VERSION);
+}
+
+void warning_file_limit()
+{
+	struct rlimit limit_st;
+	getrlimit(RLIMIT_NOFILE, & limit_st);
+
+	{
+		if(min(limit_st.rlim_cur , limit_st.rlim_max) < 400)
+		{
+			print_in_box(80,0,0,"WARNING This operation needs to open many files at same time,");
+			print_in_box(80,0,0,"        but your OS only allows to open %d files.", min(limit_st.rlim_cur , limit_st.rlim_max));
+			print_in_box(80,0,0,"        You can use command 'ulimit -n 500' to raise this limit");
+			print_in_box(80,0,0,"        to 500, or the program may crash or terminate unexpectedly.");
+			print_in_box(80,0,0,"");
+		}
+	}
 }
 
 void print_in_box(int line_width, int is_boundary, int is_center, char * pattern,...)
@@ -544,6 +562,10 @@ int check_configuration(global_context_t * global_context)
 		expected_type = FILE_TYPE_BAM;
 	else if(global_context -> config.is_SAM_file_input && !global_context -> config.is_BAM_input)
 		expected_type = FILE_TYPE_SAM;
+	
+	if(global_context -> config.max_indel_length > 16)
+		warning_file_limit();
+
 	warning_file_type(global_context -> config.first_read_file, expected_type);
 	if(global_context -> config.second_read_file[0])
 	{

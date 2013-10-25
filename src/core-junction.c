@@ -1939,7 +1939,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 			
 		locate_gene_position( left_edge_wanted , &global_context -> chromosome_table, &chro_name_left, &chro_pos_left);
 		locate_gene_position( right_edge_wanted , &global_context -> chromosome_table, &chro_name_right, &chro_pos_right);
-		if(chro_name_right!=chro_name_left) return;
+		if((! global_context->config.do_fusion_detection ) && chro_name_right!=chro_name_left) return;
 
 		//insert event
 		HashTable * event_table = NULL;

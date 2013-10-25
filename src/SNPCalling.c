@@ -1632,6 +1632,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	print_in_box(80,0,1,"");
 	warning_file_type(in_SAM_file, parameters.is_BAM_file_input?FILE_TYPE_BAM:FILE_TYPE_SAM);
 	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
+	warning_file_limit();
 	int ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
 	if(ret != -1)
 	{

@@ -50,7 +50,7 @@ int MARK_NONINFORMATIVE_SUBREADS = 0;
 
 void print_build_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads)
 {
-	print_in_box( 81,0,0,"%0.1f%%%%; time used=%.1fs; rate=%.1fk bps/s; total=%llum\r", finished_rate*100, miltime()-begin_ftime, read_per_second/1000 ,total_reads/1000000);
+	print_in_box( 81,0,0,"%4d%%%%, %3d mins elapsed, rate=%.1fk bps/s, total=%llum\r", (int)(finished_rate*100), (int)(miltime()-begin_ftime)/60, read_per_second/1000 ,total_reads/1000000);
 }
 
 void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_table)
