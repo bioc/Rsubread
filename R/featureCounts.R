@@ -43,6 +43,8 @@ featureCounts <- function(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NU
 
 	files_C <- paste(files,collapse=";")
 	
+	if(nchar(files_C) == 0) stop("No read files provided!")
+	
 	chrAliases_C <- chrAliases
 	if(is.null(chrAliases))
 	  chrAliases_C <- " "
