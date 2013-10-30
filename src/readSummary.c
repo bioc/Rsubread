@@ -227,8 +227,8 @@ unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str,
 
 void print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport)
 {
-	char * tmp_ptr1 , * next_fn, *sam_used = malloc(strlen(sam)+1);
-	int nfiles=1,x1=0;
+	char * tmp_ptr1 , * next_fn, *sam_used = malloc(strlen(sam)+1), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
+	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
 
 	strcpy(sam_used, sam);
 
@@ -238,20 +238,48 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	print_in_box(80,1,1,"featureCounts setting");
 	print_in_box(80,0,0,"");
 	
-	while(sam_used[x1])
+	nfiles = 0;
+
+	while(1)
 	{
-		if(sam_used[x1]==';') nfiles++;
-		x1++;
+		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
+		if(next_fn == NULL || strlen(next_fn)<1) break;
+		nfiles++;
+
+		int file_probe = is_certainly_bam_file(next_fn);
+		if(file_probe==-1) nNonExistFiles++;
+		if(file_probe == 1) nBAMfiles++;		
 	}
-	
-	print_in_box(80,0,0,"            Input files : %d %s file%s", nfiles, is_sam?"SAM":"BAM", nfiles>1?"s":"", CHAR_ESC);
+
+	sam_ntxt[0]=0;
+	bam_ntxt[0]=0;
+	next_ntxt[0]=0;
+
+	if(nNonExistFiles)
+		sprintf(next_ntxt, "%d unknown file%s", nNonExistFiles, nNonExistFiles>1?"s":"");
+	if(nBAMfiles)
+		sprintf(bam_ntxt, "%d BAM file%s  ", nBAMfiles, nBAMfiles>1?"s":"");
+	if(nfiles-nNonExistFiles-nBAMfiles)
+		sprintf(sam_ntxt, "%d SAM file%s  ", nfiles-nNonExistFiles-nBAMfiles , (nfiles-nNonExistFiles-nBAMfiles)>1?"s":"");
+
+
+	strcpy(sam_used, sam);
+
+	print_in_box(80,0,0,"            Input files : %s%s%s", sam_ntxt, bam_ntxt, next_ntxt);
 	nfiles=0;
 
 	while(1)
 	{
 		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
-		print_in_box(94,0,0,"                          %c[32mo%c[36m %s%c[0m",CHAR_ESC,CHAR_ESC, next_fn,CHAR_ESC);
+		int file_probe = is_certainly_bam_file(next_fn);
+
+		char file_chr = 'o';
+		if(file_probe == -1) file_chr = '?';
+		if(file_probe == 1) file_chr = 'o';
+		//file_chr = 'o';
+
+		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, next_fn,CHAR_ESC);
 		nfiles++;
 	}
 
@@ -2581,9 +2609,22 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	FILE *fp_in = NULL;
 	int read_length = 0;
 	char * line = (char*)calloc(MAX_LINE_LENGTH, 1);
-	global_context -> start_time = miltime();
+	char * file_str = "";
 
-	print_in_box(84,0,0,"Process %s %c[0m..." , global_context->input_file_name, CHAR_ESC);
+	if(strcmp( global_context->input_file_name,"STDIN")!=0)
+	{
+		int file_probe = is_certainly_bam_file(global_context->input_file_name);
+		if(file_probe == 1)global_context->is_SAM_file = 0;
+		else global_context->is_SAM_file = 1;
+
+		global_context -> start_time = miltime();
+
+		file_str = "SAM";
+		if(file_probe == 1) file_str = "BAM" ;
+		if(file_probe == -1) file_str = "Unknown";
+	}
+
+	print_in_box(84,0,0,"Process %s file %s %c[0m..." , file_str, global_context->input_file_name, CHAR_ESC);
 
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
@@ -2592,6 +2633,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		{
 			print_in_box(80,0,0,"Failed to open file %s",  global_context->input_file_name);
 			print_in_box(80,0,0,"No counts were generated for this file.");
+			print_in_box(80,0,0,"");
 			return -1;
 		}
 		fclose(exist_fp);

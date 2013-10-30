@@ -273,6 +273,8 @@ int show_summary(global_context_t * global_context)
 	{
 		if(global_context->config.is_rna_seq_reads)
 			print_in_box(80, 0,0,"         Junctions : %u", global_context -> all_junctions);
+		if(global_context->config.do_fusion_detection)
+			print_in_box(80, 0,0,"           Fusions : %u", global_context -> all_fusions);
 		print_in_box(80, 0,0,"            Indels : %u", global_context -> all_indels);
 	}
 	
@@ -1004,7 +1006,7 @@ int write_chunk_results(global_context_t * global_context)
 
 						if(global_context -> config.do_fusion_detection)
 						{
-							chimeric_cigar_parts(mate_linear_pos, is_jumped ^ mate_strand, is_jumped , mate_cigar_decompress , out_poses, out_mate_cigars, out_strands, mate_read_len, out_read_lens);
+							chimeric_cigar_parts(global_context, mate_linear_pos, is_jumped ^ mate_strand, is_jumped , mate_cigar_decompress , out_poses, out_mate_cigars, out_strands, mate_read_len, out_read_lens);
 
 							mate_linear_pos = out_poses[0];
 							mate_strand = out_strands[0]=='-';
@@ -1072,7 +1074,7 @@ int write_chunk_results(global_context_t * global_context)
 					if(global_context -> config.do_fusion_detection)
 					{
 
-						int chimeric_sections = chimeric_cigar_parts(current_linear_pos, is_first_section_jumped ^ current_strand, is_first_section_jumped , current_CIGAR , out_poses, out_cigars, out_strands, current_read_len, out_read_lens);
+						int chimeric_sections = chimeric_cigar_parts(global_context, current_linear_pos, is_first_section_jumped ^ current_strand, is_first_section_jumped , current_CIGAR , out_poses, out_cigars, out_strands, current_read_len, out_read_lens);
 
 						/*
 
@@ -1285,7 +1287,7 @@ int write_chunk_results(global_context_t * global_context)
 					if(global_context->config.do_big_margin_reporting)
 						seq_len += sprintf(additional_information+seq_len, "\tSA:i:%d", current_repeated_times);
 					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tNH:i:%d", (int)((current_result -> Score_H >> 17) & 0xfff), is_current_ok?total_best_reads:0);
-					//seq_len += sprintf(additional_information+seq_len, "\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d", current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, is_current_ok?total_best_reads:0);
+					//seq_len += sprintf(additional_information+seq_len, "\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d", current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, is_current_ok?total_best_reads:0); 
 					if(global_context->config.read_group_id[0])
 						seq_len += sprintf(additional_information+seq_len, "\tRG:Z:%s", global_context->config.read_group_id);
 
@@ -1848,8 +1850,10 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !global_context->config.do_fusion_detection)
 			{
 				//if(strcmp(read_name_1,"b1")==0)
+
 				//print_votes(vote_1, global_context -> config.index_prefix);
 				//print_votes(vote_2, global_context -> config.index_prefix);
+
 				//finalise_vote(vote_1);
  
 				/*
@@ -2351,7 +2355,7 @@ void print_subread_logo()
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m       ==== %c[0m%c[36m   ____) | |__| | |_) | | \\ \\| |____ / ____ \\| |__| |", CHAR_ESC, CHAR_ESC, CHAR_ESC);
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m ========== %c[0m%c[36m  |_____/ \\____/|____/|_|  \\_\\______/_/    \\_\\_____/%c[0m", CHAR_ESC, CHAR_ESC, CHAR_ESC, CHAR_ESC);
 	#ifdef MAKE_STANDALONE
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"          v%s",SUBREAD_VERSION);
+	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"         v%s",SUBREAD_VERSION);
 	#else
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %s",SUBREAD_VERSION);
 	#endif
@@ -2367,9 +2371,11 @@ int print_configuration(global_context_t * context)
 	if(context->config.is_rna_seq_reads)
 	{
 		if(context->config.do_fusion_detection)
-			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection");
+		{
+			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection%s", context->config.prefer_donor_receptor_junctions?" (RNA-Seq)":" (DNA-Seq)");
+		}
 		else
-			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection");
+			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection (RNA-Seq)");
 	}
 	else
 		print_in_box(80, 0, 0,         "          Function : Read alignment");
@@ -2651,6 +2657,7 @@ int load_global_context(global_context_t * context)
 	context->all_mapped_reads = 0;
 	context->all_correct_PE_reads = 0;
 	context->all_junctions = 0;
+	context->all_fusions = 0;
 	context->all_indels = 0;
 	sublog_printf(SUBLOG_STAGE_DEV1, SUBLOG_LEVEL_DEBUG, "load_global_context: finished");
 
@@ -2958,7 +2965,7 @@ unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar)
 	return ret;
 }
 
-int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * perfect_lens)
+int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * perfect_lens)
 {
 	unsigned int current_perfect_map_start = sel_pos;
 	int current_perfect_section_no = 0;
@@ -2980,6 +2987,8 @@ int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_str
 	for(cigar_cursor=0;;cigar_cursor++)
 	{
 		char ncch = in_cigar[cigar_cursor];
+		int is_chimeric_section_end = 0;
+
 		if(!ncch){
 			perfect_lens [current_perfect_section_no] = perfect_len ;
 			current_perfect_section_no++;
@@ -2988,42 +2997,64 @@ int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_str
 
 		if(toupper(ncch)=='N'||toupper(ncch)=='B')
 		{
+
+			unsigned int jummped_location;
+			int is_chro_jump = 0;
+
 			if(is_reversed)
 			{
 				if(toupper(ncch)=='N')
-					current_perfect_cursor = current_perfect_map_start - 1 + tmpi;
+					jummped_location = current_perfect_map_start - 1 + tmpi;
 				else
-					current_perfect_cursor = current_perfect_map_start - 1 - tmpi;
+					jummped_location = current_perfect_map_start - 1 - tmpi;
 			}
 			else
 			{
 				if(toupper(ncch)=='N')
-					current_perfect_cursor += tmpi;
+					jummped_location = current_perfect_cursor + tmpi;
 				else
-					current_perfect_cursor -= tmpi;
+					jummped_location = current_perfect_cursor - tmpi;
 
 			}
-			if(islower(ncch)){
-				is_reversed = !is_reversed;
-				is_negative = !is_negative;
+
+			if(ncch == 'N')
+			{
+				char * curr_chr, * new_chr;
+				unsigned int curr_offset, new_offset;
+				locate_gene_position_max(current_perfect_cursor, &global_context -> chromosome_table, & curr_chr, & curr_offset, 1);
+				locate_gene_position_max(jummped_location      , &global_context -> chromosome_table, &  new_chr, &  new_offset, 1);
+				is_chro_jump = (curr_chr != new_chr);
 			}
 
-			current_perfect_map_start = current_perfect_cursor;
-			tmpi = 0;
-			if(read_cursor<read_len)
-				sprintf(out_cigars[current_perfect_section_no] + out_cigar_writer_ptr,"%dS", read_len - read_cursor);
+			if(is_chro_jump || islower(ncch) || ncch == 'B')
+			{
+				current_perfect_cursor = jummped_location;
 
-			perfect_lens [current_perfect_section_no] = perfect_len ;
-			perfect_len = 0;
+				if(islower(ncch)){
+					is_reversed = !is_reversed;
+					is_negative = !is_negative;
+				}
 
-			current_perfect_section_no++;
-			if(current_perfect_section_no>5)break;
+				current_perfect_map_start = current_perfect_cursor;
+				tmpi = 0;
+				if(read_cursor<read_len)
+					sprintf(out_cigars[current_perfect_section_no] + out_cigar_writer_ptr,"%dS", read_len - read_cursor);
 
-			out_poses[current_perfect_section_no] = current_perfect_map_start - read_cursor;
-			out_strands[current_perfect_section_no] = is_negative?'-':'+';
-			out_cigar_writer_ptr = sprintf(out_cigars[current_perfect_section_no],"%dS", read_cursor);
+				perfect_lens [current_perfect_section_no] = perfect_len ;
+				perfect_len = 0;
+
+				current_perfect_section_no++;
+				if(current_perfect_section_no>5)break;
+
+				out_poses[current_perfect_section_no] = current_perfect_map_start - read_cursor;
+				out_strands[current_perfect_section_no] = is_negative?'-':'+';
+				out_cigar_writer_ptr = sprintf(out_cigars[current_perfect_section_no],"%dS", read_cursor);
+				is_chimeric_section_end  = 1;
+			}
 		}
-		else{
+
+		if(!is_chimeric_section_end)
+		{
 			if(isalpha(ncch))
 			{
 				out_cigar_writer_ptr+=sprintf(out_cigars[current_perfect_section_no]+out_cigar_writer_ptr, "%u%c", tmpi, ncch);
@@ -3037,7 +3068,7 @@ int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_str
 					current_perfect_cursor += tmpi;
 				tmpi = 0;
 			}
-			else if(ncch == 'D')
+			else if(ncch == 'D' || ncch == 'N')
 			{
 				if(!is_reversed)
 					current_perfect_cursor += tmpi;

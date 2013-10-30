@@ -2194,7 +2194,7 @@ float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  u
 	int ret =0;
 	char lastch;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
-		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+		//SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
 	//	exit(-1);
 		return 100;
 	}
@@ -2221,7 +2221,7 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 	int i;
 	int ret =0;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
-		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+		//SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
 	//	exit(-1);
 		return 100;
 	}

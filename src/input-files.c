@@ -2286,6 +2286,17 @@ int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, uns
 }
 
 int probe_file_type(char * fname);
+int is_certainly_bam_file(char * fname)
+{
+
+	int read_type = probe_file_type(fname);
+	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY)
+		return -1;
+	if(read_type == FILE_TYPE_BAM)
+		return 1;
+	return 0;
+}
+
 int warning_file_type(char * fname, int expected_type)
 {
 	int read_type = probe_file_type(fname);
@@ -2295,6 +2306,12 @@ int warning_file_type(char * fname, int expected_type)
 		print_in_box(80,0,0,"WARNING file '%s' is inaccessible.", fname);
 		return 1;
 	}
+	else if(read_type == FILE_TYPE_EMPTY)
+	{
+		print_in_box(80,0,0,"WARNING file '%s' is empty.", fname);
+		return 1;
+	}
+
 	else if((expected_type == FILE_TYPE_FAST_ && (read_type!= FILE_TYPE_FASTQ && read_type!= FILE_TYPE_FASTA))||
 		(expected_type != FILE_TYPE_FAST_ && expected_type != read_type))
 	{
@@ -2324,17 +2341,108 @@ int probe_file_type(char * fname)
 	char *test_buf=malloc(5000);
 
 	nch = fgetc(fp);
-	if(nch == '@')	// FASTQ OR SAM
+
+	if(feof(fp))
+		ret = FILE_TYPE_EMPTY;
+	
+	else
 	{
-		char * rptr = fgets(test_buf, 4999, fp);
-		int second_line_len = 0;
-		if(rptr)
+		if(nch == '@')	// FASTQ OR SAM
 		{
-			rptr = fgets(test_buf, 4999, fp);
+			char * rptr = fgets(test_buf, 4999, fp);
+			int second_line_len = 0;
 			if(rptr)
 			{
-				second_line_len = strlen(test_buf);
-				int tabs = 0, x1;
+				rptr = fgets(test_buf, 4999, fp);
+				if(rptr)
+				{
+					second_line_len = strlen(test_buf);
+					int tabs = 0, x1;
+					for(x1=0;x1<4999;x1++)
+					{
+						if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+						if(test_buf[x1]=='\t'){
+							tabs++;
+							continue;
+						}
+
+						if(tabs == 1)
+							if(!isdigit(test_buf[x1]))break;
+					}
+					if(rptr[0]=='@' || tabs>7)
+						ret = FILE_TYPE_SAM;
+				}
+			}
+			if(ret == FILE_TYPE_UNKNOWN)
+			{
+				rptr = fgets(test_buf, 4999, fp);
+				if(rptr[0] == '+')
+				{
+					rptr = fgets(test_buf, 4999, fp);
+					if(rptr && second_line_len == strlen(test_buf))
+						ret = FILE_TYPE_FASTQ;
+				}
+			}
+		}
+		else if(nch == '>') // FASTA
+		{
+			char * rptr = fgets(test_buf, 4999, fp);
+			int x1;
+			if(rptr)
+			{
+				ret = FILE_TYPE_FASTA;
+				for(x1=0;x1<4999;x1++)
+				{
+					if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+					nch = toupper(test_buf[x1]);
+					if(nch < ' ' || nch>127)
+					{
+						ret = FILE_TYPE_UNKNOWN;
+						break;
+					}
+				}
+				rptr = fgets(test_buf, 4999, fp);
+				if(rptr && ret == FILE_TYPE_FASTA)
+				{
+					for(x1=0;x1<4999;x1++)
+					{
+						if(test_buf[x1]=='\n' || !test_buf[x1]) break;
+						nch = toupper(test_buf[x1]);
+						if(nch == 'A' || nch == 'T' || nch == 'G' || nch == 'C' || nch == 'N' || nch == '.' || (nch >='0' && nch <= '3'))
+							;
+						else
+						{
+							ret = FILE_TYPE_UNKNOWN;
+							break;
+						}
+					}
+
+					if(x1==0) ret = FILE_TYPE_UNKNOWN;
+				}
+			}
+		}
+		else if(nch == 31) // BAM
+		{
+			nch = fgetc(fp);
+			if(nch == 139)
+			{
+				fclose(fp);
+				fp=NULL;
+				gzFile zfp = gzopen(fname, "rb");
+				if(zfp)
+				{
+					int rlen = gzread(zfp, test_buf,10);
+					if(rlen == 10 && memcmp(test_buf,"BAM\1",4)==0)
+						ret = FILE_TYPE_BAM;
+					gzclose(zfp);
+				}
+			}
+		}
+		else if(nch >= 0x20 && nch <= 0x7f) // SAM without headers
+		{
+			int tabs = 0, x1;
+			char * rptr = fgets(test_buf, 4999, fp);
+			if(rptr)
 				for(x1=0;x1<4999;x1++)
 				{
 					if(test_buf[x1]=='\n' || !test_buf[x1]) break;
@@ -2342,96 +2450,13 @@ int probe_file_type(char * fname)
 						tabs++;
 						continue;
 					}
-
 					if(tabs == 1)
 						if(!isdigit(test_buf[x1]))break;
 				}
-				if(rptr[0]=='@' || tabs>7)
-					ret = FILE_TYPE_SAM;
-			}
-		}
-		if(ret == FILE_TYPE_UNKNOWN)
-		{
-			rptr = fgets(test_buf, 4999, fp);
-			if(rptr[0] == '+')
-			{
-				rptr = fgets(test_buf, 4999, fp);
-				if(rptr && second_line_len == strlen(test_buf))
-					ret = FILE_TYPE_FASTQ;
-			}
-		}
-	}
-	else if(nch == '>') // FASTA
-	{
-		char * rptr = fgets(test_buf, 4999, fp);
-		int x1;
-		if(rptr)
-		{
-			ret = FILE_TYPE_FASTA;
-			for(x1=0;x1<4999;x1++)
-			{
-				if(test_buf[x1]=='\n' || !test_buf[x1]) break;
-				nch = toupper(test_buf[x1]);
-				if(nch < ' ' || nch>127)
-				{
-					ret = FILE_TYPE_UNKNOWN;
-					break;
-				}
-			}
-			rptr = fgets(test_buf, 4999, fp);
-			if(rptr && ret == FILE_TYPE_FASTA)
-			{
-				for(x1=0;x1<4999;x1++)
-				{
-					if(test_buf[x1]=='\n' || !test_buf[x1]) break;
-					nch = toupper(test_buf[x1]);
-					if(nch == 'A' || nch == 'T' || nch == 'G' || nch == 'C' || nch == 'N' || nch == '.' || (nch >='0' && nch <= '3'))
-						;
-					else
-					{
-						ret = FILE_TYPE_UNKNOWN;
-						break;
-					}
-				}
+			if(tabs>7)
+				ret = FILE_TYPE_SAM;
 
-				if(x1==0) ret = FILE_TYPE_UNKNOWN;
-			}
 		}
-	}
-	else if(nch == 31) // BAM
-	{
-		nch = fgetc(fp);
-		if(nch == 139)
-		{
-			fclose(fp);
-			fp=NULL;
-			gzFile zfp = gzopen(fname, "rb");
-			if(zfp)
-			{
-				int rlen = gzread(zfp, test_buf,10);
-				if(rlen == 10 && memcmp(test_buf,"BAM\1",4)==0)
-					ret = FILE_TYPE_BAM;
-			}
-		}
-	}
-	else if(nch >= 0x20 && nch <= 0x7f) // SAM without headers
-	{
-		int tabs = 0, x1;
-		char * rptr = fgets(test_buf, 4999, fp);
-		if(rptr)
-			for(x1=0;x1<4999;x1++)
-			{
-				if(test_buf[x1]=='\n' || !test_buf[x1]) break;
-				if(test_buf[x1]=='\t'){
-					tabs++;
-					continue;
-				}
-				if(tabs == 1)
-					if(!isdigit(test_buf[x1]))break;
-			}
-		if(tabs>7)
-			ret = FILE_TYPE_SAM;
-
 	}
 
 	free(test_buf);

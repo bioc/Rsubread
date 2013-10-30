@@ -144,7 +144,8 @@ typedef struct{
 	char check_donor_at_junctions;
 
 	// subfusion
-	char do_fusion_detection;
+	int do_fusion_detection;
+	int prefer_donor_receptor_junctions;
 
 	// indel
 	char do_superlong_indel_detection;
@@ -280,6 +281,7 @@ typedef struct{
 	unsigned long long all_mapped_reads;
 	unsigned long long all_correct_PE_reads;
 	unsigned int all_junctions;
+	unsigned int all_fusions;
 	unsigned int all_indels;
 
 	unsigned long long current_circle_start_position_file1;
@@ -371,7 +373,7 @@ void core_version_number(char * program);
 // The first base in the read actually has a larger coordinate than Pos. 
 unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
 
-int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
+int chimeric_cigar_parts(global_context_t * global_context , unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
 
 void warning_file_limit();
 #endif

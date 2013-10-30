@@ -28,7 +28,6 @@ static struct option long_options[] =
 	{"order",  required_argument, 0, 'S'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
-	{"fusion", no_argument, 0, 'f'},
 	{"color-convert",  no_argument, 0, 'b'},
 	{"junctionIns", required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
@@ -39,6 +38,8 @@ static struct option long_options[] =
 	{"SAMinput", no_argument, 0, 0},
 	{"hamming",  no_argument, 0, 'H'},
 	{"quality",  no_argument, 0, 'Q'},
+	{"dnaseq",  no_argument, 0, 0},
+	{"allJunctions",  no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -93,11 +94,13 @@ void print_usage_core_subjunc()
 	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
 	SUBREADputs("                            one best mapping location is found.");
 	SUBREADputs("                                 ");
-	SUBREADputs("    -f --fusion             perform fusion detection and generate fusion table.");
-	SUBREADputs("                                 ");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
+	SUBREADputs("   ");
+	SUBREADputs("       --allJunctions       detect chimeric junctions on RNA-Seq data.");
+	SUBREADputs("   ");
+	SUBREADputs("       --dnaseq             detect chimeric and fusions on DNA-Seq data.");
 	SUBREADputs("   ");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
@@ -181,11 +184,6 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	{
 		switch(c)
 		{
-			case 'f':
-				global_context->config.do_fusion_detection =1;
-				global_context->config.report_multi_mapping_reads = 1;
-				global_context->config.do_big_margin_filtering_for_junctions = 0;
-				break;
 			case 'v':
 				core_version_number("Subjunc");
 				return -1;
@@ -349,6 +347,23 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.limited_tree_scan = 0;
 					global_context->config.max_insertion_at_junctions = atoi(optarg);
 				}
+				else if(strcmp("dnaseq", long_options[option_index].name)==0 || strcmp("allJunctions", long_options[option_index].name)==0)
+				{
+					global_context->config.do_fusion_detection = 1;
+					if(strcmp("dnaseq", long_options[option_index].name)==0)
+						global_context->config.prefer_donor_receptor_junctions = 0;
+					global_context->config.report_multi_mapping_reads = 1;
+					global_context->config.do_big_margin_filtering_for_reads = 1;
+					global_context->config.limited_tree_scan = 1;
+
+					// To maximise sensitivity of junction detection:
+					// 1, Disable big margin for junctions.
+					// 2, Disable limited tree scan.
+					// 3, Disable neighbour removal.
+					// 4, Disable big margin >=2 for minor locations in process_votes (searcg iii or jjj in core-junctions.c).
+					// 5, Take a look at the flanking region length cutoff (>= 20% of the read length in new_junction in core-junctions.c) 
+				}
+
 				break;
 
 

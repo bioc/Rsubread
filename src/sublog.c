@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include <assert.h>
 #include <string.h>
 #include "subread.h"
@@ -59,47 +60,54 @@ void remove_ESC_effects(char * txt)
 }
 
 
+int is_ESC_removed()
+{
+	#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+	return !isatty(fileno(stderr));
+	#else
+	return 1;
+	#endif
+
+}
+
+
 void sublog_printf(int stage, int level, const char * pattern, ...)
 {
 	va_list args;
 	va_start(args , pattern);
 	if(level<MINIMUM_LOG_LEVEL) return;
 
-
+	int to_remove_ESC = 1;
 	#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+	to_remove_ESC = is_ESC_removed();
+	#endif
 
-	if(1)
+	if(to_remove_ESC)
 	{
+		char * vsbuf=malloc(1200);
+
+		vsnprintf(vsbuf, 1199, pattern , args);
+		remove_ESC_effects(vsbuf);
+
+		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+		fputs(vsbuf,stderr);
+		fputs("\n", stderr);
+		#else
+		Rprintf("%s\n",vsbuf);
+		#endif
+
+		free(vsbuf);
+	}
+	else
+	{
+		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
 		vfprintf(stderr, pattern , args);
 		va_end(args);
 		fputs("\n", stderr);
 
 		fflush(stderr);
+		#endif
 	}
-	else
-	{
-		char * vsbuf=malloc(1200);
-
-		vsnprintf(vsbuf, 1199, pattern , args);
-		remove_ESC_effects(vsbuf);
-
-		fprintf(stderr,"%s\n",vsbuf);
-
-		free(vsbuf);
-
-
-	}
-	#else
-		char * vsbuf=malloc(1200);
-
-		vsnprintf(vsbuf, 1199, pattern , args);
-		remove_ESC_effects(vsbuf);
-
-		Rprintf("%s\n",vsbuf);
-
-		free(vsbuf);
-
-	#endif
 }
 
 void sublog_fwrite(int stage, int level, const char * pattern, ...)
@@ -109,39 +117,38 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 
 	if(level<MINIMUM_LOG_LEVEL) return;
 
+	int to_remove_ESC = 1;
 	#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+	to_remove_ESC = is_ESC_removed();
+	#endif
 
-	if(1)
+	if(to_remove_ESC)
 	{
-		vfprintf(stderr, pattern , args);
-		va_end(args);
-
-		fflush(stderr);
-	}
-	else
-	{
-		char * vsbuf=malloc(1200);
-
-		vsnprintf(vsbuf, 1199, pattern , args);
-		remove_ESC_effects(vsbuf);
-
-		fprintf(stderr,"%s",vsbuf);
-
-		free(vsbuf);
-
-
-	}
-	#else
 		char * vsbuf=malloc(1200);
 
 		vsnprintf(vsbuf, 1199, pattern , args);
 		remove_ESC_effects(vsbuf);
 		if(strlen(vsbuf)>0)
+		{
+			#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+			fputs(vsbuf,stderr);
+			#else
 			Rprintf("%s",vsbuf);
+			#endif
 
+
+		}
 		free(vsbuf);
+	}
+	else
+	{
+		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+		vfprintf(stderr, pattern , args);
+		va_end(args);
 
-	#endif
+		fflush(stderr);
+		#endif
+	}
 
 }
 

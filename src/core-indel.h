@@ -49,11 +49,11 @@
 typedef struct{
 	unsigned int event_small_side;
 	unsigned int event_large_side;
-	union
-	{
+	//union
+	//{
 		short indel_length;
 		short junction_flanking_left;
-	};
+	//};
 	short junction_flanking_right;
 
 	unsigned char event_type;

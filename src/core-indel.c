@@ -132,6 +132,7 @@ int is_ambiguous_indel_score(chromosome_event_t * e)
 }
 void remove_neighbour(global_context_t * global_context)
 {
+
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 
 	HashTable * event_table = indel_context -> event_entry_table;
@@ -219,9 +220,9 @@ void remove_neighbour(global_context_t * global_context)
 						}
 					}
 
-				if(global_context->config.do_fusion_detection)
+				if(global_context->config.do_fusion_detection && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
 				{
-					for(xk2=-100 ; xk2 < 100 ; xk2++)
+					for(xk2=-10 ; xk2 < 10 ; xk2++)
 					{
 						if(!xk2)continue;
 						if(to_be_removed_number>=maxinum_removed_events) break;
@@ -256,7 +257,7 @@ void remove_neighbour(global_context_t * global_context)
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
 	}
 
-	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_DEBUG, "There are %d low-confidence chromosome events out of %d removed.", to_be_removed_number, all_junctions);
+	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "There are %d low-confidence chromosome events out of %d removed.", to_be_removed_number, all_junctions);
 
 	free(to_be_removed_ids);
 }
@@ -3288,6 +3289,7 @@ void init_global_context(global_context_t * context)
 	context->config.report_sam_file = 1;
 	context->config.is_rna_seq_reads = 0;
 	context->config.do_fusion_detection = 0;
+	context->config.prefer_donor_receptor_junctions = 1;
 	context->config.do_big_margin_filtering_for_reads = 0;
 	context->config.do_big_margin_filtering_for_junctions = 0;
 	context->config.do_big_margin_reporting = 1;
