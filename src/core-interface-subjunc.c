@@ -98,9 +98,25 @@ void print_usage_core_subjunc()
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("   ");
-	SUBREADputs("       --allJunctions       detect chimeric junctions on RNA-Seq data.");
+	SUBREADputs("       --dnaseq             specify that the input read data are genomic DNA");
+	SUBREADputs("                            sequencing data. When specified, the program will");
+	SUBREADputs("                            perform read alignments and also detect fusion");
+	SUBREADputs("                            events such as chimeras. Discovered fusions will");
+	SUBREADputs("                            be saved to a file (*.fusions.txt). Detailed");
+	SUBREADputs("                            mapping results for fusion reads will be saved to");
+	SUBREADputs("                            the SAM/BAM output file as well. Secondary");
+	SUBREADputs("                            alignments of fusion reads will be saved to the");
+	SUBREADputs("                            following optional fields: CC(Chr), CP(Position),");
+	SUBREADputs("                            CG(CIGAR) and CT(strand). Note that each fusion");
+	SUBREADputs("                            read occupies only one row in the SAM/BAM output");
+	SUBREADputs("                            file.");
 	SUBREADputs("   ");
-	SUBREADputs("       --dnaseq             detect chimeric and fusions on DNA-Seq data.");
+	SUBREADputs("       --allJunctions       this option should only be used for RNA-seq data.");
+	SUBREADputs("                            If specified, the program will report non-canonical");
+	SUBREADputs("                            exon-exon junctions and fusions (eg. chimeras), in");
+	SUBREADputs("                            addition to canonical exon-exon junctions. Non-");
+	SUBREADputs("                            canonical junctions and fusions are reported in the");
+	SUBREADputs("                            same format as that in `--dnaseq' option.");
 	SUBREADputs("   ");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
@@ -157,6 +173,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	opterr = 1;
 	optopt = 63;
 
+	global_context->config.entry_program_name = CORE_PROGRAM_SUBJUNC;
 	global_context->config.max_mismatch_exonic_reads = 10;
 	global_context->config.max_mismatch_junction_reads = 1;
 	global_context->config.ambiguous_mapping_tolerance = 39;

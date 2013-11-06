@@ -1314,7 +1314,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 	}
 	else if(global_context -> config.show_soft_cliping && (head_soft_clipped>0 || tail_soft_clipped>0))
 	{
-		char new_cigar_tmp[100];
+		char new_cigar_tmp[120];
 		is_First_M=1;
 		new_cigar_tmp[0]=0;
 		cigar_cursor = 0;
@@ -1372,7 +1372,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context)
 {
 	int xk1;
-	char tmp_cigar[100];
+	char tmp_cigar[120];
 	chromosome_event_t * to_be_supported [20];
 	short flanking_size_left[20], flanking_size_right[20];
 	int to_be_supported_count = 0;
@@ -2115,7 +2115,7 @@ int write_fusion_final_results(global_context_t * global_context)
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 	char fn2 [MAX_FILE_NAME_LENGTH];
 
-	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.chimerism.txt", global_context->config.output_prefix);
+	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.fusion.txt", global_context->config.output_prefix);
 	FILE * ofp = fopen(fn2, "wb");
 	fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport\n");
 
@@ -2129,7 +2129,7 @@ int write_fusion_final_results(global_context_t * global_context)
 		char * chro_name_left,* chro_name_right;
 		unsigned int chro_pos_left, chro_pos_right; 
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
-		if(event_body -> event_type != CHRO_EVENT_TYPE_FUSION)
+		if(event_body -> event_type != CHRO_EVENT_TYPE_FUSION && (global_context->config.entry_program_name != CORE_PROGRAM_SUBREAD || event_body -> event_type != CHRO_EVENT_TYPE_JUNCTION))
 			continue;
 
 		all_juncs++;

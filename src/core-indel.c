@@ -56,9 +56,17 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		{
 			//printf("T REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
 			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
-			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
+		//	chromosome_event_t * new_space = 
+			 ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
 				realloc(((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) * 
 					((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number);
+
+		//	if(!new_space){
+		//		SUBREADprintf("Unable to reallocate local event space!\n");
+		//		return NULL;
+		//	}
+
+		//	((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = new_space;
 		}
 		return ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
 	}
@@ -69,9 +77,17 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		{
 			//printf("G REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
+			//chromosome_event_t * new_space = 
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic =
 				realloc(((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) *
 					((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number); 
+
+			//if(!new_space){
+			//	SUBREADprintf("Unable to reallocate global event space!\n");
+			//	return NULL;
+			//}
+
+			//((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = new_space;
 		}
 		return ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
 	}
@@ -254,6 +270,8 @@ void remove_neighbour(global_context_t * global_context)
 		}
 
 		//printf("NBR_REMOVED=%u - %u\n", deleted_event -> event_small_side , deleted_event -> event_large_side);
+		if(deleted_event -> event_type == CHRO_EVENT_TYPE_INDEL && deleted_event -> inserted_bases)
+			free(deleted_event -> inserted_bases);
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
 	}
 
@@ -947,7 +965,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 
 	gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
 
-	for(i=0; indel_recorder[i] ; i+=3)
+	for(i=0; indel_recorder[i]  && (i<MAX_INDEL_SECTIONS); i+=3)
 	{
 		int indels = indel_recorder[i+2] - last_indel;
 			// -1 : 1 insert; 1: 1 delete
@@ -3540,11 +3558,8 @@ int core_dynamic_align(global_context_t * global_context, thread_context_t * thr
 	}
 	#endif
 
-
 	while(1)
 	{
-		assert(path_i>=0);
-		assert(j>=0);
 		if(table_mask[path_i][j] == INDEL_MASK_BY_INSERTION)
 		{
 			j--;

@@ -940,14 +940,14 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
 							{
 								toli +=3;
-								if (toli < indel_tolerance*3)
+								if (toli < MAX_INDEL_SECTIONS*3)
 								{
 									vote -> toli[offsetX][i] = toli;
 									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
 									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
 										
-									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+									if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
 								}
 								vote->current_indel_cursor [offsetX][i] = (char)dist0;
 							}

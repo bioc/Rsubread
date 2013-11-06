@@ -132,6 +132,7 @@ typedef struct{
 	int big_margin_record_size;
 
 	// subjunc
+	int entry_program_name;
 	char is_rna_seq_reads;
 	char do_big_margin_filtering_for_junctions;
 	char do_big_margin_filtering_for_reads;
@@ -184,6 +185,9 @@ typedef struct{
 #define CORE_CIGAR_OPT_BB 6
 #define CORE_CIGAR_OPT_NN 7
 
+#define CORE_PROGRAM_SUBREAD 100
+#define CORE_PROGRAM_SUBJUNC 200
+#define CORE_PROGRAM_SUBINDEL 1000
 
 typedef struct
 {
@@ -341,7 +345,7 @@ int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_co
 // cigar_len is the maximum length of decompressed cigar
 // bincigar is the maximum length of compressed cigar
 // it returns the length of decompressed cigar, or -1 if buffer is too short.
-int bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int bincigar_max_len);
+int bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int bincigar_max_len, int read_len);
 
 // compress a cigar string to bincigar
 // bincigar_len is the maximum length of compressed cigar

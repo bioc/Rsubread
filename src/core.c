@@ -121,7 +121,7 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 		}else{
 			txt_len++;
 			
-			if(txt_len == line_width - 6)
+			if(txt_len == 80 - 6)
 			{
 				is_cut = 1;
 			} 
@@ -142,10 +142,12 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 				state = 1;
 			if(!state){
 				txt_len++;
-				if(txt_len == real_lenwidth - 9)
+				if(txt_len == 80 - 9)
 				{
 					strcpy(content+x1, "\x1b[0m ...");
 					content_len = line_width - 4;
+					content_len = 80 - 4;
+					line_width = 80;
 					break;
 				} 
 			}
@@ -271,7 +273,7 @@ int show_summary(global_context_t * global_context)
 
 	if(global_context->config.output_prefix[0])
 	{
-		if(global_context->config.is_rna_seq_reads)
+		if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC)
 			print_in_box(80, 0,0,"         Junctions : %u", global_context -> all_junctions);
 		if(global_context->config.do_fusion_detection)
 			print_in_box(80, 0,0,"           Fusions : %u", global_context -> all_fusions);
@@ -352,7 +354,7 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 	//fprintf(stderr, "FINISHED=%llu, FINISHED_READS=%llu, ALL=%llu, ALLREADS=%llu, ALLCHUNKREADS=%llu; BEFORE_CHUK=%llu; CUR-BLK=%d; IND-BLK=%d\n", finished_steps, reads_finished_in_this_chunk, guessed_all_steps, guessed_all_reads,guessed_this_chunk_all_reads, guessed_all_reads_before_this_chunk,  global_context -> current_index_block_number , global_context -> index_block_number );
 
 	if(current_read_no>1000 && !progress_report_callback)
-		print_in_box(81,0,0, "%4d%%%% completed, %3d mins elapsed, total=%dk %s, rate=%2.1fk/s      \r", (int)(finished_rate*100), (int)((miltime() - global_context -> start_time)/60),(int)(guessed_all_reads*1./1000), global_context -> input_reads.is_paired_end_reads?"frags":"reads", reads_per_second/1000, reads_finished_in_this_chunk);
+		print_in_box(81,0,0, "%4d%%%% completed, %3d mins elapsed, total=%dk %s, rate=%2.1fk/s\r", (int)(finished_rate*100), (int)((miltime() - global_context -> start_time)/60),(int)(guessed_all_reads*1./1000), global_context -> input_reads.is_paired_end_reads?"frags":"reads", reads_per_second/1000, reads_finished_in_this_chunk);
 
 	if(progress_report_callback)
 	{
@@ -818,7 +820,7 @@ int write_final_results(global_context_t * context)
 	{
 		write_indel_final_results(context);
 
-		if(context -> config.is_rna_seq_reads)
+		if(context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC)
 			write_junction_final_results(context);
 
 		if(context -> config.do_fusion_detection)
@@ -995,12 +997,12 @@ int write_chunk_results(global_context_t * global_context)
 						if( mate_result -> cigar_string[0] == -1)
 						{
 							is_jumped = 1;
-							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN);
+							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN, mate_read_len);
 							mate_CIGAR = mate_cigar_decompress;
 						}
 						else
 						{
-							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string, CORE_MAX_CIGAR_LEN);
+							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string, CORE_MAX_CIGAR_LEN, mate_read_len);
 							mate_CIGAR = mate_cigar_decompress;
 						}
 
@@ -1059,14 +1061,14 @@ int write_chunk_results(global_context_t * global_context)
 					int is_first_section_jumped = 0;
 					if( current_result -> cigar_string[0] == -1)
 					{
-						bincigar2cigar(current_cigar_decompress, 100, current_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN);
+						bincigar2cigar(current_cigar_decompress, 100, current_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN, current_read_len);
 						//current_linear_pos = reverse_cigar(current_linear_pos , current_cigar_decompress, current_cigar_decompress_new);
 						current_CIGAR  = current_cigar_decompress;
 						is_first_section_jumped = 1;
 					}
 					else
 					{
-						bincigar2cigar(current_cigar_decompress, 100, current_result -> cigar_string, CORE_MAX_CIGAR_LEN);
+						bincigar2cigar(current_cigar_decompress, 100, current_result -> cigar_string, CORE_MAX_CIGAR_LEN, current_read_len);
 						current_CIGAR  = current_cigar_decompress;
 					}
 
@@ -1143,8 +1145,16 @@ int write_chunk_results(global_context_t * global_context)
 
 					if(global_context -> input_reads.is_paired_end_reads && global_context -> config.report_unmapped_using_mate_pos&& is_mate_ok)
 					{
-						current_chro_name = mate_chro_name;
-						current_chro_offset = mate_chro_offset;
+
+						// DO NOT SHOW CORRDINATE IF IT IS UNMAPPED.
+						//
+						//current_chro_name = mate_chro_name;
+						//current_chro_offset = mate_chro_offset;
+						current_chro_name = "*";
+						current_chro_offset = 0;
+
+						/////////////////////////////////////////
+
 						this_should_nagetive = mate_strand;
 						current_strand = mate_strand;
 						if(this_should_nagetive + is_second_read ==1)
@@ -1211,12 +1221,17 @@ int write_chunk_results(global_context_t * global_context)
 				}
 				long long int mate_distance = 0;
 
-				if(is_current_ok && global_context -> config.report_unmapped_using_mate_pos && global_context -> input_reads.is_paired_end_reads &&!is_mate_ok)
-				{
-					mate_distance = 0;
-					mate_chro_name = current_chro_name;
-					mate_chro_offset = current_chro_offset;
-				}
+				// DO NOT SHOW CORRDINATE IF IT IS UNMAPPED.
+				//
+					if( 0 && is_current_ok && global_context -> config.report_unmapped_using_mate_pos && global_context -> input_reads.is_paired_end_reads &&!is_mate_ok)
+					{
+						mate_distance = 0;
+
+						
+						mate_chro_name = current_chro_name;
+						mate_chro_offset = current_chro_offset;
+					}
+				//////////////////////////////////////////////
 
 				if(is_current_ok && global_context -> input_reads.is_paired_end_reads && is_mate_ok)
 				{
@@ -2355,7 +2370,10 @@ void print_subread_logo()
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m       ==== %c[0m%c[36m   ____) | |__| | |_) | | \\ \\| |____ / ____ \\| |__| |", CHAR_ESC, CHAR_ESC, CHAR_ESC);
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %c[44;37m ========== %c[0m%c[36m  |_____/ \\____/|____/|_|  \\_\\______/_/    \\_\\_____/%c[0m", CHAR_ESC, CHAR_ESC, CHAR_ESC, CHAR_ESC);
 	#ifdef MAKE_STANDALONE
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"         v%s",SUBREAD_VERSION);
+	char * spaces = "";
+	if(strlen(SUBREAD_VERSION) == 8) spaces = "";
+	else if(strlen(SUBREAD_VERSION) == 5) spaces = "  ";
+	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"        %sv%s",spaces,SUBREAD_VERSION);
 	#else
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %s",SUBREAD_VERSION);
 	#endif
@@ -2365,7 +2383,7 @@ int print_configuration(global_context_t * context)
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
 	print_subread_logo();
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
-	print_in_box(80, 1, 1, context->config.is_rna_seq_reads?"subjunc setting":"subread-align setting");
+	print_in_box(80, 1, 1, context->config.entry_program_name == CORE_PROGRAM_SUBJUNC?"subjunc setting":"subread-align setting");
 	print_in_box(80, 0, 1, "");
 
 	if(context->config.is_rna_seq_reads)
@@ -2786,7 +2804,10 @@ int cigar2bincigar(char *cigar, char *bincigar, int bincigar_len)
 		else
 		{
 			int bincigar_sec_len = write_bincigar_part(bincigar+bincigar_cursor, nch, tmpv, bincigar_len-bincigar_cursor);
-			if(bincigar_sec_len<0) return -1;
+			if(bincigar_sec_len<0){
+				bincigar[0]=0;
+				return -1;
+			}
 			bincigar_cursor += bincigar_sec_len;
 			tmpv=0;
 		}
@@ -2854,14 +2875,17 @@ int write_cigar_part(char *bincigar, char *cigar, int cigar_len , int * bincigar
 	return added_len;
 }
 
-int bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int bincigar_max_len)
+int bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int bincigar_max_len, int read_len)
 {
 	int cigar_cursor = 0, bincigar_cursor = 0;
 	while(1)
 	{
 		int bincigar_move = 0;
 		int cigar_sec_len = write_cigar_part(bincigar + bincigar_cursor, cigar+cigar_cursor, cigar_len-cigar_cursor-1, &bincigar_move);
-		if(cigar_sec_len<0) return -1;
+		if(cigar_sec_len<0){
+			sprintf(cigar,"%dM", read_len);
+			return -1;
+		}
 		//printf("NPC=%s\n", cigar);
 		cigar_cursor += cigar_sec_len;
 		bincigar_cursor += bincigar_move;
@@ -2999,7 +3023,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 		{
 
 			unsigned int jummped_location;
-			int is_chro_jump = 0;
+			int is_chro_jump = 0, is_long_jump = 0;
 
 			if(is_reversed)
 			{
@@ -3024,9 +3048,16 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				locate_gene_position_max(current_perfect_cursor, &global_context -> chromosome_table, & curr_chr, & curr_offset, 1);
 				locate_gene_position_max(jummped_location      , &global_context -> chromosome_table, &  new_chr, &  new_offset, 1);
 				is_chro_jump = (curr_chr != new_chr);
+
+				unsigned long long int dist = current_perfect_cursor;
+				dist -= jummped_location;
+				if(abs(dist) >= 134217728)
+					is_long_jump = 1;
+				// A long jump is the jump longer than 2^27.
+				// Picard does not like it!!
 			}
 
-			if(is_chro_jump || islower(ncch) || ncch == 'B')
+			if(is_chro_jump || islower(ncch) || ncch == 'B' || is_long_jump)
 			{
 				current_perfect_cursor = jummped_location;
 

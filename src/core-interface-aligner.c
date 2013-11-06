@@ -41,6 +41,7 @@ static struct option long_options[] =
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
+	{"reportFusions", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -87,7 +88,7 @@ void print_usage_core_aligner()
 	SUBREADputs("                              ");
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores in input files, '3' for");
 	SUBREADputs("                            phred+33 and '6' for phred+64. '3' by default.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -u --unique             only uniquely mapped reads will be reported (reads");
 	SUBREADputs("                            mapped to multiple locations in the reference genome");
 	SUBREADputs("                            will not be reported). This option can be used");
@@ -95,31 +96,41 @@ void print_usage_core_aligner()
 	SUBREADputs("");
 	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
 	SUBREADputs("                            than one best mapping location is found.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
 	SUBREADputs("                            one best mapping location is found.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
+	SUBREADputs("       --reportFusions      report discovered genomic fusion events such as");
+	SUBREADputs("                            chimeras. Discovered fusions will be saved to a file");
+	SUBREADputs("                            (*.fusions.txt). Detailed mapping results for fusion");
+	SUBREADputs("                            reads will be saved to the SAM/BAM output file as");
+	SUBREADputs("                            well. Secondary alignments of fusion reads will be");
+	SUBREADputs("                            saved to the following optional fields: CC(Chr),");
+	SUBREADputs("                            CP(Position), CG(CIGAR) and CT(strand). Note that");
+	SUBREADputs("                            each fusion read occupies only one row in the");
+	SUBREADputs("                            SAM/BAM output file.");
+	SUBREADputs("");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --trim3     <int>    trim off <int> number of bases from 3' end of each");
 	SUBREADputs("                            read. 0 by default.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --rg-id     <string> specify the read group ID. If specified,the read");
 	SUBREADputs("                            group ID will be added to the read group header");
 	SUBREADputs("                            field and also to each read in the mapping output.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --BAMoutput          specify that mapping results are saved into a BAM");
 	SUBREADputs("                            format file.");
 	SUBREADputs("");
@@ -141,17 +152,17 @@ void print_usage_core_aligner()
 	SUBREADputs("                            the Smith-Waterman algorithm. 2 by default.");
 	SUBREADputs("");
 	SUBREADputs("    -v                      output version of the program.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
 	SUBREADputs("    -R --read2     <input>  name of the second input file. The program will then");
 	SUBREADputs("                            be switched to the paired-end read mapping mode.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -p --minmatch2 <int>    consensus threshold for the read which receives less");
 	SUBREADputs("                            votes than the other read from the same pair, 1 by");
 	SUBREADputs("                            default.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
 	SUBREADputs("");
 	SUBREADputs("    -D --maxdist   <int>    maximum fragment/template length, 600bp by default.");
@@ -175,9 +186,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	opterr = 1;
 	optopt = 63;
 
+	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
 	global_context->config.max_mismatch_exonic_reads = 2000;
+	global_context->config.max_mismatch_junction_reads = 2000;
 	global_context->config.use_dynamic_programming_indel = 1;
-	global_context->config.extending_search_indels = 1 ;
+	global_context->config.extending_search_indels = 1;
 	global_context->config.big_margin_record_size = 9; 
 
 	if(argc<2)
@@ -362,6 +375,14 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_BAM_input = 0;
 					global_context->config.is_SAM_file_input = 1;
+				}
+				else if(strcmp("reportFusions", long_options[option_index].name)==0) 
+				{
+					global_context->config.is_rna_seq_reads = 1;
+					global_context->config.do_fusion_detection = 1;
+					global_context->config.prefer_donor_receptor_junctions = 0;
+					//global_context->config.do_big_margin_filtering_for_reads = 1;
+					//global_context->config.limited_tree_scan = 1;
 				}
 				break;
 			case '?':

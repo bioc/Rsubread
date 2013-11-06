@@ -41,6 +41,9 @@ typedef unsigned int BS_uint_32;
 #define SAMBAM_COMPRESS_LEVEL 5
 #define SAMBAM_GZIP_WINDOW_BITS -15
 
+#define TEST_BAD_BAM_CHUNKS 9999925 
+
+
 typedef struct
 {
 	char chro_name[BAM_MAX_CHROMOSOME_NAME_LEN];
@@ -110,7 +113,8 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 // load the header of a BAM file (the header is important to load BAM reads)
 // this function puts the File Pointer to the first read chunk in the BAM.
 // It returns 0 if finished loading, or non-zero if wrong.
-int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab);
+// If the chunk contains read data after the chromosome table, the read data is copied into remainder_read_data, and its lengtb is returned in remainder_read_data_len.
+int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab, char * remainder_read_data, int * remainder_read_data_len);
 
 
 // load a new line from the BAM buffer (chunk) at chunk_ptr.
@@ -157,4 +161,7 @@ int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsig
 
 int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns);
 
+int is_badBAM(char * fn);
+
+int SamBam_unzip(char * out , char * in , int inlen);
 #endif

@@ -98,11 +98,8 @@ typedef struct
 	long uniq_gene_exonid_table [MAX_HIT_NUMBER];
 	long uniq_gene_table [MAX_HIT_NUMBER];
 
-	char * parent_sequences;
 	char * chro_name_buff;
 	z_stream * strm_buffer;
-	unsigned int * parent_chunks;
-	unsigned int parents;
 
 	SamBam_Alignment aln_buffer;
 } fc_thread_thread_context_t;
@@ -143,7 +140,6 @@ typedef struct
 	int min_mapping_quality_score;
 	int min_paired_end_distance;
 	int max_paired_end_distance;
-	int max_parent_number;
 	int feature_block_size;
 	int read_length;
 	int line_length;
@@ -191,8 +187,6 @@ typedef struct
 	FILE * SAM_output_fp;
 	double start_time;
 
-	pthread_spinlock_t orphan_table_lock;
-	HashTable * orphan_table;
 	char * cmd_rebuilt;
 	
 } fc_thread_global_context_t;
@@ -1385,6 +1379,8 @@ void * feature_count_worker(void * vargs)
 
 	if(global_context -> is_SAM_file)
 	{
+		thread_context -> current_read_length1 = global_context -> read_length;
+		thread_context -> current_read_length2 = global_context -> read_length;
 		while (1)
 		{
 			while(1)
@@ -1444,8 +1440,6 @@ void * feature_count_worker(void * vargs)
 			}
 
 
-			thread_context -> current_read_length1 = global_context -> read_length;
-			thread_context -> current_read_length2 = global_context -> read_length;
 
 			process_line_buffer(global_context, thread_context);
 
@@ -1453,96 +1447,63 @@ void * feature_count_worker(void * vargs)
 	}
 	else
 	{	// if is BAM: decompress the chunk and process reads.
-		char * chunk_in_buffer = malloc(65540);
-		char * PDATA = malloc(70000);
-		z_stream * strm = thread_context -> strm_buffer;
+		char * PDATA = malloc(2*70000);
+		SamBam_Alignment * aln = &thread_context->aln_buffer;
 
+		thread_context -> current_read_length1 = global_context -> read_length;
+		thread_context -> current_read_length2 = global_context -> read_length;
 		while(1)
 		{
-			long long int chunk_id;
-			int cdata_size = 0;
+			int PDATA_len = 0;
 			while(1)
 			{
 				int is_retrieved = 0;
+				PDATA_len = 0;
 				//retrieve the next chunk.
 
 				pthread_spin_lock(&thread_context->input_buffer_lock);
 				if(thread_context->input_buffer_remainder)
 				{
+					assert(thread_context->input_buffer_remainder>4);
 					unsigned int tail_bytes = global_context->input_buffer_max_size - thread_context -> chunk_read_ptr ;
-					if(tail_bytes<12)
+					if(tail_bytes<4)
 					{
 						thread_context -> chunk_read_ptr = 0;
 						thread_context -> input_buffer_remainder -= tail_bytes;
-						memcpy(&cdata_size, thread_context->input_buffer + thread_context -> chunk_read_ptr , 4);
+						memcpy(&PDATA_len, thread_context->input_buffer + thread_context -> chunk_read_ptr , 4);
 					}
 					else
 					{
-						memcpy(&cdata_size, thread_context->input_buffer + thread_context -> chunk_read_ptr , 4);
-						if(cdata_size==0)
+						memcpy(&PDATA_len, thread_context->input_buffer + thread_context -> chunk_read_ptr , 4);
+						if(PDATA_len==0)
 						{
 							thread_context -> chunk_read_ptr = 0;
 							thread_context -> input_buffer_remainder -= tail_bytes;
-							memcpy(&cdata_size, thread_context->input_buffer , 4);
+							memcpy(&PDATA_len, thread_context->input_buffer , 4);
 						}
-						else assert(cdata_size +12 <= tail_bytes);
+					}
+					thread_context -> chunk_read_ptr+=4;
+					thread_context -> input_buffer_remainder -= 4;
 
+					//fprintf(stderr,"chunk_read_ptr=%d , input_buffer_remainder = %d\n", thread_context -> chunk_read_ptr , thread_context -> input_buffer_remainder);
+					if(PDATA_len<0 || PDATA_len > 140000)
+					{
+						SUBREADprintf("THREAD ABNORMALLY QUIT\n");
+						return NULL;
 					}
 
-					memcpy(&chunk_id, thread_context->input_buffer + thread_context -> chunk_read_ptr + 4 , 8);
-					memcpy(chunk_in_buffer, thread_context->input_buffer + thread_context -> chunk_read_ptr +12, cdata_size);
-					thread_context -> input_buffer_remainder -= 12 + cdata_size;
-					thread_context -> chunk_read_ptr += 12 + cdata_size;
+					memcpy(PDATA, thread_context -> input_buffer + thread_context -> chunk_read_ptr , PDATA_len);
+					thread_context -> chunk_read_ptr += PDATA_len;
+					thread_context -> input_buffer_remainder -= PDATA_len;
 
-					is_retrieved = 1;
+					if( PDATA_len > 0 )
+						is_retrieved = 1;
 				}
+
 
 				pthread_spin_unlock(&thread_context->input_buffer_lock);
 				if(global_context->is_all_finished && !is_retrieved){
-					free(chunk_in_buffer);
 					free(PDATA);
-					unsigned int final_try_start = time(NULL);
-
-
-					while(thread_context -> parents )
-					{
-						int ppi;
-						for(ppi = 0; ppi < global_context -> max_parent_number; ppi++)
-						{	
-							if( *(thread_context -> parent_sequences + ppi * global_context->line_length )!=0)
-							{
-								pthread_spin_lock(&global_context -> orphan_table_lock);
-								//TODO: find orphans
-								char * orph_str = HashTableGet(global_context -> orphan_table, NULL + 1 + thread_context -> parent_chunks[ppi]);
-								pthread_spin_unlock(&global_context -> orphan_table_lock);
-								if(orph_str)
-								{
-									term_strncpy(thread_context -> line_buffer1, thread_context -> parent_sequences + ppi * global_context->line_length, global_context->line_length);
-									term_strncpy(thread_context -> line_buffer2, orph_str, global_context->line_length);
-									process_line_buffer(global_context, thread_context);
-									*(thread_context -> parent_sequences + ppi * global_context->line_length ) = 0;
-									free(orph_str);
-									pthread_spin_lock(&global_context -> orphan_table_lock);
-									HashTableRemove(global_context -> orphan_table, NULL+1+ thread_context -> parent_chunks[ppi]);
-									pthread_spin_unlock(&global_context -> orphan_table_lock);
-									thread_context -> parents --;
-									//printf("Removed : T%d\n",  thread_context -> thread_id);
-								}
-							}
-						}
-						if(thread_context -> parents >= global_context -> max_parent_number - 1)
-						{
-							//printf("Unremoved at all : T%d C%llu\n", thread_context -> thread_id, chunk_id);
-							usleep(tick_time*5);
-						}
-						if(time(NULL) - final_try_start>1)
-							break;
-					}
-
-
-
-
-
 					return NULL;
 				}
 
@@ -1551,172 +1512,31 @@ void * feature_count_worker(void * vargs)
 					usleep(tick_time);
 
 			}
-
-
-			strm->zalloc = Z_NULL;
-			strm->zfree = Z_NULL;
-			strm->opaque = Z_NULL;
-			strm->avail_in = 0;
-			strm->next_in = Z_NULL;
-			int ret = inflateInit2(strm,-15);
-			if (ret != Z_OK)
+			
+			// convert binary reads into sam lines and process;
+			int processed_reads = 0, PDATA_ptr = 0;
+			while(PDATA_ptr < PDATA_len)
 			{
-				SUBREADprintf("Unable to decompress the GZ stream!\n");
-				return NULL;
-			}
-			strm->avail_in = (unsigned int)cdata_size;
-			strm->next_in = (unsigned char *)chunk_in_buffer;
-			//printf("NIN=%d\n", strm->avail_in );
-
-			strm->avail_out = 70000;
-			strm->next_out = (unsigned char *)PDATA;
-			ret = inflate(strm, Z_FINISH);
-			if(ret != Z_STREAM_END )
-			{
-				SUBREADprintf("Unable to decompress the BAM file! Please check the format of the BAM file!\nCODE=%d ; CSIZE=%d\n", ret, cdata_size);
-				return NULL;
-			}
-
-			int PDATA_len = 70000 - strm->avail_out, PDATA_ptr=0;
-			if(PDATA_len > 66000)
-			{
-				SUBREADprintf("The BAM chunk is longer than the limit!\n");
-				return NULL;
-			}
-			inflateEnd(strm);
-
-			int qid=0;
-			if(PDATA_len>1)
-			{
-				while(1)
+				int is_second_read;
+				for(is_second_read = 0; is_second_read <= global_context -> is_paired_end_data; is_second_read++)
 				{
-					SamBam_Alignment * aln = &thread_context->aln_buffer;
-					thread_context->current_read_length1 = PBam_chunk_gets(PDATA, &PDATA_ptr, PDATA_len, global_context ->sambam_chro_table , thread_context -> line_buffer1 , 2999, aln, 0);
-					if(qid==0 && global_context->is_paired_end_data)
-					{
-						int xk1 = 0, tabs=0, x_flag = 0;
-						char str_flag[12], nch;
-						while((nch = thread_context -> line_buffer1[xk1++]))
-						{
-							if(nch == '\t'){
-								tabs++;
-								if(tabs>1) break;
-								continue;
-							}
-							if(tabs == 1)
-							{
-								str_flag[x_flag++] = nch;
-								str_flag[x_flag] = 0;
-							}
-						}
-						if( ( atoi(str_flag) & SAM_FLAG_FIRST_READ_IN_PAIR) == 0)// not the first read
-						{
-							//printf("QQQ0 [%d]: UNPAIR ORPHAN!!\n", thread_context -> thread_id);
-							char * saved_line = malloc(thread_context->current_read_length1+1);
-							unsigned int parent_chunk = ((chunk_id-1) & 0x7fffffff) + 1;
-							term_strncpy(saved_line ,  thread_context -> line_buffer1 , thread_context->current_read_length1+1);
-							pthread_spin_lock(&global_context -> orphan_table_lock);
-							HashTablePut(global_context -> orphan_table, NULL+parent_chunk , saved_line);
-							pthread_spin_unlock(&global_context -> orphan_table_lock);
-							if(PDATA_ptr >= PDATA_len) break;
-							PBam_chunk_gets(PDATA, &PDATA_ptr, PDATA_len, global_context ->sambam_chro_table , thread_context -> line_buffer1 , global_context->line_length-1, aln, 0);
-						}
-					}
+					int binary_read_len, local_PDATA_ptr = PDATA_ptr;
+					char * curr_line_buff = is_second_read?thread_context -> line_buffer2:thread_context -> line_buffer1;
 
-					if(global_context->is_paired_end_data)
-					{
+					memcpy(&binary_read_len, PDATA + PDATA_ptr, 4);
+					int ret = PBam_chunk_gets(PDATA, &local_PDATA_ptr, PDATA_len, global_context -> sambam_chro_table, curr_line_buff, 2999, aln,0);
+					//printf("LL=%s\n", curr_line_buff);
+					if(ret<0)
+						SUBREADprintf("READ DECODING ERROR!\n");
 
-						if(PDATA_ptr == PDATA_len){
-							int ppi;
-							for(ppi = 0; ppi < global_context -> max_parent_number; ppi++)
-							{
-								if( *(thread_context -> parent_sequences + ppi * global_context->line_length )==0)
-								{
-									//printf("QQQ0 [%d]: UNPAIR PARENT!!\n", thread_context -> thread_id);
-									term_strncpy(thread_context -> parent_sequences + ppi * global_context->line_length, thread_context -> line_buffer1 , global_context->line_length-1);
-									*(thread_context -> parent_sequences + ppi * global_context->line_length + global_context->line_length-1) = 0;
-									thread_context -> parent_chunks[ppi] = (unsigned int )(chunk_id & 0x7fffffff);
-									thread_context -> parents ++;
-									break;
-								}
-							}
-							break;
-						}
-						else if(PDATA_ptr > PDATA_len)
-						{
-							SUBREADprintf("Unknown format issue! the file seemed not to be a compressed BAM file!\n");
-						}
-
-
-						thread_context->current_read_length2 = PBam_chunk_gets(PDATA, &PDATA_ptr, PDATA_len, global_context ->sambam_chro_table , thread_context -> line_buffer2 , 2999, aln, 0);
-						qid++;
-						//printf("%s\n%s\n", thread_context -> line_buffer1,thread_context -> line_buffer2);
-						if(thread_context->current_read_length2 >0 && thread_context->current_read_length2<1200)
-							process_line_buffer(global_context, thread_context);
-
-						if(PDATA_ptr >= PDATA_len) break;
-					}
-					else
-					{
-						process_line_buffer(global_context, thread_context);
-						qid++;
-
-						if(PDATA_ptr >= PDATA_len)
-							break;
-					}
-
+					PDATA_ptr += 4+binary_read_len;
+					processed_reads++;
 				}
-			}
 
-			double final_try_start = miltime();
-
-			while(thread_context -> parents >= global_context -> max_parent_number - 1)
-			{
-				int ppi;
-				for(ppi = 0; ppi < global_context -> max_parent_number; ppi++)
-				{	
-					if( *(thread_context -> parent_sequences + ppi * global_context->line_length )!=0)
-					{
-						pthread_spin_lock(&global_context -> orphan_table_lock);
-						//TODO: find orphans
-						char * orph_str = HashTableGet(global_context -> orphan_table, NULL + 1 + thread_context -> parent_chunks[ppi]);
-						pthread_spin_unlock(&global_context -> orphan_table_lock);
-						if(orph_str)
-						{
-							term_strncpy(thread_context -> line_buffer1, thread_context -> parent_sequences + ppi * global_context->line_length, global_context->line_length);
-							term_strncpy(thread_context -> line_buffer2, orph_str, global_context->line_length);
-							process_line_buffer(global_context, thread_context);
-							*(thread_context -> parent_sequences + ppi * global_context->line_length ) = 0;
-							free(orph_str);
-							pthread_spin_lock(&global_context -> orphan_table_lock);
-							HashTableRemove(global_context -> orphan_table, NULL+1+ thread_context -> parent_chunks[ppi]);
-							pthread_spin_unlock(&global_context -> orphan_table_lock);
-							thread_context -> parents --;
-							//printf("Removed : T%d\n", thread_context -> thread_id);
-						}
-					}
-				}
-				if(thread_context -> parents >= global_context -> max_parent_number - 1)
-				{
-					//printf("Unremoved at all : T%d C%llu\n", thread_context -> thread_id, chunk_id);
-			//		printf("Unremoved at all : T%d\n", thread_context -> thread_id);
-					usleep(tick_time*(2+getpid()%5));
-				}
-				if( miltime() - final_try_start>1)
-				{
-					if(global_context -> is_stake_warning_shown == 0)
-					{
-						global_context -> is_stake_warning_shown =1;
-						print_in_box(80,0,0,"Items in the stack: %d.", thread_context -> parents);
-						print_in_box(80,0,0,"The running time will be substantially increased.");
-					}
-					break;
-				}
+				process_line_buffer(global_context, thread_context);
+				//printf("LE\n\n");
 			}
 		}
-
-		free(chunk_in_buffer);
-		free(PDATA);
 	}
 }
 
@@ -1810,7 +1630,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
 	global_context -> is_multi_mapping_allowed = is_multi_mapping_allowed;
 	global_context -> is_SAM_file = is_SAM;
-	global_context -> max_parent_number = 10 * threads;
 	global_context -> thread_number = threads;
 	global_context -> min_mapping_quality_score = min_map_qual_score;
 	global_context -> unistr_buffer_size = 1024*1024*2;
@@ -1878,10 +1697,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].input_buffer_remainder = 0;
 		global_context -> thread_contexts[xk1].input_buffer_write_ptr = 0;
 		global_context -> thread_contexts[xk1].input_buffer = malloc(global_context -> input_buffer_max_size);
-		global_context -> thread_contexts[xk1].parent_sequences = calloc(global_context -> max_parent_number ,(global_context -> line_length + 2));
-		
-		global_context -> thread_contexts[xk1].parent_chunks = malloc(global_context -> max_parent_number *sizeof(int));
-		global_context -> thread_contexts[xk1].parents = 0;
 		global_context -> thread_contexts[xk1].thread_id = xk1;
 		global_context -> thread_contexts[xk1].chunk_read_ptr = 0;
 		global_context -> thread_contexts[xk1].count_table = calloc(sizeof(unsigned int), et_exons);
@@ -1920,8 +1735,6 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		free(global_context -> thread_contexts[xk1].line_buffer1);	
 		free(global_context -> thread_contexts[xk1].line_buffer2);	
 		free(global_context -> thread_contexts[xk1].input_buffer);
-		free(global_context -> thread_contexts[xk1].parent_sequences);
-		free(global_context -> thread_contexts[xk1].parent_chunks);
 		free(global_context -> thread_contexts[xk1].chro_name_buff);
 		free(global_context -> thread_contexts[xk1].strm_buffer);
 		pthread_spin_destroy(&global_context -> thread_contexts[xk1].input_buffer_lock);
@@ -2614,7 +2427,9 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
 		int file_probe = is_certainly_bam_file(global_context->input_file_name);
-		if(file_probe == 1)global_context->is_SAM_file = 0;
+		if(file_probe == 1){
+			global_context->is_SAM_file = 0;
+		}
 		else global_context->is_SAM_file = 1;
 
 		global_context -> start_time = miltime();
@@ -2622,9 +2437,10 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		file_str = "SAM";
 		if(file_probe == 1) file_str = "BAM" ;
 		if(file_probe == -1) file_str = "Unknown";
+		print_in_box(80,0,0,"Process %s file %s...", file_str, global_context->input_file_name);
 	}
 
-	print_in_box(84,0,0,"Process %s file %s %c[0m..." , file_str, global_context->input_file_name, CHAR_ESC);
+	int isInputFileResortNeeded = global_context->is_input_file_resort_needed;
 
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
@@ -2638,9 +2454,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		}
 		fclose(exist_fp);
 	}
-
-
-	int isInputFileResortNeeded = global_context->is_input_file_resort_needed;
 
 	if(strcmp(global_context->input_file_name,"STDIN")!=0)
 		if(warning_file_type(global_context->input_file_name, global_context->is_SAM_file?FILE_TYPE_SAM:FILE_TYPE_BAM))
@@ -2672,18 +2485,26 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 	SamBam_Reference_Info * sb_header_tab = NULL;
 	
+	unsigned long long int chunk_id = 0;
+	int binary_remainder = 0, binary_read_ptr = 0;
+	char * chunk_in_buff = malloc(70000);
+	char * binary_in_buff = malloc(80000 * 2);
+
 	if(!isSAM)
 	{
-		PBum_load_header(fp_in, &sb_header_tab);
+		int remainder_read_data_len = 0;
+
+		PBum_load_header(fp_in, &sb_header_tab, binary_in_buff,  & remainder_read_data_len);
+		//printf("RMD=%d\n", remainder_read_data_len);
+
+		if(remainder_read_data_len)
+		{
+			binary_remainder = remainder_read_data_len;
+		}
 		global_context->sambam_chro_table = sb_header_tab;
-		pthread_spin_init(&global_context->orphan_table_lock , PTHREAD_PROCESS_PRIVATE);
-		global_context->orphan_table = HashTableCreate(11011);
-		HashTableSetDeallocationFunctions(global_context->orphan_table, NULL, NULL);
 	}
 	// begin to load-in the data.
 
-	unsigned long long int chunk_id = 0;
-	char * chunk_in_buff = malloc(65400);
 	while (1){
 		int pair_no;
 		int is_second_read;
@@ -2740,10 +2561,89 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		}
 		else if(!isSAM)
 		{
-			unsigned int real_len;
-			int cdata_size = PBam_get_next_zchunk(fp_in, chunk_in_buff, 65537, & real_len);
-			//printf("CDD %lld = %d\n", chunk_id, cdata_size);
-			if(cdata_size>0) 
+			int no_of_reads = 0;
+			unsigned int real_len = 0;
+			// most of the data must have been given out before this step.
+
+			int cdata_size = 0;
+
+			if(binary_remainder > 70000)
+				SUBREADprintf("SOMETHING IS WRONG!\n");
+
+			if(binary_remainder<10000)
+				cdata_size = PBam_get_next_zchunk(fp_in, chunk_in_buff, 65537, & real_len);
+
+			if(cdata_size>0 || binary_remainder>0)
+			{
+				int x1;
+
+
+				if(binary_read_ptr>0)
+				{
+					for(x1=0; x1< binary_remainder; x1++)
+						binary_in_buff[x1] = binary_in_buff [x1 + binary_read_ptr];
+					binary_read_ptr = 0;
+				}
+
+				//fprintf(stderr,"NBN=%d, OBN=%d\n", cdata_size , binary_remainder);
+				if(cdata_size>0)
+				{
+					int new_binary_bytes = SamBam_unzip(binary_in_buff + binary_remainder , chunk_in_buff , cdata_size);
+					if(new_binary_bytes>=0)
+						binary_remainder += new_binary_bytes;
+					else	SUBREADprintf("ERROR: BAM GZIP FORMAT ERROR.\n");
+				//	fprintf(stderr,"BBN=%d\n", new_binary_bytes);
+				}
+
+				while(binary_remainder>4)
+				{
+					unsigned int binary_read_len = 0;
+					memcpy(& binary_read_len , binary_in_buff + binary_read_ptr , 4);
+					//printf("RLEN=%d; PTR=%d; RMD=%d\n", binary_read_len , binary_read_ptr, binary_remainder);
+					if(binary_read_len > 10000)
+					{
+						binary_remainder = -1;
+						//SUBREADprintf("FATAL ERROR: BAM RECORD SIZE = %u ; PTR=%d ; REM=%d.\n", binary_read_len, binary_read_ptr , binary_remainder);
+						print_in_box(80,0,0,"   A format error was detected in this BAM file.");
+						print_in_box(80,0,0,"   The remaining part in the file is skipped.");
+						print_in_box(80,0,0,"   Please check the file format using samtools.");
+						print_in_box(80,0,0,"");
+						break;
+					}
+					// if the program runs on PE mode, no_of_reads must be even.
+
+					if(isPE)
+					{
+						if(4 + binary_read_len + 4 < binary_remainder)
+						{
+							int binary_read2_len=0;
+							memcpy(&binary_read2_len , binary_in_buff + binary_read_ptr + 4 + binary_read_len, 4);
+							if(4 + binary_read_len + 4 + binary_read2_len <= binary_remainder)
+							{
+								no_of_reads +=2;
+								binary_read_ptr += 4 + binary_read_len + 4 + binary_read2_len;
+								binary_remainder -= 4 + binary_read_len + 4 + binary_read2_len;
+							}
+							else break;
+						}
+						else break;
+					}
+					else
+					{
+						if(binary_read_len + 4<= binary_remainder)
+						{
+							no_of_reads ++;
+							binary_read_ptr  += 4 + binary_read_len;
+							binary_remainder -= 4 + binary_read_len;
+						}
+						else break;
+					}
+				}
+			}
+
+			if(binary_remainder <0)break;
+
+			if(no_of_reads>0) 
 			{
 				while(1)
 				{
@@ -2753,43 +2653,40 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 					pthread_spin_lock(&thread_context->input_buffer_lock);
 
-					// the number of bytes can be utilised given the cdata_size.
-					unsigned int empty_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_remainder;
-					//printf("load len=%d, buf_rem=%d, wrt_ptr=%d\n", cdata_size, thread_context->input_buffer_remainder, thread_context->input_buffer_write_ptr);
-					if(empty_bytes>=cdata_size + 12)
+					// the number of bytes can be utilised given the two_chunk_len.
+					int empty_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_remainder;
+					int tail_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_write_ptr;
+					
+					if(thread_context->input_buffer_remainder > global_context->input_buffer_max_size)
 					{
-						unsigned int tail_bytes = global_context->input_buffer_max_size - thread_context->input_buffer_write_ptr;	
-						if(tail_bytes < cdata_size + 12)
-							empty_bytes -= tail_bytes;
+						SUBREADprintf("RMD=%d\n", thread_context->input_buffer_remainder );
+						assert(0);
+					}
 
-						if(empty_bytes>=cdata_size + 12)
+					if(tail_bytes < binary_read_ptr + 4)
+						empty_bytes -= tail_bytes;
+
+					// copy the new buffer to thread buffer.
+					// format: read_number=n, read_chunk1, read_chunk2, ..., read_chunk_n
+					if(empty_bytes >= binary_read_ptr + 4)
+					{
+
+						if(tail_bytes < binary_read_ptr + 4)
 						{
-							if(tail_bytes < cdata_size + 12)
-							{
-								if(tail_bytes >= 12) 
-									memset(thread_context->input_buffer + thread_context->input_buffer_write_ptr,0, 4);
-								memcpy(thread_context->input_buffer , &cdata_size, 12);
-								memcpy(thread_context->input_buffer + 4 , &chunk_id, sizeof(long long int));
-								memcpy(thread_context->input_buffer + 12 , chunk_in_buff, cdata_size);
-								thread_context->input_buffer_write_ptr = 12 + cdata_size;
-								thread_context->input_buffer_remainder += tail_bytes;
-							}
-							else
-							{
-								memcpy(thread_context->input_buffer+thread_context->input_buffer_write_ptr , &cdata_size, 4);
-								memcpy(thread_context->input_buffer+thread_context->input_buffer_write_ptr +  4 , &chunk_id, sizeof(long long int));
-								memcpy(thread_context->input_buffer+thread_context->input_buffer_write_ptr + 12 , chunk_in_buff, cdata_size);
-								thread_context->input_buffer_write_ptr += 12 + cdata_size;
-							}
-							
-							thread_context->input_buffer_remainder += 12 + cdata_size;
-			
-							is_finished=1;
+							if(tail_bytes>=4)
+								memset(thread_context->input_buffer + thread_context->input_buffer_write_ptr, 0, 4);
+							thread_context->input_buffer_write_ptr = 0;
+							thread_context->input_buffer_remainder += tail_bytes;
 						}
+
+						memcpy( thread_context->input_buffer + thread_context->input_buffer_write_ptr, & binary_read_ptr, 4);
+						memcpy( thread_context->input_buffer + thread_context->input_buffer_write_ptr + 4, binary_in_buff , binary_read_ptr);
+						thread_context->input_buffer_write_ptr += 4 + binary_read_ptr;
+						thread_context->input_buffer_remainder += 4 + binary_read_ptr;
+						is_finished = 1;
 					}
 
 					pthread_spin_unlock(&thread_context->input_buffer_lock);
-
 					current_thread_id++;
 					if(current_thread_id >= global_context->thread_number) current_thread_id = 0;
 
@@ -2846,6 +2743,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			{
 				// Safegarding -- it should not happen if the SAM file has a correct format.
 				line_length = 0;
+				print_in_box(80,0,0,"   There are odd number of reads in the paired-end data.");
+				print_in_box(80,0,0,"   Please make sure that the format is correct.");
 			}
 
 			//printf("FRR=%d\n%s\n", fresh_read_no, preload_line);
@@ -2895,6 +2794,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	}
 
 	free(chunk_in_buff);
+	free(binary_in_buff);
 	free(preload_line);
 	global_context->is_all_finished = 1;
 
@@ -2913,16 +2813,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	if(strcmp("STDIN",global_context->input_file_name)!=0)
 	#endif
 		fclose(fp_in);
-
-	if(!isSAM)
-	{
-		pthread_spin_destroy(&global_context->orphan_table_lock);
-		if(global_context->orphan_table->numOfElements)
-			print_in_box(80,0,1,"Warning : Orphan table is not empty!");
-		HashTableDestroy(global_context->orphan_table);
-	}
-
-
 
 	if(sb_header_tab) free(sb_header_tab);
 	if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
