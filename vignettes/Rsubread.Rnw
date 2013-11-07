@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread: a tool kit for processing next-gen sequencing data}
 \author{Wei Shi}
-\date{10 October 2013}
+\date{4 November 2013}
 \maketitle
 
 \section{Introduction}
@@ -152,7 +152,9 @@ propmapped(results)
 @
 
 \section{Citation}
-Yang Liao, Gordon K Smyth and Wei Shi (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108.
+Yang Liao, Gordon K Smyth and Wei Shi (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108.\\
+
+Yang Liao, Gordon K Smyth and Wei Shi (2013). featureCounts: an efficient general-purpose read summarization program. arXiv:1305.3347
 
 \section{Authors}
 Drs Wei Shi and Yang Liao \\

@@ -1,4 +1,10 @@
-25 Oct, 2013 - 1.13.2
+7 November, 2013
+(1) featureCounts automatically detects the type of input read files ('file.type' argument removed)
+(2) subjunc function supports the alignment of genomic DNA-seq reads ('DNAseq' option). It detects junctions and fusions (eg chimera) and report them in the mapping results (optional fields in the SAM/BAM file are used to store the mapping results of second alignments).
+(3) subjunc function can report non-canonical exon-exon junctions and fusions (eg. chimera) for RNA-seq read data('reportAllJunctions' option), in addition to the reporting of canonical exon-exon junctions.
+(4) align function reports fusions when mapping gDNA-seq data ('reportFusions' option).
+
+25 Oct, 2013 - 1.13.3
 (1) Changed inst/doc to vignettes/
 (2) Created 'usersguide' directory under 'inst' to store users guide.
 

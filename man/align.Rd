@@ -4,8 +4,15 @@
 \title{Read mapping for genomic DNA-seq and RNA-seq data via seed-and-vote (Subread and Subjunc)}
 \description{Subread and Subjunc are fast and accurate read aligners. They adopt a new mapping read mapping paradigm called ``seed-and-vote". Seed-and-vote enables highly scalable, efficient and accurate read mapping to be performed.}
 \usage{
-align(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2)
-subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
+align(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=10,TH1=3,TH2=1,
+nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,
+minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
+DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
+
+subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,
+nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,
+minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
+DNAseq=FALSE,reportAllJunctions=FALSE)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -36,7 +43,8 @@ subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_f
   \item{DP_GapExtPenalty}{ a numeric value giving the penalty for extending the gap, used by the Smith-Waterman algorithm. \code{0} by default.}
   \item{DP_MismatchPenalty}{ a numeric value giving the penalty for mismatches, used by the Smith-Waterman algorithm. \code{0} by default.}
   \item{DP_MatchScore}{ a numeric value giving the score for matches used by the Smith-Waterman algorithm. \code{2} by default.}
-  \item{DNAseq}{ logical, indicating if the input read data are genomic DNA sequencing data. If \code{TRUE}, \code{subjunc} function will ignore the splicing signals (donor/receptor sites) when searching for junctions. Junctions that occur within the same chromosome or across different chromosomes (chimerism) will all be reported for DNA seqence data.}
+  \item{reportFusions}{ logical indicating if genomic fusion events such as chimeras should be reported. If \code{TRUE}, \code{align} function will detect and report such events. This option should only be applied for genomic DNA sequencing data. For RNA-seq data, users should use \code{subjunc} with the \code{reportAllJunctions} option for detection of fusions. Discovered fusions will be saved to a file (*.fusions.txt). Detailed mapping results for fusion reads will also be saved to the SAM/BAM output file. Secondary alignments of fusion reads will be saved to the following optional fields: CC(Chr), CP(Position), CG(CIGAR) and CT(strand). Note that each fusion read occupies only one row in the SAM/BAM output file.}
+  \item{DNAseq}{ logical indicating if the input read data are genomic DNA sequencing data. If \code{TRUE}, \code{subjunc} function will ignore the splicing signals (donor/receptor sites) when searching for junctions. Junctions that occur within the same chromosome or across different chromosomes (chimerism) will all be reported for DNA seqence data.}
   \item{reportAllJunctions}{ logical. This argument should be used for RNA-seq data. If \code{TRUE}, \code{subjunc} function will report those junctions that do not have the required donor/receptor sites (GT/AG), or cross different chromosomes or are located on different strands within the same chromosome, in addition to the canonical exon-exon junctions.}
   }
 \details{

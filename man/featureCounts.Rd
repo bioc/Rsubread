@@ -3,11 +3,13 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,PEReadsReordering=FALSE,chrAliases=NULL,reportReads=FALSE)
+featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",
+useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,
+isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,
+countChimericFragments=TRUE,PEReadsReordering=FALSE,chrAliases=NULL,reportReads=FALSE)
 }
 \arguments{
-  \item{files}{ a character vector giving names of SAM/BAM format files.}
-  \item{file.type}{ a character string giving the type of files provided. \code{SAM} and \code{BAM} formats are supported. \code{SAM} by default.}
+  \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
   \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has three possible values including \code{mm9}, \code{mm10} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm9', `mm10' and `hg19', respectively. \code{mm9} by default. The in-built annotation has a SAF format (see below).}
   \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. See below for more details about SAF format annotation. \code{annot.ext} will override \code{annot.inbuilt} if they are both provided.}
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
@@ -110,7 +112,7 @@ featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",isGTFAnn
 featureCounts(files="mapping_results_SE.sam",nthreads=5)
 
 # Summarizing BAM format single-end read data:
-featureCounts(files="mapping_results_SE.bam",file.type="BAM")
+featureCounts(files="mapping_results_SE.bam")
 
 # Performing strand-specific read counting (strandSpecific=2 if reversely stranded):
 featureCounts(files="mapping_results_SE.sam",strandSpecific=1)
