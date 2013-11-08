@@ -148,7 +148,6 @@ int is_ambiguous_indel_score(chromosome_event_t * e)
 }
 void remove_neighbour(global_context_t * global_context)
 {
-
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 
 	HashTable * event_table = indel_context -> event_entry_table;
@@ -236,7 +235,7 @@ void remove_neighbour(global_context_t * global_context)
 						}
 					}
 
-				if(global_context->config.do_fusion_detection && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
+				if(1 && global_context->config.do_fusion_detection && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
 				{
 					for(xk2=-10 ; xk2 < 10 ; xk2++)
 					{

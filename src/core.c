@@ -1109,10 +1109,13 @@ int write_chunk_results(global_context_t * global_context)
 						current_CIGAR = out_cigars[0];
 					}
 
+					//printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
 					if(locate_gene_position_max(current_linear_pos,& global_context -> chromosome_table, & current_chro_name, & current_chro_offset, current_read_len))
 						is_current_ok = 0;
+					//printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
 				}
 
+				//printf("CURCIGAR=%s ; FINAL_CIGAR=%s; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
 				if(is_current_ok)
 				{
 					if(current_strand + is_second_read == 1)
@@ -1233,6 +1236,8 @@ int write_chunk_results(global_context_t * global_context)
 					}
 				//////////////////////////////////////////////
 
+		//		printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
+
 				if(is_current_ok && global_context -> input_reads.is_paired_end_reads && is_mate_ok)
 				{
 					mate_distance = mate_chro_offset - mate_soft_clipping_movement;
@@ -1295,6 +1300,8 @@ int write_chunk_results(global_context_t * global_context)
 					tailgate_0 = current_read_text[strlen(current_read_text) -1];
 					current_read_text[strlen(current_read_text) - 1] = 0;
 				}
+
+			//	printf("CURCIGAR=%s ; FINAL_CIGAR=%s ; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
 
 				if(is_current_ok || best_read_id==0)
 				{

@@ -635,7 +635,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 						if(global_context->config.do_fusion_detection)
 						{
 							int is_small_margin_minor = 0;
-							if(abs(dist)> global_context->config.maximum_intron_length)
+							if(1 && abs(dist)> global_context->config.maximum_intron_length)
 							{
 								int iii, jjj;
 								for(iii=0; iii<GENE_VOTE_TABLE_SIZE; iii++)
@@ -799,7 +799,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 
 							if(donors_found_score)
 							{
-								if(global_context -> config.do_fusion_detection && (!(current_anchor->piece_main_masks & IS_NEGATIVE_STRAND)) && !is_strand_jumped)
+								if(0&&global_context -> config.do_fusion_detection && (!(current_anchor->piece_main_masks & IS_NEGATIVE_STRAND)) && !is_strand_jumped)
 									final_split_point = curr_read_len - final_split_point;
 
 								current_anchor->piece_minor_abs_offset =  current_vote -> pos[i][j];
@@ -1508,7 +1508,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 
 
 	//if(explain_context -> pair_number == 23)
-	//	printf("POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", final_position , tmp_cigar, mismatch_bases, final_qual);
+	//	printf("%s : POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, final_qual);
 
 	int applied_mismatch = is_junction_read? global_context->config.max_mismatch_junction_reads:global_context->config.max_mismatch_exonic_reads ;
 	if(explain_context->full_read_len > EXON_LONG_READ_LENGTH)
@@ -1556,6 +1556,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 			result -> result_flags |= CORE_IS_FULLY_EXPLAINED;
 			isCigarOK=1;
 		}
+		//else printf("CIGAR COMPRESSION ERROR : %s\n", tmp_cigar);
 	}
 
 	if(!isCigarOK)
@@ -1941,7 +1942,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	int is_donor_found = is_GT_AG_donors<3;
 	int is_strand_jumped = (result->result_flags & CORE_IS_STRAND_JUMPED)?1:0;
 
-	if((!is_donor_found) && (selected_real_split_point < read_len * 0.2 || selected_real_split_point >= read_len *0.8) )
+	if(1 && (!is_donor_found) && (selected_real_split_point < read_len * 0.2 || selected_real_split_point >= read_len *0.8000) )
 		return;
 
 	if(selected_real_split_point>0)

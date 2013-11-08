@@ -369,16 +369,15 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.do_fusion_detection = 1;
 					if(strcmp("dnaseq", long_options[option_index].name)==0)
 						global_context->config.prefer_donor_receptor_junctions = 0;
-					global_context->config.report_multi_mapping_reads = 1;
-					global_context->config.do_big_margin_filtering_for_reads = 1;
-					global_context->config.limited_tree_scan = 1;
+					global_context->config.report_multi_mapping_reads = 1 ;
+					global_context->config.limited_tree_scan = 1 ;
 
 					// To maximise sensitivity of junction detection:
 					// 1, Disable big margin for junctions.
 					// 2, Disable limited tree scan.
 					// 3, Disable neighbour removal.
 					// 4, Disable big margin >=2 for minor locations in process_votes (searcg iii or jjj in core-junctions.c).
-					// 5, Take a look at the flanking region length cutoff (>= 20% of the read length in new_junction in core-junctions.c) 
+					// 5, Take a look at the flanking region length cutoff (>= 20% of the read length in new_junction in core-junctions.c, search 0.8000)  
 				}
 
 				break;
