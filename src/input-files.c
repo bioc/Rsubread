@@ -36,6 +36,17 @@
 unsigned int BASE_BLOCK_LENGTH = 15000000;
 int is_R_warnned = 0;
 
+
+FILE * f_subr_open(const char * fname, const char * mode)
+{
+
+#if defined(__LP64__) || defined(_LP64)
+		return fopen(fname, mode);
+#else
+		return fopen64(fname, mode);
+#endif
+
+}
 void fastq_64_to_33(char * qs)
 {
 	int i=0;
@@ -240,7 +251,7 @@ int is_read(char * in_buff)
 
 int geinput_open_sam(const char * filename, gene_input_t * input, int half_number)
 {
-	input->input_fp = fopen(filename, "rb");
+	input->input_fp = f_subr_open(filename, "rb");
 
 	strcpy(input->filename, filename);
 
@@ -286,7 +297,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 		return 1;
 
 	strcpy(input->filename, filename);
-	input->input_fp = fopen(filename, "rb");
+	input->input_fp = f_subr_open(filename, "rb");
 
 	if(input->input_fp == NULL)	
 		return 1;
@@ -1279,7 +1290,7 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 		if(!key_name)
 			return NULL;
 		strcpy(key_name, temp_file_name);
-		temp_file_pointer = fopen(key_name,"wb");
+		temp_file_pointer = f_subr_open(key_name,"wb");
 
 		if(0&&!temp_file_pointer)
 		{
@@ -1292,7 +1303,7 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 			setrlimit(RLIMIT_NOFILE, & limit_st);
 			//if(rl==-1)
 			//	SUBREADprintf("Cannot set limit: %d!\n", limit_st.rlim_cur);
-			temp_file_pointer = fopen(key_name,"wb");
+			temp_file_pointer = f_subr_open(key_name,"wb");
 		}
 
 
@@ -1348,7 +1359,7 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes)
 {
 	int i;
-	FILE * fp = fopen(in_SAM_file,"rb");
+	FILE * fp = f_subr_open(in_SAM_file,"rb");
 
 	while(!feof(fp))
 	{
@@ -1539,7 +1550,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 	}
 
 	sprintf(line_buffer, "%s.qStatic", temp_file_prefix);
-	FILE *qual_fp = fopen(line_buffer,"wb");
+	FILE *qual_fp = f_subr_open(line_buffer,"wb");
 	while(1)
 	{
 		//unsigned long long int file_position = ftello(fp);
@@ -1827,7 +1838,7 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 {
 	int line_len, gene_number = 0, exons = 0;
 	char old_gene_name[MAX_GENE_NAME_LEN];
-	FILE * fp = fopen(annotation_file_name, "rb");
+	FILE * fp = f_subr_open(annotation_file_name, "rb");
 
 	if(!fp)
 	{
@@ -1921,7 +1932,7 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 int does_file_exist(char * path)
 {
 	int ret ;
-	FILE * fp = fopen(path, "rb");
+	FILE * fp = f_subr_open(path, "rb");
 	ret = fp!=NULL;
 	if(fp)fclose(fp);
 
@@ -2016,12 +2027,12 @@ int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_pat
 	_SAMSORT_SNP_delete_temp_prefix = writer -> tmp_path;
 
 	sprintf(tmp_fname, "%s%s", writer -> tmp_path, "headers.txt");
-	writer -> all_chunks_header_fp = fopen(tmp_fname,"w");
+	writer -> all_chunks_header_fp = f_subr_open(tmp_fname,"w");
 	if(!writer -> all_chunks_header_fp) return -1;
 	fclose(writer -> all_chunks_header_fp);
 	unlink(tmp_fname);
 
-	writer -> out_fp = fopen(output_file,"w");
+	writer -> out_fp = f_subr_open(output_file,"w");
 	if(!writer -> out_fp) return -1;
 
 	return 0;
@@ -2052,7 +2063,7 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 			char tmpfname[MAX_FILE_NAME_LENGTH+40];
 			sprintf(tmpfname, "%sCHK%08d-BLK%03d.bin", writer -> tmp_path, x1_chunk , x1_block);
 
-			FILE * bbfp = fopen(tmpfname,"rb");
+			FILE * bbfp = f_subr_open(tmpfname,"rb");
 			if(!bbfp) continue;
 
 			while(!feof(bbfp))
@@ -2096,7 +2107,7 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 			char tmpfname[MAX_FILE_NAME_LENGTH+40];
 			sprintf(tmpfname, "%sCHK%08d-BLK%03d.bin", writer -> tmp_path, x1_chunk , x1_block);
 
-			FILE * bbfp = fopen(tmpfname,"rb");
+			FILE * bbfp = f_subr_open(tmpfname,"rb");
 			if(!bbfp) continue;
 
 			char * read_line_buf = malloc(3000);
@@ -2222,7 +2233,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		{
 			char tmpfname[MAX_FILE_NAME_LENGTH+40];
 			sprintf(tmpfname,"%sCHK%08d-BLK%03d.bin", writer -> tmp_path , writer -> current_chunk , block_id);
-			writer -> current_block_fp_array[block_id] = fopen(tmpfname, "wb");
+			writer -> current_block_fp_array[block_id] = f_subr_open(tmpfname, "wb");
 		}
 
 		fwrite(&flags, 2, 1, writer -> current_block_fp_array[block_id]);
@@ -2333,7 +2344,7 @@ int warning_file_type(char * fname, int expected_type)
 
 int probe_file_type(char * fname)
 {
-	FILE * fp = fopen(fname, "rb");
+	FILE * fp = f_subr_open(fname, "rb");
 	if(!fp) return FILE_TYPE_NONEXIST;
 
 	int ret = FILE_TYPE_UNKNOWN; 
@@ -2472,7 +2483,7 @@ int main(int argc, char ** argv)
 	short tmp_flags, is_sorted = 1;
 	char buff[3000], tmp_rname[100];
 
-	ifp = fopen(argv[1],"r");
+	ifp = f_subr_open(argv[1],"r");
 	while(1)
 	{
 		char * rr = fgets(buff,2999, ifp);
@@ -2491,7 +2502,7 @@ int main(int argc, char ** argv)
 
 	if(is_sorted) return 0;
 
-	ifp = fopen(argv[1],"r");
+	ifp = f_subr_open(argv[1],"r");
 	SAM_sort_writer writer;
 	if(sort_SAM_create(&writer, argv[2], ".")){
 		printf("ERROR: unable to create the writer!\n");

@@ -672,7 +672,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 		FILE * sam_fp = NULL;
 		SAM_sort_writer writer;
 
-		if(is_file_sorted) sam_fp = fopen(temp_file_name,"w");
+		if(is_file_sorted) sam_fp = f_subr_open(temp_file_name,"w");
 		else sort_SAM_create(&writer, temp_file_name, ".");
 
 		while(1)
@@ -2604,7 +2604,7 @@ int load_global_context(global_context_t * context)
 		}
 		else
 		{
-			context -> output_sam_fp = fopen(tmp_fname,"wb");
+			context -> output_sam_fp = f_subr_open(tmp_fname,"wb");
 			context -> output_bam_writer = NULL;
 		}
 		if((!context -> output_bam_writer) && (!context->output_sam_fp))
@@ -3049,7 +3049,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				locate_gene_position_max(jummped_location      , &global_context -> chromosome_table, &  new_chr, &  new_offset, 1);
 				is_chro_jump = (curr_chr != new_chr);
 
-				unsigned long long int dist = current_perfect_cursor;
+				long long int dist = current_perfect_cursor;
 				dist -= jummped_location;
 				if(abs(dist) >= 134217728)
 					is_long_jump = 1;

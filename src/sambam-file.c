@@ -63,7 +63,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 
 	if(file_type ==SAMBAM_FILE_SAM) 
 	{
-		ret -> os_file = fopen(fname, "rb");
+		ret -> os_file = f_subr_open(fname, "rb");
 		if(!ret -> os_file)
 		{
 			free(ret);
@@ -73,7 +73,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 	}
 	else
 	{
-		FILE * os_file = fopen(fname, "rb");
+		FILE * os_file = f_subr_open(fname, "rb");
 		if(os_file == NULL)
 		{
 			free(ret);
@@ -913,7 +913,7 @@ int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab, char * rem
 
 int test_pbam(char * fname)
 {
-	FILE * bam_fp = fopen(fname, "rb");
+	FILE * bam_fp = f_subr_open(fname, "rb");
 	char * CDATA = malloc(80010);
 	char * PDATA = malloc(1000000);
 
@@ -991,7 +991,7 @@ int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname)
 
 	if(BAM_fname)
 	{
-		writer -> bam_fp = fopen(BAM_fname, "wb");
+		writer -> bam_fp = f_subr_open(BAM_fname, "wb");
 		if(!writer -> bam_fp) return -1;
 	}
 	#ifdef MAKE_STANDALONE
@@ -1061,7 +1061,7 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer)
 	writer -> output_stream.avail_in = writer ->chunk_buffer_used;
 	CRC32 = SamBam_CRC32(writer -> chunk_buffer , writer ->chunk_buffer_used);
 
-	//FILE * dfp = fopen("my.xbin","ab");
+	//FILE * dfp = f_subr_open("my.xbin","ab");
 	//fwrite( writer ->chunk_buffer,  writer ->chunk_buffer_used, 1, dfp);
 	//fclose(dfp);
 
@@ -1414,7 +1414,7 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 
 int is_badBAM(char * fn)
 {
-	FILE * fp = fopen(fn , "r");
+	FILE * fp = f_subr_open(fn , "r");
 	if(!fp) return -1;
 
 	char * in_buff = malloc(70000);

@@ -187,7 +187,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					}
 
 					sprintf (fn, "%s.reads", index_prefix);
-					fp = fopen(fn, "w");
+					fp = f_subr_open(fn, "w");
 					for (i=0; i<read_no; i++)
 						fprintf(fp, "%u\t%s\n", read_offsets[i], read_names+i*MAX_READ_NAME_LEN);
 
@@ -219,7 +219,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				*(read_names + MAX_READ_NAME_LEN*read_no + i) = 0;
 
 				sprintf(fn, "%s.files", index_prefix);
-				FILE * fname_fp = fopen(fn, "a");
+				FILE * fname_fp = f_subr_open(fn, "a");
 				fprintf(fname_fp, "%s\t%s\t%ld\n", read_names+read_no*MAX_READ_NAME_LEN, ginp.filename, ftell(ginp.input_fp));
 				fclose(fname_fp);
 				
@@ -704,7 +704,7 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 	//fprintf(log_fp,"%c[37m", CHAR_ESC);
 	
 
-	FILE * warn_fp = fopen(FN, "r");
+	FILE * warn_fp = f_subr_open(FN, "r");
 
 	for(back_search_ptr = fpos_line_head - 1; back_search_ptr>=0; back_search_ptr--)
 	{
@@ -766,7 +766,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	int is_R_warnned = 0;
 	char * line_buf = malloc(MAX_READ_LENGTH);
 	char * read_head_buf = malloc(MAX_READ_LENGTH * 3);
-	FILE * out_fp = fopen(out_fa,"w");
+	FILE * out_fp = f_subr_open(out_fa,"w");
 	unsigned int inp_file_no, line_no;
 	int written_chrs = 0;
 	int chrom_lens_max_len = 100;
@@ -779,7 +779,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	print_in_box( 80,0,0,"Check the integrity of provided reference sequences ...");
 	for(inp_file_no = 0; inp_file_no < fa_number; inp_file_no++)
 	{
-		FILE * in_fp = fopen(input_fas[inp_file_no],"r");
+		FILE * in_fp = f_subr_open(input_fas[inp_file_no],"r");
 		long long int last_read_head_pos = 0;
 		unsigned int last_read_line_no = 1;
 
@@ -933,10 +933,13 @@ int main_buildindex(int argc,char ** argv)
 #endif
 {
 	int threshold = 24;
-	int memory_limit = 8000;	// 8000 MBytes
+	int memory_limit;	// 8000 MBytes
 	char output_file[300], c, tmp_fa_file[300], log_file_name[300];
 	char *ptr_tmp_fa_file[1];
 	unsigned int * chromosome_lengths;
+
+	if(sizeof(char *)>4) memory_limit=8000;
+	else memory_limit=2400;
 
 	ptr_tmp_fa_file[0]=tmp_fa_file;
 	output_file[0] = 0;
@@ -1044,7 +1047,7 @@ int main_buildindex(int argc,char ** argv)
 	mkstemp(tmp_fa_file);
 
 	sprintf(log_file_name, "%s.log", output_file);
-	FILE * log_fp = fopen(log_file_name,"w");
+	FILE * log_fp = f_subr_open(log_file_name,"w");
 
 	signal (SIGTERM, SIGINT_hook);
 	signal (SIGINT, SIGINT_hook);

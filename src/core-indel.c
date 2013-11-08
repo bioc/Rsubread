@@ -1256,7 +1256,7 @@ int write_indel_final_results(global_context_t * global_context)
 	fn2 = malloc(MAX_FILE_NAME_LENGTH);
 	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.indel", global_context->config.output_prefix);
 
-	ofp = fopen(fn2, "wb");
+	ofp = f_subr_open(fn2, "wb");
 
 	//if(!ofp)
 	//	printf("HOW??? %s\n", fn2);
@@ -2677,7 +2677,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 	int xk1;
 	int total_window_number =2 * (BASE_BLOCK_LENGTH / REASSEMBLY_WINDOW_LENGTH+1), window_adjust;
 
-	FILE * tmp_fp = fopen(temp_file_name,"rb");
+	FILE * tmp_fp = f_subr_open(temp_file_name,"rb");
 	if(!tmp_fp) 
 		return 0;
 
@@ -2807,7 +2807,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 	}
 
 
-	tmp_fp = fopen(temp_file_name,"rb");
+	tmp_fp = f_subr_open(temp_file_name,"rb");
 	while(!feof(tmp_fp))
 	{
 		short read_len;
@@ -3108,7 +3108,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 }
 int finalise_pileup_file_by_debrujin(global_context_t * global_context , char * temp_file_name, char * chro_name, int block_no)
 {
-	FILE * tmp_fp = fopen(temp_file_name,"rb");
+	FILE * tmp_fp = f_subr_open(temp_file_name,"rb");
 	if(!tmp_fp)
 		return 0;
 	char * read_text, * qual_text; 
@@ -3176,7 +3176,7 @@ int finalise_long_insertions_by_hashtable(global_context_t * global_context)
 	char tmp_fname[300];
 
 	sprintf(tmp_fname,"%s.reassembly.fa", global_context->config.output_prefix);
-	global_context->long_insertion_FASTA_fp = fopen(tmp_fname ,"wb");
+	global_context->long_insertion_FASTA_fp = f_subr_open(tmp_fname ,"wb");
 
 	for(chro_i=0; chro_i < global_context -> chromosome_table.total_offsets ; chro_i++)
 	{

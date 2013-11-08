@@ -1232,7 +1232,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	char magic_chars[8];
 	magic_chars[7]=0;
 
-	FILE * fp = fopen(fname, "rb");
+	FILE * fp = f_subr_open(fname, "rb");
 	if (!fp)
 	{
 		SUBREADprintf ("Table file `%s' is not found.\n", fname);
@@ -1291,7 +1291,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	else
 	{
 		fclose(fp);
-		fp = fopen(fname, "rb");
+		fp = f_subr_open(fname, "rb");
 		the_table -> version_number = SUBINDEX_VER0;
 		the_table -> current_items = load_int64(fp);
 		the_table -> buckets_number = load_int32(fp);
@@ -1372,7 +1372,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 {
 	int ii, jj, xx;
 	int i, scroll_counter = 0;
-	FILE * fp = fopen(fname, "wb");
+	FILE * fp = f_subr_open(fname, "wb");
 	int maximum_bucket_size = 0;
 	if (!fp)
 	{

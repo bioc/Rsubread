@@ -378,7 +378,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 {
 	unsigned int features = 0, xk1 = 0, lineno=0;
 	char * file_line = malloc(MAX_LINE_LENGTH+1);
-	FILE * fp = fopen(annotation_file,"r"); 
+	FILE * fp = f_subr_open(annotation_file,"r"); 
 	int is_GFF_warned = 0;
 	if(!fp) return -1;
 
@@ -1574,7 +1574,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 
 HashTable * load_alias_table(char * fname)
 {
-	FILE * fp = fopen(fname, "r");
+	FILE * fp = f_subr_open(fname, "r");
 	if(!fp)
 	{
 		print_in_box(80,0,0,"WARNING unable to open alias file '%s'", fname);
@@ -1671,7 +1671,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	{
 		char tmp_fname[350];
 		sprintf(tmp_fname, "%s.featureCounts", global_context -> input_file_name);
-		global_context -> SAM_output_fp = fopen(tmp_fname, "w");
+		global_context -> SAM_output_fp = f_subr_open(tmp_fname, "w");
 	}
 	else
 		global_context -> SAM_output_fp = NULL;
@@ -1800,7 +1800,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	unsigned int *gene_columns;
 	global_context -> assigned_reads = 0;
 
-	FILE * fp_out = fopen(out_file,"w");
+	FILE * fp_out = f_subr_open(out_file,"w");
 	if(!fp_out){
 		SUBREADprintf("Failed to create file %s\n", out_file);
 		return;
@@ -1991,7 +1991,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 	/* save the results */
 	FILE * fp_out;
 	int i, i_files = 0;
-	fp_out = fopen(out_file,"w");
+	fp_out = f_subr_open(out_file,"w");
 	if(!fp_out){
 		SUBREADprintf("Failed to create file %s\n", out_file);
 			return;
@@ -2061,10 +2061,9 @@ void print_usage()
 	SUBREADputs("              \tof features, grouped by using gene identifiers. Please refer");
 	SUBREADputs("              \tto the users guide for more details."); 
 	SUBREADputs("    "); 
-	SUBREADputs("   input_files\tGive the names of input read files that include the read"); 
-	SUBREADputs("   [-b if BAM]\tmapping results. By default, the input file should be in"); 
-	SUBREADputs("              \tSAM format. `-b' option should be specified if BAM files");
-	SUBREADputs("              \tare provided.");
+	SUBREADputs("   input_files\tGive the names of input read files that include the read mapping");
+	SUBREADputs("              \tresults. The program automatically detects the file format (SAM");
+	SUBREADputs("              \tor BAM). Multiple files can be provided at the same time."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional parameters:"); 
 	SUBREADputs("    "); 
@@ -2088,8 +2087,6 @@ void print_usage()
 	SUBREADputs("              \t`gene_id' by default. This attribute type is usually the gene");
 	SUBREADputs("              \tidentifier. This argument is useful for the meta-feature level");
 	SUBREADputs("              \tsummarization.");
-	SUBREADputs("    "); 
-	SUBREADputs("    -b        \tIndicate that the input read files are in BAM format."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -f        \tIf specified, read summarization will be performed at the "); 
 	SUBREADputs("              \tfeature level (eg. exon level). Otherwise, it is performed at");
@@ -2444,7 +2441,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
-		FILE * exist_fp = fopen( global_context->input_file_name,"r");
+		FILE * exist_fp = f_subr_open( global_context->input_file_name,"r");
 		if(!exist_fp)
 		{
 			print_in_box(80,0,0,"Failed to open file %s",  global_context->input_file_name);
@@ -2468,9 +2465,9 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	if(strcmp("STDIN",global_context->input_file_name)==0)
 		fp_in = stdin;
 	else
-		fp_in = fopen(global_context->input_file_name,"r");
+		fp_in = f_subr_open(global_context->input_file_name,"r");
 	#else
-		fp_in = fopen(global_context->input_file_name,"r");
+		fp_in = f_subr_open(global_context->input_file_name,"r");
 	#endif
 
 

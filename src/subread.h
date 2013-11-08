@@ -395,6 +395,7 @@ struct explorer_record_t
 	short b_search_tail;
 };
 
+FILE * f_subr_open(const char * fname, const char * mode);
 #define abs(a) 	  ((a)>=0?(a):-(a))
 #define max(a,b)  ((a)<(b)?(b):(a))
 #define min(a,b)  ((a)>(b)?(b):(a))

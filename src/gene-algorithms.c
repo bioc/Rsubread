@@ -1177,7 +1177,7 @@ int evaluate_piece(char * piece_str, int chron, int offset, int is_counterpart, 
 
 	inner_pos = offset + offset / 70;
 
-	fp = fopen(fname,"r");
+	fp = f_subr_open(fname,"r");
 
 	while(next_char!='\n')
 		next_char=fgetc(fp);
@@ -1515,7 +1515,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 
 	sprintf(fn, "%s.reads", index_prefix);
 
-	fp = fopen(fn, "r");
+	fp = f_subr_open(fn, "r");
 
 	if(!fp)
 	{

@@ -74,7 +74,7 @@ int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, char * rea
 			sprintf(temp_file , "%s%s-%04u.bin",temp_prefix, chromosomes[chromosome_no].chromosome_name, i);
 			chromosome_block_no++;
 
-			FILE * block_fp = fopen(temp_file,"rb");
+			FILE * block_fp = f_subr_open(temp_file,"rb");
 			if(!block_fp)
 				continue;
 
@@ -116,8 +116,8 @@ int parse_base_blocks_maybe_thread(char * temp_location, chromosome_t * chromoso
 int report_remainder(char *in_SAM_file, char *out_SAM_file, char* read_selection_list)
 {
 	int read_no = 0;
-	FILE * fp = fopen(in_SAM_file,"r");
-	FILE * out_fp = fopen(out_SAM_file,"w");
+	FILE * fp = f_subr_open(in_SAM_file,"r");
+	FILE * out_fp = f_subr_open(out_SAM_file,"w");
 	if(!out_fp)
 	{
 		SUBREADprintf("Unable to open the output file, '%s'.\n",out_SAM_file);

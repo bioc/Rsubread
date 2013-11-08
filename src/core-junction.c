@@ -799,7 +799,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 
 							if(donors_found_score)
 							{
-								if(global_context -> config.do_fusion_detection && (!current_anchor->piece_main_masks & IS_NEGATIVE_STRAND) && !is_strand_jumped)
+								if(global_context -> config.do_fusion_detection && (!(current_anchor->piece_main_masks & IS_NEGATIVE_STRAND)) && !is_strand_jumped)
 									final_split_point = curr_read_len - final_split_point;
 
 								current_anchor->piece_minor_abs_offset =  current_vote -> pos[i][j];
@@ -2116,7 +2116,7 @@ int write_fusion_final_results(global_context_t * global_context)
 	char fn2 [MAX_FILE_NAME_LENGTH];
 
 	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.fusion.txt", global_context->config.output_prefix);
-	FILE * ofp = fopen(fn2, "wb");
+	FILE * ofp = f_subr_open(fn2, "wb");
 	fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport\n");
 
 	int xk1;
@@ -2161,7 +2161,7 @@ int write_junction_final_results(global_context_t * global_context)
 	char fn2 [MAX_FILE_NAME_LENGTH];
 
 	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.junction.bed", global_context->config.output_prefix);
-	FILE * ofp = fopen(fn2, "wb");
+	FILE * ofp = f_subr_open(fn2, "wb");
 
 	fprintf(ofp, "#Chr, StartLeftBlock, EndRightBlock, Junction_Name, nSupport, Strand, StartLeftBlock, EndRightBlock, Color, nBlocks, BlockSizes, BlockStarts\n");
 

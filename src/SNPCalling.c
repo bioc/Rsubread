@@ -213,7 +213,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 	unsigned char * huge_piles = NULL;
 
 	sprintf(temp_file_name , "%s%s-%04u.bin", temp_prefix, chro_name, block_no);
-	tmp_fp = fopen(temp_file_name, "rb");
+	tmp_fp = f_subr_open(temp_file_name, "rb");
 
 	// if no temp file is here, do nothing 
 	if(!tmp_fp){
@@ -964,7 +964,7 @@ int parse_read_lists(char * in_FASTA_file, FILE * out_fp, char * temp_prefix, ch
 	char line_buffer [3000];
 	int task_no = 0;
 
-	FILE *fp = fopen(in_FASTA_file,"r");
+	FILE *fp = f_subr_open(in_FASTA_file,"r");
 
 	long long int FASTA_size = ftello(fp);
 
@@ -1031,7 +1031,7 @@ void *parse_read_lists_wrapper(void * vparam)
 int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, char * temp_prefix, chromosome_t * chromosomes, struct SNP_Calling_Parameters* parameters, int all_threads)
 {
 
-	FILE * out_fp = fopen(out_BED_file,"w");
+	FILE * out_fp = f_subr_open(out_BED_file,"w");
 	int ret=0;
 	if(!out_fp){
 		SUBREADprintf("Cannot open the output file: '%s'\n", out_BED_file);
@@ -1086,7 +1086,7 @@ int guess_quality_threshold(char * qual_file, float percentage)
 {
 	char buff[100];
 	unsigned long long readns [100], all_readn = 0;
-	FILE * qfp = fopen(qual_file, "r");
+	FILE * qfp = f_subr_open(qual_file, "r");
 	int lineno = 0;
 
 	if(!qfp)
@@ -1573,7 +1573,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		return -1;
 	}
 
-	FILE * tfp = fopen(out_BED_file,"w");
+	FILE * tfp = f_subr_open(out_BED_file,"w");
 	if(!tfp)
 	{
 		SUBREADprintf("Cannot write the output file. Please check if the disk has space and you can create file in the current directory.\n");
@@ -1581,7 +1581,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	}
 	fclose(tfp);
 
-	tfp = fopen(in_FASTA_file,"r");
+	tfp = f_subr_open(in_FASTA_file,"r");
 	if(!tfp)
 	{
 		SUBREADprintf("Cannot open the reference sequence file: %s\n", in_FASTA_file); 
@@ -1589,7 +1589,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	}
 	fclose(tfp);
 
-	tfp = fopen(in_SAM_file,"r");
+	tfp = f_subr_open(in_SAM_file,"r");
 	if(!tfp)
 	{
 		SUBREADprintf("Cannot open the input file: %s\n", in_SAM_file); 

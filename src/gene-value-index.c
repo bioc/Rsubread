@@ -119,7 +119,7 @@ void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 
 void gvindex_dump(gene_value_index_t * index, const char filename [])
 {
-	FILE * fp = fopen(filename, "wb");
+	FILE * fp = f_subr_open(filename, "wb");
 
 	fwrite(&index->start_point,4,1, fp);
 	fwrite(&index->length, 4, 1, fp);
@@ -135,7 +135,7 @@ void gvindex_dump(gene_value_index_t * index, const char filename [])
 
 int gvindex_load(gene_value_index_t * index, const char filename [])
 {
-	FILE * fp = fopen(filename, "rb");
+	FILE * fp = f_subr_open(filename, "rb");
 	int read_length;
 	read_length = fread(&index->start_point,4,1, fp);
 	assert(read_length>0);
