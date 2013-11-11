@@ -1,3 +1,7 @@
+11 Nov, 2013 - 1.13.5
+(1) Added an example for mapping paired-end reads in the vignette
+(2) Added an example for featureCounts in the vignette
+
 7 November, 2013 - 1.13.4
 (1) featureCounts automatically detects the type of input read files ('file.type' argument removed)
 (2) subjunc function supports the alignment of genomic DNA-seq reads ('DNAseq' option). It detects junctions and fusions (eg chimera) and report them in the mapping results (optional fields in the SAM/BAM file are used to store the mapping results of second alignments).

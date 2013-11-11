@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread: a tool kit for processing next-gen sequencing data}
 \author{Wei Shi}
-\date{4 November 2013}
+\date{11 November 2013}
 \maketitle
 
 \section{Introduction}
@@ -94,7 +94,18 @@ After the index was successfully built, we can now map the 1,000 reads to the re
 <<>>=
 reads <- system.file("extdata","reads.txt",package="Rsubread")
 align(index=file.path(path,"reference_index"),readfile1=reads,
+tieBreakHamming=TRUE,unique=TRUE,
 output_file=file.path(path,"alignResults.SAM"))
+@
+
+Map paired-end reads:
+
+<<>>=
+reads1 <- system.file("extdata","reads1.txt",package="Rsubread")
+reads2 <- system.file("extdata","reads2.txt",package="Rsubread")
+align(index=file.path(path,"reference_index"),readfile1=reads1,
+readfile2=reads2,tieBreakHamming=TRUE,unique=TRUE,
+output_file=file.path(path,"alignResultsPE.SAM"))
 @
 
 \section{Counting mapped reads for genomic features}
@@ -104,7 +115,32 @@ The \R{featureCounts} function is a general-purpose read summarization function,
 This function takes as input a set of files containing read mapping results and assigns mapped reads in each file to genomic features. 
 The input files can be in SAM or BAM format.
 It can be used to assign reads to genes, exons or any features users defined.
-This function includes inbuilt NCBI RefSeq gene annotations for genomes mm9, mm10 and hg19.
+This function includes in-built NCBI RefSeq gene annotations for genomes mm9, mm10 and hg19.
+
+Below gives the example code of assigning to two genes the reads and fragments generated in the last section.
+Assign reads to genes:
+
+<<>>=
+ann <- data.frame(
+GeneID=c("gene1","gene1","gene2","gene2"),
+Chr="chr_dummy",
+Start=c(100,1000,3000,5000),
+End=c(500,1800,4000,5500),
+Strand=c("+","+","-","-"),
+stringsAsFactors=FALSE)
+ann
+file_SE <- file.path(path,"alignResults.SAM")
+fc_SE <- featureCounts(file_SE,annot.ext=ann)
+fc_SE
+@
+
+Assign fragments (read pairs) to genes:
+
+<<>>=
+file_PE <- file.path(path,"alignResultsPE.SAM")
+fc_PE <- featureCounts(file_PE,annot.ext=ann,isPairedEnd=TRUE)
+fc_PE
+@
 
 \section{Finding exon junctions}
 
@@ -154,10 +190,10 @@ propmapped(results)
 \section{Citation}
 Yang Liao, Gordon K Smyth and Wei Shi (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108.\\
 
-Yang Liao, Gordon K Smyth and Wei Shi (2013). featureCounts: an efficient general-purpose read summarization program. arXiv:1305.3347
+\noindent{Yang Liao, Gordon K Smyth and Wei Shi (2013). featureCounts: an efficient general-purpose read summarization program. Bioinformatics, In Press, accepted Nov 7.}
 
 \section{Authors}
-Drs Wei Shi and Yang Liao \\
+Wei Shi and Yang Liao \\
 Bioinformatics Division \\
 The Walter and Eliza Hall Institute of Medical Research \\
 1G Royal Parade, Parkville, Victoria 3052 \\

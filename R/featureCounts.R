@@ -65,7 +65,8 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	  stop("No count data were generated.")
 	}
 	
-	y <- as.matrix(x[,-c(1:6)]) 
+	y <- as.matrix(x[,-c(1:6)])
+	colnames(y) <- colnames(x)[-c(1:6)]
 	rownames(y) <- x$GeneID
 	z <- list(counts=y,annotation=x[,1:6],targets=colnames(y))
 	z
