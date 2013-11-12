@@ -40,7 +40,7 @@ int is_R_warnned = 0;
 FILE * f_subr_open(const char * fname, const char * mode)
 {
 
-#if defined(__LP64__) || defined(_LP64)
+#if defined(__LP64__) || defined(_LP64) || defined(MACOS)
 		return fopen(fname, mode);
 #else
 		return fopen64(fname, mode);
