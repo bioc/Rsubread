@@ -2140,19 +2140,63 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 				{
 					char * first_read_text = HashTableGet(first_read_name_table, read_name_buf);
+					strtok(read_name_buf,"\t");
 					if(first_read_text)
 					{
+						fputs(read_name_buf, writer->out_fp);
+						putc('\t',  writer->out_fp);
 						fputs(first_read_text, writer->out_fp);
+
+						fputs(read_name_buf, writer->out_fp);
+						putc('\t',  writer->out_fp);
 						fputs(read_line_buf, writer->out_fp);
+
+						read_name_buf[strlen(read_name_buf)]='\t';
+						HashTableRemove(first_read_name_table, read_name_buf);
 						finished_second_reads ++;
 					}
-					else writer -> unpaired_reads +=1;
+					else{
+						// build a fake FIRST read for the mapped SECOND read.
+						// note that the TLEN, MATE_POS and MATE_CHAR are incorrect for general use.
+						fprintf(writer->out_fp, "%s\t4\t*\t0\t0\t*\t*\t0\t0\tN\tI\n", read_name_buf);
+						fputs(read_name_buf, writer->out_fp);
+						putc('\t',  writer->out_fp);
+						fputs(read_line_buf, writer->out_fp);
+						writer -> unpaired_reads +=1;
+					}
 
 					//else SUBREADprintf("WARNING: Unpaired read found in file:%s\n", read_name_buf);
 				}
 			}
-			if(finished_second_reads <= first_read_name_table -> numOfElements)
-				writer -> unpaired_reads += (first_read_name_table -> numOfElements-finished_second_reads);
+			if(1)
+			{
+				writer -> unpaired_reads += first_read_name_table -> numOfElements;
+
+				KeyValuePair * cursor;
+				int bucket;
+
+				// go through the hash table and write correct FIRST lines and dummy SECOND lines.
+				for(bucket=0; bucket< first_read_name_table -> numOfBuckets; bucket++)
+				{
+					cursor = first_read_name_table -> bucketArray[bucket];
+					while(1)
+					{
+						if (!cursor) break;
+						char * first_read_text = (char *)cursor -> value;
+						char * first_read_name = (char *)cursor -> key;
+
+						strtok(first_read_name, "\t");
+						fputs(first_read_name, writer->out_fp);
+						putc('\t',  writer->out_fp);
+						fputs(first_read_text, writer->out_fp);
+						fprintf(writer->out_fp, "%s\t4\t*\t0\t0\t*\t*\t0\t0\tN\tI\n", first_read_name);
+
+						cursor = cursor->next;
+					}
+				}
+
+
+			}
 
 			fclose(bbfp);
 			unlink(tmpfname);
@@ -2193,9 +2237,17 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		fputs(SAM_line, writer -> out_fp);
 	else
 	{
-		char read_name[MAX_READ_NAME_LEN];
+		char read_name[MAX_READ_NAME_LEN + MAX_CHROMOSOME_NAME_LEN * 2 + 26];
+		char chromosome_1_name[MAX_CHROMOSOME_NAME_LEN];
+		char chromosome_2_name[MAX_CHROMOSOME_NAME_LEN];
+		unsigned int pos_1, pos_2;
 		int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
+		char * second_col_pos = NULL;
 
+		chromosome_1_name[0]=0;
+		chromosome_2_name[0]=0;
+		pos_1 = 0;
+		pos_2 = 0;
 
 		while(line_cursor < line_len)
 		{
@@ -2204,7 +2256,8 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 			{
 				field_cursor = 0;
 				tabs++;
-				if(tabs>1) break;
+				if(tabs == 1) second_col_pos = SAM_line + line_cursor;
+				if(tabs>7) break;
 			}
 			else if(tabs == 0)
 			{
@@ -2216,14 +2269,43 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 			}
 			else if(tabs == 1)
 				flags = flags*10+(nch-'0');
-		}
+			else if(tabs == 2)
+			{
+				chromosome_1_name[field_cursor++] = nch;
+				chromosome_1_name[field_cursor]=0;
+				if(MAX_CHROMOSOME_NAME_LEN - 1 <= field_cursor) return -1;
+			}
+			else if(tabs == 3)
+				pos_1 = pos_1 * 10 + (nch-'0');
+			else if(tabs == 6)
+			{
+				chromosome_2_name[field_cursor++] = nch;
+				chromosome_2_name[field_cursor] = 0;
+				if(MAX_CHROMOSOME_NAME_LEN - 1 <= field_cursor) return -1;
+			}
+			else if(tabs == 7)
+				pos_2 = pos_2 * 10 + (nch-'0');
 
-		if(flags & SAM_FLAG_SECONDARY_MAPPING) return 0;
+		}
+		if(tabs <= 7) return -1;
+
+		line_len = strlen(second_col_pos);
 
 		sort_SAM_check_chunk(writer);
-		//int is_second_read = (flags & 0x80) ? 1:0;
+
 		for(field_cursor = 0; read_name[field_cursor] ; field_cursor++)
 			if(read_name[field_cursor] == '/') read_name[field_cursor] = 0;
+
+		if(chromosome_2_name[0]=='=')
+			strcpy(chromosome_2_name, chromosome_1_name);
+
+
+		// new read name format: OLD_READ_NAME\tCHR_R1:POS_R1:CHR_R2:POS_R2
+
+		if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u",chromosome_2_name, pos_2, chromosome_1_name, pos_1);
+		else
+			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u",chromosome_1_name, pos_1, chromosome_2_name, pos_2);
 
 		int read_name_len = strlen(read_name);
 		unsigned long long int read_line_hash = sort_SAM_hash(read_name);
@@ -2240,7 +2322,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		fwrite(&read_name_len, 2, 1, writer -> current_block_fp_array[block_id]);
 		fwrite(read_name, 1, read_name_len, writer -> current_block_fp_array[block_id]);
 		fwrite(&line_len, 2, 1, writer -> current_block_fp_array[block_id]);
-		fwrite(SAM_line, 1, line_len, writer -> current_block_fp_array[block_id]);
+		fwrite(second_col_pos, 1, line_len, writer -> current_block_fp_array[block_id]);
 
 		writer -> output_file_size += line_len;
 		writer -> current_chunk_size += line_len;
@@ -2500,7 +2582,7 @@ int main(int argc, char ** argv)
 	
 	fclose(ifp);
 
-	if(is_sorted) return 0;
+	//if(is_sorted) return 0;
 
 	ifp = f_subr_open(argv[1],"r");
 	SAM_sort_writer writer;

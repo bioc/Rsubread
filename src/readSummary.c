@@ -73,6 +73,19 @@ typedef struct
 
 typedef struct
 {
+	unsigned long long unassigned_ambiguous;
+	unsigned long long unassigned_nofeatures;
+	unsigned long long unassigned_unmapped;
+	unsigned long long unassigned_mappingquality;
+	unsigned long long unassigned_fragmentlength;
+	unsigned long long unassigned_chimericreads;
+	unsigned long long unassigned_multimapping;
+	unsigned long long assigned_reads;
+
+} fc_read_counters;
+
+typedef struct
+{
 	unsigned short thread_id;
 	char * line_buffer1;
 	char * line_buffer2;
@@ -100,6 +113,8 @@ typedef struct
 
 	char * chro_name_buff;
 	z_stream * strm_buffer;
+
+	fc_read_counters read_counters;
 
 	SamBam_Alignment aln_buffer;
 } fc_thread_thread_context_t;
@@ -146,7 +161,6 @@ typedef struct
 	int longest_chro_name;
 
 	unsigned long long int all_reads;
-	unsigned long long int assigned_reads;
 
 	unsigned short thread_number;
 	fc_thread_thread_context_t * thread_contexts;
@@ -188,6 +202,10 @@ typedef struct
 	double start_time;
 
 	char * cmd_rebuilt;
+
+	char   redo;
+
+	fc_read_counters read_counters;
 	
 } fc_thread_global_context_t;
 
@@ -339,9 +357,9 @@ void print_FC_results(fc_thread_global_context_t * global_context)
 			print_in_box(80,0,0,"             Features : %u", global_context -> exontable_exons);
 
 		if(global_context->is_paired_end_data)
-			print_in_box(80,0,0,"   Assigned fragments : %llu", global_context -> assigned_reads);
+			print_in_box(80,0,0,"   Assigned fragments : %llu", global_context -> read_counters.assigned_reads);
 		else
-			print_in_box(80,0,0,"       Assigned reads : %llu", global_context -> assigned_reads);
+			print_in_box(80,0,0,"       Assigned reads : %llu", global_context -> read_counters.assigned_reads);
 
 		print_in_box(80,0,0,"            Time cost : %.3f minutes", (miltime() - global_context -> start_time)/60);
 		print_in_box(80,0,0,"");
@@ -361,9 +379,17 @@ int is_comment_line(const char * l, int file_type, unsigned int lineno)
 	int tabs = 0, xk1 = 0;
 	if(l[0]=='#') return 1;
 
-	if(file_type == FILE_TYPE_RSUBREAD)
-		if(memcmp(l, "GeneID\tChr\tStart",16)==0) return 1;
+	if(isalpha(l[0]) && file_type == FILE_TYPE_RSUBREAD)
+	{
+		char target_chr[16];
+		memcpy(target_chr, l, 16);
+		for(xk1=0; xk1<16; xk1++)
+			target_chr[xk1] = tolower(target_chr[xk1]);
 
+		if(memcmp(target_chr, "geneid\tchr\tstart",16)==0) return 1;
+	}
+
+	xk1=0;
 	while(l[xk1]) tabs += (l[xk1++] == '\t');
 
 	return tabs < ((file_type == FILE_TYPE_GTF)?8:4);
@@ -926,13 +952,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if(!global_context->is_unpaired_warning_shown)
 					{
 						global_context->is_unpaired_warning_shown=1;
-						print_in_box(80,0,0,"");
-						print_in_box(85,0,1,"%c[31m============= WARNING ============", CHAR_ESC);
-						print_in_box(80,0,0,"Reads from the same pair are not adjacent to each other in the input!");
-						print_in_box(80,0,0,"This can make the program very slow and result in wrong counts.");
-						print_in_box(80,0,0,"You may need to specify the %s option.", global_context->isCVersion?"-S":"PEReadsReordering");
-						print_in_box(80,0,1,"==================================");
-						print_in_box(80,0,0,"");
+						global_context->redo = 1;
+						print_in_box(80,0,0,"   Reads are not properly paired.");
+						print_in_box(89,0,0,"   They are %c[36mbeing re-ordered%c[0m before counting...",CHAR_ESC, CHAR_ESC);
 					}
 				}
 			}
@@ -952,6 +974,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			    ((alignment_masks & SAM_FLAG_UNMAPPED)   &&  (alignment_masks & SAM_FLAG_MATE_UNMATCHED) && global_context -> is_paired_end_data) ||
 			    (((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_data && global_context -> is_both_end_required)
 			  ){
+				thread_context->read_counters.unassigned_unmapped ++;
+
 				if(global_context -> SAM_output_fp)
 					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped_%s\n", read_name, global_context -> is_paired_end_data?"Fragment":"Read");
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
@@ -981,6 +1005,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			//printf("SECOND=%d; FIRST=%d; THIS=%d; Q=%d\n", is_second_read, first_read_quality_score, mapping_qual, );
 			if(( mapping_qual < global_context -> min_mapping_quality_score  && ! global_context -> is_paired_end_data)||( is_second_read  && max( first_read_quality_score, mapping_qual ) < global_context -> min_mapping_quality_score))
 			{
+				thread_context->read_counters.unassigned_mappingquality ++;
+
 				if(global_context -> SAM_output_fp)
 				{
 					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Mapping_Quality\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
@@ -1019,6 +1045,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance) || (fragment_length < global_context -> min_paired_end_distance)))
 					{
+						thread_context->read_counters.unassigned_fragmentlength ++;
+
 						if(global_context -> SAM_output_fp)
 							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Fragment_Length\tLength=%ld\n", read_name, fragment_length);
 						return;
@@ -1028,6 +1056,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 					if(global_context -> is_chimertc_disallowed)
 					{
+						thread_context->read_counters.unassigned_chimericreads ++;
+
 						if(global_context -> SAM_output_fp)
 							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimeric_Reads\n", read_name);
 						return;
@@ -1048,6 +1078,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			{
 				if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
 				{
+					thread_context->read_counters.unassigned_multimapping ++;
+
 					if(global_context -> SAM_output_fp)
 						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Multimapping\n", read_name);
 					return;
@@ -1161,6 +1193,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
 			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
 		}
+		thread_context->read_counters.assigned_reads ++;
 	}
 	else if(nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0])
 	{
@@ -1173,6 +1206,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
 			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
 		}
+		thread_context->read_counters.assigned_reads ++;
 	}
 	else
 	{
@@ -1313,6 +1347,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					else
 						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
 				}
+				thread_context->read_counters.assigned_reads ++;
+
 			}
 			else if(top_voters >1 || (global_context -> is_multi_overlap_allowed))
 			{
@@ -1352,13 +1388,23 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						// overlapped but still assigned 
 						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=%d\n", read_name, final_feture_names, assigned_no);
 					}
+					thread_context->read_counters.assigned_reads ++;
+
 				}
-				else if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguous\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
+				else{
+					if(global_context -> SAM_output_fp)
+						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguous\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
+
+					thread_context->read_counters.unassigned_ambiguous ++;
+				}
 			}
 		}
-		else if(global_context -> SAM_output_fp)
-			fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_No_Features\n", read_name);
+		else{
+			if(global_context -> SAM_output_fp)
+				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_No_Features\n", read_name);
+
+			thread_context->read_counters.unassigned_nofeatures ++;
+		}
 	}
 
 }
@@ -1540,7 +1586,7 @@ void * feature_count_worker(void * vargs)
 	}
 }
 
-void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsigned int * nreads , unsigned long long int *nreads_mapped_to_exon)
+void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsigned int * nreads , unsigned long long int *nreads_mapped_to_exon, fc_read_counters * my_read_counter)
 {
 	int xk1, xk2;
 
@@ -1557,8 +1603,24 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 		total_input_reads += global_context -> thread_contexts[xk1].all_reads;
 		(*nreads_mapped_to_exon) += global_context -> thread_contexts[xk1].nreads_mapped_to_exon;
 
-		//if((!global_context->is_SAM_file) || global_context-> thread_number>1)
-		//	global_context->all_reads += global_context -> thread_contexts[xk1].all_reads;
+		global_context -> read_counters.unassigned_ambiguous += global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous;
+		global_context -> read_counters.unassigned_nofeatures += global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures;
+		global_context -> read_counters.unassigned_unmapped += global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped;
+		global_context -> read_counters.unassigned_mappingquality += global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality;
+		global_context -> read_counters.unassigned_fragmentlength += global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength;
+		global_context -> read_counters.unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
+		global_context -> read_counters.unassigned_multimapping += global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping;
+		global_context -> read_counters.assigned_reads += global_context -> thread_contexts[xk1].read_counters.assigned_reads;
+
+		my_read_counter->unassigned_ambiguous += global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous;
+		my_read_counter->unassigned_nofeatures += global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures;
+		my_read_counter->unassigned_unmapped += global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped;
+		my_read_counter->unassigned_mappingquality += global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality;
+		my_read_counter->unassigned_fragmentlength += global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength;
+		my_read_counter->unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
+		my_read_counter->unassigned_multimapping += global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping;
+		my_read_counter->assigned_reads += global_context -> thread_contexts[xk1].read_counters.assigned_reads;
+		
 	}
 
 	char pct_str[10];
@@ -1617,6 +1679,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 
 	global_context -> input_buffer_max_size = buffer_size;
 	global_context -> all_reads = 0;
+	global_context -> redo = 0;
 
 
 	global_context -> isCVersion = isCVersion;
@@ -1639,6 +1702,15 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> cmd_rebuilt = cmd_rebuilt;
 	global_context -> is_input_file_resort_needed = is_input_file_resort_needed;
 	global_context -> feature_block_size = feature_block_size;
+
+	global_context -> read_counters.unassigned_ambiguous=0;
+	global_context -> read_counters.unassigned_nofeatures=0;
+	global_context -> read_counters.unassigned_unmapped=0;
+	global_context -> read_counters.unassigned_mappingquality=0;
+	global_context -> read_counters.unassigned_fragmentlength=0;
+	global_context -> read_counters.unassigned_chimericreads=0;
+	global_context -> read_counters.unassigned_multimapping=0;
+	global_context -> read_counters.assigned_reads=0;
 
 	if(alias_file_name && alias_file_name[0])
 	{
@@ -1676,6 +1748,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	else
 		global_context -> SAM_output_fp = NULL;
 
+	global_context -> redo = 0;
 	global_context -> exontable_geneid = et_geneid;
 	global_context -> exontable_chr = et_chr;
 	global_context -> exontable_start = et_start;
@@ -1706,6 +1779,15 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].line_buffer2 = malloc(global_context -> line_length + 2);
 		global_context -> thread_contexts[xk1].chro_name_buff = malloc(CHROMOSOME_NAME_LENGTH);
 		global_context -> thread_contexts[xk1].strm_buffer = malloc(sizeof(z_stream));
+
+		global_context -> thread_contexts[xk1].read_counters.assigned_reads = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping = 0;
 
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 		void ** thread_args = malloc(sizeof(void *)*2);
@@ -1753,7 +1835,8 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	char * temp_file_name = malloc(300), * fline = malloc(3000);
 	SamBam_FILE * sambam_reader ;
 
-	print_in_box(80,0,0,"   Resort the input file ...");
+	if(!global_context->redo)
+		print_in_box(80,0,0,"   Resort the input file ...");
 	sprintf(temp_file_name, "./temp-core-%06u-%08X.sam", getpid(), rand());
 	sambam_reader = SamBam_fopen(global_context-> input_file_name, global_context-> is_SAM_file?SAMBAM_FILE_SAM:SAMBAM_FILE_BAM);
 
@@ -1779,10 +1862,10 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	}
 
 	sort_SAM_finalise(&writer);
-	if(writer.unpaired_reads)
+	if(writer.unpaired_reads && 0)
 		print_in_box(80,0,0,"   %llu unpaired reads were ignored in reordering.", writer.unpaired_reads);
 	else
-		print_in_box(80,0,0,"   %llu reads are sorted.", writer.written_reads);
+		print_in_box(80,0,0,"   %llu reads were re-ordered. Do read assignment...", writer.written_reads);
 
 	SamBam_fclose(sambam_reader);
 	strcpy(global_context-> input_file_name, temp_file_name);
@@ -1798,7 +1881,6 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	int xk1;
 	int genes = global_context -> gene_name_table -> numOfElements;
 	unsigned int *gene_columns;
-	global_context -> assigned_reads = 0;
 
 	FILE * fp_out = f_subr_open(out_file,"w");
 	if(!fp_out){
@@ -1962,7 +2044,6 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 			if(column_numbers[i_files])
 			{
 				fprintf(fp_out,"\t%u", gene_columns[i_files+non_empty_files*xk1]);
-				global_context -> assigned_reads += gene_columns[i_files+non_empty_files*xk1];
 			}
 		}
 		fprintf(fp_out,"\n");
@@ -1986,6 +2067,49 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	fclose(fp_out);
 }
 
+void fc_write_final_counts(fc_thread_global_context_t * global_context, const char * out_file, int nfiles, char * file_list, unsigned int ** column_numbers, fc_read_counters *read_counters, int isCVersion)
+{
+	char fname[300];
+	int i_files, xk1;
+
+	sprintf(fname, "%s.summary", out_file);
+	FILE * fp_out = f_subr_open(fname,"w");
+
+	if(!fp_out) return;
+
+	fprintf(fp_out,"Counter");
+	char * next_fn = file_list;
+	
+	for(i_files=0; i_files<nfiles; i_files++)
+	{
+		if(!next_fn||strlen(next_fn)<1) break;
+		if(column_numbers[i_files])
+			fprintf(fp_out,"\t%s", next_fn);
+
+		next_fn += strlen(next_fn)+1;
+	}
+
+	fprintf(fp_out,"\n");
+	char * keys [] ={"Unassigned_Ambiguous","Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_ChimericReads", "Unassigned_MultiMapping", "Assigned"};
+
+	for(xk1=0; xk1<8; xk1++)
+	{
+		fprintf(fp_out,"%s", keys[xk1]);
+		for(i_files = 0; i_files < nfiles; i_files ++)
+		{
+			unsigned long long * array_0 = (unsigned long long *)&(read_counters[i_files]);
+			unsigned long long * cntr = array_0 + xk1;
+			if(column_numbers[i_files])
+			{
+				fprintf(fp_out,"\t%llu", *(cntr));
+			}
+		}
+		fprintf(fp_out,"\n");
+	}
+
+
+	fclose(fp_out);
+}
 void fc_write_final_results(fc_thread_global_context_t * global_context, const char * out_file, int features, unsigned int ** column_numbers, char * file_list, int n_input_files, fc_feature_info_t * loaded_features, int header_out)
 {
 	/* save the results */
@@ -1996,8 +2120,6 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 		SUBREADprintf("Failed to create file %s\n", out_file);
 			return;
 		}
-
-	global_context -> assigned_reads = 0;
 
 	if(header_out)
 	{
@@ -2031,7 +2153,6 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 			{
 				int sorted_exon_no = loaded_features[i].sorted_order;
 				fprintf(fp_out,"\t%d", column_numbers[i_files][sorted_exon_no]);
-				global_context -> assigned_reads += column_numbers[i_files][sorted_exon_no];
 			}
 		}
 		fprintf(fp_out,"\n");
@@ -2161,7 +2282,7 @@ void print_usage()
 
 
 
-int readSummary_single_file(fc_thread_global_context_t * global_context, unsigned int * column_numbers, int nexons,  int * geneid, char ** chr, long * start, long * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, long * anno_chr_head, long * block_end_index, long * block_min_start , long * block_max_end);
+int readSummary_single_file(fc_thread_global_context_t * global_context, unsigned int * column_numbers, int nexons,  int * geneid, char ** chr, long * start, long * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, long * anno_chr_head, long * block_end_index, long * block_min_start , long * block_max_end, fc_read_counters * my_read_counter);
 
 int readSummary(int argc,char *argv[]){
 
@@ -2325,21 +2446,37 @@ int readSummary(int argc,char *argv[]){
 	strcpy(file_list_used, argv[2]);
 	char * next_fn = strtok_r(file_list_used,";", &tmp_pntr);
 	unsigned int ** table_columns = calloc( n_input_files , sizeof(int *)), i_files=0;
+	fc_read_counters * read_counters = calloc(n_input_files , sizeof(fc_read_counters)); 
+
 	for(;;){
+		int redoing, original_sorting = global_context.is_input_file_resort_needed;
 		if(next_fn==NULL || strlen(next_fn)<1) break;
 
-	
 		unsigned int * column_numbers = calloc(nexons, sizeof(unsigned int ));
 
 		strcpy(global_context.input_file_name, next_fn);
-		int ret_int = readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end);
+		global_context.redo=0;
+		
+		for(redoing = 0; redoing < 1 + !original_sorting; redoing++)
+		{
+			fc_read_counters * my_read_counter = &(read_counters[i_files]);
+			memset(my_read_counter, 0, sizeof(fc_read_counters));
 
-		if(ret_int!=0){
-			table_columns[i_files] = NULL;
-			free(column_numbers);
+			int ret_int = readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end, my_read_counter);
+			if(ret_int!=0 || (global_context.redo && redoing)){
+				table_columns[i_files] = NULL;
+				free(column_numbers);
+				break;
+			}
+			else table_columns[i_files] = column_numbers;
+
+			if(redoing || !global_context.redo) break;
+			
+			global_context.is_input_file_resort_needed = 1;
+			memset(column_numbers, 0, nexons * sizeof(unsigned int ));
 		}
-		else table_columns[i_files] = column_numbers;
 		global_context.is_SAM_file = isSAM;
+		global_context.is_input_file_resort_needed = original_sorting;
 
 		i_files++;
 		next_fn = strtok_r(NULL, ";", &tmp_pntr);
@@ -2351,6 +2488,8 @@ int readSummary(int argc,char *argv[]){
 		fc_write_final_gene_results(&global_context, geneid, chr, start, stop, sorted_strand, argv[3], nexons,  table_columns, argv[2], n_input_files , loaded_features, isCVersion);
 	else
 		fc_write_final_results(&global_context, argv[3], nexons, table_columns, argv[2], n_input_files ,loaded_features, isCVersion);
+
+	fc_write_final_counts(&global_context, argv[3], n_input_files, argv[2], table_columns, read_counters, isCVersion);
 
 	for(i_files=0; i_files<n_input_files; i_files++)
 		if(table_columns[i_files]) free(table_columns[i_files]);
@@ -2414,7 +2553,7 @@ int readSummary(int argc,char *argv[]){
 
 
 
-int readSummary_single_file(fc_thread_global_context_t * global_context, unsigned int * column_numbers, int nexons,  int * geneid, char ** chr, long * start, long * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, long * anno_chr_head, long * block_end_index, long * block_min_start , long * block_max_end)
+int readSummary_single_file(fc_thread_global_context_t * global_context, unsigned int * column_numbers, int nexons,  int * geneid, char ** chr, long * start, long * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, long * anno_chr_head, long * block_end_index, long * block_min_start , long * block_max_end, fc_read_counters * my_read_counter)
 {
 	FILE *fp_in = NULL;
 	int read_length = 0;
@@ -2434,7 +2573,9 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		file_str = "SAM";
 		if(file_probe == 1) file_str = "BAM" ;
 		if(file_probe == -1) file_str = "Unknown";
-		print_in_box(80,0,0,"Process %s file %s...", file_str, global_context->input_file_name);
+
+		if(!global_context->redo)
+			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context->input_file_name);
 	}
 
 	int isInputFileResortNeeded = global_context->is_input_file_resort_needed;
@@ -2522,6 +2663,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 				while(1)
 				{
 					ret = fgets(lbuf, MAX_LINE_LENGTH, fp_in);
+					if(global_context -> redo) ret = NULL;
 					if(!ret) break;
 					if(lbuf[0] != '@') break;
 				}
@@ -2567,8 +2709,12 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			if(binary_remainder > 70000)
 				SUBREADprintf("SOMETHING IS WRONG!\n");
 
-			if(binary_remainder<10000)
-				cdata_size = PBam_get_next_zchunk(fp_in, chunk_in_buff, 65537, & real_len);
+			if(global_context -> redo)
+				cdata_size = -1;
+			else{
+				if(binary_remainder<10000)
+					cdata_size = PBam_get_next_zchunk(fp_in, chunk_in_buff, 65537, & real_len);
+			}
 
 			if(cdata_size>0 || binary_remainder>0)
 			{
@@ -2707,6 +2853,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 					while(1)
 					{
 						ret = fgets(preload_line+preload_line_ptr, MAX_LINE_LENGTH, fp_in);
+						if(global_context -> redo ) ret = NULL;
 						if(!ret) break;
 						if(preload_line[preload_line_ptr] != '@') break;
 					}
@@ -2740,8 +2887,10 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			{
 				// Safegarding -- it should not happen if the SAM file has a correct format.
 				line_length = 0;
-				print_in_box(80,0,0,"   There are odd number of reads in the paired-end data.");
-				print_in_box(80,0,0,"   Please make sure that the format is correct.");
+				if( (!global_context -> redo)){
+					print_in_box(80,0,0,"   There are odd number of reads in the paired-end data.");
+					print_in_box(80,0,0,"   Please make sure that the format is correct.");
+				}
 			}
 
 			//printf("FRR=%d\n%s\n", fresh_read_no, preload_line);
@@ -2800,11 +2949,13 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 
 	unsigned long long int nreads_mapped_to_exon = 0;
 
-	fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon);
+
+	if(!global_context->redo)
+		fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon, my_read_counter);
 
 	fc_thread_destroy_thread_context(global_context);
 
-	//global_context .assigned_reads = nreads_mapped_to_exon;
+	//global_context .read_counters.assigned_reads = nreads_mapped_to_exon;
 
 	#ifdef MAKE_STANDALONE
 	if(strcmp("STDIN",global_context->input_file_name)!=0)

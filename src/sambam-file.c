@@ -34,27 +34,47 @@
 #include "gene-algorithms.h"
 #include "sambam-file.h"
 
-BS_uint_16 gzread_B16(gzFile fp)
+int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 {
-	BS_uint_16 ret;
-	gzread(fp, &ret, 2);
-	return ret;
-}
+	int x1, room =  SAMBAM_INPUT_STREAM_SIZE - ( fp -> input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr); 
 
-BS_uint_32 gzread_B32(gzFile fp)
-{
-	BS_uint_32 ret;
-	gzread(fp, &ret, 4);
-	return ret;
-}
+	if(room < 65536)
+		return -1;
 
-BS_uint_8 gzread_B8(gzFile fp)
-{
-	BS_uint_8 ret;
-	gzread(fp, &ret, 1);
-	return ret;
-}
 
+	for(x1=0; x1 < fp->input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr; x1 ++)
+	{
+		fp -> input_binary_stream_buffer [x1] = fp -> input_binary_stream_buffer [x1 + fp->input_binary_stream_read_ptr - fp -> input_binary_stream_buffer_start_ptr];
+	}
+	fp -> input_binary_stream_buffer_start_ptr = fp->input_binary_stream_read_ptr;
+
+	char * in_buff = malloc(65537);
+	unsigned int real_len = 0;
+	int ret, have = 0;
+	
+	while (1){
+			int nchunk = 0;
+			ret = PBam_get_next_zchunk(fp -> os_file, in_buff, 65536, & real_len);
+			if(ret > 0)
+				nchunk = SamBam_unzip(fp -> input_binary_stream_buffer + fp->input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr + have , in_buff , ret);
+
+			//printf("RET=%d; CHK=%d\n", ret, nchunk);
+
+			if(nchunk>0)
+				have += nchunk; 
+			if(have > 3000) break;
+			if(feof(fp->os_file)){
+				fp->is_eof=1;
+				break;
+			}
+	}
+	free(in_buff);
+
+	fp -> input_binary_stream_write_ptr += have;
+
+	return have;
+
+}
 
 SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 {
@@ -73,41 +93,60 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 	}
 	else
 	{
-		FILE * os_file = f_subr_open(fname, "rb");
-		if(os_file == NULL)
+		ret -> os_file = f_subr_open(fname, "rb");
+		if(ret -> os_file == NULL)
 		{
 			free(ret);
 			return NULL;
 		}
-		unsigned char first_ch = fgetc(os_file);
-		unsigned char second_ch = fgetc(os_file);
+		unsigned char first_ch = fgetc(ret->os_file);
+		unsigned char second_ch = fgetc(ret->os_file);
 
-		fclose(os_file);
 		if(first_ch!=31 || second_ch!=139)
 		{
 			free(ret);
 			return NULL;
 		}
 
+		fseek(ret->os_file, 0, SEEK_SET);
 
-		gzFile nf = gzopen(fname, "rb");
-		if(!nf)
+		ret -> input_binary_stream_buffer = (char *)malloc(SAMBAM_INPUT_STREAM_SIZE);
+		ret -> input_binary_stream_read_ptr = 0;
+		ret -> input_binary_stream_write_ptr = 0;
+		ret -> input_binary_stream_buffer_start_ptr = 0;
+
+		ret -> bam_file_stage = BAM_FILE_STAGE_HEADER;
+		ret -> is_eof = 0;
+		
+		SB_FETCH(ret);
+
+		if(SB_EOF(ret))
 		{
+			free(ret->input_binary_stream_buffer);
 			free(ret);
+			SUBREADprintf("FEOF 0!\n");
 			return NULL;
+
 		}
 
-		ret -> gz_file = nf;
-		ret -> bam_file_stage = BAM_FILE_STAGE_HEADER;
-		
-		BS_uint_32 magic_4 = gzread_B32(ret -> gz_file);
+		int magic_4 = 0;
+		memcpy(&magic_4 , SB_READ(ret), 4);
+		SB_RINC(ret, 4);
+
 		if(magic_4 != 21840194) // this number is the four bytes of "BAM1"
 		{
+			free(ret->input_binary_stream_buffer);
 			free(ret);
+			SUBREADprintf("FEOF 4 == %d!\n", magic_4);
 			return NULL;
 		}
-		BS_uint_32 l_text = gzread_B32(ret -> gz_file);
-		ret -> bam_file_next_section_start = gztell(ret -> gz_file) + l_text;
+
+
+		int l_text = 0;
+		memcpy(&l_text, SB_READ(ret), 4);
+		SB_RINC(ret, 4);
+
+		ret -> bam_file_next_section_start = ret -> input_binary_stream_read_ptr + l_text;
 	}
 	return ret;
 }
@@ -129,191 +168,6 @@ char read_int_char(int ch)
 	return "=ACMGRSVTWYHKDBN"[ch];
 }
 
-int SamBam_get_alignment(SamBam_FILE * fp, SamBam_Alignment * aln, int seq_needed)
-{
-		if(gzeof(fp->gz_file)) return -1;
-		unsigned long long head_pos = gztell(fp->gz_file);
-		unsigned int block_size = gzread_B32(fp->gz_file);
-		if(gzeof(fp->gz_file)) return -1;
-
-		unsigned int ref_id = gzread_B32(fp->gz_file);
-		if(gzeof(fp->gz_file)) return -1;
-
-		assert(ref_id < fp->bam_chro_table_size|| ref_id == -1);
-
-
-		if(ref_id == -1) aln -> chro_name = NULL;
-		else aln -> chro_name = fp -> bam_chro_table[ref_id].chro_name; 
-		aln -> chro_offset = gzread_B32(fp->gz_file);
-
-		unsigned int comb1 = gzread_B32(fp->gz_file);
-		aln -> mapping_quality = 0xff & (comb1 >> 8);
-
-		unsigned int comb2 = gzread_B32(fp->gz_file);
-		aln -> flags = 0xffff&(comb2 >> 16);
-
-		unsigned int read_len = gzread_B32(fp->gz_file);
-
-		unsigned int mate_ref_id = gzread_B32(fp->gz_file);
-		if(gzeof(fp->gz_file)) return -1;
-
-		assert(mate_ref_id < fp->bam_chro_table_size || mate_ref_id == -1);
-		if(mate_ref_id == -1) aln -> mate_chro_name = NULL;
-		else aln -> mate_chro_name = fp -> bam_chro_table[mate_ref_id].chro_name; 
-
-		aln -> mate_chro_offset = gzread_B32(fp->gz_file);
-
-		aln -> templete_length = (int)gzread_B32(fp->gz_file);
-
-		int read_name_len = comb1 & 0xff;
-		assert(read_name_len < BAM_MAX_READ_NAME_LEN);
-
-		gzread(fp->gz_file, aln -> read_name, read_name_len);
-		aln -> read_name[read_name_len] = 0;
-
-		int cigar_ops = comb2 & 0xffff;
-		int xk1;
-		aln -> cigar[0]=0; 
-		for(xk1=0; xk1<cigar_ops;xk1++)
-		{
-			char cigar_piece_buf[BAM_MAX_CIGAR_LEN];
-			unsigned int cigar_piece = gzread_B32(fp->gz_file);
-
-			sprintf(cigar_piece_buf, "%u%c", cigar_piece>>4, cigar_op_char(cigar_piece&0xf));
-			if(strlen(cigar_piece_buf)+strlen(aln->cigar)<BAM_MAX_CIGAR_LEN-1)
-				strcat(aln->cigar, cigar_piece_buf);
-			else
-			{
-				SUBREADprintf("WARNING: cigar string is too long to the buffer\nThis can happen when the BAM file was generated by a very old version of SAMTools.\n");
-				SUBREADprintf("Please only use the compressed BAM format.\n");
-				return -1;
-			}
-		}
-
-		char read_2_seq = 0;
-		int seq_qual_bytes = read_len + (read_len /2)+(read_len%2);
-		int gzread_len = gzread(fp->gz_file, aln-> buff_for_seq, seq_qual_bytes);
-		if(gzread_len < seq_qual_bytes)
-			return -1;
-
-		if(seq_needed)
-		{
-			for(xk1=0;xk1<read_len;xk1++)
-			{
-				if(xk1 %2 == 0){
-					read_2_seq = aln-> buff_for_seq[xk1/2];
-				}
-				if(xk1 < BAM_MAX_READ_LEN)
-					aln -> sequence[xk1] = read_int_char(0xf&(read_2_seq >> (xk1%2?0:4)));
-			}
-			aln -> sequence[min(BAM_MAX_READ_LEN-1,read_len)] = 0;
-			if(read_len >= BAM_MAX_READ_LEN-1)
-				SUBREADprintf("WARNING: read is too long to the buffer\n");
-
-			
-			for(xk1=0;xk1<read_len;xk1++)
-			{
-				read_2_seq = aln -> buff_for_seq[(read_len /2)+(read_len%2) + xk1] ;
-				if(xk1 < BAM_MAX_READ_LEN)
-					aln -> seq_quality[xk1] = 33+read_2_seq;
-			}
-			aln -> seq_quality[min(BAM_MAX_READ_LEN-1,read_len)] = 0;
-		}
-		else
-		{
-			aln -> seq_quality[0]='#';
-			aln -> seq_quality[1]=0;
-			aln -> sequence[0]='N';
-			aln -> sequence[1]=0;
-		}
-
-		unsigned long long int skip_len=0;
-		aln -> NH_number = -1;
-		while(gztell(fp->gz_file) < head_pos+block_size+4)
-		{
-			char tagname[2];
-			gzread(fp->gz_file, tagname, 2);
-			char tagtype, nch;
-			gzread(fp->gz_file, &tagtype, 1);
-			skip_len=9999999;
-
-
-			switch(tagtype)
-			{
-				case 'Z':	// string
-				case 'H':	// string
-					while(1)
-					{
-						gzread(fp->gz_file, &nch,1);
-						if(nch==0)break;
-					}
-					skip_len=0;
-					break;
-				case 'c':
-				case 'C':
-				case 'A':
-					skip_len=1;
-					break;
-				case 's':
-				case 'S':
-					skip_len=2;
-					break;
-				case 'i':
-				case 'f':
-				case 'I':
-					skip_len=4;
-					break;
-				case 'B':
-					gzread(fp->gz_file, &nch,1);
-					int arlen = gzread_B32(fp->gz_file);
-
-					int arskip_len = -1;
-					switch(nch){
-						case 'A':
-						case 'c':
-						case 'C':
-							arskip_len=1;
-							break;
-						case 's':
-						case 'S':
-							arskip_len=2;
-							break;
-						case 'i':
-						case 'I':
-						case 'f':
-							arskip_len=4;
-							break;
-						default: break;
-					}
-					if(arskip_len==-1) break;
-					else
-						gzseek(fp->gz_file, arskip_len * arlen, SEEK_CUR);
-					skip_len = 0;
-
-					break;
-				default: break;
-			}
-			//fprintf(stderr,"TG=%s\tTY=%c\tSKP=%d\n", tagname, tagtype, skip_len);
-
-			if(skip_len>9999998) break;
-
-			if(memcmp(tagname,"NH",2)==0)
-			{
-				int nh_v=0;
-				gzread(fp->gz_file, &nh_v, skip_len);
-				aln -> NH_number = nh_v;
-			}
-			else
-				gzseek(fp->gz_file, skip_len, SEEK_CUR);
-		}
-
-		unsigned long long tail_pos = gztell(fp->gz_file);
-		skip_len = block_size - (tail_pos - head_pos - 4);
-		long long int seek_ret= gzseek(fp->gz_file, skip_len, SEEK_CUR);
-		if(seek_ret < 0) return -1;
-		return 0;
-}
-
 void SamBam_fclose(SamBam_FILE * fp)
 {
 	if(fp->file_type==SAMBAM_FILE_SAM)
@@ -323,7 +177,8 @@ void SamBam_fclose(SamBam_FILE * fp)
 	}
 	else
 	{
-		gzclose(fp->gz_file);
+		fclose(fp->os_file);
+		free(fp -> input_binary_stream_buffer);
 		free(fp -> bam_chro_table);
 		free(fp);
 	}
@@ -331,31 +186,48 @@ void SamBam_fclose(SamBam_FILE * fp)
 
 int SamBam_feof(SamBam_FILE * fp)
 {
-	if(fp->file_type==SAMBAM_FILE_SAM) return feof(fp->os_file);
-	else{
-			if(gzeof(fp->gz_file)) return 1;
-			return 0;
-	}
+	if(fp->file_type ==SAMBAM_FILE_SAM) 
+		return feof(fp->os_file);
+	else return SB_EOF(fp); 
 }
 
 void SamBam_read_ref_info(SamBam_FILE * ret)
 {
-	unsigned int ref_info_size = gzread_B32(ret -> gz_file);
+	unsigned int ref_info_size = 0;
+	ret ->bam_chro_table_size = 0;
+	//printf("CKK0\n");
+
+	SB_FETCH(ret);
+	if(SB_EOF(ret))
+		return;
+
+	//printf("CKK1\n");
+
+	memcpy(&ref_info_size, SB_READ(ret),4);
+	SB_RINC(ret, 4);
 
 	int xk1;
 	ret -> bam_chro_table = malloc(sizeof(SamBam_Reference_Info) * ref_info_size);
 	for(xk1=0;xk1<ref_info_size;xk1++)
 	{
-		int ref_name_len = gzread_B32(ret -> gz_file);
+		SB_FETCH(ret);
+	
+		if(SB_EOF(ret))
+			break;
+
+		int ref_name_len = 0;
+		memcpy(&ref_name_len, SB_READ(ret),4);
+		SB_RINC(ret, 4);
+
 		int ref_readin_len = min(ref_name_len, BAM_MAX_CHROMOSOME_NAME_LEN-1);
 		int ref_skip_len = ref_name_len - ref_readin_len;
 
-		gzread(ret -> gz_file, ret -> bam_chro_table[xk1].chro_name , ref_readin_len);
+		memcpy(ret -> bam_chro_table[xk1].chro_name, SB_READ(ret), ref_readin_len);
 		ret -> bam_chro_table[xk1].chro_name[ref_readin_len] = 0;
-		if(ref_skip_len)gzseek(ret -> gz_file , ref_skip_len , SEEK_CUR);
+		SB_RINC(ret, ref_readin_len + ref_skip_len);
 
-
-		ret -> bam_chro_table[xk1].chro_length = gzread_B32(ret -> gz_file);
+		memcpy(&(ret -> bam_chro_table[xk1].chro_length), SB_READ(ret),4);
+		SB_RINC(ret, 4);
 
 		//SUBREADprintf("CHRO[%d] : %s [%d]\n", xk1+1, ret -> bam_chro_table[xk1].chro_name , ret -> bam_chro_table[xk1].chro_length);
 	}
@@ -377,12 +249,20 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 		{
 			char nch;
 			xk1=0;
+			SB_FETCH(fp);
+			if(SB_EOF(fp))
+				return NULL;
+
 			while(1)
 			{
-				if(xk1 >= buff_len-2 || gztell(fp->gz_file) >= fp -> bam_file_next_section_start)
+				if(xk1 >= buff_len-2 || fp -> input_binary_stream_read_ptr >= fp -> bam_file_next_section_start)
 					break;
 
-				nch = gzgetc(fp->gz_file);
+				nch = *(SB_READ(fp));
+				SB_RINC(fp,1);
+
+				//printf("NNCH=%c\n", nch);
+
 				if(nch == '\r'||nch=='\n' || nch <0) break;
 				buff[xk1]=nch;
 				xk1++;
@@ -392,7 +272,10 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 				buff[xk1]='\n';
 				buff[xk1+1]=0;
 			}
-			if(gztell(fp->gz_file) >= fp -> bam_file_next_section_start)
+
+//			printf("%d > %d\n", fp -> input_binary_stream_read_ptr , fp -> bam_file_next_section_start);
+
+			if(fp -> input_binary_stream_read_ptr >= fp -> bam_file_next_section_start)
 			{
 				SamBam_read_ref_info(fp);
 				fp -> bam_file_stage = BAM_FILE_STAGE_ALIGNMENT;
@@ -402,43 +285,15 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 		else
 		{
 			SamBam_Alignment *aln = &fp->aln_buff;
-			int is_align_error =SamBam_get_alignment(fp, aln, seq_needed);
-			if(is_align_error)return NULL;
-			else
-			{
-					char * chro_name = "*";
-					char * cigar = "*";
-					unsigned int chro_offset = 0;
+			int chunk_ptr = 0;
+			SB_FETCH(fp);
+			if(SB_EOF(fp)) return NULL;
 
-					if(aln -> chro_name){
-						chro_name = aln -> chro_name;
-						chro_offset = aln -> chro_offset+1;
-						if(aln -> cigar[0])
-							cigar = aln -> cigar;
-					}
+			int text_len = PBam_chunk_gets(SB_READ(fp) , &chunk_ptr, fp -> input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr , fp -> bam_chro_table, buff , buff_len, aln, seq_needed);
+			SB_RINC(fp, chunk_ptr);
 
-					char * mate_chro_name = "*";
-					unsigned int mate_chro_offset = 0;
-					if(aln -> mate_chro_name)
-					{
-						if(aln -> mate_chro_name == chro_name) mate_chro_name = "=";
-						else
-							mate_chro_name = aln -> mate_chro_name;
-						mate_chro_offset = aln -> mate_chro_offset+1;
-					}
-
-					long long int templete_length = aln -> templete_length;
-
-					char ext_fields[20];
-					if(aln->NH_number >=0)
-						sprintf(ext_fields,"\tNH:i:%d", aln->NH_number);
-					else	ext_fields[0]=0;
-					
-					snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s\n", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, ext_fields);
-			}
-		
-			//fprintf(stderr, "%s", buff);
-			return buff;
+			if(text_len>0) return buff;
+			return NULL;
 		}
 	}
 }
@@ -629,6 +484,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	// decrypt the BAM mess.
 	unsigned int block_size;
 	if((*chunk_ptr) +4> chunk_limit) return -1;
+
 	memcpy(&block_size, chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
 	unsigned int next_start = block_size+(*chunk_ptr);
@@ -636,26 +492,22 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	int ref_id;
 	memcpy(&ref_id, chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	if(ref_id == -1) aln -> chro_name = NULL;
 	else aln -> chro_name = bam_chro_table[ref_id].chro_name; 
 
 	memcpy(&(aln -> chro_offset), chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	unsigned int comb1;
 	memcpy(&comb1, chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	aln -> mapping_quality = 0xff & (comb1 >> 8);
 
 	unsigned int comb2;
 	memcpy(&comb2, chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	aln -> flags = 0xffff&(comb2 >> 16);
 
@@ -663,28 +515,22 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	memcpy(&read_len, chunk+(*chunk_ptr), 4);
 
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	unsigned int mate_ref_id;
 	memcpy(&mate_ref_id, chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	if(mate_ref_id == -1) aln -> mate_chro_name = NULL;
 	else aln -> mate_chro_name = bam_chro_table[mate_ref_id].chro_name; 
 
 	memcpy(&(aln -> mate_chro_offset), chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	memcpy(&(aln -> templete_length), chunk+(*chunk_ptr), 4);
 	(*chunk_ptr)+=4;
-	if((*chunk_ptr) > chunk_limit) return -1;
 
 	int read_name_len = comb1 & 0xff;
 	assert(read_name_len < BAM_MAX_READ_NAME_LEN);
-
-	if((*chunk_ptr) + read_name_len > chunk_limit) return -1;
 
 	memcpy(aln -> read_name, chunk+(*chunk_ptr), read_name_len);
 	aln -> read_name[read_name_len] = 0;
@@ -715,8 +561,6 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	char read_2_seq = 0;
 	int seq_qual_bytes = read_len + (read_len /2)+(read_len%2);
 
-
-	if((*chunk_ptr) + seq_qual_bytes > chunk_limit) return -1;
 	memcpy( aln-> buff_for_seq, chunk+(*chunk_ptr), seq_qual_bytes);
 	(*chunk_ptr) += seq_qual_bytes;
 
@@ -1183,7 +1027,7 @@ int SamBam_writer_close(SamBam_Writer * writer)
 	return 0;
 }
 
-int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text)
+int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text, int add_chro)
 {
 	int new_text_len = strlen(header_text);
 
@@ -1199,16 +1043,35 @@ int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text)
 	writer -> header_plain_text_buffer_used += new_text_len;
 	strcpy(writer -> header_plain_text_buffer + writer -> header_plain_text_buffer_used, "\n");
 	writer -> header_plain_text_buffer_used ++;
+	if(add_chro && memcmp(header_text, "@SQ",3)==0)
+	{
+		char * chro = NULL;
+		int chro_len = -1;
+		char * toktmp = NULL;
+		char * ret_tmp = strtok_r(header_text, "\t", &toktmp);
+
+		while(1){
+			if(!ret_tmp) break;
+
+			if(memcmp(ret_tmp,"SN:", 3)==0) chro = ret_tmp + 3;
+			else if(memcmp(ret_tmp,"LN:", 3)==0) chro_len = atoi(ret_tmp + 3);
+
+			ret_tmp = strtok_r(NULL, "\t", &toktmp);
+		}
+
+		if(chro && (chro_len>0))
+			SamBam_writer_add_chromosome(writer, chro, chro_len, 0);
+		
+	}
 
 	//if(writer -> header_plain_text_buffer_used %97==0) printf("MV=%d\n",writer -> header_plain_text_buffer_used);
 
 	return 0;
 }
 
-int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length)
+int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length, int add_header)
 {
 	unsigned int chro_id = writer -> chromosome_name_table -> numOfElements;
-	char * line_buf = malloc(1000);
 
 	//assert(strlen(chro_name) < 30);
 
@@ -1217,9 +1080,14 @@ int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsig
 	HashTablePut(writer -> chromosome_name_table, chro_name_space, NULL+1+chro_id);
 	HashTablePut(writer -> chromosome_id_table, NULL+1+chro_id, chro_name_space);
 	HashTablePut(writer -> chromosome_len_table, NULL+1+chro_id, NULL + 1 + chro_length);
-	snprintf(line_buf,999, "@SQ\tSN:%s\tLN:%u", chro_name , chro_length);
-	SamBam_writer_add_header(writer, line_buf);
-	free(line_buf);
+
+	if(add_header)
+	{
+		char * line_buf = malloc(1000);
+		snprintf(line_buf,999, "@SQ\tSN:%s\tLN:%u", chro_name , chro_length);
+		SamBam_writer_add_header(writer, line_buf, 0);
+		free(line_buf);
+	}
 
 	return 0;
 }
@@ -1290,19 +1158,23 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 			bin[bin_cursor+1] = additional_columns[col_cursor+1];
 
 			char datatype = additional_columns[col_cursor+3];
-			if(datatype=='i')
+			if(datatype=='i' || datatype == 'f')
 			{
 				int dig_len =0;
 				while(additional_columns[dig_len+col_cursor+5] != '\t' && additional_columns[dig_len+col_cursor+5]) dig_len++;
-				int val = atoi(additional_columns+col_cursor+5);
-				bin[bin_cursor+2]='i';
-				memcpy(bin+bin_cursor+3, &val,4);
+				int val = 0;
+				float fval = 0;
+				if(datatype=='i') val = atoi(additional_columns+col_cursor+5);
+				else val = atof(additional_columns+col_cursor+5);
+
+				bin[bin_cursor+2]=datatype;
+				memcpy(bin+bin_cursor+3, (datatype=='i')? ((void *)&val):((void *)&fval),4);
 				bin_cursor += 3 + 4;
 				col_cursor += 5 + dig_len;
 			}
-			else if(datatype=='Z')
+			else if(datatype=='Z' || datatype == 'H')
 			{
-				bin[bin_cursor+2]='Z';
+				bin[bin_cursor+2]=datatype;
 				bin_cursor +=3;
 				int str_len = 0;
 				col_cursor +=5;
@@ -1317,6 +1189,54 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 				bin_cursor += str_len + 1;
 				col_cursor += str_len;
 			}
+			else if(datatype=='A')
+			{
+				bin[bin_cursor+2]='A';
+				bin[bin_cursor+3]=additional_columns[col_cursor+5];
+				col_cursor += 6;
+				bin_cursor += 4;
+			}
+			else if(datatype=='B')
+				//array
+			{
+				char celltype = additional_columns[col_cursor+5];
+				int * items = (int *)(&bin[bin_cursor+4]);
+
+				bin[bin_cursor+2]='B';
+				bin[bin_cursor+3]=celltype;
+				bin_cursor += 4 + 4;
+				col_cursor += 7;
+
+				(*items) = 0;
+
+				int last_cursor = col_cursor;
+				while(1){
+					if(additional_columns[col_cursor] == ',' || additional_columns[col_cursor] == '\t' || additional_columns[col_cursor] == 0)
+					{ // add new item 
+
+						char cell_buff [30];
+						if((col_cursor - last_cursor) < 29)
+						{
+							memcpy(cell_buff, additional_columns + last_cursor, (col_cursor - last_cursor));
+							cell_buff[(col_cursor - last_cursor)] = 0;
+							int intv = 0; float fltv = 0;
+							if(celltype == 'i')intv = atoi(cell_buff);							
+							else fltv = atof(cell_buff);
+							memcpy(bin + bin_cursor, (celltype == 'i')?(void *)&intv:(void *)&fltv, 4);
+							bin_cursor += 4;
+							(*items) ++;
+						}
+						last_cursor = col_cursor+1;
+					}
+					if(additional_columns[col_cursor] == '\t' || additional_columns[col_cursor] == 0)
+						break;
+
+					col_cursor++;
+					
+				}
+				
+			}
+
 			if(bin_cursor>250) break;
 			continue;
 		}
@@ -1410,7 +1330,41 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 	return 0;
 }
 
+int SamBam_unzip(char * out , char * in , int inlen)
+{
+	#define unzip_out_max_len 65537
+	z_stream strm;
+	strm.zalloc = Z_NULL;
+	strm.zfree = Z_NULL;
+	strm.opaque = Z_NULL;
+	strm.avail_in = 0;
+	strm.next_in = Z_NULL;
+	int ret = inflateInit2(&strm, SAMBAM_GZIP_WINDOW_BITS);
+	if (ret != Z_OK)
+		return -1;
 
+	strm.avail_in = (unsigned int)inlen;
+	strm.next_in = (unsigned char *)in;
+
+	strm.avail_out = unzip_out_max_len;
+	strm.next_out = (unsigned char *)out;
+	ret = inflate(&strm, Z_FINISH);
+	if(ret != Z_STREAM_END)
+	{
+		inflateEnd(&strm);
+		return -1;
+	}
+	int have = unzip_out_max_len - strm.avail_out;
+
+	inflateEnd(&strm);
+
+	return have;
+}
+
+
+
+
+#ifdef MAKE_TEST_SAMBAM
 
 int is_badBAM(char * fn)
 {
@@ -1418,7 +1372,7 @@ int is_badBAM(char * fn)
 	if(!fp) return -1;
 
 	char * in_buff = malloc(70000);
-	char * out_buff = malloc(70000);
+	char * out_buff = malloc(170000);
 	int blks=0;
 
 	int state = 0;
@@ -1555,7 +1509,7 @@ int is_badBAM(char * fn)
 				memcpy(& chros, out_buff + (data_ptr - chunk_start_ptr), 4);
 
 				all_chros = chros;
-				//printf("chros=%d\n", chros);
+				printf("chros=%d\n", chros);
 				data_ptr +=4;
 				state = 3;
 			}
@@ -1583,7 +1537,7 @@ int is_badBAM(char * fn)
 					data_ptr += ref_name_len + 8 - last_len;
 					if(chros ==1){
 						state = 4;
-		//				printf("header len = %d\n", data_ptr);
+						printf("header len = %d\n", data_ptr);
 						break;
 					}
 					else
@@ -1607,8 +1561,8 @@ int is_badBAM(char * fn)
 				tested_chunks ++;
 				if(tested_chunks > TEST_BAD_BAM_CHUNKS)
 					break;
-				//printf("tested_chunks=%d; reads=%d; data_ptr=%d; start_ptr=%d; have=%d\n", tested_chunks, tested_reads, data_ptr, chunk_start_ptr,  have);
-				if(data_ptr!= chunk_start_ptr && have > 3000)
+				printf("tested_chunks=%d; reads=%d; data_ptr=%d; start_ptr=%d; have=%d\n", tested_chunks, tested_reads, data_ptr, chunk_start_ptr,  have);
+				if(data_ptr!= chunk_start_ptr && have > 9993000)
 				{
 					//printf("PTRS: %d != %d - %d\n", data_ptr, chunk_start_ptr, have);
 					fret=1;
@@ -1637,6 +1591,8 @@ int is_badBAM(char * fn)
 					last_len = 0;
 					memcpy(&my_chro,  out_buff + (data_ptr - chunk_start_ptr) , 4);
 					data_ptr += read_len;
+
+					printf("the %d-th read_len=%d\n", tested_reads+1, read_len);
 
 					if(read_len>10000)
 					{
@@ -1678,43 +1634,21 @@ int is_badBAM(char * fn)
 	return fret;
 }
 
-int SamBam_unzip(char * out , char * in , int inlen)
-{
-	#define unzip_out_max_len 65537
-	z_stream strm;
-	strm.zalloc = Z_NULL;
-	strm.zfree = Z_NULL;
-	strm.opaque = Z_NULL;
-	strm.avail_in = 0;
-	strm.next_in = Z_NULL;
-	int ret = inflateInit2(&strm, SAMBAM_GZIP_WINDOW_BITS);
-	if (ret != Z_OK)
-		return -1;
-
-	strm.avail_in = (unsigned int)inlen;
-	strm.next_in = (unsigned char *)in;
-
-	strm.avail_out = unzip_out_max_len;
-	strm.next_out = (unsigned char *)out;
-	ret = inflate(&strm, Z_FINISH);
-	if(ret != Z_STREAM_END)
-	{
-		inflateEnd(&strm);
-		return -1;
-	}
-	int have = unzip_out_max_len - strm.avail_out;
-
-	inflateEnd(&strm);
-
-	return have;
-}
-
-#ifdef MAKE_TEST_SAMBAM
-
 int main(int argc , char ** argv)
 {
 	int bad = is_badBAM(argv[1]);
 	printf("BAD BAM=%d\t\t%s\n", bad, argv[1]);
+
+	SamBam_FILE * r2fp = SamBam_fopen(argv[1], SAMBAM_FILE_BAM);
+
+	while(1)
+	{
+		char read_buff[3000];
+		char * ret = SamBam_fgets(r2fp, read_buff, 2999, 0);
+		if(!ret)break;
+		SUBREADprintf("%s", ret);
+		
+	}
 
 	return 0;
 }
@@ -1724,10 +1658,10 @@ void test_bam_compress()
 	SamBam_Writer writer;
 	if(SamBam_writer_create(&writer , "my.bam")) printf("INIT ERROR\n");
 
-	SamBam_writer_add_header(&writer, "@RG	ID:xxhxh");
-	SamBam_writer_add_chromosome(&writer, "chr1", 123123);
-	SamBam_writer_add_chromosome(&writer, "chr2", 223123);
-	SamBam_writer_add_header(&writer, "@PG	ID:subread	VN:1.4.0b2");
+	SamBam_writer_add_header(&writer, "@RG	ID:xxhxh", 0);
+	SamBam_writer_add_chromosome(&writer, "chr1", 123123, 1);
+	SamBam_writer_add_chromosome(&writer, "chr2", 223123, 1);
+	SamBam_writer_add_header(&writer, "@PG	ID:subread	VN:1.4.0b2", 0);
 	SamBam_writer_add_read(& writer, "Read1", 0, "chr1", 100000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "XG:Z:OX	NM:i:2	RG:Z:MyGroup1");
 	SamBam_writer_add_read(& writer, "Read2", 16, "chr2", 200000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "NM:i:1	XX:i:8172736	RG:Z:nxnmn	XY:i:33999	XZ:Z:Zuzuzu");
 	SamBam_writer_close(&writer);

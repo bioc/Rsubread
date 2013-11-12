@@ -2511,13 +2511,13 @@ void write_sam_headers(global_context_t * context)
 {
 	if(context -> config.is_BAM_output)
 	{
-		SamBam_writer_add_header(context -> output_bam_writer,"@HD\tVN:1.0\tSO:unsorted");
+		SamBam_writer_add_header(context -> output_bam_writer,"@HD\tVN:1.0\tSO:unsorted", 0);
 		int xk1;
 		unsigned int last_offset = 0;
 		char obuf[300];
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
 		{
-			SamBam_writer_add_chromosome(context -> output_bam_writer, context->chromosome_table.read_names+ xk1 * MAX_CHROMOSOME_NAME_LEN, context->chromosome_table.read_offsets[xk1] - last_offset+16);
+			SamBam_writer_add_chromosome(context -> output_bam_writer, context->chromosome_table.read_names+ xk1 * MAX_CHROMOSOME_NAME_LEN, context->chromosome_table.read_offsets[xk1] - last_offset+16, 1);
 			last_offset = context->chromosome_table.read_offsets[xk1];
 		}
 
@@ -2525,10 +2525,10 @@ void write_sam_headers(global_context_t * context)
 		if(context->config.read_group_id[0])
 		{
 			snprintf(obuf,299, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
-			SamBam_writer_add_header(context -> output_bam_writer,obuf);
+			SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		}
 		snprintf(obuf,299, "@PG\tID:subread\tPN:subread\tVN:%s", SUBREAD_VERSION);
-		SamBam_writer_add_header(context -> output_bam_writer,obuf);
+		SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 	}
 	else
 	{

@@ -40,9 +40,9 @@ typedef unsigned int BS_uint_32;
 
 #define SAMBAM_COMPRESS_LEVEL 5
 #define SAMBAM_GZIP_WINDOW_BITS -15
+#define SAMBAM_INPUT_STREAM_SIZE 140000
 
 #define TEST_BAD_BAM_CHUNKS 9999925 
-
 
 typedef struct
 {
@@ -72,18 +72,29 @@ typedef struct
 } SamBam_Alignment;
 
 
+#define SB_FETCH(a)  if((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < 3000){SamBam_fetch_next_chunk(a);}
+#define SB_EOF(a)  ((a)-> is_eof && (  (a) -> input_binary_stream_write_ptr <= (a) -> input_binary_stream_read_ptr ))
+#define SB_READ(a)  ((a) -> input_binary_stream_buffer + (a) -> input_binary_stream_read_ptr - (a) -> input_binary_stream_buffer_start_ptr)
+#define SB_RINC(a, len)   ((a) -> input_binary_stream_read_ptr) += len
+
 typedef struct
 {
-	union{
-		FILE * os_file;
-		gzFile gz_file;
-	};
+	FILE * os_file;
+
 	int file_type;
 	int bam_file_stage;
+
 	unsigned long long bam_file_next_section_start;
-	SamBam_Reference_Info * bam_chro_table;
+	unsigned long long input_binary_stream_read_ptr;
+	unsigned long long input_binary_stream_write_ptr;
+	unsigned long long input_binary_stream_buffer_start_ptr;
+
+	SamBam_Reference_Info * bam_chro_table; 
 	int bam_chro_table_size;
 	SamBam_Alignment aln_buff;
+
+	char * input_binary_stream_buffer;
+	int is_eof;
 } SamBam_FILE;
 
 
@@ -155,13 +166,15 @@ int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname);
 
 int SamBam_writer_close(SamBam_Writer * writer);
 
-int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text);
+int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text, int add_chro);
 
-int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length);
+int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length, int add_header_too);
 
 int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns);
 
 int is_badBAM(char * fn);
 
 int SamBam_unzip(char * out , char * in , int inlen);
+
+int SamBam_fetch_next_chunk(SamBam_FILE *fp);
 #endif
