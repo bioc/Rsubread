@@ -695,7 +695,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 		else{
 			sort_SAM_finalise(&writer);
 			if(writer.unpaired_reads)
-				print_in_box(80,0,0,"%llu unpaired reads were ignored in reordering.", writer.unpaired_reads);
+				print_in_box(80,0,0,"%llu single-end mapped reads in reordering.", writer.unpaired_reads);
 		}
 
 		SamBam_fclose(sambam_reader);

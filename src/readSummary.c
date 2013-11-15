@@ -1072,7 +1072,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						thread_context->read_counters.unassigned_chimericreads ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimero\n", read_name);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimera\n", read_name);
 						return;
 					}
 				}
@@ -1089,15 +1089,18 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
 			{
 
-				if(is_second_read)
+				if(is_second_read && read_1_chr)
 				{
-					if((!read_1_chr) || strcmp(read_1_chr, mate_chr)!=0 || mate_pos!=read_1_pos)
+					if((strcmp(read_1_chr, mate_chr)!=0 || mate_pos!=read_1_pos) && read_1_chr[0] != '*'  && mate_chr[0]!='*')
 					{
 				//	printf("RV:%s,%s   %d,%d\n", read_1_chr, mate_chr, mate_pos, read_1_pos);
-						global_context->is_unpaired_warning_shown=1;
-						global_context->redo = 1;
-						print_in_box(80,0,0,"   Reads are not properly paired.");
-						print_in_box(89,0,0,"   They are %c[36mbeing re-ordered%c[0m before counting...",CHAR_ESC, CHAR_ESC);
+						if(!global_context->is_unpaired_warning_shown)
+						{
+							global_context->is_unpaired_warning_shown=1;
+							global_context->redo = 1;
+							print_in_box(80,0,0,"   Reads are not properly paired.");
+							print_in_box(89,0,0,"   They are %c[36mbeing re-ordered%c[0m before counting...",CHAR_ESC, CHAR_ESC);
+						}
 					}
 				}
 				else
@@ -2122,7 +2125,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	}
 
 	fprintf(fp_out,"\n");
-	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_Chimero"};
+	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_Chimera"};
 
 	for(xk1=0; xk1<8; xk1++)
 	{
@@ -2214,9 +2217,12 @@ void print_usage()
 	SUBREADputs("              \tof features, grouped by using gene identifiers. Please refer");
 	SUBREADputs("              \tto the users guide for more details."); 
 	SUBREADputs("    "); 
-	SUBREADputs("   input_files\tGive the names of input read files that include the read mapping");
-	SUBREADputs("              \tresults. The program automatically detects the file format (SAM");
-	SUBREADputs("              \tor BAM). Multiple files can be provided at the same time."); 
+	SUBREADputs("   input_files\tGive the names of input read files that include the read");
+	SUBREADputs("              \tmapping results. Format of input files is automatically");
+	SUBREADputs("              \tdetermined (SAM or BAM). Paired-end reads will be");
+	SUBREADputs("              \tautomatically re-ordered if it is found that reads from the");
+	SUBREADputs("              \tsame pair are not adjacent to each other. Multiple files can");
+	SUBREADputs("              \tbe provided at the same time."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional parameters:"); 
 	SUBREADputs("    "); 
