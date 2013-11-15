@@ -952,6 +952,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					//printf("WARN:%d [%d]\n", global_context->is_unpaired_warning_shown, thread_context -> thread_id);
 					if(!global_context->is_unpaired_warning_shown)
 					{
+				//	printf("RV:%s,%s\n", read_name, read_name1);
 						global_context->is_unpaired_warning_shown=1;
 						global_context->redo = 1;
 						print_in_box(80,0,0,"   Reads are not properly paired.");
@@ -1090,9 +1091,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(is_second_read)
 				{
-					//printf("RV:%s,%s   %d,%d\n", read_1_chr, mate_chr, mate_pos, read_1_pos);
 					if((!read_1_chr) || strcmp(read_1_chr, mate_chr)!=0 || mate_pos!=read_1_pos)
 					{
+				//	printf("RV:%s,%s   %d,%d\n", read_1_chr, mate_chr, mate_pos, read_1_pos);
 						global_context->is_unpaired_warning_shown=1;
 						global_context->redo = 1;
 						print_in_box(80,0,0,"   Reads are not properly paired.");
