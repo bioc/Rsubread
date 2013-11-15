@@ -1,3 +1,10 @@
+15 Nov, 2013 -1.13.6
+(1) featureCounts outputs summary info after read assignments (giving reasons for those unassigned reads).
+(2) featureCounts automatically re-orders paired-end reads if reads from the same pair are not adjacent to each other ('PEReadsReordering' option is not needed any more). It can also deal with those read pairs that have only one end included in SAM/BAM files.
+(3) Subjunc has an improved performance in mapping the exon-spanning reads in which junction locations are very close to (1-2bp away from) the ends of reads.
+(4) Fixed a bug related to FreeBSD installation.
+(5) Fixed a bug for running on 32-bit machines for a few functions.
+
 11 Nov, 2013 - 1.13.5
 (1) Added an example for mapping paired-end reads in the vignette
 (2) Added an example for featureCounts in the vignette
