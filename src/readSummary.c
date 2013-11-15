@@ -73,14 +73,14 @@ typedef struct
 
 typedef struct
 {
+	unsigned long long assigned_reads;
 	unsigned long long unassigned_ambiguous;
+	unsigned long long unassigned_multimapping;
 	unsigned long long unassigned_nofeatures;
 	unsigned long long unassigned_unmapped;
 	unsigned long long unassigned_mappingquality;
 	unsigned long long unassigned_fragmentlength;
 	unsigned long long unassigned_chimericreads;
-	unsigned long long unassigned_multimapping;
-	unsigned long long assigned_reads;
 
 } fc_read_counters;
 
@@ -176,6 +176,7 @@ typedef struct
 	HashTable * annot_chro_name_alias_table;	// name in annotation file -> alias name
 	char alias_file_name[300];
 	char input_file_name[300];
+	char raw_input_file_name[300];
 	char output_file_name[300];
 	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
 
@@ -908,8 +909,8 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
 
-	char * read_chr, *tmp_tok_ptr, *CIGAR_str , *read_name = NULL, *read_name1 = NULL;
-	long read_pos, fragment_length = 0;
+	char * read_chr, *read_1_chr = NULL, *tmp_tok_ptr, *CIGAR_str , *read_name = NULL, *read_name1 = NULL;
+	long read_pos, fragment_length = 0, read_1_pos = 0;
 	unsigned int search_start = 0, search_end;
 	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
 	long * hits_indices1 = thread_context -> hits_indices1, * hits_indices2 = thread_context -> hits_indices2;
@@ -977,7 +978,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				thread_context->read_counters.unassigned_unmapped ++;
 
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped_%s\n", read_name, global_context -> is_paired_end_data?"Fragment":"Read");
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped\n", read_name);
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
@@ -1009,7 +1010,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(global_context -> SAM_output_fp)
 				{
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Mapping_Quality\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MappingQuality\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
 				}
 				return;
 			}
@@ -1020,6 +1021,17 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 
+		long mate_pos = 0;
+		char * mate_chr = NULL;
+
+		if(is_second_read)
+		{
+			mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);// mate_chr
+			if(mate_chr[0]=='=') mate_chr = read_chr;
+			char * mate_pos_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// mate_pos
+			mate_pos = atol(mate_pos_str);
+
+		}
 
 		if(is_second_read == 0 && global_context -> is_paired_end_data && 
 	   	  (global_context -> is_PE_distance_checked || global_context -> is_chimertc_disallowed)
@@ -1029,9 +1041,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			if(!is_half_mapped)
 			{
-				char * mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
-				if(!mate_chr) return;
-				strtok_r(NULL,"\t", &tmp_tok_ptr);	// mate_pos
+				char * mate_chrx = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
+				if(!mate_chrx) return;
+				strtok_r(NULL,"\t", &tmp_tok_ptr);
 				if(!tmp_tok_ptr) return;
 				char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
 				if(!tmp_tok_ptr) return;
@@ -1041,14 +1053,14 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				int is_first_read_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
 				int is_second_read_negative_strand = (alignment_masks & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)?1:0; 
 
-				if(mate_chr[0]=='=' && is_first_read_negative_strand!=is_second_read_negative_strand)
+				if(mate_chrx[0]=='=' && is_first_read_negative_strand!=is_second_read_negative_strand)
 				{
 					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance) || (fragment_length < global_context -> min_paired_end_distance)))
 					{
 						thread_context->read_counters.unassigned_fragmentlength ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Fragment_Length\tLength=%ld\n", read_name, fragment_length);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_FragmentLength\tLength=%ld\n", read_name, fragment_length);
 						return;
 					}
 				}
@@ -1059,7 +1071,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						thread_context->read_counters.unassigned_chimericreads ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimeric_Reads\n", read_name);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimero\n", read_name);
 						return;
 					}
 				}
@@ -1070,18 +1082,37 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(SAM_FLAG_UNMAPPED & alignment_masks) continue;
 
-		if(!global_context -> is_multi_mapping_allowed)
+		char * NH_pos = strstr(tmp_tok_ptr,"\tNH:i:");
+		if(NH_pos)
 		{
-			char * NH_pos = strstr(tmp_tok_ptr,"\tNH:i:");
-			
-			if(NH_pos)
+			if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
 			{
-				if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
+
+				if(is_second_read)
+				{
+					//printf("RV:%s,%s   %d,%d\n", read_1_chr, mate_chr, mate_pos, read_1_pos);
+					if((!read_1_chr) || strcmp(read_1_chr, mate_chr)!=0 || mate_pos!=read_1_pos)
+					{
+						global_context->is_unpaired_warning_shown=1;
+						global_context->redo = 1;
+						print_in_box(80,0,0,"   Reads are not properly paired.");
+						print_in_box(89,0,0,"   They are %c[36mbeing re-ordered%c[0m before counting...",CHAR_ESC, CHAR_ESC);
+					}
+				}
+				else
+				{
+					read_1_chr = read_chr;
+					read_1_pos = read_pos;
+				}
+
+
+				// now it is a NH>1 read!
+				if((is_second_read || !global_context -> is_paired_end_data) && !global_context -> is_multi_mapping_allowed)
 				{
 					thread_context->read_counters.unassigned_multimapping ++;
 
 					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Multimapping\n", read_name);
+						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\n", read_name);
 					return;
 				}
 			}
@@ -1393,7 +1424,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				}
 				else{
 					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguous\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
+						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguity\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
 
 					thread_context->read_counters.unassigned_ambiguous ++;
 				}
@@ -1401,7 +1432,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 		else{
 			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_No_Features\n", read_name);
+				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\n", read_name);
 
 			thread_context->read_counters.unassigned_nofeatures ++;
 		}
@@ -1742,7 +1773,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	if(global_context -> is_read_details_out)
 	{
 		char tmp_fname[350];
-		sprintf(tmp_fname, "%s.featureCounts", global_context -> input_file_name);
+		sprintf(tmp_fname, "%s.featureCounts", global_context -> raw_input_file_name);
 		global_context -> SAM_output_fp = f_subr_open(tmp_fname, "w");
 	}
 	else
@@ -2077,7 +2108,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 
 	if(!fp_out) return;
 
-	fprintf(fp_out,"Counter");
+	fprintf(fp_out,"Status");
 	char * next_fn = file_list;
 	
 	for(i_files=0; i_files<nfiles; i_files++)
@@ -2090,7 +2121,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	}
 
 	fprintf(fp_out,"\n");
-	char * keys [] ={"Unassigned_Ambiguous","Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_ChimericReads", "Unassigned_MultiMapping", "Assigned"};
+	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_Chimero"};
 
 	for(xk1=0; xk1<8; xk1++)
 	{
@@ -2227,8 +2258,8 @@ void print_usage()
 	SUBREADputs("              \tfind multi-mapping reads.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must satisfy in order");
-    SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
-    SUBREADputs("              \tsatisfy this criteria. 0 by default."); 
+	SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
+	SUBREADputs("              \tsatisfy this criteria. 0 by default."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -T <int>  \tNumber of the threads. 1 by default."); 
 	SUBREADputs("    "); 
@@ -2246,8 +2277,7 @@ void print_usage()
 	SUBREADputs("    -p        \tIf specified, fragments (or templates) will be counted instead");
 	SUBREADputs("              \tof reads. This option is only applicable for paired-end reads.");
 	SUBREADputs("              \tThe two reads from the same fragment must be adjacent to each");
-	SUBREADputs("              \tother in the provided SAM/BAM file. If SAM/BAM input does not");
-	SUBREADputs("              \tmeet this requirement, the -S option should be provided as well."); 
+	SUBREADputs("              \tother in the provided SAM/BAM file.");
 	SUBREADputs("    "); 
 	SUBREADputs("    -P        \tIf specified, paired-end distance will be checked when assigning");
 	SUBREADputs("              \tfragments to meta-features or features. This option is only");
@@ -2266,13 +2296,6 @@ void print_usage()
 	SUBREADputs("              \thave their two ends aligned to different chromosomes) will"); 
 	SUBREADputs("              \tNOT be included for summarization. This option is only "); 
 	SUBREADputs("              \tapplicable for paired-end read data."); 
-	SUBREADputs("    "); 
-	SUBREADputs("    -S        \tIf specified, the program will reorder input reads according to");
-	SUBREADputs("              \ttheir names and make reads from the same pair be adjacent to");
-	SUBREADputs("              \teach other. This option should be provided when reads from the");
-	SUBREADputs("              \tsame pair are not adjacent to each other in input SAM/BAM files");
-	SUBREADputs("              \t(for instance sorting reads by chromosomal locations could");
-	SUBREADputs("              \tdecouple reads from the same pair)."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -v        \toutput version of the program.");
 	SUBREADputs("    "); 
@@ -2455,6 +2478,7 @@ int readSummary(int argc,char *argv[]){
 		unsigned int * column_numbers = calloc(nexons, sizeof(unsigned int ));
 
 		strcpy(global_context.input_file_name, next_fn);
+		strcpy(global_context.raw_input_file_name, next_fn);
 		global_context.redo=0;
 		
 		for(redoing = 0; redoing < 1 + !original_sorting; redoing++)

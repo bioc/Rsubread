@@ -213,7 +213,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 
 	int whole_section_matched = match_chro(read_text , value_index, explain_context -> current_is_strand_jumped?read_head_abs_offset - remainder_len +1:read_head_abs_offset, remainder_len , explain_context -> current_is_strand_jumped, global_context -> config.space_type);
  
-	if(whole_section_matched + sofar_matched > explain_context -> best_matching_bases|| (whole_section_matched + sofar_matched ==  explain_context -> best_matching_bases &&  explain_context -> best_jump_length > explain_context -> tmp_jump_length))
+	if(whole_section_matched + sofar_matched > explain_context -> best_matching_bases|| (whole_section_matched + sofar_matched ==  explain_context -> best_matching_bases &&  explain_context -> best_jump_length < explain_context -> tmp_jump_length))
 	{
 		//if(explain_context->pair_number == 23)printf("ACCEPTED: SECTIONS=%d; MATCH_SCORE=%d > %d\n", explain_context -> tmp_search_sections, whole_section_matched + sofar_matched, explain_context -> best_matching_bases);
 		explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_end =  explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_start + remainder_len;
@@ -355,7 +355,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 
 	int whole_section_matched = match_chro(read_text , value_index, read_tail_abs_offset - (explain_context -> current_is_strand_jumped?-1:read_tail_pos), read_tail_pos , explain_context -> current_is_strand_jumped, global_context -> config.space_type);
  
-	if(whole_section_matched + sofar_matched > explain_context -> best_matching_bases || (whole_section_matched + sofar_matched == explain_context -> best_matching_bases && explain_context -> best_jump_length > explain_context -> tmp_jump_length))
+	if(whole_section_matched + sofar_matched > explain_context -> best_matching_bases || (whole_section_matched + sofar_matched == explain_context -> best_matching_bases && explain_context -> best_jump_length < explain_context -> tmp_jump_length))
 	{
 		explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_start =  0;
 		explain_context -> best_matching_bases = whole_section_matched + sofar_matched ;
@@ -1133,7 +1133,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = back_search_tail_position;
 
 	explain_context.tmp_jump_length = 0;
-	explain_context.best_jump_length = 0xffff0000;
+	explain_context.best_jump_length = 0xffff0000 * 0;
 
 	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0);
 
@@ -1165,7 +1165,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.tmp_search_junctions[0].read_pos_start = front_search_read_start;
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = front_search_start_position;
 	explain_context.tmp_jump_length = 0;
-	explain_context.best_jump_length = 0xffff0000;
+	explain_context.best_jump_length = 0xffff0000 * 0;
 	search_events_to_front(global_context, thread_context, &explain_context, read_text + front_search_read_start, qual_text + front_search_read_start, front_search_start_position,read_len - front_search_read_start , 0);
 
 	// calc

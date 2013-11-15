@@ -581,8 +581,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 			while(chunk[*chunk_ptr]) (*chunk_ptr)++;
 			(*chunk_ptr)++;
 		}
-		else if(extype == 'A') delta=1;
-		else if(extype == 'c' || extype=='C') delta=1;
+		else if(extype == 'A' || extype == 'c' || extype=='C') delta=1;
 		else if(extype == 'i' || extype=='I' || extype == 'f') delta=4;
 		else if(extype == 's' || extype=='S') delta=2;
 		else if(extype == 'B') 
@@ -1182,6 +1181,7 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 				{
 					bin[bin_cursor + str_len] = additional_columns[str_len+col_cursor];
 					str_len++;
+					if(bin_cursor + str_len > 280) break;
 				}
 
 				bin[bin_cursor + str_len] =0;
@@ -1222,9 +1222,11 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 							int intv = 0; float fltv = 0;
 							if(celltype == 'i')intv = atoi(cell_buff);							
 							else fltv = atof(cell_buff);
-							memcpy(bin + bin_cursor, (celltype == 'i')?(void *)&intv:(void *)&fltv, 4);
-							bin_cursor += 4;
-							(*items) ++;
+							if(bin_cursor < 280){
+								memcpy(bin + bin_cursor, (celltype == 'i')?(void *)&intv:(void *)&fltv, 4);
+								bin_cursor += 4;
+								(*items) ++;
+							}
 						}
 						last_cursor = col_cursor+1;
 					}
