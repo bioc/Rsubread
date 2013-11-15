@@ -6,7 +6,7 @@
 featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",
 useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,
 isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,
-countChimericFragments=TRUE,PEReadsReordering=FALSE,chrAliases=NULL,reportReads=FALSE)
+countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
@@ -21,13 +21,12 @@ countChimericFragments=TRUE,PEReadsReordering=FALSE,chrAliases=NULL,reportReads=
   \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
-  \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (templates or read pairs) will be counted instead of individual reads. \code{FALSE} by default. The two reads from the same fragment must be adjacent to each other in the provided SAM/BAM file. If SAM/BAM input does not meet this requirement, the \code{PEReadsReordering} option should be set to \code{TRUE}.}
+  \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (templates or read pairs) will be counted instead of individual reads. \code{FALSE} by default.}
   \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   \item{checkFragLength}{ logical indicating if the two ends from the same fragment are required to satisify the fragment length criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. The fragment length criteria are specified via \code{minFragLength} and \code{maxFragLength}.}
   \item{minFragLength}{ \code{integer} giving the minimum fragment length for paired-end reads. \code{50} by default.}
   \item{maxFragLength}{ \code{integer} giving the maximum fragment length for paired-end reads. \code{600} by default. \code{minFragLength} and \code{maxFragLength} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a fragment spans two or more exons, the observed fragment length might be much bigger than the nominal fragment length.}
   \item{countChimericFragments}{ logical indicating whether a chimeric fragment, which has its two reads mapped to different chromosomes, should be counted or not. If this fragment overlaps with only one feature (or one meta-feature), typically by one of its two read, this fragment will be assigned to that feature (or meta-feature). If it is found to overlap more than one feature (or meta-feature), for example one of its two reads overlaps meta-feature A and the other overlaps meta-feature B, and \code{allowMultiOverlap} is \code{FALSE}, then this fragment will not be counted. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
-  \item{PEReadsReordering}{ logical indicating if paired-end reads included in the input should be re-ordered so that reads from the same pair are placed next to each other. \code{FALSE} by default. Note that \code{featureCounts} function requires reads from the same pair to be located next to each other in the input. BAM files may contain reads that were sorted by their mapping locations. If such files are provided, this option should be set to \code{TRUE}.}   
   \item{chrAliases}{ a character string giving the name of a file that contains aliases of chromosome names. The file should be a comma delimited text file that includes two columns. The first column gives the chromosome names used in the annotation and the second column gives the chromosome names used by reads. This file should not contain header lines. Names included in this file are case sensitive.}
   \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
   }
@@ -82,19 +81,19 @@ But GTF/GFF annotation should only be provided as a file, and \code{isGTFAnnotat
 \code{featureCounts} function uses the `gene_id' attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level.\cr\cr
  
 When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of reads will be counted.
-When counting fragments, \code{featureCounts} function requires reads from the same pair to be adjacent to each other in the input file.
-If the input does not satisfy this requirement (eg. reads might be sorted by their mapped locations in the output of some aligners), users should set the \code{PEReadsReordering} option to \code{TRUE} to instruct \code{featureCounts} to re-order reads so that reads from the same pair can be placed together and fragment counting can thus be correctly performed.
+\code{featureCounts} function checks if reads from the same pair are adjacent to each other (this could happen when reads were for example sorted by their mapping locations), and it automatically reorders those reads that belong to the same pair but are not adjacent to each other in the input read file.
 }
 \value{ 
 A list with the following components:
 \tabular{ll}{
   \code{counts}:\tab a data matrix containing read counts for each feature or meta-feature for each library.\cr
   \code{annotation}:\tab a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the in-built annotations are used.\cr
-  \code{targets}:\tab a character vector giving sample information.
+  \code{targets}:\tab a character vector giving sample information.\cr
+  \code{stat}:\tab a data frame giving numbers of unassigned reads and the reasons why they are not assigned (eg. ambiguity, multi-mapping, mapping quality, fragment length, chimera and so on), in addition to the number of successfully assigned reads for each library.
 }
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, accepted on Nov 7, 2013.
+Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, accepted on Nov 7, 2013, doi: 10.1093/bioinformatics/btt656.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
