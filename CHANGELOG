@@ -1,3 +1,6 @@
+16 Nov, 2013 - 1.13.7
+(1) Fixed a bug in featureCounts in dealing with unpaired reads in SAM/BAM files.
+
 15 Nov, 2013 -1.13.6
 (1) featureCounts outputs summary info after read assignments (giving reasons for those unassigned reads).
 (2) featureCounts automatically re-orders paired-end reads if reads from the same pair are not adjacent to each other ('PEReadsReordering' option is not needed any more). It can also deal with those read pairs that have only one end included in SAM/BAM files.
