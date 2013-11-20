@@ -132,6 +132,7 @@ typedef struct{
 	int big_margin_record_size;
 
 	// subjunc
+	int entry_program_name;
 	char is_rna_seq_reads;
 	char do_big_margin_filtering_for_junctions;
 	char do_big_margin_filtering_for_reads;
@@ -144,7 +145,8 @@ typedef struct{
 	char check_donor_at_junctions;
 
 	// subfusion
-	char do_fusion_detection;
+	int do_fusion_detection;
+	int prefer_donor_receptor_junctions;
 
 	// indel
 	char do_superlong_indel_detection;
@@ -183,6 +185,9 @@ typedef struct{
 #define CORE_CIGAR_OPT_BB 6
 #define CORE_CIGAR_OPT_NN 7
 
+#define CORE_PROGRAM_SUBREAD 100
+#define CORE_PROGRAM_SUBJUNC 200
+#define CORE_PROGRAM_SUBINDEL 1000
 
 typedef struct
 {
@@ -280,6 +285,7 @@ typedef struct{
 	unsigned long long all_mapped_reads;
 	unsigned long long all_correct_PE_reads;
 	unsigned int all_junctions;
+	unsigned int all_fusions;
 	unsigned int all_indels;
 
 	unsigned long long current_circle_start_position_file1;
@@ -339,7 +345,7 @@ int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_co
 // cigar_len is the maximum length of decompressed cigar
 // bincigar is the maximum length of compressed cigar
 // it returns the length of decompressed cigar, or -1 if buffer is too short.
-int bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int bincigar_max_len);
+int bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int bincigar_max_len, int read_len);
 
 // compress a cigar string to bincigar
 // bincigar_len is the maximum length of compressed cigar
@@ -371,7 +377,7 @@ void core_version_number(char * program);
 // The first base in the read actually has a larger coordinate than Pos. 
 unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
 
-int chimeric_cigar_parts(unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
+int chimeric_cigar_parts(global_context_t * global_context , unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
 
 void warning_file_limit();
 #endif

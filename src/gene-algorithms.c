@@ -1177,7 +1177,7 @@ int evaluate_piece(char * piece_str, int chron, int offset, int is_counterpart, 
 
 	inner_pos = offset + offset / 70;
 
-	fp = fopen(fname,"r");
+	fp = f_subr_open(fname,"r");
 
 	while(next_char!='\n')
 		next_char=fgetc(fp);
@@ -1515,7 +1515,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 
 	sprintf(fn, "%s.reads", index_prefix);
 
-	fp = fopen(fn, "r");
+	fp = f_subr_open(fn, "r");
 
 	if(!fp)
 	{
@@ -2194,7 +2194,7 @@ float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  u
 	int ret =0;
 	char lastch;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
-		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+		//SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
 	//	exit(-1);
 		return 100;
 	}
@@ -2221,7 +2221,7 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 	int i;
 	int ret =0;
 	if(pos < array_index -> start_base_offset || pos + read_len >= array_index -> start_base_offset + array_index -> length){
-		SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
+		//SUBREADprintf("WARNING: BASE INDEX OUT OF LIMIT: %u < %u < %u\n%s\n", array_index -> start_base_offset , pos, array_index -> start_base_offset + array_index -> length, read_txt);
 	//	exit(-1);
 		return 100;
 	}

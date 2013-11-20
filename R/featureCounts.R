@@ -1,4 +1,4 @@
-featureCounts <- function(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,PEReadsReordering=FALSE,chrAliases=NULL,reportReads=FALSE)
+featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
 {
 	flag <- FALSE
 
@@ -43,19 +43,24 @@ featureCounts <- function(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NU
 
 	files_C <- paste(files,collapse=";")
 	
+	if(nchar(files_C) == 0) stop("No read files provided!")
+	
 	chrAliases_C <- chrAliases
 	if(is.null(chrAliases))
 	  chrAliases_C <- " "
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,as.numeric(tolower(file.type)=="sam"),as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(PEReadsReordering),sep=",")
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
-	x <- read.delim(fout,stringsAsFactors=FALSE)  
-
+	x <- read.delim(fout,stringsAsFactors=FALSE)
 	colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
 
+	x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
+
 	file.remove(fout)
+	file.remove(paste(fout,".summary",sep=""))
+	
 	if(flag) 
 	  file.remove(fout_annot)
 	
@@ -63,9 +68,11 @@ featureCounts <- function(files,file.type="SAM",annot.inbuilt="mm9",annot.ext=NU
 	  stop("No count data were generated.")
 	}
 	
-	y <- as.matrix(x[,-c(1:6)]) 
+	y <- as.matrix(x[,-c(1:6)])
+	colnames(y) <- colnames(x)[-c(1:6)]
 	rownames(y) <- x$GeneID
-	z <- list(counts=y,annotation=x[,1:6],targets=colnames(y))
+	
+	z <- list(counts=y,annotation=x[,1:6],targets=colnames(y),stat=x_summary)
 	z
 	
 }

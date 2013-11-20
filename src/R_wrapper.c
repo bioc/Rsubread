@@ -183,17 +183,25 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
         n = *nargs;
         c_argv = (char **) calloc(n,sizeof(char *));
 
-	for(i=0; i<n; i++)
+	if(strstr(r_argv, ",,")==NULL )
 	{
-		char * current_arg = strtok(i?NULL:r_argv,",");
-		arg_len = strlen(current_arg);
-		c_argv[i] = (char *)calloc(1+arg_len,sizeof(char));
-		strcpy(c_argv[i], current_arg);
+		for(i=0; i<n; i++)
+		{
+			char * current_arg = strtok(i?NULL:r_argv,",");
+			if(current_arg == NULL)
+				break;
+			arg_len = strlen(current_arg);
+			c_argv[i] = (char *)calloc(1+arg_len,sizeof(char));
+			strcpy(c_argv[i], current_arg);
+		}
+
+		n=i;
+
+		readSummary(n,c_argv);
+
+		for(i=0;i<n;i++) free(c_argv[i]);
 	}
-
-        readSummary(n,c_argv);
-
-        for(i=0;i<n;i++) free(c_argv[i]);
+	else Rprintf("No input files are provided. \n");
         free(c_argv);
         free(r_argv);
 

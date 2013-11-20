@@ -102,7 +102,7 @@ unsigned int calculate_read_span(char * cigar)
 
 unsigned int transform_pillup_to_index(char * chromosome_name, unsigned int block_start, char * temp_file_name, FILE * L1index_fp, FILE * L2index_fp)
 {
-	FILE * pile_fp = fopen(temp_file_name,"rb");
+	FILE * pile_fp = f_subr_open(temp_file_name,"rb");
 	if(!pile_fp) return 0;
 
 	int buckets_in_block = BASE_BLOCK_LENGTH_INDEX / BUCKET_SIZE_INDEX;
@@ -201,9 +201,9 @@ int finalise_sam_index(HashTable * chromosome_size_table, char * output_file_pre
 	KeyValuePair * cursor;
 	char temp_file_name[MAX_FILE_NAME_LENGTH];
 	sprintf(temp_file_name, "%s.L1i",output_file_prefix);
-	FILE * L1index_fp = fopen(temp_file_name,"wb");
+	FILE * L1index_fp = f_subr_open(temp_file_name,"wb");
 	sprintf(temp_file_name, "%s.L2i",output_file_prefix);
-	FILE * L2index_fp = fopen(temp_file_name,"wb");
+	FILE * L2index_fp = f_subr_open(temp_file_name,"wb");
 	int bucket;
 	for(bucket=0; bucket<chromosome_size_table -> numOfBuckets; bucket++)
 	{

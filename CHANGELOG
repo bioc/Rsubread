@@ -1,3 +1,6 @@
+20 Nov, 2013 - 1.12.2
+(1) fixed a bug for featureCounts in dealing with paired reads.
+
 25 Oct, 2013 - 1.12.1
 (1) Fixed a bug for featureCounts
 

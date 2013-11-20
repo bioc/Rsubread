@@ -56,9 +56,17 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		{
 			//printf("T REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
 			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
-			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
+		//	chromosome_event_t * new_space = 
+			 ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
 				realloc(((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) * 
 					((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number);
+
+		//	if(!new_space){
+		//		SUBREADprintf("Unable to reallocate local event space!\n");
+		//		return NULL;
+		//	}
+
+		//	((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = new_space;
 		}
 		return ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
 	}
@@ -69,9 +77,17 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		{
 			//printf("G REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
+			//chromosome_event_t * new_space = 
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic =
 				realloc(((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic, sizeof(chromosome_event_t) *
 					((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number); 
+
+			//if(!new_space){
+			//	SUBREADprintf("Unable to reallocate global event space!\n");
+			//	return NULL;
+			//}
+
+			//((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = new_space;
 		}
 		return ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
 	}
@@ -219,9 +235,9 @@ void remove_neighbour(global_context_t * global_context)
 						}
 					}
 
-				if(global_context->config.do_fusion_detection)
+				if(1 && global_context->config.do_fusion_detection && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
 				{
-					for(xk2=-100 ; xk2 < 100 ; xk2++)
+					for(xk2=-10 ; xk2 < 10 ; xk2++)
 					{
 						if(!xk2)continue;
 						if(to_be_removed_number>=maxinum_removed_events) break;
@@ -253,10 +269,12 @@ void remove_neighbour(global_context_t * global_context)
 		}
 
 		//printf("NBR_REMOVED=%u - %u\n", deleted_event -> event_small_side , deleted_event -> event_large_side);
+		if(deleted_event -> event_type == CHRO_EVENT_TYPE_INDEL && deleted_event -> inserted_bases)
+			free(deleted_event -> inserted_bases);
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
 	}
 
-	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_DEBUG, "There are %d low-confidence chromosome events out of %d removed.", to_be_removed_number, all_junctions);
+	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "There are %d low-confidence chromosome events out of %d removed.", to_be_removed_number, all_junctions);
 
 	free(to_be_removed_ids);
 }
@@ -946,7 +964,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 
 	gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
 
-	for(i=0; indel_recorder[i] ; i+=3)
+	for(i=0; indel_recorder[i]  && (i<MAX_INDEL_SECTIONS); i+=3)
 	{
 		int indels = indel_recorder[i+2] - last_indel;
 			// -1 : 1 insert; 1: 1 delete
@@ -1237,7 +1255,7 @@ int write_indel_final_results(global_context_t * global_context)
 	fn2 = malloc(MAX_FILE_NAME_LENGTH);
 	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.indel", global_context->config.output_prefix);
 
-	ofp = fopen(fn2, "wb");
+	ofp = f_subr_open(fn2, "wb");
 
 	//if(!ofp)
 	//	printf("HOW??? %s\n", fn2);
@@ -2658,7 +2676,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 	int xk1;
 	int total_window_number =2 * (BASE_BLOCK_LENGTH / REASSEMBLY_WINDOW_LENGTH+1), window_adjust;
 
-	FILE * tmp_fp = fopen(temp_file_name,"rb");
+	FILE * tmp_fp = f_subr_open(temp_file_name,"rb");
 	if(!tmp_fp) 
 		return 0;
 
@@ -2788,7 +2806,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 	}
 
 
-	tmp_fp = fopen(temp_file_name,"rb");
+	tmp_fp = f_subr_open(temp_file_name,"rb");
 	while(!feof(tmp_fp))
 	{
 		short read_len;
@@ -3089,7 +3107,7 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 }
 int finalise_pileup_file_by_debrujin(global_context_t * global_context , char * temp_file_name, char * chro_name, int block_no)
 {
-	FILE * tmp_fp = fopen(temp_file_name,"rb");
+	FILE * tmp_fp = f_subr_open(temp_file_name,"rb");
 	if(!tmp_fp)
 		return 0;
 	char * read_text, * qual_text; 
@@ -3157,7 +3175,7 @@ int finalise_long_insertions_by_hashtable(global_context_t * global_context)
 	char tmp_fname[300];
 
 	sprintf(tmp_fname,"%s.reassembly.fa", global_context->config.output_prefix);
-	global_context->long_insertion_FASTA_fp = fopen(tmp_fname ,"wb");
+	global_context->long_insertion_FASTA_fp = f_subr_open(tmp_fname ,"wb");
 
 	for(chro_i=0; chro_i < global_context -> chromosome_table.total_offsets ; chro_i++)
 	{
@@ -3288,6 +3306,7 @@ void init_global_context(global_context_t * context)
 	context->config.report_sam_file = 1;
 	context->config.is_rna_seq_reads = 0;
 	context->config.do_fusion_detection = 0;
+	context->config.prefer_donor_receptor_junctions = 1;
 	context->config.do_big_margin_filtering_for_reads = 0;
 	context->config.do_big_margin_filtering_for_junctions = 0;
 	context->config.do_big_margin_reporting = 1;
@@ -3538,11 +3557,8 @@ int core_dynamic_align(global_context_t * global_context, thread_context_t * thr
 	}
 	#endif
 
-
 	while(1)
 	{
-		assert(path_i>=0);
-		assert(j>=0);
 		if(table_mask[path_i][j] == INDEL_MASK_BY_INSERTION)
 		{
 			j--;

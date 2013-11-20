@@ -43,6 +43,7 @@
 #define FILE_TYPE_FASTQ   105
 #define FILE_TYPE_FASTA   110
 #define FILE_TYPE_UNKNOWN 999
+#define FILE_TYPE_EMPTY   999990
 #define FILE_TYPE_NONEXIST 999999
 
 
@@ -170,4 +171,5 @@ void colorread2base(char * read_buffer, int read_len);
 int warning_file_type(char * fname, int expected_type);
 char color2char(char clr, char c1);
 
+int is_certainly_bam_file(char * fname);
 #endif

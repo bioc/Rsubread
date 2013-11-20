@@ -940,14 +940,14 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
 							{
 								toli +=3;
-								if (toli < indel_tolerance*3)
+								if (toli < MAX_INDEL_SECTIONS*3)
 								{
 									vote -> toli[offsetX][i] = toli;
 									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
 									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
 										
-									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+									if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
 								}
 								vote->current_indel_cursor [offsetX][i] = (char)dist0;
 							}
@@ -1232,7 +1232,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	char magic_chars[8];
 	magic_chars[7]=0;
 
-	FILE * fp = fopen(fname, "rb");
+	FILE * fp = f_subr_open(fname, "rb");
 	if (!fp)
 	{
 		SUBREADprintf ("Table file `%s' is not found.\n", fname);
@@ -1291,7 +1291,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	else
 	{
 		fclose(fp);
-		fp = fopen(fname, "rb");
+		fp = f_subr_open(fname, "rb");
 		the_table -> version_number = SUBINDEX_VER0;
 		the_table -> current_items = load_int64(fp);
 		the_table -> buckets_number = load_int32(fp);
@@ -1372,7 +1372,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 {
 	int ii, jj, xx;
 	int i, scroll_counter = 0;
-	FILE * fp = fopen(fname, "wb");
+	FILE * fp = f_subr_open(fname, "wb");
 	int maximum_bucket_size = 0;
 	if (!fp)
 	{
