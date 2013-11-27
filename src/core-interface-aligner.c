@@ -36,12 +36,14 @@ static struct option long_options[] =
 	{"quality",  no_argument, 0, 'Q'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
+	{"memoryMultiplex",  required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
 	{"reportFusions", no_argument, 0, 0},
+	{"gzFASTQinput", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -126,6 +128,8 @@ void print_usage_core_aligner()
 	SUBREADputs("");
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
+	SUBREADputs("");
+	SUBREADputs("       --gzFASTQinput       specify that the input format is gzipped FASTQ.");
 	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
 	SUBREADputs("");
@@ -353,7 +357,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 				
 			case 0:
-				if(strcmp("rg-id", long_options[option_index].name)==0) 
+				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
+				{
+					global_context->config.memory_use_multiplex = atoi(optarg);
+				}
+				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{
 					strcpy(global_context->config.read_group_id, optarg);
 				}
@@ -370,6 +378,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_BAM_input = 1;
 					global_context->config.is_SAM_file_input = 1;
+				}
+				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
+				{
+					global_context->config.is_gzip_fastq=1;
 				}
 				else if(strcmp("SAMinput", long_options[option_index].name)==0) 
 				{

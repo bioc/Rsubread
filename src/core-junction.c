@@ -82,10 +82,14 @@ typedef struct{
 	char is_GT_AG_donors;
 	char is_donor_found;
 	char is_strand_jumped;
+	char is_break_even;
 
 	unsigned long long int Score_H;
 	unsigned int Score_L;
 } select_junction_record_t;
+
+
+#define SEARCH_MIN_MOVEMENT 16
 
 
 // read_head_abs_pos is the offset of the FIRST WANTED base.
@@ -120,7 +124,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 	
 	if((global_context -> config.do_fusion_detection|| there_are_events_in_range(event_table->appendix1, read_head_abs_offset + 15, remainder_len - 15 )) && 
 		MAX_EVENTS_IN_READ - 1 > explain_context -> tmp_search_sections)
-		for(tested_read_pos = 16 ; tested_read_pos <= remainder_len; tested_read_pos++)
+		for(tested_read_pos = SEARCH_MIN_MOVEMENT ; tested_read_pos <= remainder_len; tested_read_pos++)
 		{
 			int xk1, matched_bases_to_site;
 			chromosome_event_t *site_events[MAX_EVENT_ENTRIES_PER_SITE+1];
@@ -168,6 +172,15 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 					// note that these two values are the index of the first wanted base.
 					unsigned int new_read_head_abs_offset;
 
+					if(global_context -> config.do_fusion_detection && tested_event -> event_type == CHRO_EVENT_TYPE_INDEL)
+					{
+						if(explain_context ->current_is_strand_jumped){
+							if(potential_event_pos == tested_event-> event_small_side) continue; 
+						}else{
+							if(potential_event_pos == tested_event-> event_large_side) continue; 
+						}
+					}
+
 					if(global_context -> config.do_fusion_detection)// && tested_event->event_type == CHRO_EVENT_TYPE_FUSION)
 						new_read_head_abs_offset = (potential_event_pos == tested_event -> event_large_side)?tested_event -> event_small_side:tested_event -> event_large_side;
 					else
@@ -186,7 +199,8 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].is_connected_to_large_side = (potential_event_pos == tested_event -> event_large_side);
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_start = tested_read_pos - min(0, tested_event -> indel_length) + tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_head_abs_offset;
-						explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);
+						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
+							explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);
 
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 						//else if(tested_event->event_type == CHRO_EVENT_TYPE_JUNCTION) jump_penalty = 1;
@@ -204,7 +218,8 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_sections --;
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
-						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);
+						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
+							explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);
 					}
 					//if(global_context ->config.limited_tree_scan) break;
 				}
@@ -225,6 +240,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 		memcpy(explain_context -> front_search_junctions, explain_context -> tmp_search_junctions , sizeof(perfect_section_in_read_t) * (explain_context -> tmp_search_sections +1)); 
 	}
 }
+
 
 // read_tail_abs_offset is actually the offset of the base next to the last base in read tail.
 // read_tail_pos is the FIRST UNWANTED BASE, after the read.
@@ -258,7 +274,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 	// minimum perfect section length is 1
 	// tested_read_pos is the first WANTED BASE in section.
 	if(MAX_EVENTS_IN_READ - 1> explain_context -> tmp_search_sections && ( there_are_events_in_range(event_table -> appendix2, read_tail_abs_offset - read_tail_pos, read_tail_pos - 15)||global_context -> config.do_fusion_detection))
-		for(tested_read_pos = read_tail_pos - 16; tested_read_pos >=0;tested_read_pos --)
+		for(tested_read_pos = read_tail_pos - SEARCH_MIN_MOVEMENT; tested_read_pos >=0;tested_read_pos --)
 		{
 			int xk1, matched_bases_to_site;
 			int jump_penalty = 0;
@@ -294,13 +310,24 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 
 			matched_bases_to_site = match_chro(read_text + tested_read_pos, value_index, tested_chro_begin , read_tail_pos - tested_read_pos, explain_context -> current_is_strand_jumped, global_context -> config.space_type);
 
-			//if(explain_context->pair_number == 23)
+			//if(explain_context->pair_number == 1503)
 			//	printf("B_JUMP?%d > %d TLEN=%d \n", (1+matched_bases_to_site)*10000 / (read_tail_pos - tested_read_pos) , 9000, read_tail_pos - tested_read_pos);
 
 			if((1+matched_bases_to_site)*10000/(read_tail_pos - tested_read_pos) > 9000)
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
+
+					if(global_context -> config.do_fusion_detection && tested_event -> event_type == CHRO_EVENT_TYPE_INDEL)
+					{
+						if(explain_context->current_is_strand_jumped){
+							if(potential_event_pos == tested_event-> event_large_side) continue; 
+						}else{
+							if(potential_event_pos == tested_event-> event_small_side) continue; 
+						}
+					}
+
+
 					
 					// note that read_tail_pos is the first unwanted base.
 					int new_read_tail_pos = tested_read_pos;
@@ -329,7 +356,9 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].is_connected_to_large_side = (potential_event_pos == tested_event -> event_small_side);
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end = tested_read_pos + min(0, tested_event->indel_length) - tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_tail_abs_offset; 
-						explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);
+
+						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
+							explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);
 
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 						//else if(tested_event->event_type == CHRO_EVENT_TYPE_JUNCTION) jump_penalty = 1;
@@ -345,7 +374,9 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_sections --;
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
-						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);
+
+						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
+							explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);
 					
 					}
 					//if(global_context ->config.limited_tree_scan) break;
@@ -616,6 +647,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 		{
 			select_junction_record_t * current_anchor = &current_anchors[kx1];
 			//if((current_anchors[kx1].piece_main_coverage_end - current_anchors[kx1].piece_main_coverage_start)*10000 > curr_read_len * 8000)continue;
+			current_anchor -> is_break_even  = is_second_read?is_anchor_2_breakeven:is_anchor_1_breakeven;
 
 			if(global_context->config.is_rna_seq_reads || global_context->config.do_fusion_detection)
 			{
@@ -683,7 +715,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 						unsigned long long int new_score_H = 0;
 						unsigned int new_score_L = 0 ;
 
-						make_128bit_score(&new_score_H, &new_score_L, 0, current_anchor->piece_main_votes , current_vote -> votes[i][j], 0, 0, (current_anchor->piece_main_coverage_end -current_anchor->piece_main_coverage_start) + (current_vote -> coverage_end[i][j] - current_vote -> coverage_start[i][j]) , current_anchors[kx1].piece_main_hamming_match + minor_hamming_match, current_anchors[kx1].piece_main_read_quality + minor_read_quality ,  0xffffffff , abs(dist));
+						make_128bit_score(&new_score_H, &new_score_L, 0, current_anchor->piece_main_votes , current_vote -> votes[i][j], 0, 0, (current_anchor->piece_main_coverage_end -current_anchor->piece_main_coverage_start) + (current_vote -> coverage_end[i][j] - current_vote -> coverage_start[i][j]) , current_anchors[kx1].piece_main_hamming_match + minor_hamming_match, current_anchors[kx1].piece_main_read_quality + minor_read_quality ,  0xffffffff , global_context->config.report_multi_mapping_reads?0:abs(dist));
 
 						//new_score = current_anchors[kx1].piece_main_extra_scores +  max(500000-abs(dist),0) + current_anchor -> piece_main_votes * 20000000 + current_vote -> votes[i][j] * 20000000 + (current_anchor->piece_main_coverage_end - current_anchor->piece_main_coverage_start) - 100 * (current_anchors[kx1].piece_main_indels);
 
@@ -820,7 +852,12 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 								max_score_H = new_score_H;
 								max_score_L = new_score_L;
 							}
+							current_anchor -> is_break_even  = is_second_read?is_anchor_2_breakeven:is_anchor_1_breakeven;
+
 						}
+						else
+							if(new_score_H  == max_score_H && new_score_L == max_score_L)
+								current_anchor -> is_break_even  = 1;
 					}
 			}
 			if(current_anchors[kx1].is_strand_jumped)
@@ -856,9 +893,14 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 
 				if(global_context -> config.do_fusion_detection)
 				{
-					unsigned int read1_tail_pos = (read_1_anchors[i].piece_main_coverage_end > read_1_anchors[i].piece_minor_coverage_end)?
+					unsigned int read1_tail_pos = read_1_anchors[i].piece_main_abs_offset;
+					if(read_1_anchors[i].piece_minor_votes)
+						read1_tail_pos = (read_1_anchors[i].piece_main_coverage_end > read_1_anchors[i].piece_minor_coverage_end)?
 										read_1_anchors[i].piece_main_abs_offset: read_1_anchors[i].piece_minor_abs_offset ;
-					unsigned int read2_head_pos = (read_2_anchors[j].piece_main_coverage_end < read_2_anchors[j].piece_minor_coverage_end)?
+					unsigned int read2_head_pos = read_2_anchors[j].piece_main_abs_offset;
+
+					if(read_2_anchors[j].piece_minor_votes)
+						read2_head_pos = (read_2_anchors[j].piece_main_coverage_end < read_2_anchors[j].piece_minor_coverage_end)?
 										read_2_anchors[j].piece_main_abs_offset: read_2_anchors[j].piece_minor_abs_offset ;
 
 					dist = read1_tail_pos;
@@ -908,20 +950,10 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 				int second_major_votes = (read_1_anchors[i].piece_main_votes > read_2_anchors[j].piece_main_votes)? read_2_anchors[j].piece_main_votes :read_1_anchors[i].piece_main_votes;
 				int second_minor_votes = (read_1_anchors[i].piece_main_votes > read_2_anchors[j].piece_main_votes)? read_2_anchors[j].piece_minor_votes :read_1_anchors[i].piece_minor_votes;
 
-				make_128bit_score(&new_score_H, &new_score_L,1, anchor_major_votes, anchor_minor_votes, second_major_votes, second_minor_votes, SUM_COVERAGE , SUM_HAMMING , SUM_QUAL,  abs(dist)  , SUM_OF_INTRONS);
+				make_128bit_score(&new_score_H, &new_score_L,1, anchor_major_votes, anchor_minor_votes, second_major_votes, second_minor_votes, SUM_COVERAGE , SUM_HAMMING , SUM_QUAL,  abs(dist)  , global_context->config.report_multi_mapping_reads?0:SUM_OF_INTRONS);
 
 				alignment_result_t * alignment_1_best = _global_retrieve_alignment_ptr(global_context, pair_number, 0, 0);
 				alignment_result_t * alignment_2_best = _global_retrieve_alignment_ptr(global_context, pair_number, 1, 0);
-
-
-				/*
-				if(pair_number==25) 
-				{
-					printf("ANCHOR=%d,%d; SCORE=%llu,%u\nBEST_SCORE=%llu,%u; SUPREME=%d\n", i, j, new_score_H, new_score_L,  alignment_1_best-> Score_H,  alignment_1_best-> Score_L, new_score_H  > alignment_1_best -> Score_H);
-					printf("V1main=%d; V1min=%d; V2main=%d; V2min=%d\n\n", read_1_anchors[i].piece_main_votes, read_1_anchors[i].piece_minor_votes, read_2_anchors[j].piece_main_votes , read_2_anchors[j].piece_minor_votes );
-				}*/
-
-				//unsigned int new_score = dist_adjust + read_1_anchors[i].single_score + read_2_anchors[j].single_score - 100*(read_1_anchors[i].piece_main_indels + read_2_anchors[j].piece_main_indels)/2;
 
 				if(!global_context -> config.do_fusion_detection)
 				{
@@ -977,6 +1009,9 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 					
 					is_paired_end_selected = 1;
 
+
+					assert(best_read_id_r1==best_read_id_r2);
+
 					best_read_id_r1 += 1;
 					best_read_id_r2 += 1;
 
@@ -984,10 +1019,10 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 					set_zero_votes(global_context, pair_number,1 , best_read_id_r2);
 
 
-					/*if(pair_number == 407229){
-						printf("MAX_VOTES=%d\t\tSTART_POS=%u\t\tMINOR_VOTES=%d\t\tMINOR_POS=%u\n%s\n\n",  read_1_anchors[i].piece_main_votes, read_1_anchors[i].piece_main_abs_offset, read_1_anchors[i].piece_minor_votes, read_1_anchors[i].piece_minor_abs_offset, read_text_1);
-						print_votes(vote_1, global_context -> config.index_prefix);
-					}*/
+					//if(pair_number == 6326){
+					//	printf("RESULT # %d : MAX_VOTES=%d\t\tSTART_POS=%u\t\tMINOR_VOTES=%d\t\tMINOR_POS=%u\nPIECE 2: MAX_VOTES=%d\t\tSTART_POS=%u\tDIST=%llu\nSCORE=%llu %u\n\n", best_read_id_r1,  read_1_anchors[i].piece_main_votes, read_1_anchors[i].piece_main_abs_offset, read_1_anchors[i].piece_minor_votes, read_1_anchors[i].piece_minor_abs_offset, read_2_anchors[j].piece_main_votes, read_2_anchors[j].piece_main_abs_offset, abs(dist)  , new_score_H, new_score_L);
+					//	print_votes(vote_1, global_context -> config.index_prefix);
+					//}
 				}
 			}
 	}
@@ -999,21 +1034,25 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 		{
 			if((read_1_anchors[i].Score_H > alignment_1_best -> Score_H) || (read_1_anchors[i].Score_H == alignment_1_best -> Score_H && read_1_anchors[i].Score_L >= alignment_1_best -> Score_L))
 			{
-				if(read_1_anchors[i].Score_H > alignment_1_best -> Score_H ||  read_1_anchors[i].Score_L > alignment_1_best -> Score_L )
-				{
+				if(global_context->input_reads.is_paired_end_reads)
 					best_read_id_r1 = 0;
-
-					if(is_anchor_1_breakeven)
-						alignment_1_best -> result_flags |= CORE_IS_BREAKEVEN;
-					else
-						alignment_1_best -> result_flags &= ~CORE_IS_BREAKEVEN;
-				}
-				else
-				{
-					if(read_1_anchors[i].piece_main_abs_offset > _global_retrieve_alignment_ptr(global_context, pair_number, 0, 0)->selected_position && global_context->config.multi_best_reads == 1)
+				else{
+					if(read_1_anchors[i].Score_H > alignment_1_best -> Score_H ||  read_1_anchors[i].Score_L > alignment_1_best -> Score_L )
+					{
 						best_read_id_r1 = 0;
 
-					alignment_1_best -> result_flags |= CORE_IS_BREAKEVEN;
+						if(read_1_anchors[i].is_break_even)
+							alignment_1_best -> result_flags |= CORE_IS_BREAKEVEN;
+						else
+							alignment_1_best -> result_flags &= ~CORE_IS_BREAKEVEN;
+					}
+					else
+					{
+						if(read_1_anchors[i].piece_main_abs_offset > _global_retrieve_alignment_ptr(global_context, pair_number, 0, 0)->selected_position && global_context->config.multi_best_reads == 1)
+							best_read_id_r1 = 0;
+
+						alignment_1_best -> result_flags |= CORE_IS_BREAKEVEN;
+					}
 				}
 
 				alignment_1_best -> Score_H = read_1_anchors[i].Score_H;
@@ -1040,23 +1079,17 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 			{
 				if(read_2_anchors[j].Score_H > alignment_2_best -> Score_H || (read_2_anchors[j].Score_H == alignment_2_best -> Score_H && read_2_anchors[j].Score_L >= alignment_2_best -> Score_L))
 				{
-					if(read_2_anchors[j].Score_H > alignment_2_best -> Score_H || read_2_anchors[j].Score_L >  alignment_2_best-> Score_L )
-					{
-						best_read_id_r2 = 0;
+					best_read_id_r2 = 0;
 
-						if(is_anchor_2_breakeven)
+					if(read_2_anchors[j].Score_H == alignment_2_best -> Score_H && read_2_anchors[j].Score_L == alignment_2_best -> Score_L)
+						alignment_2_best -> result_flags |= CORE_IS_BREAKEVEN;
+					else
+					{
+						if(read_2_anchors[j].is_break_even)
 							alignment_2_best -> result_flags |= CORE_IS_BREAKEVEN;
 						else
 							alignment_2_best -> result_flags &= ~CORE_IS_BREAKEVEN;
 					}
-					else
-					{
-						if(read_2_anchors[j].piece_main_abs_offset > _global_retrieve_alignment_ptr(global_context, pair_number, 1, 0)->selected_position && global_context->config.multi_best_reads == 1)
-							best_read_id_r2 = 0;
-						alignment_2_best -> result_flags &= ~CORE_IS_BREAKEVEN;
-						//printf("SET_BE_2: %d\n", pair_number);
-					}
-
 					alignment_2_best -> Score_H = read_2_anchors[j].Score_H;
 					alignment_2_best -> Score_L = read_2_anchors[j].Score_L;
 					is_paired_end_selected = 0;
@@ -1118,10 +1151,6 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.is_second_read = is_second_read ;
 	explain_context.best_read_id = best_read_id;
 
-
-	//if(pair_number==13)
-	//	printf("ORIPOS=%u VOTE=%d ;; PAIR#=%u\n", current_result -> selected_position, current_result->selected_votes, pair_number);
-
 	unsigned int back_search_tail_position, front_search_start_position;
 	unsigned short back_search_read_tail, front_search_read_start;
 
@@ -1131,6 +1160,11 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 
 	explain_context.tmp_search_junctions[0].read_pos_end = back_search_read_tail;
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = back_search_tail_position;
+
+	//if(pair_number==1503)
+	//	printf("ORIPOS=%u VOTE=%d ;; PAIR#=%u ;; INDELS=%d\n", current_result -> selected_position, current_result->selected_votes, pair_number, current_result -> indels_in_confident_coverage);
+
+
 
 	explain_context.tmp_jump_length = 0;
 	explain_context.best_jump_length = 0xffff0000 * 0;
@@ -1147,6 +1181,8 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 
 		int last_sec = explain_context.back_search_confirmed_sections-1;
 
+		//if(pair_number==1503)
+			//printf("AFTB_SEC=%d POS=%u - %d + %d\n", last_sec, explain_context.back_search_junctions[last_sec].abs_offset_for_start,  explain_context.back_search_junctions[last_sec].read_pos_end , explain_context.back_search_junctions[last_sec].read_pos_start);
 		current_result -> selected_position = explain_context.back_search_junctions[last_sec].abs_offset_for_start - explain_context.back_search_junctions[last_sec].read_pos_end + explain_context.back_search_junctions[last_sec].read_pos_start;
  
 	}
@@ -1156,6 +1192,8 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 		front_search_start_position = current_result -> selected_position + front_search_read_start;
 	}
 
+	//if(pair_number==1503)
+	//	printf("AFTBPOS=%u PAIR#=%u\n", current_result -> selected_position, pair_number);
 
 	// clean the temporary results
 	explain_context.tmp_search_sections = 0;
@@ -1486,7 +1524,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 					}
 				}
 				
-				sprintf(piece_cigar+strlen(piece_cigar), "%d%c", event_after -> event_large_side - event_after -> event_small_side + delta_one, jump_mode);
+				sprintf(piece_cigar+strlen(piece_cigar), "%u%c", event_after -> event_large_side - event_after -> event_small_side + delta_one, jump_mode);
 				if(event_after -> indel_at_junction) sprintf(piece_cigar+strlen(piece_cigar), "%dI", event_after -> indel_at_junction);
 				is_junction_read ++;
 			}
@@ -1507,7 +1545,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 	int final_qual = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases);
 
 
-	//if(explain_context -> pair_number == 23)
+	//if(explain_context -> pair_number == 6326)
 	//	printf("%s : POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, final_qual);
 
 	int applied_mismatch = is_junction_read? global_context->config.max_mismatch_junction_reads:global_context->config.max_mismatch_exonic_reads ;
@@ -1525,6 +1563,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 				assert(0);
 			result -> cigar_string[0]=0xff;
 			compressed_len = cigar2bincigar(tmp_cigar, result -> cigar_string + 1, CORE_MAX_CIGAR_LEN - 1);
+			if(result -> cigar_string [1]==0) result -> cigar_string[0]=0;
 		}
 		else
 			compressed_len = cigar2bincigar(tmp_cigar, result -> cigar_string, CORE_MAX_CIGAR_LEN);
@@ -1564,6 +1603,13 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 		result -> final_quality = final_qual;
 		result -> result_flags &= ~CORE_IS_FULLY_EXPLAINED;
 		result -> Score_H &= 0x7fffffffffffffffllu;
+		if(explain_context-> best_read_id)
+		{
+			alignment_result_t * result_prime = _global_retrieve_alignment_ptr(global_context, explain_context->pair_number, 0, 0); 
+			result_prime -> Score_H &= 0x7fffffffffffffffllu;
+			result_prime = _global_retrieve_alignment_ptr(global_context, explain_context->pair_number, 1, 0); 
+			result_prime -> Score_H &= 0x7fffffffffffffffllu;
+		}
 	}
 
 	result -> selected_position = final_position;

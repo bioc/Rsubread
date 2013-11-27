@@ -81,6 +81,7 @@ typedef struct{
 	int is_first_iteration_running;
 	int is_second_iteration_running;
 	int is_third_iteration_running;
+	int memory_use_multiplex;
 	char temp_file_prefix[MAX_FILE_NAME_LENGTH];
 	unsigned int reads_per_chunk;
 
@@ -98,6 +99,7 @@ typedef struct{
 	int is_methylation_reads;
 	int phred_score_format;
 	int is_SAM_file_input;
+	int is_gzip_fastq;
 
 
 	// reporting scheme
@@ -380,4 +382,7 @@ unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
 int chimeric_cigar_parts(global_context_t * global_context , unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * out_read_lens);
 
 void warning_file_limit();
+void quick_sort(void * arr,int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r));
+
+void merge_sort(void * arr, int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r), void merge(void * arr, int start, int items, int items2));
 #endif

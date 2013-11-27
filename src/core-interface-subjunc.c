@@ -39,7 +39,9 @@ static struct option long_options[] =
 	{"hamming",  no_argument, 0, 'H'},
 	{"quality",  no_argument, 0, 'Q'},
 	{"dnaseq",  no_argument, 0, 0},
+	{"gzFASTQinput", no_argument, 0, 0},
 	{"allJunctions",  no_argument, 0, 0},
+	{"memoryMultiplex",  required_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -90,10 +92,10 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
 	SUBREADputs("                            than one best mapping location is found.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
 	SUBREADputs("                            one best mapping location is found.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
@@ -120,26 +122,28 @@ void print_usage_core_subjunc()
 	SUBREADputs("   ");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --trim3     <int>    trim off <int> number of bases from 3' end of each");
 	SUBREADputs("                            read. 0 by default.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --rg-id     <string> specify the read group ID. If specified,the read");
 	SUBREADputs("                            group ID will be added to the read group header");
 	SUBREADputs("                            field and also to each read in the mapping output.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
+	SUBREADputs("       --gzFASTQinput       specify that the input format is gzipped FASTQ.");
+	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("       --BAMoutput          specify that mapping results are saved into a BAM");
 	SUBREADputs("                            format file.");
 	SUBREADputs("");
 	SUBREADputs("    -v                      output version of the program.");
-	SUBREADputs("                                 ");
+	SUBREADputs("");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
@@ -335,7 +339,11 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 				
 			case 0:
-				if(strcmp("rg-id", long_options[option_index].name)==0) 
+				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
+				{
+					global_context->config.memory_use_multiplex = atoi(optarg);
+				}
+				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{
 					strcpy(global_context->config.read_group_id, optarg);
 				}
@@ -363,6 +371,10 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.check_donor_at_junctions=0;
 					global_context->config.limited_tree_scan = 0;
 					global_context->config.max_insertion_at_junctions = atoi(optarg);
+				}
+				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
+				{
+					global_context->config.is_gzip_fastq=1;
 				}
 				else if(strcmp("dnaseq", long_options[option_index].name)==0 || strcmp("allJunctions", long_options[option_index].name)==0)
 				{

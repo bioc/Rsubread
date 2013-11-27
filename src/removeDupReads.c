@@ -200,7 +200,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	seed48(rand48_seed);
 	sprintf(temp_file_prefix, "%s/temp-delrep-%06u-%08lX-", temp_location==NULL?".":temp_location, getpid(), lrand48());
 
-	if(break_SAM_file(in_SAM_file, 0, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL)) return -1;
+	if(break_SAM_file(in_SAM_file, 0, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL, NULL)) return -1;
 
 	// Step 2: initialize the read voting table, scanning each temporary file. Each read in the temporary file is a vote to a location in the voting table. Then, each read in the temporary file is scanned again against the voting table. If the mapping location of this read receives >=threshold votes in the table, the read is removed from the read selection list.
 

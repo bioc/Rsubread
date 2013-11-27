@@ -2531,7 +2531,9 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 		for(j=0; j< vote->items[i]; j++)
 		{
 			locate_gene_position(vote -> pos[i][j], &offsets, &chrname, &chrpos);
-			SUBREADprintf("\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) %s\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j], (vote -> masks[i][j] & IS_NEGATIVE_STRAND)?"NEG":"POS");
+			int toli = vote->toli [i][j];
+			int last_offset = vote -> indel_recorder[i][j][toli+2];
+			SUBREADprintf("\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) Indel %d %s\n", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j],last_offset, (vote -> masks[i][j] & IS_NEGATIVE_STRAND)?"NEG":"POS");
 		}
 	
 

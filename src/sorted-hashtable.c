@@ -755,43 +755,46 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						int dist0 = kv-di;
 						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
 						{
-							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-							test_max += 1;
-							vote -> votes[offsetX][i] = test_max;
-							vote -> quality[offsetX][i] += quality;
-
-
-							/*
-							if (offset_from_5 <  vote->coverage_start [offsetX][i])
+							if(is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND)))
 							{
-								vote->coverage_start [offsetX][i] = offset_from_5;
-							}*/
-							if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
-							{
-								vote->coverage_end [offsetX][i] = offset_from_5+16;
-							}
+								gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+								test_max += 1;
+								vote -> votes[offsetX][i] = test_max;
+								vote -> quality[offsetX][i] += quality;
 
-							int toli =  vote -> toli[offsetX][i];
 
-							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
-							{
-								toli +=3;
-								if (toli < indel_tolerance*3)
+								/*
+								if (offset_from_5 <  vote->coverage_start [offsetX][i])
 								{
-									vote -> toli[offsetX][i] = toli;
-									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-										
-									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+									vote->coverage_start [offsetX][i] = offset_from_5;
+								}*/
+								if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
+								{
+									vote->coverage_end [offsetX][i] = offset_from_5+16;
 								}
-								vote->current_indel_cursor [offsetX][i] = (char)dist0;
-							}
-							else
-								vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 
-							vote->max_vote = max(vote->max_vote , test_max);
-							i = 9999999;
+								int toli =  vote -> toli[offsetX][i];
+
+								if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+								{
+									toli +=3;
+									if (toli < indel_tolerance*3)
+									{
+										vote -> toli[offsetX][i] = toli;
+										vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+										vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+										vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+											
+										if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+									}
+									vote->current_indel_cursor [offsetX][i] = (char)dist0;
+								}
+								else
+									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+
+								vote->max_vote = max(vote->max_vote , test_max);
+								i = 9999999;
+							}
 						}
 					}
 					if (i>=9999999){
@@ -927,35 +930,39 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						int dist0 = kv-di;
 						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
 						{
-							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-							test_max += 1;
-							vote -> votes[offsetX][i] = test_max;
-							vote -> quality[offsetX][i] += quality;
-
-							if (offset +16 > vote->coverage_end [offsetX][i])
-								vote->coverage_end [offsetX][i] = offset+16;
-
-							int toli =  vote -> toli[offsetX][i];
-
-							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+							if(is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND)))
 							{
-								toli +=3;
-								if (toli < MAX_INDEL_SECTIONS*3)
-								{
-									vote -> toli[offsetX][i] = toli;
-									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-										
-									if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-								}
-								vote->current_indel_cursor [offsetX][i] = (char)dist0;
-							}
-							else
-								vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 
-							vote->max_vote = max(vote->max_vote , test_max);
-							i = 9999999;
+								gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+								test_max += 1;
+								vote -> votes[offsetX][i] = test_max;
+								vote -> quality[offsetX][i] += quality;
+
+								if (offset +16 > vote->coverage_end [offsetX][i])
+									vote->coverage_end [offsetX][i] = offset+16;
+
+								int toli =  vote -> toli[offsetX][i];
+
+								if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+								{
+									toli +=3;
+									if (toli < MAX_INDEL_SECTIONS*3)
+									{
+										vote -> toli[offsetX][i] = toli;
+										vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+										vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+										vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+											
+										if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+									}
+									vote->current_indel_cursor [offsetX][i] = (char)dist0;
+								}
+								else
+									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+
+								vote->max_vote = max(vote->max_vote , test_max);
+								i = 9999999;
+							}
 						}
 					}
 					if (i>=9999999){

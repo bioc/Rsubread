@@ -701,6 +701,112 @@ void register_reverse_table(int block_no, long this_block_min_start, long this_b
 
 }
 
+void feature_merge(void * arrv, int start, int items, int items2)
+{
+	void ** arr = (void **) arrv;
+
+	long * ret_start = (long *) arr[0];
+	long * ret_end = (long *) arr[1];
+	unsigned char * ret_strand = (unsigned char *) arr[2];
+	int * ret_entyrez = (int *) arr[3];
+	fc_feature_info_t ** old_info_ptr = (fc_feature_info_t **) arr[4];
+
+	int total_items = items+items2;
+	long * tmp_start = malloc(sizeof(long) * total_items);
+	long * tmp_end = malloc(sizeof(long) * total_items);
+	unsigned char * tmp_strand = malloc(sizeof(char) * total_items);
+	int * tmp_entyrez = malloc(sizeof(int) * total_items);
+	fc_feature_info_t ** tmp_info_ptr = malloc(sizeof(fc_feature_info_t*) * total_items);
+
+	int read_1_ptr = start;
+	int read_2_ptr = start+items;
+	int write_ptr;
+
+	for(write_ptr=0; write_ptr<total_items; write_ptr++)
+	{
+		if((read_1_ptr >= start+items)||(read_2_ptr < start+total_items && ret_start[read_1_ptr] >= ret_start[read_2_ptr]))
+		{
+			tmp_start[write_ptr] = ret_start[read_2_ptr];
+			tmp_end[write_ptr] = ret_end[read_2_ptr];
+			tmp_strand[write_ptr] = ret_strand[read_2_ptr];
+			tmp_entyrez[write_ptr] = ret_entyrez[read_2_ptr];
+			tmp_info_ptr[write_ptr] = old_info_ptr[read_2_ptr];
+			read_2_ptr++;
+		}
+		else
+		{
+			tmp_start[write_ptr] = ret_start[read_1_ptr];
+			tmp_end[write_ptr] = ret_end[read_1_ptr];
+			tmp_strand[write_ptr] = ret_strand[read_1_ptr];
+			tmp_entyrez[write_ptr] = ret_entyrez[read_1_ptr];
+			tmp_info_ptr[write_ptr] = old_info_ptr[read_1_ptr];
+			read_1_ptr++;
+		}
+	}
+
+	memcpy(ret_start+ start, tmp_start, sizeof(long) * total_items);
+	memcpy(ret_end+ start, tmp_end, sizeof(long) * total_items);
+	memcpy(ret_strand+ start, tmp_strand, sizeof(char) * total_items);
+	memcpy(ret_entyrez+ start, tmp_entyrez, sizeof(int) * total_items);
+	memcpy(old_info_ptr+ start, tmp_info_ptr, sizeof(fc_feature_info_t*) * total_items);
+
+	free(tmp_start);
+	free(tmp_end);
+	free(tmp_strand);
+	free(tmp_entyrez);
+	free(tmp_info_ptr);
+}
+
+
+int feature_sort_compare(void * arrv, int l, int r)
+{
+	void ** arr = (void **) arrv;
+	long * ret_start = (long *)arr[0];
+	long ll = ret_start[l];
+	long rl = ret_start[r];
+
+	if(ll==rl) return 0;
+	else if(ll>rl) return 1;
+	else return -1;
+}
+
+void feature_sort_exchange(void * arrv, int l, int r)
+{
+	void ** arr = (void **) arrv;
+	long tmp;
+	fc_feature_info_t * tmpptr;
+
+	long * ret_start = (long *) arr[0];
+	long * ret_end = (long *) arr[1];
+	unsigned char * ret_strand = (unsigned char *) arr[2];
+	int * ret_entyrez = (int *) arr[3];
+	fc_feature_info_t ** old_info_ptr = (fc_feature_info_t **) arr[4];
+
+	
+	tmp = ret_start[r];
+	ret_start[r]=ret_start[l];
+	ret_start[l]=tmp;
+
+	tmp = ret_end[r];
+	ret_end[r]=ret_end[l];
+	ret_end[l]=tmp;
+
+	tmp = ret_strand[r];
+	ret_strand[r]=ret_strand[l];
+	ret_strand[l]=tmp;
+
+	tmp = ret_entyrez[r];
+	ret_entyrez[r]=ret_entyrez[l];
+	ret_entyrez[l]=tmp;
+
+	tmpptr = old_info_ptr[r];
+	old_info_ptr[r]=old_info_ptr[l];
+	old_info_ptr[l]=tmpptr;
+
+}
+
+
+
 void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int features, fc_feature_info_t * loaded_features, char *** sorted_chr_names, int ** sorted_entrezid, long ** sorted_start, long ** sorted_end, unsigned char ** sorted_strand, char ** anno_chr_2ch, char *** anno_chrs, long ** anno_chr_head, long ** block_end_index, long ** block_min_start_pos, long ** block_max_end_pos)
 {
 	unsigned int chro_pnt;
@@ -772,7 +878,6 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 		fc_chromosome_index_info * this_chro_info = HashTableGet(global_context -> exontable_chro_table , this_chro_name);
 		assert(this_chro_info);
 		unsigned int this_chro_number = this_chro_info -> chro_number;
-		//printf("CNN=%u\nPTR=%p\n", this_chro_number, chro_feature_ptr);
 		unsigned int this_chro_table_ptr = chro_feature_ptr[this_chro_number];
 
 		ret_char_name[this_chro_table_ptr] = this_chro_name;// (char *)loaded_features[chro_pnt].chro;
@@ -799,48 +904,23 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 		memset(tmp_chro_inf -> reverse_table_start_index, 0xff, sizeof(int) *bins_in_chr);
 
 		tmp_chro_inf -> chro_block_table_start = current_block_id; 
-		unsigned int sort_j, this_block_items = 0;
+		unsigned int this_block_items = 0;
 		long this_block_min_start = 0x7fffffff, this_block_max_end = 0;
 		unsigned int this_chro_tab_end =  tmp_chro_inf -> chro_features + tmp_chro_inf -> chro_feature_table_start;
+
+		void * in_array[5];
+		in_array[0] = ret_start + tmp_chro_inf -> chro_feature_table_start; 
+		in_array[1] = ret_end + tmp_chro_inf -> chro_feature_table_start; 
+		in_array[2] = ret_strand + tmp_chro_inf -> chro_feature_table_start; 
+		in_array[3] = ret_entrez + tmp_chro_inf -> chro_feature_table_start; 
+		in_array[4] = old_info_ptr + tmp_chro_inf -> chro_feature_table_start; 
+
+		merge_sort(in_array, this_chro_tab_end - tmp_chro_inf -> chro_feature_table_start, feature_sort_compare, feature_sort_exchange, feature_merge);
+
 		for(sort_i = tmp_chro_inf -> chro_feature_table_start; sort_i< this_chro_tab_end ; sort_i++)
 		{
-			unsigned int min_j = sort_i;
-			unsigned int min_start = ret_start[min_j];
-			for(sort_j = sort_i+1; sort_j < this_chro_tab_end; sort_j++)
-			{
-				// put the minimun start to *sort_i 
-				if(ret_start[sort_j] < min_start)
-				{
-					min_j = sort_j;
-					min_start = ret_start[sort_j];
-				}
-			}
-			if(min_j != sort_i)
-			{
-				unsigned int tmp;
-				void * tmp_ptr;
-				long tmpl;
-
-				tmpl = ret_start[sort_i];
-				ret_start[sort_i] = ret_start[min_j];
-				ret_start[min_j] = tmpl;
-
-				tmpl = ret_end[sort_i];
-				ret_end[sort_i] = ret_end[min_j];
-				ret_end[min_j] = tmpl;
-
-				tmp = ret_strand[sort_i];
-				ret_strand[sort_i] = ret_strand[min_j];
-				ret_strand[min_j] = tmp;
-
-				tmp = ret_entrez[sort_i];
-				ret_entrez[sort_i] = ret_entrez[min_j];
-				ret_entrez[min_j] = tmp;
-
-				tmp_ptr = old_info_ptr[sort_i];
-				old_info_ptr[sort_i] = old_info_ptr[min_j];
-				old_info_ptr[min_j] = tmp_ptr;
-			}
+			// NOW THE FEATURES (ret_start, ret_end, ret_strand, ret_entrez, old_info_ptr) ARE ALL SORTED!
+			//printf("NT=%lu\tCHRO=%d\n", ret_start[sort_i], tmp_chro_inf->chro_number);
 			old_info_ptr[sort_i]->sorted_order = sort_i;
 
 			int feature_bin_location = ret_start[sort_i] / REVERSE_TABLE_BUCKET_LENGTH;

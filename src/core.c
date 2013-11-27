@@ -267,7 +267,7 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 1,1,"Summary");
 	print_in_box(80, 0,1,"");
 	print_in_box(80, 0,0,"         Processed : %llu %s" , global_context -> all_processed_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
-	print_in_box(81, 0,0,"            Mapped : %llu %s (%.1f%%%%)", global_context -> all_mapped_reads/ (global_context->input_reads.is_paired_end_reads?2:1), global_context->input_reads.is_paired_end_reads?"fragments":"reads" ,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads / (global_context->input_reads.is_paired_end_reads?2:1));
+	print_in_box(81, 0,0,"            Mapped : %llu %s (%.1f%%%%)", global_context -> all_mapped_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads" ,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
 	if(global_context->input_reads.is_paired_end_reads)
 		print_in_box(80, 0,0,"  Correctly paired : %llu fragments", global_context -> all_correct_PE_reads);
 
@@ -566,6 +566,8 @@ int check_configuration(global_context_t * global_context)
 		expected_type = FILE_TYPE_BAM;
 	else if(global_context -> config.is_SAM_file_input && !global_context -> config.is_BAM_input)
 		expected_type = FILE_TYPE_SAM;
+	else if(global_context -> config.is_gzip_fastq)
+		expected_type = FILE_TYPE_GZIP_FAST_;
 	
 	if(global_context -> config.max_indel_length > 16)
 		warning_file_limit();
@@ -573,7 +575,7 @@ int check_configuration(global_context_t * global_context)
 	warning_file_type(global_context -> config.first_read_file, expected_type);
 	if(global_context -> config.second_read_file[0])
 	{
-		if(expected_type==FILE_TYPE_FAST_)
+		if(expected_type==FILE_TYPE_FAST_ || expected_type==FILE_TYPE_GZIP_FAST_)
 			warning_file_type(global_context -> config.second_read_file, expected_type);
 		else
 			print_in_box(80,0,0,"You should specify only one input SAM or BAM file.");
@@ -663,7 +665,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 
 	if(is_bam || (global_context->input_reads.is_paired_end_reads && !is_file_sorted))
 	{
-		sprintf(temp_file_name, "./temp-core-%06u-%08X.sam", getpid(), rand());
+		sprintf(temp_file_name, "%s.sam", global_context->config.temp_file_prefix);
 		sambam_reader = SamBam_fopen(fname, is_bam?SAMBAM_FILE_BAM: SAMBAM_FILE_SAM);
 		if(!sambam_reader){
 			SUBREADprintf("Unable to open %s.\n", fname);
@@ -709,6 +711,39 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 	return 0;
 }
 
+int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n)
+{
+	int is_OK = 0;
+	char temp_file_name[200];
+	char * linebuff=malloc(3001);
+	gzFile * rawfp = gzopen(fname, "r");
+	
+	if(rawfp)
+	{
+		print_in_box(80,0,0,"Decompress %s...", fname);
+		sprintf(temp_file_name, "%s-%d.fq", global_context->config.temp_file_prefix, half_n);
+		FILE * outfp = fopen(temp_file_name, "w");
+		if(outfp)
+		{
+			while(1)
+			{
+				char * bufr =gzgets(rawfp, linebuff, 3000);
+				if(!bufr) break;
+				fputs(bufr, outfp);
+			}
+			is_OK = 1;
+			fclose(outfp);
+		}
+
+		gzclose(rawfp);
+	}
+
+	strcpy(fname, temp_file_name);
+	global_context -> will_remove_input_file |= (1<< (half_n-1));
+
+	return !is_OK;
+}
+
 int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int half_number, int is_init)
 {
 	char *fname;
@@ -725,7 +760,11 @@ int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int 
 	else
 	{
 		if(is_init)
+		{
+			if(global_context -> config.is_gzip_fastq)
+				if(convert_GZ_to_FQ(global_context, (half_number==2)? global_context ->config.second_read_file : global_context ->config.first_read_file, half_number)) return -1;
 			fname = (half_number == 2)?global_context -> config.second_read_file:global_context -> config.first_read_file;
+		}
 		else
 			fname = (half_number == 2)?global_context -> input_reads.second_read_file.filename:global_context -> input_reads.first_read_file.filename;
 		return geinput_open(fname, fp);
@@ -847,6 +886,8 @@ int get_soft_clipping_length(char* CIGAR)
 	return 0;
 }
 
+#define CIGAR_PERFECT_SECTIONS 12
+
 int write_chunk_results(global_context_t * global_context)
 {
 	unsigned int read_number, sqr_read_number = 0, sqr_interval;
@@ -854,13 +895,13 @@ int write_chunk_results(global_context_t * global_context)
 	char * additional_information = malloc(1800);
 	short current_display_offset = 0, current_display_tailgate = 0;
 
-	unsigned int out_poses[6], xk1;
-	char * out_cigars[6], *out_mate_cigars[6];
-	char out_strands[6];
-	short out_read_lens[6];
+	unsigned int out_poses[CIGAR_PERFECT_SECTIONS+1], xk1;
+	char * out_cigars[CIGAR_PERFECT_SECTIONS+1], *out_mate_cigars[CIGAR_PERFECT_SECTIONS+1];
+	char out_strands[CIGAR_PERFECT_SECTIONS+1];
+	short out_read_lens[CIGAR_PERFECT_SECTIONS+1];
 
-	for(xk1 = 0; xk1 < 6; xk1++) out_cigars[xk1] = malloc(100);
-	for(xk1 = 0; xk1 < 6; xk1++) out_mate_cigars[xk1] = malloc(100);
+	for(xk1 = 0; xk1 < CIGAR_PERFECT_SECTIONS+1; xk1++) out_cigars[xk1] = malloc(100);
+	for(xk1 = 0; xk1 < CIGAR_PERFECT_SECTIONS+1; xk1++) out_mate_cigars[xk1] = malloc(100);
 
 	//if(global_context -> config.space_type == GENE_SPACE_COLOR && !global_context -> config.convert_color_to_base)
 	//	current_display_offset = 1;
@@ -924,7 +965,7 @@ int write_chunk_results(global_context_t * global_context)
 				alignment_result_t *current_result, *mate_result;
 				current_result = _global_retrieve_alignment_ptr(global_context  , read_number, is_second_read, best_read_id);
 				mate_result    = _global_retrieve_alignment_ptr(global_context  , read_number,!is_second_read, best_read_id);
-				if(best_read_id>0 && current_result->selected_votes < 1 && (is_second_read == 1 || !global_context -> input_reads.is_paired_end_reads)) break;
+				if(best_read_id>0 && current_result->selected_votes < 1 && (is_second_read == 0 || !global_context -> input_reads.is_paired_end_reads)) break;
 				if(best_read_id>0 && ( global_context -> input_reads.is_paired_end_reads&& !is_result_in_PE(prime_result))) break;
 
 				char * current_name      = is_second_read ? read_name_2 : read_name_1;
@@ -997,13 +1038,15 @@ int write_chunk_results(global_context_t * global_context)
 						if( mate_result -> cigar_string[0] == -1)
 						{
 							is_jumped = 1;
-							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN, mate_read_len);
+							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN - 1, mate_read_len);
+
 							mate_CIGAR = mate_cigar_decompress;
 						}
 						else
 						{
 							bincigar2cigar(mate_cigar_decompress, 100, mate_result -> cigar_string, CORE_MAX_CIGAR_LEN, mate_read_len);
 							mate_CIGAR = mate_cigar_decompress;
+
 						}
 
 						if(global_context -> config.do_fusion_detection)
@@ -1078,15 +1121,6 @@ int write_chunk_results(global_context_t * global_context)
 
 						int chimeric_sections = chimeric_cigar_parts(global_context, current_linear_pos, is_first_section_jumped ^ current_strand, is_first_section_jumped , current_CIGAR , out_poses, out_cigars, out_strands, current_read_len, out_read_lens);
 
-						/*
-
-						printf("\n\npos=%u ; cigar=%s ; first_jump=%d; main_section_strand=%c\n", current_linear_pos , current_CIGAR, is_first_section_jumped, (current_result->result_flags & CORE_IS_NEGATIVE_STRAND)?'-':'+');
-						for(xk1=0;xk1<chimeric_sections;xk1++)
-						{
-							printf(" perfect [ %d ] : cigar = %s ; pos = %u (%c)\n", xk1, out_cigars[xk1] , out_poses [xk1] , out_strands[xk1]);
-						}*/
-
-
 						//sprintf(additional_information + strlen(additional_information), "\tXX:Z:%s", current_cigar_decompress);
 
 						for(xk1=1; xk1<chimeric_sections; xk1++)
@@ -1115,7 +1149,6 @@ int write_chunk_results(global_context_t * global_context)
 					//printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
 				}
 
-				//printf("CURCIGAR=%s ; FINAL_CIGAR=%s; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
 				if(is_current_ok)
 				{
 					if(current_strand + is_second_read == 1)
@@ -1291,9 +1324,6 @@ int write_chunk_results(global_context_t * global_context)
 				if(mate_chro_name[0]!='=') 
 					mate_distance = 0;
 
-
-			//	printf("RAS1=%s\nRAS2=%s\n\n", read_text_1,read_text_2);
-
 				int tailgate_0 = -1;
 				if(current_display_tailgate)
 				{
@@ -1301,7 +1331,8 @@ int write_chunk_results(global_context_t * global_context)
 					current_read_text[strlen(current_read_text) - 1] = 0;
 				}
 
-			//	printf("CURCIGAR=%s ; FINAL_CIGAR=%s ; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
+				//if(read_number==2461)
+				//printf("CURCIGAR=%s ; FINAL_CIGAR=%s ; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
 
 				if(is_current_ok || best_read_id==0)
 				{
@@ -1309,7 +1340,7 @@ int write_chunk_results(global_context_t * global_context)
 					if(global_context->config.do_big_margin_reporting)
 						seq_len += sprintf(additional_information+seq_len, "\tSA:i:%d", current_repeated_times);
 					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tNH:i:%d", (int)((current_result -> Score_H >> 17) & 0xfff), is_current_ok?total_best_reads:0);
-					//seq_len += sprintf(additional_information+seq_len, "\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d", current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, is_current_ok?total_best_reads:0); 
+				//	seq_len += sprintf(additional_information+seq_len, "\tSG:Z:%s\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d",current_cigar_decompress, current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, is_current_ok?total_best_reads:0); 
 					if(global_context->config.read_group_id[0])
 						seq_len += sprintf(additional_information+seq_len, "\tRG:Z:%s", global_context->config.read_group_id);
 
@@ -1327,15 +1358,24 @@ int write_chunk_results(global_context_t * global_context)
 				if(second_char > 0)
 					current_read_text[1] = second_char;
 
-				if(is_current_ok)
-					global_context -> all_mapped_reads++;
+				if(global_context->input_reads.is_paired_end_reads)
+				{
+					if(is_second_read)
+						if(is_current_ok || is_mate_ok)
+							global_context -> all_mapped_reads++;
+				}
+				else
+				{
+					if(is_current_ok)
+						global_context -> all_mapped_reads++;
+				}
 			} 
 		}
 	}
 
 	free(additional_information);
-	for(xk1 = 0; xk1 < 6; xk1++) free(out_cigars[xk1]);
-	for(xk1 = 0; xk1 < 6; xk1++) free(out_mate_cigars[xk1]);
+	for(xk1 = 0; xk1 < CIGAR_PERFECT_SECTIONS; xk1++) free(out_cigars[xk1]);
+	for(xk1 = 0; xk1 < CIGAR_PERFECT_SECTIONS; xk1++) free(out_mate_cigars[xk1]);
 	return 0;
 }
 void init_chunk_scanning_parameters(global_context_t * global_context, thread_context_t * thread_context, gene_input_t ** ginp1, gene_input_t ** ginp2, unsigned int * read_block_start, unsigned int * reads_to_be_done)
@@ -1873,8 +1913,10 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			{
 				//if(strcmp(read_name_1,"b1")==0)
 
+				//if(current_read_number == 17296){
 				//print_votes(vote_1, global_context -> config.index_prefix);
 				//print_votes(vote_2, global_context -> config.index_prefix);
+				//}
 
 				//finalise_vote(vote_1);
  
@@ -2584,9 +2626,9 @@ int load_global_context(global_context_t * context)
 
 
 	if(context->input_reads.is_paired_end_reads)
-		context->config.reads_per_chunk = 7*1024*1024;
+		context->config.reads_per_chunk = 7*1024*1024*min(40,max(1,context->config.memory_use_multiplex));
 	else
-		context->config.reads_per_chunk = 14*1024*1024;
+		context->config.reads_per_chunk = 14*1024*1024*min(40,max(1,context->config.memory_use_multiplex));
 
 	struct stat ginp1_stat;
 	stat(context->config.first_read_file , &ginp1_stat);
@@ -2735,7 +2777,8 @@ int destroy_global_context(global_context_t * context)
 	geinput_close(&context -> input_reads.first_read_file);
 	if(context->input_reads.is_paired_end_reads) geinput_close(&context -> input_reads.second_read_file);
 	destroy_offsets(&context->chromosome_table);
-	if(context -> will_remove_input_file) unlink(context ->config.first_read_file);
+	if((context -> will_remove_input_file & 1) && (memcmp(context ->config.first_read_file, "./core-temp", 11) == 0)) unlink(context ->config.first_read_file);
+	if((context -> will_remove_input_file & 2) && (memcmp(context ->config.second_read_file, "./core-temp", 11) == 0)) unlink(context ->config.second_read_file);
 
 	return 0;
 }
@@ -3082,7 +3125,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				perfect_len = 0;
 
 				current_perfect_section_no++;
-				if(current_perfect_section_no>5)break;
+				if(current_perfect_section_no>CIGAR_PERFECT_SECTIONS)break;
 
 				out_poses[current_perfect_section_no] = current_perfect_map_start - read_cursor;
 				out_strands[current_perfect_section_no] = is_negative?'-':'+';
@@ -3152,4 +3195,78 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 	}
 
 	return current_perfect_section_no;
+}
+
+void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r));
+
+void quick_sort(void * arr, int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r))
+{
+	quick_sort_run(arr, 0, arr_size-1, compare, exchange);
+}
+ 
+ 
+void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r))
+{
+	int pivot,j,i;
+
+	if(spot_high-spot_low<1) return;
+	pivot = spot_low;
+	i = spot_low;
+	j = spot_high;
+
+	while(i<=j)
+	{
+		if(compare(arr, i, pivot) <0)
+		{
+			i++;
+			continue;
+		}
+
+		if(compare(arr, j, pivot)>0)
+		{
+			j--;
+			continue;
+		}
+
+		if(i!=j)
+			exchange(arr,i,j);
+		i++;
+		j--;
+	}
+
+	quick_sort_run(arr, spot_low, j, compare, exchange);
+	quick_sort_run(arr, i, spot_high, compare, exchange);
+	
+}
+
+
+
+void merge_sort_run(void * arr, int start, int items, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r), void merge(void * arr, int start, int items, int items2))
+{
+	if(items > 11)
+	{
+		int half_point = items/2;
+		merge_sort_run(arr, start, half_point, compare, exchange, merge);
+		merge_sort_run(arr, start + half_point, items - half_point, compare, exchange, merge);
+		merge(arr, start, half_point, items - half_point);
+	}
+	else
+	{
+		int i, j;
+		for(i=start; i< start + items - 1; i++)
+		{
+			int min_j = i;
+			for(j=i + 1; j< start + items; j++)
+			{
+				if(compare(arr, min_j, j) > 0)
+					min_j = j;
+			}
+			if(i!=min_j)
+				exchange(arr, i, min_j);
+		}
+	}
+}
+void merge_sort(void * arr, int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r), void merge(void * arr, int start, int items, int items2))
+{
+	merge_sort_run(arr, 0, arr_size, compare, exchange, merge);
 }

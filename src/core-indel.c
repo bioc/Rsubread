@@ -148,6 +148,8 @@ int is_ambiguous_indel_score(chromosome_event_t * e)
 }
 void remove_neighbour(global_context_t * global_context)
 {
+//	return;
+
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 
 	HashTable * event_table = indel_context -> event_entry_table;
@@ -194,7 +196,7 @@ void remove_neighbour(global_context_t * global_context)
 						if(is_ambiguous_indel_score(tested_neighbour))
 							to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 						else
-							if(abs(length_diff)<=16)
+							if(abs(length_diff)<=16 )
 							{
 								if(event_body->event_quality < tested_neighbour -> event_quality)
 									to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
@@ -1029,6 +1031,8 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 							}
 							else if ( is_in_indel && (mv == 0 || mv == 3)  )
 							{
+								//if(pair_number == 17296)
+								//printf("R%d : NEW INDEL: %u; len = %d\n", is_second_read, indel_left_boundary - 1 , current_indel_len);
 								#ifdef indel_debug
 								printf("NEW INDEL: %u; len = %d\n", indel_left_boundary - 1 , current_indel_len);
 								#endif
@@ -3302,7 +3306,10 @@ int finalise_long_insertions(global_context_t * global_context)
 
 void init_global_context(global_context_t * context)
 {
+	srand(time(NULL));
+
 	memset(context->module_contexts, 0, 5*sizeof(void *));
+	context->config.memory_use_multiplex = 1;
 	context->config.report_sam_file = 1;
 	context->config.is_rna_seq_reads = 0;
 	context->config.do_fusion_detection = 0;
@@ -3327,7 +3334,7 @@ void init_global_context(global_context_t * context)
 	context->config.use_dynamic_programming_indel=0;
 	context->config.use_bitmap_event_table = 1;
 	context->config.convert_color_to_base = 0;
-
+	context->config.is_gzip_fastq = 0;
 
 	context->config.is_BAM_output = 0;
 	context->config.is_BAM_input = 0;

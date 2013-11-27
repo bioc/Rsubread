@@ -42,6 +42,9 @@
 #define FILE_TYPE_FAST_   100
 #define FILE_TYPE_FASTQ   105
 #define FILE_TYPE_FASTA   110
+#define FILE_TYPE_GZIP_FAST_   1000
+#define FILE_TYPE_GZIP_FASTQ   1105
+#define FILE_TYPE_GZIP_FASTA   1110
 #define FILE_TYPE_UNKNOWN 999
 #define FILE_TYPE_EMPTY   999990
 #define FILE_TYPE_NONEXIST 999999
@@ -139,7 +142,7 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 
 int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
 
-int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr);
+int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file);
 
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes);
 

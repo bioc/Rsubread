@@ -365,13 +365,20 @@ typedef struct{
 } chromosome_t;
 
 typedef struct{
-	unsigned int read_number;
-	unsigned int pos;
+	unsigned char record_type;
+	unsigned char  mapping_quality;
 	unsigned short read_pos;
 	unsigned short read_len;
-	unsigned char  mapping_quality;
+	unsigned int read_number;
+	unsigned int pos;
 	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
+
+typedef struct{
+	unsigned char record_type;
+	unsigned int pos;
+	short type;	
+} VCF_temp_read_t;
 
 
 struct explorer_section_t
