@@ -141,8 +141,6 @@ double fisherSub(int a, int b, int c, int d)
  * @date   2000/04/23
  */
 
-#define LINEAR_STEP 300000
-
 double fisher_exact_test(int a, int b, int c, int d)
 {
 
@@ -161,30 +159,12 @@ double fisher_exact_test(int a, int b, int c, int d)
 
         double p_sum = 0.0;
 
-
-	if(a<=LINEAR_STEP*4)
-	{
-        	double p = fisherSub(a, b, c, d);
-		while (a >= 0) {
-		    p_sum += p;
-		    if (a == 0) break;
-		    --a; ++b; ++c; --d;
-		    p = fisherSub(a, b, c, d);
-		}
-	}
-	else
-	{
-		//a-=LINEAR_STEP/2; b+=LINEAR_STEP/2; c+=LINEAR_STEP/2; d-=LINEAR_STEP/2;
-                a=max(0,a);d=max(0,d);
-        	double p = LINEAR_STEP*fisherSub(a, b, c, d);
-		while (a >= 0) {
-		    p_sum += p;
-		    if (a <= 0) break;
-		    a-= LINEAR_STEP; b+=LINEAR_STEP; c+=LINEAR_STEP; d-=LINEAR_STEP;
-                    a=max(0,a);d=max(0,d);
-		    p = min(a,LINEAR_STEP)*fisherSub(a, b, c, d);
-		}
-	
+	double p = fisherSub(a, b, c, d);
+	while (a >= 0) {
+	    p_sum += p;
+	    if (a == 0) break;
+	    --a; ++b; ++c; --d;
+	    p = fisherSub(a, b, c, d);
 	}
 
 	return p_sum;
@@ -550,10 +530,10 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		int j;
 		int a=0, b=0, c=0, d=0;
 		long long int reference_len_long = reference_len;
-		/**    | POI  | All_Window (inc. POI)
-		 * ----+------+-------
-		 * #mm |  a   |  b
-		 * #pm |  c   |  d
+		/**          | POI  | All_Window (inc. POI)
+		 * ----------+------+-------
+		 * #mismatch |  a   |  b
+		 * #matched  |  c   |  d
 		 **/
 
 
@@ -561,35 +541,38 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		{
 			a=0; c=0;
 
-			for(j=0;j<4;j++)
+			if(i+parameters -> fisher_exact_testlen < reference_len_long)
 			{
-				if(i+parameters -> fisher_exact_testlen < reference_len_long)
+				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i + parameters -> fisher_exact_testlen))
 				{
-					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i + parameters -> fisher_exact_testlen))
+					char true_value = referenced_genome[i + parameters -> fisher_exact_testlen];
+					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+
+					for(j=0;j<4;j++)
 					{
-
-						char true_value = referenced_genome[i + parameters -> fisher_exact_testlen];
-						int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
-
 						if(j == true_value_int)
 							d += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
 						else
 							b += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
 					}
 				}
-				
-				if(i>=0)
-				{
-					char true_value = referenced_genome[i];
-					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+			}
+			
+			if(i>=0)
+			{
+				char true_value = referenced_genome[i];
+				int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 
+				for(j=0;j<4;j++)
+				{
 					if(j == true_value_int)
 						c  =  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
 					else
 						a +=  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
 				}
-
 			}
+
+			
 			// test the middle base
 			if(i>=0 && a > 0){
 
@@ -610,16 +593,20 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
 
+				//if(strcmp(chro_name, "chr20")==0 && block_no  == 3 && i == 57566366-1-3*15000000)
+				//	SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d\n", chro_name, i,a,b,c,d, flanking_unmatched, flanking_matched);
+
 				snp_filter_background_unmatched[i] = flanking_unmatched;
 				snp_filter_background_matched[i] = flanking_matched;
 
 				fisher_test_size ++;
 			}
 
-			for(j=0;j<4;j++)
-				if(i >= parameters -> fisher_exact_testlen)
+			if(i >= parameters -> fisher_exact_testlen)
+			{
+				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen))
 				{
-					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen))
+					for(j=0;j<4;j++)
 					{
 						char true_value = referenced_genome[i - parameters -> fisher_exact_testlen];
 						int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
@@ -629,6 +616,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 							b -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
 					}
 				}
+			}
 	
 		}
 	}
