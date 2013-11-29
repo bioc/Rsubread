@@ -1,3 +1,6 @@
+29 Nov, 2013
+(1) Re-wrote the qualityScores function.
+
 16 Nov, 2013 - 1.13.7
 (1) Fixed a bug in featureCounts in dealing with unpaired reads in SAM/BAM files.
 

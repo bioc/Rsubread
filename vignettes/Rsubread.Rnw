@@ -172,7 +172,7 @@ The \R{qualityScores} function can be used to quickly retrieve the quality score
 <<>>=
 library(Rsubread)
 reads <- system.file("extdata","reads.txt",package="Rsubread")
-x <- qualityScores(filename=reads,nreads=1000)
+x <- qualityScores(filename=reads,input_format="FASTQ",nreads=1000)
 boxplot(x)
 @
 \end{scriptsize}
