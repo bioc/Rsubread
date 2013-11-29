@@ -57,9 +57,10 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("");
-	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format). Both ");
-	SUBREADputs("                            base-space and color-space read data are supported. ");
-	SUBREADputs("                            For paired-end reads, this gives the first read file");
+	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format by default");
+	SUBREADputs("                            . See below for more supported formats). Both base-");
+	SUBREADputs("                            space and color-space read data are supported. For");
+	SUBREADputs("                            paired-end reads, this gives the first read file");
 	SUBREADputs("                            and the other read file should be specified using");
 	SUBREADputs("                            the -R option.");
 	SUBREADputs("");
@@ -133,7 +134,8 @@ void print_usage_core_subjunc()
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
 	SUBREADputs("");
-	SUBREADputs("       --gzFASTQinput       specify that the input format is gzipped FASTQ.");
+	SUBREADputs("       --gzFASTQinput       specify that the input read data is in gzipped");
+	SUBREADputs("                            FASTQ/FASTA format.");
 	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
 	SUBREADputs("");

@@ -1266,6 +1266,13 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 		if(writer -> header_plain_text_buffer)
 			SamBam_writer_write_header(writer);
 	}
+
+	if(!qual_text || !read_text)	
+	{
+		SUBREADprintf("ERROR: sam file is incomplete.\n");
+		return 1;
+	}
+
 	writer -> writer_state = 10;
 	char additional_bin[300];
 	int cigar_opts[24], xk1, cover_length = 0;

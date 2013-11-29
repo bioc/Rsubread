@@ -262,6 +262,8 @@ int show_summary(global_context_t * global_context)
 	}
 
 	print_in_box(80,0,1,"");
+	print_in_box(89,0,1,"%c[36mCompleted successfully.%c[0m", CHAR_ESC, CHAR_ESC);
+	print_in_box(80,0,1,"");
 	print_in_box(80,2,1,"");
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
 	print_in_box(80, 1,1,"Summary");

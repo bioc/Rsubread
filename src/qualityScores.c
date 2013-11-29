@@ -61,24 +61,39 @@ typedef struct {
 	int quality_offset_warning_shown;
 } qualscore_context;
 
-int finalise_qs_context(qualscore_context * qs_context)
+int finalise_qs_context(qualscore_context * qs_context, int prev_ret)
 {
 	fclose(qs_context -> result_fp);
 	free(qs_context-> IO_line_buff);
-	if(qs_context -> input_file_type == FILE_TYPE_FASTQ)
-		fclose(qs_context -> fq_reader);
-	else if(qs_context -> input_file_type == FILE_TYPE_SAM || qs_context -> input_file_type == FILE_TYPE_BAM)
-		SamBam_fclose(qs_context -> sambam_reader);
-	else if(qs_context -> input_file_type == FILE_TYPE_GZIP_FASTQ)
-		gzclose(qs_context -> gzfq_reader);
-	else return 1;
 
-	double avg_phred = qs_context -> total_phred_sum*1./ qs_context->scored_bases;
-	double avg_prob = qs_context -> total_errorprob_sum*1./1000000/qs_context->scored_bases;
+	SUBREADprintf("\n");
 
-	SUBREADprintf("Program finished successfully. %llu reads were scored.\n", qs_context -> scored_reads);
-	SUBREADprintf("Average Phred score is %.1f, Average wrong sequence probability is %.2f%%.\n", avg_phred, avg_prob*100);
+	if(prev_ret)
+	{
+		SUBREADprintf("Program terminated. No results were generated.\n");
+	}
+	else
+	{
+		if(qs_context -> input_file_type == FILE_TYPE_FASTQ)
+			fclose(qs_context -> fq_reader);
+		else if(qs_context -> input_file_type == FILE_TYPE_SAM || qs_context -> input_file_type == FILE_TYPE_BAM)
+			SamBam_fclose(qs_context -> sambam_reader);
+		else if(qs_context -> input_file_type == FILE_TYPE_GZIP_FASTQ)
+			gzclose(qs_context -> gzfq_reader);
+		else return 1;
 
+		double avg_phred = qs_context -> total_phred_sum*1./ qs_context->scored_bases;
+		double avg_prob = qs_context -> total_errorprob_sum*1./1000000/qs_context->scored_bases;
+
+		SUBREADprintf("Program finished successfully. %llu reads were scored.\n", qs_context -> scored_reads);
+
+		if(qs_context-> quality_offset_warning_shown)
+			SUBREADprintf("However, the Phred score offset (%d) seemed to be wrong. The quality scores can be meaningless.\n", qs_context -> phred_offset);
+		else
+			SUBREADprintf("Average Phred score is %.1f. Average wrong sequence probability is %.2f%%.\n", avg_phred, avg_prob*100);
+	}
+
+	SUBREADprintf("\n");
 	return 0;
 }
 
@@ -98,9 +113,12 @@ int add_read_scores(qualscore_context * qs_context, char * qual_text)
 			}
 		}
 
-		if(nch>0)
+		if(nch <=0 || nch>0)
 		{
-			int error_prob_100t = ERROR_PROB_INT_TABLE[nch];
+			int error_prob_100t = 0;
+
+			if(nch>0)
+				error_prob_100t = ERROR_PROB_INT_TABLE[nch];
 			out_cursor+=sprintf(qs_context->IO_line_buff+out_cursor,"%d,", nch);
 
 			qs_context -> total_errorprob_sum += error_prob_100t;
@@ -134,7 +152,8 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 		{
 			if(retstr[0]!='@')
 			{
-				SUBREADprintf("ERROR: The input fastq file has a wrong format!");
+				SUBREADprintf("ERROR: The input fastq file has a wrong format!\n");
+				return -1;
 			}
 			qs_context -> line_counter ++;
 
@@ -154,7 +173,8 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 			{
 				if(retstr[0]!='+')
 				{
-					SUBREADprintf("ERROR: The input fastq file has a wrong format!");
+					SUBREADprintf("ERROR: The input fastq file has a wrong format!\n");
+					return -1;
 				}
 				qs_context -> line_counter += 2;
 			}
@@ -186,7 +206,7 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 					if(nstr) flags = atoi(nstr);
 					else continue; 
 
-					if(qs_context -> sam_end>0 && !(flags &SAM_FLAG_PAIRED_TASK ))
+					if(0&& qs_context -> sam_end>0 && !(flags &SAM_FLAG_PAIRED_TASK ))
 					{
 						SUBREADprintf("ERROR: The SAM/BAM input file contains single-end reads, please do not specify paired-end specific arguments (e.g., first-end or second-end).\n");
 						ret = 1;
@@ -220,7 +240,7 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 					nstr = strtok_r(NULL, "\t", &tmpptr);	// qual_text 
 					if(!nstr) continue; 
 
-					if((qs_context -> sam_end == 1 && (flags & SAM_FLAG_FIRST_READ_IN_PAIR)) || (qs_context -> sam_end == 2 && (flags & SAM_FLAG_SECOND_READ_IN_PAIR))  || (qs_context -> sam_end == 0))
+					if((qs_context -> sam_end == 1 && (!(flags & SAM_FLAG_SECOND_READ_IN_PAIR))) || (qs_context -> sam_end == 2 && (flags & SAM_FLAG_SECOND_READ_IN_PAIR))  || (qs_context -> sam_end == 0))
 					{
 						if((flags & 256)==0 )
 						{
@@ -303,7 +323,11 @@ int start_qs_context(qualscore_context * qs_context)
 	else 
 	{
 		if(ret || !qs_context -> fq_reader)
+		{
 			SUBREADprintf("ERROR: cannot open input file '%s'.\n", qs_context->input_name);
+			SUBREADprintf("       The file does not exist, or it is not in the %s format.\n", qs_context -> input_file_type == FILE_TYPE_FASTQ?"FASTQ":(qs_context -> input_file_type == FILE_TYPE_SAM?"SAM":(qs_context -> input_file_type == FILE_TYPE_BAM?"BAM":"gzipped FASTQ")));
+			ret=1;
+		}
 		else
 		{
 			qs_context -> IO_line_buff = malloc(6000);
@@ -318,7 +342,9 @@ int start_qs_context(qualscore_context * qs_context)
 	if(qs_context->phred_offset!=33 && (qs_context -> input_file_type == FILE_TYPE_SAM || qs_context -> input_file_type == FILE_TYPE_BAM))
 		SUBREADprintf("WARNING: your input file is in SAM or BAM format. In most cases, the Phred score offset in SAM or BAM is 33.\n");
 
-	SUBREADprintf("Start to scan the input file...\n");
+	if(!ret)
+		SUBREADprintf("Scan the input file...\n");
+
 	return ret;
 }
 
@@ -363,56 +389,66 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 
 		while (1)
 		{
-			int ret = qs_next_qual(&qs_context, linebuff);
-			if(ret) break;
+			int reti = qs_next_qual(&qs_context, linebuff);
+			if(reti<0) ret = 1; 
+			if(reti) break;
 			read_number++;
 			if(read_number % 1000000 == 0)
 				SUBREADprintf("  %llu reads have been scanned in %.1f seconds.\n", read_number, miltime() -  start_time);
 		}
 
-		rewind_qs_file(&qs_context);
-
-		double sampling_rate = (read_number-0.1)/qs_context.needed_reads;
-		 
-		double next_sample_number = 0;
-		sampling_rate = max(1.000000000001, sampling_rate);
-
-		SUBREADprintf("Totally %llu reads were scanned; the sampling interval is %.1f.\nNow extract read quality information...\n", read_number, sampling_rate);
-
-		read_number = 0;
-
-		while(1)
+		if(!ret)
 		{
-			int ret = qs_next_qual(&qs_context, linebuff);
-			if(ret) break;
-			if(read_number >= next_sample_number - 0.0000000001)
+			if(read_number<1)
+				SUBREADprintf("Warning: the input file is empty%s.\n", (qs_context.sam_end ==2)?", or it does not contain any second-end read":"");
+			else
 			{
-				add_read_scores(&qs_context, linebuff);
-				next_sample_number += sampling_rate;
+
+				rewind_qs_file(&qs_context);
+
+				double sampling_rate = (read_number-0.1)/qs_context.needed_reads;
+				 
+				double next_sample_number = 0;
+				sampling_rate = max(1.000000000001, sampling_rate);
+
+				SUBREADprintf("Totally %llu reads were scanned; the sampling interval is %.1f.\nNow extract read quality information...\n", read_number, sampling_rate);
+
+				read_number = 0;
+
+				while(1)
+				{
+					int reti = qs_next_qual(&qs_context, linebuff);
+					if(reti) break;
+					if(read_number >= next_sample_number - 0.0000000001)
+					{
+						add_read_scores(&qs_context, linebuff);
+						next_sample_number += sampling_rate;
+					}
+					read_number++;
+
+					if(read_number % 1000000 == 0)
+						SUBREADprintf("  %llu reads have been scanned in %.1f seconds.\n", read_number, miltime() -  start_time);
+				}
 			}
-			read_number++;
-
-			if(read_number % 1000000 == 0)
-				SUBREADprintf("  %llu reads have been scanned in %.1f seconds.\n", read_number, miltime() -  start_time);
 		}
-
 
 		free(linebuff);
 	}
 
-	finalise_qs_context(&qs_context);
+	finalise_qs_context(&qs_context, ret);
 	return ret;
 }
 
-#ifdef MAKE_STANDALONE
 
 static struct option long_options[] =
 {
 	{"BAMinput",  no_argument, 0, '9'},
 	{"SAMinput",  no_argument, 0, '8'},
 	{"gzFASTQinput",  no_argument, 0, '7'},
+	{"FASTQinput",  no_argument, 0, '6'},
 	{"first-end",  no_argument, 0, '1'},
 	{"second-end",  no_argument, 0, '2'},
+	{"both-ends",  no_argument, 0, '0'},
 	{"counted-reads",  required_argument, 0, 'n'},
 	{"phred-offset",  required_argument, 0, 'P'},
 	{0, 0, 0, 0}
@@ -423,14 +459,18 @@ void qualscore_usage()
 	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs(" ./qualityScores -i input_file -o output_file {--BAMinput} {--SAMinput} {--gzFASTQinput} {--first-end} {--second-end} {--counted-reads <int>} {--phred-offset 33|64}");
+	SUBREADputs(" ./qualityScores -i input_file -o output_file {--FASTQinput --BAMinput or --SAMinput or --gzFASTQinput} {--first-end or --second-end or --both-ends} {--counted-reads <int>} {--phred-offset 33|64}");
 	SUBREADputs("");
 }
 
+#ifdef MAKE_STANDALONE
 int main(int argc, char ** argv)
+#else
+int main_qualityScores(int argc, char ** argv)
+#endif
 {
 	int c;
-	int option_index = 0 , offset_pt = 33, needed_reads = 1000, sam_end = 0;
+	int option_index = 0 , offset_pt = 33, needed_reads = 10000, sam_end = 0;
 
 	optind = 1;
 	opterr = 1;
@@ -443,6 +483,8 @@ int main(int argc, char ** argv)
 	char * out_nameptr = out_name;
 
 	in_name[0]=out_name[0]=0;
+
+	sam_end = 1;	// default: first-end only
 
 	while ((c = getopt_long (argc, argv, "n:i:o:P:12987", long_options, &option_index)) != -1)
 	{
@@ -461,6 +503,12 @@ int main(int argc, char ** argv)
 				break;
 			case '7':
 				input_format="GZFASTQ";
+				break;
+			case '6':
+				input_format="FASTQ";
+				break;
+			case '0':
+				sam_end = 0;
 				break;
 			case '1':
 				sam_end = 1;
@@ -492,4 +540,3 @@ int main(int argc, char ** argv)
 	return ret;
 }
 
-#endif

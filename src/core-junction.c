@@ -1,4 +1,4 @@
-	/***************************************************************
+/***************************************************************
 
    The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
@@ -93,7 +93,7 @@ typedef struct{
 
 
 // read_head_abs_pos is the offset of the FIRST WANTED base.
-void search_events_to_front(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_head_abs_offset, short remainder_len, short sofar_matched)
+void search_events_to_front(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_head_abs_offset, short remainder_len, short sofar_matched, int suggested_movement)
 {
 	short tested_read_pos;
 
@@ -122,9 +122,13 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 
 	// tested_read_pos is the index of the first base unwanted!
 	
+
+	int move_start = SEARCH_MIN_MOVEMENT;
+	if(suggested_movement) move_start = suggested_movement-1;
+
 	if((global_context -> config.do_fusion_detection|| there_are_events_in_range(event_table->appendix1, read_head_abs_offset + 15, remainder_len - 15 )) && 
 		MAX_EVENTS_IN_READ - 1 > explain_context -> tmp_search_sections)
-		for(tested_read_pos = SEARCH_MIN_MOVEMENT ; tested_read_pos <= remainder_len; tested_read_pos++)
+		for(tested_read_pos = move_start ; tested_read_pos <= remainder_len; tested_read_pos++)
 		{
 			int xk1, matched_bases_to_site;
 			chromosome_event_t *site_events[MAX_EVENT_ENTRIES_PER_SITE+1];
@@ -156,13 +160,9 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 			else
 				tested_chro_begin = read_head_abs_offset;
 
-
 			matched_bases_to_site = match_chro(read_text, value_index, tested_chro_begin, tested_read_pos, explain_context -> current_is_strand_jumped, global_context -> config.space_type);
 
-
-	
-
-			if((1+matched_bases_to_site)*10000/tested_read_pos > 9000)
+			if(tested_read_pos >0 && (1+matched_bases_to_site)*10000/tested_read_pos > 9000)
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
@@ -199,8 +199,9 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].is_connected_to_large_side = (potential_event_pos == tested_event -> event_large_side);
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_start = tested_read_pos - min(0, tested_event -> indel_length) + tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_head_abs_offset;
-						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
-							explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);
+					
+						explain_context -> tmp_jump_length += 100 * (tested_event->event_large_side - tested_event->event_small_side) - 1;
+							
 
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 						//else if(tested_event->event_type == CHRO_EVENT_TYPE_JUNCTION) jump_penalty = 1;
@@ -214,12 +215,13 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_sections ++;
 
 						//if(explain_context -> pair_number == 23){printf("JUMP_IN: %u ; STRAND=%c ; REMENDER=%d ; 0=%d 0=%d\n", new_read_head_abs_offset, tested_event -> is_strand_jumped?'X':'=', new_remainder_len, tested_event -> indel_length,  tested_event -> indel_at_junction);}
-						search_events_to_front(global_context, thread_context, explain_context, read_text + tested_event -> indel_at_junction + tested_read_pos -  min(0, tested_event->indel_length), qual_text + tested_read_pos -  min(0, tested_event->indel_length), new_read_head_abs_offset, new_remainder_len, sofar_matched + matched_bases_to_site - jump_penalty);
+
+						//printf("SUGGEST_NEXT = %d (! %d)\n", tested_event -> connected_next_event_distance,  tested_event -> connected_previous_event_distance);
+						search_events_to_front(global_context, thread_context, explain_context, read_text + tested_event -> indel_at_junction + tested_read_pos -  min(0, tested_event->indel_length), qual_text + tested_read_pos -  min(0, tested_event->indel_length), new_read_head_abs_offset, new_remainder_len, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_next_event_distance);
 						explain_context -> tmp_search_sections --;
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
-						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
-							explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);
+						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side) * 100 - 1;
 					}
 					//if(global_context ->config.limited_tree_scan) break;
 				}
@@ -244,7 +246,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 
 // read_tail_abs_offset is actually the offset of the base next to the last base in read tail.
 // read_tail_pos is the FIRST UNWANTED BASE, after the read.
-void search_events_to_back(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_tail_abs_offset, short read_tail_pos, short sofar_matched)
+void search_events_to_back(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_tail_abs_offset, short read_tail_pos, short sofar_matched, int suggested_movement)
 {
 	short tested_read_pos;
 
@@ -273,8 +275,10 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 
 	// minimum perfect section length is 1
 	// tested_read_pos is the first WANTED BASE in section.
+	int move_start = read_tail_pos - SEARCH_MIN_MOVEMENT;
+	if(suggested_movement) move_start = read_tail_pos - suggested_movement ;
 	if(MAX_EVENTS_IN_READ - 1> explain_context -> tmp_search_sections && ( there_are_events_in_range(event_table -> appendix2, read_tail_abs_offset - read_tail_pos, read_tail_pos - 15)||global_context -> config.do_fusion_detection))
-		for(tested_read_pos = read_tail_pos - SEARCH_MIN_MOVEMENT; tested_read_pos >=0;tested_read_pos --)
+		for(tested_read_pos = move_start; tested_read_pos >=0;tested_read_pos --)
 		{
 			int xk1, matched_bases_to_site;
 			int jump_penalty = 0;
@@ -313,7 +317,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 			//if(explain_context->pair_number == 1503)
 			//	printf("B_JUMP?%d > %d TLEN=%d \n", (1+matched_bases_to_site)*10000 / (read_tail_pos - tested_read_pos) , 9000, read_tail_pos - tested_read_pos);
 
-			if((1+matched_bases_to_site)*10000/(read_tail_pos - tested_read_pos) > 9000)
+			if((read_tail_pos>tested_read_pos) && (1+matched_bases_to_site)*10000/(read_tail_pos - tested_read_pos) > 9000)
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
@@ -357,8 +361,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end = tested_read_pos + min(0, tested_event->indel_length) - tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_tail_abs_offset; 
 
-						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
-							explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);
+						explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side) * 100 - 1;
 
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 						//else if(tested_event->event_type == CHRO_EVENT_TYPE_JUNCTION) jump_penalty = 1;
@@ -369,14 +372,13 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].is_strand_jumped = explain_context -> current_is_strand_jumped;
 
 						explain_context -> tmp_search_sections ++;
-
-						search_events_to_back(global_context, thread_context, explain_context, read_text , qual_text, new_read_tail_abs_offset , new_read_tail_pos, sofar_matched + matched_bases_to_site - jump_penalty);
+						//printf("SUGGEST_PREV at %u = %d (! %d)\n", tested_event -> event_small_side, tested_event -> connected_previous_event_distance, tested_event -> connected_next_event_distance);
+						search_events_to_back(global_context, thread_context, explain_context, read_text , qual_text, new_read_tail_abs_offset , new_read_tail_pos, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_previous_event_distance);
 						explain_context -> tmp_search_sections --;
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
 
-						if(tested_event -> event_type!=CHRO_EVENT_TYPE_INDEL)
-							explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);
+						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side) * 100 - 1;
 					
 					}
 					//if(global_context ->config.limited_tree_scan) break;
@@ -610,7 +612,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 						{
 							int found_indels , found_inde_pos;
 							
-							int matchingness_count = match_indel_chro_to_front(curr_read_text, value_index,  current_vote -> pos[i][j] , curr_read_len, &found_indels, &found_inde_pos, global_context -> config.max_indel_length, 0);
+							int matchingness_count = match_indel_chro_to_front(curr_read_text, value_index,  current_vote -> pos[i][j] , curr_read_len, &found_indels, &found_inde_pos, global_context -> config.max_indel_length, 1);
 
 							if(matchingness_count*1000 >= curr_read_len*800)
 							{
@@ -1169,7 +1171,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.tmp_jump_length = 0;
 	explain_context.best_jump_length = 0xffff0000 * 0;
 
-	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0);
+	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 1);
 
 	if(explain_context.back_search_confirmed_sections>0)
 	{
@@ -1204,7 +1206,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = front_search_start_position;
 	explain_context.tmp_jump_length = 0;
 	explain_context.best_jump_length = 0xffff0000 * 0;
-	search_events_to_front(global_context, thread_context, &explain_context, read_text + front_search_read_start, qual_text + front_search_read_start, front_search_start_position,read_len - front_search_read_start , 0);
+	search_events_to_front(global_context, thread_context, &explain_context, read_text + front_search_read_start, qual_text + front_search_read_start, front_search_start_position,read_len - front_search_read_start , 0, 0);
 
 	// calc
 	finalise_explain_CIGAR(global_context, thread_context, &explain_context);

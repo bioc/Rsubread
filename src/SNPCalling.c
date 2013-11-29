@@ -543,18 +543,22 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 			if(i+parameters -> fisher_exact_testlen < reference_len_long)
 			{
-				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i + parameters -> fisher_exact_testlen))
-				{
-					char true_value = referenced_genome[i + parameters -> fisher_exact_testlen];
-					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+				int mm=0, pm=0;
+				char true_value = referenced_genome[i + parameters -> fisher_exact_testlen];
+				int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 
-					for(j=0;j<4;j++)
-					{
-						if(j == true_value_int)
-							d += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
-						else
-							b += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
-					}
+				for(j=0;j<4;j++)
+				{
+					if(j == true_value_int)
+						pm = snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
+					else
+						mm += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i+parameters -> fisher_exact_testlen) *4 + j ];
+				}
+
+				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i + parameters -> fisher_exact_testlen) || (mm *4 < pm))
+				{
+					d += pm;
+					b += mm;
 				}
 			}
 			
@@ -582,7 +586,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 				int flanking_unmatched = b-a;
 				int flanking_matched = d-c;
-				if(SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i))
+				if(SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c))
 				{
 					flanking_unmatched = b;
 					flanking_matched = d;
@@ -604,17 +608,20 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 			if(i >= parameters -> fisher_exact_testlen)
 			{
-				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen))
+				int mm=0, pm=0;
+				char true_value = referenced_genome[i - parameters -> fisher_exact_testlen];
+				int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+				for(j=0;j<4;j++)
 				{
-					for(j=0;j<4;j++)
-					{
-						char true_value = referenced_genome[i - parameters -> fisher_exact_testlen];
-						int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
-						if(j == true_value_int)
-							d -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
-						else
-							b -= snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
-					}
+					if(j == true_value_int)
+						pm = snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
+					else
+						mm += snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen) *4 + j ];
+				}
+				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen) || (mm*4<pm))
+				{
+					d-=pm;
+					b-=mm;
 				}
 			}
 	
@@ -1257,7 +1264,10 @@ void print_usage_snp(char * myname)
 	SUBREADputs("");
 	SUBREADputs("Optional arguments:");
 	SUBREADputs("");
-	SUBREADputs("  -a <file>  Specify the name of a VCF file containing known SNPs.");
+	SUBREADputs("  -a <file>  Provide a set of annotated SNPs (e.g. SNPs included in the dbSNP");
+	SUBREADputs("             database). The supplied file should be in VCF format. Providing");
+	SUBREADputs("             known SNPs to the program should improve its SNP calling");
+	SUBREADputs("             performance. Note that the provided SNPs may or may not be called.");
 	SUBREADputs("");
 	SUBREADputs("  -b         Indicate the input file provided via -i is in BAM format.");
 	SUBREADputs("");
@@ -1561,6 +1571,8 @@ int main_snp_calling_test(int argc,char ** argv)
 	ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
 	if(ret != -1)
 	{
+		print_in_box(80,0,1,"");
+		print_in_box(89,0,1,"%c[36mCompleted successfully.%c[0m",CHAR_ESC, CHAR_ESC);
 		print_in_box(80,0,1,"");
 		print_in_box(80,2,1,"");
 		SUBREADputs("");

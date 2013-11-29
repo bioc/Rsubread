@@ -63,7 +63,9 @@ typedef struct{
 	char is_strand_jumped;		// "strand jumped" means that the left and right sides are on different strands. This only applys to fusions.
 						// Also, if "is_strand_jumped" is true, all coordinates (e.g., splicing points, cover_start, cover_end, etc) are on "reversed read" view.
 
-	char is_ambiguous;
+	//char is_ambiguous;
+	char connected_next_event_distance;	// the distance (negative or positive) to the next event in the table. For example, if the cigar string is 10M3I1M1I10M, event "3I" will have 1 here .
+	char connected_previous_event_distance;	// the distance (negative or positive) to the next event in the table. For example, if the cigar string is 10M3I1M1I10M, event "1I" will have 1 here.
 
 	//char inserted_bases[(1+MAX_INSERTION_LENGTH) / 4 + 1];
 	char * inserted_bases;

@@ -1035,8 +1035,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				//	printf("RV:%s,%s\n", read_name, read_name1);
 						global_context->is_unpaired_warning_shown=1;
 						global_context->redo = 1;
-						print_in_box(80,0,0,"   Reads are not properly paired.");
-						print_in_box(89,0,0,"   They are %c[36mbeing re-ordered%c[0m before counting...",CHAR_ESC, CHAR_ESC);
+						print_in_box(80,0,0,"   Found reads that are not properly paired.");
+						print_in_box(80,0,0,"   (missing mate or the mate is not the next read)");
 					}
 				}
 			}
@@ -1178,8 +1178,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						{
 							global_context->is_unpaired_warning_shown=1;
 							global_context->redo = 1;
-							print_in_box(80,0,0,"   Reads are not properly paired.");
-							print_in_box(89,0,0,"   They are %c[36mbeing re-ordered%c[0m before counting...",CHAR_ESC, CHAR_ESC);
+							print_in_box(80,0,0,"   Found reads that are not properly paired.");
+							print_in_box(80,0,0,"   (missing mate or mate is not the next read)");
 						}
 					}
 				}
@@ -1977,10 +1977,8 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	}
 
 	sort_SAM_finalise(&writer);
-	if(writer.unpaired_reads && 0)
-		print_in_box(80,0,0,"   %llu unpaired reads were ignored in reordering.", writer.unpaired_reads);
-	else
-		print_in_box(80,0,0,"   %llu reads were re-ordered. Do read assignment...", writer.written_reads);
+	print_in_box(80,0,0,"   %llu read%s ha%s missing mates.", writer.unpaired_reads, writer.unpaired_reads>1?"s":"", writer.unpaired_reads>1?"ve":"s");
+	print_in_box(80,0,0,"   Input was converted to a format accepted by featureCounts.");
 
 	SamBam_fclose(sambam_reader);
 	strcpy(global_context-> input_file_name, temp_file_name);
@@ -2752,7 +2750,18 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		}
 		global_context->sambam_chro_table = sb_header_tab;
 	}
+
 	// begin to load-in the data.
+	if(!global_context->redo)
+	{
+			if(isPE)
+			{
+					print_in_box(80,0,0,"   Assign fragments (read pairs) to features...");
+					print_in_box(80,0,0,"   Each fragment is counted once.");
+			}
+			else
+					print_in_box(80,0,0,"   Assign reads to features...");
+	}
 
 	while (1){
 		int pair_no;
