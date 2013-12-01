@@ -2721,6 +2721,20 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 	#endif
 
 
+	// begin to load-in the data.
+	if(!global_context->redo)
+	{
+			if( global_context->is_paired_end_data)
+			{
+					print_in_box(80,0,0,"   Assign fragments (read pairs) to features...");
+					print_in_box(80,0,0,"   Each fragment is counted once.");
+			}
+			else
+					print_in_box(80,0,0,"   Assign reads to features...");
+	}
+
+
+
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
 
 	int buffer_pairs = global_context -> thread_number>1?512:1;
@@ -2749,18 +2763,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			binary_remainder = remainder_read_data_len;
 		}
 		global_context->sambam_chro_table = sb_header_tab;
-	}
-
-	// begin to load-in the data.
-	if(!global_context->redo)
-	{
-			if(isPE)
-			{
-					print_in_box(80,0,0,"   Assign fragments (read pairs) to features...");
-					print_in_box(80,0,0,"   Each fragment is counted once.");
-			}
-			else
-					print_in_box(80,0,0,"   Assign reads to features...");
 	}
 
 	while (1){

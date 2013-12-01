@@ -194,10 +194,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	optopt = 63;
 
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
-	global_context->config.max_mismatch_exonic_reads = 2000;
-	global_context->config.max_mismatch_junction_reads = 2000;
+	global_context->config.max_mismatch_exonic_reads = 200;
+	global_context->config.max_mismatch_junction_reads = 200;
 	global_context->config.use_dynamic_programming_indel = 1;
-	//global_context->config.extending_search_indels = 1;
+	global_context->config.extending_search_indels = 1;
 	global_context->config.big_margin_record_size = 9; 
 
 	if(argc<2)

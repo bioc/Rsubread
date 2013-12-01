@@ -86,9 +86,11 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 {
 	va_list args;
 	va_start(args , pattern);
-	char is_R_linebreak=0, * content;
+	char is_R_linebreak=0, * content, *out_line_buff;
 
 	content= malloc(1000);
+	out_line_buff= malloc(1000);
+	out_line_buff[0]=0;
 	vsprintf(content, pattern, args);
 	int is_R_code,x1,content_len = strlen(content), state, txt_len, is_cut = 0, real_lenwidth;
 
@@ -158,29 +160,31 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 
 	if(content_len==0 && is_boundary)
 	{
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,is_boundary==1?"//":"\\\\");
+		strcat(out_line_buff,is_boundary==1?"//":"\\\\");
 		for(x1=0;x1<line_width-4;x1++)
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"=");
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,is_boundary==1?"\\\\":"//");
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"");
+			strcat(out_line_buff,"=");
+		strcat(out_line_buff,is_boundary==1?"\\\\":"//");
+		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "%s", out_line_buff);
 
 		free(content);
+		free(out_line_buff);
 		return;
 	}
 	else if(is_boundary)
 	{
 		int left_stars = (line_width - content_len)/2 - 1;
 		int right_stars = line_width - content_len - 2 - left_stars;
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,is_boundary==1?"//":"\\\\");
-		for(x1=0;x1<left_stars-2;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"=");
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[36m", CHAR_ESC);
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %s ", content);
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[0m", CHAR_ESC);
-		for(x1=0;x1<right_stars-2;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"=");
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,is_boundary==1?"\\\\":"//");
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"");
+		strcat(out_line_buff,is_boundary==1?"//":"\\\\");
+		for(x1=0;x1<left_stars-2;x1++) strcat(out_line_buff,"=");
+		sprintf(out_line_buff+strlen(out_line_buff),"%c[36m", CHAR_ESC);
+		sprintf(out_line_buff+strlen(out_line_buff)," %s ", content);
+		sprintf(out_line_buff+strlen(out_line_buff),"%c[0m", CHAR_ESC);
+		for(x1=0;x1<right_stars-2;x1++) strcat(out_line_buff,"=");
+		strcat(out_line_buff,is_boundary==1?"\\\\":"//");
+		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "%s", out_line_buff);
 
 		free(content);
+		free(out_line_buff);
 		return;
 	}
 
@@ -203,11 +207,11 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 	//for(x1=0;x1<left_spaces;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
 
 	spaces[left_spaces+2] = 0;
-	sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,spaces);
+	strcat(out_line_buff,spaces);
 
 	if(is_R_code)
 	{
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
+		strcat(out_line_buff,content);
 	}
 	else
 	{
@@ -223,14 +227,14 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 		if(col1w>0 && col1w < content_len-1)
 		{
 			content[col1w+1]=0;
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[36m", CHAR_ESC);
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content+col1w+2);
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"%c[0m", CHAR_ESC);
+			strcat(out_line_buff,content);
+			strcat(out_line_buff," ");
+			sprintf(out_line_buff+strlen(out_line_buff),"%c[36m", CHAR_ESC);
+			strcat(out_line_buff,content+col1w+2);
+			sprintf(out_line_buff+strlen(out_line_buff),"%c[0m", CHAR_ESC);
 		}
 		else
-			sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,content);
+			strcat(out_line_buff,content);
 	}
 //	for(x1=0;x1<right_spaces - 1;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
 	
@@ -239,10 +243,12 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 	spaces[78]='|';
 	
 	right_spaces = max(1,right_spaces);
-	if(is_R_linebreak)
-		sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %c[0m%s%c", CHAR_ESC, spaces + (78 - right_spaces + 1) ,CORE_SOFT_BR_CHAR);
-	else
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," %c[0m%s", CHAR_ESC , spaces + (78 - right_spaces + 1));
+	//if(is_R_linebreak)
+	//	sprintf(out_line_buff+strlen(out_line_buff)," %c[0m%s%c", CHAR_ESC, spaces + (78 - right_spaces + 1) ,CORE_SOFT_BR_CHAR);
+	//else
+		sprintf(out_line_buff+strlen(out_line_buff)," %c[0m%s", CHAR_ESC , spaces + (78 - right_spaces + 1));
+	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, out_line_buff);
+	free(out_line_buff);
 	free(content);
 }
 
