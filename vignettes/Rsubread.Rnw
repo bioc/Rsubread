@@ -164,7 +164,7 @@ The \R{qualityScores} function can be used to quickly retrieve the quality score
 
 \begin{scriptsize}
 <<>>=
-x <- qualityScores(filename=reads,input_format="FASTQ",offset=33,nreads=1000)
+x <- qualityScores(filename=reads,input_format="FASTQ",offset=64,nreads=1000)
 boxplot(x)
 @
 \end{scriptsize}
