@@ -947,6 +947,9 @@ int main_buildindex(int argc,char ** argv)
 	tmp_file_for_signal = tmp_fa_file;
 
 	SUBREADprintf("\n");
+
+	optind = 0;
+	
 	while ((c = getopt (argc, argv, "kvcqM:o:f:D?")) != -1)
 		switch(c)
 		{
