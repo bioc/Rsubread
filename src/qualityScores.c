@@ -82,15 +82,15 @@ int finalise_qs_context(qualscore_context * qs_context, int prev_ret)
 			gzclose(qs_context -> gzfq_reader);
 		else return 1;
 
-		double avg_phred = qs_context -> total_phred_sum*1./ qs_context->scored_bases;
-		double avg_prob = qs_context -> total_errorprob_sum*1./1000000/qs_context->scored_bases;
+		//double avg_phred = qs_context -> total_phred_sum*1./ qs_context->scored_bases;
+		//double avg_prob = qs_context -> total_errorprob_sum*1./1000000/qs_context->scored_bases;
 
 		SUBREADprintf("Program finished successfully. %llu reads were scored.\n", qs_context -> scored_reads);
 
 		if(qs_context-> quality_offset_warning_shown)
 			SUBREADprintf("However, the Phred score offset (%d) seemed to be wrong. The quality scores can be meaningless.\n", qs_context -> phred_offset);
-		else
-			SUBREADprintf("Average Phred score is %.1f. Average wrong sequence probability is %.2f%%.\n", avg_phred, avg_prob*100);
+	//	else
+	//		SUBREADprintf("Average Phred score is %.1f. Average wrong sequence probability is %.2f%%.\n", avg_phred, avg_prob*100);
 	}
 
 	SUBREADprintf("\n");
@@ -115,15 +115,15 @@ int add_read_scores(qualscore_context * qs_context, char * qual_text)
 
 		if(nch <=0 || nch>0)
 		{
-			int error_prob_100t = 0;
+		//	int error_prob_100t = 0;
 
-			if(nch>0)
-				error_prob_100t = ERROR_PROB_INT_TABLE[nch];
+		//	if(nch>0)
+		//		error_prob_100t = ERROR_PROB_INT_TABLE[nch];
 			out_cursor+=sprintf(qs_context->IO_line_buff+out_cursor,"%d,", nch);
 
-			qs_context -> total_errorprob_sum += error_prob_100t;
-			qs_context -> total_phred_sum += nch;
-			qs_context -> scored_bases ++;
+		//	qs_context -> total_errorprob_sum += error_prob_100t;
+		//	qs_context -> total_phred_sum += nch;
+		//	qs_context -> scored_bases ++;
 		}
 	}
 	if(out_cursor>0)
