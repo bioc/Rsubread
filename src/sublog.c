@@ -133,6 +133,9 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 			#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
 			fputs(vsbuf,stderr);
 			#else
+			int vslen = strlen(vsbuf);
+			if(vsbuf[vslen-1]!='\n')
+				strcat(vsbuf+vslen, "\n");
 			Rprintf("%s",vsbuf);
 			#endif
 
