@@ -19,7 +19,7 @@ This function extracts the quality characters from each base in each read and th
 If the total number of reads in a dataset is \code{n}, then every \code{n}/\code{nreads} read is extracted from the input data.
 }
 \value{ 
-A data matrix containing Phred scores for each base in each read. Rows in the matrix are reads and columns are base positions in the read.
+A data matrix containing Phred scores for read bases. Rows in the matrix are reads and columns are base positions in each read.
 }
 %\references{}
 \author{Wei Shi, Yang Liao and Zhiyin Dai}

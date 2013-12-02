@@ -1,29 +1,43 @@
-subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
 {
-	opt <- paste("-i",index,"-r",readfile1,sep=",")
-	if(!is.null(readfile2)) 
-		opt <- paste(opt,"-R",readfile2,sep=",")	
+	if(length(readfile1) != length(output_file))
+		stop("The number of input file names is different from the number of output file names.")
+
+	if(!is.null(readfile2)){
+		if(length(readfile1) != length(readfile2))
+			stop("The number of file names for the first reads is different from the number of file names for the second reads.")
+	}
+
+	opt <- paste("-i",index,sep=",")	
+
 	if(tolower(input_format) == "sam")
 	  opt <- paste(opt,"--SAMinput",sep=",")
 	if(tolower(input_format) == "bam")
 	  opt <- paste(opt,"--BAMinput",sep=",")	
-	opt <- paste(opt,"-o",output_file,sep=",")	
+	if(tolower(input_format) == "gzfastq")
+		opt <- paste(opt,"--gzFASTQinput",sep=",")
+	
 	if(tolower(output_format) == "bam")
-	  opt <- paste(opt,"--BAMoutput",sep=",")	  
+	  opt <- paste(opt,"--BAMoutput",sep=",")
+
 	opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-T",nthreads,"-I",indels,sep=",")	
+
 	if(tieBreakQS)
 	  opt <- paste(opt,"-Q",sep=",")
 	if(tieBreakHamming)
 	  opt <- paste(opt,"-H",sep=",")
 	if(unique)
 	  opt <- paste(opt,"-u",sep=",")
+
 	opt <- paste(opt,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")	
+
 	if(!is.null(readGroupID))
 	  opt <- paste(opt,"--rg-id",readGroupID,sep=",")
 	if(!is.null(readGroup))
 	  opt <- paste(opt,"--rg",readGroup,sep=",")
 	if(color2base)
 		opt <- paste(opt,"-b",sep=",")
+
 	if(DNAseq)
 		opt <- paste(opt,"--dnaseq",sep=",")
 	if(reportAllJunctions)
@@ -34,7 +48,14 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_f
 	else
 		opt <- paste(opt,"-P",6,sep=",")	
 
-	cmd <- paste("subjunc",opt,sep=",")
-	n <- length(unlist(strsplit(cmd,",")))
-	C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+	for(i in 1:length(readfile1)){
+		opt_files <- paste("-r",readfile1[i],sep=",")
+		if(!is.null(readfile2)) 
+			opt_files <- paste(opt_files,"-R",readfile2[i],sep=",")
+		opt_files <- paste(opt_files,"-o",output_file[i],sep=",")
+
+		cmd <- paste("subjunc",opt_files,opt,sep=",")
+		n <- length(unlist(strsplit(cmd,",")))
+		C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+	}
 }
