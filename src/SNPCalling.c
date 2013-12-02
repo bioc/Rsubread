@@ -527,7 +527,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 	if(parameters -> fisher_exact_testlen)
 	{
-		int j, add_new, remove_old;
+		int j, is_fresh_jumppd, remove_old;
 		int a=0, b=0, c=0, d=0, go_ahead = 0, left_tail = 0;
 		long long int reference_len_long = reference_len;
 		/**          | POI  | All_Window (inc. POI)
@@ -538,7 +538,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		remove_old = 1;
 		for(i= - parameters -> fisher_exact_testlen;i<reference_len_long; i++)
 		{
-			a=0; c=0; add_new = 1;
+			a=0; c=0; is_fresh_jumppd = 1;
 
 			if(i>=0)
 			{
@@ -552,15 +552,18 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					else
 						a +=  snp_voting_table_Pos_midNexcellent[ i * 4 + j ] + snp_voting_table_Neg_midNexcellent[ i * 4 + j ];
 				}
+
+
+				// if the POI reached in this step is not fresh (known SNPs with < 80% support)
+				if(SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c))
+				{
+					is_fresh_jumppd = 0;
+					go_ahead --;
+				}
 			}
 
-			if(SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c))
-			{
-				add_new = 0;
-				go_ahead --;
-			}
-
-			if(add_new){
+			// if the current POI is fresh, then add a new FRESH base into the right window
+			if(is_fresh_jumppd){
 				while(i+parameters -> fisher_exact_testlen+go_ahead < reference_len_long)
 				{
 					int mm=0, pm=0, is_added = 0;
@@ -575,7 +578,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 							mm += snp_voting_table_Pos_midNexcellent[ (i+parameters -> fisher_exact_testlen + go_ahead) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i + go_ahead+parameters -> fisher_exact_testlen) *4 + j ];
 					}
 
-					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, go_ahead + i + parameters -> fisher_exact_testlen+go_ahead) || (mm *4 < pm))
+					if((!SNP_bitmap_recorder)||(!is_snp_bitmap(SNP_bitmap_recorder, go_ahead + i + parameters -> fisher_exact_testlen)) || (mm *4 < pm))
 					{
 						d += pm;
 						b += mm;
@@ -601,13 +604,13 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					flanking_matched = d;
 				}
 
+				//SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d\n", chro_name, i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail);
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
 				if( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
 
 				//if(strcmp(chro_name, "chr20")==0 && block_no  == 3 && i == 57566366-1-3*15000000)
-				//	SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d\n", chro_name, i,a,b,c,d, flanking_unmatched, flanking_matched);
 
 				snp_filter_background_unmatched[i] = flanking_unmatched;
 				snp_filter_background_matched[i] = flanking_matched;
@@ -640,7 +643,9 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					else	left_tail--;
 				}
 			}
-			if(add_new)
+
+			// if a fresh base is at POI, the tail is removed in next step.
+			if(is_fresh_jumppd)
 				remove_old = 1;
 			else{
 				left_tail ++;

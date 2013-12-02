@@ -3154,6 +3154,10 @@ int feature_count_main(int argc, char ** argv)
 		sprintf(cmd_rebuilt+strlen(cmd_rebuilt), "\"%s\" ", argv[c]);
 	}
 
+	optind=0;
+	opterr=1;
+	optopt=63;
+
 	while ((c = getopt_long (argc, argv, "A:g:t:T:o:a:d:D:L:Q:pbF:fs:SCBPMORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{

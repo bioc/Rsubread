@@ -244,6 +244,10 @@ int main_repeated_test(int argc,char ** argv)
 	read_count = 0;
 	threads = 0;
 
+	optind=0;
+	opterr=1;
+	optopt=63;
+
 	if(argc<2)
 	{
 		print_usage_rrr(argv[0]);
