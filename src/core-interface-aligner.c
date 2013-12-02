@@ -189,7 +189,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	int c;
 	int option_index = 0;	
 
-	optind = 1;
+	optind = 0;
 	opterr = 1;
 	optopt = 63;
 

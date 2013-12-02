@@ -535,9 +535,10 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		 * #mismatch |  a   |  b
 		 * #matched  |  c   |  d
 		 **/
+		remove_old = 1;
 		for(i= - parameters -> fisher_exact_testlen;i<reference_len_long; i++)
 		{
-			a=0; c=0; add_new = 1; remove_old = 1;
+			a=0; c=0; add_new = 1;
 
 			if(i>=0)
 			{
@@ -614,29 +615,31 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 				fisher_test_size ++;
 			}
 
-			while(i >= parameters -> fisher_exact_testlen + left_tail)
+			if(remove_old)
 			{
-				int mm=0, pm=0, is_removed = 0;
-				char true_value = referenced_genome[i - parameters -> fisher_exact_testlen-left_tail];
-				int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
-				for(j=0;j<4;j++)
+				while(i >= parameters -> fisher_exact_testlen + left_tail)
 				{
-					if(j == true_value_int)
-						pm = snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ];
-					else
-						mm += snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ];
-				}
-				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen-left_tail) || (mm*4<pm))
-				{
-					d-=pm;
-					b-=mm;
-					is_removed =1;
-				}
+					int mm=0, pm=0, is_removed = 0;
+					char true_value = referenced_genome[i - parameters -> fisher_exact_testlen-left_tail];
+					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+					for(j=0;j<4;j++)
+					{
+						if(j == true_value_int)
+							pm = snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ];
+						else
+							mm += snp_voting_table_Pos_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] + snp_voting_table_Neg_midNexcellent[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ];
+					}
+					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen-left_tail) || (mm*4<pm))
+					{
+						d-=pm;
+						b-=mm;
+						is_removed =1;
+					}
 
-				if(is_removed) break;
-				else	left_tail--;
+					if(is_removed) break;
+					else	left_tail--;
+				}
 			}
-
 			if(add_new)
 				remove_old = 1;
 			else{
@@ -1360,7 +1363,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	read_count = 0;
 	threads = 1;
 
-	optind = 1;
+	optind = 0;
 	opterr = 1;
 	optopt = 63;
 

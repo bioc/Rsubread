@@ -440,7 +440,7 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 }
 
 
-static struct option long_options[] =
+static struct option qs_long_options[] =
 {
 	{"BAMinput",  no_argument, 0, '9'},
 	{"SAMinput",  no_argument, 0, '8'},
@@ -469,13 +469,10 @@ int main(int argc, char ** argv)
 int main_qualityScores(int argc, char ** argv)
 #endif
 {
+
+	int ret;
 	int c;
 	int option_index = 0 , offset_pt = 33, needed_reads = 10000, sam_end = 0;
-
-	optind = 1;
-	opterr = 1;
-	optopt = 63;
-
 	char in_name[300];
 	char out_name[300];
 	char * input_format = "FASTQ";
@@ -485,8 +482,12 @@ int main_qualityScores(int argc, char ** argv)
 	in_name[0]=out_name[0]=0;
 
 	sam_end = 1;	// default: first-end only
+	optind = 0;
+	opterr = 1;
+	optopt = 63;
 
-	while ((c = getopt_long (argc, argv, "n:i:o:P:12987", long_options, &option_index)) != -1)
+
+	while((c = getopt_long (argc, argv, "n:i:o:P:12987", qs_long_options, &option_index)) != -1)
 	{
 		switch(c){
 			case 'n':
@@ -536,7 +537,8 @@ int main_qualityScores(int argc, char ** argv)
 		return 0;
 	}
 
-	int ret = retrieve_scores(&in_nameptr, &offset_pt, &needed_reads, &sam_end, &input_format, &out_nameptr);
+	ret = retrieve_scores(&in_nameptr, &offset_pt, &needed_reads, &sam_end, &input_format, &out_nameptr);
+
 	return ret;
 }
 
