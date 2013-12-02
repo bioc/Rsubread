@@ -1,6 +1,9 @@
-1 Dec, 2013
+1 Dec, 2013 - 1.13.8
 (1) Re-wrote the qualityScores function.
-(2) Subread and subjunc allows input of multiple library files at the same time.
+(2) Align and subjunc functions allow input of multiple library files at the same time.
+(3) Align and subjunc functions support gzipped FASTQ input.
+(4) Align and subjunc output uniquely mapped reads only by default (tieBreakHamming option is turned on by default as well).
+(5) exactSNP can use annotated SNPs to improve SNP-calling performance.
 
 16 Nov, 2013 - 1.13.7
 (1) Fixed a bug in featureCounts in dealing with unpaired reads in SAM/BAM files.

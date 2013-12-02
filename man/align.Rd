@@ -67,13 +67,13 @@ See \code{\link{buildindex}} function for more details.
 Mapping performance is largely determined by the number of subreads extracted from each read \code{nsubreads} and the consensus threshold \code{TH1} (also \code{TH2} for paired-end read data).
 Default settings are recommended for most of the read mapping tasks.
 
-Multiple input files (libraries) can be provided to \code{Subread} or \code{Subjunc} at the same time.
+Multiple input files (libraries) are allowed to be provided to \code{Subread} or \code{Subjunc} functions.
 
 \code{Subjunc} requires donor/receptor sites to be present when detecting exon-exon junctions.
 It can detect up to four junction locations in a single exon-spanning reads.
 }
 \value{ 
-No value is produced but a SAM format file is written to the current working directory. For \code{Subjunc}, a BED file including discovered exon-exon junction will also be written to the current working directory.
+No value is produced but SAM or BAM format files are written to the current working directory. For \code{Subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.

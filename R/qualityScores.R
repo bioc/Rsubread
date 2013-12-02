@@ -24,6 +24,7 @@ qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000
 	
 	scores <- read.csv(score_file,header=FALSE,stringsAsFactors=FALSE)
 	scores <- as.matrix(scores)
+	colnames(scores) <- 1:ncol(scores)
 	
 	file.remove(score_file)
 	
