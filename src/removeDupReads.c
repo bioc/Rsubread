@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
 #include "subread.h"
@@ -221,6 +222,8 @@ void print_usage_rrr(char * myname)
 	SUBREADprintf("Usage: %s -i <input_SAM_file> -o <output_SAM_file> {-r threshold} {-t temp_path} {-c max_read_number}\n\n", myname);
 }
 
+struct option rem_long_options[]={{0,0,0,0}};
+
 #ifdef MAKE_STANDALONE
 int main(int argc,char ** argv)
 #else
@@ -232,7 +235,7 @@ int main_repeated_test(int argc,char ** argv)
 	char input_SAM_file[300];
 	char output_SAM_file[300];
 	char temp_path[300];
-	int threshold;
+	int threshold, optindex = 0;
 	int threads;
 	unsigned int read_count;
 
@@ -253,7 +256,7 @@ int main_repeated_test(int argc,char ** argv)
 		print_usage_rrr(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "i:o:r:t:c:?")) != -1)
+	while ((c = getopt_long (argc, argv, "i:o:r:t:c:?", rem_long_options, &optindex)) != -1)
 	{
 		switch (c)
 		{

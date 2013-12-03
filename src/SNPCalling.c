@@ -29,6 +29,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <assert.h>
+#include <getopt.h>
 #include "subread.h"
 #include "gene-algorithms.h"
 #include "SNPCalling.h"
@@ -1335,6 +1336,9 @@ void print_usage_snp(char * myname)
 }
 
 
+static struct option snp_long_options[]={
+	{0,0,0,0}
+};
 
 #ifdef MAKE_STANDALONE
 int main(int argc,char ** argv)
@@ -1355,7 +1359,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	char out_BED_file[300];
 	char temp_path[300];
 	char in_FASTA_file[300];
-	int threads;
+	int threads, optindex=0;
 	int t=0, k;
 	struct SNP_Calling_Parameters parameters;
 	unsigned int read_count;
@@ -1415,7 +1419,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_usage_snp(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4")) != -1)
+	while ((c = getopt_long (argc, argv, "a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
 	{
 		switch (c)
 		{
