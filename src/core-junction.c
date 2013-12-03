@@ -200,7 +200,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_start = tested_read_pos - min(0, tested_event -> indel_length) + tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_head_abs_offset;
 					
-						explain_context -> tmp_jump_length += 100 * (tested_event->event_large_side - tested_event->event_small_side) - 1;
+						explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);// - 1;
 							
 
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
@@ -221,7 +221,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_sections --;
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
-						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side) * 100 - 1;
+						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);// - 1;
 					}
 					//if(global_context ->config.limited_tree_scan) break;
 				}
@@ -276,9 +276,9 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 	// minimum perfect section length is 1
 	// tested_read_pos is the first WANTED BASE in section.
 	int move_start = read_tail_pos - SEARCH_MIN_MOVEMENT;
-	if(suggested_movement) move_start = read_tail_pos - suggested_movement ;
+	if(suggested_movement) move_start = read_tail_pos - suggested_movement + 1;
 	if(MAX_EVENTS_IN_READ - 1> explain_context -> tmp_search_sections && ( there_are_events_in_range(event_table -> appendix2, read_tail_abs_offset - read_tail_pos, read_tail_pos - 15)||global_context -> config.do_fusion_detection))
-		for(tested_read_pos = move_start; tested_read_pos >=0;tested_read_pos --)
+		for(tested_read_pos =  read_tail_pos - SEARCH_MIN_MOVEMENT; tested_read_pos >=0;tested_read_pos --)
 		{
 			int xk1, matched_bases_to_site;
 			int jump_penalty = 0;
@@ -361,7 +361,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end = tested_read_pos + min(0, tested_event->indel_length) - tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_tail_abs_offset; 
 
-						explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side) * 100 - 1;
+						explain_context -> tmp_jump_length += (tested_event->event_large_side - tested_event->event_small_side);// - 1;
 
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 						//else if(tested_event->event_type == CHRO_EVENT_TYPE_JUNCTION) jump_penalty = 1;
@@ -378,7 +378,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
 
-						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side) * 100 - 1;
+						explain_context -> tmp_jump_length -= (tested_event->event_large_side - tested_event->event_small_side);// - 1;
 					
 					}
 					//if(global_context ->config.limited_tree_scan) break;
@@ -612,7 +612,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 						{
 							int found_indels , found_inde_pos;
 							
-							int matchingness_count = match_indel_chro_to_front(curr_read_text, value_index,  current_vote -> pos[i][j] , curr_read_len, &found_indels, &found_inde_pos, global_context -> config.max_indel_length, 1);
+							int matchingness_count = match_indel_chro_to_front(curr_read_text, value_index,  current_vote -> pos[i][j] , curr_read_len, &found_indels, &found_inde_pos, global_context -> config.max_indel_length, 0);
 
 							if(matchingness_count*1000 >= curr_read_len*800)
 							{
@@ -1171,7 +1171,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.tmp_jump_length = 0;
 	explain_context.best_jump_length = 0xffff0000 * 0;
 
-	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 1);
+	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 0);
 
 	if(explain_context.back_search_confirmed_sections>0)
 	{
