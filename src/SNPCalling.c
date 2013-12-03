@@ -1583,6 +1583,9 @@ int main_snp_calling_test(int argc,char ** argv)
 	print_in_box(80,0,0,"              Q value cutoff : 10E-%.1f", parameters.cutoff_multiplex);
 	print_in_box(80,0,0,"         P value upper bound : %.5f", parameters.cutoff_upper_bound);
 	print_in_box(80,0,0,"       Flanking windows size : %d", parameters.fisher_exact_testlen);
+	if(parameters.known_SNP_vcf[0])
+		print_in_box(80,0,0,"       Known SNP annotations : %s", parameters.known_SNP_vcf);
+	
 	print_in_box(80,0,1,"");
 	print_in_box(80,2,1,"http://subread.sourceforge.net/");
 	SUBREADputs("");
