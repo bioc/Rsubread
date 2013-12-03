@@ -40,7 +40,6 @@ int main_qualityScores(int argc, char *argv[]);
 
 void R_buildindex_wrapper(int * nargs, char ** argv)
 {
-	optind = 1;
 
 	char * r_argv, ** c_argv;
 	int i,n;
@@ -66,8 +65,7 @@ void R_align_wrapper(int * nargs, char ** argv)
 {
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
-        optind = 1;
-
+	
         char * r_argv, ** c_argv;
         int i,n;
     
@@ -93,7 +91,6 @@ void R_junction_wrapper(int * nargs, char ** argv)
 {
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -119,7 +116,6 @@ void R_junction_wrapper(int * nargs, char ** argv)
 
 void R_sam2bed_wrapper(int * nargs, char ** argv)
 {
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -144,7 +140,6 @@ void R_sam2bed_wrapper(int * nargs, char ** argv)
 
 void R_propmapped_wrapper(int * nargs, char ** argv)
 {
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -171,8 +166,6 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
 	//printf("RCL=%ld\n", R_CStackLimit);
-        optind = 1;
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n, arg_len;
@@ -214,7 +207,6 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 {
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -240,7 +232,6 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 
 void R_removeDupReads_wrapper(int * nargs, char ** argv)
 {
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -265,7 +256,6 @@ void R_removeDupReads_wrapper(int * nargs, char ** argv)
 
 void R_qualityScores_wrapper(int * nargs, char ** argv)
 {
-	optind = 1;
 
 	char * r_argv, ** c_argv;
 	int i,n;
