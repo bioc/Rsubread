@@ -1,3 +1,6 @@
+5 Dec, 2013 - 1.13.9
+(1) Fixed a file input issue for exactSNP.
+
 1 Dec, 2013 - 1.13.8
 (1) Re-wrote the qualityScores function.
 (2) Align and subjunc functions allow input of multiple library files at the same time.
