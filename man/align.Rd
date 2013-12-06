@@ -2,35 +2,37 @@
 \alias{align}
 \alias{subjunc}
 \title{Read mapping for genomic DNA-seq and RNA-seq data via seed-and-vote (Subread and Subjunc)}
-\description{Subread and Subjunc are fast and accurate read aligners. They adopt a new mapping read mapping paradigm called ``seed-and-vote". Seed-and-vote enables highly scalable, efficient and accurate read mapping to be performed.}
+\description{Subread and Subjunc perform local and global alignments respectively. The seed-and-vote paradigm enables efficient and accurate alignments to be carried out.}
 \usage{
-align(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=10,TH1=3,TH2=1,
-nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,nBestLocations=1,
+align(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",
+output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,TH1=3,TH2=1,
+nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,
 minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
-DP_GapOpenPenalty=-2,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
+DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 
-subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_file,output_format="SAM",nsubreads=14,TH1=1,TH2=1,
-nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=FALSE,unique=FALSE,
+subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",
+output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,
+nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,
 minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
 DNAseq=FALSE,reportAllJunctions=FALSE)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
-  \item{readfile1}{ character string giving the name of file which includes sequencing reads. This will be the name of first file of paired-end data are provided. The read file should be in FASTQ or FASTA format.}
-  \item{readfile2}{ character string giving the name of second file when paired-end read data are provided. \code{NULL} by default.}
-  \item{input_format}{ character string specifying format of the read input file(s). \code{FASTQ} by default. Acceptable formats include \code{FASTQ}, \code{FASTA}, \code{SAM} and \code{BAM}. The character string is case insensitive.}
-  \item{output_file}{ character string giving the name of output file which includes the mapping results.}
+  \item{readfile1}{ a character vector including names of files that include sequence reads to be aligned. For paired-end reads, this gives the list of files including first reads in each library. File format is FASTQ/FASTA by default. See \code{input_format} option for more supported formats.}
+  \item{readfile2}{ a character vector giving names of files that include second reads in paired-end read data. Files included in \code{readfile2} should be in the same order as their mate files included in \code{readfile1} .\code{NULL} by default.}
+  \item{input_format}{ character string specifying format of the read input file(s). \code{FASTQ} by default (this includes FASTA format as well). Acceptable formats include \code{FASTQ} (including FASTA), \code{gzFASTQ} (gzipped FASTQ or FASTA), \code{SAM} and \code{BAM}. The character string is case insensitive.}
   \item{output_format}{ character string specifying format of the output file. \code{SAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
+  \item{output_file}{ a character vector specifying names of output files. By default, names of output files are set as the file names provided in \code{readfile1} added with an suffix string.}
   \item{nsubreads}{ numeric value giving the number of subreads extracted from each read.} 
-  \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This threshold will be applied to the first read if paired-end read data are provided.}
-  \item{TH2}{ numeric value giving the consensus threhold for the second read in a pair.}
+  \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This is the threshold for the first reads if paired-end read data are provided.}
+  \item{TH2}{ numeric value giving the consensus threhold for the second reads in paired-end data.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.} 
-  \item{indels}{ numeric value giving the number of insertions/deletions allowed during the mapping. \code{5} by default.}
-  \item{phredOffset}{ numeric value added to the phred score of each base in each read. \code{33} by default.}
-  \item{tieBreakQS}{logical. If \code{TRUE}, use quality scores to break ties when more than one best locations were found. \code{FALSE} by default. }
-  \item{tieBreakHamming}{ logical. If \code{TRUE}, use Hamming distance to break ties when more than one best locations were found (to use this option, the index must be built with reference sequence included).}
-  \item{unique}{ logical. If \code{TRUE}, only uniquely mapped reads will be reported (reads mapped to multiple locations in the reference genome will not be reported). This option can be used together with option \code{tieBreakQS} or \code{tieBreakHamming}.}
-  \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The value of \code{nBestLocations} has to be within the range of 1 to 16. The number of equally-best locations reported for a read will be less than or equal to this value. For example, if a read has two equally-best mapping locations, but the \code{nBestLocations} set to be 5, then only two locations will be reported for this read. Note that the \code{-u} takes precedence over \code{nBestLocations}, ie. no mapping locations will be reported for multi-mapping reads when \code{unique} is set to \code{TRUE}.}
+  \item{indels}{ numeric value giving the maximum number of insertions/deletions allowed during the mapping. \code{5} by default.}
+  \item{phredOffset}{ numeric value added to the Phred quality scores of read bases by the sequencer. \code{33} by default.}
+  \item{tieBreakQS}{logical indicating if the mapping quality score should be to break the tie when more than one best location was found for a read. \code{FALSE} by default. Note that the mapping quality score used for tie breaking was calcuated only from the perfectly matched subreads (16mers) extracted from the read, whereas the mapping quality scores included in the mapping output for mapped reads were calcuated from using all the bases in the read. Also note that there may still be more than one best mapping location found after tie breaking using this option.}
+  \item{tieBreakHamming}{ logical indicating if the Hamming distance should be used to break the tie when more than one best mapping location was found for a read. \code{TRUE} by default. The distance between the mapped read and the target region in the reference is calcuated using all the bases included in the read. Note that there may still be more than one best mapping location found after tie breaking using this option.}
+  \item{unique}{ logical indicating if uniquely mapped reads should be reported only. \code{TRUE} by default. It is recommended that this option is used together with \code{tieBreakHamming} or \code{tieBreakQS}.}
+  \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The allowed value is between 1 to 16 (inclusive). Note that the \code{unique} argument takes precedence over \code{nBestLocations} argument.}
   \item{minFragLength}{ numeric value giving the minimum fragment length. 50 by default.}
   \item{maxFragLength}{ numeric value giving the maximum fragment length. 600 by default.}
   \item{PE_orientation}{ character string giving the orientation of the two reads from the same pair. It has three possible values including \code{fr}, \code{ff} and \code{rf}. Letter \code{f} denotes the forward strand and letter \code{r} the reverse strand. \code{fr} by default (ie. the first read in the pair is on the forward strand and the second read on the reverse strand).}
@@ -39,7 +41,7 @@ DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{readGroupID}{ a character string giving the read group ID. The specified string is added to the read group header field and also be added to each read in the mapping output. \code{NULL} by default.}
   \item{readGroup}{ a character string in the format of \code{tag:value}. This string will be added to the read group (RG) header in the mapping output. \code{NULL} by default.}
   \item{color2base}{ logical. If \code{TRUE}, color-space read bases will be converted to base-space bases in the mapping output. Note that the mapping itself will still be performed at color-space. \code{FALSE} by default.}
-  \item{DP_GapOpenPenalty}{ a numeric value giving the penalty for opening a gap when using the Smith-Waterman dynamic programming algorithm to detect insertions and deletions. The Smith-Waterman algorithm is only applied for those reads which are found to contain insertions or deletions. \code{-2} by default.}
+  \item{DP_GapOpenPenalty}{ a numeric value giving the penalty for opening a gap when using the Smith-Waterman dynamic programming algorithm to detect insertions and deletions. The Smith-Waterman algorithm is only applied for those reads which are found to contain insertions or deletions. \code{-1} by default.}
   \item{DP_GapExtPenalty}{ a numeric value giving the penalty for extending the gap, used by the Smith-Waterman algorithm. \code{0} by default.}
   \item{DP_MismatchPenalty}{ a numeric value giving the penalty for mismatches, used by the Smith-Waterman algorithm. \code{0} by default.}
   \item{DP_MatchScore}{ a numeric value giving the score for matches used by the Smith-Waterman algorithm. \code{2} by default.}
@@ -65,11 +67,13 @@ See \code{\link{buildindex}} function for more details.
 Mapping performance is largely determined by the number of subreads extracted from each read \code{nsubreads} and the consensus threshold \code{TH1} (also \code{TH2} for paired-end read data).
 Default settings are recommended for most of the read mapping tasks.
 
-\code{Subjunc} requires donor and receptor sites to be existent when detecting exon-exon junctions.
+Multiple input files (libraries) are allowed to be provided to \code{Subread} or \code{Subjunc} functions.
+
+\code{Subjunc} requires donor/receptor sites to be present when detecting exon-exon junctions.
 It can detect up to four junction locations in a single exon-spanning reads.
 }
 \value{ 
-No value is produced but a SAM format file is written to the current working directory. For \code{Subjunc}, a BED file including discovered exon-exon junction will also be written to the current working directory.
+No value is produced but SAM or BAM format files are written to the current working directory. For \code{Subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.

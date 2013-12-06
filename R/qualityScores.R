@@ -1,23 +1,33 @@
-qualityScores <- function(filename, offset=64, nreads = 10000)
+qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000)
 {
-	if (file.exists(filename) == FALSE){
-		print("Source file specified doesn't exist.");
-	} 
-	else
-	{
-		score_file = paste(".Rsubread_qualityScores_score_pid",Sys.getpid(),sep="") 
-		temp_file = paste(".Rsubread_qualityScores_temp_pid",Sys.getpid(),sep="")
-		.C("retrieve_scores", as.character(filename), as.integer(offset), as.integer(nreads), as.character(temp_file), as.character(score_file), PACKAGE="Rsubread")
-	if (file.exists(score_file)) {
-		scores = as.matrix(read.csv(score_file,header=F));
-		file.remove(score_file)
-	}
-	else
-	{
-		scores = as.matrix(read.csv(temp_file,header=F));
-	}
-	file.remove(temp_file)
+	if (file.exists(filename) == FALSE)
+		stop("Can not find the input file. Pleaes check whether the file name is correct.")
+	
+	score_file = paste(".Rsubread_qualityScores_score_pid",Sys.getpid(),sep="")
+	
+	opt <- paste("-i",filename,"-o",score_file,sep=",")
+
+	if(tolower(input_format) == "gzfastq")
+		opt <- paste(opt,"--gzFASTQinput",sep=",")
+	  	
+	if(tolower(input_format) == "sam")
+		opt <- paste(opt,"--SAMinput",sep=",")
+
+	if(tolower(input_format) == "bam")
+		opt <- paste(opt,"--BAMinput",sep=",")
+
+	opt <- paste(opt,"--phred-offset",offset,"--counted-reads",nreads,sep=",")
+
+	cmd <- paste("qualityScores",opt,sep=",")
+	n <- length(unlist(strsplit(cmd,",")))
+	C_args <- .C("R_qualityScores_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+	
+	scores <- read.csv(score_file,header=FALSE,stringsAsFactors=FALSE)
+	scores <- as.matrix(scores)
 	colnames(scores) <- 1:ncol(scores)
-	return(scores)
-	}
+	
+	file.remove(score_file)
+	
+	scores
 }
+

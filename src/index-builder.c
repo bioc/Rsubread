@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -926,13 +927,17 @@ void SIGINT_hook(int param)
 	#endif
 }
 
+static struct option ib_long_options[]={
+	{0, 0, 0, 0}
+};
+
 #ifdef MAKE_STANDALONE
 int main(int argc,char ** argv)
 #else
 int main_buildindex(int argc,char ** argv)
 #endif
 {
-	int threshold = 24;
+	int threshold = 24, optindex=0;
 	int memory_limit;	// 8000 MBytes
 	char output_file[300], c, tmp_fa_file[300], log_file_name[300];
 	char *ptr_tmp_fa_file[1];
@@ -947,7 +952,10 @@ int main_buildindex(int argc,char ** argv)
 	tmp_file_for_signal = tmp_fa_file;
 
 	SUBREADprintf("\n");
-	while ((c = getopt (argc, argv, "kvcqM:o:f:D?")) != -1)
+
+	optind = 0;
+	
+	while ((c = getopt_long (argc, argv, "kvcqM:o:f:D?", ib_long_options, &optindex)) != -1)
 		switch(c)
 		{
 			case 'v':

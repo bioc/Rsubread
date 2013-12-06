@@ -36,10 +36,10 @@ int propmapped(int argc,char *argv[]);
 int readSummary(int argc,char *argv[]);
 int main_snp_calling_test(int argc,char *argv[]);
 int main_repeated_test(int argc, char *argv[]);
+int main_qualityScores(int argc, char *argv[]);
 
 void R_buildindex_wrapper(int * nargs, char ** argv)
 {
-	optind = 1;
 
 	char * r_argv, ** c_argv;
 	int i,n;
@@ -65,8 +65,7 @@ void R_align_wrapper(int * nargs, char ** argv)
 {
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
-        optind = 1;
-
+	
         char * r_argv, ** c_argv;
         int i,n;
     
@@ -92,7 +91,6 @@ void R_junction_wrapper(int * nargs, char ** argv)
 {
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -118,7 +116,6 @@ void R_junction_wrapper(int * nargs, char ** argv)
 
 void R_sam2bed_wrapper(int * nargs, char ** argv)
 {
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -143,7 +140,6 @@ void R_sam2bed_wrapper(int * nargs, char ** argv)
 
 void R_propmapped_wrapper(int * nargs, char ** argv)
 {
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -170,8 +166,6 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
 	//printf("RCL=%ld\n", R_CStackLimit);
-        optind = 1;
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n, arg_len;
@@ -213,7 +207,6 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 {
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -239,7 +232,6 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 
 void R_removeDupReads_wrapper(int * nargs, char ** argv)
 {
-        optind = 1;
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -262,5 +254,27 @@ void R_removeDupReads_wrapper(int * nargs, char ** argv)
 }
 
 
+void R_qualityScores_wrapper(int * nargs, char ** argv)
+{
+
+	char * r_argv, ** c_argv;
+	int i,n;
+	
+	r_argv = (char *)calloc(1000, sizeof(char));
+	strcpy(r_argv,*argv);
+	
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(200,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+
+	main_qualityScores(n,c_argv);
+
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
+
+}
 
 

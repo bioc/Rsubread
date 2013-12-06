@@ -1116,7 +1116,7 @@ int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage)
 			for(; int_opt<8; int_opt++) if("MIDNSHP=X"[int_opt] == nch)break;
 			cigar_int[num_opt ++] = (tmp_int << 4) | int_opt; 
 			tmp_int = 0;
-			if(num_opt>=12)break;
+			if(num_opt>=24)break;
 		}
 	}
 
@@ -1266,9 +1266,16 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 		if(writer -> header_plain_text_buffer)
 			SamBam_writer_write_header(writer);
 	}
+
+	if(!qual_text || !read_text)	
+	{
+		SUBREADprintf("ERROR: sam file is incomplete.\n");
+		return 1;
+	}
+
 	writer -> writer_state = 10;
 	char additional_bin[300];
-	int cigar_opts[12], xk1, cover_length = 0;
+	int cigar_opts[24], xk1, cover_length = 0;
 	int cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length);
 	int read_name_len = 1+strlen(read_name) ;
 	int additional_bin_len = SamBam_compress_additional(additional_columns, additional_bin);

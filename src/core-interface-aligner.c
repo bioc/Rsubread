@@ -36,12 +36,14 @@ static struct option long_options[] =
 	{"quality",  no_argument, 0, 'Q'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
+	{"memoryMultiplex",  required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
 	{"reportFusions", no_argument, 0, 0},
+	{"gzFASTQinput", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -57,9 +59,11 @@ void print_usage_core_aligner()
 	SUBREADputs("    ");
 	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("   ");
-	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format). For ");
-	SUBREADputs("                            paired-end read data, this will be the first read");
-	SUBREADputs("                            file and the other read file should be provided via");
+	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format by default");
+	SUBREADputs("                            . See below for more supported formats). Both base-");
+	SUBREADputs("                            space and color-space read data are supported. For");
+	SUBREADputs("                            paired-end reads, this gives the first read file");
+	SUBREADputs("                            and the other read file should be specified using");
 	SUBREADputs("                            the -R option.");
 	SUBREADputs("    ");
 	SUBREADputs("Optional general arguments:");
@@ -127,6 +131,9 @@ void print_usage_core_aligner()
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
 	SUBREADputs("");
+	SUBREADputs("       --gzFASTQinput       specify that the input read data is in gzipped");
+	SUBREADputs("                            FASTQ/FASTA format.");
+	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
 	SUBREADputs("");
 	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
@@ -139,7 +146,7 @@ void print_usage_core_aligner()
 	SUBREADputs("                            programming algorithm to detect insertions and");
 	SUBREADputs("                            deletions. The Smith-Waterman algorithm is only");
 	SUBREADputs("                            applied for those reads which are found to contain");
-	SUBREADputs("                            insertions or deletions. -2 by default.");
+	SUBREADputs("                            insertions or deletions. -1 by default.");
 	SUBREADputs("");
 	SUBREADputs("       --DPGapExt   <int>   a numeric value giving the penalty for extending the");
 	SUBREADputs("                            gap, used by the Smith-Waterman algorithm. 0 by");
@@ -182,13 +189,13 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	int c;
 	int option_index = 0;	
 
-	optind = 1;
+	optind = 0;
 	opterr = 1;
 	optopt = 63;
 
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
-	global_context->config.max_mismatch_exonic_reads = 2000;
-	global_context->config.max_mismatch_junction_reads = 2000;
+	global_context->config.max_mismatch_exonic_reads = 200;
+	global_context->config.max_mismatch_junction_reads = 200;
 	global_context->config.use_dynamic_programming_indel = 1;
 	global_context->config.extending_search_indels = 1;
 	global_context->config.big_margin_record_size = 9; 
@@ -234,7 +241,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.read_trim_5 = atoi(optarg); 
 				break;
 			case 'J':
-				global_context->config.show_soft_cliping = 1;
+				global_context->config.show_soft_cliping = 0;
 				break;
 			case 'B':
 				global_context->config.multi_best_reads = atoi(optarg); 
@@ -316,11 +323,15 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.reassembly_key_length = 28;
 
 					global_context->config.is_third_iteration_running = 1;
-					global_context->config.max_mismatch_exonic_reads = 1;
-					global_context->config.max_mismatch_junction_reads = 1;
-					global_context->config.total_subreads = 28;
-					global_context->config.minimum_subread_for_first_read = 3;
-					global_context->config.minimum_subread_for_second_read = 1;
+
+
+					// These options were removed for maximising the sensitivity.
+					// They should be put back when we want a higher indel accuracy.
+					//global_context->config.max_mismatch_exonic_reads = 1;
+					//global_context->config.max_mismatch_junction_reads = 1;
+					//global_context->config.total_subreads = 28;
+					//global_context->config.minimum_subread_for_first_read = 3;
+					//global_context->config.minimum_subread_for_second_read = 1;
 					global_context->config.do_big_margin_filtering_for_reads = 0;
 					global_context->config.extending_search_indels = 0;
 					global_context->config.use_dynamic_programming_indel = 1;
@@ -353,7 +364,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 				
 			case 0:
-				if(strcmp("rg-id", long_options[option_index].name)==0) 
+				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
+				{
+					global_context->config.memory_use_multiplex = atoi(optarg);
+				}
+				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{
 					strcpy(global_context->config.read_group_id, optarg);
 				}
@@ -370,6 +385,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_BAM_input = 1;
 					global_context->config.is_SAM_file_input = 1;
+				}
+				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
+				{
+					global_context->config.is_gzip_fastq=1;
 				}
 				else if(strcmp("SAMinput", long_options[option_index].name)==0) 
 				{

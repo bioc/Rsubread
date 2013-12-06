@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
 #include "subread.h"
@@ -200,7 +201,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	seed48(rand48_seed);
 	sprintf(temp_file_prefix, "%s/temp-delrep-%06u-%08lX-", temp_location==NULL?".":temp_location, getpid(), lrand48());
 
-	if(break_SAM_file(in_SAM_file, 0, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL)) return -1;
+	if(break_SAM_file(in_SAM_file, 0, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL, NULL)) return -1;
 
 	// Step 2: initialize the read voting table, scanning each temporary file. Each read in the temporary file is a vote to a location in the voting table. Then, each read in the temporary file is scanned again against the voting table. If the mapping location of this read receives >=threshold votes in the table, the read is removed from the read selection list.
 
@@ -221,6 +222,8 @@ void print_usage_rrr(char * myname)
 	SUBREADprintf("Usage: %s -i <input_SAM_file> -o <output_SAM_file> {-r threshold} {-t temp_path} {-c max_read_number}\n\n", myname);
 }
 
+struct option rem_long_options[]={{0,0,0,0}};
+
 #ifdef MAKE_STANDALONE
 int main(int argc,char ** argv)
 #else
@@ -232,7 +235,7 @@ int main_repeated_test(int argc,char ** argv)
 	char input_SAM_file[300];
 	char output_SAM_file[300];
 	char temp_path[300];
-	int threshold;
+	int threshold, optindex = 0;
 	int threads;
 	unsigned int read_count;
 
@@ -244,12 +247,16 @@ int main_repeated_test(int argc,char ** argv)
 	read_count = 0;
 	threads = 0;
 
+	optind=0;
+	opterr=1;
+	optopt=63;
+
 	if(argc<2)
 	{
 		print_usage_rrr(argv[0]);
 		return 0;
 	}
-	while ((c = getopt (argc, argv, "i:o:r:t:c:?")) != -1)
+	while ((c = getopt_long (argc, argv, "i:o:r:t:c:?", rem_long_options, &optindex)) != -1)
 	{
 		switch (c)
 		{

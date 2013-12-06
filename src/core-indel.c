@@ -140,14 +140,16 @@ void set_alignment_result(global_context_t * global_context, int pair_number, in
 
 int is_ambiguous_indel_score(chromosome_event_t * e)
 {
-	
-	if(e -> indel_length == 1 && e->is_ambiguous>4)return 1;
-	if(e -> indel_length == 1 && e->is_ambiguous>3 && (e-> event_small_side % 7 < 3))return 1;
-	if(e -> indel_length == 2) return e->is_ambiguous>5;
 	return 0;
+	//if(e -> indel_length == 1 && e->is_ambiguous>4)return 1;
+	//if(e -> indel_length <= 3 && e->is_ambiguous>3 && (e-> event_small_side % 7 < 3))return 1;
+	//if(e -> indel_length == 4) return e->is_ambiguous>4;
+	//return 0;
 }
 void remove_neighbour(global_context_t * global_context)
 {
+//	return;
+
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 
 	HashTable * event_table = indel_context -> event_entry_table;
@@ -194,8 +196,14 @@ void remove_neighbour(global_context_t * global_context)
 						if(is_ambiguous_indel_score(tested_neighbour))
 							to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 						else
-							if(abs(length_diff)<=16)
+							if(length_diff==0)
 							{
+								if(event_body -> event_small_side - event_body->connected_previous_event_distance + 1 == tested_neighbour-> event_large_side) continue;
+								if(tested_neighbour -> event_small_side - tested_neighbour->connected_previous_event_distance + 1 == event_body-> event_large_side) continue;
+
+								if(event_body -> event_large_side + event_body->connected_next_event_distance - 1 == tested_neighbour-> event_small_side) continue;
+								if(tested_neighbour -> event_large_side + tested_neighbour->connected_next_event_distance - 1 == event_body-> event_small_side) continue;
+
 								if(event_body->event_quality < tested_neighbour -> event_quality)
 									to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 								else if(event_body->event_quality ==  tested_neighbour -> event_quality &&
@@ -671,7 +679,7 @@ void set_insertion_sequence(global_context_t * global_context, thread_context_t 
 	}
 }
 
-void local_add_indel_event(global_context_t * global_context, thread_context_t * thread_context, HashTable * event_table, char * read_text, unsigned int left_edge, int indels, int score_supporting_read_added, int is_ambiguous, int mismatched_bases)
+chromosome_event_t * local_add_indel_event(global_context_t * global_context, thread_context_t * thread_context, HashTable * event_table, char * read_text, unsigned int left_edge, int indels, int score_supporting_read_added, int is_ambiguous, int mismatched_bases)
 {
 		chromosome_event_t * found = NULL;
 		chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
@@ -701,7 +709,8 @@ void local_add_indel_event(global_context_t * global_context, thread_context_t *
 
 		if(found){
 			found -> supporting_reads += score_supporting_read_added;
-			found -> is_ambiguous = max(is_ambiguous , found -> is_ambiguous );
+			//found -> is_ambiguous = max(is_ambiguous , found -> is_ambiguous );
+			return NULL;
 		}
 		else
 		{
@@ -728,9 +737,10 @@ void local_add_indel_event(global_context_t * global_context, thread_context_t *
 			new_event -> indel_length = indels;
 			new_event -> supporting_reads = 1;
 			new_event -> event_quality = 1;//pow(0.5 , 3*mismatched_bases);
-			new_event -> is_ambiguous = is_ambiguous;
+			//new_event -> is_ambiguous = is_ambiguous;
 			
 			put_new_event(event_table, new_event , event_no);
+			return new_event;
 		}
 	
 }
@@ -981,6 +991,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 			if(global_context -> config.use_dynamic_programming_indel || read_len > EXON_LONG_READ_LENGTH)
 			{
 				char movement_buffer[1500];
+				chromosome_event_t * last_event = NULL;
 
 				first_correct_base = min(first_correct_base+10, read_len);
 				int x1, dyna_steps = core_dynamic_align(global_context, thread_context, read_text + last_correct_base, first_correct_base - last_correct_base, voting_position + last_correct_base + last_indel, movement_buffer, indels);
@@ -1029,6 +1040,8 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 							}
 							else if ( is_in_indel && (mv == 0 || mv == 3)  )
 							{
+								//if(pair_number == 17296)
+								//printf("R%d : NEW INDEL: %u; len = %d\n", is_second_read, indel_left_boundary - 1 , current_indel_len);
 								#ifdef indel_debug
 								printf("NEW INDEL: %u; len = %d\n", indel_left_boundary - 1 , current_indel_len);
 								#endif
@@ -1046,7 +1059,14 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								}
 
 								//printf("INDEL_DDADD: I=%d; INDELS=%d; PN=%d; LOC=%u\n",i, current_indel_len, pair_number, indel_left_boundary-1);
-								local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
+								chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
+
+								if(last_event && new_event){
+									int dist = new_event -> event_small_side - last_event -> event_large_side +1;
+									new_event -> connected_previous_event_distance = dist;
+									last_event -> connected_next_event_distance = dist;
+								}
+								last_event = new_event;
 							}
 							
 
@@ -1073,13 +1093,15 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 				int best_j=0, best_score=-99999, is_ambiguous_indel= 0;
 				unsigned int best_pos = 0;
 				int cutoff = first_correct_base-last_correct_base  + min(0, indels) - global_context -> config.flanking_subread_indel_mismatch;
+				int mid_j = (first_correct_base-last_correct_base )/2, min_j=99990;
 				int mismatched_bases = 0;
 
 				if(first_correct_base > last_correct_base + 4)
-					for(j=0; j<(first_correct_base-last_correct_base + min(0, indels)) ; j++)
+					for(j=0; j<(first_correct_base-last_correct_base + min(0, indels)); j++)
 					{
 						// j is the first UNWANTED base after the first matched part.
 						int score , s2, s1;
+
 						s1 = match_chro(read_text + last_correct_base, current_value_index, voting_position + last_correct_base + last_indel, j, 0, global_context->config.space_type);
 						if(s1 >= j - global_context -> config.flanking_subread_indel_mismatch)
 						{
@@ -1088,31 +1110,42 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 							score = s2+s1;
 							if(score >= cutoff)
 							{
-								if(score>best_score)
+								if(score == best_score)
+									is_ambiguous_indel ++;
+
+								if(score>best_score || (abs(mid_j-j)>min_j && best_score == score))
 								{
 									mismatched_bases = first_correct_base-last_correct_base  + min(0, indels) - score;
 									best_score = score;
 									best_j = j;
 									// best_pos here is the absolute offset of the FIRST UNWANTED BASE.
 									best_pos = voting_position  + last_correct_base + j + last_indel;
-									is_ambiguous_indel = 0;
+									min_j = abs(mid_j-j);
+									if(score>best_score)
+										is_ambiguous_indel = 0;
 								}
-								else if(score == best_score)
-									is_ambiguous_indel ++;
 							}
 						}
 					}
 
 
-			//	printf("AMB=%d\n", is_ambiguous_indel);
-				//if(is_ambiguous_indel) best_score=0;
+				
+				/*
+				SUBREADprintf("\n%s\nRANGE:%d - %d ; BSCORE:%d @  %d   ; AMB=%d ; INDELS=%d ; MM=%d\n", read_name, first_correct_base, last_correct_base, best_score, last_indel + last_correct_base + best_j, is_ambiguous_indel, indels, mismatched_bases);
+
+				SUBREADprintf("%s\n", read_text);
+				for(j=0;j<  last_indel + last_correct_base + best_j; j++)
+					putc(' ' , stderr);
+				putc('\\' , stderr);
+				for(j=0;j<  indels; j++)
+					putc(gvindex_get( current_value_index, best_pos + j)  , stderr);
+				putc('\n', stderr);
+
+				*/
 
 				if(best_score >0)
 				{
-				// add new indel entry into the table.
-				// a junction has two sides: the LAST WANTED base and the FIRST WANTED base in each side.
 					local_add_indel_event(global_context, thread_context, event_table, read_text + last_correct_base + last_indel, best_pos - 1, indels, 1, is_ambiguous_indel, mismatched_bases);
-					//printf("INDEL_P0ADD: I=%d; INDELS=%d; PN=%d; LOC=%u\n",i,indels, pair_number, best_pos-1);
 				}
 			}
 		}
@@ -1319,19 +1352,10 @@ int write_indel_final_results(global_context_t * global_context)
 
 			if(CHRO_EVENT_TYPE_INDEL == event_body -> event_type)
 			{
-				//if(event_body -> final_counted_reads<8)
-				//	event_body -> event_quality = pow(0.5,(8-event_body -> final_counted_reads));
 				if(event_body -> final_counted_reads<30)
 					event_body -> event_quality = pow(0.5,(30-event_body -> final_counted_reads));
 				else	event_body -> event_quality = 1;
 
-				//if(event_body -> is_ambiguous > 0)
-				//	event_body -> event_quality *= pow(0.5,15);
-
-				//if(event_body -> final_counted_reads > 15)
-				//	if(event_body->final_reads_mismatches*6 >= event_body -> final_counted_reads * 5 )
-				//		event_body -> event_quality *= pow(0.5,5);
-				//event_body -> event_quality *= pow(0.5, min(10 , 10*event_body->final_reads_mismatches*1./event_body -> final_counted_reads));
 			}
 			fprintf(ofp, "%s\t%u\t.\t%s\t%s\t%d\t.\tINDEL;DP=%d;ALLMM=%u\n", chro_name, chro_pos, ref_bases, alt_bases, (int)(max(1, 250 + 10*log(event_body -> event_quality)/log(10))), event_body -> final_counted_reads, event_body -> final_reads_mismatches);
 		}
@@ -1499,16 +1523,9 @@ int build_local_reassembly(global_context_t *global_context , thread_context_t *
 
 		is_position_certain = 0;
 
-		//if(global_context -> config.do_big_margin_filtering_for_reads)
-			//if(is_ambiguous_voting(global_context, pair_number, !is_second_read, mate_result->selected_votes, mate_result->confident_coverage_start, mate_result->confident_coverage_end, mate_read_len, (mate_result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0))
-		//		return 0;
 	}
 	else
 	{
-
-		//if(global_context -> config.do_big_margin_filtering_for_reads)
-		//	if(is_ambiguous_voting(global_context, pair_number, is_second_read, current_result->selected_votes, current_result->confident_coverage_start, current_result->confident_coverage_end, read_len, (current_result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0))
-		//		return 0;
 		read_anchor_position = current_result -> selected_position;
 	}
 
@@ -3302,7 +3319,10 @@ int finalise_long_insertions(global_context_t * global_context)
 
 void init_global_context(global_context_t * context)
 {
+	srand(time(NULL));
+
 	memset(context->module_contexts, 0, 5*sizeof(void *));
+	context->config.memory_use_multiplex = 1;
 	context->config.report_sam_file = 1;
 	context->config.is_rna_seq_reads = 0;
 	context->config.do_fusion_detection = 0;
@@ -3327,7 +3347,7 @@ void init_global_context(global_context_t * context)
 	context->config.use_dynamic_programming_indel=0;
 	context->config.use_bitmap_event_table = 1;
 	context->config.convert_color_to_base = 0;
-
+	context->config.is_gzip_fastq = 0;
 
 	context->config.is_BAM_output = 0;
 	context->config.is_BAM_input = 0;
