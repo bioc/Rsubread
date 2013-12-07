@@ -1,3 +1,6 @@
+7 Dec, 2013 - 1.13.10
+(1) Removed 'doc' directory under Rsubread/inst/
+
 5 Dec, 2013 - 1.13.9
 (1) Fixed a file input issue for exactSNP.
 

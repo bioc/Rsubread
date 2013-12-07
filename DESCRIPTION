@@ -1,7 +1,7 @@
 Package: Rsubread
 Type: Package
 Title:  Rsubread package: high-performance read alignment, quantification and mutation discovery
-Version: 1.13.9
+Version: 1.13.10
 Author: Wei Shi and Yang Liao with contributions from Jenny Zhiyin Dai and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>
 Description: This R package provides powerful and easy-to-use tools for analyzing next-gen sequencing read data. Functions of this package include quality assessment of sequence reads, read alignment, read summarization, exon-exon junction detection, fusion detection, detection of short and long indels, absolute expression calling and SNP calling. This package can be used to anlayze data generated from all major sequencing platforms such as Illumina GA/HiSeq/MiSeq, Roche GS-FLX, ABI SOLiD and LifeTech Ion PGM/Proton sequencers. It supports multiple operating systems incluidng Linux, Mac OS X, FreeBSD and Solaris.
