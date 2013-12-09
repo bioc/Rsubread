@@ -8,4 +8,4 @@ Description: This R package provides easy-to-use tools for analyzing next-gen se
 URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
 License: GPL-3
 LazyLoad: yes
-biocViews: Sequencing, HighThroughputSequencing
+biocViews: Bioinformatics, Sequencing, HighThroughputSequencing, SequenceMatching, RNAseq, ChIPseq, GeneExpression, GeneRegulation, Genetics, SNP, GeneticVariability, Preprocessing, QualityControl, SequenceAnnotation, Software
