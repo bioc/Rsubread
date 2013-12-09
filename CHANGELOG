@@ -1,5 +1,6 @@
 9 Dec, 2013
-(1) remove alignResults.SAM file from inst/extdata directory.
+(1) removed alignResults.SAM file from inst/extdata directory.
+(2) added recommended alignment setting section in users guide.
 
 6 Dec, 2013 - 1.12.4
 
