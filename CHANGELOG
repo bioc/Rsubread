@@ -1,4 +1,4 @@
-9 Dec, 2013
+12 Dec, 2013 - 1.12.5
 (1) removed alignResults.SAM file from inst/extdata directory.
 (2) added recommended alignment setting section in users guide.
 (3) updated biocviews terms.
