@@ -1,3 +1,6 @@
+18 Dec, 2013 - 1.13.12
+(1) Fixed a bug in featureCounts for processing long header lines in SAM/BAM files.
+
 9 Dec, 2013 - 1.13.11
 (1) Added recommended alignment settign in users guide.
 (2) Updated biocviews terms.
