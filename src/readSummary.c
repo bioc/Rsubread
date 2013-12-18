@@ -1795,6 +1795,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> input_buffer_max_size = buffer_size;
 	global_context -> all_reads = 0;
 	global_context -> redo = 0;
+	global_context -> SAM_output_fp = NULL;
 
 
 	global_context -> isCVersion = isCVersion;
@@ -1962,6 +1963,7 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 
 	SAM_sort_writer writer;
 	sort_SAM_create(&writer, temp_file_name, ".");
+	int is_read_len_warned = 0;
 
 	while(1)
 	{
@@ -1970,8 +1972,10 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 		int ret = sort_SAM_add_line(&writer, fline, strlen(fline));
 		if(ret<0) 
 		{
-			print_in_box(80,0,0,"ERROR: read name is too long; check the input format.");
-			break;
+			if(!is_read_len_warned)
+				print_in_box(80,0,0,"WARNING: reads with very long names were found.");
+			is_read_len_warned = 1;
+		//	break;
 		}
 	//printf("N1=%llu\n",  writer.unpaired_reads);
 	}
@@ -2787,7 +2791,18 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 					ret = fgets(lbuf, MAX_LINE_LENGTH, fp_in);
 					if(global_context -> redo) ret = NULL;
 					if(!ret) break;
-					if(lbuf[0] != '@') break;
+					if(lbuf[0] == '@') 
+					{
+						int retlen = strlen(ret);
+						if(ret[retlen-1]!='\n')
+						{
+							while(1){
+								int nch = getc(fp_in);
+								if(nch == EOF || nch == '\n') break;
+							}
+						}
+					}
+					else break;
 				}
 
 				if(!ret) break;
@@ -2977,7 +2992,16 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 						ret = fgets(preload_line+preload_line_ptr, MAX_LINE_LENGTH, fp_in);
 						if(global_context -> redo ) ret = NULL;
 						if(!ret) break;
-						if(preload_line[preload_line_ptr] != '@') break;
+						if(preload_line[preload_line_ptr] == '@'){
+							int retlen = strlen(ret);
+							if(ret[retlen-1]!='\n')
+							{
+								while(1){
+									int nch = getc(fp_in);
+									if(nch == EOF || nch == '\n') break;
+								}
+							}
+						}else break;
 					}
 
 					if(!ret) break;

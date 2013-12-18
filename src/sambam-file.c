@@ -238,8 +238,20 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 {
 	if(fp->file_type==SAMBAM_FILE_SAM){
 		char * ret = fgets(buff, buff_len, fp->os_file);
-		if(strlen(buff)<1) return NULL;
-		else return ret;
+		int strlenbuff = strlen(buff);
+		if(strlenbuff < 1 || ret == NULL) return NULL;
+		else{
+			if(ret[strlenbuff-1]!='\n')
+			{
+				while(1)
+				{
+					int ch = getc(fp->os_file);
+					if(ch == EOF || ch == '\n')break;
+				}
+				ret[strlenbuff-1] = '\n';
+			}
+			return ret;
+		}
 	}
 	else
 	{
@@ -255,7 +267,7 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 
 			while(1)
 			{
-				if(xk1 >= buff_len-2 || fp -> input_binary_stream_read_ptr >= fp -> bam_file_next_section_start)
+				if(fp -> input_binary_stream_read_ptr >= fp -> bam_file_next_section_start)
 					break;
 
 				nch = *(SB_READ(fp));
@@ -264,14 +276,15 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 				//printf("NNCH=%c\n", nch);
 
 				if(nch == '\r'||nch=='\n' || nch <0) break;
-				buff[xk1]=nch;
-				xk1++;
+				if(xk1 < buff_len-2)
+				{
+					buff[xk1]=nch;
+					xk1++;
+				}
 			}
 
-			if(xk1<buff_len-1){
-				buff[xk1]='\n';
-				buff[xk1+1]=0;
-			}
+			buff[xk1]='\n';
+			buff[xk1+1]=0;
 
 //			printf("%d > %d\n", fp -> input_binary_stream_read_ptr , fp -> bam_file_next_section_start);
 
