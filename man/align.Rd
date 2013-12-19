@@ -5,16 +5,19 @@
 \description{Subread and Subjunc perform local and global alignments respectively. The seed-and-vote paradigm enables efficient and accurate alignments to be carried out.}
 \usage{
 align(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",
-output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,TH1=3,TH2=1,
-nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,
-minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
-DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
+output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
+TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
+tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
+maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
+readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,
+DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 
 subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",
-output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,
-nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,
-minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
-DNAseq=FALSE,reportAllJunctions=FALSE)
+output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,
+TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
+tieBreakHamming=TRUE,unique=TRUE,minFragLength=50,maxFragLength=600,
+PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,
+color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -82,7 +85,7 @@ Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and s
 %\note{}
 %\seealso{}
 \examples{
-# build an index using a sample reference sequence ('reference.fa') that includes a chromosome called 'chr_dummy' and 90,000 bases
+# Build an index for the artificial sequence included in file 'reference.fa'.
 library(Rsubread)
 ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./reference_index",reference=ref)

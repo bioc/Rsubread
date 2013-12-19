@@ -44,7 +44,7 @@ Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and s
 %\note{}
 %\seealso{}
 \examples{
-# build an index using a sample reference sequence ('reference.fa') that includes a chromosome called 'chr_dummy' and 90,000 bases
+# Build an index for the artifical sequence included in file 'reference.fa'
 library(Rsubread)
 ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./reference_index",reference=ref)

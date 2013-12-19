@@ -1,3 +1,6 @@
+20 Dec, 2013 - 1.13.13
+(1) Documentation improvement.
+
 18 Dec, 2013 - 1.13.12
 (1) Fixed a bug in featureCounts for processing long header lines in SAM/BAM files.
 

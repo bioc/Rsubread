@@ -3,10 +3,12 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",
-useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,minMQS=0,
-isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,
-countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
+featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,
+GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,
+allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,
+minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,
+minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,chrAliases=NULL,
+reportReads=FALSE)
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
@@ -106,7 +108,8 @@ library(Rsubread)
 featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm9")
 
 # Summarizing single-end reads using a user-provided GTF annotation file:
-featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
+featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",
+isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
 
 # Summarizing single-end reads using 5 threads:
 featureCounts(files="mapping_results_SE.sam",nthreads=5)
@@ -121,7 +124,8 @@ featureCounts(files="mapping_results_SE.sam",strandSpecific=1)
 featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE)
 
 # Counting fragments satisfying the fragment length criteria, eg. [50bp, 600bp]:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,checkFragLength=TRUE,minFragLength=50,maxFragLength=600)
+featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,
+checkFragLength=TRUE,minFragLength=50,maxFragLength=600)
 
 # Counting fragments that have both ends successfully aligned without checking the fragment length:
 featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,requireBothEndsMapped=TRUE)
