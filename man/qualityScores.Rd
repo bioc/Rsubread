@@ -9,7 +9,7 @@ qualityScores(filename, input_format="gzFASTQ", offset=33, nreads=10000)
 \arguments{
   \item{filename}{ character string giving the name of an input file containing sequence reads.}
   \item{input_format}{ character string specifying format of the input file. \code{gzFASTQ} (gzipped FASTQ) by default. Acceptable formats include \code{gzFASTQ}, \code{FASTQ}, \code{SAM} and \code{BAM}. Character string is case insensitive.}
-  \item{offset}{ numeric value giving the offset added to the Phred scores, \code{33} by default.}
+  \item{offset}{ numeric value giving the offset added to the base-calling Phred scores. Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
   \item{nreads}{ numeric value giving the number of reads from which quality scores are extracted. \code{10000} by default.}
 }
 \details{
