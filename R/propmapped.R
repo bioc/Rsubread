@@ -1,11 +1,19 @@
-propmapped <- function(samfiles)
+propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE)
 {
     fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
-    for(i in 1:length(samfiles)){
-	cmd <- paste("propmapped",samfiles[i],fout,sep=",")
-	n <- length(unlist(strsplit(cmd,",")))
-	y <- .C("R_propmapped_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+    for(i in 1:length(files)){
+	  opt <- paste("-i",files[i],sep=",")
+	  
+	  if(countFragments)
+		opt <- paste(opt,"-f",sep=",")
+	  if(properlyPaired)
+	    opt <- paste(opt,"-p",sep=",")
+	  
+	  opt <- paste(opt,"-o",fout,sep=",")
+	  cmd <- paste("propmapped",opt,sep=",")
+	  n <- length(unlist(strsplit(cmd,",")))
+	  C_args <- .C("R_propmapped_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
     }
 
     x1 <- read.delim(fout,header=FALSE,stringsAsFactors=FALSE,sep=",")
@@ -14,4 +22,3 @@ propmapped <- function(samfiles)
     colnames(x1) <- c("Samples","NumTotal","NumMapped","PropMapped")
     x1
 }
-
