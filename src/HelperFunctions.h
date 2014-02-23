@@ -31,4 +31,10 @@
 
 int RSubread_parse_CIGAR_string(const char * CIGAR_Str, unsigned int * Staring_Points, unsigned short * Section_Length);
 
+
+// This function try to find the attribute value of a given attribute name from the extra column string in GTF/GFF.
+// If the value is found, it returns the length of the value (must be > 0 by definition), or -1 if no attribute is found or the format is wrong.
+
+int GTF_extra_column_value(const char * Extra_Col, const char * Target_Name, char * Target_Value, int TargVal_Size);
+
 #endif

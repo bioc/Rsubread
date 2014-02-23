@@ -45,6 +45,220 @@ void is_bad_read(char * r, int len, char * w)
 {
 }
 
+void merge_event_sides(void * arr, int start, int items, int items2)
+{
+	void ** arrl  =  (void **)arr;
+	chromosome_event_t * event_space = (chromosome_event_t*) arrl[1];
+	int * event_id_list = (int *)arrl[0];
+	int is_small_side = (arrl[2]!=NULL);
+
+	int * merge_tmp = malloc(sizeof(int)* (items+items2));
+	int x1, first_cursor = start, second_cursor = start+items;
+
+	for(x1=0;x1<items+items2;x1++)
+	{
+		int choose_2 = 0;
+		if(first_cursor >= start+items)
+			choose_2 = 1;
+		else if(second_cursor < start+items+items2)
+		{
+
+			chromosome_event_t * levent = event_space + event_id_list[first_cursor];
+			chromosome_event_t * revent = event_space + event_id_list[second_cursor];
+
+			if(is_small_side){
+				if(levent->event_small_side > revent ->event_small_side)
+					choose_2 = 1;
+			}else
+			{
+				if(levent->event_large_side > revent ->event_large_side)
+					choose_2 = 1;
+			}
+		
+		}
+
+		if(choose_2)
+			merge_tmp[x1] = event_id_list[second_cursor++];
+		else
+			merge_tmp[x1] = event_id_list[first_cursor++];
+	
+	}
+
+	memcpy(event_id_list + start, merge_tmp, sizeof(int)* (items+items2));
+
+	free(merge_tmp);
+}
+
+void exchange_event_sides(void * arr, int l, int r)
+{
+	void ** arrl  =  (void **)arr;
+	int * event_id_list = (int *)arrl[0];
+
+	int tmp ;
+	tmp = event_id_list[l];
+	event_id_list[l] = event_id_list[r];
+	event_id_list[r] = tmp;
+	
+}
+
+int compare_event_inner(chromosome_event_t * event_space, int l, int r, int is_small_side)
+{
+
+	chromosome_event_t * revent = event_space +r;
+	chromosome_event_t * levent = event_space +l;
+	if(is_small_side){
+		if(levent->event_small_side <revent ->event_small_side) return -1;
+		else if(levent->event_small_side ==revent ->event_small_side) return 0;
+		else return 1;
+	}else
+	{
+		if(levent->event_large_side <revent ->event_large_side) return -1;
+		else if(levent->event_large_side ==revent ->event_large_side) return 0;
+		else return 1;
+	}
+
+
+}
+
+int compare_event_sides(void * arr, int l, int r)
+{
+	void ** arrl  =  (void **)arr;
+	chromosome_event_t * event_space = (chromosome_event_t*) arrl[1];
+	int * event_id_list = (int *)arrl[0];
+	int is_small_side = (arrl[2]!=NULL);
+
+	return compare_event_inner(event_space, event_id_list[l], event_id_list[r], is_small_side);
+}
+
+int BINsearch_event(chromosome_event_t * event_space, int * event_ids, int is_small_side, unsigned int pos, int events)
+{
+	int imax, imin;
+	assert(events > 0);
+	imax = events - 1; imin = 0;
+
+	while (1)	
+	{
+		int imid = (imin+ imax)/2;
+		unsigned tested_mid_pos;
+		//assert(imax<events);
+		//assert(imin<events);
+		//assert(imid<events);
+		assert(event_ids[imid]<events);
+		chromosome_event_t * mid_event = event_space+event_ids[imid];
+		tested_mid_pos = is_small_side?mid_event->event_small_side:mid_event->event_large_side;
+
+		if(tested_mid_pos == pos)
+			return imid;
+		else if(tested_mid_pos < pos)
+			imin = imid +1;
+		else	imax = imid -1;
+
+		if(imin > imax)
+			return imax;
+	}
+}
+
+#define ANTI_SUPPORTING_READ_LIMIT 100
+
+int anti_supporting_read_scan(global_context_t * global_context)
+{
+
+	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
+	if(indel_context->total_events<1)return 0;
+
+	chromosome_event_t * event_space = indel_context -> event_space_dynamic;
+
+	int x1, * small_side_ordered_event_ids, * large_side_ordered_event_ids, cancelled_events=0, * cancelled_event_list = malloc(sizeof(int)*ANTI_SUPPORTING_READ_LIMIT), x2;
+
+	small_side_ordered_event_ids = malloc(sizeof(int)*indel_context -> total_events);
+	large_side_ordered_event_ids = malloc(sizeof(int)*indel_context -> total_events);
+
+	for(x1=0; x1<indel_context->total_events; x1++)
+	{
+		small_side_ordered_event_ids[x1]=x1;
+		large_side_ordered_event_ids[x1]=x1;
+	}
+
+	void * sort_data[3];
+	sort_data[0] = small_side_ordered_event_ids;
+	sort_data[1] = event_space;
+	sort_data[2] = (void *)0xffff;	// small_side_ordering
+
+	merge_sort(sort_data, indel_context->total_events, compare_event_sides, exchange_event_sides, merge_event_sides);
+
+	sort_data[0] = large_side_ordered_event_ids;
+	sort_data[2] = NULL;	// large_side_ordering
+
+	merge_sort(sort_data, indel_context->total_events, compare_event_sides, exchange_event_sides, merge_event_sides);
+
+	int current_read_number;
+	for(current_read_number = 0; current_read_number < global_context -> processed_reads_in_chunk; current_read_number++)
+	{
+		int is_second_read;
+		for (is_second_read = 0; is_second_read < 1 + global_context -> input_reads.is_paired_end_reads; is_second_read ++)
+		{
+			int best_read_id;
+			for(best_read_id = 0; best_read_id < global_context -> config.multi_best_reads; best_read_id++)
+			{
+				alignment_result_t *current_result = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, best_read_id);
+				if(current_result -> selected_votes<1) break;
+				if(!global_context->config.report_multi_mapping_reads)if(current_result -> result_flags & CORE_IS_BREAKEVEN) continue;
+				if(current_result -> result_flags & CORE_IS_GAPPED_READ) continue;
+				if(current_result->selected_votes < global_context->config.minimum_subread_for_first_read)
+					continue;
+
+				cancelled_events=0;
+				unsigned int mapping_head = current_result -> selected_position;
+				unsigned int coverage_start = mapping_head + current_result -> confident_coverage_start;
+				unsigned int coverage_end = mapping_head + current_result -> confident_coverage_end;
+
+				int small_side_left_event = BINsearch_event(event_space, small_side_ordered_event_ids,1, coverage_start - 1, indel_context->total_events) + 1;
+				int large_side_left_event = BINsearch_event(event_space, large_side_ordered_event_ids,0, coverage_start - 1, indel_context->total_events) + 1;
+
+				int small_side_right_event = BINsearch_event(event_space, small_side_ordered_event_ids,1, coverage_end, indel_context->total_events)+20;
+				int large_side_right_event = BINsearch_event(event_space, large_side_ordered_event_ids,0, coverage_end, indel_context->total_events)+20;
+
+				for(x1 = small_side_left_event ; x1 <= small_side_right_event ; x1++)
+				{
+					if(x1 >= indel_context->total_events) break;
+					if(ANTI_SUPPORTING_READ_LIMIT <= cancelled_events) break;
+					chromosome_event_t * event_body = event_space+ small_side_ordered_event_ids[x1];
+					if(event_body -> event_small_side <= coverage_start + 5) continue;
+					if(event_body -> event_small_side >= coverage_end - 5) continue;
+
+					event_body -> anti_supporting_reads ++;
+					cancelled_event_list[cancelled_events++] = small_side_ordered_event_ids[x1];
+				}
+
+				for(x1 = large_side_left_event ; x1 <= large_side_right_event ; x1++)
+				{
+					if(x1 >= indel_context->total_events) break;
+					chromosome_event_t * event_body = event_space+ large_side_ordered_event_ids[x1];
+					if(event_body -> event_large_side <= coverage_start + 5) continue;
+					if(event_body -> event_large_side >= coverage_end- 5) continue;
+
+					int to_be_add = 1;
+					for(x2=0; x2<cancelled_events; x2++)
+						if(cancelled_event_list[x2] == large_side_ordered_event_ids[x1])
+						{
+							to_be_add = 0;
+							break;
+						}
+
+					if(to_be_add){
+						event_body -> anti_supporting_reads ++;
+					}
+				}
+			}
+		}
+	} 
+
+	free(small_side_ordered_event_ids);
+	free(large_side_ordered_event_ids);
+
+	return 0;
+}
+
 chromosome_event_t * reallocate_event_space( global_context_t* global_context,thread_context_t * thread_context,int event_no)
 {
 	int max_event_no;
@@ -94,15 +308,6 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 
 }
 
-void set_alignment_result_art(alignment_result_t * alignment_result, unsigned int position, int votes, char * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand)
-{
-	alignment_result -> selected_position = position;
-	alignment_result -> selected_votes = votes;
-	alignment_result -> indels_in_confident_coverage = indel_recorder_copy(alignment_result -> selected_indel_record, indel_record);
-	alignment_result -> confident_coverage_end = best_cover_end;
-	alignment_result -> confident_coverage_start = best_cover_start;
-	alignment_result -> result_flags = is_negative_strand? (alignment_result -> result_flags|CORE_IS_NEGATIVE_STRAND):(alignment_result -> result_flags &~CORE_IS_NEGATIVE_STRAND) ;
-}
 void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, char * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset)
 {
 	if(best_read_id >= global_context->config.multi_best_reads) return;
@@ -157,7 +362,7 @@ void remove_neighbour(global_context_t * global_context)
 	int xk1;
 	int * to_be_removed_ids;
 	int to_be_removed_number = 0, all_junctions = 0;
-	int maxinum_removed_events = global_context-> config.do_fusion_detection? 9999999:999999;
+	int maxinum_removed_events = global_context-> config.do_fusion_detection? 9999999:1999999;
 
 
 	to_be_removed_ids = malloc(sizeof(int) * (1+maxinum_removed_events));
@@ -242,6 +447,10 @@ void remove_neighbour(global_context_t * global_context)
 								to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 						}
 					}
+
+				if(0&&to_be_removed_number<maxinum_removed_events)
+					if(event_body -> supporting_reads<2 && event_body -> anti_supporting_reads > 5 * event_body -> supporting_reads)
+							to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 
 				if(1 && global_context->config.do_fusion_detection && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
 				{
@@ -586,6 +795,7 @@ void put_new_event(HashTable * event_table, chromosome_event_t * new_event , int
 
 	for(xk1=0; xk1<2; xk1++)
 	{
+		if(0 == sides[xk1])continue ;
 		unsigned int * id_list = HashTableGet(event_table, NULL+sides[xk1]);
 		if(!id_list)
 		{
@@ -610,6 +820,7 @@ int search_event(global_context_t * global_context, HashTable * event_table, chr
 {
 	int ret = 0;
 
+	if(pos < 1 || pos > 0xffff0000)return 0;
 
 	if(event_table->appendix1)
 	{
@@ -631,6 +842,7 @@ int search_event(global_context_t * global_context, HashTable * event_table, chr
 		for(xk2=0; xk2<MAX_EVENT_ENTRIES_PER_SITE; xk2++)
 		{
 			if(!res[xk2])break;
+			//if(res[xk2] - 1>= ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ) { SUBREADprintf("FATAL ERROR: Event id out-of-boundary: %u > %u!\n", res[xk2],  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ); continue;}
 			chromosome_event_t * event_body = &event_space[res[xk2]-1]; 
 
 			if((event_body -> event_type & event_type) == 0)continue;
@@ -665,10 +877,10 @@ void set_insertion_sequence(global_context_t * global_context, thread_context_t 
 {
 	int xk1;
 
-	(*binary_bases) = malloc((1+insertions)/4+1);
+	(*binary_bases) = malloc((1+insertions)/4+2);
 
 	assert(insertions <= MAX_INSERTION_LENGTH);
-	memset((*binary_bases),0, (1+insertions)/4+1);
+	memset((*binary_bases),0, (1+insertions)/4+2);
 
 	for(xk1=0; xk1<insertions;xk1++)
 	{
@@ -1061,6 +1273,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								//printf("INDEL_DDADD: I=%d; INDELS=%d; PN=%d; LOC=%u\n",i, current_indel_len, pair_number, indel_left_boundary-1);
 								chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
 
+								mark_gapped_read(current_result);
 								if(last_event && new_event){
 									int dist = new_event -> event_small_side - last_event -> event_large_side +1;
 									new_event -> connected_previous_event_distance = dist;
@@ -1146,6 +1359,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 				if(best_score >0)
 				{
 					local_add_indel_event(global_context, thread_context, event_table, read_text + last_correct_base + last_indel, best_pos - 1, indels, 1, is_ambiguous_indel, mismatched_bases);
+					mark_gapped_read(current_result);
 				}
 			}
 		}
@@ -1261,13 +1475,17 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 				unsigned int head_indel_left_edge = head_indel_pos + current_result->selected_position - 1;
 				head_indel_left_edge -= max(0, head_indel_movement);
 				if(head_indel_left_edge>=0)
+				{
 					local_add_indel_event(global_context, thread_context, event_table, read_text + head_indel_pos, head_indel_left_edge, head_indel_movement, 1, 1, 0);
+					mark_gapped_read(current_result);
+				}
 			}
 			if(tail_indel_movement && s_tail < 7)
 			{
 				unsigned int tail_indel_left_edge = tail_indel_pos + current_result->selected_position + current_result -> indels_in_confident_coverage - 1;
 				
 				local_add_indel_event(global_context, thread_context, event_table, read_text + tail_indel_pos, tail_indel_left_edge, tail_indel_movement, 1, 1, 0);
+				mark_gapped_read(current_result);
 
 			}
 		}
@@ -1297,7 +1515,7 @@ int write_indel_final_results(global_context_t * global_context)
 	ref_bases = malloc(1000);
 	alt_bases = malloc(1000);
 
-	fputs("##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Raw read depth\">\n", ofp);
+	fputs("##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Raw read depth\">\n##INFO=<ID=AT,Number=1,Type=Integer,Description=\"Raw background read\">\\n", ofp);
 	fputs("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n", ofp);
 
 	for(xk1 = 0; xk1 <  indel_context -> total_events ; xk1++)
@@ -1357,7 +1575,7 @@ int write_indel_final_results(global_context_t * global_context)
 				else	event_body -> event_quality = 1;
 
 			}
-			fprintf(ofp, "%s\t%u\t.\t%s\t%s\t%d\t.\tINDEL;DP=%d;ALLMM=%u\n", chro_name, chro_pos, ref_bases, alt_bases, (int)(max(1, 250 + 10*log(event_body -> event_quality)/log(10))), event_body -> final_counted_reads, event_body -> final_reads_mismatches);
+			fprintf(ofp, "%s\t%u\t.\t%s\t%s\t%d\t.\tINDEL;DP=%d;ALLMM=%u;AT=%d\n", chro_name, chro_pos, ref_bases, alt_bases, (int)(max(1, 250 + 10*log(event_body -> event_quality)/log(10))), event_body -> final_counted_reads, event_body -> final_reads_mismatches, event_body -> anti_supporting_reads);
 		}
 
 		global_context->all_indels++;
@@ -1558,7 +1776,7 @@ int insert_pileup_read(global_context_t * global_context , reassembly_block_cont
 			unsigned long long int node_key = 0;
 			for(xk1=0; xk1<global_context ->config.k_mer_length; xk1++)
 			{
-				node_key = (node_key << 2) | base2int(read_text[xk1 + read_pos]);
+				node_key = (node_key << 2) | (base2int(read_text[xk1 + read_pos]));
 			}
 
 			
@@ -1965,7 +2183,7 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 			gehash_go_q(&block_context->voting_indexes[window_no], subread_int , read_offset, read_len, 0, block_context -> vote_list, 22, 0, read_offset,  0, 0x7fffffff);
 	}
 
-	int WINDOW_SEARCH_TREE_WIDTH = 2;
+	int WINDOW_SEARCH_TREE_WIDTH = 1;
 	int i,j;
 
 	int max_read_scoring [8];
@@ -1974,14 +2192,22 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 	float max_allele_quality [8];
 
 	memset(max_read_scoring, 0, sizeof(int)* 8);
+	memset(max_allele_quality, 0, sizeof(float)* 8);
+	memset(max_read_ids, 0, sizeof(int)* 8);
+	memset(max_read_nonoverlap, 0, sizeof(int)* 8);
 
-	if(is_target_window_X(window_no)) print_votes(block_context -> vote_list, global_context -> config.index_prefix);
+	//intif(is_target_window_X(window_no))
+	//if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+	//	print_votes(block_context -> vote_list, global_context -> config.index_prefix);
 
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< block_context -> vote_list -> items[i]; j++)
 		{
 			//if(is_digged_in)break;
 			//if((block_context -> vote_list -> coverage_end[i][j] - block_context -> vote_list -> coverage_start[i][j]) * 6 > read_len ) 
+//			if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+//				SUBREADprintf("LLLX PRINT_VOTE @%u : V=%d\n", block_context -> vote_list -> pos[i][j],  block_context -> vote_list -> votes[i][j] );
+
 			if( block_context -> vote_list -> votes[i][j] > 4) 
 			{
 				int next_read_no = (block_context -> vote_list -> pos[i][j] + MAX_READ_LENGTH +1 )/10000;
@@ -2036,7 +2262,7 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 					long long int pos_delta = next_read_pos;
 					pos_delta -= start_read_pos;
 
-					int xk3, next_read_scoring = 0;
+					int xk3, next_read_scoring = 0, next_read_matching = 0;
 
 					int order_reward = (is_next_certain && is_start_certain && search_direction * pos_delta >0)? 25000:0;
 					if(is_start_certain * is_next_certain == 0) order_reward = 10000;
@@ -2044,27 +2270,32 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 
 					if(anchor_to_index > 0)
 					{
+						if(next_read_len+ next_read_nonoverlap< read_len)continue;// no new bases are added by the new read.
+
 						for(xk3 = next_read_nonoverlap ; xk3 < read_len ; xk3++)
-							if(start_read_txt[xk3] == next_read_txt[xk3 - next_read_nonoverlap]) next_read_scoring++;
-						wrong_bases = read_len - next_read_nonoverlap - next_read_scoring;
+							if(start_read_txt[xk3] == next_read_txt[xk3 - next_read_nonoverlap]) next_read_matching++;
+						wrong_bases = read_len - next_read_nonoverlap - next_read_matching;
 						if(wrong_bases>=2)
 						{
 							next_read_scoring = -1;
 						}
 						else
 						{
-							block_context -> total_matched_bases += next_read_scoring;
+							block_context -> total_matched_bases += next_read_matching;
 
-							next_read_scoring = two_read_overlapped * 1000 + order_reward
-   						    	+(unsigned int)(HashTableGet(block_context -> read_quality_table, NULL+test_next_read_key)-NULL)/10 - wrong_bases * 2000;
+							next_read_scoring = two_read_overlapped * 10000 + order_reward
+   						    	+(unsigned int)(HashTableGet(block_context -> read_quality_table, NULL+test_next_read_key)-NULL)/10 - wrong_bases * 20000;
 						}
 					}
 					else
 					{
-						for(xk3 = - next_read_nonoverlap ; xk3 <  next_read_len ; xk3++)
-							if(next_read_txt[xk3] == start_read_txt[xk3 + next_read_nonoverlap]) next_read_scoring++;
+						if(0< next_read_nonoverlap) continue; // no new bases are added by the new read.  
+						int should_match = min(next_read_len, read_len - next_read_nonoverlap);
+						if(next_read_len >  read_len - next_read_nonoverlap) continue; // the head of the next read is untested: bad!
+						for(xk3 = - next_read_nonoverlap ; xk3 <  should_match ; xk3++)
+							if(next_read_txt[xk3] == start_read_txt[xk3 + next_read_nonoverlap]) next_read_matching++;
 
-						wrong_bases = read_len + next_read_nonoverlap - next_read_scoring;
+						wrong_bases = should_match + next_read_nonoverlap - next_read_matching;
 
 						if(wrong_bases>=2)
 						{
@@ -2072,18 +2303,30 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 						}
 						else
 						{
-							block_context -> total_matched_bases += next_read_scoring;
+							block_context -> total_matched_bases += next_read_matching;
 
-							next_read_scoring = two_read_overlapped * 1000 +order_reward
-						 	+ (unsigned int)(HashTableGet(block_context -> read_quality_table, NULL+test_next_read_key)-NULL)/10 - wrong_bases * 2000;
+							next_read_scoring = two_read_overlapped * 10000 +order_reward
+						 	+ (unsigned int)(HashTableGet(block_context -> read_quality_table, NULL+test_next_read_key)-NULL)/10 - wrong_bases * 20000;
 						}
 
 					}
+
 
 					if(wrong_bases)
 						next_read_allele_quality *= 0.5;
 
 					int is_rectifiable = rectify_read_text(global_context, block_context, window_no, &block_context->voting_indexes[window_no], next_read_txt , 0);
+
+
+/*
+					if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+					{
+						SUBREADprintf("LLLX: NREAD #%d HAS QUAL %d ; is_rectifiable=%d ; WB=%d; ANCHOR_TO_I=%d\n", next_read_no, next_read_scoring, is_rectifiable, wrong_bases, anchor_to_index);
+						SUBREADprintf("LLLX: NREAD OVL=%d, RLEN=%d, NRLEN=%d, NRMATCH=%d\n", next_read_nonoverlap, read_len, next_read_len, next_read_matching);
+						SUBREADprintf("LLLX: THIS_READ=%s\n", start_read_txt);
+						SUBREADprintf("LLLX: NEXT_READ=%s\n", next_read_txt);
+					}
+*/
 					if((next_read_scoring > max_read_scoring[ WINDOW_SEARCH_TREE_WIDTH-1]) && is_rectifiable)
 					{
 						int is_unique = 1, is_replace = 0;
@@ -2157,6 +2400,9 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 	{
 		unsigned int next_read_no = max_read_ids[i];
 		int is_fresh = 1;
+
+//			if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+//				SUBREADprintf("LLLX: TEST: %d\n", i);
 
 		if(max_read_scoring[i]<=0) break;
 		is_digged_in = 1;
@@ -2232,6 +2478,8 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 			}
 
 			block_context -> rebuilt_window_size += new_bases;
+//			if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+//				SUBREADprintf("LLLX: DIG IN: %d -> %d  (DIR=%d)\n", start_read_no, next_read_no, search_direction);
 
 			search_window_once(global_context, block_context, window_no, next_read_no, search_direction, anti_loop, next_allele_quality);
 			DIGIN_COUNTER ++;
@@ -2256,7 +2504,8 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 		//block_context -> used_read_number = current_used_read_number;
 	}
 
-
+//	if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+//		SUBREADprintf("LLLX: NOT DIG IN: %d :: %d   DIR=%d\n", is_digged_in, block_context -> rebuilt_window_size, search_direction);
 
 	if(!is_digged_in && block_context -> rebuilt_window_size > 0)
 	{
@@ -2266,11 +2515,12 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 		{
 			//int is_same_allele = 0;
 
+//			if(block_context -> window_start_pos > 1124357402 && block_context -> window_start_pos < 1124359402)
+//				SUBREADprintf("LLLX [%d] CPY: %d<%d\n", xk1, block_context -> final_alleles[xk1].rebuilt_size , block_context -> rebuilt_window_size);
+
 			if(block_context -> final_alleles[xk1].rebuilt_size < block_context -> rebuilt_window_size)
 			{
-
 				//int xk3=0;
-
 				for(xk2= global_context -> config.reassembly_window_alleles - 1 ; xk2 > xk1; xk2--)
 					memcpy(&block_context -> final_alleles[xk2], &block_context -> final_alleles[xk2 - 1], sizeof(struct reassmebly_window_allele));
 
@@ -2287,9 +2537,9 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 }
 
 
-#define MAX_INDELS_IN_WINDOW 10
+#define MAX_INDELS_IN_WINDOW 10  
 #define PROBE_KEY_NUMBER 12
-#define INDEL_FULL_ALIGN_MAX_MISMATCH 4
+#define INDEL_FULL_ALIGN_MAX_MISMATCH 3
 #define SINGLE_PROBE_MAX_MISMATCH 1
 
 int full_indel_alignment(global_context_t * global_context, reassembly_by_voting_block_context_t * block_context, char * full_rebuilt_window, int full_rebuilt_window_size, gene_value_index_t * base_index, unsigned int window_start_pos, unsigned int * perfect_segment_start_pos, int * perfect_segment_lengths,int * indels_after_perfect_segments, short * indels_read_positions, float * indel_quality)
@@ -2647,6 +2897,13 @@ int put_long_indel_event(global_context_t * global_context, unsigned int best_po
 		if(found)break;
 	}
 
+/*
+				if(best_pos >= 1124357402&& best_pos < 1124359402)
+				{
+					fprintf(stderr, "LLLX-BB: %u :: FOUND=%p\n", best_pos, found);
+				}
+
+*/
 
 	if(found)
 	{
@@ -2693,13 +2950,15 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 	int xk1;
 	int total_window_number =2 * (BASE_BLOCK_LENGTH / REASSEMBLY_WINDOW_LENGTH+1), window_adjust;
 
+	unsigned int block_start_linear_pos = linear_gene_position(&global_context->chromosome_table, chro_name, block_no*BASE_BLOCK_LENGTH); 
+	//if(block_start_linear_pos> 150000000) return 0;
+
 	FILE * tmp_fp = f_subr_open(temp_file_name,"rb");
 	if(!tmp_fp) 
 		return 0;
 
 	print_in_box(80,0,0,"Processing %s\n", temp_file_name);
 
-	unsigned int block_start_linear_pos = linear_gene_position(&global_context->chromosome_table, chro_name, block_no*BASE_BLOCK_LENGTH); 
 	unsigned int * window_center_read_no = (unsigned int *) malloc(sizeof(unsigned int)* total_window_number * global_context -> config.reassembly_start_read_number);
 	unsigned int * window_base_number = (unsigned int *) malloc(sizeof(unsigned int)* total_window_number);
 	unsigned int * window_center_read_qual = (unsigned int *) malloc(sizeof(unsigned int)* total_window_number * global_context -> config.reassembly_start_read_number);
@@ -2917,7 +3176,6 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 				window_center_read_qual[window_no  * global_context -> config.reassembly_start_read_number + xk44] = qual_of_this_read; 
 
 			}
-
 			for(read_offset = 0; read_offset < read_len - global_context -> config.reassembly_subread_length+1; read_offset += REASSEMBLY_SUBREAD_GAP)
 			{
 				unsigned int subread_int = 0;
@@ -2927,6 +3185,17 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 
 				gehash_insert_limited(&block_context.voting_indexes[window_no], subread_int , read_offset +10000 *read_no, 400, 10000);
 			}
+
+
+
+		/*
+			if(strstr(temp_file_name, "chr1-0005"))
+				if(window_no == 63763 || window_no == 63762)
+				{
+					SUBREADprintf("LLLX-INSERT_WIN: [%d] : %s  RN=%d  RL=%d  ITEMS=%llu\n",window_no, read_text, read_no, read_len, block_context.voting_indexes[window_no].current_items);
+
+				}
+		*/
 
 			char * sequence_for_hash = (char *) malloc(read_len+1);
 			assert(sequence_for_hash);
@@ -2960,7 +3229,6 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 
 	HashTable * event_table = indel_context -> event_entry_table;
-	chromosome_event_t * event_space = indel_context -> event_space_dynamic;
 
 	for(xk1 = 0; xk1 <  total_window_number; xk1++)
 	{
@@ -2987,12 +3255,22 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 				if(!window_center_read_no[xk1 * global_context -> config.reassembly_start_read_number + start_read_i ]) continue;
 
 				unsigned int this_start_read_no = window_center_read_no[xk1 * global_context -> config.reassembly_start_read_number + start_read_i ]-1 ;
+				unsigned int window_start_pos = block_context.block_start_linear_pos + xk1 * REASSEMBLY_WINDOW_LENGTH / 2; 
+				block_context.window_start_pos = window_start_pos;
 
 				search_window(global_context, &block_context, xk1, this_start_read_no , -1);
 				memcpy(first_half_alleles, block_context.final_alleles, global_context -> config.reassembly_window_alleles * sizeof(struct reassmebly_window_allele ));
 				search_window(global_context, &block_context, xk1, this_start_read_no,  1);
 				memcpy(second_half_alleles, block_context.final_alleles, global_context -> config.reassembly_window_alleles * sizeof(struct reassmebly_window_allele));
 
+				/*
+				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
+				{
+					fprintf(stderr, "LLLX: %u [%d] :: START READ = %u ; FN=%s ; BASES=%u\n", window_start_pos, xk1, this_start_read_no, temp_file_name , window_base_number[xk1]);
+					char fname [100];
+					sprintf(fname, "DP-%d-%d", getpid(), xk1);
+					gehash_dump(&block_context.voting_indexes[xk1], fname);
+				}*/
 
 				unsigned long long int starter_read_key = (xk1 * 1llu +1)<<32 ;
 				starter_read_key |=  ( (this_start_read_no)& 0xfffff)<<12; 
@@ -3015,7 +3293,6 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 
 						gene_value_index_t * base_index = &global_context->all_value_indexes[0] ;
 						//unsigned int best_matched = 0, best_pos;
-						unsigned int window_start_pos = block_context.block_start_linear_pos + xk1 * REASSEMBLY_WINDOW_LENGTH / 2; 
 
 
 
@@ -3029,12 +3306,24 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 
 						int indels_in_window = full_indel_alignment(global_context, &block_context, full_rebuilt_window, full_rebuilt_window_size, base_index, window_start_pos, perfect_segment_start_pos, perfect_segment_lengths, indels_after_perfect_segments, indels_read_positions, quality_of_indels_aln);
 						//printf("FULL_FOUND = %d   IN  %d/%d\n", indels_in_window, xk1, total_window_number);
+/*
+						if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
+						{
+							fprintf(stderr,"LLLX-RR:%s\nLLLX: %u :: %d,%d :: FOUND = %d\n", full_rebuilt_window, window_start_pos, first_allele_no, second_allele_no, indels_in_window);
+						}
+*/
 
 						for(xk2 = 0; xk2 < indels_in_window; xk2++)
 						{
 							unsigned int best_pos = perfect_segment_start_pos [xk2] + perfect_segment_lengths[xk2];
 							int indels = indels_after_perfect_segments[xk2], is_fresh = 1;
 							float quality_of_this_indel = quality_of_indels_aln[xk2] * first_half_alleles [first_allele_no].allele_quality * second_half_alleles[second_allele_no].allele_quality;
+
+/*				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
+				{
+					fprintf(stderr, "LLLX-SS [%d]: %u :: QUALS = %f, %f, %f\n", xk2, best_pos,  quality_of_indels_aln[xk2], first_half_alleles [first_allele_no].allele_quality ,  second_half_alleles[second_allele_no].allele_quality);
+				}
+*/
 
 							//printf("FINAL ADD: %d < %d\n\n", indels, global_context -> config.max_indel_length);
 							if(abs(indels) >= global_context -> config.max_indel_length){
@@ -3053,10 +3342,30 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 							for(neighbour_delta = - 30; neighbour_delta < 30 ; neighbour_delta++)
 							{
 								chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
+								chromosome_event_t * event_space = indel_context -> event_space_dynamic;
+
 								int xk3, found_events = search_event(global_context, event_table, event_space, best_pos + neighbour_delta , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_LONG_INDEL|CHRO_EVENT_TYPE_INDEL, search_return);
+
+/*
+				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
+				{
+					fprintf(stderr, "LLLX-NN: %u :: FOUND = %d\n", best_pos,  found_events);
+				}
+*/
+
 								for(xk3 = 0; xk3<found_events; xk3++)
 								{
 									chromosome_event_t * tested_neighbour = search_return[xk3];
+
+
+/*
+				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
+				{
+					fprintf(stderr, "LLLX-QQ: %u :: FRESH = %d :: QUAL = %f , %f\n", best_pos, is_fresh, tested_neighbour -> event_quality , quality_of_this_indel);
+				}
+*/
+
+
 									//if(tested_neighbour -> indel_length == indels || abs(neighbour_delta) < 5)
 									if(tested_neighbour -> event_quality >= quality_of_this_indel)
 										is_fresh = 0;
@@ -3065,6 +3374,13 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 				
 
 							}
+
+/*
+				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
+				{
+					fprintf(stderr, "LLLX-AA: %u :: FRESH=%d  :: QUALS = %f\n", best_pos, is_fresh, quality_of_this_indel);
+				}
+*/
 
 							if(is_fresh)
 							{
@@ -3329,7 +3645,6 @@ void init_global_context(global_context_t * context)
 	context->config.prefer_donor_receptor_junctions = 1;
 	context->config.do_big_margin_filtering_for_reads = 0;
 	context->config.do_big_margin_filtering_for_junctions = 0;
-	context->config.do_big_margin_reporting = 1;
 	context->config.maximum_intron_length = 500000;
 	context->config.use_hamming_distance_in_exon = 0;
 	context->config.is_third_iteration_running = 0;
@@ -3394,6 +3709,7 @@ void init_global_context(global_context_t * context)
 	context->config.index_prefix[0] = 0;
 	context->config.output_prefix[0] = 0;
 	context->config.medium_result_prefix[0] = 0;
+	context->config.SAM_extra_columns = 0;
 
 	context->config.DP_penalty_create_gap = -1;
 	context->config.DP_penalty_extend_gap = 0;

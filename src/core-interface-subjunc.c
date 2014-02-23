@@ -20,7 +20,7 @@ static struct option long_options[] =
 	{"minmatch2",  required_argument, 0, 'p'},
 	{"singleSAM",  required_argument, 0, '1'},
 	{"pairedSAM",  required_argument, 0, '2'},
-	{"threads",  required_argument, 0, 't'},
+	{"threads",  required_argument, 0, 'T'},
 	{"indel",  required_argument, 0, 'I'},
 	{"phred",  required_argument, 0, 'P'},
 	{"mindist",  required_argument, 0, 'd'},
@@ -30,6 +30,7 @@ static struct option long_options[] =
 	{"trim3", required_argument, 0, '3'},
 	{"color-convert",  no_argument, 0, 'b'},
 	{"junctionIns", required_argument, 0, 0},
+	{"multi",  required_argument, 0, 'B'},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
 	{"unique",  no_argument, 0, 'u'},
@@ -42,6 +43,7 @@ static struct option long_options[] =
 	{"gzFASTQinput", no_argument, 0, 0},
 	{"allJunctions",  no_argument, 0, 0},
 	{"memoryMultiplex",  required_argument, 0, 0},
+	{"extraColumns",  no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -82,6 +84,11 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default. Indels of up");
 	SUBREADputs("                            to 200bp long can be detected.");
+	SUBREADputs("");
+	SUBREADputs("    -B --multi     <int>    specify the maximal number of equally-best mapping");
+	SUBREADputs("                            locations allowed to be reported for any read. The");
+	SUBREADputs("                            value has to be within the range of 1 to 16. 1 by");
+	SUBREADputs("                            default. ");
 	SUBREADputs("");
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
 	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
@@ -182,7 +189,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBJUNC;
 	global_context->config.max_mismatch_exonic_reads = 10;
 	global_context->config.max_mismatch_junction_reads = 1;
-	global_context->config.ambiguous_mapping_tolerance = 39;
+	global_context->config.ambiguous_mapping_tolerance = 39 - 20 ;
 	global_context->config.extending_search_indels = 0;
 	global_context->config.do_fusion_detection =0;
 	global_context->config.use_dynamic_programming_indel = 0;
@@ -234,12 +241,6 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 			case 's':
 				global_context->config.downscale_mapping_quality = 1;
 				break;
-			case 'M':
-				global_context->config.do_big_margin_reporting = 1;
-				global_context->config.do_big_margin_filtering_for_reads = 1;
-				global_context->config.report_multi_mapping_reads = 0;
-				break;
-
 			case 'A':
 				global_context->config.report_sam_file = 0;
 				break;
@@ -333,8 +334,12 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.report_sam_file = 0;
 				break;
 			case 'B':
-				global_context->config.is_first_iteration_running = 0;
-				strcpy(global_context->config.medium_result_prefix, optarg);
+				//global_context->config.is_first_iteration_running = 0;
+				//strcpy(global_context->config.medium_result_prefix, optarg);
+				global_context->config.multi_best_reads = atoi(optarg); 
+				if(global_context->config.multi_best_reads<1)
+					global_context->config.multi_best_reads=1;
+
 				break;
 			case 'c':
 				global_context->config.space_type = GENE_SPACE_COLOR; 
@@ -343,7 +348,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 			case 0:
 				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
 				{
-					global_context->config.memory_use_multiplex = atoi(optarg);
+					global_context->config.memory_use_multiplex = atof(optarg);
 				}
 				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{
@@ -374,6 +379,10 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.limited_tree_scan = 0;
 					global_context->config.max_insertion_at_junctions = atoi(optarg);
 				}
+				else if(strcmp("extraColumns", long_options[option_index].name)==0) 
+				{
+					global_context->config.SAM_extra_columns=1;
+				}
 				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
 				{
 					global_context->config.is_gzip_fastq=1;
@@ -383,7 +392,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.do_fusion_detection = 1;
 					if(strcmp("dnaseq", long_options[option_index].name)==0)
 						global_context->config.prefer_donor_receptor_junctions = 0;
-					global_context->config.report_multi_mapping_reads = 1 ;
+					//global_context->config.report_multi_mapping_reads = 1 ;
 					global_context->config.limited_tree_scan = 1 ;
 
 					// To maximise sensitivity of junction detection:

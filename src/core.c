@@ -408,7 +408,6 @@ int parse_opts_core(int argc , char ** argv, global_context_t * global_context)
 				global_context->config.downscale_mapping_quality = 1;
 				break;
 			case 'M':
-				global_context->config.do_big_margin_reporting = 1;
 				global_context->config.do_big_margin_filtering_for_reads = 1;
 				global_context->config.report_multi_mapping_reads = 0;
 				break;
@@ -580,13 +579,17 @@ int check_configuration(global_context_t * global_context)
 	if(global_context -> config.max_indel_length > 16)
 		warning_file_limit();
 
-	warning_file_type(global_context -> config.first_read_file, expected_type);
+	int wret = warning_file_type(global_context -> config.first_read_file, expected_type), wret2 = 0;
 	if(global_context -> config.second_read_file[0])
 	{
 		if(expected_type==FILE_TYPE_FAST_ || expected_type==FILE_TYPE_GZIP_FAST_)
-			warning_file_type(global_context -> config.second_read_file, expected_type);
+			wret2 = warning_file_type(global_context -> config.second_read_file, expected_type);
 		else
-			print_in_box(80,0,0,"You should specify only one input SAM or BAM file.");
+			print_in_box(80,0,0,"Only one input SAM or BAM file is needed. The second input file is ignored.");
+	}
+
+	if(wret == -1 || wret2 == -1){
+		return -1;
 	}
 
 	return 0;
@@ -639,12 +642,19 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 	short tmp_flags;
 	SamBam_FILE * sambam_reader;
 
+	char * env_no_sort = getenv("SUBREAD_DO_NOT_CHECK_INPUT");
+	if(env_no_sort){
+		global_context->input_reads.is_paired_end_reads = 1;
+		SUBREADprintf("\nWARNING: The SAM input file was assumed to be sorted by name.\nENV: SUBREAD_DO_NOT_CHECK_INPUT\n");
+		return 0;
+	}
 
 	int is_file_sorted = 1;
 	unsigned long long int read_no = 0;
 	sambam_reader = SamBam_fopen(fname, is_bam?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
 	if(!sambam_reader)
 	{
+		SUBREADprintf("ERROR: Unable to open file '%s'. The file is not in the specified format.\n", fname);
 		free(fline);
 		return -1;
 	}
@@ -656,14 +666,22 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 		if(is_SAM_unsorted(fline, tmp_readname, &tmp_flags , read_no)){
 			if(tmp_flags & 1) global_context->input_reads.is_paired_end_reads = 1;
 			is_file_sorted = 0;
+			read_no++;
 			break;
 		}
+		read_no++;
 		if(tmp_flags & 1) global_context->input_reads.is_paired_end_reads = 1;
 		else global_context->input_reads.is_paired_end_reads = 0;
 
 		if(! global_context->input_reads.is_paired_end_reads) break;
-		read_no++;
 	}
+
+	if(read_no<1)
+	{
+		SUBREADprintf("ERROR: unable to find any reads from file '%s'. The file is not in the specified format or is empty.\n", fname);
+		return -1;
+	}
+
 	SamBam_fclose(sambam_reader);
 	print_in_box(80,0,0,"The input %s file contains %s-end reads.", is_bam?"BAM":"SAM",  global_context->input_reads.is_paired_end_reads?"paired":"single");
 	if(!is_file_sorted)
@@ -681,9 +699,15 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 		}
 		FILE * sam_fp = NULL;
 		SAM_sort_writer writer;
+		int writer_opened = 0;
 
 		if(is_file_sorted) sam_fp = f_subr_open(temp_file_name,"w");
-		else sort_SAM_create(&writer, temp_file_name, ".");
+		else writer_opened = sort_SAM_create(&writer, temp_file_name, ".");
+
+		if((is_file_sorted && !sam_fp) || (writer_opened && !is_file_sorted)){
+			SUBREADprintf("Failed to write to the directory. You may not have permission to write to this directory or the disk is full.\n");
+			return -1;
+		}
 
 		while(1)
 		{
@@ -956,12 +980,65 @@ int write_chunk_results(global_context_t * global_context)
 		}
 		//printf("BAS1=%s\nBAS2=%s\n\n", read_text_1,read_text_2);
 
-		alignment_result_t * prime_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0, 0);
+		//alignment_result_t * prime_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0, 0);
+		int read_1_repeats = 0, read_1_reported=0;
+		int read_2_repeats = 0, read_2_reported=0;
 		for(total_best_reads=0; total_best_reads<global_context -> config.multi_best_reads; total_best_reads++)
 		{
 			alignment_result_t * current_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0, total_best_reads);
-			if(total_best_reads > 0 && current_result->selected_votes < 1) break;
-			if(total_best_reads > 0 && global_context -> input_reads.is_paired_end_reads && !is_result_in_PE(prime_result)) break;
+			alignment_result_t * current_result_2 = NULL;
+
+			//if(total_best_reads > 0 && current_result->selected_votes < 1) break;
+			//if(total_best_reads > 0 && global_context -> input_reads.is_paired_end_reads && !is_result_in_PE(prime_result)) break;
+			int read_1_result_available = 1;
+			int read_2_result_available = 1;
+
+			if(global_context -> config.multi_best_reads>1)
+			{
+				char * chro1_chro = NULL;
+				unsigned int chro_1_pos = 0;
+				if(locate_gene_position_max(current_result -> selected_position, &global_context -> chromosome_table, &chro1_chro, &chro_1_pos, read_len_1))
+				{
+					read_1_result_available = 0;
+				}
+			}
+
+			if(read_1_result_available)
+				if((current_result->result_flags & CORE_IS_BREAKEVEN) && !global_context -> config.report_multi_mapping_reads)
+				{
+					read_1_result_available = 0;
+				//	SUBREADprintf("Disabled read on time UNIQ:%s\n",current_name);
+				}
+
+			if(global_context -> input_reads.is_paired_end_reads)
+			{
+				current_result_2 = _global_retrieve_alignment_ptr(global_context  , read_number, 1, total_best_reads);
+
+				if(read_2_result_available)
+					if((current_result_2->result_flags & CORE_IS_BREAKEVEN) && !global_context -> config.report_multi_mapping_reads)
+					{
+						read_2_result_available = 0;
+					}
+
+
+				if(global_context -> config.multi_best_reads>1)
+				{
+					char * chro1_chro = NULL;
+					unsigned int chro_1_pos = 0;
+					if(locate_gene_position_max(current_result_2 -> selected_position, &global_context -> chromosome_table, &chro1_chro, &chro_1_pos, read_len_2))
+					{
+						read_2_result_available = 0;
+					}
+				}
+
+
+				if(current_result_2 -> result_flags & CORE_IS_FULLY_EXPLAINED)if(read_2_result_available) read_2_repeats ++;
+				if(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED)if(read_1_result_available) read_1_repeats ++;
+			}else
+			{
+				if(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED)
+					if(read_1_result_available)read_1_repeats ++;
+			}
 		}
 
 		for(best_read_id=0; best_read_id<global_context -> config.multi_best_reads; best_read_id++)
@@ -970,11 +1047,26 @@ int write_chunk_results(global_context_t * global_context)
 			char current_cigar_decompress[100];
 			for(is_second_read = 0; is_second_read < 1+ global_context -> input_reads.is_paired_end_reads; is_second_read++)
 			{
-				alignment_result_t *current_result, *mate_result;
+				alignment_result_t *current_result, *mate_result = NULL;
 				current_result = _global_retrieve_alignment_ptr(global_context  , read_number, is_second_read, best_read_id);
-				mate_result    = _global_retrieve_alignment_ptr(global_context  , read_number,!is_second_read, best_read_id);
-				if(best_read_id>0 && current_result->selected_votes < 1 && (is_second_read == 0 || !global_context -> input_reads.is_paired_end_reads)) break;
-				if(best_read_id>0 && ( global_context -> input_reads.is_paired_end_reads&& !is_result_in_PE(prime_result))) break;
+				
+				if(global_context -> input_reads.is_paired_end_reads)
+					mate_result    = _global_retrieve_alignment_ptr(global_context  , read_number,!is_second_read, best_read_id);
+
+				//if(best_read_id>0 && current_result->selected_votes < 1 && (is_second_read == 0 || !global_context -> input_reads.is_paired_end_reads)) break;
+				//if(best_read_id>0 && ( global_context -> input_reads.is_paired_end_reads&& !is_result_in_PE(prime_result))) break;
+				/*
+				if(global_context -> input_reads.is_paired_end_reads)
+				{
+					if(best_read_id)
+						if((!(current_result -> result_flags &CORE_IS_FULLY_EXPLAINED)) && !(CORE_IS_FULLY_EXPLAINED &  mate_result -> result_flags))
+							break;
+				}else
+				{
+					if(best_read_id)
+						if(!(current_result -> result_flags &CORE_IS_FULLY_EXPLAINED))
+							break;
+				}*/
 
 				char * current_name      = is_second_read ? read_name_2 : read_name_1;
 				char * current_read_text = is_second_read ? read_text_2 : read_text_1;
@@ -984,6 +1076,8 @@ int write_chunk_results(global_context_t * global_context)
 				int mate_read_len	= is_second_read ? read_len_1  : read_len_2;
 				unsigned int mate_linear_pos=0, current_linear_pos=0;
 				char mate_strand = 0, current_strand = 0;
+				int current_read_repeats = is_second_read ? read_2_repeats:read_1_repeats;
+				int * current_read_reported = is_second_read ? (&read_2_reported):(&read_1_reported);
 
 				char * current_chro_name=NULL, * mate_chro_name = NULL;
 				unsigned int current_chro_offset=0, mate_chro_offset=0;
@@ -1067,17 +1161,13 @@ int write_chunk_results(global_context_t * global_context)
 						}
 
 						if(locate_gene_position_max(mate_linear_pos, &global_context -> chromosome_table, & mate_chro_name, & mate_chro_offset, mate_read_len))
-							is_mate_ok = 0;
-
-						mate_soft_clipping_movement = get_soft_clipping_length(mate_CIGAR);
-						if(global_context -> config.space_type == GENE_SPACE_COLOR)
 						{
-							if( (!is_second_read)  +  mate_strand == 1 )
-							{
-								//mate_chro_offset ++;
-							}
-
+							is_mate_ok = 0;
+							//if(!is_second_read)
+							//	read_2_repeats--;
+								
 						}
+						mate_soft_clipping_movement = get_soft_clipping_length(mate_CIGAR);
 						mate_chro_offset += mate_soft_clipping_movement;
 
 					}
@@ -1096,16 +1186,17 @@ int write_chunk_results(global_context_t * global_context)
 				}
 		
 
-				if(global_context -> config.do_big_margin_reporting || global_context -> config.do_big_margin_filtering_for_reads)
+				if(global_context -> config.do_big_margin_filtering_for_reads)
 					current_repeated_times = is_ambiguous_voting(global_context, read_number, is_second_read, current_result->selected_votes, current_result->confident_coverage_start, current_result->confident_coverage_end, current_read_len, current_strand);
 		
-				if(is_current_ok)
-					if((current_result->result_flags & CORE_IS_BREAKEVEN) && !global_context -> config.report_multi_mapping_reads)
-						is_current_ok = 0;
+
 
 				if(is_current_ok)
-					if(global_context -> config.do_big_margin_filtering_for_reads && current_repeated_times>1)
+					if((current_result->result_flags & CORE_IS_BREAKEVEN) && !global_context -> config.report_multi_mapping_reads)
+					{
 						is_current_ok = 0;
+					//	SUBREADprintf("Disabled read on time UNIQ:%s\n",current_name);
+					}
 
 				if(is_current_ok)
 				{
@@ -1151,17 +1242,23 @@ int write_chunk_results(global_context_t * global_context)
 						current_CIGAR = out_cigars[0];
 					}
 
-					//printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
 					if(locate_gene_position_max(current_linear_pos,& global_context -> chromosome_table, & current_chro_name, & current_chro_offset, current_read_len))
+					{
 						is_current_ok = 0;
-					//printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
+					//	if (!is_second_read) 
+					//		read_1_repeats--;
+					//	current_read_repeats--;
+					}
 				}
 
 				if(is_current_ok)
 				{
 					if(current_strand + is_second_read == 1)
 						mask |= SAM_FLAG_REVERSE_STRAND_MATCHED;
-					if(best_read_id>0) mask |= SAM_FLAG_SECONDARY_MAPPING;
+					if(*current_read_reported){
+						mask |= SAM_FLAG_SECONDARY_MAPPING;
+					}
+					(*current_read_reported)=1;
 					//if(1639 == read_number)
 					//	printf("R0=%d ; NEG=%d; SEC=%d\n",(*current_has_reversed), (current_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0, is_second_read);
 					int current_need_reverse = current_strand;
@@ -1277,7 +1374,6 @@ int write_chunk_results(global_context_t * global_context)
 					}
 				//////////////////////////////////////////////
 
-		//		printf("CURCIGAR=%s ; OK=%d\n", current_cigar_decompress, is_current_ok);
 
 				if(is_current_ok && global_context -> input_reads.is_paired_end_reads && is_mate_ok)
 				{
@@ -1320,11 +1416,45 @@ int write_chunk_results(global_context_t * global_context)
 				if(mate_chro_name[0]!='*' && mate_chro_name == current_chro_name && global_context -> input_reads.is_paired_end_reads)
 				{
 					mate_chro_name="=";
+
+					//if(2190 == read_number)SUBREADprintf("MATE_DIST=%lld\n", mate_distance);
+
 					if(is_mate_ok && is_current_ok && abs(mate_distance) >= global_context->config. minimum_pair_distance && abs(mate_distance) <= global_context-> config.maximum_pair_distance  && current_strand == mate_strand)
 					{
-						mask |= SAM_FLAG_MATCHED_IN_PAIR;
-						if(is_second_read)
-							global_context->all_correct_PE_reads  ++;
+					//	if(2190 == read_number)SUBREADprintf("MATE_DIST 2 =%lld , CUR_OFF=%u, MAT_OFF=%u, CUR_STRAND=%d\n", mate_distance, current_chro_offset, mate_chro_offset, current_strand);
+						int is_PEM = 0;
+						if(global_context -> config.do_fusion_detection)
+						{
+							is_PEM = 1;
+						}
+						else 
+						{
+							if(global_context -> config.is_first_read_reversed && !(global_context -> config.is_second_read_reversed))
+							{
+								if(current_strand == 0)
+								{
+									if((is_second_read + (mate_chro_offset > current_chro_offset) == 1) || mate_chro_offset == current_chro_offset)
+										is_PEM = 1;
+								}
+							}
+							else
+							{
+								if(current_strand)
+								{
+									if((is_second_read + (mate_chro_offset < current_chro_offset) == 1) || mate_chro_offset == current_chro_offset) is_PEM = 1;
+								}else{
+									if((is_second_read + (mate_chro_offset > current_chro_offset) == 1) || mate_chro_offset == current_chro_offset) is_PEM = 1;
+
+								}
+							}
+						}
+
+						//if(2190 == read_number)SUBREADprintf("MATE_DIST 3 =%lld ; PEM=%d\n", mate_distance, is_PEM);
+						if(is_PEM){
+							mask |= SAM_FLAG_MATCHED_IN_PAIR;
+							if(is_second_read)
+								global_context->all_correct_PE_reads  ++;
+						}
 					}
 
 
@@ -1342,13 +1472,25 @@ int write_chunk_results(global_context_t * global_context)
 				//if(read_number==2461)
 				//printf("CURCIGAR=%s ; FINAL_CIGAR=%s ; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
 
-				if(is_current_ok || best_read_id==0)
+				if( is_mate_ok ||is_current_ok || (global_context -> config.multi_best_reads <2) || (best_read_id==0 && read_1_repeats == 0 && read_2_repeats == 0))
 				{
 					int seq_len = strlen(additional_information);
-					if(global_context->config.do_big_margin_reporting)
-						seq_len += sprintf(additional_information+seq_len, "\tSA:i:%d", current_repeated_times);
-					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tNH:i:%d", (int)((current_result -> Score_H >> 17) & 0xfff), is_current_ok?total_best_reads:0);
-				//	seq_len += sprintf(additional_information+seq_len, "\tSG:Z:%s\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d",current_cigar_decompress, current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, is_current_ok?total_best_reads:0); 
+					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tSM:i:%d\tNH:i:%d", (int)((current_result -> Score_H >> 17) & 0xfff), current_result -> final_mismatched_bases, current_read_repeats);
+
+					if( is_current_ok && global_context -> config.is_rna_seq_reads && !(current_result -> result_flags & CORE_NOTFOUND_DONORS))
+					{
+						seq_len += sprintf(additional_information+seq_len, "\tXS:A:%c", (current_result -> result_flags & CORE_IS_GT_AG_DONORS)?'+':'-');
+					}
+
+					if(global_context -> config.SAM_extra_columns)
+					{
+						if(!is_current_ok){
+							current_cigar_decompress[0]='*';
+							current_cigar_decompress[1]=0;
+						}
+						seq_len += sprintf(additional_information+seq_len, "\tSG:Z:%s\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d\tSP:Z:%s",current_cigar_decompress, current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, current_read_repeats, (current_result -> result_flags & CORE_IS_GAPPED_READ)?"GAPPED":"NOEVENT"); 
+					}
+
 					if(global_context->config.read_group_id[0])
 						seq_len += sprintf(additional_information+seq_len, "\tRG:Z:%s", global_context->config.read_group_id);
 
@@ -1705,10 +1847,13 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				{
 					//printf("RESET0 %d %d\n", current_result->selected_votes , global_context->config.total_subreads * global_context->config.minimum_support_for_second_read);
 					current_result->selected_votes = 0;
+					current_result -> final_mismatched_bases = 0;
 					continue;
 				}
 				if(locate_current_value_index(global_context, thread_context, current_result, current_rlen))
 				{
+					current_result->selected_votes = 0;
+					current_result -> final_mismatched_bases = 0;
 					//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR, "Read position excesses index boundary.");
 					continue;
 				}
@@ -1797,6 +1942,8 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	if(thread_context)
 		thread_context -> current_value_index = global_context -> current_value_index;
 
+	int GENE_SLIDING_STEP = global_context -> current_index -> index_gap;
+
 	for(current_read_number = read_block_start; current_read_number < reads_to_be_done + read_block_start ; current_read_number++)
 	{
 		int is_second_read;
@@ -1836,9 +1983,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						subread_step = ((current_rlen - 18)<<16)/62;
 				}
 
-				#ifdef NEED_SUBREAD_STATISTIC
-				int allsubreads_for_each_gap [3], noninformative_subreads_for_each_gap[3];
-				#endif
+				int allsubreads_for_each_gap [GENE_SLIDING_STEP], noninformative_subreads_for_each_gap[GENE_SLIDING_STEP];
 
 				int applied_subreads = 1 + ((current_rlen - 18)<<16) / subread_step;
 				unsigned int current_high_border = high_index_border -  current_rlen;
@@ -1846,26 +1991,29 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				if(global_context->config.is_rna_seq_reads && current_rlen > EXON_LONG_READ_LENGTH && global_context->config.all_threads<2)
 					core_fragile_junction_voting(global_context, thread_context, current_read, current_qual, current_rlen, is_reversed, global_context->config.space_type, low_index_border, current_high_border, vote_fg);
 
-				#ifdef NEED_SUBREAD_STATISTIC
-				for(xk1=0;xk1<3;xk1++)
+				if(global_context->config.SAM_extra_columns)
 				{
-					allsubreads_for_each_gap[xk1]=0;
-					noninformative_subreads_for_each_gap[xk1]=0;
+					for(xk1=0;xk1<GENE_SLIDING_STEP;xk1++)
+					{
+						allsubreads_for_each_gap[xk1]=0;
+						noninformative_subreads_for_each_gap[xk1]=0;
+					}
 				}
-				#endif
 
 				for(subread_no=0; subread_no < applied_subreads ; subread_no++)
 				{
 					for(xk1=0; xk1<GENE_SLIDING_STEP ; xk1++)
 					{
 
-				#ifdef NEED_SUBREAD_STATISTIC
-						current_vote -> noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
-						current_vote -> all_used_subreads = allsubreads_for_each_gap[xk1];
-				#endif
+						if(global_context->config.SAM_extra_columns)
+						{
+							current_vote -> noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
+							current_vote -> all_used_subreads = allsubreads_for_each_gap[xk1];
+						}
 
 						int subread_offset = ((subread_step * subread_no) >> 16);
-						subread_offset -= subread_offset%3 - xk1; 
+						if(GENE_SLIDING_STEP > 1)
+							subread_offset -= subread_offset%(GENE_SLIDING_STEP) - xk1; 
 
 						int subread_quality = 1;
 						char * subread_string = current_read + subread_offset;
@@ -1888,10 +2036,11 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 
 
-				#ifdef NEED_SUBREAD_STATISTIC
-						noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
-						allsubreads_for_each_gap[xk1] = current_vote -> all_used_subreads;
-				#endif
+						if(global_context->config.SAM_extra_columns)
+						{
+							noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
+							allsubreads_for_each_gap[xk1] = current_vote -> all_used_subreads;
+						}
 
 
 					}
@@ -1899,20 +2048,21 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 				//puts("");
 
-				#ifdef NEED_SUBREAD_STATISTIC
-				short max_noninformative_subreads = -1;
-				unsigned char max_all_subreads = 0;
+				if(global_context->config.SAM_extra_columns)
+				{
+					short max_noninformative_subreads = -1;
+					unsigned char max_all_subreads = 0;
 
-				for(xk1=0;xk1<3;xk1++)
-					if(noninformative_subreads_for_each_gap[xk1] > max_noninformative_subreads)
-					{
-						max_noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
-						max_all_subreads = allsubreads_for_each_gap[xk1];
-					}
+					for(xk1=0;xk1<GENE_SLIDING_STEP;xk1++)
+						if(noninformative_subreads_for_each_gap[xk1] > max_noninformative_subreads)
+						{
+							max_noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
+							max_all_subreads = allsubreads_for_each_gap[xk1];
+						}
 
-				current_vote -> noninformative_subreads = max_noninformative_subreads;
-				current_vote -> all_used_subreads = max_all_subreads;
-				#endif
+					current_vote -> noninformative_subreads = max_noninformative_subreads;
+					current_vote -> all_used_subreads = max_all_subreads;
+				}
 			}
 
 
@@ -1921,8 +2071,10 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			{
 				//if(strcmp(read_name_1,"b1")==0)
 
-				//if(current_read_number == 17296){
-				//print_votes(vote_1, global_context -> config.index_prefix);
+				//if(current_read_number == 119) {
+				//	SUBREADprintf("NOINF=%d\n", vote_1 -> noninformative_subreads );
+				//	print_votes(vote_1, global_context -> config.index_prefix);
+				//}
 				//print_votes(vote_2, global_context -> config.index_prefix);
 				//}
 
@@ -2151,7 +2303,7 @@ unsigned int split_read_files(global_context_t * global_context)
 
 		while(1)
 		{
-			char * tok_tmp, * flag;
+			char * tok_tmp = NULL, * flag;
 			if(processed_reads >= chunk_reads || feof(global_context->input_reads.first_read_file.input_fp))
 				break;
 
@@ -2337,6 +2489,7 @@ int read_chunk_circles(global_context_t *global_context)
 	
 		reward_read_files(global_context, SEEK_SET);
 		ret = run_maybe_threads(global_context, STEP_ITERATION_ONE);
+		ret = anti_supporting_read_scan(global_context);
 
 		//HashTable * event_table = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID])->event_entry_table;
 		//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "There are %ld elements in the indel table before filtering.", event_table ->numOfElements);
@@ -2606,7 +2759,7 @@ int load_global_context(global_context_t * context)
 
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1))
 	{
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
+		//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
 		return -1;
 	}
 
@@ -2627,16 +2780,16 @@ int load_global_context(global_context_t * context)
 	{
 		if(core_geinput_open(context, &context->input_reads.second_read_file, 2,1))
 		{
-			sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.second_read_file);
+			//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.second_read_file);
 			return -1;
 		}
 	}
 
 
 	if(context->input_reads.is_paired_end_reads)
-		context->config.reads_per_chunk = 7*1024*1024*min(40,max(1,context->config.memory_use_multiplex));
+		context->config.reads_per_chunk = 7*1024*1024*min(40,max(0.01,context->config.memory_use_multiplex));
 	else
-		context->config.reads_per_chunk = 14*1024*1024*min(40,max(1,context->config.memory_use_multiplex));
+		context->config.reads_per_chunk = 14*1024*1024*min(40,max(0.01,context->config.memory_use_multiplex));
 
 	struct stat ginp1_stat;
 	stat(context->config.first_read_file , &ginp1_stat);

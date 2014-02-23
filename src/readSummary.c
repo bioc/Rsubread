@@ -58,6 +58,9 @@
 #define FILE_TYPE_RSUBREAD 10
 #define FILE_TYPE_GTF 100
 
+#define ALLOW_ALL_MULTI_MAPPING 1
+#define ALLOW_PRIMARY_MAPPING 2
+
 #define MAX_HIT_NUMBER 3000
 
 typedef struct
@@ -81,6 +84,7 @@ typedef struct
 	unsigned long long unassigned_mappingquality;
 	unsigned long long unassigned_fragmentlength;
 	unsigned long long unassigned_chimericreads;
+	unsigned long long unassigned_secondary;
 
 } fc_read_counters;
 
@@ -240,7 +244,7 @@ unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str,
 
 void print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport)
 {
-	char * tmp_ptr1 , * next_fn, *sam_used = malloc(strlen(sam)+1), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
+	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+1), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
 	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
 
 	strcpy(sam_used, sam);
@@ -259,7 +263,7 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		nfiles++;
 
-		int file_probe = is_certainly_bam_file(next_fn);
+		int file_probe = is_certainly_bam_file(next_fn, NULL);
 		if(file_probe==-1) nNonExistFiles++;
 		if(file_probe == 1) nBAMfiles++;		
 	}
@@ -285,11 +289,11 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	{
 		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
-		int file_probe = is_certainly_bam_file(next_fn);
+		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE);
 
-		char file_chr = 'o';
+		char file_chr = 'S';
 		if(file_probe == -1) file_chr = '?';
-		if(file_probe == 1) file_chr = 'o';
+		else if(is_first_read_PE == 1) file_chr = 'P';
 		//file_chr = 'o';
 
 		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, next_fn,CHAR_ESC);
@@ -311,7 +315,12 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	print_in_box(80,0,0,"                  Level : %s level", global_context->is_gene_level?"meta-feature":"feature");
 	print_in_box(80,0,0,"             Paired-end : %s", global_context->is_paired_end_data?"yes":"no");
 	print_in_box(80,0,0,"        Strand specific : %s", global_context->is_strand_checked?(global_context->is_strand_checked==1?"yes":"inversed"):"no");
-	print_in_box(80,0,0,"     Multimapping reads : %s", global_context->is_multi_mapping_allowed?"counted":"not counted");
+	char * multi_mapping_allow_mode = "not counted";
+	if(global_context->is_multi_mapping_allowed == ALLOW_PRIMARY_MAPPING)
+		multi_mapping_allow_mode = "primary only";
+	else if(global_context->is_multi_mapping_allowed == ALLOW_ALL_MULTI_MAPPING)
+		multi_mapping_allow_mode = "counted";
+	print_in_box(80,0,0,"     Multimapping reads : %s", multi_mapping_allow_mode);
 	print_in_box(80,0,0,"Multi-overlapping reads : %s", global_context->is_multi_overlap_allowed?"counted":"not counted");
 
 	if(global_context->is_paired_end_data)
@@ -557,59 +566,11 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				ret_features[xk1].sorted_order = xk1;
 				strtok_r(NULL,"\t",&token_temp);	// "frame"
 				char * extra_attrs = strtok_r(NULL,"\t",&token_temp);	// name_1 "val1"; name_2 "val2"; ... 
-				if(extra_attrs && (strlen(extra_attrs)>6))
+				if(extra_attrs && (strlen(extra_attrs)>2))
 				{
-					int attr_state = 0;	// 0: name; 1:value
-					int name_start = 0;
-					int val_start = 0;
-					int is_gene_id = 0;
-					int xk2, exch;
-
-					
-					while((*extra_attrs)==' ')extra_attrs++;
-
-					for(xk2 = 0;  extra_attrs[xk2]; xk2++)
-					{
-						exch = extra_attrs[xk2];
-						if(exch == ' ' && attr_state == 0)
-							continue;
-						else if(exch == '#' && attr_state == 0)
-							break;
-						else if(exch == '\"')
-						{
-							if(xk2<1) break;
-							if(attr_state == 0){
-								char tmpx;
-								val_start = xk2 + 1;
-								tmpx = extra_attrs[xk2 - 1];
-								extra_attrs[xk2 - 1] = 0;
-								//printf("%s=%s\n", extra_attrs + name_start, global_context -> gene_id_column);
-								while(extra_attrs[name_start] == ' ' )name_start++;
-
-								if(strcmp(extra_attrs + name_start, global_context -> gene_id_column)==0)
-									is_gene_id = 1;
-								extra_attrs[xk2 - 1] = tmpx;
-							}
-							else if(attr_state == 1)
-							{
-								if(is_gene_id)
-								{
-									extra_attrs[xk2]=0;
-									term_strncpy(feature_name_tmp, extra_attrs + val_start, FEATURE_NAME_LENGTH);
-									//printf("N=%s\n", ret_features[xk1].feature_name);
-									is_gene_id = 2;
-									is_gene_id_found = 1;
-									break;
-								}
-								is_gene_id = 0 ;
-								name_start = xk2 + 2;	// "; NAME2
-							}
-							
-							attr_state = !attr_state;
-							continue;
-						}
-						
-					}
+					int attr_val_len = GTF_extra_column_value(extra_attrs , global_context -> gene_id_column , feature_name_tmp, FEATURE_NAME_LENGTH);
+					if(attr_val_len>0) is_gene_id_found=1;
+			//		printf("V=%s\tR=%d\n", extra_attrs , attr_val_len);
 				}
 
 				if(is_gene_id_found)
@@ -657,7 +618,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	global_context -> exontable_nchrs = (int)chro_name_table-> numOfElements;
 	global_context -> exontable_chro_table = chro_name_table;
 
-	print_in_box(80,0,0,"   Number of features is %d\n", features);
+	print_in_box(80,0,0,"   Features : %d\n", features);
 	if(features < 1)
 	{
 		print_in_box(80,0,0,"WARNING no features were loaded in format %s.", file_type == FILE_TYPE_GTF?"GTF":"SAF");
@@ -989,7 +950,7 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
 
-	char * read_chr, *read_1_chr = NULL, *tmp_tok_ptr, *CIGAR_str , *read_name = NULL, *read_name1 = NULL;
+	char * read_chr, *read_1_chr = NULL, *tmp_tok_ptr= NULL, *CIGAR_str , *read_name = NULL, *read_name1 = NULL;
 	long read_pos, fragment_length = 0, read_1_pos = 0;
 	unsigned int search_start = 0, search_end;
 	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
@@ -1190,9 +1151,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				}
 
 
-				// now it is a NH>1 read!
-				if((is_second_read || !global_context -> is_paired_end_data) && !global_context -> is_multi_mapping_allowed)
+				if(global_context -> is_multi_mapping_allowed == 0)
 				{
+					// now it is a NH>1 read!
+					// not allow multimapping -> discard!
 					thread_context->read_counters.unassigned_multimapping ++;
 
 					if(global_context -> SAM_output_fp)
@@ -1200,6 +1162,15 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					return;
 				}
 			}
+		}
+
+		// if a pair of reads have one secondary, the entire fragment is seen as secondary.
+		if((alignment_masks & SAM_FLAG_SECONDARY_MAPPING) && (global_context -> is_multi_mapping_allowed == ALLOW_PRIMARY_MAPPING))
+		{
+			thread_context->read_counters.unassigned_secondary ++;
+
+			if(global_context -> SAM_output_fp)
+				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\n", read_name);
 		}
 
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
@@ -1725,6 +1696,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 		global_context -> read_counters.unassigned_fragmentlength += global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength;
 		global_context -> read_counters.unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
 		global_context -> read_counters.unassigned_multimapping += global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping;
+		global_context -> read_counters.unassigned_secondary += global_context -> thread_contexts[xk1].read_counters.unassigned_secondary;
 		global_context -> read_counters.assigned_reads += global_context -> thread_contexts[xk1].read_counters.assigned_reads;
 
 		my_read_counter->unassigned_ambiguous += global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous;
@@ -1734,6 +1706,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 		my_read_counter->unassigned_fragmentlength += global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength;
 		my_read_counter->unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
 		my_read_counter->unassigned_multimapping += global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping;
+		my_read_counter->unassigned_secondary += global_context -> thread_contexts[xk1].read_counters.unassigned_secondary;
 		my_read_counter->assigned_reads += global_context -> thread_contexts[xk1].read_counters.assigned_reads;
 		
 	}
@@ -1743,8 +1716,8 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, unsign
 		sprintf(pct_str,"(%.1f%%%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
 	else	pct_str[0]=0;
 
-	print_in_box(80,0,0,"   Total number of %s is : %llu", global_context -> is_paired_end_data?"fragments":"reads", total_input_reads); 
-	print_in_box(pct_str[0]?81:80,0,0,"   Number of successfully assigned %s is : %llu %s", global_context -> is_paired_end_data?"fragments":"reads", *nreads_mapped_to_exon,pct_str); 
+	print_in_box(80,0,0,"   Total %s : %llu", global_context -> is_paired_end_data?"fragments":"reads", total_input_reads); 
+	print_in_box(pct_str[0]?81:80,0,0,"   Successfully assigned %s : %llu %s", global_context -> is_paired_end_data?"fragments":"reads", *nreads_mapped_to_exon,pct_str); 
 	print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
 	print_in_box(80,0,0,"");
 }
@@ -1826,6 +1799,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> read_counters.unassigned_fragmentlength=0;
 	global_context -> read_counters.unassigned_chimericreads=0;
 	global_context -> read_counters.unassigned_multimapping=0;
+	global_context -> read_counters.unassigned_secondary=0;
 	global_context -> read_counters.assigned_reads=0;
 
 	if(alias_file_name && alias_file_name[0])
@@ -1904,6 +1878,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_secondary = 0;
 
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 		void ** thread_args = malloc(sizeof(void *)*2);
@@ -2013,7 +1988,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		fprintf(fp_out, "\n");
 	}
 
-	char * tmp_ptr, * next_fn;
+	char * tmp_ptr = NULL, * next_fn;
 	int non_empty_files = 0, i_files=0;
 	fprintf(fp_out,"Geneid\tChr\tStart\tEnd\tStrand\tLength");
 	next_fn = strtok_r(file_list, ";", &tmp_ptr);
@@ -2207,9 +2182,9 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	}
 
 	fprintf(fp_out,"\n");
-	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_Chimera"};
+	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragementLength", "Unassigned_Chimera", "Unassigned_Secondary"};
 
-	for(xk1=0; xk1<8; xk1++)
+	for(xk1=0; xk1<9; xk1++)
 	{
 		fprintf(fp_out,"%s", keys[xk1]);
 		for(i_files = 0; i_files < nfiles; i_files ++)
@@ -2248,7 +2223,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 
 
 
-	char * tmp_ptr, * next_fn;
+	char * tmp_ptr = NULL, * next_fn;
 	fprintf(fp_out,"Geneid\tChr\tStart\tEnd\tStrand\tLength");
 	next_fn = strtok_r(file_list, ";", &tmp_ptr);
 	while(1){
@@ -2280,6 +2255,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 
 static struct option long_options[] =
 {
+	{"primary",no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -2345,6 +2321,11 @@ void print_usage()
 	SUBREADputs("              \ta multi-mapping read will be counted up to N times if it has N");
 	SUBREADputs("              \treported mapping locations). The program uses the `NH' tag to");
 	SUBREADputs("              \tfind multi-mapping reads.");
+	SUBREADputs("    "); 
+	SUBREADputs("    --primary \tif specified, only primary alignments are included in the");
+	SUBREADputs("              \tsummarization. Secondary alignments are identified using bit");
+	SUBREADputs("              \t0x100 in the Flag field and such alignments are excluded from");
+	SUBREADputs("              \tthe summarization."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must satisfy in order");
 	SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
@@ -2428,6 +2409,7 @@ int readSummary(int argc,char *argv[]){
 	21: Annotation Chromosome Alias Name File. If the file is not specified, set this value to NULL or a zero-length string.
 	22: Command line for CfeatureCounts header output; RfeatureCounts should set this value to NULL or a zero-length string.
 	23: as.numeric(isInputFileResortNeeded)
+	24: as.numeric(feature_block_size) # the size is feature bins; 128KB by default
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20;
@@ -2515,7 +2497,6 @@ int readSummary(int argc,char *argv[]){
 	if(argc>23)
 		isInputFileResortNeeded = atoi(argv[23]);
 	else	isInputFileResortNeeded = 0;
-
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
 
@@ -2537,8 +2518,8 @@ int readSummary(int argc,char *argv[]){
 	}
 
 	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &anno_chr_2ch, &anno_chrs, &anno_chr_head, & block_end_index, & block_min_start, & block_max_end);
-	print_in_box(80,0,0,"   Number of meta-features is %d", global_context . gene_name_table -> numOfElements);
-	print_in_box(80,0,0,"   Number of chromosomes is %d", global_context . exontable_nchrs);
+	print_in_box(80,0,0,"   Meta-features : %d", global_context . gene_name_table -> numOfElements);
+	print_in_box(80,0,0,"   Chromosomes : %d", global_context . exontable_nchrs);
 
 	print_in_box(80,0,0,"");
 
@@ -2553,7 +2534,7 @@ int readSummary(int argc,char *argv[]){
 
 
 
-	char * tmp_pntr;
+	char * tmp_pntr = NULL;
 	char * file_list_used = malloc(strlen(argv[2])+1);
 	strcpy(file_list_used, argv[2]);
 	char * next_fn = strtok_r(file_list_used,";", &tmp_pntr);
@@ -2561,7 +2542,7 @@ int readSummary(int argc,char *argv[]){
 	fc_read_counters * read_counters = calloc(n_input_files , sizeof(fc_read_counters)); 
 
 	for(;;){
-		int redoing, original_sorting = global_context.is_input_file_resort_needed;
+		int redoing, original_sorting = global_context.is_input_file_resort_needed, orininal_isPE = global_context.is_paired_end_data;
 		if(next_fn==NULL || strlen(next_fn)<1) break;
 
 		unsigned int * column_numbers = calloc(nexons, sizeof(unsigned int ));
@@ -2590,6 +2571,7 @@ int readSummary(int argc,char *argv[]){
 		}
 		global_context.is_SAM_file = isSAM;
 		global_context.is_input_file_resort_needed = original_sorting;
+		global_context.is_paired_end_data = orininal_isPE;
 
 		i_files++;
 		next_fn = strtok_r(NULL, ";", &tmp_pntr);
@@ -2670,12 +2652,19 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 {
 	FILE *fp_in = NULL;
 	int read_length = 0;
+	int is_first_read_PE=0;
 	char * line = (char*)calloc(MAX_LINE_LENGTH, 1);
 	char * file_str = "";
 
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
-		int file_probe = is_certainly_bam_file(global_context->input_file_name);
+		int file_probe = is_certainly_bam_file(global_context->input_file_name, &is_first_read_PE);
+
+		// a Singel-end SAM/BAM file cannot be assigned as a PE SAM/BAM file;
+		// but a PE SAM/BAM file may be assigned as a SE file if the user wishes to do so.
+		if(is_first_read_PE==0)
+				global_context -> is_paired_end_data = 0;
+
 		if(file_probe == 1){
 			global_context->is_SAM_file = 0;
 		}
@@ -2688,7 +2677,14 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 		if(file_probe == -1) file_str = "Unknown";
 
 		if(!global_context->redo)
+		{
 			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context->input_file_name);
+			if(is_first_read_PE)
+				print_in_box(80,0,0,"   Paired-end reads are included.");
+			else
+				print_in_box(80,0,0,"   Single-end reads are included.");
+		}
+		
 	}
 
 	int isInputFileResortNeeded = global_context->is_input_file_resort_needed;
@@ -2731,7 +2727,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, unsigne
 			if( global_context->is_paired_end_data)
 			{
 					print_in_box(80,0,0,"   Assign fragments (read pairs) to features...");
-					print_in_box(80,0,0,"   Each fragment is counted once.");
+	//				print_in_box(80,0,0,"   Each fragment is counted no more than once.");
 			}
 			else
 					print_in_box(80,0,0,"   Assign reads to features...");
@@ -3192,7 +3188,7 @@ int feature_count_main(int argc, char ** argv)
 				strcpy(alias_file_name, optarg);
 				break;
 			case 'M':
-				is_Multi_Mapping_Allowed = 1;
+				is_Multi_Mapping_Allowed = ALLOW_ALL_MULTI_MAPPING;
 				break;
 			case 'v':
 				core_version_number("featureCounts");
@@ -3261,6 +3257,14 @@ int feature_count_main(int argc, char ** argv)
 			case 'L':
 				feature_block_size = atoi(optarg);
 				break;
+			case 0 :	// long options
+
+				if(strcmp("primary", long_options[option_index].name)==0)
+				{
+					is_Multi_Mapping_Allowed = ALLOW_PRIMARY_MAPPING;
+				}
+
+				break;
 			case '?':
 			default :
 				print_usage();
@@ -3316,7 +3320,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[17] = nameFeatureTypeColumn;
 	Rargv[18] = nameGeneIDColumn;
 	Rargv[19] = min_qual_score_str;
-	Rargv[20] = is_Multi_Mapping_Allowed?"1":"0";
+	Rargv[20] = is_Multi_Mapping_Allowed == ALLOW_PRIMARY_MAPPING?"2":(is_Multi_Mapping_Allowed == ALLOW_ALL_MULTI_MAPPING?"1":"0");
 	Rargv[21] = alias_file_name;
 	Rargv[22] = cmd_rebuilt;
 	Rargv[23] = is_Input_Need_Reorder?"1":"0";

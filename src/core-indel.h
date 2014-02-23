@@ -27,7 +27,8 @@
 // chromosome events can be indels, junctions or fusions.
 // if it is an insertion event, event_large_site = event_small_site+1.
 
-#define MAX_EVENT_ENTRIES_PER_SITE 5
+//#define MAX_EVENT_ENTRIES_PER_SITE 5
+#define MAX_EVENT_ENTRIES_PER_SITE 12 
 #define CHRO_EVENT_TYPE_REMOVED 0
 #define CHRO_EVENT_TYPE_INDEL 8
 #define CHRO_EVENT_TYPE_LONG_INDEL 16 
@@ -61,6 +62,7 @@ typedef struct{
 	char indel_at_junction;
 	char is_negative_strand;	// this only works to junction detection, according to 'GT/AG' or 'CT/AC' donors. This only applys to junctions.
 	char is_strand_jumped;		// "strand jumped" means that the left and right sides are on different strands. This only applys to fusions.
+	char is_donor_found;		// only for junctions: GT/AG is found at the location.
 						// Also, if "is_strand_jumped" is true, all coordinates (e.g., splicing points, cover_start, cover_end, etc) are on "reversed read" view.
 
 	//char is_ambiguous;
@@ -69,7 +71,8 @@ typedef struct{
 
 	//char inserted_bases[(1+MAX_INSERTION_LENGTH) / 4 + 1];
 	char * inserted_bases;
-	unsigned int supporting_reads;
+	unsigned short supporting_reads;
+	unsigned short anti_supporting_reads;
 	unsigned short final_counted_reads;
 	unsigned short final_reads_mismatches;
 	unsigned int global_event_id;
@@ -79,7 +82,7 @@ typedef struct{
 
 struct reassmebly_window_allele
 {
-	char rebuilt_window[2500];
+	char rebuilt_window[8000];
 	float allele_quality;
 	int rebuilt_size;
 };
@@ -112,6 +115,7 @@ typedef struct{
 	int search_cost;
 	int total_matched_bases;
 	int max_matched_bases;
+	unsigned int window_start_pos;
 } reassembly_by_voting_block_context_t;
 
 
@@ -157,7 +161,6 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 int write_indel_final_results(global_context_t * context);
 int search_event(global_context_t * global_context,HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, char event_type, chromosome_event_t ** return_buffer);
 
-void set_alignment_result_art(alignment_result_t * alignment_result, unsigned int position, int votes, char * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand);
 void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, char * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset);
 
 void put_new_event(HashTable * event_table, chromosome_event_t * new_event , int event_no);
@@ -177,4 +180,6 @@ void destroy_pileup_table(HashTable* local_reassembly_pileup_files);
 chromosome_event_t * reallocate_event_space(global_context_t* global_context,thread_context_t* thread_context,int event_no);
 
 int there_are_events_in_range(char * bitmap, unsigned int pos, int sec_len);
+
+int anti_supporting_read_scan(global_context_t * global_context);
 #endif

@@ -17,6 +17,9 @@
   ***************************************************************/
   
   
+#include <ctype.h>
+#include <string.h>
+
 #include "subread.h"
 #include "HelperFunctions.h"
 
@@ -84,11 +87,235 @@ void display_sections(char * CIGAR_Str)
 	
 }
 
-#ifdef RSUBREAD_TEST_HELPER_FUNCTIONS
-void main()
-#else
-void testi_helper_1_main()
-#endif
+
+#define GECV_STATE_BEFORE 10
+#define GECV_STATE_NAME 20
+#define GECV_STATE_GAP 30
+#define GECV_STATE_VALUE 40
+#define GECV_STATE_QVALUE 50
+#define GECV_STATE_QV_END 60
+#define GECV_STATE_ERROR 9999
+
+int GTF_extra_column_istoken_chr(char c)
+{
+	return (isalpha(c)||isdigit(c)||c=='_');
+}
+
+int GTF_extra_column_value(const char * Extra_Col, const char * Target_Name, char * Target_Value, int TargVal_Size)
+{
+	int state = GECV_STATE_BEFORE;
+	int col_cursor = 0, is_correct_name=0;
+	char name_buffer[200];
+	int name_cursor = 0, value_cursor=-1;
+
+	while(1)
+	{
+		if(name_cursor>190) return -1;
+		char nch = Extra_Col[col_cursor];
+		if(nch == '\n' || nch == '\r') nch = 0;
+		if(state == GECV_STATE_BEFORE)
+		{
+			if(GTF_extra_column_istoken_chr(nch))
+			{
+				name_buffer[0] = nch;
+				name_cursor = 1;
+				state = GECV_STATE_NAME;
+			}
+			else if(nch != ' ' && nch != 0)
+			{
+				state = GECV_STATE_ERROR;
+			}
+		}
+		else if(state == GECV_STATE_NAME)
+		{
+			if(nch == ' ' || nch == '=')
+			{
+				state = GECV_STATE_GAP;
+				name_buffer[name_cursor] = 0;
+				is_correct_name = (strcmp(name_buffer , Target_Name) == 0);
+				//printf("CORR=%d : '%s'\n", is_correct_name, name_buffer);
+			}
+			else if(nch == '"')
+			{
+				name_buffer[name_cursor] = 0;
+				is_correct_name = (strcmp(name_buffer , Target_Name) == 0);
+				state = GECV_STATE_QVALUE;
+				if(is_correct_name)
+					value_cursor = 0;
+			}
+			else if(GTF_extra_column_istoken_chr(nch))
+				name_buffer[name_cursor++] = nch;
+			else
+			{
+				state = GECV_STATE_ERROR;
+				//printf("ERR2  : '%c'\n", nch);
+			}
+			
+		}
+		else if(state == GECV_STATE_GAP)
+		{
+			if(nch == '"')
+			{
+				state = GECV_STATE_QVALUE;
+				if(is_correct_name)
+					value_cursor = 0;
+			}
+			else if(nch != '=' && isgraph(nch))
+			{
+				state = GECV_STATE_VALUE;
+				if(is_correct_name)
+				{
+					Target_Value[0]=nch;
+					value_cursor = 1;
+				}
+			}
+			else if(nch != ' ' && nch != '=')
+				state = GECV_STATE_ERROR;
+		}
+		else if(state == GECV_STATE_VALUE)
+		{
+			if(nch == ';' || nch == 0)
+			{
+				state = GECV_STATE_BEFORE;
+				if(is_correct_name)
+				{
+					Target_Value[value_cursor] = 0;
+				}
+				is_correct_name = 0;
+			}
+			else{
+				if(value_cursor < TargVal_Size-1 && is_correct_name)
+					Target_Value[value_cursor++] = nch;
+			}
+		}
+		else if(state == GECV_STATE_QVALUE)
+		{
+			if(nch == '"')
+			{
+				state = GECV_STATE_QV_END;
+				if(is_correct_name)
+					Target_Value[value_cursor] = 0;
+				is_correct_name = 0;
+			}
+			else
+			{
+				if(value_cursor < TargVal_Size-1 && is_correct_name)
+				{
+					if(nch !=' ' || value_cursor>0)
+						Target_Value[value_cursor++] = nch;
+				}
+			}
+		}
+		else if(state == GECV_STATE_QV_END)
+		{
+			if(nch == ';' || nch == 0)
+				state = GECV_STATE_BEFORE;
+			else if(nch != ' ')
+				state = GECV_STATE_ERROR;
+				
+		}
+
+		if (GECV_STATE_ERROR == state){
+			Target_Value[0]=0;
+			return -1;
+		}
+		if (nch == 0)
+		{
+			if(state == GECV_STATE_BEFORE && value_cursor>0)
+			{
+				int x1;
+				for(x1 = value_cursor-1; x1>=0; x1--)
+				{
+					if(Target_Value[x1] == ' '){
+						value_cursor --;
+						Target_Value[x1]=0;
+					}
+					else break;
+				}
+
+				if(value_cursor>0)
+					return value_cursor;
+			}
+			Target_Value[0]=0;
+			return -1;
+		}
+		col_cursor++;
+	}
+}
+
+
+void hpl_test2_func()
+{
+	char * extra_column = " gene_id \"PC4-013  \"; 013=ABCD  ; PC4 =  CCXX  ";
+	char * col_name = "gene_id";
+	char col_val[100];
+
+	int col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+	col_name = "013";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+	col_name = "PC4";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+	col_name = "XXX";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+	extra_column = "gene_id =   \"PC4-013  ;=\"  ;013 = AXXD ; PC4=x";
+	col_name = "013";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+	col_name = "gene_id";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+	col_name = "PC4";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+
+
+	extra_column = " gene_id\"  PC4-013  ;=  \"; XXX='123' ;013 :ABCD  ; PC4 =  CCXX=  ;";
+	col_name = "013";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+	col_name = "XXX";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+	col_name = "PC4";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+	col_name = "gene_id";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+
+	extra_column = "gene_id \"653635\"; transcript_id \"TR:653635\";";
+	col_name = "gene_id";
+	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
+	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+
+
+
+
+
+}
+
+void hpl_test1_func()
 {
 	display_sections("");
 	display_sections("*");
@@ -97,3 +324,13 @@ void testi_helper_1_main()
 	display_sections("200S110M2I10M800N32M3I12M200N40M");
 	display_sections("3M1663N61M1045N36M3D20M66N10M2D10M77N3M1663N61M1045N36M3D20M66N103M1663N61M1045N36M3D20M66N9M");
 }
+
+#ifdef RSUBREAD_TEST_HELPER_FUNCTIONS
+void main()
+#else
+void testi_helper_1_main()
+#endif
+{
+	hpl_test2_func();
+}
+

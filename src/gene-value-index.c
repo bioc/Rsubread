@@ -26,11 +26,11 @@
 #include "input-files.h"
 
 
-int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned int base_number)
+int gvindex_init(gene_value_index_t * index, unsigned int start_point)
 {
 	index->start_point = start_point;
-	index->length = base_number;
-	index->values = malloc(base_number / 4 + 1);
+	index->memory_block_size = 100000000;
+	index->values = malloc(index->memory_block_size);
 	if(!index->values)
 	{
 		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
@@ -98,6 +98,11 @@ void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
 	int i;
 
+	if(index -> memory_block_size <= offset_byte + 2)
+	{
+		index -> memory_block_size *= 1.5;
+		index->values = realloc(index->values, index -> memory_block_size);
+	}
 	for (i=0; i<16; i++)
 	{
 		// 11110011
@@ -530,7 +535,7 @@ void match_indel_table_to_back_in(HashTable * indel_table , char * read, gene_va
 	for(xi = 1 ; xi < test_len-1 ; xi++)
 	{
 		indel_record_t found_records[20];
-		int section_matched_bases, num_records = find_all_indels(indel_table , last_base_pos - xi, found_records, 1);
+		int section_matched_bases = 0, num_records = find_all_indels(indel_table , last_base_pos - xi, found_records, 1);
 
 		if(num_records>0)
 			section_matched_bases = match_chro(read + test_len - xi, index, last_base_pos - xi, xi ,0,GENE_SPACE_BASE);

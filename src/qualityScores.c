@@ -85,7 +85,7 @@ int finalise_qs_context(qualscore_context * qs_context, int prev_ret)
 		//double avg_phred = qs_context -> total_phred_sum*1./ qs_context->scored_bases;
 		//double avg_prob = qs_context -> total_errorprob_sum*1./1000000/qs_context->scored_bases;
 
-		SUBREADprintf("Program finished successfully. %llu reads were scored.\n", qs_context -> scored_reads);
+		SUBREADprintf("Completed successfully. Quality scores for %llu reads (equally spaced in the file) are returned.\n", qs_context -> scored_reads);
 
 		if(qs_context-> quality_offset_warning_shown)
 			SUBREADprintf("However, the Phred score offset (%d) seemed to be wrong. The quality scores can be meaningless.\n", qs_context -> phred_offset);
@@ -411,7 +411,7 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 				double next_sample_number = 0;
 				sampling_rate = max(1.000000000001, sampling_rate);
 
-				SUBREADprintf("Totally %llu reads were scanned; the sampling interval is %.1f.\nNow extract read quality information...\n", read_number, sampling_rate);
+				SUBREADprintf("Totally %llu reads were scanned; the sampling interval is %d.\nNow extract read quality information...\n", read_number, (int)(sampling_rate));
 
 				read_number = 0;
 

@@ -151,7 +151,6 @@ typedef char gene_vote_number_t;
 
 #define ANCHORS_NUMBER 259
 
-#define GENE_SLIDING_STEP 3
 #define BEXT_RESULT_LIMIT 16
 
 #define SEARCH_BACK 0
@@ -169,6 +168,9 @@ typedef char gene_vote_number_t;
 
 #define SUBINDEX_VER0 100
 #define SUBINDEX_VER1 200
+#define SUBINDEX_VER2 201
+
+#define SUBREAD_INDEX_OPTION_INDEX_GAP 0x0101
 
 
 #define CHAR_ESC 27
@@ -216,6 +218,7 @@ typedef struct {
 
 
 typedef struct{
+	unsigned int memory_block_size;
 	unsigned int start_base_offset;
 	unsigned int start_point;
 	unsigned int length;
@@ -242,6 +245,7 @@ typedef struct {
 	int buckets_number;
 	char is_small_table;
 	struct gehash_bucket * buckets;
+	int index_gap;
 } gehash_t;
 
 
@@ -369,6 +373,7 @@ typedef struct{
 	unsigned char  mapping_quality;
 	unsigned short read_pos;
 	unsigned short read_len;
+	unsigned short flags;
 	unsigned int read_number;
 	unsigned int pos;
 	char strand;	// 0 = positive, 1 = negative

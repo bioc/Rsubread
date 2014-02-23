@@ -1148,11 +1148,6 @@ int chars2color(char c1, char c2)
 
 int find_subread_end(int len, int TOTAL_SUBREADS, int subread)
 {
-	/*
-	float step = max(3.00001, (len-16-GENE_SLIDING_STEP)*1.0/(TOTAL_SUBREADS-1)+0.00001);
-	return (int) (step * subread) + 15;
-	*/
-
 	if(len<= EXON_LONG_READ_LENGTH)
 	{
 		int subread_step =  ((len<<16) - (19<<16))/(TOTAL_SUBREADS -1);
@@ -1336,6 +1331,7 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 	datum.record_type = 100;
 	datum.read_number = read_number;
 	datum.pos = pos;
+	datum.flags = flags;
 	datum.strand = strand;
 	datum.read_pos = read_pos;
 	datum.read_len = read_len;
@@ -1557,7 +1553,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 		int is_snp = 0;
 		if(strstr(alt_seq,","))
 		{
-			char * com_tmp;
+			char * com_tmp = NULL;
 			char * com_sec = strtok_r(alt_seq, ",", &com_tmp);
 			while(com_sec)
 			{
@@ -1694,8 +1690,9 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 			}
 
 
-
+			//SUBREADprintf("ARRI_0=%p ; OFFS=%p ; EVT=%p\n%s\n",array_index, offsets, event_table, line_buffer);
 			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, &pairdist, sequence , quality_string, &rl, &repeated);
+			//SUBREADprintf("ARRI_2=%p ; OFFS=%p ; EVT=%p\n",array_index, offsets, event_table);
 
 			if(strlen(quality_string)<2)
 			{
@@ -2133,6 +2130,21 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 					char * new_line_mem = malloc(read_len+1);
 					fread(new_line_mem, 1, read_len, bbfp);
 					new_line_mem[read_len] = 0;
+
+					if(read_len<2)
+					{
+						SUBREADprintf("Cannot determain read length from the tmp file!\n");
+						assert(0);
+					}
+
+
+					if( new_line_mem[0]==0 || new_line_mem[1]==0)
+					{
+						SUBREADprintf("Cannot load read part from the tmp file!\n");
+						assert(0);
+					}
+
+
 					HashTablePut(first_read_name_table, read_name, new_line_mem);
 					//if( first_read_name_table -> numOfElements<4)printf("RV=%s\n", read_name);
 				}
@@ -2149,11 +2161,13 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 			char tmpfname[MAX_FILE_NAME_LENGTH+40];
 			sprintf(tmpfname, "%sCHK%08d-BLK%03d.bin", writer -> tmp_path, x1_chunk , x1_block);
 
+	//		printf("START_BLOCK: %s\n", tmpfname);
+
 			FILE * bbfp = f_subr_open(tmpfname,"rb");
 			if(!bbfp) continue;
 
 			char * read_line_buf = malloc(3000);
-			char * read_name_buf = malloc(MAX_READ_NAME_LEN+1);
+			char * read_name_buf = malloc(MAX_READ_NAME_LEN + MAX_CHROMOSOME_NAME_LEN * 2 + 26);
 
 			while(!feof(bbfp))
 			{
@@ -2164,11 +2178,13 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 				if(ret<1) break;
 
 				fread(&read_name_len, 2,1 , bbfp);
+
+				if(read_name_len>=MAX_READ_NAME_LEN + MAX_CHROMOSOME_NAME_LEN * 2 + 26)
+					SUBREADprintf("VERY_LONG_NAME(%d)\n", read_name_len);
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 				{
 					fread(read_name_buf, 1, read_name_len, bbfp);
 					read_name_buf[read_name_len] = 0;
-					//printf("RR=%s\n", read_name_buf);
 				}
 				else	fseek(bbfp, read_name_len, SEEK_CUR);
 				fread(&read_len, 2,1 , bbfp);
@@ -2179,8 +2195,11 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 				}
 				else	fseek(bbfp, read_len, SEEK_CUR);
 
+
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 				{
+//					printf("RRNAME:%s\n", read_name_buf);
+
 					char * first_read_text = HashTableGet(first_read_name_table, read_name_buf);
 					strtok(read_name_buf,"\t");
 					if(first_read_text)
@@ -2251,76 +2270,85 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 					//else SUBREADprintf("WARNING: Unpaired read found in file:%s\n", read_name_buf);
 				}
 			}
-			if(1)
-			{
-				writer -> unpaired_reads += first_read_name_table -> numOfElements;
-
-				KeyValuePair * cursor;
-				int bucket;
-
-				// go through the hash table and write correct FIRST lines and dummy SECOND lines.
-				for(bucket=0; bucket< first_read_name_table -> numOfBuckets; bucket++)
-				{
-					cursor = first_read_name_table -> bucketArray[bucket];
-					while(1)
-					{
-						if (!cursor) break;
-						char * first_read_text = (char *)cursor -> value;
-						char * first_read_name = (char *)cursor -> key;
-
-						int dummy_flags = 4 | 1, mate_flags = 0;
-						char * dummy_mate_chr = NULL;
-						unsigned int dummy_mate_pos = 0, tmpi=0, dummy_char_strpos = 0;
-						int tabs = 0;
-						int read_cursor = 0;
-
-						for(read_cursor = 0;; read_cursor++)
-						{
-							char nch = first_read_text[read_cursor];
-							if(!nch) break;
-							if(nch == '\t')
-							{
-								if(tabs == 0){
-									mate_flags = tmpi; 
-									dummy_mate_chr = first_read_text+read_cursor+1;
-								}
-								else if(tabs == 1)
-									dummy_char_strpos = read_cursor;
-								else if(tabs == 2)
-								{
-									dummy_mate_pos = tmpi;
-									break;
-								}
-								tmpi=0;
-								tabs++;
-							}else{
-								if(tabs==0 || tabs == 2) tmpi = tmpi * 10 + (nch - '0');
-							}
-						}
-
-						dummy_flags |= SAM_FLAG_SECOND_READ_IN_PAIR;
-						if(mate_flags & SAM_FLAG_UNMAPPED)  dummy_flags |= SAM_FLAG_MATE_UNMATCHED;
-						if(mate_flags & SAM_FLAG_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
-						if(mate_flags & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_REVERSE_STRAND_MATCHED;
-
-						strtok(first_read_name, "\t");
-						fputs(first_read_name, writer->out_fp);
-						putc('\t',  writer->out_fp);
-						fputs(first_read_text, writer->out_fp);
-						first_read_text[dummy_char_strpos] = 0;
-						fprintf(writer->out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%d\t0\tN\tI\tMF:I:%d\n", first_read_name, dummy_flags, dummy_mate_chr, dummy_mate_pos,mate_flags);
-
-						cursor = cursor->next;
-					}
-				}
-
-
-			}
 
 			fclose(bbfp);
 			unlink(tmpfname);
 			free(read_name_buf);
 			free(read_line_buf);
+		}
+
+
+
+		if(1)
+		{
+			writer -> unpaired_reads += first_read_name_table -> numOfElements;
+
+			KeyValuePair * cursor;
+			int bucket;
+
+			// go through the hash table and write correct FIRST lines and dummy SECOND lines.
+			for(bucket=0; bucket< first_read_name_table -> numOfBuckets; bucket++)
+			{
+				cursor = first_read_name_table -> bucketArray[bucket];
+				while(1)
+				{
+					if (!cursor) break;
+					char * first_read_text = (char *)cursor -> value;
+					char * first_read_name = (char *)cursor -> key;
+
+					int dummy_flags = 4 | 1, mate_flags = 0;
+					char * dummy_mate_chr = NULL;
+					unsigned int dummy_mate_pos = 0, tmpi=0, dummy_char_strpos = 0;
+					int tabs = 0;
+					int read_cursor = 0;
+
+					for(read_cursor = 0;; read_cursor++)
+					{
+						char nch = first_read_text[read_cursor];
+						if(!nch) break;
+						if(nch == '\t')
+						{
+							if(tabs == 0){
+								mate_flags = tmpi; 
+								dummy_mate_chr = first_read_text+read_cursor+1;
+							}
+							else if(tabs == 1)
+								dummy_char_strpos = read_cursor;
+							else if(tabs == 2)
+							{
+								dummy_mate_pos = tmpi;
+								break;
+							}
+							tmpi=0;
+							tabs++;
+						}else{
+							if(tabs==0 || tabs == 2) tmpi = tmpi * 10 + (nch - '0');
+						}
+					}
+
+					dummy_flags |= SAM_FLAG_SECOND_READ_IN_PAIR;
+					if(mate_flags & SAM_FLAG_UNMAPPED)  dummy_flags |= SAM_FLAG_MATE_UNMATCHED;
+					if(mate_flags & SAM_FLAG_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
+					if(mate_flags & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_REVERSE_STRAND_MATCHED;
+
+					if((!first_read_text[0])||(!first_read_text[1]))
+					{
+						SUBREADprintf("unable to recover the first read! : '%s' , flags = %d\n", first_read_name, mate_flags);
+						assert(0);
+					}
+
+					strtok(first_read_name, "\t");
+					fputs(first_read_name, writer->out_fp);
+					putc('\t',  writer->out_fp);
+					fputs(first_read_text, writer->out_fp);
+					first_read_text[dummy_char_strpos] = 0;
+					fprintf(writer->out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%d\t0\tN\tI\tMF:i:%d\n", first_read_name, dummy_flags, dummy_mate_chr, dummy_mate_pos,mate_flags);
+
+					cursor = cursor->next;
+				}
+			}
+
+
 		}
 
 		HashTableDestroy(first_read_name_table);
@@ -2409,7 +2437,6 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		if(tabs <= 7) return -1;
 
 		line_len = strlen(second_col_pos);
-
 		sort_SAM_check_chunk(writer);
 
 		for(field_cursor = 0; read_name[field_cursor] ; field_cursor++)
@@ -2420,6 +2447,22 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 
 
 		// new read name format: OLD_READ_NAME\tCHR_R1:POS_R1:CHR_R2:POS_R2
+
+
+		if(flags & SAM_FLAG_MATE_UNMATCHED)
+		{
+			if(chromosome_2_name[0] != '*')
+				strcpy(chromosome_2_name , "*");
+			pos_2 = 0;
+		}
+
+
+		if(flags & SAM_FLAG_UNMAPPED)
+		{
+			if(chromosome_1_name[0] != '*')
+				strcpy(chromosome_1_name , "*");
+			pos_1 = 0;
+		}
 
 		if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u",chromosome_2_name, pos_2, chromosome_1_name, pos_1);
@@ -2436,6 +2479,21 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 			sprintf(tmpfname,"%sCHK%08d-BLK%03d.bin", writer -> tmp_path , writer -> current_chunk , block_id);
 			writer -> current_block_fp_array[block_id] = f_subr_open(tmpfname, "wb");
 		}
+
+		if(line_len < 2)
+		{
+			SUBREADprintf("unable to put the first read!\n");
+			assert(0);
+		}
+
+		if(second_col_pos[0]==0 || second_col_pos[1]==0)
+		{
+			SUBREADprintf("unable to put the first read TEXT!\n");
+			assert(0);
+		}
+
+
+//		printf("WRNAME:%s\n", read_name);
 
 		fwrite(&flags, 2, 1, writer -> current_block_fp_array[block_id]);
 		fwrite(&read_name_len, 2, 1, writer -> current_block_fp_array[block_id]);
@@ -2497,11 +2555,11 @@ int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, uns
 	return 0;
 }
 
-int probe_file_type(char * fname);
-int is_certainly_bam_file(char * fname)
+int probe_file_type(char * fname, int * is_first_PE);
+int is_certainly_bam_file(char * fname, int * is_first_read_PE)
 {
 
-	int read_type = probe_file_type(fname);
+	int read_type = probe_file_type(fname, is_first_read_PE);
 	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY)
 		return -1;
 	if(read_type == FILE_TYPE_BAM)
@@ -2533,12 +2591,12 @@ int warning_file_type(char * fname, int expected_type)
 		return 1;
 	}
 
-	int read_type = probe_file_type(fname);
+	int read_type = probe_file_type(fname, NULL);
 
 	if(read_type == FILE_TYPE_NONEXIST)
 	{
-		print_in_box(80,0,0,"WARNING file '%s' is inaccessible.", fname);
-		return 1;
+		SUBREADprintf("ERROR: unable to open file '%s'. File name might be incorrect, or you do not have the permission to read the file.\n", fname);
+		return -1;
 	}
 	else if(read_type == FILE_TYPE_EMPTY)
 	{
@@ -2578,7 +2636,7 @@ int warning_file_type(char * fname, int expected_type)
 	return 0;
 }
 
-int probe_file_type(char * fname)
+int probe_file_type(char * fname, int * is_first_read_PE)
 {
 	FILE * fp = f_subr_open(fname, "rb");
 	if(!fp) return FILE_TYPE_NONEXIST;
@@ -2710,8 +2768,42 @@ int probe_file_type(char * fname)
 		}
 	}
 
-	free(test_buf);
 	if(fp)fclose(fp);
+
+	if(FILE_TYPE_BAM == ret || FILE_TYPE_SAM == ret)
+		if(is_first_read_PE)
+		{
+			SamBam_FILE * tpfp = SamBam_fopen(fname, (FILE_TYPE_BAM  == ret)?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
+			while(1)
+			{
+				char * tbr = SamBam_fgets(tpfp, test_buf, 4999, 0);
+				if(!tbr){
+					ret = FILE_TYPE_EMPTY;
+					break;
+				}
+				if(tbr[0]=='@') continue;
+				char * rname_str, *tmpstr;
+				rname_str = strtok_r(tbr, "\t", &tmpstr);
+				if(!rname_str)
+				{
+					ret = FILE_TYPE_UNKNOWN;
+					break;
+				}
+				rname_str = strtok_r(NULL, "\t", &tmpstr);
+				if((!rname_str)|| (!isdigit(rname_str[0]))) 
+				{
+					ret = FILE_TYPE_UNKNOWN;
+					break;
+				}
+
+				int flags = atoi(rname_str);
+				(*is_first_read_PE) = flags &1;
+				break;
+			}
+			SamBam_fclose(tpfp);
+		}
+
+	free(test_buf);
 	return ret;
 }
 
@@ -2767,7 +2859,7 @@ int main(int argc, char ** argv)
 int main(int argc, char ** argv)
 {
 	char * fn = argv[1];
-	int type = probe_file_type(fn);
+	int type = probe_file_type(fn, NULL);
 	switch(type)
 	{
 		case FILE_TYPE_FASTQ: printf("Type: FASTQ\n"); break;

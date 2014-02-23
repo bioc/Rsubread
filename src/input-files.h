@@ -58,6 +58,8 @@
 
 #define SAM_SORT_BLOCKS 229
 #define SAM_SORT_BLOCK_SIZE 512333303LLU
+//#define SAM_SORT_BLOCK_SIZE 11123333LLU
+
 typedef struct
 {
 	unsigned long long int output_file_size;
@@ -174,5 +176,7 @@ void colorread2base(char * read_buffer, int read_len);
 int warning_file_type(char * fname, int expected_type);
 char color2char(char clr, char c1);
 
-int is_certainly_bam_file(char * fname);
+int is_certainly_bam_file(char * fname, int * is_firstread_PE);
+
+unsigned long long int sort_SAM_hash(char * str);
 #endif

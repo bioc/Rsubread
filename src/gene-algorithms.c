@@ -450,7 +450,7 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 		if (offsets->read_offsets[n] > linear)
 		{
 			// the end of the read should not excess the end of the chromosome
-			if(rl + linear >= offsets->read_offsets[n]) return 1;
+			if(rl + linear > offsets->read_offsets[n]) return 1;
 
 			if (n==0)
 				*pos = linear;

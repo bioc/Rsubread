@@ -51,11 +51,27 @@ typedef struct{
 	// middle result context
 	unsigned char tmp_search_sections;
 	perfect_section_in_read_t  tmp_search_junctions [MAX_EVENTS_IN_READ];
-	unsigned int tmp_jump_length;
 	char current_is_strand_jumped;
 
-	unsigned int best_jump_length;
+//	unsigned int tmp_jump_length;
+//	unsigned int best_jump_length;
+	
+	// for the BEST record
+	// they are not restored
 	int best_matching_bases;
+	int tmp_total_matched_bases;
+	int is_currently_tie;
+	int best_is_complex;
+	int best_support_as_simple;
+	int best_min_unsupport_as_simple;
+	int best_min_support_as_complex;
+	int best_is_pure_donor_found_explain;
+
+	// for the "current" stack (they are restored after poping from the stack)
+	int tmp_support_as_simple;
+	int tmp_min_unsupport;
+	int tmp_min_support_as_complex;
+	int tmp_is_pure_donor_found_explain;
 
 	// input context
 	int full_read_len;
@@ -79,6 +95,8 @@ typedef struct
 	char * read_text_2;
 	char is_negative_strand;
 } new_junction_context_t;
+
+void new_explain_try_replace(global_context_t* global_context, thread_context_t * thread_context, explain_context_t * explain_context, int remainder_len, int search_to_back);
 
 int init_junction_tables(global_context_t * context);
 int destroy_junction_tables(global_context_t * context);

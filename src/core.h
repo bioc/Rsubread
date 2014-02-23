@@ -61,6 +61,8 @@
 
 #define _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read)  (is_second_read?(global_context->big_margin_record + (2*pair_number+is_second_read)* global_context->config.big_margin_record_size):(global_context->big_margin_record + pair_number * global_context->config.big_margin_record_size))
 
+#define mark_gapped_read(res) (res)-> result_flags|= CORE_IS_GAPPED_READ;
+
 typedef struct{
 	int is_paired_end_reads;
 	gene_input_t first_read_file;
@@ -81,7 +83,7 @@ typedef struct{
 	int is_first_iteration_running;
 	int is_second_iteration_running;
 	int is_third_iteration_running;
-	int memory_use_multiplex;
+	float memory_use_multiplex;
 	char temp_file_prefix[MAX_FILE_NAME_LENGTH];
 	unsigned int reads_per_chunk;
 
@@ -116,6 +118,7 @@ typedef struct{
 	int is_BAM_input;
 	int is_BAM_output;
 	int convert_color_to_base;
+	int SAM_extra_columns;
 	unsigned long long int multi_best_reads;
 
 	// basic voting
@@ -138,7 +141,6 @@ typedef struct{
 	char is_rna_seq_reads;
 	char do_big_margin_filtering_for_junctions;
 	char do_big_margin_filtering_for_reads;
-	char do_big_margin_reporting;
 	char limited_tree_scan;
 	char use_hamming_distance_in_exon;
 	unsigned int maximum_intron_length;
@@ -172,11 +174,12 @@ typedef struct{
 } configuration_t;
 
 #define CORE_IS_GT_AG_DONORS 1
-#define CORE_NOTFOUND_DONORS 3
+#define CORE_NOTFOUND_DONORS 2
 #define CORE_IS_STRAND_JUMPED 4
 #define CORE_IS_NEGATIVE_STRAND 8
 #define CORE_IS_FULLY_EXPLAINED 16
 #define CORE_IS_BREAKEVEN 32
+#define CORE_IS_GAPPED_READ 64 
 
 #define CORE_CIGAR_OPT_M 0
 #define CORE_CIGAR_OPT_S 1
@@ -193,13 +196,14 @@ typedef struct{
 
 typedef struct
 {
-	unsigned int selected_position;
-	unsigned char selected_votes;
 
+	unsigned int selected_position;
+	// 4-bytes
+	unsigned char selected_votes;
 	unsigned char noninformative_subreads_in_vote;
 	unsigned char used_subreads_in_vote;
-
 	unsigned char final_quality;
+	// 4-bytes
 
 	// this coverage is the range on reads, in point of view of "main piece" strand (i.e., "is_negative_strand")
 	char indels_in_confident_coverage; 
@@ -212,8 +216,13 @@ typedef struct
 		};
 		char cigar_string[MAX_INDEL_SECTIONS * 3+5];
 	};
+	// 28 bytes
 
-	unsigned int Score_L;
+	union
+	{
+		unsigned int Score_L;
+		int final_mismatched_bases;
+	};
 	unsigned long long int Score_H;
 
 } alignment_result_t;

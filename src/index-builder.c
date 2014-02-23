@@ -38,11 +38,12 @@
 
 
 #define MAX_KEY_MATCH GENE_VOTE_SPACE 
-
+int GENE_SLIDING_STEP = 3;
 int IS_COLOR_SPACE = 0;
 int VALUE_ARRAY_INDEX = 1;
 int QUICK_BUILD = 0;
 int MARK_NONINFORMATIVE_SUBREADS = 0;
+int IS_FORCED_ONE_BLOCK = 0;
 
 #define NEXT_READ 1
 #define NEXT_FILE 2
@@ -99,31 +100,29 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	if (chro_file_number > 199)
 	{
-		SUBREADprintf("There are too many chromosome files. You may merge them into less than 199 files.\n");
+		SUBREADprintf("ERROR: There are too many FASTA files. You may merge them into one FASTA file.\n");
 		return -1;
 	}
 
 	if (strlen (index_prefix) > 290)
 	{
-		SUBREADprintf("The path is too long. It should not be longer than 290 chars.\n");
+		SUBREADprintf("ERROR: The path is too long. It should not be longer than 290 chars.\n");
 		return -1;
 	}
 
 	if(all_bases<1)
 	{
-		SUBREADprintf("File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
+		SUBREADprintf("ERROR: File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
 		return -1;
 	}
 
-	if(gehash_create_ex(& table, segment_size, 0, SUBINDEX_VER1)) return 1;
+	if(gehash_create_ex(& table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP)) return 1;
 
 	if(MARK_NONINFORMATIVE_SUBREADS)
 		copy_non_informative_subread(&table, huge_table);
 
-	unsigned int size_of_array_index = (unsigned int)(min(MAX_BASES_IN_INDEX, segment_size*4.35 + MIN_READ_SPLICING));
-
 	if(VALUE_ARRAY_INDEX)
-		if(gvindex_init(&value_array_index, 0, size_of_array_index)) return 1;
+		if(gvindex_init(&value_array_index, 0)) return 1;
 
 	file_number = 0;
 	offset = 0;
@@ -321,11 +320,11 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				else
 					array_int_key = int_key = genekey2int(window, GENE_SPACE_BASE);
 				
-				if(gehash_create_ex(&table, segment_size, 0, SUBINDEX_VER1)) return 1;
+				if(gehash_create_ex(&table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP)) return 1;
 				if(MARK_NONINFORMATIVE_SUBREADS)
 					copy_non_informative_subread(&table, huge_table);
 				if(VALUE_ARRAY_INDEX)
-					if(gvindex_init(&value_array_index, offset - (IS_COLOR_SPACE?0:0),(unsigned int)(min(MAX_BASES_IN_INDEX-offset + 2, size_of_array_index )))) return 1;
+					if(gvindex_init(&value_array_index, offset)) return 1;
 			}
 	
 			status = 0;
@@ -345,7 +344,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				}
 			}
 
-			if(table.current_items >= segment_size && (read_len > MIN_READ_SPLICING || read_len < 32))
+			if((!IS_FORCED_ONE_BLOCK) && table.current_items >= segment_size && (read_len > MIN_READ_SPLICING || read_len < 32))
 			{
 				status = FULL_PARTITION;
 				continue;
@@ -404,7 +403,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				if(offset > 0xFFFFFFFDU)	
 				{
-					SUBREADprintf("The chromosome data contains too many bases. The size of chromosome file should be less than 4G Bytes\n") ;
+					SUBREADprintf("ERROR: The chromosome data contains too many bases. The size of the input FASTA file(s) should be less than 4G Bytes\n") ;
 					return -1;
 				}
 
@@ -462,7 +461,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		if(!huge_index[i])
 		{
 			for(j=0;j<i;j++) free(huge_index[j]);
-			SUBREADprintf("You need at least one point five gigabytes of memory for building the index.\n");
+			SUBREADprintf("ERROR: You need at least one point five gigabytes of memory for building the index.\n");
 			return -1;
 		}
 		memset(huge_index[i], 0 , 1024*1024);
@@ -478,18 +477,18 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	if (chro_file_number > 199)
 	{
-		SUBREADprintf("There are too many FASTA files. You may merge them into less than 199 files.\n");
+		SUBREADprintf("ERROR: There are too many FASTA files. You may merge them into one FASTA file.\n");
 		return -1;
 	}
 
 	if (strlen (index_prefix) > 290)
 	{
-		SUBREADprintf("The path is too long. It should not be longer than 290 chars.\n");
+		SUBREADprintf("ERROR: The path is too long. It should not be longer than 290 chars.\n");
 		return -1;
 	}
 	if(all_bases<1)
 	{
-		SUBREADprintf("File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
+		SUBREADprintf("ERROR: File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
 		return -1;
 	}
 
@@ -626,7 +625,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 				if(offset > 0xFFFFFFFDU)	
 				{
-					SUBREADprintf("The chromosome data contains too many bases. The size of chromosome file should be less than 4G Bytes\n") ;
+					SUBREADprintf("ERROR: The chromosome data contains too many bases. The size of the input FASTA files should be less than 4G Bytes\n") ;
 					return -1;
 				}
 
@@ -767,12 +766,18 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	int is_R_warnned = 0;
 	char * line_buf = malloc(MAX_READ_LENGTH);
 	char * read_head_buf = malloc(MAX_READ_LENGTH * 3);
-	FILE * out_fp = f_subr_open(out_fa,"w");
 	unsigned int inp_file_no, line_no;
 	int written_chrs = 0;
 	int chrom_lens_max_len = 100;
 	int chrom_lens_len = 0;
 	ERROR_FOUND_IN_FASTA = 0;
+	FILE * out_fp = f_subr_open(out_fa,"w");
+
+	if(!out_fp)
+	{
+		SUBREADprintf("ERROR: The current directory is not writable, but the index builder needs to create temporary files in the current directory. Please change the working directory and rerun the index builder.\n");
+		return -1;
+	}
 
 	(*chrom_lens) = malloc(chrom_lens_max_len*sizeof(unsigned int));
 	memset((*chrom_lens), 0, chrom_lens_max_len*sizeof(unsigned int));
@@ -786,7 +791,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 		if(!in_fp)
 		{
-			SUBREADprintf("Input file '%s' is not found or is not accessible. No index was built.\n", input_fas[inp_file_no]);
+			SUBREADprintf("ERROR: Input file '%s' is not found or is not accessible. No index was built.\n", input_fas[inp_file_no]);
 			return -1;
 		}
 
@@ -895,7 +900,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 
 	if(!written_chrs){
-		SUBREADprintf("No index was built because there were no subreads extracted. A chromosome needs at least 16 bases to be indexed.");
+		SUBREADprintf("ERROR: No index was built because there were no subreads extracted. A chromosome needs at least 16 bases to be indexed.");
 		return 1;
 	}
 	free(line_buf);
@@ -951,13 +956,22 @@ int main_buildindex(int argc,char ** argv)
 	tmp_fa_file[0] = 0;
 	tmp_file_for_signal = tmp_fa_file;
 
+	IS_FORCED_ONE_BLOCK = 0;
+	GENE_SLIDING_STEP = 3;
+
 	SUBREADprintf("\n");
 
 	optind = 0;
 	
-	while ((c = getopt_long (argc, argv, "kvcqM:o:f:D?", ib_long_options, &optindex)) != -1)
+	while ((c = getopt_long (argc, argv, "kvcqBFM:o:f:D?", ib_long_options, &optindex)) != -1)
 		switch(c)
 		{
+			case 'B':
+				IS_FORCED_ONE_BLOCK = 1;
+				break;
+			case 'F':
+				GENE_SLIDING_STEP =1;
+				break;
 			case 'v':
 				core_version_number("Subread-buildindex");
 				return 0;
@@ -1002,12 +1016,23 @@ int main_buildindex(int argc,char ** argv)
 		SUBREADputs("");
 		SUBREADputs("Optional arguments:");
 		SUBREADputs("");
-		SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default");
+		SUBREADputs("    -F              build a full index for the reference genome. 16bp subreads");
+		SUBREADputs("                    will be extracted from every position of the reference");
+		SUBREADputs("                    genome. Size of the index is typically 3 times the size of");
+		SUBREADputs("                    index built from using the default setting.");
+		SUBREADputs("");
+		SUBREADputs("    -B              create one block of index. The built index will not be split");
+		SUBREADputs("                    into multiple pieces. This makes the largest amount of");
+		SUBREADputs("                    memory be requested when running alignments, but it enables");
+		SUBREADputs("                    the maximum mapping speed to be achieved. This option");
+		SUBREADputs("                    overrides -M when it is provided as well.");
+		SUBREADputs("");
+		SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default.");
 		SUBREADputs("");
 		SUBREADputs("    -f <int>        specify the threshold for removing uninformative subreads");
 		SUBREADputs("                    (highly repetitive 16mers in the reference). 24 by default.");
 		SUBREADputs("");
-		SUBREADputs("    -c              build a color-space index");
+		SUBREADputs("    -c              build a color-space index.");
 		SUBREADputs("");
 		SUBREADputs("    -v              output version of the program.");
 		SUBREADputs("");
@@ -1027,14 +1052,23 @@ int main_buildindex(int argc,char ** argv)
 	print_in_box(80, 0, 1, "");
 	print_in_box(80, 0, 0, "               Index name : %s", output_file);
 	print_in_box(80, 0, 0, "              Index space : %s", IS_COLOR_SPACE?"color-space":"base-space");
-	if(memory_limit > 12000)
+
+	if(IS_FORCED_ONE_BLOCK)
 	{
-		print_in_box(80, 0, 0, "                   Memory : %u -> %u Mbytes", memory_limit, 12000);
-		memory_limit = 12000;
+		print_in_box(80, 0, 0, "          One block index : yes");
 	}
 	else
-		print_in_box(80, 0, 0, "                   Memory : %u Mbytes", memory_limit);
+	{
+		if(memory_limit > 12000 && GENE_SLIDING_STEP>2)
+		{
+			print_in_box(80, 0, 0, "                   Memory : %u -> %u Mbytes", memory_limit, 12000);
+			memory_limit = 12000;
+		}
+		else
+			print_in_box(80, 0, 0, "                   Memory : %u Mbytes", memory_limit);
+	}
 	print_in_box(80, 0, 0, "         Repeat threshold : %d repeats", threshold);
+	print_in_box(80, 0, 0, " Distance to next subread : %d", GENE_SLIDING_STEP);
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
@@ -1061,7 +1095,8 @@ int main_buildindex(int argc,char ** argv)
 	signal (SIGINT, SIGINT_hook);
 
 	int ret = check_and_convert_FastA(argv+optind , argc - optind, tmp_fa_file, &chromosome_lengths, log_fp, log_file_name);
-	fclose(log_fp);
+	if(log_fp)
+		fclose(log_fp);
 
 	if(!ret)
 	{

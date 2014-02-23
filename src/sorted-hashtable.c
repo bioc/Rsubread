@@ -36,9 +36,9 @@
 
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table)
 {
-	return gehash_create_ex(the_table, expected_size, is_small_table, SUBINDEX_VER0);
+	return gehash_create_ex(the_table, expected_size, is_small_table, SUBINDEX_VER0, 3);
 }
-int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number)
+int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int index_gap)
 {
 	int expected_bucket_number;
 	int i;
@@ -49,9 +49,10 @@ int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_t
 	// calculate the number of buckets for creating the data structure
 	expected_bucket_number = expected_size / GEHASH_BUCKET_LENGTH; 
 
-	if(SUBINDEX_VER0 == version_number)
+	if(SUBINDEX_VER1 > version_number)
 	{
 		if(expected_bucket_number < 10111 && !is_small_table)expected_bucket_number = 10111;
+		else if(is_small_table)	expected_bucket_number = 4;
 	}
 	else
 	{
@@ -63,7 +64,9 @@ int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_t
 		int j, valid_v;
 		
 		valid_v = 1;
-		for(j=2; j<=13;j++)
+		int test_prime = 13;
+		if(SUBINDEX_VER1 > version_number && is_small_table) test_prime = 3;
+		for(j=2; j<=test_prime;j++)
 		{
 			if (expected_bucket_number % j == 0)
 				valid_v = 0;
@@ -94,6 +97,8 @@ int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_t
 		the_table -> buckets [i].current_items = 0;
 		the_table -> buckets [i].space_size = 0;
 	}
+
+	the_table -> index_gap = index_gap;
 
 	return 0;
 }
@@ -852,9 +857,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 		short *current_keys;//, *endp12;
 		short key = raw_key / the_table->buckets_number;
 
-		#ifdef NEED_SUBREAD_STATISTIC
 		vote -> all_used_subreads++;
-		#endif
 
 		current_bucket = _gehash_get_bucket (the_table, raw_key);
 		items = current_bucket -> current_items;
@@ -890,14 +893,12 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 			else break;
 		}
 
-		#ifdef NEED_SUBREAD_STATISTIC
 		if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
 		{
 			// assumed to be non-informative subread.
 			vote -> noninformative_subreads++;
 			return 0;
 		}
-		#endif
 
 		{
 			int ii_end = INDEL_SEGMENT_SIZE;
@@ -1239,6 +1240,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	char magic_chars[8];
 	magic_chars[7]=0;
 
+	the_table -> index_gap = 0;
+
 	FILE * fp = f_subr_open(fname, "rb");
 	if (!fp)
 	{
@@ -1248,11 +1251,41 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 	fread(magic_chars,1,8,fp);
 
+	if(memcmp(magic_chars, "2subindx",8)!=0)
+	{
+		print_in_box(80,0,0,"");
+		print_in_box(80,0,0,"WARNING your reference index was built under an old version of subread");
+		print_in_box(80,0,0,"        package. Please rebuild the index for the reference genome.");
+		print_in_box(80,0,0,"");
+	}
 	if(memcmp(magic_chars+1, "subindx",7)==0)
 	{
 		if('1'==magic_chars[0])
 			the_table -> version_number = SUBINDEX_VER1;
+		else if('2'==magic_chars[0])
+			the_table -> version_number = SUBINDEX_VER2;
 		else	assert(0);
+
+		if(SUBINDEX_VER2 == the_table -> version_number)
+		{
+			while(1)
+			{
+				short option_key, option_length;
+
+				fread(&option_key, 2, 1, fp);
+				if(!option_key) break;
+
+				fread(&option_length, 2, 1, fp);
+
+				if(option_key == SUBREAD_INDEX_OPTION_INDEX_GAP)
+					fread(&(the_table -> index_gap),2,1,fp);
+				else
+					fseek(fp, option_length, SEEK_CUR);
+			}
+			assert(the_table -> index_gap);
+		}
+		else if(SUBINDEX_VER1 == the_table -> version_number)
+			the_table -> index_gap = 3;
 
 		the_table -> current_items = load_int64(fp);
 		the_table -> buckets_number = load_int32(fp);
@@ -1298,6 +1331,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	else
 	{
 		fclose(fp);
+		the_table -> index_gap = 3;
 		fp = f_subr_open(fname, "rb");
 		the_table -> version_number = SUBINDEX_VER0;
 		the_table -> current_items = load_int64(fp);
@@ -1375,6 +1409,29 @@ void gehash_sort(gehash_t * the_table)
 	}
 }
 
+void write_cell(short option_key, short option_length, char * option_value, FILE * fp)
+{
+	fwrite(&option_key, 2, 1, fp);
+	fwrite(&option_length, 2, 1, fp);
+	fwrite(option_value, option_length, 1, fp);
+}
+
+
+void write_options(FILE * fp, gehash_t * the_table)
+{
+	short option_key, option_length;
+	short option_value;
+
+	option_key = SUBREAD_INDEX_OPTION_INDEX_GAP;
+	option_length = 2;
+	option_value = the_table -> index_gap;
+
+	write_cell(option_key, option_length, (char *) &option_value,fp);
+
+	option_key = 0;
+	fwrite(&option_key, 2, 1, fp);
+}
+
 int gehash_dump(gehash_t * the_table, const char fname [])
 {
 	int ii, jj, xx;
@@ -1387,8 +1444,11 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		return -1;
 	}
 
-	if(the_table->version_number == SUBINDEX_VER1)
-		fwrite("1subindx",1,8,fp);
+	if(the_table->version_number == SUBINDEX_VER2)
+	{
+		fwrite("2subindx",1,8,fp);
+		write_options(fp, the_table);
+	}
 
 	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
@@ -1407,7 +1467,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	gehash_data_t * sort_space_data [SORT_LANE_NUMBER];
 	int items_in_sort[SORT_LANE_NUMBER] ;
 	int items_in_merge[SORT_LANE_NUMBER] ;
-	if(the_table->version_number == SUBINDEX_VER1)
+	if(the_table->version_number > SUBINDEX_VER0)
 	{
 		for(xx=0;xx<SORT_LANE_NUMBER;xx++)
 		{
@@ -1538,7 +1598,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		fwrite(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
 	}
 
-	if(the_table->version_number == SUBINDEX_VER1)
+	if(the_table->version_number > SUBINDEX_VER0)
 	{
 		for(xx=0;xx<SORT_LANE_NUMBER;xx++)
 		{

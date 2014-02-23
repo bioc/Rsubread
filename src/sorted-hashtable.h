@@ -40,7 +40,7 @@
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table);
 
 // The EX version creates a hashtable with the given version number
-int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number);
+int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int GENE_SLIDING_STEP);
 
 // This function puts a data item into the table. If there is duplication, it insert another copy into the table but do not overlap on the old one.
 int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data);

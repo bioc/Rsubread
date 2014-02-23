@@ -16,7 +16,7 @@ static struct option long_options[] =
 	{"read2",  required_argument, 0, 'R'},
 	{"output",  required_argument, 0, 'o'},
 	{"subreads",  required_argument, 0, 'n'},
-	{"threads",  required_argument, 0, 't'},
+	{"threads",  required_argument, 0, 'T'},
 	{"indel",  required_argument, 0, 'I'},
 	{"phred",  required_argument, 0, 'P'},
 	{"minmatch",  required_argument, 0, 'm'},
@@ -44,6 +44,8 @@ static struct option long_options[] =
 	{"SAMinput", no_argument, 0, 0},
 	{"reportFusions", no_argument, 0, 0},
 	{"gzFASTQinput", no_argument, 0, 0},
+	{"extraColumns",  no_argument, 0, 0},
+	{"forcedPE",  no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -254,12 +256,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 's':
 				global_context->config.downscale_mapping_quality = 1;
 				break;
-			case 'M':
-				global_context->config.do_big_margin_reporting = 1;
-				global_context->config.do_big_margin_filtering_for_reads = 1;
-				global_context->config.report_multi_mapping_reads = 0;
-				break;
-
 			case 'A':
 				global_context->config.report_sam_file = 0;
 				break;
@@ -366,7 +362,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 0:
 				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
 				{
-					global_context->config.memory_use_multiplex = atoi(optarg);
+					global_context->config.memory_use_multiplex = atof(optarg);
 				}
 				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{
@@ -389,6 +385,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
 				{
 					global_context->config.is_gzip_fastq=1;
+				}
+				else if(strcmp("extraColumns", long_options[option_index].name)==0) 
+				{
+					global_context->config.SAM_extra_columns=1;
 				}
 				else if(strcmp("SAMinput", long_options[option_index].name)==0) 
 				{
