@@ -332,66 +332,68 @@ int prop_PE(propMapped_context * context)
 
 		sprintf(fname, "%s-%d.bin", context->temp_file_prefix, bini);
 		FILE * fp = f_subr_open(fname, "rb");
-		while(!feof(fp))
+		if(fp)
 		{
-			unsigned char read_len;
-			unsigned short flags;
-			char * read_name;
-			fread(&read_len,1,1,fp);
-			if(feof(fp))break;
-			read_name = malloc((int)read_len+1);
-			fread(read_name,read_len,1,fp);
-			read_name[read_len]=0;
-			//assert(read_len == strlen(read_name));
-			//printf("RNAME=%s;\n", read_name);
-			fread(&flags,1, sizeof(short), fp);
+				while(!feof(fp))
+				{
+					unsigned char read_len;
+					unsigned short flags;
+					char * read_name;
+					fread(&read_len,1,1,fp);
+					if(feof(fp))break;
+					read_name = malloc((int)read_len+1);
+					fread(read_name,read_len,1,fp);
+					read_name[read_len]=0;
+					//assert(read_len == strlen(read_name));
+					//printf("RNAME=%s;\n", read_name);
+					fread(&flags,1, sizeof(short), fp);
 
-			int new_OK; 
-			
-			if(context -> is_fragments_counted){
-				if(context -> is_proppair_needed )
-					new_OK = (flags & 2)>0;
-				else	new_OK=1;
+					int new_OK; 
+					
+					if(context -> is_fragments_counted){
+						if(context -> is_proppair_needed )
+							new_OK = (flags & 2)>0;
+						else	new_OK=1;
 
-				if(new_OK)
-					new_OK = !((flags & 4) * (flags & 8));
-			}
-			else
-			{
-				new_OK = ((flags & 4) == 0);
-			}
-			int old_OK = HashTableGet(rname_table, read_name) - NULL;
-			if(old_OK)
-			{
-				old_OK--;
+						if(new_OK)
+							new_OK = !((flags & 4) * (flags & 8));
+					}
+					else
+					{
+						new_OK = ((flags & 4) == 0);
+					}
+					int old_OK = HashTableGet(rname_table, read_name) - NULL;
+					if(old_OK)
+					{
+						old_OK--;
 
-				// if the old read is unmapped or the old read is not properly mapped pair.
-				if(new_OK && !old_OK )
-					HashTablePut(rname_table, read_name, NULL+2);
-			}
-			else
-				HashTablePut(rname_table, read_name, NULL + new_OK + 1);
+						// if the old read is unmapped or the old read is not properly mapped pair.
+						if(new_OK && !old_OK )
+							HashTablePut(rname_table, read_name, NULL+2);
+					}
+					else
+						HashTablePut(rname_table, read_name, NULL + new_OK + 1);
+				}
+
+				fclose(fp);
+				unlink(fname);
+
+
+				int bucket;
+				KeyValuePair *cursor;
+
+				for(bucket=0; bucket < rname_table -> numOfBuckets; bucket++)
+				{
+					cursor = rname_table -> bucketArray[bucket];
+					while (1)
+					{
+						if (!cursor) break;
+						if(cursor -> value == NULL+2) context -> mapped_reads++;
+						context -> all_reads++;
+						cursor = cursor->next;
+					}
+				}
 		}
-
-		fclose(fp);
-		unlink(fname);
-
-
-		int bucket;
-		KeyValuePair *cursor;
-
-		for(bucket=0; bucket < rname_table -> numOfBuckets; bucket++)
-		{
-			cursor = rname_table -> bucketArray[bucket];
-			while (1)
-			{
-				if (!cursor) break;
-				if(cursor -> value == NULL+2) context -> mapped_reads++;
-				context -> all_reads++;
-				cursor = cursor->next;
-			}
-		}
-
 		HashTableDestroy(rname_table);
 	}
 	return 0;

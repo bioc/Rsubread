@@ -112,6 +112,7 @@ typedef struct{
 	int report_no_unpaired_reads;
 	int max_mismatch_exonic_reads;
 	int max_mismatch_junction_reads;
+	int ignore_unmapped_reads;
 	int report_unmapped_using_mate_pos;
 	int report_multi_mapping_reads;
 	int downscale_mapping_quality;

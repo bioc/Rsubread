@@ -1472,7 +1472,7 @@ int write_chunk_results(global_context_t * global_context)
 				//if(read_number==2461)
 				//printf("CURCIGAR=%s ; FINAL_CIGAR=%s ; OK=%d\n", current_cigar_decompress, current_CIGAR, is_current_ok);
 
-				if( is_mate_ok ||is_current_ok || (global_context -> config.multi_best_reads <2) || (best_read_id==0 && read_1_repeats == 0 && read_2_repeats == 0))
+				if( is_mate_ok ||is_current_ok || (((global_context -> config.multi_best_reads <2) || (best_read_id==0 && read_1_repeats == 0 && read_2_repeats == 0)) && ! global_context->config.ignore_unmapped_reads))
 				{
 					int seq_len = strlen(additional_information);
 					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tSM:i:%d\tNH:i:%d", (int)((current_result -> Score_H >> 17) & 0xfff), current_result -> final_mismatched_bases, current_read_repeats);

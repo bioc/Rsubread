@@ -2447,7 +2447,7 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 		//int current_used_read_number = block_context -> used_read_number;
 		if(new_bases>=basic_length && new_bases < max_length)
 		{
-			assert(strlen(block_context -> rebuilt_window) == block_context ->rebuilt_window_size);
+			if(strlen(block_context -> rebuilt_window) != block_context ->rebuilt_window_size) return 1;
 
 			//int is_rectifiable = rectify_read_text(global_context, block_context, window_no, &block_context->voting_indexes[window_no], next_read_txt , 1);
 			//if(!is_rectifiable) continue;
@@ -3650,6 +3650,7 @@ void init_global_context(global_context_t * context)
 	context->config.is_third_iteration_running = 0;
 	context->input_reads.is_paired_end_reads = 0;
 	context->will_remove_input_file = 0;
+	context->config.ignore_unmapped_reads = 0;
 	context->config.report_unmapped_using_mate_pos = 1;
 	context->config.report_multi_mapping_reads = 1;
 	context->config.downscale_mapping_quality=0;

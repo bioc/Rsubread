@@ -46,6 +46,7 @@ static struct option long_options[] =
 	{"gzFASTQinput", no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
+	{"ignoreUnmapped",  no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -394,6 +395,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_BAM_input = 0;
 					global_context->config.is_SAM_file_input = 1;
+				}
+				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
+				{
+					global_context->config.ignore_unmapped_reads = 1;
 				}
 				else if(strcmp("reportFusions", long_options[option_index].name)==0) 
 				{
