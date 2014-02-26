@@ -251,34 +251,34 @@ void hpl_test2_func()
 	char col_val[100];
 
 	int col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 	col_name = "013";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 	col_name = "PC4";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 	col_name = "XXX";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 	extra_column = "gene_id =   \"PC4-013  ;=\"  ;013 = AXXD ; PC4=x";
 	col_name = "013";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 	col_name = "gene_id";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 	col_name = "PC4";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 
@@ -286,28 +286,28 @@ void hpl_test2_func()
 	extra_column = " gene_id\"  PC4-013  ;=  \"; XXX='123' ;013 :ABCD  ; PC4 =  CCXX=  ;";
 	col_name = "013";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 	col_name = "XXX";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 	col_name = "PC4";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 	col_name = "gene_id";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 
 	extra_column = "gene_id \"653635\"; transcript_id \"TR:653635\";";
 	col_name = "gene_id";
 	col_len = GTF_extra_column_value(extra_column, col_name, col_val, 100);
-	printf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
+	SUBREADprintf("LEN=%d; KEY='%s'; VAL=\"%s\"\n", col_len, col_name, col_val);
 
 
 
