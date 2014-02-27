@@ -766,6 +766,9 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 			is_OK = 1;
 			fclose(outfp);
 		}
+		else{
+			SUBREADprintf("Unable to create temporary file '%s'\nThe program has to terminate.\nPlease run the program in a directory where you have the privilege to create files.\n", temp_file_name);
+		}
 
 		gzclose(rawfp);
 	}

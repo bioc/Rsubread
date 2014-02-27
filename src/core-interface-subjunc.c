@@ -43,6 +43,7 @@ static struct option long_options[] =
 	{"gzFASTQinput", no_argument, 0, 0},
 	{"allJunctions",  no_argument, 0, 0},
 	{"memoryMultiplex",  required_argument, 0, 0},
+	{"ignoreUnmapped",  no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
@@ -349,6 +350,10 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
 				{
 					global_context->config.memory_use_multiplex = atof(optarg);
+				}
+				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
+				{
+					global_context->config.ignore_unmapped_reads = 1;
 				}
 				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{

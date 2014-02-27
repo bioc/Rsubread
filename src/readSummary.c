@@ -1834,6 +1834,10 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		char tmp_fname[350];
 		sprintf(tmp_fname, "%s.featureCounts", global_context -> raw_input_file_name);
 		global_context -> SAM_output_fp = f_subr_open(tmp_fname, "w");
+		if(!global_context -> SAM_output_fp)
+		{
+			SUBREADprintf("Unable to create file '%s'; the read assignment details are not written.\n", tmp_fname);
+		}
 	}
 	else
 		global_context -> SAM_output_fp = NULL;
@@ -1937,7 +1941,12 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 	}
 
 	SAM_sort_writer writer;
-	sort_SAM_create(&writer, temp_file_name, ".");
+	int ret = sort_SAM_create(&writer, temp_file_name, ".");
+	if(ret)
+	{
+		SUBREADprintf("Unable to sort input file because temporary file '%s' cannot be created.\n", temp_file_name);
+		return -1;
+	}
 	int is_read_len_warned = 0;
 
 	while(1)
@@ -2167,7 +2176,10 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	sprintf(fname, "%s.summary", out_file);
 	FILE * fp_out = f_subr_open(fname,"w");
 
-	if(!fp_out) return;
+	if(!fp_out){
+		SUBREADprintf("Unable to create summary file '%s'\n", fname);
+		return;
+	}
 
 	fprintf(fp_out,"Status");
 	char * next_fn = file_list;
