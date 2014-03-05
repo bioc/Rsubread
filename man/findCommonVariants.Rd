@@ -1,6 +1,6 @@
 \name{findCommonVariants}
 \alias{findCommonVariants}
-\title{Finding the commo variants among all input VCF files}
+\title{Finding the common variants among all input VCF files}
 \description{
 The common variants (inc. SNPs and indels) among all the input files are found. A data frame containing these common variants is returned. The data frame has a similar format as VCF files. }
 \usage{
