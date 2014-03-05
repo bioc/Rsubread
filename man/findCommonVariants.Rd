@@ -27,11 +27,11 @@ If there are not any common variants, this function returns an NA value.
 
 %\note{}
 %\seealso{}
-\examples{
+\examples{\dontrun{
 # finding the common variants between to input VCF files: a.vcf and b.vcf
 library(Rsubread)
 x <- findCommonVariants(c('a.vcf','b.vcf'))
-}
+}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}
