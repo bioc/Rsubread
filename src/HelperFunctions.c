@@ -334,3 +334,104 @@ void testi_helper_1_main()
 	hpl_test2_func();
 }
 
+char *str_replace(char *orig, char *rep, char *with) {
+    char *result; // the return string
+    char *ins;    // the next insert point
+    char *tmp;    // varies
+    int len_rep;  // length of rep
+    int len_with; // length of with
+    int len_front; // distance between rep and end of last rep
+    int count;    // number of replacements
+
+    if (!orig)
+        return NULL;
+    if (!rep)
+        rep = "";
+    len_rep = strlen(rep);
+    if (!with)
+        with = "";
+    len_with = strlen(with);
+
+    ins = orig;
+    for (count = 0; NULL != (tmp = strstr(ins, rep)); ++count) {
+        ins = tmp + len_rep;
+    }
+    tmp = result = malloc(strlen(orig) + (len_with - len_rep) * count + 1);
+
+    if (!result)
+        return NULL;
+
+    while (count--) {
+        ins = strstr(orig, rep);
+        len_front = ins - orig;
+        tmp = strncpy(tmp, orig, len_front) + len_front;
+        tmp = strcpy(tmp, with) + len_with;
+        orig += len_front + len_rep; // move to next "end of rep"
+    }
+    strcpy(tmp, orig);
+    return result;
+}
+
+
+
+// rule: the string is ABC123XXXXXX...
+// This is the priroity:
+// First, compare the letters part.
+// Second, compare the pure numeric part.
+// Third, compare the remainder.
+int strcmp_number(char * s1, char * s2)
+{
+	int x1 = 0;
+	int ret = 0;
+
+	while(1)
+	{
+		char nch1 = s1[x1];
+		char nch2 = s2[x1];
+
+		if((!nch1) || !nch2){return nch2?1:(nch1?(-1):0);}
+		if(isdigit(nch1) && isdigit(nch2))break;
+
+		ret = nch1 - nch2;
+		if(ret) return ret;
+		x1++;
+	}
+
+	int v1 = 0, v2 = 0;
+	while(1)
+	{
+		char nch1 = s1[x1];
+		char nch2 = s2[x1];
+		if((!nch1) || !nch2){
+			if(nch1 || nch2)
+				return nch2?(-1):1;
+			break;
+		}
+		int is_chr1_digit = isdigit(nch1);
+		int is_chr2_digit = isdigit(nch2);
+
+		if(is_chr1_digit || is_chr2_digit)
+		{
+			if(is_chr1_digit && is_chr2_digit)
+			{
+				v1 = v1*10+(nch1-'0');
+				v2 = v2*10+(nch2-'0');
+			}
+			else
+			{
+				ret = nch1 - nch2;
+				return ret;
+			}
+		}
+		else break;
+		x1++;
+	}
+
+	if(v1==v2)
+		return strcmp(s1+x1, s2+x1);	
+	else
+	{
+		ret = v1 - v2;
+		return ret;
+	}
+}

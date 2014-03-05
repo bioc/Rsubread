@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.9 2013/06/20 07:26:26 cvs Exp $
+ * $Id: hashtable.c,v 9999.10 2014/03/04 23:53:25 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -115,6 +115,7 @@ void HashTableDestroy(HashTable *hashTable) {
         KeyValuePair *pair = hashTable->bucketArray[i];
         while (pair != NULL) {
             KeyValuePair *nextPair = pair->next;
+
             if (hashTable->keyDeallocator != NULL)
                 hashTable->keyDeallocator((void *) pair->key);
             if (hashTable->valueDeallocator != NULL)
@@ -224,10 +225,12 @@ int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int 
 
     if (pair) {
         if (pair->key != key) {
-            if (replace_key==0 && hashTable->keyDeallocator != NULL)
-                hashTable->keyDeallocator((void *) pair->key);
             if(replace_key)
+	    {
+		if(hashTable->keyDeallocator)
+			hashTable->keyDeallocator((void *) pair->key);
                 pair->key = key;
+	    }
         }
         if (pair->value != value) {
             if (hashTable->valueDeallocator != NULL)

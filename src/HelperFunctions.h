@@ -37,4 +37,17 @@ int RSubread_parse_CIGAR_string(const char * CIGAR_Str, unsigned int * Staring_P
 
 int GTF_extra_column_value(const char * Extra_Col, const char * Target_Name, char * Target_Value, int TargVal_Size);
 
+
+// Replacing `rep' with `with' in `orig'. 
+// Rhe return value must be freed if it is not NULL.
+char *str_replace(char *orig, char *rep, char *with) ;
+
+
+// rule: the string is ABC123XXXXXX...
+// // This is the priroity:
+// // First, compare the letters part.
+// // Second, compare the pure numeric part.
+// // Third, compare the remainder.
+int strcmp_number(char * s1, char * s2);
+
 #endif

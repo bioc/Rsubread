@@ -1515,7 +1515,7 @@ int write_indel_final_results(global_context_t * global_context)
 	ref_bases = malloc(1000);
 	alt_bases = malloc(1000);
 
-	fputs("##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Raw read depth\">\n##INFO=<ID=AT,Number=1,Type=Integer,Description=\"Raw background read\">\\n", ofp);
+	fputs("##fileformat=VCFv4.0\n##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Raw read depth\">\n##INFO=<ID=ALLMM,Number=1,Type=Integer,Description=\"All mimatched bases in the supporting reads\">\n##INFO=<ID=AT,Number=1,Type=Integer,Description=\"All reads mapped to this location (inc. reads not including this variant)\">\n", ofp);
 	fputs("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n", ofp);
 
 	for(xk1 = 0; xk1 <  indel_context -> total_events ; xk1++)

@@ -766,7 +766,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 				if(fisher_density_adj >= 0. )
 				{
-					snprintf(sprint_line,999, "%s\t%u\t.\t%c\t%s\t%.3f\t.\tDP=%d;WINMIM=%d;WINTOT=%d;ALTNUMBER=%s\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, -10*log(max(1E-40,fisher_density_adj))/log(10), all_reads, snp_filter_background_unmatched[i], snp_filter_background_matched[i]+snp_filter_background_unmatched[i], supporting_list);
+					snprintf(sprint_line,999, "%s\t%u\t.\t%c\t%s\t%.3f\t.\tDP=%d;MM=%s;BGTOTAL=%d;BGMM=%d\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, -10*log(max(1E-40,fisher_density_adj))/log(10), all_reads, supporting_list , snp_filter_background_matched[i]+snp_filter_background_unmatched[i], snp_filter_background_unmatched[i]);
 					if(parameters->output_fp_lock)
 						subread_lock_occupy(parameters->output_fp_lock);
 					fwrite(sprint_line, 1, strlen(sprint_line),out_fp);
@@ -1028,6 +1028,7 @@ int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, ch
 	if(!out_fp){
 		SUBREADprintf("Cannot open the output file: '%s'\n", out_BED_file);
 	}
+	fputs("##fileformat=VCFv4.0\n",out_fp);
 	fputs("##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n", out_fp);
 	fputs("##INFO=<ID=WINMIM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the windows\">\n", out_fp);
 	fputs("##INFO=<ID=WINTOT,Number=1,Type=Integer,Description=\"Total number of bases in the windows\">\n", out_fp);
