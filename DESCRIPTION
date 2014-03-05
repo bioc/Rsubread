@@ -2,7 +2,7 @@ Package: Rsubread
 Type: Package
 Title: Rsubread package: high-performance read alignment,
         quantification and mutation discovery
-Version: 1.13.15
+Version: 1.13.16
 Author: Wei Shi and Yang Liao with contributions from Jenny Zhiyin Dai
         and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>
@@ -20,7 +20,7 @@ Description: This R package provides powerful and easy-to-use tools for
 URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
 License: GPL-3
 LazyLoad: yes
-biocViews: Sequencing, Sequencing, SequenceMatching, RNASeq, ChIPSeq,
+biocViews: Sequencing, SequenceMatching, RNASeq, ChIPSeq,
         GeneExpression, GeneRegulation, Genetics, SNP,
         GeneticVariability, Preprocessing, QualityControl,
         GenomeAnnotation, Software
