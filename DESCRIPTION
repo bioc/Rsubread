@@ -20,7 +20,7 @@ Description: This R package provides powerful and easy-to-use tools for
 URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
 License: GPL-3
 LazyLoad: yes
-biocViews: Sequencing, SequenceMatching, RNASeq, ChIPSeq,
+biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq,
         GeneExpression, GeneRegulation, Genetics, SNP,
         GeneticVariability, Preprocessing, QualityControl,
         GenomeAnnotation, Software
