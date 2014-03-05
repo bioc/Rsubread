@@ -18,6 +18,8 @@ There are eight columns in the returned data frame: chromosome name, position, i
 }
 \value{ 
 A data frame containing the common variants among all the input VCF files is returned. The first eight columns are: chromosome name, position, identity, reference sequence, alternative sequence, quality, filter and extra information.
+
+If there are not any common variants, this function returns an NA value.
 }
 %\references{
 %}
