@@ -28,7 +28,7 @@ findCommonVariants <- function(VCF_files)
 	for(vcf_file in VCF_files)
 	{
 		print(paste("Doing", vcf_file))
-		vcf_body <- read.delim(vcf_file, comment='#', header=FALSE)
+		vcf_body <- read.delim(vcf_file, comment.char='#', header=FALSE)
 		
 		nky <- 0
 		for(row_no in 1:nrow(vcf_body))
