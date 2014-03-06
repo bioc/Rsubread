@@ -4,7 +4,7 @@
 \description{
 The common variants (inc. SNPs and indels) among all the input files are found. A data frame containing these common variants is returned. The data frame has a similar format as VCF files. }
 \usage{
-  x <- findCommonVariants(vcf_files)
+  findCommonVariants(vcf_files)
 }
 \arguments{
   \item{vcf_files}{ a character vector giving the names of VCF format files.}
