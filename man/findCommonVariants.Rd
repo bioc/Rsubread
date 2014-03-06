@@ -4,10 +4,10 @@
 \description{
 The common variants (inc. SNPs and indels) among all the input files are found. A data frame containing these common variants is returned. The data frame has a similar format as VCF files. }
 \usage{
-  findCommonVariants(vcf_files)
+  findCommonVariants(VCF_files)
 }
 \arguments{
-  \item{vcf_files}{ a character vector giving the names of VCF format files.}
+  \item{VCF_files}{ a character vector giving the names of VCF format files.}
 }
 \details{
 This function loads all variants (SNPs and indels) from the input VCF files, and find the common variants that are reported in all the VCF files. If a variant record in a input VCF file has multiple alternative sequences (split by `,'), each alternative sequence is treated as a single variant. Two variants in two VCF files are the same only if their genomic locations, their reference sequences, their alternative sequences and their variant types are identical.
