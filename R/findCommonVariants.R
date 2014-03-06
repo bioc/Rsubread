@@ -10,7 +10,7 @@ findCommonVariants <- function(VCF_files)
 
 	C_args <- .C("R_mergeVCF",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
-	x <- try(read.delim(fout,stringsAsFactors=FALSE, comment="#"),silent=TRUE)
+	x <- try(read.delim(fout,stringsAsFactors=FALSE, comment.char="#"),silent=TRUE)
 	file.remove(fout)
 	if(class(x)!='try-error') {
 		colnames(x)[1:8] <- c("Chr","Pos","Reference","Identity","Alternative","Quality", "Filter","Info")
@@ -22,7 +22,7 @@ findCommonVariants <- function(VCF_files)
 
 }
 
-findCommonVariants_inner <- function(VCF_files)
+.findCommonVariants_inner <- function(VCF_files)
 {
 	
 	for(vcf_file in VCF_files)
