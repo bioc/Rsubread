@@ -1271,15 +1271,18 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								}
 
 								//printf("INDEL_DDADD: I=%d; INDELS=%d; PN=%d; LOC=%u\n",i, current_indel_len, pair_number, indel_left_boundary-1);
-								chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
+								if(abs(current_indel_len)<=global_context -> config.max_indel_length)
+								{
+									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
 
-								mark_gapped_read(current_result);
-								if(last_event && new_event){
-									int dist = new_event -> event_small_side - last_event -> event_large_side +1;
-									new_event -> connected_previous_event_distance = dist;
-									last_event -> connected_next_event_distance = dist;
+									mark_gapped_read(current_result);
+									if(last_event && new_event){
+										int dist = new_event -> event_small_side - last_event -> event_large_side +1;
+										new_event -> connected_previous_event_distance = dist;
+										last_event -> connected_next_event_distance = dist;
+									}
+									last_event = new_event;
 								}
-								last_event = new_event;
 							}
 							
 
@@ -1370,7 +1373,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 
 
 
-	if(global_context -> config.extending_search_indels)
+	if(global_context -> config.extending_search_indels && global_context -> config.max_indel_length>0)
 	{
 		// USING EXTENDING TO FIND INDELS
 		// THIS IS UNSTABLE!
@@ -1474,7 +1477,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 			{
 				unsigned int head_indel_left_edge = head_indel_pos + current_result->selected_position - 1;
 				head_indel_left_edge -= max(0, head_indel_movement);
-				if(head_indel_left_edge>=0)
+				if(head_indel_left_edge>=0 && abs(head_indel_movement)<=global_context -> config.max_indel_length)
 				{
 					local_add_indel_event(global_context, thread_context, event_table, read_text + head_indel_pos, head_indel_left_edge, head_indel_movement, 1, 1, 0);
 					mark_gapped_read(current_result);
@@ -1484,8 +1487,11 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 			{
 				unsigned int tail_indel_left_edge = tail_indel_pos + current_result->selected_position + current_result -> indels_in_confident_coverage - 1;
 				
-				local_add_indel_event(global_context, thread_context, event_table, read_text + tail_indel_pos, tail_indel_left_edge, tail_indel_movement, 1, 1, 0);
-				mark_gapped_read(current_result);
+				if(abs(tail_indel_movement)<=global_context -> config.max_indel_length)
+				{
+					local_add_indel_event(global_context, thread_context, event_table, read_text + tail_indel_pos, tail_indel_left_edge, tail_indel_movement, 1, 1, 0);
+					mark_gapped_read(current_result);
+				}
 
 			}
 		}

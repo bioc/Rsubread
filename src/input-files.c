@@ -1846,7 +1846,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 		(*block_count) = fp_table->numOfElements;
 	HashTableDestroy(fp_table);
 	SamBam_fclose(sambam_reader);
-	(*real_read_count) = read_number;
+	if(real_read_count)
+		(*real_read_count) = read_number;
 	return 0;
 }
 

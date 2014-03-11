@@ -3194,7 +3194,8 @@ int feature_count_main(int argc, char ** argv)
 		switch(c)
 		{
 			case 'S':
-				is_Input_Need_Reorder = 1;
+				SUBREADprintf("The '-S' option has been deprecated.\n FeatureCounts will automatically examine the read order.\n");
+				//is_Input_Need_Reorder = 1;
 				break;
 			case 'A':
 				strcpy(alias_file_name, optarg);
@@ -3228,6 +3229,7 @@ int feature_count_main(int argc, char ** argv)
 				is_PE = 1;
 				break;
 			case 'b':
+				SUBREADprintf("The '-b' option has been deprecated.\n FeatureCounts will automatically examine the file format.\n");
 				is_SAM = 0;
 				break;
 			case 'C':

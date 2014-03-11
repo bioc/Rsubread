@@ -200,7 +200,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.max_mismatch_exonic_reads = 200;
 	global_context->config.max_mismatch_junction_reads = 200;
 	global_context->config.use_dynamic_programming_indel = 1;
-	global_context->config.extending_search_indels = 1;
+
+	// config.extending_search_indels is changed from 1 to 0 on 10/mar/2014
+	global_context->config.extending_search_indels = 0;
 	global_context->config.big_margin_record_size = 9; 
 
 	if(argc<2)
