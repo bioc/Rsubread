@@ -2325,19 +2325,14 @@ void print_usage()
 	SUBREADputs("              \tbe allowed to be assigned to more than one matched meta-"); 
 	SUBREADputs("              \tfeature (or feature if -f is specified). "); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -s <int>  \tindicate if strand-specific read counting should be performed.");
+	SUBREADputs("    -s <int>  \tIndicate if strand-specific read counting should be performed.");
 	SUBREADputs("              \tIt has three possible values:  0 (unstranded), 1 (stranded) and");
 	SUBREADputs("              \t2 (reversely stranded). 0 by default.");
 	SUBREADputs("    "); 
-	SUBREADputs("    -M        \tif specified, multi-mapping reads/fragments will be counted (ie.");
+	SUBREADputs("    -M        \tIf specified, multi-mapping reads/fragments will be counted (ie.");
 	SUBREADputs("              \ta multi-mapping read will be counted up to N times if it has N");
 	SUBREADputs("              \treported mapping locations). The program uses the `NH' tag to");
 	SUBREADputs("              \tfind multi-mapping reads.");
-	SUBREADputs("    "); 
-	SUBREADputs("    --primary \tif specified, only primary alignments are included in the");
-	SUBREADputs("              \tsummarization. Secondary alignments are identified using bit");
-	SUBREADputs("              \t0x100 in the Flag field and such alignments are excluded from");
-	SUBREADputs("              \tthe summarization."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    -Q <int>  \tThe minimum mapping quality score a read must satisfy in order");
 	SUBREADputs("              \tto be counted. For paired-end reads, at least one end should");
@@ -2353,6 +2348,12 @@ void print_usage()
 	SUBREADputs("              \thits if the read/fragment is counted multiple times. Name of");
 	SUBREADputs("              \tthe file is the same as name of the input read file except a");
 	SUBREADputs("              \tsuffix `.featureCounts' is added.");
+	SUBREADputs("    "); 
+	SUBREADputs("    --primary \tIf specified, only primary alignments will be counted. Primary");
+	SUBREADputs("              \tand secondary alignments are identified using bit 0x100 in the");
+	SUBREADputs("              \tFlag field of SAM/BAM files. All primary alignments in a dataset");
+	SUBREADputs("              \twill be counted no matter they are from multi-mapping reads or");
+	SUBREADputs("              \tnot ('-M' is ignored). ");
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional paired-end parameters:"); 
 	SUBREADputs("    "); 
@@ -2379,7 +2380,7 @@ void print_usage()
 	SUBREADputs("              \tNOT be included for summarization. This option is only "); 
 	SUBREADputs("              \tapplicable for paired-end read data."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    -v        \toutput version of the program.");
+	SUBREADputs("    -v        \tOutput version of the program.");
 	SUBREADputs("    "); 
 
 
@@ -3201,7 +3202,8 @@ int feature_count_main(int argc, char ** argv)
 				strcpy(alias_file_name, optarg);
 				break;
 			case 'M':
-				is_Multi_Mapping_Allowed = ALLOW_ALL_MULTI_MAPPING;
+				if(0 == is_Multi_Mapping_Allowed)
+					is_Multi_Mapping_Allowed = ALLOW_ALL_MULTI_MAPPING;
 				break;
 			case 'v':
 				core_version_number("featureCounts");

@@ -958,6 +958,7 @@ int main_buildindex(int argc,char ** argv)
 
 	IS_FORCED_ONE_BLOCK = 0;
 	GENE_SLIDING_STEP = 3;
+	IS_COLOR_SPACE = 0;
 
 	SUBREADprintf("\n");
 

@@ -508,9 +508,10 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 
 			//	SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d\n", chro_name, i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail);
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
-				if(all_result_needed ||( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
+				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
+
 
 				//if(strcmp(chro_name, "chr20")==0 && block_no  == 3 && i == 57566366-1-3*15000000)
 
@@ -519,7 +520,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 					snp_filter_background_matched[i] = flanking_matched;
 				}
 				fisher_test_size ++;
-			}else if(all_result_needed) snp_fisher_raw[i]=1.1;
+			}else if(i>=0 && all_result_needed) snp_fisher_raw[i]=1.1;
 
 			if(remove_old)
 			{
@@ -631,7 +632,10 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		tmp_fp = f_subr_open(temp_file_name, "rb");
 		if(tmp_fp)
 		{
+			int min_phred_score_raw = parameters -> min_phred_score;
+			parameters -> min_phred_score -= 3;
 			read_tmp_block(parameters, tmp_fp,NULL , snp_BGC_piles,block_no, reference_len, referenced_genome);
+			parameters -> min_phred_score  = min_phred_score_raw;
 		}
 		fclose(tmp_fp);
 		unlink(temp_file_name);
@@ -841,7 +845,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 				if(snp_fisher_raw[i] >= 0. )
 				{
 					float Qvalue =  -1.0*log(max(1E-40,snp_fisher_raw[i]))/log(10);
-					char BGC_Qvalue_str [90];
+					char BGC_Qvalue_str [120];
 					BGC_Qvalue_str[0]=0;
 
 					if(snp_fisher_BGC)
@@ -1584,7 +1588,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_usage_snp(argv[0]);
 		return 0;
 	}
-	while ((c = getopt_long (argc, argv, "N:a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
+	while ((c = getopt_long (argc, argv, "7:N:a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
 	{
 		switch (c)
 		{
@@ -1698,7 +1702,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		}
 	}
 
-	if(out_BED_file[0]==0 || in_FASTA_file[0]==0 || in_SAM_file[0]==0)
+	if(out_BED_file[0]==0 || in_FASTA_file[0]==0 || (parameters.pile_file_name [0] == 0 && in_SAM_file[0]==0))
 	{
 		SUBREADprintf("The names of the input file, the output file and the reference sequence file must be specified using -i, -o and -g options.\n");
 		return -1;
@@ -1720,14 +1724,16 @@ int main_snp_calling_test(int argc,char ** argv)
 	}
 	fclose(tfp);
 
-	tfp = f_subr_open(in_SAM_file,"r");
-	if(!tfp)
+	if(in_SAM_file[0])
 	{
-		SUBREADprintf("Cannot open the input file: %s\n", in_SAM_file); 
-		return -1;
+		tfp = f_subr_open(in_SAM_file,"r");
+		if(!tfp)
+		{
+			SUBREADprintf("Cannot open the input file: %s\n", in_SAM_file); 
+			return -1;
+		}
+		fclose(tfp);
 	}
-	fclose(tfp);
-
 
 
 

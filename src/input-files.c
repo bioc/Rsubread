@@ -1357,13 +1357,16 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes)
 {
-	int i;
-	FILE * fp = f_subr_open(in_SAM_file,"rb");
+	int i, is_first_read_PE;
+	int is_BAM = is_certainly_bam_file(in_SAM_file,  &is_first_read_PE);
+	SamBam_FILE * fp = SamBam_fopen(in_SAM_file,is_BAM?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
 
-	while(!feof(fp))
+	while(1)
 	{
 		char line_buffer [3000];
-		int linelen = read_line(2999, fp, line_buffer, 0);
+		char * is_ret = SamBam_fgets(fp, line_buffer, 2999, 0); 
+		if(!is_ret) break;
+		int linelen = strlen(line_buffer);
 
 		if(line_buffer[0]=='@')
 		{
@@ -1408,7 +1411,7 @@ int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes)
 		else
 			break;
 	}
-	fclose(fp);
+	SamBam_fclose(fp);
 	return 0;
 }
 
