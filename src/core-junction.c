@@ -1705,7 +1705,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 	int final_qual = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases);
 
 
-	//if(explain_context -> pair_number == 119)
+	//if(explain_context -> pair_number == 273)
 	//printf("%s : POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\tBEST_READ_NO=%d\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, final_qual, explain_context -> best_read_id);
 
 	int applied_mismatch = is_junction_read? global_context->config.max_mismatch_junction_reads:global_context->config.max_mismatch_exonic_reads ;

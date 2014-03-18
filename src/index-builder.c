@@ -949,7 +949,7 @@ int main_buildindex(int argc,char ** argv)
 	unsigned int * chromosome_lengths;
 
 	if(sizeof(char *)>4) memory_limit=8000;
-	else memory_limit=1200;
+	else memory_limit=3000;
 
 	ptr_tmp_fa_file[0]=tmp_fa_file;
 	output_file[0] = 0;

@@ -88,11 +88,15 @@ void print_usage_core_aligner()
 	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default. Indels of up");
 	SUBREADputs("                            to 200bp long can be detected.");
 	SUBREADputs("    ");
-	SUBREADputs("    -B --multi     <int>    specify the maximal number of equally-best mapping");
-	SUBREADputs("                            locations allowed to be reported for any read. The");
-	SUBREADputs("                            value has to be within the range of 1 to 16. 1 by");
-	SUBREADputs("                            default. ");
-	SUBREADputs("                              ");
+	SUBREADputs("    -B --multi     <int>    Specify the maximal number of equally-best mapping");
+	SUBREADputs("                            locations allowed to be reported for each read. 1");
+	SUBREADputs("                            by default. Allowed values are between 1 to 16");
+	SUBREADputs("                            (inclusive). 'NH' tag is used to indicate how many");
+	SUBREADputs("                            alignments are reported for the read and 'HI' tag");
+	SUBREADputs("                            is used for numbering the alignments reported for");
+	SUBREADputs("                            the same read, in the output. Note that -u option");
+	SUBREADputs("                            takes precedence over -B.");
+	SUBREADputs("");
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores in input files, '3' for");
 	SUBREADputs("                            phred+33 and '6' for phred+64. '3' by default.");
 	SUBREADputs("");
@@ -191,6 +195,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 {
 	int c;
 	int option_index = 0;	
+	int is_64_bit_computer = sizeof(char *)>4; 
 
 	optind = 0;
 	opterr = 1;
@@ -310,6 +315,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 'I':
 				global_context->config.max_indel_length = atoi(optarg);
 
+				if(!is_64_bit_computer) global_context->config.max_indel_length = min(global_context->config.max_indel_length , 16); 
 				if(global_context->config.max_indel_length <0)global_context->config.max_indel_length =0;
 				if(global_context->config.max_indel_length > MAX_INSERTION_LENGTH)global_context->config.max_indel_length = MAX_INSERTION_LENGTH;
 				if(global_context->config.max_indel_length > 16)
@@ -331,10 +337,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					//global_context->config.total_subreads = 28;
 					//global_context->config.minimum_subread_for_first_read = 3;
 					//global_context->config.minimum_subread_for_second_read = 1;
-					global_context->config.do_big_margin_filtering_for_reads = 0;
-					global_context->config.extending_search_indels = 0;
-					global_context->config.use_dynamic_programming_indel = 1;
-					global_context->config.flanking_subread_indel_mismatch = 0;
+					//global_context->config.do_big_margin_filtering_for_reads = 0;
+					//global_context->config.extending_search_indels = 0;
+					//global_context->config.use_dynamic_programming_indel = 1;
+					//global_context->config.flanking_subread_indel_mismatch = 0;
 
 					global_context->config.do_superlong_indel_detection = 0;
 				}

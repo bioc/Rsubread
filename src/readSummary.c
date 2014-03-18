@@ -1171,6 +1171,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			if(global_context -> SAM_output_fp)
 				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\n", read_name);
+			return;
 		}
 
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 

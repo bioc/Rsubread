@@ -955,6 +955,7 @@ int write_chunk_results(global_context_t * global_context)
 		char read_name_1[MAX_READ_NAME_LEN+1], read_name_2[MAX_READ_NAME_LEN+1];
 		int read_len_1, read_len_2=0;
 		int best_read_id = 0;
+		int best_read_id_HI = 0; 
 		int total_best_reads = 0;
 		int read1_has_reversed = 0;
 		int read2_has_reversed = 0;
@@ -986,6 +987,7 @@ int write_chunk_results(global_context_t * global_context)
 		//alignment_result_t * prime_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0, 0);
 		int read_1_repeats = 0, read_1_reported=0;
 		int read_2_repeats = 0, read_2_reported=0;
+		//int is_PE_OK = -1;
 		for(total_best_reads=0; total_best_reads<global_context -> config.multi_best_reads; total_best_reads++)
 		{
 			alignment_result_t * current_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0, total_best_reads);
@@ -1034,7 +1036,6 @@ int write_chunk_results(global_context_t * global_context)
 					}
 				}
 
-
 				if(current_result_2 -> result_flags & CORE_IS_FULLY_EXPLAINED)if(read_2_result_available) read_2_repeats ++;
 				if(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED)if(read_1_result_available) read_1_repeats ++;
 			}else
@@ -1079,7 +1080,7 @@ int write_chunk_results(global_context_t * global_context)
 				int mate_read_len	= is_second_read ? read_len_1  : read_len_2;
 				unsigned int mate_linear_pos=0, current_linear_pos=0;
 				char mate_strand = 0, current_strand = 0;
-				int current_read_repeats = is_second_read ? read_2_repeats:read_1_repeats;
+				//int current_read_repeats = is_second_read ? read_2_repeats:read_1_repeats;
 				int * current_read_reported = is_second_read ? (&read_2_reported):(&read_1_reported);
 
 				char * current_chro_name=NULL, * mate_chro_name = NULL;
@@ -1477,8 +1478,16 @@ int write_chunk_results(global_context_t * global_context)
 
 				if( is_mate_ok ||is_current_ok || (((global_context -> config.multi_best_reads <2) || (best_read_id==0 && read_1_repeats == 0 && read_2_repeats == 0)) && ! global_context->config.ignore_unmapped_reads))
 				{
+
+					char hi_tag_out[18];
+					hi_tag_out[0]=0;
+
+					if(max(read_2_repeats,read_1_repeats) > 1)
+						sprintf(hi_tag_out,"\tHI:i:%d", best_read_id_HI);
+
+
 					int seq_len = strlen(additional_information);
-					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tSM:i:%d\tNH:i:%d", (int)((current_result -> Score_H >> 17) & 0xfff), current_result -> final_mismatched_bases, current_read_repeats);
+					seq_len += sprintf(additional_information+seq_len, "\tSH:i:%d\tSM:i:%d\tNH:i:%d%s", (int)((current_result -> Score_H >> 17) & 0xfff), current_result -> final_mismatched_bases, max(read_2_repeats,read_1_repeats), hi_tag_out);
 
 					if( is_current_ok && global_context -> config.is_rna_seq_reads && !(current_result -> result_flags & CORE_NOTFOUND_DONORS))
 					{
@@ -1491,7 +1500,7 @@ int write_chunk_results(global_context_t * global_context)
 							current_cigar_decompress[0]='*';
 							current_cigar_decompress[1]=0;
 						}
-						seq_len += sprintf(additional_information+seq_len, "\tSG:Z:%s\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tNH:i:%d\tSP:Z:%s",current_cigar_decompress, current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, current_read_repeats, (current_result -> result_flags & CORE_IS_GAPPED_READ)?"GAPPED":"NOEVENT"); 
+						seq_len += sprintf(additional_information+seq_len, "\tSG:Z:%s\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tSP:Z:%s",current_cigar_decompress, current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, (current_result -> result_flags & CORE_IS_GAPPED_READ)?"GAPPED":"NOEVENT"); 
 					}
 
 					if(global_context->config.read_group_id[0])
@@ -1515,12 +1524,18 @@ int write_chunk_results(global_context_t * global_context)
 				{
 					if(is_second_read)
 						if(is_current_ok || is_mate_ok)
+						{
 							global_context -> all_mapped_reads++;
+							best_read_id_HI++;
+						}
 				}
 				else
 				{
 					if(is_current_ok)
+					{
+						best_read_id_HI++;
 						global_context -> all_mapped_reads++;
+					}
 				}
 			} 
 		}
@@ -2076,6 +2091,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 				//if(current_read_number == 119) {
 				//	SUBREADprintf("NOINF=%d\n", vote_1 -> noninformative_subreads );
+				//#warning =============== COMMENT THIS LINE!!!! ======================
 				//	print_votes(vote_1, global_context -> config.index_prefix);
 				//}
 				//print_votes(vote_2, global_context -> config.index_prefix);

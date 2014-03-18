@@ -2081,6 +2081,35 @@ int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_pat
 	return 0;
 }
 
+void find_tag_out(char * read_line_buf, char * tag, char * hi_tag_out)
+{
+	int hi_tag = -1;
+	char tag_str[10];
+	sprintf(tag_str , "\t%s:i:", tag);
+	char * hi_tag_str = strstr(read_line_buf, tag_str);
+	if(hi_tag_str)
+	{
+
+
+		hi_tag = 0;
+		int line_cursor;
+		for(line_cursor=6; ; line_cursor++)
+		{
+			char nch = hi_tag_str[line_cursor];
+//								printf("HI:i=%s; nch [%d] ='%c'\n", hi_tag_str, line_cursor, nch);
+			if(!isdigit(nch)) break;
+			hi_tag = hi_tag*10 + (nch-'0');
+		}
+	}
+
+	if(hi_tag >=0)
+	{
+		sprintf(hi_tag_out,"\t%s:i:%d", tag, hi_tag);
+	}else hi_tag_out[0] = 0;
+
+
+}
+
 void sort_SAM_finalise(SAM_sort_writer * writer)
 {
 	int x1_chunk, x1_block;
@@ -2149,7 +2178,11 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 					}
 
 
-					HashTablePut(first_read_name_table, read_name, new_line_mem);
+					char * old_line_mem = HashTableGet(first_read_name_table, read_name);
+					if(old_line_mem)
+						old_line_mem[0]=0xff;
+					else
+						HashTablePut(first_read_name_table, read_name, new_line_mem);
 					//if( first_read_name_table -> numOfElements<4)printf("RV=%s\n", read_name);
 				}
 			}
@@ -2206,7 +2239,7 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 
 					char * first_read_text = HashTableGet(first_read_name_table, read_name_buf);
 					strtok(read_name_buf,"\t");
-					if(first_read_text)
+					if(first_read_text && first_read_text[0]!=(char)0xff)
 					{
 						fputs(read_name_buf, writer->out_fp);
 						putc('\t',  writer->out_fp);
@@ -2262,9 +2295,15 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 						memcpy(dummy_mate_chr_buf, dummy_mate_chr, read_line_buf +dummy_char_strpos - dummy_mate_chr);
 						dummy_mate_chr_buf[read_line_buf +dummy_char_strpos - dummy_mate_chr]=0;
 
+						char hi_tag_out[18];
+						char nh_tag_out[18];
+
+						find_tag_out(read_line_buf, "HI", hi_tag_out);
+						find_tag_out(read_line_buf, "NH", nh_tag_out);
+
 						// build a fake FIRST read for the mapped SECOND read.
 						// note that the TLEN, MATE_POS and MATE_CHAR are incorrect for general use.
-						fprintf(writer->out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%d\t0\tN\tI\tMF:i:%d\n", read_name_buf, dummy_flags, dummy_mate_chr_buf, dummy_mate_pos, mate_flags);
+						fprintf(writer->out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%d\t0\tN\tI%s%s\n", read_name_buf, dummy_flags, dummy_mate_chr_buf, dummy_mate_pos, nh_tag_out, hi_tag_out);
 						fputs(read_name_buf, writer->out_fp);
 						putc('\t',  writer->out_fp);
 						fputs(read_line_buf, writer->out_fp);
@@ -2300,54 +2339,61 @@ void sort_SAM_finalise(SAM_sort_writer * writer)
 					char * first_read_text = (char *)cursor -> value;
 					char * first_read_name = (char *)cursor -> key;
 
-					int dummy_flags = 4 | 1, mate_flags = 0;
-					char * dummy_mate_chr = NULL;
-					unsigned int dummy_mate_pos = 0, tmpi=0, dummy_char_strpos = 0;
-					int tabs = 0;
-					int read_cursor = 0;
-
-					for(read_cursor = 0;; read_cursor++)
+					if(first_read_text[0]!=(char)0xff)
 					{
-						char nch = first_read_text[read_cursor];
-						if(!nch) break;
-						if(nch == '\t')
+						int dummy_flags = 4 | 1, mate_flags = 0;
+						char * dummy_mate_chr = NULL;
+						unsigned int dummy_mate_pos = 0, tmpi=0, dummy_char_strpos = 0;
+						int tabs = 0;
+						int read_cursor = 0;
+
+						for(read_cursor = 0;; read_cursor++)
 						{
-							if(tabs == 0){
-								mate_flags = tmpi; 
-								dummy_mate_chr = first_read_text+read_cursor+1;
-							}
-							else if(tabs == 1)
-								dummy_char_strpos = read_cursor;
-							else if(tabs == 2)
+							char nch = first_read_text[read_cursor];
+							if(!nch) break;
+							if(nch == '\t')
 							{
-								dummy_mate_pos = tmpi;
-								break;
+								if(tabs == 0){
+									mate_flags = tmpi; 
+									dummy_mate_chr = first_read_text+read_cursor+1;
+								}
+								else if(tabs == 1)
+									dummy_char_strpos = read_cursor;
+								else if(tabs == 2)
+								{
+									dummy_mate_pos = tmpi;
+									break;
+								}
+								tmpi=0;
+								tabs++;
+							}else{
+								if(tabs==0 || tabs == 2) tmpi = tmpi * 10 + (nch - '0');
 							}
-							tmpi=0;
-							tabs++;
-						}else{
-							if(tabs==0 || tabs == 2) tmpi = tmpi * 10 + (nch - '0');
 						}
+
+						dummy_flags |= SAM_FLAG_SECOND_READ_IN_PAIR;
+						if(mate_flags & SAM_FLAG_UNMAPPED)  dummy_flags |= SAM_FLAG_MATE_UNMATCHED;
+						if(mate_flags & SAM_FLAG_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
+						if(mate_flags & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_REVERSE_STRAND_MATCHED;
+
+						if((!first_read_text[0])||(!first_read_text[1]))
+						{
+							SUBREADprintf("unable to recover the first read! : '%s' , flags = %d\n", first_read_name, mate_flags);
+							assert(0);
+						}
+
+						char nh_tag_out[18];
+						char hi_tag_out[18];
+						find_tag_out(first_read_text, "NH", nh_tag_out);
+						find_tag_out(first_read_text, "HI", hi_tag_out);
+
+						strtok(first_read_name, "\t");
+						fputs(first_read_name, writer->out_fp);
+						putc('\t',  writer->out_fp);
+						fputs(first_read_text, writer->out_fp);
+						first_read_text[dummy_char_strpos] = 0;
+						fprintf(writer->out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%d\t0\tN\tI%s%s\n", first_read_name, dummy_flags, dummy_mate_chr, dummy_mate_pos, nh_tag_out,hi_tag_out);
 					}
-
-					dummy_flags |= SAM_FLAG_SECOND_READ_IN_PAIR;
-					if(mate_flags & SAM_FLAG_UNMAPPED)  dummy_flags |= SAM_FLAG_MATE_UNMATCHED;
-					if(mate_flags & SAM_FLAG_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
-					if(mate_flags & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)  dummy_flags |= SAM_FLAG_REVERSE_STRAND_MATCHED;
-
-					if((!first_read_text[0])||(!first_read_text[1]))
-					{
-						SUBREADprintf("unable to recover the first read! : '%s' , flags = %d\n", first_read_name, mate_flags);
-						assert(0);
-					}
-
-					strtok(first_read_name, "\t");
-					fputs(first_read_name, writer->out_fp);
-					putc('\t',  writer->out_fp);
-					fputs(first_read_text, writer->out_fp);
-					first_read_text[dummy_char_strpos] = 0;
-					fprintf(writer->out_fp, "%s\t%d\t*\t0\t0\t*\t%s\t%d\t0\tN\tI\tMF:i:%d\n", first_read_name, dummy_flags, dummy_mate_chr, dummy_mate_pos,mate_flags);
-
 					cursor = cursor->next;
 				}
 			}
@@ -2392,17 +2438,20 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		char chromosome_1_name[MAX_CHROMOSOME_NAME_LEN];
 		char chromosome_2_name[MAX_CHROMOSOME_NAME_LEN];
 		unsigned int pos_1, pos_2;
-		int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
+		int hi_tag,flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
 		char * second_col_pos = NULL;
 
 		chromosome_1_name[0]=0;
 		chromosome_2_name[0]=0;
 		pos_1 = 0;
 		pos_2 = 0;
+		hi_tag = -1;
 
 		while(line_cursor < line_len)
 		{
 			char nch = SAM_line[line_cursor++];
+			if(!nch)break;
+
 			if(nch == '\t')
 			{
 				field_cursor = 0;
@@ -2440,6 +2489,18 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		}
 		if(tabs <= 7) return -1;
 
+		char * hi_tag_str = strstr(SAM_line,"\tHI:i:");
+		if(hi_tag_str)
+		{
+			hi_tag = 0;
+			for(line_cursor=6; ; line_cursor++)
+			{
+				char nch = hi_tag_str[line_cursor];
+				if(!isdigit(nch)) break;
+				hi_tag = hi_tag*10 + (nch-'0');
+			}
+		}
+
 		line_len = strlen(second_col_pos);
 		sort_SAM_check_chunk(writer);
 
@@ -2468,10 +2529,16 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 			pos_1 = 0;
 		}
 
-		if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
-			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u",chromosome_2_name, pos_2, chromosome_1_name, pos_1);
+		char hi_key [13];
+		if(hi_tag >=0)
+			sprintf(hi_key, ":%d", hi_tag);
 		else
-			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u",chromosome_1_name, pos_1, chromosome_2_name, pos_2);
+			hi_key[0]=0;
+
+		if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
+			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u%s",chromosome_2_name, pos_2, chromosome_1_name, pos_1, hi_key);
+		else
+			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u%s",chromosome_1_name, pos_1, chromosome_2_name, pos_2, hi_key);
 
 		int read_name_len = strlen(read_name);
 		unsigned long long int read_line_hash = sort_SAM_hash(read_name);

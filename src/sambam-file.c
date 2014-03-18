@@ -577,7 +577,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	memcpy( aln-> buff_for_seq, chunk+(*chunk_ptr), seq_qual_bytes);
 	(*chunk_ptr) += seq_qual_bytes;
 
-	int nh_val = -1;
+	int nh_val = -1, hi_val = -1;
 	while( (*chunk_ptr) < next_start)
 	{
 		char extag[2];
@@ -618,7 +618,12 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 		//	fprintf(stderr, "NO_EXTYPE: %c\n", extype);
 			break;
 		}
-		
+		if(memcmp(extag,"HI",2)==0 && delta<=4)
+		{
+			hi_val=0;
+			memcpy(&hi_val, chunk+(*chunk_ptr),delta);
+		}
+	
 		if(memcmp(extag,"NH",2)==0 && delta<=4)
 		{
 			nh_val=0;
@@ -655,6 +660,8 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 				aln -> seq_quality[xk1] = 33+read_2_seq;
 		}
 		aln -> seq_quality[min(BAM_MAX_READ_LEN-1,read_len)] = 0;
+		if(aln -> seq_quality[0]==' ')
+			strcpy(aln -> seq_quality, "*");
 	}
 	else
 	{
@@ -688,12 +695,18 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	long long int templete_length = aln -> templete_length;
 
 	char nh_tag [20];
+	char hi_tag [20];
 	nh_tag[0]=0;
+	hi_tag[0]=0;
+
 	if(nh_val>=0)
 		sprintf(nh_tag, "\tNH:i:%d",nh_val);
+
+	if(hi_val>=0)
+		sprintf(hi_tag, "\tHI:i:%d",hi_val);
 	//fprintf(stderr, "HN_TAG=%d\n", nh_val	);
 
-	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s\n", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, nh_tag);
+	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, nh_tag, hi_tag);
 
 	//fprintf(stderr,"%s", buff);
 
