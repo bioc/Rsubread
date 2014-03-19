@@ -1,3 +1,6 @@
+19 March, 2014 - 1.13.18
+(1) Updated users manual.
+
 13 March, 2014 - 1.13.17
 (1) Subjunc can now output multiple best mapping locations for a read.
 (2) Default memory size was changed to 8000MB in buildindex function.
