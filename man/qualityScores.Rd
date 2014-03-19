@@ -27,8 +27,8 @@ A data matrix containing Phred scores for read bases. Rows in the matrix are rea
 %\seealso{}
 \examples{
 library(Rsubread)
-reads <- system.file("extdata","reads.txt",package="Rsubread")
-x <- qualityScores(filename=reads,input_format="FASTQ",offset=64,nreads=1000)
+reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
+x <- qualityScores(filename=reads,offset=64,nreads=1000)
 x[1:10,1:10]
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

@@ -3,36 +3,33 @@
 \title{Build index for a reference genome}
 \description{An index needs to be built before read mapping can be performed. This function creates a hash table for the reference genome, which can then be used by Subread and Subjunc aligners for read alignment.}
 \usage{
-buildindex(basename,reference,colorspace=FALSE,memory=3700,TH_subread=24)
+buildindex(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,TH_subread=24,colorspace=FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of the file containing all the refernece sequences.}
-  \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
-  \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 3700 MB by default.}
+  \item{gappedIndex}{ logical. If \code{FALSE}, 16mers (subreads) will be extracted from every chromosomal location of a reference genome and then they will be used to build a hash table index. By default(\code{TRUE}), subreads are extracted in every three bases from the genome.}
+  \item{indexSplit}{ logical. If \code{TRUE}, the built index is allowed to be splitted into multiple segments. The number of such segments is determined by \code{memory} value, genome size and permitting of gaps between subreads(\code{gappedIndex}). If \code{indexSplit} is set to \code{FALSE}, a single-segment index (no splitting) will be generated regardless of what value is chosen for \code{memory}.}
+  \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 8000 MB by default.}
   \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16 mers). 24 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
+  \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
   }
 \details{
-This function builds an index for a reference genome and the built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} to map reads.
-Subread is a general-purpose read aligner that can be used to map both genomic DNA sequencing (gDNA-seq) reads and RNA sequencing (RNA-seq) reads.
-Subjunc is designed for detecting exon-exon junctions from using RNA-seq data.
-Subread and Subjunc use a mapping paradigm called 'seed-and-vote', allowing more efficient and accurate read mapping (Liao et al. 2013).
+This function generates a hash table (an index) for a reference genome, in which keys are subreads (16mers) and values are their chromosomal locations in the reference genome.
+By default, subreads will be extracted in every three bases from a reference genome.
+However, if \code{gappedIndex} is set to \code{FALSE}, then subreads will be extracted from every chromosomal location of genome for index building.
+The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads(Liao et al. 2013).
 
-This function generates a hash table for the reference genome, in which keys are subreads (16mers) and values are their locations in the reference genome.
-Highly repetitive subreads (or uninformative subreads) are excluded from the hash table so as to reduce mapping ambiguity (mapping location of the read is directly determined from the mapping locations of subreads extracted from it).
-The argument \code{TH_subread} specifies the maximal number of times a subread is allowed to occur in the reference genome to be included in the hash table.
+Highly repetitive subreads (or uninformative subreads) are excluded from the hash table so as to reduce mapping ambiguity.
+\code{TH_subread} specifies the maximal number of times a subread is allowed to occur in the reference genome to be included in hash table.
 
-The argument \code{memory} controls how many index segments will be generated after index building is completed.
-Because only one index segment is present in the memory at any time when performing read alignments, this argument also controls the amount of computer memory (RAM) being used in read aligning.
-The default value (\code{3700MB}) enables the index (ie. the hash table) built for the human or mouse genome to be partitioned into two segments, each about 4GB in size (including half of the hash table entries and half the actual reference sequences. Note that each reference base in encoded in 2 bits).
-The running time of mapping 10 million 100bp reads to the human or mouse genome is typically 30 minutes.
+The built index might be splitted into multiple segments if its size is greater than \code{memory} value.
+The number of such segments is dependent on \code{memory} value, size of reference genome and whether gaps are allowed between subreads extracted from genome.
+Only one segment is loaded into memory at any time when read alignment is being carried out.
+The larger the \code{memory} value, the faster the read mapping will be.
+If \code{indexSplit} is set to \code{FALSE}, the index will not be splitted and this will enable maximum mapping speed to be achieved.
 
-The index for the human or mouse genome can be built into one whole segment by setting \code{memory} to \code{8000}.
-This allows the maximal mapping speed to be achieved.
-It takes less than 20 minutes to map 10 million reads to the human or mouse genome with this setting.
-
-It takes typically less than one hour and half to build an index for the human or mouse genome.
-The index only needs to be built once and can be re-used in the subsequent alignments.
+The index needs to be built only once and it can then be re-used in the subsequent alignments.
 }
 \value{
 No value is produced but index files are written to the current working directory.

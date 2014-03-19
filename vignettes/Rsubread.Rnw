@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread package: high-performance read alignment, quantification and mutation discovery}
 \author{Wei Shi}
-\date{2 December 2013}
+\date{19 March 2014}
 \maketitle
 
 \section{Introduction}
@@ -76,14 +76,8 @@ Rsubread creates a hash table for indexing the reference genome.
 Keys in the hash table are the 16bp sequences and hash values are their corresponding chromosomal locations. 
 Color space index can be built by setting the \R{colorsapce} argument to \R{TRUE}.\\
 
-A unique feature of Rsubread is that it allows users to control the computer memory usage in the read mapping process.
-Users can do this by specifying the amount of memory (in MB) to be used for mapping.
-By default, 3700MB of memory will be used.
-This will for example partition the index into two chunks for the human genome.
-Only one chunk of index will be existent in the memory at any time.
-To load the entire index into the memory, users can specify the requested amount of memory to be 8000MB for the human genome (
-the actual memory usage is up to 7.6GB).
-With this setting, Subread has the highest mapping speed.\\
+A unique feature of Rsubread is that it allows users to control the computer memory usage in read mapping process.
+Users can do this by tuning the amount of memory (in MB) to be used in read mapping.\\
 
 {\noindent\bf Step 2: read mapping\\}
 
@@ -91,8 +85,8 @@ After the index was successfully built, we map the read dataset (including 1,000
 
 \begin{scriptsize}
 <<>>=
-reads <- system.file("extdata","reads.txt",package="Rsubread")
-align(index="reference_index",readfile1=reads,output_file="alignResults.SAM")
+reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
+align(index="reference_index",readfile1=reads,output_file="alignResults.BAM")
 @
 \end{scriptsize}
 
@@ -100,10 +94,10 @@ Map paired-end reads:
 
 \begin{scriptsize}
 <<>>=
-reads1 <- system.file("extdata","reads1.txt",package="Rsubread")
-reads2 <- system.file("extdata","reads2.txt",package="Rsubread")
+reads1 <- system.file("extdata","reads1.txt.gz",package="Rsubread")
+reads2 <- system.file("extdata","reads2.txt.gz",package="Rsubread")
 align(index="reference_index",readfile1=reads1,readfile2=reads2,
-output_file="alignResultsPE.SAM")
+output_file="alignResultsPE.BAM")
 @
 \end{scriptsize}
 
@@ -112,11 +106,11 @@ output_file="alignResultsPE.SAM")
 The \R{featureCounts} function is a general-purpose read summarization function that assigns mapped reads (RNA-seq or gDNA-seq reads) to genomic features such as genes, exons, promoters, gene bodies and genomic bins.
 
 This function takes as input a set of files that contain read mapping results and an annotation file that includes genomic features.
-It automatically detects the format of input read files (SAM or BAM).
-It also automatically re-orders the paired reads if they are not in consecutive positions in the input.
-In-built NCBI RefSeq gene annotations for genomes mm9, mm10 and hg19 are provided for users convenience.
+It automatically detects the format of input read files (supported formats include SAM and BAM).
+For paired end reads, it automatically re-orders the reads if reads from the same pair were found to not be next to each other in the input.
+In-built NCBI RefSeq gene annotations for genomes mm9, mm10 and hg19 are provided for convenience.
 
-Below gives the example code of assigning reads and fragments generated in the last section to two genes.
+Below gives the example code of assigning reads and fragments, generated in the last section, to two artificial genes.
 Assign single end reads to genes:
 
 \begin{scriptsize}
@@ -129,16 +123,16 @@ End=c(500,1800,4000,5500),
 Strand=c("+","+","-","-"),
 stringsAsFactors=FALSE)
 ann
-fc_SE <- featureCounts("alignResults.SAM",annot.ext=ann)
+fc_SE <- featureCounts("alignResults.BAM",annot.ext=ann)
 fc_SE
 @
 \end{scriptsize}
 
-Assign fragments (read pairs) to genes:
+Assign fragments (read pairs) to the two genes:
 
 \begin{scriptsize}
 <<>>=
-fc_PE <- featureCounts("alignResultsPE.SAM",annot.ext=ann,isPairedEnd=TRUE)
+fc_PE <- featureCounts("alignResultsPE.BAM",annot.ext=ann,isPairedEnd=TRUE)
 fc_PE
 @
 \end{scriptsize}
@@ -160,40 +154,41 @@ The \R{qualityScores} function can be used to quickly retrieve and display the q
 
 \begin{scriptsize}
 <<>>=
-x <- qualityScores(filename=reads,input_format="FASTQ",offset=64,nreads=1000)
+x <- qualityScores(filename=reads,offset=64,nreads=1000)
 x[1:10,1:10]
 @
 \end{scriptsize}
 
 \section{GC content}
 
-The \R{atgcContent} function returns the fraction of A, T, G and C bases in all the reads or at each base location of the reads.
+The \R{atgcContent} function returns fractions of A, T, G and C bases at each base location of reads or in the entire dataset.
 
-\begin{scriptsize}
-<<>>=
-## Fraction of A,T,G and C bases in all the reads
-x <- atgcContent(filename=reads)
-x
-## Fraction of A,T,G and C bases at each read location
-xb <- atgcContent(filename=reads,basewise=TRUE)
-xb[,1:5]
-@
-\end{scriptsize}
+%\begin{scriptsize}
+%<<>>=
+%## Fraction of A,T,G and C bases in all the reads
+%x <- atgcContent(filename=reads)
+%x
+%## Fraction of A,T,G and C bases at each read location
+%xb <- atgcContent(filename=reads,basewise=TRUE)
+%xb[,1:5]
+%@
+%\end{scriptsize}
 
 \section{Mapping percentage}
 
-Function \R{propmapped} returns the proportion of mapped reads include in a SAM/BAM file.
+Function \R{propmapped} returns the proportion of mapped reads included in a SAM/BAM file.
+For paired end reads, it can return the proportion of mapped fragments (ie. read pairs).
 
 \begin{scriptsize}
 <<>>=
-propmapped("alignResults.SAM")
+propmapped("alignResults.BAM")
 @
 \end{scriptsize}
 
 \section{Citation}
 Yang Liao, Gordon K Smyth and Wei Shi (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108.\\
 
-\noindent{Yang Liao, Gordon K Smyth and Wei Shi (2013). featureCounts: an efficient general-purpose read summarization program. Bioinformatics, In Press, accepted Nov 7.}
+\noindent{Yang Liao, Gordon K Smyth and Wei Shi (2013). featureCounts: an efficient general-purpose read summarization program. Bioinformatics, 2013 Nov 30. [Epub ahead of print]}
 
 \section{Authors}
 Wei Shi and Yang Liao \\
@@ -203,6 +198,7 @@ The Walter and Eliza Hall Institute of Medical Research \\
 Australia \\
 
 \section{Contact}
-Please contact Wei Shi (shi at wehi dot edu dot au) if you have any inquires.
+Please post to Bioconductor mailing list (\url{http://bioconductor.org/}) if you find any bugs and have any inquires.
+Or, you may contact Wei Shi (shi at wehi dot edu dot au) directly.
 
 \end{document}

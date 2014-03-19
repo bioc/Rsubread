@@ -26,14 +26,7 @@ Otherwise, a data matrix containing nucleotide percentages for each base positio
 \author{Zhiyin Dai and Wei Shi}
 %\note{}
 %\seealso{}
-\examples{
-library(Rsubread)
-reads <- system.file("extdata","reads.txt",package="Rsubread")
-# Fraction of A,T,G and C in the entire dataset
-x <- atgcContent(filename=reads,basewise=FALSE)
-# Fraction of A,T,G and C at each base location across all the reads
-xb <- atgcContent(filename=reads,basewise=TRUE)
-}
+%\examples{}
 % Add one or more standard keywords, see file 'KEYWORDS' in the 
 % R documentation directory.
 %\keyword{}

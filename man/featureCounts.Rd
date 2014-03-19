@@ -5,8 +5,9 @@
 \usage{
 featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,
 GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,
-allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,
-minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,
+allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,
+countMultiMappingReads=FALSE,countPrimaryAlignmentsOnly=FALSE,minMQS=0,
+isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,
 minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,chrAliases=NULL,
 reportReads=FALSE)
 }
@@ -22,6 +23,7 @@ reportReads=FALSE)
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
+  \item{countPrimaryAlignmentsOnly}{ logical indicating if only primary alignments should be counted. Primary and secondary alignments are identified using bit 0x100 in the Flag field of SAM/BAM files. If \code{TRUE}, all primary alignments in a dataset will be counted no matter they are from multi-mapping reads or not (ie. \code{countMultiMappingReads} is ignored).}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (templates or read pairs) will be counted instead of individual reads. \code{FALSE} by default.}
   \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
@@ -91,7 +93,7 @@ A list with the following components:
   \code{counts}:\tab a data matrix containing read counts for each feature or meta-feature for each library.\cr
   \code{annotation}:\tab a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the in-built annotations are used.\cr
   \code{targets}:\tab a character vector giving sample information.\cr
-  \code{stat}:\tab a data frame giving numbers of unassigned reads and the reasons why they are not assigned (eg. ambiguity, multi-mapping, mapping quality, fragment length, chimera and so on), in addition to the number of successfully assigned reads for each library.
+  \code{stat}:\tab a data frame giving numbers of unassigned reads and the reasons why they are not assigned (eg. assignment ambiguity, multi-mapping, secondary alignment, mapping quality, fragment length, chimera and so on), in addition to the number of successfully assigned reads for each library.
 }
 }
 \references{
@@ -104,34 +106,34 @@ Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpo
 \examples{\dontrun{
 library(Rsubread)
 
-# Summarizing single-end reads using built-in RefSeq annotation for mouse genome mm9:
+# Summarize SAM format single-end reads using built-in RefSeq annotation for mouse genome mm9:
 featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm9")
 
-# Summarizing single-end reads using a user-provided GTF annotation file:
+# Summarize single-end reads using a user-provided GTF annotation file:
 featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",
 isGTFAnnotationFile=TRUE,GTF.featureType="exon",GTF.attrType="gene_id")
 
-# Summarizing single-end reads using 5 threads:
+# Summarize single-end reads using 5 threads:
 featureCounts(files="mapping_results_SE.sam",nthreads=5)
 
-# Summarizing BAM format single-end read data:
+# Summarize BAM format single-end read data:
 featureCounts(files="mapping_results_SE.bam")
 
-# Performing strand-specific read counting (strandSpecific=2 if reversely stranded):
-featureCounts(files="mapping_results_SE.sam",strandSpecific=1)
+# Perform strand-specific read counting (strandSpecific=2 if reversely stranded):
+featureCounts(files="mapping_results_SE.bam",strandSpecific=1)
 
-# Summarizing paired-end reads and counting fragments (instead of reads):
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE)
+# Summarize paired-end reads and counting fragments (instead of reads):
+featureCounts(files="mapping_results_PE.bam",isPairedEnd=TRUE)
 
-# Counting fragments satisfying the fragment length criteria, eg. [50bp, 600bp]:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,
+# Count fragments satisfying the fragment length criteria, eg. [50bp, 600bp]:
+featureCounts(files="mapping_results_PE.bam",isPairedEnd=TRUE,
 checkFragLength=TRUE,minFragLength=50,maxFragLength=600)
 
-# Counting fragments that have both ends successfully aligned without checking the fragment length:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,requireBothEndsMapped=TRUE)
+# Count fragments that have both ends successfully aligned without checking the fragment length:
+featureCounts(files="mapping_results_PE.bam",isPairedEnd=TRUE,requireBothEndsMapped=TRUE)
 
-# Excluding chimeric fragments from fragment counting:
-featureCounts(files="mapping_results_PE.sam",isPairedEnd=TRUE,countChimericFragments=FALSE)
+# Exclude chimeric fragments from fragment counting:
+featureCounts(files="mapping_results_PE.bam",isPairedEnd=TRUE,countChimericFragments=FALSE)
 }}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.

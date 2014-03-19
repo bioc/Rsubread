@@ -1,3 +1,11 @@
+13 March, 2014 - 1.13.17
+(1) Subjunc can now output multiple best mapping locations for a read.
+(2) Default memory size was changed to 8000MB in buildindex function.
+(3) buildindex function can now build a full index with no gaps.
+(4) buildindex now supports the generation of a single-segment index.
+(5) Default input format and output format were changed to 'gzFASTQ' and 'BAM', respectively, for align and subjunc functions.
+(6) A new argument 'countPrimaryAlignmentsonly' was added into featureCounts.
+
 21 Feb, 2014, 1.13.14
 (1) Re-wrote the propmapped function.
 

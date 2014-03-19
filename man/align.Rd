@@ -4,7 +4,7 @@
 \title{Read mapping for genomic DNA-seq and RNA-seq data via seed-and-vote (Subread and Subjunc)}
 \description{Subread and Subjunc perform local and global alignments respectively. The seed-and-vote paradigm enables efficient and accurate alignments to be carried out.}
 \usage{
-align(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",
+align(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
 TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
 tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
@@ -12,19 +12,19 @@ maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,
 DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 
-subjunc(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",
+subjunc(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,
 TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
-tieBreakHamming=TRUE,unique=TRUE,minFragLength=50,maxFragLength=600,
-PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,
-color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
+tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
+maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
+readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
   \item{readfile1}{ a character vector including names of files that include sequence reads to be aligned. For paired-end reads, this gives the list of files including first reads in each library. File format is FASTQ/FASTA by default. See \code{input_format} option for more supported formats.}
   \item{readfile2}{ a character vector giving names of files that include second reads in paired-end read data. Files included in \code{readfile2} should be in the same order as their mate files included in \code{readfile1} .\code{NULL} by default.}
-  \item{input_format}{ character string specifying format of the read input file(s). \code{FASTQ} by default (this includes FASTA format as well). Acceptable formats include \code{FASTQ} (including FASTA), \code{gzFASTQ} (gzipped FASTQ or FASTA), \code{SAM} and \code{BAM}. The character string is case insensitive.}
-  \item{output_format}{ character string specifying format of the output file. \code{SAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
+  \item{input_format}{ character string specifying format of the read input file(s). \code{gzFASTQ} by default (this includes FASTA format as well). Acceptable formats include \code{FASTQ} (including FASTA), \code{gzFASTQ} (gzipped FASTQ or FASTA), \code{SAM} and \code{BAM}. The character string is case insensitive.}
+  \item{output_format}{ character string specifying format of the output file. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
   \item{output_file}{ a character vector specifying names of output files. By default, names of output files are set as the file names provided in \code{readfile1} added with an suffix string.}
   \item{nsubreads}{ numeric value giving the number of subreads extracted from each read.} 
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This is the threshold for the first reads if paired-end read data are provided.}
@@ -35,7 +35,7 @@ color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{tieBreakQS}{logical indicating if the mapping quality score should be to break the tie when more than one best location was found for a read. \code{FALSE} by default. Note that the mapping quality score used for tie breaking was calcuated only from the perfectly matched subreads (16mers) extracted from the read, whereas the mapping quality scores included in the mapping output for mapped reads were calcuated from using all the bases in the read. Also note that there may still be more than one best mapping location found after tie breaking using this option.}
   \item{tieBreakHamming}{ logical indicating if the Hamming distance should be used to break the tie when more than one best mapping location was found for a read. \code{TRUE} by default. The distance between the mapped read and the target region in the reference is calcuated using all the bases included in the read. Note that there may still be more than one best mapping location found after tie breaking using this option.}
   \item{unique}{ logical indicating if uniquely mapped reads should be reported only. \code{TRUE} by default. It is recommended that this option is used together with \code{tieBreakHamming} or \code{tieBreakQS}.}
-  \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The allowed value is between 1 to 16 (inclusive). Note that the \code{unique} argument takes precedence over \code{nBestLocations} argument.}
+  \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The allowed value is between 1 to 16 (inclusive). `NH' tag is used to indicate how many alignments are reported for the read and `HI' tag is used for numbering the alignments reported for the same read, in the output. Note that the \code{unique} argument takes precedence over \code{nBestLocations} argument.}
   \item{minFragLength}{ numeric value giving the minimum fragment length. 50 by default.}
   \item{maxFragLength}{ numeric value giving the maximum fragment length. 600 by default.}
   \item{PE_orientation}{ character string giving the orientation of the two reads from the same pair. It has three possible values including \code{fr}, \code{ff} and \code{rf}. Letter \code{f} denotes the forward strand and letter \code{r} the reverse strand. \code{fr} by default (ie. the first read in the pair is on the forward strand and the second read on the reverse strand).}
@@ -70,10 +70,8 @@ See \code{\link{buildindex}} function for more details.
 Mapping performance is largely determined by the number of subreads extracted from each read \code{nsubreads} and the consensus threshold \code{TH1} (also \code{TH2} for paired-end read data).
 Default settings are recommended for most of the read mapping tasks.
 
-Multiple input files (libraries) are allowed to be provided to \code{Subread} or \code{Subjunc} functions.
-
 \code{Subjunc} requires donor/receptor sites to be present when detecting exon-exon junctions.
-It can detect up to four junction locations in a single exon-spanning reads.
+It can detect up to four junction locations in each exon-spanning read.
 }
 \value{ 
 No value is produced but SAM or BAM format files are written to the current working directory. For \code{Subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
@@ -91,8 +89,8 @@ ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./reference_index",reference=ref)
 
 # align a sample read dataset ('reads.txt') to the sample reference
-reads <- system.file("extdata","reads.txt",package="Rsubread")
-align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.SAM")
+reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
+align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM")
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.

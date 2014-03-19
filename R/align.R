@@ -1,4 +1,4 @@
-align <- function(index,readfile1,readfile2=NULL,input_format="FASTQ",output_format="SAM",output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
+align <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 {
 	if(length(readfile1) != length(output_file))
 		stop("The number of input file names is different from the number of output file names.")
