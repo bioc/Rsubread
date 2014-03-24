@@ -6,15 +6,15 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	  switch(tolower(as.character(annot.inbuilt)),
 	    mm9={
 	      ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
-	      cat("Mouse annotation NCBI Build 37.2 is used.\n")
+	      cat("NCBI RefSeq annotation for mm9 (build 37.2) is used.\n")
 		},
 	    mm10={
 	      ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
-	      cat("Mouse annotation NCBI Build 38.1 is used.\n")
+	      cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
 		 },
 	    hg19={
 	      ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
-	      cat("Human annotation NCBI Build 37.2 is used.\n")
+	      cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
 	       },
 	       {
 		stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
