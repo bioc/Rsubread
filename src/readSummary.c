@@ -664,6 +664,7 @@ void register_reverse_table(int block_no, long this_block_min_start, long this_b
 
 void feature_merge(void * arrv, int start, int items, int items2)
 {
+
 	void ** arr = (void **) arrv;
 
 	long * ret_start = (long *) arr[0];
@@ -889,19 +890,22 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 
 			if(this_block_items && (this_block_items > features_per_block_bins[block_bin_location] || feature_bin_location != block_bin_location))//global_context -> feature_block_size)
 			{
-				ret_block_end_index[current_block_id] = sort_i;	// FIRST UNWANTED ID
-				ret_block_min_start[current_block_id] = this_block_min_start;
-				ret_block_max_end[current_block_id] = this_block_max_end;
-				register_reverse_table(current_block_id, this_block_min_start, this_block_max_end, tmp_chro_inf);
-				//printf("B=%d; ST=%ld, END=%ld, ITM=%d\n", current_block_id, this_block_min_start, this_block_max_end, this_block_items);
-				current_block_id++;
-				if(current_block_id >= current_block_buffer_size)
+
+				if(current_block_id >= current_block_buffer_size - 1)
 				{
 					current_block_buffer_size *= 1.3;
 					ret_block_min_start = realloc(ret_block_min_start, sizeof(long)*current_block_buffer_size);
 					ret_block_max_end = realloc(ret_block_max_end, sizeof(long)*current_block_buffer_size);
 					ret_block_end_index = realloc(ret_block_end_index, sizeof(long)*current_block_buffer_size);
 				}
+
+
+				ret_block_end_index[current_block_id] = sort_i;	// FIRST UNWANTED ID
+				ret_block_min_start[current_block_id] = this_block_min_start;
+				ret_block_max_end[current_block_id] = this_block_max_end;
+				register_reverse_table(current_block_id, this_block_min_start, this_block_max_end, tmp_chro_inf);
+				//printf("B=%d; ST=%ld, END=%ld, ITM=%d\n", current_block_id, this_block_min_start, this_block_max_end, this_block_items);
+				current_block_id++;
 				this_block_max_end = 0;
 				this_block_items = 0;
 				this_block_min_start = 0x7fffffff;

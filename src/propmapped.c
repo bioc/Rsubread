@@ -356,7 +356,7 @@ int prop_PE(propMapped_context * context)
 						else	new_OK=1;
 
 						if(new_OK)
-							new_OK = !((flags & 4) * (flags & 8));
+							new_OK = (!(flags & 4)) || ( (flags & 1) && !(flags&8) );
 					}
 					else
 					{
