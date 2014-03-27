@@ -112,6 +112,7 @@ For paired end reads, it automatically re-orders the reads if reads from the sam
 In-built NCBI RefSeq gene annotations for genomes mm9, mm10 and hg19 are provided for convenience.
 These annotations include chromosomal coordinates of exons of each gene.
 When these annotations are used for summarization, only reads overlapping with exons will be counted by \R{featureCounts}.
+Users can use {\texttt{getInBuiltAnnotation}} function to retrieve these annotations.
 
 Below gives the example code of assigning reads and fragments, generated in the last section, to two artificial genes.
 Assign single end reads to genes:
