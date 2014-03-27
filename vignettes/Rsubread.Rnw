@@ -107,8 +107,11 @@ The \R{featureCounts} function is a general-purpose read summarization function 
 
 This function takes as input a set of files that contain read mapping results and an annotation file that includes genomic features.
 It automatically detects the format of input read files (supported formats include SAM and BAM).
-For paired end reads, it automatically re-orders the reads if reads from the same pair were found to not be next to each other in the input.
+For paired end reads, it automatically re-orders the reads if reads from the same pair were found not to be next to each other in the input.
+
 In-built NCBI RefSeq gene annotations for genomes mm9, mm10 and hg19 are provided for convenience.
+These annotations include chromosomal coordinates of exons of each gene.
+When these annotations are used for summarization, only reads overlapping with exons will be counted by \R{featureCounts}.
 
 Below gives the example code of assigning reads and fragments, generated in the last section, to two artificial genes.
 Assign single end reads to genes:
