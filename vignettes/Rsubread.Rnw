@@ -192,7 +192,7 @@ propmapped("alignResults.BAM")
 \section{Citation}
 Yang Liao, Gordon K Smyth and Wei Shi (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108.\\
 
-\noindent{Yang Liao, Gordon K Smyth and Wei Shi (2013). featureCounts: an efficient general-purpose read summarization program. Bioinformatics, 2013 Nov 30. [Epub ahead of print]}
+\noindent{Yang Liao, Gordon K Smyth and Wei Shi (2014). featureCounts: an efficient general purpose program for assigning sequence reads to genomic features. Bioinformatics, 30(7):923-30}
 
 \section{Authors}
 Wei Shi and Yang Liao \\
