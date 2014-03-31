@@ -97,7 +97,7 @@ A list with the following components:
 }
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, accepted on Nov 7, 2013, doi: 10.1093/bioinformatics/btt656.
+Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, 30(7):923-30, 2014.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
