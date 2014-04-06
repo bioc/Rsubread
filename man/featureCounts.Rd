@@ -89,12 +89,10 @@ When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of re
 }
 \value{ 
 A list with the following components:
-\tabular{ll}{
-  \code{counts}:\tab a data matrix containing read counts for each feature or meta-feature for each library.\cr
-  \code{annotation}:\tab a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the in-built annotations are used.\cr
-  \code{targets}:\tab a character vector giving sample information.\cr
-  \code{stat}:\tab a data frame giving numbers of unassigned reads and the reasons why they are not assigned (eg. assignment ambiguity, multi-mapping, secondary alignment, mapping quality, fragment length, chimera and so on), in addition to the number of successfully assigned reads for each library.
-}
+\item{counts}{ a data matrix containing read counts for each feature or meta-feature for each library.}
+\item{annotation}{ a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the in-built annotations are used.}
+\item{targets}{ a character vector giving sample information.}
+\item{stat}{ a data frame giving numbers of unassigned reads and the reasons why they are not assigned (eg. assignment ambiguity, multi-mapping, secondary alignment, mapping quality, fragment length, chimera and so on), in addition to the number of successfully assigned reads for each library.}
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, 30(7):923-30, 2014.

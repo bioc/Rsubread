@@ -14,7 +14,7 @@ sam2bed(samfile,bedfile,readlen)
 This function converts a SAM format file to a BED format file, which can then be displayed in a genome browser like UCSC genome browser, IGB, IGV.
 }
 \value{ 
-There is no return value, but a BED format file is created in the current working directory. This file contains six columns including chromosomal name, start position, end position, name(`.'), mapping quality score and strandness.
+No value is produced but a BED format file is written to the current working directory. This file contains six columns including chromosomal name, start position, end position, name(`.'), mapping quality score and strandness.
 }
 %\references{}
 \author{Wei Shi}

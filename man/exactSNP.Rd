@@ -31,7 +31,7 @@ It can be used to call SNPs for individual samples (ie. no control samples are r
 Detail of the algorithm is described in a manuscript which is currently under preparation.
 }
 \value{
-A VCF format file including detailed information for reported SNPs, such as chromosomal location, reference base, alternative base, read coverage, allele frequency, p value etc. 
+No value is produced but but a VCF format file is written to the current working directory. This file contains detailed information for discovered SNPs including chromosomal locations, reference bases, alternative bases, read coverages, allele frequencies and p values. 
 }
 %\references{
 %}

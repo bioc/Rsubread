@@ -39,8 +39,6 @@ int sam2bed(int argc,char *argv[]){
   char * line = NULL;
   char * tok;
   char strand;
-  size_t len = 0;
-  ssize_t z;
   char * chr;
   int i, readlen, chr_start, chr_end, flag, mqs;
 
@@ -78,4 +76,6 @@ int sam2bed(int argc,char *argv[]){
  
   fclose(fp);
   fclose(fp_out);
+  
+  return 0;
 }
