@@ -3,7 +3,8 @@
 \title{Build index for a reference genome}
 \description{An index needs to be built before read mapping can be performed. This function creates a hash table for the reference genome, which can then be used by Subread and Subjunc aligners for read alignment.}
 \usage{
-buildindex(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,TH_subread=24,colorspace=FALSE)
+buildindex(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,
+TH_subread=24,colorspace=FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
