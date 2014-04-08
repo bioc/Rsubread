@@ -1,3 +1,25 @@
+CHANGES IN VERSION 1.14.0
+------------------------
+
+NEW FEATURES
+
+    o featureCounts automatically re-orders paired end reads if they were sorted by chromosomal locations in the input. It can also deal with read pairs in which only one end was included in the input.
+
+    o featureCounts is more robust in processing different variants of GTF/GFF annotation files.
+	
+    o Subjunc can detect exon-exon junctions which are located at the start or end of reads. It can detect non-canonical junctions ('reportAllJunctions' option) in addition to canonical junctions, and it can also be used to detect chimerism in both RNA-seq and gDNA-seq data.
+		
+    o Both align (Subread aligner) and subjunc now take gzipped FASTQ files and outputs BAM files in their default settings. They accept multiple input files as well.
+
+	o Breakpoint locations are reported along with mapping location of each fusion read in SAM/BAM files, using tags including CC(chromosome name), CP(mapping position), CG(CIGAR string) and CT(strand).
+	
+    o A full index (no gaps) can be built for a reference genome to further speed up read mapping. 
+
+    o qualityScores() and propmapped() functions were rewritten.
+
+    o Bug fixes.
+
+
 CHANGES IN VERSION 1.12.0
 ------------------------
 
