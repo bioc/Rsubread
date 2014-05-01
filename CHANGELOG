@@ -1,3 +1,7 @@
+1 May 2014
+(1) Added following parameters to featureCounts: readExtension5,readExtension3,minReadOverlap and countSplitAlignmentsOnly.
+(2) Changed the order of parameters used by featureCounts.
+
 8 April 2014 - 1.13.25
 (1) Fixed formatting issue for buildindex function in the vignette.
 (2) Added release news.

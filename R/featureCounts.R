@@ -1,4 +1,4 @@
-featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,nthreads=1,strandSpecific=0,countMultiMappingReads=FALSE,countPrimaryAlignmentsOnly=FALSE,minMQS=0,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
+featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,nthreads=1,strandSpecific=0,minMQS=0,readExtension5=0,readExtension3=0,minReadOverlap=1,countSplitAlignmentsOnly=FALSE,countMultiMappingReads=FALSE,countPrimaryAlignmentsOnly=FALSE,countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
 {
 	flag <- FALSE
 
@@ -52,7 +52,7 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	countMultiMappingReads_C <- countMultiMappingReads
 	if(countPrimaryAlignmentsOnly) countMultiMappingReads_C <- 2
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),sep=",")
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minReadOverlap,as.numeric(countSplitAlignmentsOnly),sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
