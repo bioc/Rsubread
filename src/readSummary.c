@@ -126,6 +126,8 @@ typedef struct
 } fc_thread_thread_context_t;
 
 #define REVERSE_TABLE_BUCKET_LENGTH 131072
+#define REDUCE_TO_5_PRIME_END 5
+#define REDUCE_TO_3_PRIME_END 3
 
 typedef struct
 {
@@ -157,6 +159,7 @@ typedef struct
 	int is_unpaired_warning_shown;
 	int is_stake_warning_shown;
 	int is_split_alignments_only;
+	int reduce_5_3_ends_to_one;
 	int isCVersion;
 
 	int min_mapping_quality_score;
@@ -178,6 +181,7 @@ typedef struct
 	unsigned int input_buffer_max_size;
 	SamBam_Reference_Info * sambam_chro_table;
 
+	char * debug_command;
 	char * unistr_buffer_space;
 	unsigned int unistr_buffer_size;
 	unsigned int unistr_buffer_used;
@@ -334,6 +338,8 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 		print_in_box(80,0,0,"      Overlapping bases : %d", global_context -> overlap_length_required);
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
 		print_in_box(80,0,0,"        Read extensions : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
+	if(global_context -> reduce_5_3_ends_to_one)
+		print_in_box(80,0,0,"      Read reduction to : %d' end" , global_context -> reduce_5_3_ends_to_one == REDUCE_TO_5_PRIME_END ?5:3);
 
 	if(global_context->is_paired_end_data)
 	{
@@ -965,10 +971,9 @@ void sort_feature_info(fc_thread_global_context_t * global_context, unsigned int
 int strcmp_slash(char * s1, char * s2)
 {
 	char nch;
-	while(nch = *s1){
+	while(0!=(nch = *(s1++))){
 		if(nch == '/') break;
 		if(nch != (*s2)) return 1;
-		s1++;
 		s2++;
 	}
 	return nch != *s2;
@@ -1050,7 +1055,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				thread_context->read_counters.unassigned_unmapped ++;
 
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped\n", read_name);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped\t*\t*\n", read_name);
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
@@ -1082,7 +1087,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(global_context -> SAM_output_fp)
 				{
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MappingQuality\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MappingQuality\t*\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
 				}
 				return;
 			}
@@ -1132,7 +1137,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						thread_context->read_counters.unassigned_fragmentlength ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_FragmentLength\tLength=%ld\n", read_name, fragment_length);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_FragmentLength\t*\tLength=%ld\n", read_name, fragment_length);
 						return;
 					}
 				}
@@ -1143,7 +1148,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						thread_context->read_counters.unassigned_chimericreads ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimera\n", read_name);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimera\t*\t*\n", read_name);
 						return;
 					}
 				}
@@ -1188,7 +1193,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					thread_context->read_counters.unassigned_multimapping ++;
 
 					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\n", read_name);
+						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\t*\t*\n", read_name);
 					return;
 				}
 			}
@@ -1200,7 +1205,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			thread_context->read_counters.unassigned_secondary ++;
 
 			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\n", read_name);
+				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\t*\t*\n", read_name);
 			return;
 		}
 
@@ -1235,58 +1240,80 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			int nhits = 0;
 
 			int cigar_section_id, cigar_sections;
-			unsigned int Staring_Points[6];
+			unsigned int Starting_Points[6];
 			unsigned short Section_Lengths[6];
 			long * hits_indices = (is_second_read?hits_indices2:hits_indices1);
 			short * hits_total_length = (is_second_read?hits_total_length2:hits_total_length1);
 
-			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Staring_Points, Section_Lengths);
-
-			// Extending the reads to the 3' and 5' ends. (from the read point of view) 
-			if(global_context -> five_end_extension)
-			{
-				if(is_this_negative_strand){
-					Section_Lengths [cigar_sections - 1] += global_context -> five_end_extension;
-				}else{
-					if( Staring_Points [0] > global_context -> five_end_extension)
-					{
-						Staring_Points [0]  -= global_context -> five_end_extension;
-						Section_Lengths [0] += global_context -> five_end_extension;
-					}
-					else
-					{
-						Section_Lengths [0] += Staring_Points [0]-1;
-						Staring_Points [0] = 1;
-					}
-				}
-			}
-
-			if(global_context -> three_end_extension)
-			{
-
-				if(is_this_negative_strand){
-					if( Staring_Points [0] > global_context -> three_end_extension)
-					{
-						Staring_Points [0]  -= global_context -> three_end_extension;
-						Section_Lengths [0] += global_context -> three_end_extension;
-					}
-					else
-					{
-						Section_Lengths [0] += Staring_Points [0]-1;
-						Staring_Points [0] = 1;
-					}
-				}
-				else	Section_Lengths [cigar_sections - 1] += global_context -> three_end_extension;
-
-			}
+			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Starting_Points, Section_Lengths);
 
 			if(cigar_sections>1 || !global_context->is_split_alignments_only) 
 			{
+
+				if(global_context -> reduce_5_3_ends_to_one)
+				{
+					if((REDUCE_TO_5_PRIME_END == global_context -> reduce_5_3_ends_to_one) + is_this_negative_strand == 1) // reduce to 5' end (small coordinate if positive strand / large coordinate if negative strand)
+					{
+						Section_Lengths[0]=1;
+					}
+					else
+					{
+						Starting_Points[0] = Starting_Points[cigar_sections-1] + Section_Lengths[cigar_sections-1] - 1;
+						Section_Lengths[0]=1;
+					}
+
+					cigar_sections = 1;
+				}
+
+				// Extending the reads to the 3' and 5' ends. (from the read point of view) 
+				if(global_context -> five_end_extension)
+				{
+					if(is_this_negative_strand){
+						Section_Lengths [cigar_sections - 1] += global_context -> five_end_extension;
+					}else{
+						if( Starting_Points [0] > global_context -> five_end_extension)
+						{
+							Starting_Points [0]  -= global_context -> five_end_extension;
+							Section_Lengths [0] += global_context -> five_end_extension;
+						}
+						else
+						{
+							Section_Lengths [0] += Starting_Points [0]-1;
+							Starting_Points [0] = 1;
+						}
+					}
+				}
+
+				if(global_context -> three_end_extension)
+				{
+
+					if(is_this_negative_strand){
+						if( Starting_Points [0] > global_context -> three_end_extension)
+						{
+							Starting_Points [0]  -= global_context -> three_end_extension;
+							Section_Lengths [0] += global_context -> three_end_extension;
+						}
+						else
+						{
+							Section_Lengths [0] += Starting_Points [0]-1;
+							Starting_Points [0] = 1;
+						}
+					}
+					else	Section_Lengths [cigar_sections - 1] += global_context -> three_end_extension;
+
+				}
+
+				if( global_context -> debug_command [0] == 'D')
+					SUBREADprintf("\n\nRead name = %s ; Second read = %d\n", read_name, is_second_read);
+
 				for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
 				{
-					long section_begin_pos = read_pos + Staring_Points[cigar_section_id];
+					long section_begin_pos = read_pos + Starting_Points[cigar_section_id];
 					long section_end_pos = Section_Lengths[cigar_section_id] + section_begin_pos - 1;
-			//		printf("CIGAR_str=%s; cigar_sections=%d; base=%ld; pos[%d]=%u ; len[%d]=%d\n", CIGAR_str, cigar_sections, read_pos, cigar_section_id, Staring_Points[cigar_section_id],cigar_section_id, Section_Lengths[cigar_section_id]);
+
+					
+					if(global_context -> debug_command [0] == 'D')
+						SUBREADprintf("Section [%d]: %d ~ %d\n", cigar_section_id , Starting_Points[cigar_section_id], Starting_Points[cigar_section_id]+Section_Lengths[cigar_section_id]);
 
 					int start_reverse_table_index = section_begin_pos / REVERSE_TABLE_BUCKET_LENGTH;
 					int end_reverse_table_index = (1+section_end_pos) / REVERSE_TABLE_BUCKET_LENGTH;
@@ -1358,7 +1385,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if((is_second_read && skipped_for_exonic == 2) || (!global_context -> is_paired_end_data) || (alignment_masks & 0x8))
 					{
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Nonjunction\n", read_name);
+							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Nonjunction\t*\t*\n", read_name);
 
 						thread_context->read_counters.unassigned_nonjunction ++;
 						return;
@@ -1430,7 +1457,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
+			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\t*\n", read_name, final_feture_name);
 		}
 		thread_context->read_counters.assigned_reads ++;
 	}
@@ -1443,7 +1470,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
+			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\t*\n", read_name, final_feture_name);
 		}
 		thread_context->read_counters.assigned_reads ++;
 	}
@@ -1582,9 +1609,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
 					if(decision_table_items>1)
 						// assigned by read-voting
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tVotes/All_Items=%d/%d\n", read_name, final_feture_name, max_votes, decision_table_items);
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tVotes/Targets=%d/%d\n", read_name, final_feture_name, max_votes, decision_table_items);
 					else
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\n", read_name, final_feture_name);
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\t*\n", read_name, final_feture_name);
 				}
 				thread_context->read_counters.assigned_reads ++;
 
@@ -1632,7 +1659,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				}
 				else{
 					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguity\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
+						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguit\t*\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
 
 					thread_context->read_counters.unassigned_ambiguous ++;
 				}
@@ -1640,7 +1667,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 		else{
 			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\n", read_name);
+				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\t*\t*\n", read_name);
 
 			thread_context->read_counters.unassigned_nofeatures ++;
 		}
@@ -1917,7 +1944,7 @@ HashTable * load_alias_table(char * fname)
 	return ret;
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minReadOverlap, int is_split_alignments_only)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minReadOverlap, int is_split_alignments_only, int reduce_5_3_ends_to_one, char * debug_command)
 {
 
 	global_context -> input_buffer_max_size = buffer_size;
@@ -1937,6 +1964,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
 	global_context -> is_multi_mapping_allowed = is_multi_mapping_allowed;
 	global_context -> is_split_alignments_only = is_split_alignments_only;
+	global_context -> reduce_5_3_ends_to_one = reduce_5_3_ends_to_one;
 	global_context -> is_SAM_file = is_SAM;
 
 
@@ -1952,6 +1980,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> five_end_extension = fiveEndExtension;
 	global_context -> three_end_extension = threeEndExtension;
 	global_context -> overlap_length_required = minReadOverlap;
+	global_context -> debug_command = debug_command;
 
 	global_context -> read_counters.unassigned_ambiguous=0;
 	global_context -> read_counters.unassigned_nofeatures=0;
@@ -1961,6 +1990,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> read_counters.unassigned_chimericreads=0;
 	global_context -> read_counters.unassigned_multimapping=0;
 	global_context -> read_counters.unassigned_secondary=0;
+	global_context -> read_counters.unassigned_nonjunction=0;
 	global_context -> read_counters.assigned_reads=0;
 
 	if(alias_file_name && alias_file_name[0])
@@ -2432,8 +2462,10 @@ static struct option long_options[] =
 	{"primary",no_argument, 0, 0},
 	{"readExtension5", required_argument, 0, 0},
 	{"readExtension3", required_argument, 0, 0},
+	{"read2pos", required_argument, 0, 0},
 	{"minReadOverlap", required_argument, 0, 0},
 	{"countSplitAlignmentsOnly", no_argument, 0, 0},
+	{"debugCommand", required_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -2521,11 +2553,11 @@ void print_usage()
 	SUBREADputs("              \twill be counted no matter they are from multi-mapping reads or");
 	SUBREADputs("              \tnot ('-M' is ignored). ");
 	SUBREADputs("    "); 
-	SUBREADputs("    --readExtension5 <int> Reads are extended upstream by <int> bases from their");
-	SUBREADputs("              \t5' end."); 
+	SUBREADputs("    --readExtension5 <int>      Reads are extended upstream by <int> bases from");
+	SUBREADputs("              \ttheir 5' end."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    --readExtension3 <int> Reads are extended upstream by <int> bases from their");
-	SUBREADputs("              \t3' end."); 
+	SUBREADputs("    --readExtension3 <int>      Reads are extended upstream by <int> bases from");
+	SUBREADputs("              \ttheir 3' end."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    --minReadOverlap <int>      Specify the minimum required number of");
 	SUBREADputs("              \toverlapped bases between a read and a feature to which the read");
@@ -2537,6 +2569,10 @@ void print_usage()
 	SUBREADputs("              \talignments are exon-spanning reads from RNA-seq data. '-f' and");
 	SUBREADputs("              \t'-O' options should also be specified if the purpose is to");
 	SUBREADputs("              \tassign exon-spanning reads to all their overlapping exons.");
+	SUBREADputs("    "); 
+	SUBREADputs("    --read2pos <5:3>            The read is reduced to its 5' most base or 3'");
+	SUBREADputs("              \tmost base. Read summarization is then performed based on the");
+	SUBREADputs("              \tsingle base which the read is reduced to."); 
 	SUBREADputs("    "); 
 	SUBREADputs("    Optional paired-end parameters:"); 
 	SUBREADputs("    "); 
@@ -2610,14 +2646,16 @@ int readSummary(int argc,char *argv[]){
 	26: as.numeric(Three_End_Extension_Length)  # 3' end extension
 	27: as.numeric(Minimum_Overlap_Between_Read_And_Feature) # 1 by default
 	28: as.numeric(is_Split_Alignment_Only) # 0 by default
+	29: as.numeric(reduce_5_3_ends_to_one) # 0= no reduction; 1= reduce to 5' end; 2= reduce to 3' end
+	30: debug_command # This is for debug only; RfeatureCounts should pass a space (" ") to this parameter, disabling the debug command.
 	 */
 
-	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20;
+	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one;
 	char **chr;
 	long *start, *stop;
 	int *geneid;
 
-	char *nameFeatureTypeColumn, *nameGeneIDColumn;
+	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command;
 	long nexons;
 
 
@@ -2716,11 +2754,21 @@ int readSummary(int argc,char *argv[]){
 		isSplitAlignmentOnly = atoi(argv[28]);
 	else	isSplitAlignmentOnly = 0;
 
+	if(argc>29)
+		reduce_5_3_ends_to_one = atoi(argv[29]);	// 0 : no reduce; 1: reduce to 5' end; 2: reduce to 3' end.
+	else	reduce_5_3_ends_to_one = 0;
+
+
+	if(argc>30 && strlen(argv[30])>0 && argv[30][0]!=' ')
+		debug_command = argv[30];
+	else
+		debug_command = " ";
+
 	unsigned int buffer_size = 1024*1024*6;
 
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minReadOverlap, isSplitAlignmentOnly);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minReadOverlap, isSplitAlignmentOnly, reduce_5_3_ends_to_one, debug_command);
 	print_FC_configuration(&global_context, argv[1], argv[2], argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport);
 
 
@@ -3343,7 +3391,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[29];
+	char * Rargv[31];
 	char annot_name[300];
 	char * out_name = malloc(300);
 	char * alias_file_name = malloc(300);
@@ -3354,6 +3402,7 @@ int feature_count_main(int argc, char ** argv)
 	int min_qual_score = 0;
 	int min_dist = 50;
 	int max_dist = 600;
+	char debug_command[10];
 	char min_dist_str[11];
 	char max_dist_str[11];
 	char min_qual_score_str[11];
@@ -3373,6 +3422,7 @@ int feature_count_main(int argc, char ** argv)
 	int is_PE_Dist_Checked = 0;
 	int is_Multi_Mapping_Allowed = 0;
 	int is_Split_Alignment_Only = 0;
+	int reduce_5_3_ends_to_one = 0;
 	int threads = 1;
 	int isGTF = 1;
 	char nthread_str[4];
@@ -3385,6 +3435,7 @@ int feature_count_main(int argc, char ** argv)
 	very_long_file_names [0] = 0;
 
 	alias_file_name[0]=0;
+	debug_command[0] = 0;
 
 	strcpy(nameFeatureTypeColumn,"exon");
 	strcpy(nameGeneIDColumn,"gene_id");
@@ -3498,17 +3549,34 @@ int feature_count_main(int argc, char ** argv)
 				if(strcmp("readExtension5", long_options[option_index].name)==0)
 				{
 					fiveEndExtension = atoi(optarg);
+					fiveEndExtension = max(0, fiveEndExtension);
 				}
 
 				if(strcmp("readExtension3", long_options[option_index].name)==0)
 				{
 					threeEndExtension = atoi(optarg);
+					threeEndExtension = max(0, threeEndExtension);
 				}
 
 				if(strcmp("minReadOverlap", long_options[option_index].name)==0)
 				{
 					minReadOverlap = atoi(optarg);
 				}
+
+				if(strcmp("debugCommand", long_options[option_index].name)==0)
+				{
+					strcpy(debug_command, optarg);
+				}
+
+
+				if(strcmp("read2pos", long_options[option_index].name)==0)
+				{
+					if(optarg[0]=='3')
+						reduce_5_3_ends_to_one = REDUCE_TO_3_PRIME_END;
+					else if(optarg[0]=='5')
+						reduce_5_3_ends_to_one = REDUCE_TO_5_PRIME_END;
+						
+				}				
 
 				if(strcmp("countSplitAlignmentsOnly", long_options[option_index].name)==0)
 				{
@@ -3591,7 +3659,9 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[26] = strThreeEndExtension;
 	Rargv[27] = strMinReadOverlap;
 	Rargv[28] = is_Split_Alignment_Only?"1":"0";
-	readSummary(29, Rargv);
+	Rargv[29] = (reduce_5_3_ends_to_one == 0?"0":(reduce_5_3_ends_to_one==REDUCE_TO_3_PRIME_END?"3":"5"));
+	Rargv[30] = debug_command;
+	readSummary(31, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
