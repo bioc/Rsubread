@@ -7,7 +7,8 @@ featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE
 GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,
 allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,
 checkFragLength=FALSE,minFragLength=50,maxFragLength=600,
-nthreads=1,strandSpecific=0,minMQS=0,readExtension5=0,readExtension3=0,
+nthreads=1,strandSpecific=0,minMQS=0,
+readExtension5=0,readExtension3=0,read2pos=NULL,
 minReadOverlap=1,countSplitAlignmentsOnly=FALSE,
 countMultiMappingReads=FALSE,countPrimaryAlignmentsOnly=FALSE,
 countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
@@ -29,9 +30,9 @@ countChimericFragments=TRUE,chrAliases=NULL,reportReads=FALSE)
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
-
   \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
+  \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
   \item{minReadOverlap}{ \code{integer} giving the minimum number of overlapped bases between a read and a feature required for the read to be assigned to the feature. Negative values are also accepted, indicating a gap being allowed between a read and a feature. \code{1} by default.}
   \item{countSplitAlignmentsOnly}{ logical indicating whether only split alignments (their CIGAR strings containing letter 'N') should be used for summarization. \code{FALSE} by default. Example split alignments are exon-spanning reads from RNA-seq data. \code{useMetaFeatures} should be set to \code{FALSE} and \code{allowMultiOverlap} should be set to \code{TRUE}, if the purpose of summarization is to assign exon-spanning reads to all their overlapping exons.}
   \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
