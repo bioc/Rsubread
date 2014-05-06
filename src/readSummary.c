@@ -1161,6 +1161,22 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(!tmp_tok_ptr) return;
 
+
+		// This filter has to be put here because the 0x400 FLAG is not about mapping but about sequencing.
+		// A unmapped read with 0x400 FLAG should be able to kill the mapped mate which may have no 0x400 FLAG. 
+		if(global_context -> is_duplicate_ignored)
+		{
+			if(alignment_masks & SAM_FLAG_DUPLICATE)
+			{
+				thread_context->read_counters.unassigned_duplicate ++;
+				if(global_context -> SAM_output_fp)
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Duplicate\t*\t*\n", read_name);
+
+				return;
+			}
+
+		}
+
 		if(SAM_FLAG_UNMAPPED & alignment_masks) continue;
 
 		char * NH_pos = strstr(tmp_tok_ptr,"\tNH:i:");
@@ -1211,20 +1227,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			if(global_context -> SAM_output_fp)
 				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\t*\t*\n", read_name);
 			return;
-		}
-
-
-		if(global_context -> is_duplicate_ignored)
-		{
-			if(alignment_masks & SAM_FLAG_DUPLICATE)
-			{
-				thread_context->read_counters.unassigned_duplicate ++;
-				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Duplicate\t*\t*\n", read_name);
-
-				return;
-			}
-
 		}
 
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
@@ -2678,7 +2680,7 @@ int readSummary(int argc,char *argv[]){
 	28: as.numeric(is_Split_Alignment_Only) # 0 by default
 	29: as.numeric(reduce_5_3_ends_to_one) # 0= no reduction; 1= reduce to 5' end; 2= reduce to 3' end
 	30: debug_command # This is for debug only; RfeatureCounts should pass a space (" ") to this parameter, disabling the debug command.
-	31: as.numeric(is_duplicate_ignored) # 0 = INCLUDE DUPLICATE READS; 1 = IGNORE DUPLICATE READS (0x400 FLAG IS SET)
+	31: as.numeric(is_duplicate_ignored) # 0 = INCLUDE DUPLICATE READS; 1 = IGNORE DUPLICATE READS (0x400 FLAG IS SET) ; "0" by default.
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one;
