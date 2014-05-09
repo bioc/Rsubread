@@ -1,5 +1,8 @@
+9 May 2014 -- 1.15.3
+(1) Added 'ignoreDup' option to featureCounts.
+
 2 May 2014 -- 1.15.2
-(1) added read2pos option to featureCounts.
+(1) Added read2pos option to featureCounts.
 
 1 May 2014 -- 1.15.1
 (1) Added following parameters to featureCounts: readExtension5,readExtension3,minReadOverlap and countSplitAlignmentsOnly.
