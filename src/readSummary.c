@@ -234,15 +234,15 @@ unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str,
 	unsigned int ret;
 	if(global_context->unistr_buffer_used + strl >= global_context->unistr_buffer_size-1)
 	{
-		if( global_context->unistr_buffer_size < 0xa0000000u)
+		if( global_context->unistr_buffer_size < 3435973835u) // 4G / 5 * 4 - 5
 		{
-			global_context -> unistr_buffer_size = global_context->unistr_buffer_size * 5/4;
+			global_context -> unistr_buffer_size = global_context->unistr_buffer_size /4 *5;
 			global_context -> unistr_buffer_space = realloc(global_context -> unistr_buffer_space, global_context->unistr_buffer_size);
 		}
 		else
 		{
-			SUBREADprintf("The annotation file is too large. The program cannot correctly run.\n");
-			return 0xffffffff;
+			SUBREADprintf("Error: exceed memory limit (4GB) for storing annotation data.\n");
+			return 0xffffffffu;
 		}
 	}
 
