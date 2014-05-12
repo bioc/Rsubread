@@ -1,3 +1,6 @@
+12 May 2014 -- 1.15.4
+(1) Fixed a bug in featureCounts when dealing with a very big annotation file.
+
 9 May 2014 -- 1.15.3
 (1) Added 'ignoreDup' option to featureCounts.
 
