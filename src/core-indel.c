@@ -268,7 +268,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		max_event_no = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number;
 		if(max_event_no<=event_no)
 		{
-			//printf("T REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
+			//printf("T REALLOCATD: %d\n",  (int)(((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5));
 			((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
 		//	chromosome_event_t * new_space = 
 			 ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic = 
@@ -289,7 +289,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 		max_event_no = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number;
 		if(max_event_no<=event_no)
 		{
-			//printf("G REALLOCATD: %d\n",  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5);
+			//printf("G REALLOCATD: %d\n",  (int)(((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number * 1.5));
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number *= 1.6;
 			//chromosome_event_t * new_space = 
 			((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic =
@@ -927,7 +927,7 @@ chromosome_event_t * local_add_indel_event(global_context_t * global_context, th
 		else
 		{
 			int event_no;
-			event_no =(thread_context)?((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> total_events: ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) ->  total_events;
+			//event_no =(thread_context)?((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> total_events: ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) ->  total_events;
 
 			if(thread_context)
 				event_no = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> total_events ++;
@@ -1156,18 +1156,11 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 	unsigned int voting_position;
 
 	HashTable * event_table = NULL;
-	chromosome_event_t * event_space = NULL;
 
 	if(thread_context)
-	{
 		event_table = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_entry_table; 
-		event_space = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
-	}
 	else
-	{
 		event_table = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_entry_table; 
-		event_space = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
-	}
 
 
 	alignment_result_t *current_result = _global_retrieve_alignment_ptr(global_context, pair_number, is_second_read, best_read_id);
@@ -1203,7 +1196,8 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 			if(global_context -> config.use_dynamic_programming_indel || read_len > EXON_LONG_READ_LENGTH)
 			{
 				char movement_buffer[1500];
-				chromosome_event_t * last_event = NULL;
+				//chromosome_event_t * last_event = NULL;
+				int last_event_id = -1;
 
 				first_correct_base = min(first_correct_base+10, read_len);
 				int x1, dyna_steps = core_dynamic_align(global_context, thread_context, read_text + last_correct_base, first_correct_base - last_correct_base, voting_position + last_correct_base + last_indel, movement_buffer, indels);
@@ -1274,14 +1268,25 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								if(abs(current_indel_len)<=global_context -> config.max_indel_length)
 								{
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
-
 									mark_gapped_read(current_result);
-									if(last_event && new_event){
+
+									if(last_event_id >=0 && new_event){
+										// the event space can be changed when the new event is added. the location is updated everytime.
+										chromosome_event_t * event_space = NULL;
+										if(thread_context)
+											event_space = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
+										else
+											event_space = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
+										chromosome_event_t * last_event = event_space + last_event_id;
+
 										int dist = new_event -> event_small_side - last_event -> event_large_side +1;
 										new_event -> connected_previous_event_distance = dist;
 										last_event -> connected_next_event_distance = dist;
 									}
-									last_event = new_event;
+
+									if (new_event)
+										last_event_id = new_event -> global_event_id;
+									else	last_event_id = -1;
 								}
 							}
 							
@@ -2548,7 +2553,7 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 #define INDEL_FULL_ALIGN_MAX_MISMATCH 3
 #define SINGLE_PROBE_MAX_MISMATCH 1
 
-int full_indel_alignment(global_context_t * global_context, reassembly_by_voting_block_context_t * block_context, char * full_rebuilt_window, int full_rebuilt_window_size, gene_value_index_t * base_index, unsigned int window_start_pos, unsigned int * perfect_segment_start_pos, int * perfect_segment_lengths,int * indels_after_perfect_segments, short * indels_read_positions, float * indel_quality)
+int full_indel_alignment(global_context_t * global_context, reassembly_by_voting_block_context_t * block_context, char * full_rebuilt_window, int full_rebuilt_window_size, gene_value_index_t * base_index, unsigned int window_start_pos, unsigned int * perfect_segment_start_pos, int * perfect_segment_lengths,int * indels_after_perfect_segments, short * indels_read_positions, float * indel_quality, unsigned int * contig_start_pos, unsigned int * contig_end_pos)
 {
 	int xk1;
 	int is_unreliable = 0;
@@ -2563,6 +2568,8 @@ int full_indel_alignment(global_context_t * global_context, reassembly_by_voting
 	unsigned int last_best_xk2 = xk2;
 
 	memset(probe_poses ,0 , sizeof(unsigned int)*PROBE_KEY_NUMBER);
+	(*contig_start_pos) = 0;
+	(*contig_end_pos) = 0xffffffff;
 
 	for(xk1=0; xk1<PROBE_KEY_NUMBER; xk1++)
 	{
@@ -2585,6 +2592,12 @@ int full_indel_alignment(global_context_t * global_context, reassembly_by_voting
 
 		if(max_probe_match >= global_context -> config.reassembly_key_length - SINGLE_PROBE_MAX_MISMATCH)
 		{
+				// calculate the contig start;
+			if((*contig_start_pos)==0)
+				(*contig_start_pos) = next_best_xk2 + 1 - (probe_key-full_rebuilt_window);
+
+			(*contig_end_pos) = next_best_xk2 + 1 - (probe_key-full_rebuilt_window) + full_rebuilt_window_size;
+
 			probe_poses[used_probes] = next_best_xk2+1;
 			used_probe_in_rebuilt_window[used_probes] = (full_rebuilt_window_size-global_context -> config.reassembly_key_length) * xk1 /(PROBE_KEY_NUMBER-1);
 			//if(max_probe_match<global_context -> config.reassembly_key_length - 1)
@@ -2647,7 +2660,6 @@ int full_indel_alignment(global_context_t * global_context, reassembly_by_voting
 			{
 				int left_matched = match_chro(full_rebuilt_window + used_probe_in_rebuilt_window[xk1], base_index, probe_poses[xk1] - 1, (xk2 - probe_poses[xk1]+ 1 - max(0, indels_in_section)), 0,  global_context -> config.space_type);
 				int right_matched = match_chro(full_rebuilt_window + used_probe_in_rebuilt_window[xk1] + (xk2 - probe_poses[xk1] + 1) -indels_in_section , base_index, xk2,  probe_poses[xk1+1] - 1 - xk2, 0,  global_context -> config.space_type);
-				//printf("DIFF=%d = %d+%d >= %d =%d+%d; indels=%d\n",  left_matched+right_matched, left_matched, right_matched , probe_poses[xk1+1]-probe_poses[xk1]-max(0, indels_in_section), (xk2 - probe_poses[xk1]+ 1 - max(0, indels_in_section)),probe_poses[xk1+1] - 1 - xk2 , indels_in_section);
 				if(left_matched+right_matched > best_edge_score)
 				{
 					best_edge_score = left_matched+right_matched;
@@ -3298,26 +3310,16 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 						int xk2, full_rebuilt_window_size = strlen(full_rebuilt_window);
 
 						gene_value_index_t * base_index = &global_context->all_value_indexes[0] ;
-						//unsigned int best_matched = 0, best_pos;
 
-
-
-						unsigned int perfect_segment_start_pos[MAX_INDELS_IN_WINDOW];
+						unsigned int perfect_segment_start_pos[MAX_INDELS_IN_WINDOW], contig_start_pos, contig_end_pos, segment_length_last = 0, all_fresh = 0;
 						int perfect_segment_lengths[MAX_INDELS_IN_WINDOW];
 						int indels_after_perfect_segments[MAX_INDELS_IN_WINDOW];
 						float quality_of_indels_aln[MAX_INDELS_IN_WINDOW];
 						short indels_read_positions[MAX_INDELS_IN_WINDOW];
+						char contig_CIGAR[200];
 
-						//if(abs(10190024 - window_start_pos) > 2000) continue;
-
-						int indels_in_window = full_indel_alignment(global_context, &block_context, full_rebuilt_window, full_rebuilt_window_size, base_index, window_start_pos, perfect_segment_start_pos, perfect_segment_lengths, indels_after_perfect_segments, indels_read_positions, quality_of_indels_aln);
-						//printf("FULL_FOUND = %d   IN  %d/%d\n", indels_in_window, xk1, total_window_number);
-/*
-						if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
-						{
-							fprintf(stderr,"LLLX-RR:%s\nLLLX: %u :: %d,%d :: FOUND = %d\n", full_rebuilt_window, window_start_pos, first_allele_no, second_allele_no, indels_in_window);
-						}
-*/
+						int indels_in_window = full_indel_alignment(global_context, &block_context, full_rebuilt_window, full_rebuilt_window_size, base_index, window_start_pos, perfect_segment_start_pos, perfect_segment_lengths, indels_after_perfect_segments, indels_read_positions, quality_of_indels_aln, &contig_start_pos, &contig_end_pos);
+						contig_CIGAR[0]=0;						
 
 						for(xk2 = 0; xk2 < indels_in_window; xk2++)
 						{
@@ -3325,13 +3327,6 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 							int indels = indels_after_perfect_segments[xk2], is_fresh = 1;
 							float quality_of_this_indel = quality_of_indels_aln[xk2] * first_half_alleles [first_allele_no].allele_quality * second_half_alleles[second_allele_no].allele_quality;
 
-/*				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
-				{
-					fprintf(stderr, "LLLX-SS [%d]: %u :: QUALS = %f, %f, %f\n", xk2, best_pos,  quality_of_indels_aln[xk2], first_half_alleles [first_allele_no].allele_quality ,  second_half_alleles[second_allele_no].allele_quality);
-				}
-*/
-
-							//printf("FINAL ADD: %d < %d\n\n", indels, global_context -> config.max_indel_length);
 							if(abs(indels) >= global_context -> config.max_indel_length){
 								continue;
 							}
@@ -3340,10 +3335,12 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 								continue;
 							}
 
+							sprintf(contig_CIGAR+strlen(contig_CIGAR), "%dM%d%c", indels_read_positions[xk2] - segment_length_last, abs(indels), indels<0?'I':'D');  
+							segment_length_last = indels_read_positions[xk2];
+							if(indels<0) segment_length_last -= indels;
+
 							all_indels_in_window++;
 
-							//printf("TEST LONG: %d\n", indels);
-							// search neighbours
 							int neighbour_delta;
 							for(neighbour_delta = - 30; neighbour_delta < 30 ; neighbour_delta++)
 							{
@@ -3352,27 +3349,10 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 
 								int xk3, found_events = search_event(global_context, event_table, event_space, best_pos + neighbour_delta , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_LONG_INDEL|CHRO_EVENT_TYPE_INDEL, search_return);
 
-/*
-				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
-				{
-					fprintf(stderr, "LLLX-NN: %u :: FOUND = %d\n", best_pos,  found_events);
-				}
-*/
-
 								for(xk3 = 0; xk3<found_events; xk3++)
 								{
 									chromosome_event_t * tested_neighbour = search_return[xk3];
 
-
-/*
-				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
-				{
-					fprintf(stderr, "LLLX-QQ: %u :: FRESH = %d :: QUAL = %f , %f\n", best_pos, is_fresh, tested_neighbour -> event_quality , quality_of_this_indel);
-				}
-*/
-
-
-									//if(tested_neighbour -> indel_length == indels || abs(neighbour_delta) < 5)
 									if(tested_neighbour -> event_quality >= quality_of_this_indel)
 										is_fresh = 0;
 									else tested_neighbour -> event_type = CHRO_EVENT_TYPE_REMOVED; 
@@ -3381,27 +3361,29 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 
 							}
 
-/*
-				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
-				{
-					fprintf(stderr, "LLLX-AA: %u :: FRESH=%d  :: QUALS = %f\n", best_pos, is_fresh, quality_of_this_indel);
-				}
-*/
 
 							if(is_fresh)
-							{
-				
-					//			printf("PUTLONG: %d\n", indels);
 								put_long_indel_event(global_context, best_pos,  indels, quality_of_this_indel, full_rebuilt_window + indels_read_positions[xk2], CHRO_EVENT_TYPE_LONG_INDEL);
-
-								int write_cursor;
-								for(write_cursor = 0 ; write_cursor < full_rebuilt_window_size ; write_cursor += 70)
-								{
-									fwrite(full_rebuilt_window + write_cursor , min(70, full_rebuilt_window_size - write_cursor), 1, global_context -> long_insertion_FASTA_fp);
-									fputs("\n",global_context -> long_insertion_FASTA_fp);
-								}
+							all_fresh += is_fresh;
+				
+						}
+	
+						if(all_fresh)
+						{
+							int write_cursor;
+							char * chro_begin;
+							unsigned int chro_offset_start = 0;
+							unsigned int chro_offset_end = 0;
+							locate_gene_position_max(contig_start_pos ,& global_context -> chromosome_table, &chro_begin, &chro_offset_start, 0);
+							locate_gene_position_max(contig_end_pos ,& global_context -> chromosome_table, &chro_begin, &chro_offset_end, 0);
+							fprintf(global_context -> long_insertion_FASTA_fp, ">%s-%u-%u-%s%dM\n", chro_name, chro_offset_start, chro_offset_end - 1, contig_CIGAR, full_rebuilt_window_size - segment_length_last);
+							for(write_cursor = 0 ; write_cursor < full_rebuilt_window_size ; write_cursor += 70)
+							{
+								fwrite(full_rebuilt_window + write_cursor , min(70, full_rebuilt_window_size - write_cursor), 1, global_context -> long_insertion_FASTA_fp);
+								fputs("\n",global_context -> long_insertion_FASTA_fp);
 							}
 						}
+
 					}
 			}
 		}
@@ -3695,6 +3677,7 @@ void init_global_context(global_context_t * context)
 	context->config.total_subreads = 10;
 	context->config.minimum_subread_for_first_read = 3;
 	context->config.minimum_subread_for_second_read = 1;
+	context->config.max_mismatch_entire_reads = 10;
 	context->config.max_mismatch_exonic_reads = 5;
 	context->config.max_mismatch_junction_reads = 2;
 	context->config.all_threads = 1;
@@ -3705,6 +3688,12 @@ void init_global_context(global_context_t * context)
 	context->config.report_no_unpaired_reads = 0;
 	context->config.limited_tree_scan = 0;
 	context->config.high_quality_base_threshold = 500000;
+
+	/*
+	#warning ##################################################
+	#warning ## CHANGE THIS VALUE TO 70000 BEFORE RELEASE!   ##
+	#warning ##################################################
+	*/
 	context->config.init_max_event_number = 70000;
 	context->config.show_soft_cliping = 1;
 	context->config.big_margin_record_size = 9;

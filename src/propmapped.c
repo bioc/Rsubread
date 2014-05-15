@@ -25,6 +25,10 @@
 #include <assert.h>
 #include <dirent.h>
 #include <getopt.h>
+#include <sys/types.h>
+#include <sys/resource.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "subread.h" 
 #include "core.h" 
 #include "hashtable.h" 
@@ -399,6 +403,20 @@ int prop_PE(propMapped_context * context)
 	return 0;
 }
 
+void ppm_warning_file_limit()
+{
+	struct rlimit limit_st;
+	getrlimit(RLIMIT_NOFILE, & limit_st);
+
+	{
+		if(min(limit_st.rlim_cur , limit_st.rlim_max) < 400)
+		{
+			SUBREADprintf("Your operation system does not allow a single process to open more then 400 files. You may need to change this setting by using a 'ulimit -n 500' command, or the program may crash.\n");
+		}
+	}
+}
+
+
 
 #ifdef MAKE_STANDALONE
 int main(int argc, char ** argv)
@@ -464,6 +482,7 @@ int propmapped(int argc, char ** argv)
 
 	SUBREADprintf("The input file is opened as a %cAM file.\nThe %ss in the input file are being counted.\n", context -> is_BAM_input?'B':'S', context -> is_fragments_counted?"fragment":"read");
 
+	ppm_warning_file_limit ();
 	ret = ret || init_PE_sambam(context);
 	ret = ret || split_PE_sambam(context);
 	ret = ret || finalise_PE_split(context);

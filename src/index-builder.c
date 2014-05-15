@@ -763,7 +763,7 @@ void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned li
 
 int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, unsigned int ** chrom_lens, FILE * log_fp, char * log_fn)
 {
-	int is_R_warnned = 0;
+	int is_R_warnned = 0, is_repeated_chro= 0;
 	char * line_buf = malloc(MAX_READ_LENGTH);
 	char * read_head_buf = malloc(MAX_READ_LENGTH * 3);
 	unsigned int inp_file_no, line_no;
@@ -781,6 +781,12 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 	(*chrom_lens) = malloc(chrom_lens_max_len*sizeof(unsigned int));
 	memset((*chrom_lens), 0, chrom_lens_max_len*sizeof(unsigned int));
+
+
+	HashTable * rep_name_table = HashTableCreate(9999);
+	HashTableSetDeallocationFunctions(rep_name_table, free, NULL);
+	HashTableSetKeyComparisonFunction(rep_name_table, (int (*) (const void *, const void *)) strcmp);
+	HashTableSetHashFunction(rep_name_table , fc_chro_hash);
 	
 	print_in_box( 80,0,0,"Check the integrity of provided reference sequences ...");
 	for(inp_file_no = 0; inp_file_no < fa_number; inp_file_no++)
@@ -792,6 +798,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 		if(!in_fp)
 		{
 			SUBREADprintf("ERROR: Input file '%s' is not found or is not accessible. No index was built.\n", input_fas[inp_file_no]);
+			HashTableDestroy(rep_name_table);
 			return -1;
 		}
 
@@ -841,6 +848,27 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 				strcat(read_head_buf, line_buf);
 				strcat(read_head_buf, "\n");
+
+				int chro_name_end=1;
+				while(line_buf[chro_name_end])
+				{
+					if(line_buf[chro_name_end]==' '||line_buf[chro_name_end]=='|' || line_buf[chro_name_end]=='\t')break;
+					chro_name_end++;
+				}
+
+				line_buf[chro_name_end] = 0;
+				int is_exist = HashTableGet(rep_name_table , line_buf+1) - NULL;
+				if(is_exist)
+				{
+					SUBREADprintf("ERROR: repeated chromosome name '%s' is observed in the FASTA file(s).\nThe index was NOT built.\n", line_buf+1);
+					is_repeated_chro=1;
+					break;
+				}
+
+				char * keymem = malloc(chro_name_end);
+				strcpy(keymem, line_buf+1);
+				HashTablePut(rep_name_table, keymem, NULL+1);
+
 			}
 			else if(line_head_pos<1)
 			{
@@ -899,13 +927,18 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	}
 
 
+	HashTableDestroy(rep_name_table);
+	free(line_buf);
+	free(read_head_buf);
+	fclose(out_fp);
+
 	if(!written_chrs){
 		SUBREADprintf("ERROR: No index was built because there were no subreads extracted. A chromosome needs at least 16 bases to be indexed.");
 		return 1;
 	}
-	free(line_buf);
-	free(read_head_buf);
-	fclose(out_fp);
+
+	if(is_repeated_chro)
+		return 1;
 
 	if(ERROR_FOUND_IN_FASTA)
 	{
@@ -1009,7 +1042,7 @@ int main_buildindex(int argc,char ** argv)
 
 		SUBREADputs("Usage:");
 		SUBREADputs("");
-		SUBREADputs(" ./subread-buildindex -o <basename> -M <int> {FASTA file1} [FASTA file2] ...");
+		SUBREADputs(" ./subread-buildindex [options] -o <basename> {FASTA file1} [FASTA file2] ...");
 		SUBREADputs("");
 		SUBREADputs("Required arguments:");
 		SUBREADputs("");

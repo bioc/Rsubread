@@ -110,6 +110,7 @@ typedef struct{
 	char output_prefix[MAX_FILE_NAME_LENGTH];
 	int report_sam_file;
 	int report_no_unpaired_reads;
+	int max_mismatch_entire_reads;
 	int max_mismatch_exonic_reads;
 	int max_mismatch_junction_reads;
 	int ignore_unmapped_reads;
@@ -229,6 +230,8 @@ typedef struct
 } alignment_result_t;
 
 #define CORE_MAX_CIGAR_LEN (MAX_INDEL_SECTIONS * 3+5)
+#define CORE_MAX_CIGAR_STR_LEN 110
+#define CORE_ADDITIONAL_INFO_LENGTH 400
 
 typedef struct
 {

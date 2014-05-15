@@ -47,6 +47,7 @@ static struct option long_options[] =
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
+	{"maxMismatches",  required_argument, 0, 'M'},
 	{0, 0, 0, 0}
 };
 
@@ -115,6 +116,10 @@ void print_usage_core_aligner()
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("");
+	SUBREADputs("    -M --maxMismatches <int> specify the maximum number of mismatched bases");
+	SUBREADputs("                            allowed in the alignment. 10 by default. Mismatches");
+	SUBREADputs("                            found in soft-clipped bases are not counted.");
+	SUBREADputs("   ");
 	SUBREADputs("       --reportFusions      report discovered genomic fusion events such as");
 	SUBREADputs("                            chimeras. Discovered fusions will be saved to a file");
 	SUBREADputs("                            (*.fusions.txt). Detailed mapping results for fusion");
@@ -345,6 +350,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.do_superlong_indel_detection = 0;
 				}
 				break;
+			case 'M':
+				global_context->config.max_mismatch_entire_reads = atoi(optarg);
+				break;
 			case 'P':
 				if (optarg[0]=='3')
 					global_context->config.phred_score_format = FASTQ_PHRED33;
@@ -413,8 +421,21 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.is_rna_seq_reads = 1;
 					global_context->config.do_fusion_detection = 1;
 					global_context->config.prefer_donor_receptor_junctions = 0;
-					//global_context->config.do_big_margin_filtering_for_reads = 1;
+					global_context->config.do_big_margin_filtering_for_reads = 1;
 					//global_context->config.limited_tree_scan = 1;
+					//
+					//
+					/*#warning =====================================================
+					#warning =====================================================
+					#warning These changes are made for Olivers project!
+					#warning Comment the following four lines in the next release! 
+					#warning =====================================================
+					#warning =====================================================
+					global_context->config.high_quality_base_threshold = 999999;
+					global_context->config.max_mismatch_junction_reads = 0;
+					global_context->config.do_big_margin_filtering_for_junctions = 1;
+					global_context->config.total_subreads = 20;
+					*/
 				}
 				break;
 			case '?':

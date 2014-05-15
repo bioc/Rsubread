@@ -2188,7 +2188,7 @@ int extend_covered_region(gene_value_index_t *array_index, unsigned int read_sta
 }
 
 
-float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch, int ql_kill)
+float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch, int * all_mismatched, int ql_kill)
 {
 	int i;
 	int ret =0;
@@ -2207,6 +2207,7 @@ float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  u
 			ret ++;
 		}else
 		{
+			(*all_mismatched)++;
 			(*high_qual_unmatch)++;
 			ret --;
 		}
@@ -2216,7 +2217,7 @@ float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  u
 	return ret*1.;
 }
 
-float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int ql_kill)
+float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int * all_mismatched, int ql_kill)
 {
 	int i;
 	int ret =0;
@@ -2252,6 +2253,7 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 		}
 		else
 		{
+			(*all_mismatched)++;
 			if(!qual_txt)
 			{
 				ret -= 1000000;
@@ -2308,7 +2310,8 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 		{
 			if(cigar_txt[cigar_cursor] == 'M' || cigar_txt[cigar_cursor] == 'S') 
 			{
-				float nret = match_base_quality(array_index, read_txt + read_cursor, chromosome_cursor , (qual_txt && qual_txt[0])?qual_txt + read_cursor:NULL, x, 0, phred_version, mismatch, 200000);
+				int all_MM=0;
+				float nret = match_base_quality(array_index, read_txt + read_cursor, chromosome_cursor , (qual_txt && qual_txt[0])?qual_txt + read_cursor:NULL, x, 0, phred_version, mismatch, &all_MM, 200000);
 				//printf ("%s: Q=%.6f; L=%d ; POS=%u\n",  read_txt + read_cursor, nret, x, chromosome_cursor);
 
 				ret += (int)(nret*1000000);

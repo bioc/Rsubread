@@ -2631,7 +2631,7 @@ int is_certainly_bam_file(char * fname, int * is_first_read_PE)
 {
 
 	int read_type = probe_file_type(fname, is_first_read_PE);
-	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY)
+	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY || read_type == FILE_TYPE_UNKNOWN)
 		return -1;
 	if(read_type == FILE_TYPE_BAM)
 		return 1;

@@ -45,6 +45,8 @@ static struct option long_options[] =
 	{"memoryMultiplex",  required_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
+	{"disableBigMargin",  no_argument, 0, 0},
+	{"maxMismatches",  required_argument, 0, 'M'},
 	{0, 0, 0, 0}
 };
 
@@ -112,6 +114,12 @@ void print_usage_core_subjunc()
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
+	SUBREADputs("   ");
+	SUBREADputs("    -M --maxMismatches <int> specify the maximum number of mismatched bases");
+	SUBREADputs("                            allowed in the alignment. 10 by default. Mismatches");
+	SUBREADputs("                            found in soft-clipped bases are not counted.");
+	SUBREADputs("   ");
+	SUBREADputs("       --disableBigMargin   disable big margin for calling junctions.");
 	SUBREADputs("   ");
 	SUBREADputs("       --dnaseq             specify that the input read data are genomic DNA");
 	SUBREADputs("                            sequencing data. When specified, the program will");
@@ -287,6 +295,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				if(global_context->config.all_threads >32) global_context->config.all_threads = 32;
 
 				break;
+			case 'M':
+				global_context->config.max_mismatch_entire_reads = atoi(optarg);
+				break;
 			case 'R':
 				global_context->input_reads.is_paired_end_reads = 1;
 				strncpy(global_context->config.second_read_file, optarg, MAX_FILE_NAME_LENGTH-1);
@@ -397,6 +408,12 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
 				{
 					global_context->config.is_gzip_fastq=1;
+				}
+				else if(strcmp("disableBigMargin", long_options[option_index].name)==0) 
+				{
+					global_context->config.max_mismatch_junction_reads = 10;
+					global_context->config.do_big_margin_filtering_for_junctions = 0;
+					global_context->config.limited_tree_scan = 0;
 				}
 				else if(strcmp("dnaseq", long_options[option_index].name)==0 || strcmp("allJunctions", long_options[option_index].name)==0)
 				{

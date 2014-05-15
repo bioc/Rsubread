@@ -74,9 +74,9 @@ void warning_file_limit()
 		if(min(limit_st.rlim_cur , limit_st.rlim_max) < 400)
 		{
 			print_in_box(80,0,0,"WARNING This operation needs to open many files at same time,");
-			print_in_box(80,0,0,"        but your OS only allows to open %d files.", min(limit_st.rlim_cur , limit_st.rlim_max));
-			print_in_box(80,0,0,"        You can use command 'ulimit -n 500' to raise this limit");
-			print_in_box(80,0,0,"        to 500, or the program may crash or terminate unexpectedly.");
+			print_in_box(80,0,0,"	but your OS only allows to open %d files.", min(limit_st.rlim_cur , limit_st.rlim_max));
+			print_in_box(80,0,0,"	You can use command 'ulimit -n 500' to raise this limit");
+			print_in_box(80,0,0,"	to 500, or the program may crash or terminate unexpectedly.");
 			print_in_box(80,0,0,"");
 		}
 	}
@@ -254,48 +254,50 @@ void print_in_box(int line_width, int is_boundary, int is_center, char * pattern
 
 
 
+
 int show_summary(global_context_t * global_context)
 {
 
-	if(progress_report_callback)
-	{
-		long long int all_reads_K = global_context -> all_processed_reads / 1000;
-		float mapped_reads_percentage = global_context -> all_mapped_reads * 1./global_context -> all_processed_reads;
-		if(global_context->input_reads.is_paired_end_reads) mapped_reads_percentage/=2;
-		progress_report_callback(10, 900000, (int) (miltime()-global_context->start_time));
-		progress_report_callback(10, 900010, (int) all_reads_K);
-		progress_report_callback(10, 900011, (int) (10000.*mapped_reads_percentage));
-	}
+        if(progress_report_callback)
+        {
+                long long int all_reads_K = global_context -> all_processed_reads / 1000;
+                float mapped_reads_percentage = global_context -> all_mapped_reads * 1./global_context -> all_processed_reads;
+                if(global_context->input_reads.is_paired_end_reads) mapped_reads_percentage/=2;
+                progress_report_callback(10, 900000, (int) (miltime()-global_context->start_time));
+                progress_report_callback(10, 900010, (int) all_reads_K);
+                progress_report_callback(10, 900011, (int) (10000.*mapped_reads_percentage));
+        }
 
-	print_in_box(80,0,1,"");
-	print_in_box(89,0,1,"%c[36mCompleted successfully.%c[0m", CHAR_ESC, CHAR_ESC);
-	print_in_box(80,0,1,"");
-	print_in_box(80,2,1,"");
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
-	print_in_box(80, 1,1,"Summary");
-	print_in_box(80, 0,1,"");
-	print_in_box(80, 0,0,"         Processed : %llu %s" , global_context -> all_processed_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
-	print_in_box(81, 0,0,"            Mapped : %llu %s (%.1f%%%%)", global_context -> all_mapped_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads" ,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
-	if(global_context->input_reads.is_paired_end_reads)
-		print_in_box(80, 0,0,"  Correctly paired : %llu fragments", global_context -> all_correct_PE_reads);
+        print_in_box(80,0,1,"");
+        print_in_box(89,0,1,"%c[36mCompleted successfully.%c[0m", CHAR_ESC, CHAR_ESC);
+        print_in_box(80,0,1,"");
+        print_in_box(80,2,1,"");
+        sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
+        print_in_box(80, 1,1,"Summary");
+        print_in_box(80, 0,1,"");
+        print_in_box(80, 0,0,"         Processed : %llu %s" , global_context -> all_processed_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
+        print_in_box(81, 0,0,"            Mapped : %llu %s (%.1f%%%%)", global_context -> all_mapped_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads" ,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
+        if(global_context->input_reads.is_paired_end_reads)
+                print_in_box(80, 0,0,"  Correctly paired : %llu fragments", global_context -> all_correct_PE_reads);
 
-	if(global_context->config.output_prefix[0])
-	{
-		if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC)
-			print_in_box(80, 0,0,"         Junctions : %u", global_context -> all_junctions);
-		if(global_context->config.do_fusion_detection)
-			print_in_box(80, 0,0,"           Fusions : %u", global_context -> all_fusions);
-		print_in_box(80, 0,0,"            Indels : %u", global_context -> all_indels);
-	}
-	
-	print_in_box(80, 0,1,"");
-	print_in_box(80, 0,0,"      Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);
-	print_in_box(80, 0,1,"");
-	print_in_box(80, 2,1,"http://subread.sourceforge.net/");
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
+        if(global_context->config.output_prefix[0])
+        {
+                if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC)
+                        print_in_box(80, 0,0,"         Junctions : %u", global_context -> all_junctions);
+                if(global_context->config.do_fusion_detection)
+                        print_in_box(80, 0,0,"           Fusions : %u", global_context -> all_fusions);
+                print_in_box(80, 0,0,"            Indels : %u", global_context -> all_indels);
+        }
+        
+        print_in_box(80, 0,1,"");
+        print_in_box(80, 0,0,"      Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);
+        print_in_box(80, 0,1,"");
+        print_in_box(80, 2,1,"http://subread.sourceforge.net/");
+        sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
 
-	return 0;
+        return 0;
 }
+
 
 
 void show_progress(global_context_t * global_context, thread_context_t * thread_context, unsigned int current_read_no, int task)
@@ -921,9 +923,791 @@ int get_soft_clipping_length(char* CIGAR)
 	return 0;
 }
 
+
 #define CIGAR_PERFECT_SECTIONS 12
 
-int write_chunk_results(global_context_t * global_context)
+typedef struct{
+	char current_cigar_decompress[CORE_MAX_CIGAR_STR_LEN + 1];
+	char cigar [CORE_MAX_CIGAR_STR_LEN];
+
+	unsigned int out_poses[CIGAR_PERFECT_SECTIONS];
+	short out_lens[CIGAR_PERFECT_SECTIONS];
+	char out_cigars[CIGAR_PERFECT_SECTIONS][60];
+	char out_strands[CIGAR_PERFECT_SECTIONS];
+
+	char additional_information[CORE_ADDITIONAL_INFO_LENGTH + 1];
+	alignment_result_t * raw_result;
+
+	unsigned int linear_position;
+	short soft_clipping_movements;
+	char * chro;
+	unsigned int offset;
+	int strand;
+
+	int mapping_quality;
+}subread_output_tmp_t;
+
+typedef struct{
+	long long int *PE_distance;
+	char * out_cigar_buffer[CIGAR_PERFECT_SECTIONS];
+	subread_output_tmp_t *r1;
+	subread_output_tmp_t *r2;
+	subread_output_tmp_t ** out_pairs;
+
+} subread_output_context_t;
+
+void init_output_context(global_context_t * global_context ,subread_output_context_t * out_context)
+{
+	int xk1;
+	out_context -> r1 = malloc(sizeof(subread_output_tmp_t) *global_context->config.multi_best_reads );
+
+	for(xk1=0;xk1<CIGAR_PERFECT_SECTIONS;xk1++)
+		out_context -> out_cigar_buffer[xk1] = malloc(60);
+
+	out_context -> out_pairs = malloc(sizeof( subread_output_context_t *) * global_context->config.multi_best_reads * 2);
+
+	if(global_context -> input_reads.is_paired_end_reads)
+	{
+		out_context -> PE_distance = malloc(sizeof(long long) * global_context->config.multi_best_reads);
+		out_context -> r2 = malloc(sizeof(subread_output_tmp_t) *global_context->config.multi_best_reads );
+	}
+	else{
+		out_context -> PE_distance = NULL;
+		out_context -> r2 = NULL;
+	}
+}
+
+void destroy_output_context(global_context_t * global_context ,subread_output_context_t * out_context)
+{
+	int xk1;
+	for(xk1=0;xk1<CIGAR_PERFECT_SECTIONS;xk1++)
+		free(out_context -> out_cigar_buffer[xk1]);
+
+	free(out_context -> out_pairs);
+	free(out_context -> r1 );
+	if(global_context -> input_reads.is_paired_end_reads)
+	{
+		free(out_context -> r2);
+		free(out_context -> PE_distance);
+	}
+}
+
+int locate_current_value_index(global_context_t * global_context, thread_context_t * thread_context, alignment_result_t * result, int rlen);
+int calc_edit_dist(global_context_t * global_context, alignment_result_t * current_result, char * cigar , unsigned int pos ,  char * read_text)
+{
+	locate_current_value_index(global_context, NULL, current_result, 1);
+	gene_value_index_t * current_value_index = global_context->current_value_index; 
+
+	int cigar_cursor=0;
+	unsigned int chro_cursor = pos, tmpi=0;
+	int read_cursor = 0;
+	int all_mm = 0;
+
+	while(1)
+	{
+		char nch = cigar[cigar_cursor++];
+		if(!nch)break;
+
+		if('0'<=nch && '9' >=nch)
+		{
+			tmpi = tmpi*10+nch-'0';
+		}
+		else{
+			if(nch == 'M')
+			{
+				int matched = match_chro(read_text + read_cursor, current_value_index, chro_cursor, tmpi, 0, global_context -> config.space_type);
+				all_mm += tmpi - matched;
+				chro_cursor += tmpi;
+				read_cursor += tmpi;
+			}
+			else if(nch == 'N' || nch == 'D')
+			{
+				if('D' == nch) all_mm+=tmpi;
+				chro_cursor += tmpi;
+			}
+			else if(nch == 'I')
+			{
+				read_cursor += tmpi;
+				all_mm+=tmpi;
+			}
+			else if(nch == 'S')
+			{
+				chro_cursor += tmpi;
+				read_cursor += tmpi;
+			}
+	
+			tmpi = 0;
+		}
+	}
+
+	return all_mm;
+}
+
+int convert_read_to_tmp(global_context_t * global_context , subread_output_context_t * output_context, int read_number, int is_second_read, int read_len, char * read_text, char * qual_text, alignment_result_t * current_result, subread_output_tmp_t * r)
+{
+
+	int is_r_OK;
+	r -> raw_result = current_result;
+
+	is_r_OK = (current_result -> result_flags & CORE_IS_FULLY_EXPLAINED) > 0;
+
+	if(is_r_OK)
+		if((current_result->result_flags & CORE_IS_BREAKEVEN) && !global_context -> config.report_multi_mapping_reads)
+			is_r_OK = 0;
+
+	if(is_r_OK){
+
+		int current_strand = (current_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
+		int is_first_section_jumped = 0;
+
+
+		if( current_result -> cigar_string[0] == -1)
+		{
+			bincigar2cigar( r-> current_cigar_decompress, CORE_MAX_CIGAR_STR_LEN, current_result -> cigar_string + 1, CORE_MAX_CIGAR_LEN, read_len);
+			is_first_section_jumped = 1;
+		}
+		else
+			bincigar2cigar( r-> current_cigar_decompress, CORE_MAX_CIGAR_STR_LEN, current_result -> cigar_string, CORE_MAX_CIGAR_LEN, read_len);
+
+		int chimeric_sections = 0;
+		int current_repeated_times;
+
+		current_repeated_times = is_ambiguous_voting(global_context, read_number, is_second_read, current_result->selected_votes, current_result->confident_coverage_start, current_result->confident_coverage_end, read_len, current_strand);
+
+		r->linear_position = current_result -> selected_position;
+		r->mapping_quality = current_result -> final_quality;
+		if(current_repeated_times>1) r->mapping_quality = 0;
+
+		strcpy(r->cigar, r -> current_cigar_decompress);
+		r->strand = (current_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
+
+		sprintf(r->additional_information, "\tSM:i:%d",current_result -> final_mismatched_bases);
+
+		if(global_context -> config.SAM_extra_columns)
+		{
+			sprintf(r->additional_information + strlen( r->additional_information), "\tSG:Z:%s\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tSP:Z:%s", r-> current_cigar_decompress, current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, (current_result -> result_flags & CORE_IS_GAPPED_READ)?"GAPPED":"NOEVENT"); 
+		}
+
+
+		//printf("SM='%s'\n", r->additional_information);
+
+
+		if(global_context -> config.do_fusion_detection)
+		{			
+			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped ,  r->current_cigar_decompress , r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens);
+
+			int xk1;
+			strcpy(r->out_cigars[0], output_context->out_cigar_buffer[0]);
+			for(xk1=1; xk1<chimeric_sections; xk1++)
+			{
+				unsigned int chimeric_pos;
+				char * chimaric_chr;
+				strcpy(r->out_cigars[xk1], output_context->out_cigar_buffer[xk1]);
+
+				if(0==locate_gene_position_max(r->out_poses[xk1],& global_context -> chromosome_table, & chimaric_chr, & chimeric_pos, 0+r->out_lens[xk1]))
+				{
+					int soft_clipping_movement = 0;
+					soft_clipping_movement = get_soft_clipping_length(r->out_cigars[xk1]);
+					char strand_xor = (r->out_strands[xk1] == '-');
+					sprintf(r->additional_information + strlen(r->additional_information), "\tCG:Z:%s\tCP:i:%u\tCT:Z:%c\tCC:Z:%s", r->out_cigars[xk1] , chimeric_pos + soft_clipping_movement + 1, strand_xor?'-':'+' , chimaric_chr );
+				}
+				else is_r_OK = 0;
+			}
+			r->linear_position = r->out_poses[0];
+			r->strand = r->out_strands[0]=='-';
+
+			strcpy(r->cigar , r->out_cigars[0]);
+		}
+		r->soft_clipping_movements = get_soft_clipping_length(r->cigar);
+	}
+
+	if(is_r_OK)
+	{
+		if(locate_gene_position_max(r->linear_position,& global_context -> chromosome_table, &r-> chro , &r -> offset, read_len))
+			is_r_OK = 0;
+
+		else
+			r -> offset++;
+
+		if(global_context -> config.is_rna_seq_reads && !(current_result -> result_flags & CORE_NOTFOUND_DONORS))
+		{
+			sprintf(r->additional_information + strlen(r->additional_information), "\tXS:A:%c", (current_result -> result_flags & CORE_IS_GT_AG_DONORS)?'+':'-');
+		}
+
+	}
+
+	return is_r_OK;
+}
+
+
+int calculate_fragment_combinations(global_context_t * global_context, subread_output_context_t * out_context, int read_number , int read_len_1, int read_len_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2)
+{
+	int mapping_location_number;
+
+	// Features that need attention:
+
+	// (1) fusion cigar split
+	// (2) soft-clipping moving mapping location
+	// (3) making the two ends to have the best strand: if both ends mapped, as what they should be; 
+	//		       if only one end is mapped: the other end is flipped to the same strand.
+	// (4) ambiguous voting
+
+	// Additional criteria: 
+	// (1) a read must be entirely in a chromosome, or it is reported as unmapped.
+
+	int read_1_locations = 0;
+	int read_2_locations = 0;
+
+	// First, counting the number of mapping locations for each end.
+	// 
+	for( mapping_location_number = 0 ; mapping_location_number < global_context->config.multi_best_reads; mapping_location_number++)
+	{
+		alignment_result_t * current_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0,  mapping_location_number);
+
+		int is_2_OK = 0, is_1_OK = convert_read_to_tmp(global_context, out_context, read_number , 0 , read_len_1, read_text_1, qual_text_1, current_result, &out_context->r1[read_1_locations]);
+
+		if(global_context->input_reads.is_paired_end_reads)
+		{
+			alignment_result_t * current_result2 = _global_retrieve_alignment_ptr(global_context  , read_number, 1,  mapping_location_number);
+			is_2_OK = convert_read_to_tmp(global_context , out_context, read_number , 1, read_len_2, read_text_2, qual_text_2, current_result2, &out_context->r2[read_2_locations]);
+			if(is_2_OK)read_2_locations++;
+		}
+		//printf("L1,2_OK = %d, %d\n", is_1_OK, is_2_OK);
+
+		if(is_1_OK)read_1_locations++;
+
+		if(! ( is_2_OK || is_1_OK))
+			break;
+	}
+
+	// now all the potential locations were written into out_context->r1 and out_context->r2.
+	// we find the best combinations between out_context->r1 and out_context->r2 now.
+	int ret = 0;
+	if(global_context-> config.multi_best_reads == 1)
+	{
+		out_context -> out_pairs[0]   =  read_1_locations?out_context -> r1 : NULL;
+		out_context -> out_pairs[1]   =  read_2_locations?out_context -> r2 : NULL;
+		ret = 1;
+	}
+	else if(global_context->input_reads.is_paired_end_reads)
+	{
+		int r1_xx, r2_xx, yy, zz;
+		memset(out_context->PE_distance, 0x7F, sizeof(long long) * global_context->config.multi_best_reads);
+
+
+		out_context -> out_pairs[0] = NULL;
+		out_context -> out_pairs[1] = NULL;
+
+		if(read_1_locations > 0 && read_2_locations > 0)
+		{
+			for(r1_xx=0; r1_xx < read_1_locations; r1_xx ++)
+				for(r2_xx=0; r2_xx < read_2_locations; r2_xx ++)
+				{
+					long long int distance = 0x100000000ll;
+
+					// the chro in the data structure is a pointer to the offset table; they can be compaired directly.
+					if(out_context->r1 [r1_xx] . chro == out_context->r2 [r2_xx].chro)
+					{
+						distance = out_context->r1 [r1_xx] . linear_position;
+						distance -= out_context->r2 [r2_xx] . linear_position;
+						if(0>distance) distance=-distance;
+					}
+
+					if(distance < out_context -> PE_distance[global_context->config.multi_best_reads - 1])
+					{
+						for(yy = 0; yy < global_context->config.multi_best_reads; yy++)
+						{
+							if(distance < out_context -> PE_distance[yy])
+								break;
+						}
+
+						// now replace the 2*yy-th and (2*yy+1)-th items in array output_records with the current couple.
+
+						for(zz = global_context->config.multi_best_reads - 2 ; zz >= yy; zz--)
+						{
+							out_context -> PE_distance[zz+1] = out_context -> PE_distance[zz];
+							memcpy(&(out_context -> out_pairs[zz*2 + 2]), &(out_context -> out_pairs[zz*2]), 2*sizeof(void *));
+						}
+						out_context -> PE_distance[yy] = distance;
+						out_context -> out_pairs[yy*2]   = out_context -> r1  + r1_xx;
+						out_context -> out_pairs[yy*2+1] = out_context -> r2  + r2_xx;
+						ret ++;
+						if(ret > global_context->config.multi_best_reads) ret = global_context->config.multi_best_reads;
+					}
+				}
+		}
+		else
+		{
+			for(yy = 0; yy < max(read_1_locations, read_2_locations); yy++)
+			{
+				out_context -> out_pairs[yy*2  ] = read_1_locations == 0? NULL :  out_context -> r1  + yy;
+				out_context -> out_pairs[yy*2+1] = read_2_locations == 0? NULL :  out_context -> r2  + yy;
+			}
+			ret =  max(read_1_locations, read_2_locations);
+		}
+	}
+	else
+	{
+		int yy;
+		ret = read_1_locations;
+		for(yy = 0; yy < read_1_locations; yy++)
+			out_context -> out_pairs[yy  ] =  out_context -> r1 +yy;
+	}
+	return max(1, ret);
+}
+
+int calc_tlen(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int read_len_1, int  read_len_2);
+
+int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int is_second_read, int read_len_1, int read_len_2, int current_location_no)
+{
+	int ret;
+
+	if(global_context->input_reads.is_paired_end_reads)
+	{
+		ret  = SAM_FLAG_PAIRED_TASK;
+		ret |= is_second_read?SAM_FLAG_SECOND_READ_IN_PAIR:SAM_FLAG_FIRST_READ_IN_PAIR;
+
+		subread_output_tmp_t * this_rec = is_second_read?rec2:rec1;
+		subread_output_tmp_t * mate_rec = is_second_read?rec1:rec2;
+
+		if(this_rec == NULL)  ret |= SAM_FLAG_UNMAPPED;
+		else
+			if(this_rec->strand + is_second_read == 1) ret |= SAM_FLAG_REVERSE_STRAND_MATCHED;
+
+		if(mate_rec == NULL)  ret |= SAM_FLAG_MATE_UNMATCHED;
+		else
+			if(mate_rec->strand + is_second_read != 1) ret |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
+
+		if(rec1 && rec2)
+		{
+			int TLEN = calc_tlen(global_context , rec1, rec2, read_len_1, read_len_2);
+			int is_PEM = 0;
+			if(TLEN >= global_context->config. minimum_pair_distance  && TLEN <= global_context-> config.maximum_pair_distance &&  this_rec->strand == mate_rec->strand)
+			{
+				if(global_context -> config.is_first_read_reversed && !(global_context -> config.is_second_read_reversed))
+				{
+					if(this_rec -> strand == 0)
+					{
+						if((is_second_read + (mate_rec-> offset > this_rec -> offset) == 1) || mate_rec-> offset == this_rec -> offset)
+							is_PEM = 1;
+					}
+				}
+				else
+				{
+					if(this_rec -> strand)
+					{
+						if((is_second_read + (mate_rec-> offset < this_rec -> offset) == 1) || mate_rec-> offset == this_rec -> offset) is_PEM = 1;
+					}else
+					{
+						if((is_second_read + (mate_rec-> offset > this_rec -> offset) == 1) || mate_rec-> offset == this_rec -> offset) is_PEM = 1;
+
+					}
+				}
+			}
+			if(is_PEM) ret |= SAM_FLAG_MATCHED_IN_PAIR;
+		}
+	}
+	else
+	{
+		ret = 0;
+
+		if(rec1 == NULL)  ret |= SAM_FLAG_UNMAPPED;
+		else
+			if(rec1->strand) ret |= SAM_FLAG_REVERSE_STRAND_MATCHED;
+	}
+
+	if(current_location_no>0){
+		if((rec1 && !is_second_read)||(rec2 && is_second_read))
+			ret |= SAM_FLAG_SECONDARY_MAPPING;
+	}
+
+	return ret;
+}
+
+
+int calc_tlen(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int read_len_1, int  read_len_2)
+{
+	long long int ret = rec1->offset;
+	ret -= rec2->offset;
+	if(ret<0)ret=-ret;
+
+	if(rec1->offset - rec1->soft_clipping_movements < rec2->offset - rec2->soft_clipping_movements ) ret += read_len_2;
+	else ret += read_len_1;
+
+	ret = max(read_len_1, ret);
+	ret = max(read_len_2, ret);
+	return (int)ret;
+}
+
+int calc_should_reverse(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int is_second_read)
+{
+	subread_output_tmp_t * cur_rec = is_second_read?rec2:rec1;
+
+	if(cur_rec)
+		return cur_rec->strand;
+	else
+	{
+		subread_output_tmp_t * mate_rec = is_second_read?rec2:rec1;
+		return mate_rec?mate_rec->strand:0;
+	}
+}
+
+
+#define write_chunk_results_145 write_chunk_results
+
+// rec1 or rec2 is OK if they are not NULL.
+void write_single_fragment(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int all_locations , int current_location , char * read_name_1, char * read_name_2, int read_len_1, int read_len_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2, int * is_read1_reversed, int * is_read2_reversed )
+{
+
+//	if( all_locations < 2) return;
+
+
+	int flag1 = calc_flags( global_context , rec1, rec2, 0,  read_len_1,  read_len_2, current_location);
+
+	int flag2 = -1;
+
+	if(global_context->input_reads.is_paired_end_reads)
+	{
+		flag2 = calc_flags( global_context , rec1, rec2, 1,  read_len_1,  read_len_2, current_location);
+		if(flag2 & SAM_FLAG_MATCHED_IN_PAIR) global_context->all_correct_PE_reads  ++;
+	}
+
+	int tlen = 0;
+
+	// rec -> chro is a pointer to the offset table; the pointers can be compared.
+	if(rec1 && rec2 && rec1->chro == rec2->chro)tlen = calc_tlen(global_context , rec1, rec2,  read_len_1,  read_len_2);
+
+
+
+	int applied_reverse_space;
+	applied_reverse_space = global_context->config.space_type;
+	if(global_context -> config.convert_color_to_base)
+	{
+		colorread2base(read_text_1, read_len_1+1);
+		if(global_context->input_reads.is_paired_end_reads)
+			colorread2base(read_text_2, read_len_2+1);
+		applied_reverse_space = GENE_SPACE_BASE;
+	}
+
+	int should_1_reverse = calc_should_reverse( global_context , rec1, rec2, 0);
+
+	if(should_1_reverse + (*is_read1_reversed) == 1)
+	{
+		reverse_read(read_text_1, read_len_1 + global_context->config.convert_color_to_base, applied_reverse_space);
+		reverse_quality(qual_text_1, read_len_1);
+		(*is_read1_reversed) = !(*is_read1_reversed);
+	}
+
+	if(global_context->input_reads.is_paired_end_reads)
+	{
+		int should_2_reverse = calc_should_reverse( global_context , rec1, rec2, 1);
+
+		if(should_2_reverse + (*is_read2_reversed) == 1)
+		{
+			reverse_read(read_text_2, read_len_2 + global_context->config.convert_color_to_base, applied_reverse_space);
+			reverse_quality(qual_text_2, read_len_2);
+			(*is_read2_reversed) = !(*is_read2_reversed);
+		}
+	}
+	remove_backslash(read_name_1);
+	remove_backslash(read_name_2);
+
+	int display_offset1 = 0, display_tailgate1 = 0;
+	int display_offset2 = 0, display_tailgate2 = 0;
+
+	if(global_context -> config.space_type == GENE_SPACE_COLOR)
+	{
+
+		if(rec1 && rec1 -> strand)
+		{
+			display_offset1 = 0;
+			display_tailgate1 = 1;
+		}
+		else
+		{
+			if(!global_context -> config.convert_color_to_base)
+			{
+				// the first base was a fake prime base; the second base is the first meaningful base.
+				char second_char = read_text_1[1];
+				read_text_1[1] = color2char(second_char, read_text_1[0]);
+			}
+			display_offset1 = 1;
+			display_tailgate1 = 0;
+		}
+
+		if(rec2 && rec2 -> strand)
+		{
+			if(!global_context -> config.convert_color_to_base)
+			{
+				// the first base was a fake prime base; the second base is the first meaningful base.
+				char second_char = read_text_2[1];
+				read_text_2[1] = color2char(second_char, read_text_2[0]);
+			}
+			display_offset2 = 1;
+			display_tailgate2 = 0;
+		}
+		else
+		{
+			display_offset2 = 0;
+			display_tailgate2 = 1;
+		}
+		assert(display_offset1 + display_tailgate1 == 1);
+		assert(display_offset2 + display_tailgate2 == 1);
+	}
+	if(!qual_text_1[0])
+	{
+		int xi2;
+		for(xi2=display_offset1;read_text_1[xi2 + display_tailgate1];xi2++) qual_text_1[xi2 - display_offset1] = 'I';
+		qual_text_1[xi2 - display_offset1]=0;
+		for(xi2=display_offset2;read_text_2[xi2 + display_tailgate2];xi2++) qual_text_2[xi2 - display_offset2] = 'I';
+		qual_text_2[xi2 - display_offset2]=0;
+
+	}
+
+
+
+	if(display_tailgate1)
+		read_text_1[strlen(read_text_1)-1]=0;
+	if(display_tailgate2)
+		read_text_2[strlen(read_text_2)-1]=0;
+
+
+	if(global_context -> config.space_type == GENE_SPACE_BASE){ 
+		if(rec1){
+			short rec1_edit = calc_edit_dist(global_context, rec1->raw_result, rec1->cigar , rec1->linear_position, read_text_1);
+			sprintf(rec1->additional_information + strlen( rec1->additional_information), "\tNM:i:%d", rec1_edit );
+		}
+		if(global_context->input_reads.is_paired_end_reads && rec2)
+		{
+			short rec2_edit = calc_edit_dist(global_context, rec2->raw_result, rec2->cigar , rec2->linear_position, read_text_2);
+			sprintf(rec2->additional_information + strlen( rec2->additional_information), "\tNM:i:%d", rec2_edit );
+		}
+	}
+
+
+	char extra_additional_1 [200+CORE_ADDITIONAL_INFO_LENGTH], extra_additional_2[200+CORE_ADDITIONAL_INFO_LENGTH];
+
+	extra_additional_1[0]=0;
+	extra_additional_2[0]=0;
+
+	sprintf(extra_additional_1, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	sprintf(extra_additional_2, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+
+	if(global_context->config.read_group_id[0])
+	{
+			snprintf(extra_additional_1+strlen(extra_additional_1),100, "\tRG:Z:%s", global_context->config.read_group_id);
+			snprintf(extra_additional_2+strlen(extra_additional_2),100, "\tRG:Z:%s", global_context->config.read_group_id);
+	}
+
+	char * out_chro1, * out_chro2, *out_cigar1, *out_cigar2;
+	if(rec1)
+	{
+		strcat(extra_additional_1, rec1->additional_information);
+		//printf("STRCAT: + '%s' = '%s'\n",  rec1->additional_information, extra_additional_1);
+		out_chro1 = rec1->chro;
+		out_cigar1 = rec1->cigar;
+	}
+	else
+	{
+		out_chro1 = "*";
+		out_cigar1 = "*";
+	}
+
+	if(rec2)
+	{
+		strcat(extra_additional_2, rec2->additional_information);
+		out_chro2 = rec2->chro;
+		out_cigar2 = rec2->cigar;
+	}
+	else
+	{
+		out_chro2 = "*";
+		out_cigar2 = "*";
+	}
+
+	int out_offset1=0, out_offset2=0;
+	long long int out_tlen1, out_tlen2;
+
+	out_tlen1 = tlen;
+	out_tlen2 = tlen;
+	if(rec1 && rec2)
+	{
+		if( rec1->offset >  rec2->offset) out_tlen1 = - out_tlen1;
+		else	out_tlen2 = -out_tlen2;
+	}
+	if(global_context -> input_reads.is_paired_end_reads)
+	{
+		if(rec1 || rec2)
+			global_context -> all_mapped_reads++;
+	}
+	else if(rec1)
+		global_context -> all_mapped_reads++;
+
+	if(rec1)
+		out_offset1 = rec1->offset + rec1 -> soft_clipping_movements;
+	if(rec2)
+		out_offset2 = rec2->offset + rec2 -> soft_clipping_movements;
+
+
+	int  out_mapping_quality1 = 0, out_mapping_quality2 = 0;
+	if(rec1)
+		 out_mapping_quality1 = rec1->mapping_quality;
+	if(rec2)
+		 out_mapping_quality2 = rec2->mapping_quality;
+
+	char * mate_chro_for_1  = out_chro2;
+	char * mate_chro_for_2  = out_chro1;
+
+	if(out_chro1 == out_chro2 && out_chro1 && out_chro1[0]!='*'){
+		mate_chro_for_1="=";
+		mate_chro_for_2="=";
+	}
+
+
+	if(global_context -> config.is_BAM_output){
+		SamBam_writer_add_read(global_context -> output_bam_writer, read_name_1, flag1,  out_chro1 , out_offset1, out_mapping_quality1, out_cigar1, out_chro2 , out_offset2, out_tlen1, read_len_1, read_text_1 + display_offset1, qual_text_1, extra_additional_1);
+
+		if(global_context->input_reads.is_paired_end_reads)
+			SamBam_writer_add_read(global_context -> output_bam_writer, read_name_2, flag2,  out_chro2 , out_offset2, out_mapping_quality2, out_cigar2, out_chro1 , out_offset1, out_tlen2, read_len_2, read_text_2 + display_offset2, qual_text_2, extra_additional_2);
+	}
+	else
+	{
+		sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s\t%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1);
+		if(global_context->input_reads.is_paired_end_reads)
+			sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s\t%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2);
+	}
+}
+
+int write_chunk_results_145(global_context_t * global_context)
+{
+	
+	/**********************************************
+	 **********************************************
+	 ** Initiate the memory blocks
+	 **********************************************
+	 **********************************************
+	 */
+	gene_input_t * ginp1, * ginp2=NULL;
+
+	ginp1 = &global_context->input_reads.first_read_file;
+	if(global_context->input_reads.is_paired_end_reads)
+		ginp2 = &global_context->input_reads.second_read_file;
+
+	int read_number, sqr_read_number = 0, sqr_interval = global_context -> processed_reads_in_chunk/10; 
+	
+	subread_output_context_t out_context;
+	init_output_context(global_context, &out_context);	
+
+	char * read_text_1, * read_text_2;
+	char * qual_text_1, * qual_text_2;
+	char * read_name_1, * read_name_2;
+	char * output_line_buffer;
+
+	int read_len_1 = 0, read_len_2 = 0;
+	read_text_1 = malloc(sizeof(char) * (MAX_READ_LENGTH+1));
+	read_text_2 = malloc(sizeof(char) * (MAX_READ_LENGTH+1));
+	qual_text_1 = malloc(sizeof(char) * (MAX_READ_LENGTH+1));
+	qual_text_2 = malloc(sizeof(char) * (MAX_READ_LENGTH+1));
+	read_name_1 = malloc(sizeof(char) * (MAX_READ_NAME_LEN+1));
+	read_name_2 = malloc(sizeof(char) * (MAX_READ_NAME_LEN+1));
+	output_line_buffer = malloc(sizeof(char) * ( 2* MAX_READ_LENGTH + 2 * MAX_CHROMOSOME_NAME_LEN + MAX_READ_NAME_LEN + CORE_MAX_CIGAR_STR_LEN + CORE_ADDITIONAL_INFO_LENGTH + 100));
+
+	/**********************************************
+	 **********************************************
+	 ** Going through all reads in this chunk.
+	 **********************************************
+	 **********************************************
+	 */
+	for(read_number = 0; read_number < global_context -> processed_reads_in_chunk ; read_number++)
+	{		
+		int output_alignment_number, is_read1_reversed, is_read2_reversed;
+
+		if(sqr_read_number > sqr_interval)
+		{
+			show_progress(global_context, NULL, read_number, STEP_WRITE_CHUNK_RESULTS);
+			sqr_read_number = 0;
+		}
+
+		sqr_read_number ++;
+		fetch_next_read_pair(global_context, NULL, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 0);
+		if(qual_text_1[0] && global_context -> config.phred_score_format == FASTQ_PHRED64)
+		{
+			fastq_64_to_33(qual_text_1);
+			if(global_context->input_reads.is_paired_end_reads)
+				fastq_64_to_33(qual_text_2);
+		
+		}
+
+		is_read1_reversed = 0;
+		is_read2_reversed = 0;
+
+		memset( out_context.out_pairs, 0, sizeof(void *) *2* global_context->config.multi_best_reads);
+
+		// Array output_records is organised in the order of [R1, R2, R1, R2, R1, R2...]. The total number of items is output_fragment_combinations (*2 for paired-end reads).
+		int output_fragment_combinations = calculate_fragment_combinations(global_context , &out_context, read_number, read_len_1, read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2);
+
+
+		/**********************************************
+		 **********************************************
+		 ** Write the fragment results. Note that each fragment MUST be paired.
+		 **********************************************
+		 **********************************************
+		 */
+
+	//	if(output_fragment_combinations >= 0) printf("MM READ=%d : %s\n",  output_fragment_combinations, read_name_1); 
+
+		for(output_alignment_number = 0; output_alignment_number < max(1,output_fragment_combinations);output_alignment_number ++)
+		{
+			char * read_text_1_raw =NULL, * read_text_2_raw =NULL, is_null_qual = 0;
+			if(global_context -> config.space_type == GENE_SPACE_COLOR)
+			{
+				read_text_1_raw = malloc(1250);
+				read_text_2_raw = malloc(1250);
+				is_null_qual = qual_text_1[0]==0;
+				strcpy(read_text_1_raw, read_text_1);
+				strcpy(read_text_2_raw, read_text_2);
+				// for color-space reads, the read text is re-written everytime because it is impossible to re-reverse the reads.
+			}
+
+			if(global_context->input_reads.is_paired_end_reads)
+				write_single_fragment(global_context, out_context.out_pairs[2*output_alignment_number], out_context.out_pairs[2*output_alignment_number + 1], output_fragment_combinations , output_alignment_number , read_name_1, read_name_2, read_len_1, read_len_2, read_text_1, read_text_2, qual_text_1, qual_text_2, &is_read1_reversed, &is_read2_reversed );
+			else
+				write_single_fragment(global_context, out_context.out_pairs[output_alignment_number], NULL, output_fragment_combinations , output_alignment_number , read_name_1, read_name_2, read_len_1, read_len_2, read_text_1, read_text_2, qual_text_1, qual_text_2, &is_read1_reversed, &is_read2_reversed );
+
+			if(global_context -> config.space_type == GENE_SPACE_COLOR)
+			{
+				// for color-space reads, the read text is re-written everytime because it is impossible to re-reverse the reads.
+				is_read1_reversed = 0;
+				is_read2_reversed = 0;
+				strcpy(read_text_1, read_text_1_raw);
+				strcpy(read_text_2, read_text_2_raw);
+				if(is_null_qual){
+					qual_text_1[0]=0;
+					qual_text_2[0]=0;
+				}
+				free(read_text_2_raw);
+				free(read_text_1_raw);
+			}
+		}
+
+	}
+
+
+	free(read_text_1);
+	free(read_text_2);
+	free(qual_text_1);
+	free(qual_text_2);
+	free(read_name_1);
+	free(read_name_2);
+	free(output_line_buffer);
+	destroy_output_context(global_context, &out_context);	
+
+	return 0;
+}
+
+
+
+int write_chunk_results_144(global_context_t * global_context)
 {
 	unsigned int read_number, sqr_read_number = 0, sqr_interval;
 	gene_input_t * ginp1, * ginp2=NULL;
@@ -2602,100 +3386,105 @@ void print_subread_logo()
 	char * spaces = "";
 	if(strlen(SUBREAD_VERSION) == 8) spaces = "";
 	else if(strlen(SUBREAD_VERSION) == 5) spaces = "  ";
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"        %sv%s",spaces,SUBREAD_VERSION);
+	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"	%sv%s",spaces,SUBREAD_VERSION);
 	#else
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO ,"       %s",SUBREAD_VERSION);
 	#endif
 }
+
+
+
 int print_configuration(global_context_t * context)
 {
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
-	print_subread_logo();
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
-	print_in_box(80, 1, 1, context->config.entry_program_name == CORE_PROGRAM_SUBJUNC?"subjunc setting":"subread-align setting");
-	print_in_box(80, 0, 1, "");
+        sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
+        print_subread_logo();
+        sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
+        print_in_box(80, 1, 1, context->config.entry_program_name == CORE_PROGRAM_SUBJUNC?"subjunc setting":"subread-align setting");
+        print_in_box(80, 0, 1, "");
 
-	if(context->config.is_rna_seq_reads)
-	{
-		if(context->config.do_fusion_detection)
-		{
-			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection%s", context->config.prefer_donor_receptor_junctions?" (RNA-Seq)":" (DNA-Seq)");
-		}
-		else
-			print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection (RNA-Seq)");
-	}
-	else
-		print_in_box(80, 0, 0,         "          Function : Read alignment");
-	print_in_box(80, 0, 0,         "           Threads : %d", context->config.all_threads);
-	if( context->config.second_read_file[0])
-	{
-		print_in_box(80, 0, 0, "      Input file 1 : %s", context->config.first_read_file);
-		print_in_box(80, 0, 0, "      Input file 2 : %s", context->config.second_read_file);
-	}
-	else
-		print_in_box(80, 0, 0, "        Input file : %s%s", context->config.first_read_file, context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):"");
+        if(context->config.is_rna_seq_reads)
+        {
+                if(context->config.do_fusion_detection)
+                {
+                        print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection%s", context->config.prefer_donor_receptor_junctions?" (RNA-Seq)":" (DNA-Seq)");
+                }
+                else
+                        print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection (RNA-Seq)");
+        }
+        else
+                print_in_box(80, 0, 0,         "          Function : Read alignment");
+        print_in_box(80, 0, 0,         "           Threads : %d", context->config.all_threads);
+        if( context->config.second_read_file[0])
+        {
+                print_in_box(80, 0, 0, "      Input file 1 : %s", context->config.first_read_file);
+                print_in_box(80, 0, 0, "      Input file 2 : %s", context->config.second_read_file);
+        }
+        else
+                print_in_box(80, 0, 0, "        Input file : %s%s", context->config.first_read_file, context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):"");
 
-	if(context->config.output_prefix [0])
-		print_in_box(80, 0, 0, "       Output file : %s (%s)", context->config.output_prefix, context->config.is_BAM_output?"BAM":"SAM");
-	else
-		print_in_box(80, 0, 0, "     Output method : STDOUT (%s)" , context->config.is_BAM_output?"BAM":"SAM");
+        if(context->config.output_prefix [0])
+                print_in_box(80, 0, 0, "       Output file : %s (%s)", context->config.output_prefix, context->config.is_BAM_output?"BAM":"SAM");
+        else
+                print_in_box(80, 0, 0, "     Output method : STDOUT (%s)" , context->config.is_BAM_output?"BAM":"SAM");
 
-	print_in_box(80, 0, 0,         "        Index name : %s", context->config.index_prefix);
-	print_in_box(80, 0, 0,         "      Phred offset : %d", (context->config.phred_score_format == FASTQ_PHRED33)?33:64);
-	//print_in_box(80, 0, 0,         "        Space type : %s", (context->config.space_type == GENE_SPACE_COLOR)?"color-space":"base-space");
-	print_in_box(80, 0, 1, "");
-	if( context->config.second_read_file[0])
-	{
-		print_in_box(80, 0, 0, "   Min read1 votes : %d", context->config.minimum_subread_for_first_read);
-		print_in_box(80, 0, 0, "   Min read2 votes : %d", context->config.minimum_subread_for_second_read);
-		print_in_box(80, 0, 0, " Max fragment size : %d", context->config.maximum_pair_distance);
-		print_in_box(80, 0, 0, " Min fragment size : %d", context->config.minimum_pair_distance);
-		print_in_box(80, 0, 1, "");
-	}
-	else
-		print_in_box(80, 0, 0, "         Min votes : %d", context->config.minimum_subread_for_first_read);
+        print_in_box(80, 0, 0,         "        Index name : %s", context->config.index_prefix);
+        print_in_box(80, 0, 0,         "      Phred offset : %d", (context->config.phred_score_format == FASTQ_PHRED33)?33:64);
+        //print_in_box(80, 0, 0,         "        Space type : %s", (context->config.space_type == GENE_SPACE_COLOR)?"color-space":"base-space");
+        print_in_box(80, 0, 1, "");
+        if( context->config.second_read_file[0])
+        {
+                print_in_box(80, 0, 0, "   Min read1 votes : %d", context->config.minimum_subread_for_first_read);
+                print_in_box(80, 0, 0, "   Min read2 votes : %d", context->config.minimum_subread_for_second_read);
+                print_in_box(80, 0, 0, " Max fragment size : %d", context->config.maximum_pair_distance);
+                print_in_box(80, 0, 0, " Min fragment size : %d", context->config.minimum_pair_distance);
+                print_in_box(80, 0, 1, "");
+        }
+        else
+                print_in_box(80, 0, 0, "         Min votes : %d", context->config.minimum_subread_for_first_read);
 
-	print_in_box(80, 0, 0,         "        Max indels : %d", context->config.max_indel_length);
-	print_in_box(80, 0, 0,         " # of Best mapping : %d", context->config.multi_best_reads);
-	print_in_box(80, 0, 0,         "    Unique mapping : %s", context->config.report_multi_mapping_reads?"no":"yes");
-	print_in_box(80, 0, 0,         "  Hamming distance : %s", context->config.use_hamming_distance_break_ties?"yes":"no");
-	print_in_box(80, 0, 0,         "    Quality scores : %s", context->config.use_quality_score_break_ties?"yes":"no");
+        print_in_box(80, 0, 0,         "        Max indels : %d", context->config.max_indel_length);
+        print_in_box(80, 0, 0,         " # of Best mapping : %d", context->config.multi_best_reads);
+        print_in_box(80, 0, 0,         "    Unique mapping : %s", context->config.report_multi_mapping_reads?"no":"yes");
+        print_in_box(80, 0, 0,         "  Hamming distance : %s", context->config.use_hamming_distance_break_ties?"yes":"no");
+        print_in_box(80, 0, 0,         "    Quality scores : %s", context->config.use_quality_score_break_ties?"yes":"no");
+	if(context->config.max_mismatch_entire_reads != 10)
+		print_in_box(80, 0, 0,         "    Max Mismatched : %d bases", context->config.max_mismatch_entire_reads);
 
-	if(context->config.max_insertion_at_junctions)
-		print_in_box(80, 0, 0,         "Insertions at junc : %d", context->config.max_insertion_at_junctions);
+        if(context->config.max_insertion_at_junctions)
+                print_in_box(80, 0, 0,         "Insertions at junc : %d", context->config.max_insertion_at_junctions);
 
-	if(context->config.read_group_id[0])
-		print_in_box(80, 0, 0, "   Read group name : %s", context->config.read_group_id);
+        if(context->config.read_group_id[0])
+                print_in_box(80, 0, 0, "   Read group name : %s", context->config.read_group_id);
 
-	print_in_box(80, 0, 1, "");
-	print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
-	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
+        print_in_box(80, 0, 1, "");
+        print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
+        sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
 
-	if(!context->config.first_read_file[0])
-	{
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify at least one input file in the FASTQ/FASTA/PLAIN format using the '-r' option.\n");
-		return -1;
-	}
+        if(!context->config.first_read_file[0])
+        {
+                sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify at least one input file in the FASTQ/FASTA/PLAIN format using the '-r' option.\n");
+                return -1;
+        }
 
-	if(0 && !context->config.output_prefix[0])
-	{
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify the path of output using the '-o' option.\n");
-		return -1;
-	}
+        if(0 && !context->config.output_prefix[0])
+        {
+                sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify the path of output using the '-o' option.\n");
+                return -1;
+        }
 
-	if(!context->config.index_prefix[0])
-	{
-		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify the prefix of the index files using the '-i' option.\n");
-		return -1;
-	}
-	char tbuf[90];
-	char_strftime(tbuf);
+        if(!context->config.index_prefix[0])
+        {
+                sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify the prefix of the index files using the '-i' option.\n");
+                return -1;
+        }
+        char tbuf[90];
+        char_strftime(tbuf);
 
-	print_in_box(80,1,1,"Running (%s)", tbuf);
-	print_in_box(80,0,1,"");
+        print_in_box(80,1,1,"Running (%s)", tbuf);
+        print_in_box(80,0,1,"");
 
 
-	return 0;
+        return 0;
 }
 
 
