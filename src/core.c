@@ -1535,13 +1535,17 @@ void write_single_fragment(global_context_t * global_context, subread_output_tmp
 		if( rec1->offset >  rec2->offset) out_tlen1 = - out_tlen1;
 		else	out_tlen2 = -out_tlen2;
 	}
-	if(global_context -> input_reads.is_paired_end_reads)
+
+	if(0==current_location)
 	{
-		if(rec1 || rec2)
+		if(global_context -> input_reads.is_paired_end_reads)
+		{
+			if(rec1 || rec2)
+				global_context -> all_mapped_reads++;
+		}
+		else if(rec1)
 			global_context -> all_mapped_reads++;
 	}
-	else if(rec1)
-		global_context -> all_mapped_reads++;
 
 	if(rec1)
 		out_offset1 = rec1->offset + rec1 -> soft_clipping_movements;

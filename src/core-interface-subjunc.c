@@ -119,8 +119,8 @@ void print_usage_core_subjunc()
 	SUBREADputs("                            allowed in the alignment. 10 by default. Mismatches");
 	SUBREADputs("                            found in soft-clipped bases are not counted.");
 	SUBREADputs("   ");
-	SUBREADputs("       --disableBigMargin   disable big margin for calling junctions.");
-	SUBREADputs("   ");
+//	SUBREADputs("       --disableBigMargin   disable big margin for calling junctions.");
+//	SUBREADputs("   ");
 	SUBREADputs("       --dnaseq             specify that the input read data are genomic DNA");
 	SUBREADputs("                            sequencing data. When specified, the program will");
 	SUBREADputs("                            perform read alignments and also detect fusion");
