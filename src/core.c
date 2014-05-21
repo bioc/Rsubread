@@ -1369,7 +1369,7 @@ void write_single_fragment(global_context_t * global_context, subread_output_tmp
 	if(global_context->input_reads.is_paired_end_reads)
 	{
 		flag2 = calc_flags( global_context , rec1, rec2, 1,  read_len_1,  read_len_2, current_location);
-		if(flag2 & SAM_FLAG_MATCHED_IN_PAIR) global_context->all_correct_PE_reads  ++;
+		if((0 == current_location) && (flag2 & SAM_FLAG_MATCHED_IN_PAIR)) global_context->all_correct_PE_reads  ++;
 	}
 
 	int tlen = 0;
