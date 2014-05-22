@@ -230,7 +230,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 
 */
 
-	while ((c = getopt_long (argc, argv, "xsvJS:L:AHd:D:n:m:p:G:E:X:Y:P:R:r:i:l:o:T:I:t:B:bFcuUfMQ1:2:3:5:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "xsvJS:L:AHd:D:n:m:p:G:E:X:Y:P:R:r:i:l:o:T:I:t:B:bFcuUfM:Q1:2:3:5:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
