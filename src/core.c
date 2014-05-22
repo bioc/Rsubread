@@ -1496,8 +1496,10 @@ void write_single_fragment(global_context_t * global_context, subread_output_tmp
 	extra_additional_1[0]=0;
 	extra_additional_2[0]=0;
 
-	sprintf(extra_additional_1, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
-	sprintf(extra_additional_2, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	if(rec1)
+		sprintf(extra_additional_1, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	if(rec2)
+		sprintf(extra_additional_2, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
 
 	if(global_context->config.read_group_id[0])
 	{
