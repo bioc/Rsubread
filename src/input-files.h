@@ -155,7 +155,7 @@ int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_sta
 
 int does_file_exist (char * filename);
 
-double guess_reads_density_format(char * fname, int is_sam, int * phred_format);
+double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int * max_phred);
 
 FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table);
 

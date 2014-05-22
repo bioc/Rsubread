@@ -289,6 +289,12 @@ int show_summary(global_context_t * global_context)
                 print_in_box(80, 0,0,"            Indels : %u", global_context -> all_indels);
         }
         
+
+	if(global_context -> is_phred_warning)
+	{
+		print_in_box(80, 0,1,"");
+		print_in_box(80,0,0, "           WARNING : Phred offset (%d) incorrect?", global_context->config.phred_score_format == FASTQ_PHRED33?33:64);
+	}
         print_in_box(80, 0,1,"");
         print_in_box(80, 0,0,"      Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);
         print_in_box(80, 0,1,"");
@@ -3566,7 +3572,8 @@ void write_sam_headers(global_context_t * context)
 int load_global_context(global_context_t * context)
 {
 	char tmp_fname [MAX_FILE_NAME_LENGTH];
-	int guess_phred_format = -1 ;
+	int min_phred_score = -1 , max_phred_score = -1;
+	context -> is_phred_warning = 0; 
 	
 
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1))
@@ -3608,8 +3615,19 @@ int load_global_context(global_context_t * context)
 	context->input_reads.first_read_file_size = ginp1_stat.st_size;
 
 
-	context -> input_reads.avg_read_length = guess_reads_density_format(context->config.first_read_file , context->config.is_SAM_file_input + context->input_reads.is_paired_end_reads, &guess_phred_format);
+	context -> input_reads.avg_read_length = guess_reads_density_format(context->config.first_read_file , context->config.is_SAM_file_input?1:0, &min_phred_score, &max_phred_score);
 	if(context -> input_reads.avg_read_length<0 )context -> input_reads.avg_read_length = 250;
+//	SUBREADprintf("QR=[%d,%d]; ALEN=%f\n",  min_phred_score, max_phred_score, context -> input_reads.avg_read_length);
+	if(max_phred_score>=0)
+	{
+		if((context->config.phred_score_format == FASTQ_PHRED64 && min_phred_score < 65) || (context->config.phred_score_format == FASTQ_PHRED33 && max_phred_score > 33+50))
+		{
+			print_in_box(80,0,0, "WARNING The specified phred-score offset (%d) seems to be incorrect.", context->config.phred_score_format == FASTQ_PHRED33?33:64);
+			print_in_box(80,0,0, "        The observed phred-score range is [%d,%d].", min_phred_score, max_phred_score);
+			print_in_box(80,0,0, "");
+			context -> is_phred_warning = 1;
+		}
+	}
 
 
 	if(context->config.report_sam_file && context -> config.output_prefix[0])

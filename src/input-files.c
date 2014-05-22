@@ -56,14 +56,14 @@ void fastq_64_to_33(char * qs)
 
 double guess_reads_density(char * fname, int is_sam)
 {
-	return guess_reads_density_format(fname, is_sam, NULL);
+	return guess_reads_density_format(fname, is_sam, NULL, NULL);
 }
-double guess_reads_density_format(char * fname, int is_sam, int * phred_format)
+double guess_reads_density_format(char * fname, int is_sam, int * min_phred_score, int * max_phred_score)
 {
 	gene_input_t ginp;
 	long long int fpos =0, fpos2 = 0;
 	int i;
-	char max_qual_chr = 0, min_qual_chr = 127;
+	int max_qual_chr = -1, min_qual_chr = 127;
 	char buff[MAX_READ_LENGTH] , qbuf[MAX_READ_LENGTH];
 
 	if(is_sam == 0)
@@ -96,14 +96,10 @@ double guess_reads_density_format(char * fname, int is_sam, int * phred_format)
 			
 	}
 
-	if(phred_format)
+	if(min_phred_score)
 	{
-		if(max_qual_chr<'M')
-			*phred_format = FASTQ_PHRED33;
-		else if(min_qual_chr>='@' && max_qual_chr<'k')
-			*phred_format = FASTQ_PHRED64;
-		//else
-		//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_WARNING, "The fastq file is broken : %d %d.", min_qual_chr , max_qual_chr);
+		(*min_phred_score) = min_qual_chr;
+		(*max_phred_score) = max_qual_chr;
 
 	}	
 	fpos2 = ftello(ginp.input_fp) - fpos;

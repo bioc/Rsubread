@@ -275,6 +275,7 @@ typedef struct{
 	int index_block_number;
 	int current_index_block_number;
 	int will_remove_input_file;
+	int is_phred_warning;
 
 	// global locks
 	subread_lock_t thread_initial_lock;
