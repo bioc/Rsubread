@@ -1051,7 +1051,6 @@ int calc_edit_dist(global_context_t * global_context, alignment_result_t * curre
 			tmpi = 0;
 		}
 	}
-
 	return all_mm;
 }
 
@@ -1733,7 +1732,6 @@ int write_chunk_results_145(global_context_t * global_context)
 		}
 
 	}
-
 
 	free(read_text_1);
 	free(read_text_2);
@@ -4207,7 +4205,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 
 	for(xk1=0; xk1<current_perfect_section_no;xk1++)
 	{
-		if(main_piece_strand == out_strands[xk1] && perfect_lens[xk1]>perfect_lens[best_match])
+		if(best_match < 0 || (main_piece_strand == out_strands[xk1] && perfect_lens[xk1]>perfect_lens[best_match]))
 			best_match = xk1;
 	}
 
