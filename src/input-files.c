@@ -641,9 +641,9 @@ int trim_read_inner(char * read_text, char * qual_text, int rlen, short t_5, sho
 
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string)
 {
-	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0);
+	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0, NULL);
 }
-int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3)
+int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary)
 {
 	if(input->file_type == GENE_INPUT_PLAIN)
 	{
@@ -669,7 +669,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 
 		while(1)
 		{
-				int is_second_map = 0;
+			//	int is_second_map = 0;
 				int linelen = read_line(3000, input->input_fp, in_buff, 0);
 				if(linelen <1)return -1;
 				if(read_name)
@@ -691,10 +691,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 						{
 							mask_buf[current_str_pos] = 0;
 							int flags = atoi(mask_buf) ;
-							if(flags & SAM_FLAG_SECONDARY_MAPPING) 
+							if(is_secondary && (flags & SAM_FLAG_SECONDARY_MAPPING))
 							{
-								is_second_map = 1;
-								break;
+								(*is_secondary) = 1;
 							}
 							need_reverse = ( flags & SAM_FLAG_REVERSE_STRAND_MATCHED )?1:0;
 							
@@ -727,7 +726,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 					// skip a line if not single-end
 					read_line(1, input->input_fp, in_buff, 0);
 
-				if(!is_second_map)break;
+				break;
 				//printf("Repeated read skipped : %s\n", read_name);
 		}
 
@@ -2526,7 +2525,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		}
 
 		char hi_key [13];
-		if(hi_tag >=0)
+		if(hi_tag >=0 && pos_1 && pos_2)
 			sprintf(hi_key, ":%d", hi_tag);
 		else
 			hi_key[0]=0;
@@ -2536,6 +2535,9 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		else
 			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u%s",chromosome_1_name, pos_1, chromosome_2_name, pos_2, hi_key);
 
+		//if(memcmp("V0112_0155:7:1101:4561:132881", read_name, 27)==0)
+		//	printf("RRN=%s\n", read_name);
+		
 		int read_name_len = strlen(read_name);
 		unsigned long long int read_line_hash = sort_SAM_hash(read_name);
 

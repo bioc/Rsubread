@@ -101,7 +101,7 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 // The memory space for read_string must be at least 512 bytes.
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string);
 int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_string, char * quality_string, gene_offset_t* offsets, unsigned int * pos, int * mapping_quality, int * mapping_flags, int need_reversed);
-int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3);
+int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary);
 
 void geinput_jump_read(gene_input_t * input);
 

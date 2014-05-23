@@ -838,33 +838,38 @@ void relocate_geinputs(global_context_t * global_context, thread_context_t * thr
 int fetch_next_read_pair(global_context_t * global_context, thread_context_t * thread_context, gene_input_t* ginp1, gene_input_t* ginp2, int *read_len_1, int *read_len_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, char * qual_text_1, char *qual_text_2, int remove_color_head)
 {
 	int rl1, rl2=0;
+	int is_second_R1, is_second_R2;
 
-	rl1 = geinput_next_read_trim(ginp1, read_name_1, read_text_1 , qual_text_1, global_context->config.read_trim_5, global_context->config.read_trim_3);
-	if(global_context->config.space_type == GENE_SPACE_COLOR && remove_color_head)
+	do
 	{
-		if(isalpha(read_text_1[0]))
-		{
-			int xk1;
-			for(xk1=2; read_text_1[xk1]; xk1++)
-				read_text_1[xk1-2]=read_text_1[xk1];
-			read_text_1[xk1-2]=0;
-		}
-	}
-
-	if(ginp2)
-	{
-		rl2 = geinput_next_read_trim(ginp2, read_name_2, read_text_2 , qual_text_2, global_context->config.read_trim_5, global_context->config.read_trim_3);
+		is_second_R1 = 0; is_second_R2 = 0;
+		rl1 = geinput_next_read_trim(ginp1, read_name_1, read_text_1 , qual_text_1, global_context->config.read_trim_5, global_context->config.read_trim_3, &is_second_R1);
 		if(global_context->config.space_type == GENE_SPACE_COLOR && remove_color_head)
 		{
-			if(isalpha(read_text_2[0]))
+			if(isalpha(read_text_1[0]))
 			{
 				int xk1;
-				for(xk1=2; read_text_2[xk1]; xk1++)
-					read_text_2[xk1-2]=read_text_2[xk1];
-				read_text_2[xk1-2]=0;
+				for(xk1=2; read_text_1[xk1]; xk1++)
+					read_text_1[xk1-2]=read_text_1[xk1];
+				read_text_1[xk1-2]=0;
 			}
 		}
-	}
+
+		if(ginp2)
+		{
+			rl2 = geinput_next_read_trim(ginp2, read_name_2, read_text_2 , qual_text_2, global_context->config.read_trim_5, global_context->config.read_trim_3, &is_second_R2);
+			if(global_context->config.space_type == GENE_SPACE_COLOR && remove_color_head)
+			{
+				if(isalpha(read_text_2[0]))
+				{
+					int xk1;
+					for(xk1=2; read_text_2[xk1]; xk1++)
+						read_text_2[xk1-2]=read_text_2[xk1];
+					read_text_2[xk1-2]=0;
+				}
+			}
+		}
+	} while(is_second_R1||is_second_R2) ;
 
 	if( global_context->config.space_type == GENE_SPACE_COLOR)
 	{
@@ -945,6 +950,7 @@ typedef struct{
 	alignment_result_t * raw_result;
 
 	unsigned int linear_position;
+	unsigned int raw_linear;
 	short soft_clipping_movements;
 	char * chro;
 	unsigned int offset;
@@ -1080,6 +1086,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		current_repeated_times = is_ambiguous_voting(global_context, read_number, is_second_read, current_result->selected_votes, current_result->confident_coverage_start, current_result->confident_coverage_end, read_len, current_strand);
 
+		r->raw_linear = current_result -> selected_position;
 		r->linear_position = current_result -> selected_position;
 		r->mapping_quality = current_result -> final_quality;
 		if(current_repeated_times>1) r->mapping_quality = 0;
@@ -1170,12 +1177,32 @@ int calculate_fragment_combinations(global_context_t * global_context, subread_o
 	{
 		alignment_result_t * current_result = _global_retrieve_alignment_ptr(global_context  , read_number, 0,  mapping_location_number);
 
-		int is_2_OK = 0, is_1_OK = convert_read_to_tmp(global_context, out_context, read_number , 0 , read_len_1, read_text_1, qual_text_1, current_result, &out_context->r1[read_1_locations]);
+		int is_2_OK = 0, is_1_OK = 0, xx1, is_fresh;
+
+		is_fresh = 1;
+		for(xx1=0;xx1 < read_1_locations; xx1++)
+		{
+
+			if(current_result -> selected_position == out_context->r1[xx1].raw_linear)
+				is_fresh = 0;
+		}
+
+		if(is_fresh)
+			is_1_OK = convert_read_to_tmp(global_context, out_context, read_number , 0 , read_len_1, read_text_1, qual_text_1, current_result, &out_context->r1[read_1_locations]);
 
 		if(global_context->input_reads.is_paired_end_reads)
 		{
 			alignment_result_t * current_result2 = _global_retrieve_alignment_ptr(global_context  , read_number, 1,  mapping_location_number);
-			is_2_OK = convert_read_to_tmp(global_context , out_context, read_number , 1, read_len_2, read_text_2, qual_text_2, current_result2, &out_context->r2[read_2_locations]);
+
+
+			is_fresh = 1;
+			for(xx1=0;xx1 < read_2_locations; xx1++)
+				if(current_result2 -> selected_position == out_context->r2[xx1].linear_position)
+					is_fresh = 0;
+
+			if(is_fresh)
+				is_2_OK = convert_read_to_tmp(global_context , out_context, read_number , 1, read_len_2, read_text_2, qual_text_2, current_result2, &out_context->r2[read_2_locations]);
+
 			if(is_2_OK)read_2_locations++;
 		}
 		//printf("L1,2_OK = %d, %d\n", is_1_OK, is_2_OK);
@@ -1251,6 +1278,9 @@ int calculate_fragment_combinations(global_context_t * global_context, subread_o
 			}
 			ret =  max(read_1_locations, read_2_locations);
 		}
+
+//		if(memcmp("V0112_0155:7:1102:10778:2461", read_name_1, 27)==0)
+//			SUBREADprintf("NNNLLL=%d,%d,%d\n", read_1_locations, read_2_locations, ret);
 	}
 	else
 	{
@@ -2787,6 +2817,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
 				int current_rlen = is_second_read?read_len_2:read_len_1;
 				int subread_step;
+				if(current_rlen< 16) continue;
 				if(current_rlen<= EXON_LONG_READ_LENGTH)
 				{
 					subread_step = (((current_rlen - 18)<<16))/(global_context -> config.total_subreads -1);
@@ -3105,6 +3136,7 @@ unsigned int split_read_files(global_context_t * global_context)
 	unsigned long long * read_position_1;
 	unsigned long long * read_position_2 = NULL;
 	char * read_line_buf = malloc(3002);
+	char * read_line_buf2 = malloc(3002);
 	read_position_1 = (unsigned long long*)malloc(global_context->config.reads_per_chunk * sizeof(long long));
 	if(global_context->input_reads.is_paired_end_reads)
 		read_position_2 = (unsigned long long*)malloc(global_context->config.reads_per_chunk * sizeof(long long));
@@ -3118,7 +3150,7 @@ unsigned int split_read_files(global_context_t * global_context)
 
 		while(1)
 		{
-			char * tok_tmp = NULL, * flag;
+			char * tok_tmp = NULL, * flag,  *flag2;
 			if(processed_reads >= chunk_reads || feof(global_context->input_reads.first_read_file.input_fp))
 				break;
 
@@ -3126,11 +3158,9 @@ unsigned int split_read_files(global_context_t * global_context)
 			if(global_context->input_reads.is_paired_end_reads)
 				fhead_pos2 = ftello(global_context->input_reads.second_read_file.input_fp); 
 
-			/*char * is_ret = */fgets(read_line_buf, 3000, global_context->input_reads.first_read_file.input_fp);
+			fgets(read_line_buf, 3000, global_context->input_reads.first_read_file.input_fp);
 			if(global_context->input_reads.is_paired_end_reads)
-				fgets(read_line_buf, 3000, global_context->input_reads.second_read_file.input_fp);
-
-			//if(!is_ret) break;
+				fgets(read_line_buf2, 3000, global_context->input_reads.second_read_file.input_fp);
 
 			flag = strtok_r(read_line_buf,"\t",&tok_tmp);
 			if(!flag) break;
@@ -3138,7 +3168,19 @@ unsigned int split_read_files(global_context_t * global_context)
 			flag = strtok_r(NULL,"\t",&tok_tmp);
 			if(!flag) break;
 
-			if((atoi(flag) & 0x100) == 0)
+			
+			int flagi2 = 0;
+			if(global_context->input_reads.is_paired_end_reads)
+			{
+				flag2 = strtok_r(read_line_buf2,"\t",&tok_tmp);
+				flag2 = strtok_r(NULL,"\t",&tok_tmp);
+				if(!flag2) break;
+				flagi2 = atoi(flag2);
+			}
+
+			int flagi1 = atoi(flag);
+
+			if((flagi1 & 0x100) == 0 && (flagi2&0x100) == 0)
 			{
 				read_position_1[processed_reads] = fhead_pos1;
 				if(global_context->input_reads.is_paired_end_reads)
@@ -3148,7 +3190,7 @@ unsigned int split_read_files(global_context_t * global_context)
 			if(global_context->input_reads.is_paired_end_reads)
 			{
 				fgets(read_line_buf, 3000, global_context->input_reads.first_read_file.input_fp);
-				fgets(read_line_buf, 3000, global_context->input_reads.second_read_file.input_fp);
+				fgets(read_line_buf2, 3000, global_context->input_reads.second_read_file.input_fp);
 			}
 		}
 		//printf("PPPP=%llu\n", processed_reads);
@@ -3173,6 +3215,7 @@ unsigned int split_read_files(global_context_t * global_context)
 	}
 
 	free(read_line_buf);
+	free(read_line_buf2);
 
 	int thread_no;
 	for(thread_no = 0; thread_no < global_context->config.all_threads; thread_no++)
@@ -3770,9 +3813,11 @@ int destroy_global_context(global_context_t * context)
 	geinput_close(&context -> input_reads.first_read_file);
 	if(context->input_reads.is_paired_end_reads) geinput_close(&context -> input_reads.second_read_file);
 	destroy_offsets(&context->chromosome_table);
+
+	
 	if((context -> will_remove_input_file & 1) && (memcmp(context ->config.first_read_file, "./core-temp", 11) == 0)) unlink(context ->config.first_read_file);
 	if((context -> will_remove_input_file & 2) && (memcmp(context ->config.second_read_file, "./core-temp", 11) == 0)) unlink(context ->config.second_read_file);
-
+	
 	return 0;
 }
 
