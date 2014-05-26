@@ -59,6 +59,8 @@ typedef struct{
 	// for the BEST record
 	// they are not restored
 	int best_matching_bases;
+	int best_second_match_diff;
+	int second_best_matching_bases;
 	int tmp_total_matched_bases;
 	int is_currently_tie;
 	int best_is_complex;

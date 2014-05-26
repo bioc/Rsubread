@@ -47,6 +47,7 @@ static struct option long_options[] =
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
+	{"accurateFusions",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
 	{0, 0, 0, 0}
 };
@@ -422,20 +423,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.do_fusion_detection = 1;
 					global_context->config.prefer_donor_receptor_junctions = 0;
 					global_context->config.do_big_margin_filtering_for_reads = 1;
-					//global_context->config.limited_tree_scan = 1;
-					//
-					//
-					/*#warning =====================================================
-					#warning =====================================================
-					#warning These changes are made for Olivers project!
-					#warning Comment the following four lines in the next release! 
-					#warning =====================================================
-					#warning =====================================================
-					global_context->config.high_quality_base_threshold = 999999;
-					global_context->config.max_mismatch_junction_reads = 0;
-					global_context->config.do_big_margin_filtering_for_junctions = 1;
-					global_context->config.total_subreads = 20;
-					*/
+				}
+				else if(strcmp("accurateFusions", long_options[option_index].name)==0) 
+				{
+					global_context->config.more_accurate_fusions = 1;
 				}
 				break;
 			case '?':
@@ -444,6 +435,15 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				print_usage_core_aligner();
 				return -1 ;
 		}
+	}
+
+	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
+	if(global_context->config.more_accurate_fusions)
+	{
+		global_context->config.high_quality_base_threshold = 999999;
+		global_context->config.max_mismatch_junction_reads = 0;
+		global_context->config.do_big_margin_filtering_for_junctions = 1;
+		global_context->config.total_subreads = 20;
 	}
 
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;

@@ -153,6 +153,7 @@ typedef struct{
 	// subfusion
 	int do_fusion_detection;
 	int prefer_donor_receptor_junctions;
+	int more_accurate_fusions;
 
 	// indel
 	char do_superlong_indel_detection;
@@ -223,7 +224,10 @@ typedef struct
 	union
 	{
 		unsigned int Score_L;
-		int final_mismatched_bases;
+		struct{
+			short final_mismatched_bases;
+			short best_second_diff_bases;
+		};
 	};
 	unsigned long long int Score_H;
 

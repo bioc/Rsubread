@@ -258,12 +258,14 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 		explain_context -> best_min_unsupport_as_simple = explain_context -> tmp_min_unsupport;
 		explain_context -> best_min_support_as_complex = explain_context -> tmp_min_support_as_complex;
 		explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
+		explain_context -> second_best_matching_bases = max(explain_context -> second_best_matching_bases, explain_context -> best_matching_bases); 
 		explain_context -> best_matching_bases = explain_context-> tmp_total_matched_bases ;
 	}
 	else if(explain_context -> best_matching_bases == explain_context-> tmp_total_matched_bases)
 	{
 		// only gapped explainations are complex counted.
 		explain_context -> best_is_complex +=  explain_context -> tmp_search_sections;
+		explain_context -> second_best_matching_bases = explain_context -> best_matching_bases;
 
 		if(explain_context -> best_is_complex > 1)
 		{
@@ -331,6 +333,7 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 			explain_context -> front_search_confirmed_sections = explain_context -> tmp_search_sections +1;
 			memcpy(explain_context -> front_search_junctions, explain_context -> tmp_search_junctions , sizeof(perfect_section_in_read_t) * (explain_context -> tmp_search_sections +1)); 
 		}
+
 	}
 }
 
@@ -1300,7 +1303,8 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = back_search_tail_position;
 
 	explain_context.tmp_search_sections = 0;
-	explain_context.best_matching_bases = 0;
+	explain_context.best_matching_bases = -9999;
+	explain_context.second_best_matching_bases = -9999;
 	explain_context.tmp_total_matched_bases = 0;
 	explain_context.is_currently_tie = 0;
 	explain_context.best_is_complex = 0;
@@ -1316,6 +1320,7 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 0);
 
 	int is_backsearch_tie = explain_context.is_currently_tie;
+	int back_search_matches_diff = -9999;
 	if(explain_context.back_search_confirmed_sections>0)
 	{
 		
@@ -1327,7 +1332,9 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 		int last_sec = explain_context.back_search_confirmed_sections-1;
 
 		current_result -> selected_position = explain_context.back_search_junctions[last_sec].abs_offset_for_start - explain_context.back_search_junctions[last_sec].read_pos_end + explain_context.back_search_junctions[last_sec].read_pos_start;
+		back_search_matches_diff = explain_context.best_matching_bases - explain_context.second_best_matching_bases;
  
+		//SUBREADprintf("DBI:%d - %d;\n", explain_context.best_matching_bases , explain_context.second_best_matching_bases);
 	}
 	else
 	{
@@ -1336,7 +1343,8 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	}
 
 	explain_context.tmp_search_sections = 0;
-	explain_context.best_matching_bases = 0;
+	explain_context.best_matching_bases = -9999;
+	explain_context.second_best_matching_bases = -9999;
 	explain_context.tmp_total_matched_bases = 0;
 	explain_context.is_currently_tie = 0;
 	explain_context.best_is_complex = 0;
@@ -1355,6 +1363,11 @@ int explain_read(global_context_t * global_context, thread_context_t * thread_co
 	search_events_to_front(global_context, thread_context, &explain_context, read_text + front_search_read_start, qual_text + front_search_read_start, front_search_start_position,read_len - front_search_read_start , 0, 0);
 
 	int is_frontsearch_tie = explain_context.is_currently_tie;
+
+	//SUBREADprintf("DFI:%d - %d;\n", explain_context.best_matching_bases , explain_context.second_best_matching_bases);
+	int front_search_matches_diff = explain_context.best_matching_bases - explain_context.second_best_matching_bases;
+	explain_context.best_second_match_diff = front_search_matches_diff + back_search_matches_diff;
+
 	if((!global_context -> config.report_multi_mapping_reads )&& (is_frontsearch_tie || is_backsearch_tie))
 	{
 		current_result -> final_quality = 0;
@@ -1806,6 +1819,7 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 	result -> selected_position = final_position;
 	result -> final_quality = final_qual;
 	result -> final_mismatched_bases = mismatch_bases;
+	result -> best_second_diff_bases = (9<explain_context -> best_second_match_diff)?-1:explain_context -> best_second_match_diff; 
 
 	return 0;
 }
@@ -1973,7 +1987,8 @@ int donor_jumped_score(global_context_t * global_context, thread_context_t * thr
 
 		}
 
-		if(left_should_match + right_should_match  >= JUNCTION_CONFIRM_WINDOW*2 -1  &&
+		int mismatch_in_between_allowd = (global_context -> config.more_accurate_fusions)?0:1;
+		if(left_should_match + right_should_match  >= JUNCTION_CONFIRM_WINDOW*2 - mismatch_in_between_allowd  &&
 			left_should_not_match <= JUNCTION_CONFIRM_WINDOW -3 && right_should_not_match <= JUNCTION_CONFIRM_WINDOW -3)
 		{
 			int test_score = is_donor_test_ok*500+left_should_match + right_should_match - left_should_not_match - right_should_not_match;
@@ -2055,6 +2070,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 	//	donor_left[2]=0; donor_right[2]=0;
 		//printf("TESTDON: %s %s; OFFSET=%d; DON_OK=%d; NORMAL=%d; LEFT_OFF=%d; RIGHT_OFF=%d\n", donor_left, donor_right, real_split_point_i, is_donor_test_ok, normally_arranged, left_indel_offset, right_indel_offset);
 
+		int mismatch_in_between_allowd = (global_context -> config.more_accurate_fusions)?0:1;
 		if(is_donor_test_ok || !need_donor_test)
 		{
 			if(normally_arranged)
@@ -2070,7 +2086,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 
 						right_should_match = match_chro(read_text + real_split_point + inserted_bases, value_index, right_virtualHead_abs_offset + real_split_point + right_indel_offset + inserted_bases, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
 				//		printf("INS=%d; LM=%d; RM=%d\t\tLOL=%u, LOR=%u, SP=%d\n", inserted_bases, left_should_match, right_should_match, left_virtualHead_abs_offset, right_virtualHead_abs_offset, real_split_point);
-						if(right_should_match >= 2*JUNCTION_CONFIRM_WINDOW - left_should_match - 1)
+						if(right_should_match >= 2*JUNCTION_CONFIRM_WINDOW - left_should_match - mismatch_in_between_allowd)
 						{
 							left_should_not_match = match_chro(read_text + real_split_point + inserted_bases, value_index, left_virtualHead_abs_offset + real_split_point + left_indel_offset, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
 							right_should_not_match = match_chro(read_text + real_split_point - JUNCTION_CONFIRM_WINDOW, value_index, right_virtualHead_abs_offset  + real_split_point + right_indel_offset - JUNCTION_CONFIRM_WINDOW + inserted_bases, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
@@ -2109,7 +2125,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 				left_should_not_match = match_chro(read_text + real_split_point - JUNCTION_CONFIRM_WINDOW, value_index, left_virtualHead_abs_offset + left_indel_offset + real_split_point - JUNCTION_CONFIRM_WINDOW, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
 	
 
-				if(left_should_match +right_should_match >= 2*JUNCTION_CONFIRM_WINDOW -1 && 
+				if(left_should_match +right_should_match >= 2*JUNCTION_CONFIRM_WINDOW - mismatch_in_between_allowd && 
 					left_should_not_match <= JUNCTION_CONFIRM_WINDOW -5 && right_should_not_match <= JUNCTION_CONFIRM_WINDOW -5)
 				{
 					

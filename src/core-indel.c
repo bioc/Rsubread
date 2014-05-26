@@ -3630,6 +3630,7 @@ void init_global_context(global_context_t * context)
 	context->config.report_sam_file = 1;
 	context->config.is_rna_seq_reads = 0;
 	context->config.do_fusion_detection = 0;
+	context->config.more_accurate_fusions = 1;
 	context->config.prefer_donor_receptor_junctions = 1;
 	context->config.do_big_margin_filtering_for_reads = 0;
 	context->config.do_big_margin_filtering_for_junctions = 0;

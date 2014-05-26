@@ -1059,6 +1059,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 	int is_r_OK;
 	r -> raw_result = current_result;
+	r->additional_information[0]=0;
 
 	is_r_OK = (current_result -> result_flags & CORE_IS_FULLY_EXPLAINED) > 0;
 
@@ -1093,7 +1094,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 		strcpy(r->cigar, r -> current_cigar_decompress);
 		r->strand = (current_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
 
-		sprintf(r->additional_information, "\tSM:i:%d",current_result -> final_mismatched_bases);
+		//sprintf(r->additional_information, "\tSM:i:%d",current_result -> final_mismatched_bases);
 
 		if(global_context -> config.SAM_extra_columns)
 		{
@@ -1145,6 +1146,13 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 		{
 			sprintf(r->additional_information + strlen(r->additional_information), "\tXS:A:%c", (current_result -> result_flags & CORE_IS_GT_AG_DONORS)?'+':'-');
 		}
+
+		if(global_context -> config.more_accurate_fusions)
+		{
+			
+			sprintf(r->additional_information + strlen(r->additional_information), "\tDF:i:%d", current_result -> best_second_diff_bases >0?current_result -> best_second_diff_bases:9999 );
+		}
+
 
 	}
 

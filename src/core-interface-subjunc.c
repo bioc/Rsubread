@@ -442,6 +442,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	}
 
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;
+	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
 
 
 	return 0;
