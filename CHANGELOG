@@ -1,3 +1,6 @@
+27 May 2014 - 1.15.5
+(1) Add maxMismatches parameter to align and subjunc functions.
+
 12 May 2014 -- 1.15.4
 (1) Fixed a bug in featureCounts when dealing with a very big annotation file.
 

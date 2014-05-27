@@ -6,7 +6,7 @@
 \usage{
 align(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
-TH1=3,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
+TH1=3,TH2=1,maxMismatches=10,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
 tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
 maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,
@@ -29,6 +29,7 @@ readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{nsubreads}{ numeric value giving the number of subreads extracted from each read.} 
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This is the threshold for the first reads if paired-end read data are provided.}
   \item{TH2}{ numeric value giving the consensus threhold for the second reads in paired-end data.}
+  \item{maxMismatches}{ numeric value giving the maximum number of mis-matched bases allowed in the alignment. \code{10} by default. Mis-matches found in soft-clipped bases are not counted.}
   \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.} 
   \item{indels}{ numeric value giving the maximum number of insertions/deletions allowed during the mapping. \code{5} by default.}
   \item{phredOffset}{ numeric value added to base-calling Phred scores to make quality scores (represented as ASCII letters). Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
