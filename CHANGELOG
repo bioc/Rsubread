@@ -1,5 +1,6 @@
 29 May 2014 - 1.15.6
 (1) Fixed the codoc mismatch bug for subjunc.
+(2) Update users guide.
 
 27 May 2014 - 1.15.5
 (1) Add maxMismatches parameter to align and subjunc functions.
