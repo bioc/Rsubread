@@ -14,7 +14,7 @@ DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 
 subjunc(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,
-TH1=1,TH2=1,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
+TH1=1,TH2=1,maxMismatches=10,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
 tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
 maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)

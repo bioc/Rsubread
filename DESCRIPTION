@@ -2,7 +2,7 @@ Package: Rsubread
 Type: Package
 Title: Rsubread package: high-performance read alignment,
         quantification and mutation discovery
-Version: 1.15.5
+Version: 1.15.6
 Author: Wei Shi and Yang Liao with contributions from Jenny Zhiyin Dai
         and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>
