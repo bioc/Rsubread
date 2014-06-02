@@ -1526,7 +1526,7 @@ int write_indel_final_results(global_context_t * global_context)
 	ref_bases = malloc(1000);
 	alt_bases = malloc(1000);
 
-	fputs("##fileformat=VCFv4.0\n##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Raw read depth\">\n##INFO=<ID=ALLMM,Number=1,Type=Integer,Description=\"All mimatched bases in the supporting reads\">\n##INFO=<ID=AT,Number=1,Type=Integer,Description=\"All reads mapped to this location (inc. reads not including this variant)\">\n", ofp);
+	fputs("##fileformat=VCFv4.0\n##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Raw read depth\">\n##INFO=<ID=SR,Number=1,Type=String,Description=\"Number of supporting reads for variants\">\n", ofp);
 	fputs("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n", ofp);
 
 	for(xk1 = 0; xk1 <  indel_context -> total_events ; xk1++)
@@ -1586,7 +1586,7 @@ int write_indel_final_results(global_context_t * global_context)
 				else	event_body -> event_quality = 1;
 
 			}
-			fprintf(ofp, "%s\t%u\t.\t%s\t%s\t%d\t.\tINDEL;DP=%d;ALLMM=%u;AT=%d\n", chro_name, chro_pos, ref_bases, alt_bases, (int)(max(1, 250 + 10*log(event_body -> event_quality)/log(10))), event_body -> final_counted_reads, event_body -> final_reads_mismatches, event_body -> anti_supporting_reads);
+			fprintf(ofp, "%s\t%u\t.\t%s\t%s\t%d\t.\tINDEL;DP=%d;SR=%d\n", chro_name, chro_pos, ref_bases, alt_bases, (int)(max(1, 250 + 10*log(event_body -> event_quality)/log(10))), event_body -> final_counted_reads + event_body -> anti_supporting_reads, event_body -> final_counted_reads);
 		}
 
 		global_context->all_indels++;

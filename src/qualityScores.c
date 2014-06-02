@@ -134,7 +134,6 @@ int add_read_scores(qualscore_context * qs_context, char * qual_text)
 	return 0;
 }
 
-
 int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 {
 	int ret = 0, need_reverse=0;
@@ -143,9 +142,9 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 		char * retstr;
 
 		if(qs_context -> input_file_type == FILE_TYPE_FASTQ)
-			retstr = fgets(qual_buff, 2999, qs_context -> fq_reader);
+			retstr = fgets_noempty(qual_buff, 2999, qs_context -> fq_reader);
 		else
-			retstr = gzgets(qs_context -> fq_reader, qual_buff, 2999);
+			retstr = gzgets_noempty(qs_context -> fq_reader, qual_buff, 2999);
 
 		if(!retstr) ret = 1;
 		else
@@ -159,14 +158,14 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 
 
 			if(qs_context -> input_file_type == FILE_TYPE_FASTQ)
-				retstr = fgets(qual_buff, 2999, qs_context -> fq_reader);
+				retstr = fgets_noempty(qual_buff, 2999, qs_context -> fq_reader);
 			else
-				retstr = gzgets(qs_context -> fq_reader, qual_buff, 2999);
+				retstr = gzgets_noempty(qs_context -> fq_reader, qual_buff, 2999);
 
 			if(qs_context -> input_file_type == FILE_TYPE_FASTQ)
-				retstr = fgets(qual_buff, 2999, qs_context -> fq_reader);
+				retstr = fgets_noempty(qual_buff, 2999, qs_context -> fq_reader);
 			else
-				retstr = gzgets(qs_context -> fq_reader, qual_buff, 2999);
+				retstr = gzgets_noempty(qs_context -> fq_reader, qual_buff, 2999);
 
 			if(!retstr) ret = 1;
 			else 
@@ -180,9 +179,9 @@ int qs_next_qual(qualscore_context * qs_context, char * qual_buff)
 			}
 
 			if(qs_context -> input_file_type == FILE_TYPE_FASTQ)
-				retstr = fgets(qual_buff, 2999, qs_context -> fq_reader);
+				retstr = fgets_noempty(qual_buff, 2999, qs_context -> fq_reader);
 			else
-				retstr = gzgets(qs_context -> fq_reader, qual_buff, 2999);
+				retstr = gzgets_noempty(qs_context -> fq_reader, qual_buff, 2999);
 			
 			if(!retstr) ret = 1;
 		}

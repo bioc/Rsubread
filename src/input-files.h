@@ -179,4 +179,8 @@ char color2char(char clr, char c1);
 int is_certainly_bam_file(char * fname, int * is_firstread_PE);
 
 unsigned long long int sort_SAM_hash(char * str);
+
+char * fgets_noempty(char * buf, int maxlen, FILE * fp);
+
+char * gzgets_noempty(void * fp, char * buf, int maxlen);
 #endif

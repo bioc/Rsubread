@@ -908,7 +908,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					fwrite(referenced_genome + i, 1, 1, out_fp);
 				fwrite(referenced_genome + 1 + i + max(0,indels), 1, 1, out_fp);
 				unsigned short * indel_sups = parameters -> cigar_event_table-> appendix2;
-				fprintf(out_fp, "\t1.0\t.\tINDEL;DP=%d\n",indel_sups[event_id]);
+				fprintf(out_fp, "\t1.0\t.\tINDEL;DP=%d;SR=%d\n",all_reads,indel_sups[event_id]);
 
 				parameters->reported_indels++;
 				if(parameters->output_fp_lock)
@@ -1133,10 +1133,11 @@ int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, ch
 	}
 	fputs("##fileformat=VCFv4.0\n",out_fp);
 	fputs("##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n", out_fp);
-	fputs("##INFO=<ID=WINMIM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the windows\">\n", out_fp);
-	fputs("##INFO=<ID=WINTOT,Number=1,Type=Integer,Description=\"Total number of bases in the windows\">\n", out_fp);
-	fputs("##INFO=<ID=ALTNUMBER,Number=1,Type=String,Description=\"Number of supporting reads for each alternative allele\">\n", out_fp);
+	fputs("##INFO=<ID=BGMM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the background\">\n", out_fp);
+	fputs("##INFO=<ID=BGTOTAL,Number=1,Type=Integer,Description=\"Total number of bases in the background\">\n", out_fp);
+	fputs("##INFO=<ID=MM,Number=1,Type=String,Description=\"Number of supporting reads for each alternative allele\">\n", out_fp);
 	fputs("##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n", out_fp);
+	fputs("##INFO=<ID=SR,Number=1,Type=String,Description=\"Number of supporting reads for variants\">\n", out_fp);
 	fputs("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n", out_fp);
 	if(all_threads < 2)
 	{

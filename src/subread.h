@@ -157,8 +157,15 @@ typedef char gene_vote_number_t;
 #define SEARCH_BACK 0
 #define SEARCH_FRONT 1
 
+//#define LARGE_GENE_VOTE_TABLE
+#ifdef LARGE_GENE_VOTE_TABLE
+#warning "Using LARGE_GENE_VOTE_TABLE"
+#define GENE_VOTE_SPACE 32 
+#define GENE_VOTE_TABLE_SIZE 109 
+#else
 #define GENE_VOTE_SPACE 8
 #define GENE_VOTE_TABLE_SIZE 61
+#endif
 
 #define MAX_ANNOTATION_EXONS 30000 
 #define MAX_EXONS_PER_GENE 400 

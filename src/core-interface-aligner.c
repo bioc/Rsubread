@@ -117,8 +117,8 @@ void print_usage_core_aligner()
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("");
-	SUBREADputs("    -M --maxMismatches <int> specify the maximum number of mismatched bases");
-	SUBREADputs("                            allowed in the alignment. 10 by default. Mismatches");
+	SUBREADputs("    -M --maxMismatches <int> Specify the maximum number of mis-matched bases");
+	SUBREADputs("                            allowed in the alignment. 10 by default. Mis-matches");
 	SUBREADputs("                            found in soft-clipped bases are not counted.");
 	SUBREADputs("   ");
 	SUBREADputs("       --reportFusions      report discovered genomic fusion events such as");

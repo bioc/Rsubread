@@ -144,6 +144,49 @@ long long int guess_gene_bases(char ** files, int file_number)
 }
 
 
+int read_line_noempty(int max_read_len, FILE * fp, char * buff, int must_upper)
+{
+	int ret =0;
+	if(must_upper)
+	{
+		while(1)
+		{
+			char ch = fgetc(fp);
+			#ifdef WINDOWS
+			if(ch == '\r') continue;
+			#endif
+			if(ch == EOF) break;
+			if(ch == '\n'){
+					if(ret)
+						break;
+			}
+			else if(ret < max_read_len-1)
+				buff[ret++] = toupper(ch);
+		}
+	}
+	else
+	{
+		while(1)
+		{
+			char ch = fgetc(fp);
+			#ifdef WINDOWS
+			if(ch == '\r') continue;
+			#endif
+			if (ch == EOF) break;
+			if(ch == '\n'){
+					if(ret)
+						break;
+			}
+			else buff[ret++] = ch;
+		}
+	
+	}
+	buff[ret]=0;
+	return ret;
+}
+
+
+
 int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 {
 	int ret =0;
@@ -300,7 +343,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 
 	while (1){
 		long long int last_pos = ftello(input->input_fp);
-		int rlen = read_line(1200, input->input_fp, in_buff, 0);
+		int rlen = read_line_noempty(1200, input->input_fp, in_buff, 0);
 		if (rlen<=0)
 			return 1;
 
@@ -326,7 +369,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 			input->file_type = GENE_INPUT_FASTQ;
 		//	printf("FILE %s OPENED AS FATSQ.\n", filename);
 
-			rlen += read_line(1200, input->input_fp, in_buff, 0);
+			rlen += read_line_noempty(1200, input->input_fp, in_buff, 0);
 			input->space_type = is_read(in_buff);
 
 
@@ -441,6 +484,7 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer_3000)
 }
 
 #define SKIP_LINE { nch=' '; while(nch != EOF && nch != '\n') nch = fgetc(input->input_fp); }
+#define SKIP_LINE_NOEMPTY {int content_line_l = 0; nch=' '; while(nch != EOF && (nch != '\n' ||! content_line_l)){nch = fgetc(input->input_fp); content_line_l += (nch != '\n');} }
 
 void geinput_jump_read(gene_input_t * input)
 {
@@ -479,10 +523,10 @@ void geinput_jump_read(gene_input_t * input)
 	}
 	else if(input->file_type == GENE_INPUT_FASTQ)
 	{
-		SKIP_LINE
-		SKIP_LINE
-		SKIP_LINE
-		SKIP_LINE
+		SKIP_LINE_NOEMPTY
+		SKIP_LINE_NOEMPTY
+		SKIP_LINE_NOEMPTY
+		SKIP_LINE_NOEMPTY
 	}
 }
 
@@ -800,52 +844,52 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		//READ NAME
 		if (read_name == NULL)
 		{
-			SKIP_LINE;
+			SKIP_LINE_NOEMPTY;
 			if(nch == EOF) return -1;
 		}
 		else
 		{
-			nch = fgetc(input->input_fp);
-			if(nch==EOF) return -1;
-			#ifdef WINDOWS
-			if(nch=='\r')
+			while(1)
 			{
-				nch = fgetc(input->input_fp);
-				if(nch==EOF) return -1;
-			}
-			#endif
-			if(nch=='@')
-			{
-				read_line(MAX_READ_NAME_LEN, input->input_fp, read_name, 0);
-				int cursor = 1;
-				while(read_name[cursor])
-				{
-					if(read_name[cursor] == ' ' || read_name[cursor] == '\t')
+					nch = fgetc(input->input_fp);
+					if(nch==EOF) return -1;
+					#ifdef WINDOWS
+					if(nch=='\r')
 					{
-						read_name [cursor] = 0;
-						break;	
+						nch = fgetc(input->input_fp);
+						if(nch==EOF) return -1;
 					}
-					cursor++;
-				}
-			}
-			else
-			{
-				SUBREADprintf("WARNING: unexpected line: `%s', POS=%llu\nFASTQ file may be damaged.\n", read_string, (long long int)ftello(input->input_fp));
-				return -1;
+					#endif
+					if(nch == '@') break;
+					if(nch != '\n' && nch != '\r')
+					{
+							SKIP_LINE_NOEMPTY;
+					}
 			}
 
+			read_line_noempty(MAX_READ_NAME_LEN, input->input_fp, read_name, 0);
+			int cursor = 1;
+			while(read_name[cursor])
+			{
+				if(read_name[cursor] == ' ' || read_name[cursor] == '\t')
+				{
+					read_name [cursor] = 0;
+					break;	
+				}
+				cursor++;
+			}
 		}
 		// READ LINE 
-		ret = read_line(1200, input->input_fp, read_string, 1);
+		ret = read_line_noempty(1200, input->input_fp, read_string, 1);
 
 		// SKIP "+"
-		SKIP_LINE;
+		SKIP_LINE_NOEMPTY;
 
 		// QUAL LINE 
 		if (quality_string)
-			read_line(1200, input->input_fp, quality_string, 0);
+			read_line_noempty(1200, input->input_fp, quality_string, 0);
 		else
-			SKIP_LINE;
+			SKIP_LINE_NOEMPTY;
 
 		#ifdef MODIFIED_READ_LEN
 		{
@@ -2705,6 +2749,30 @@ int warning_file_type(char * fname, int expected_type)
 	return 0;
 }
 
+char * gzgets_noempty(void * fp, char * buf, int maxlen)
+{
+	char * ret;
+	while(1)
+	{
+		ret = gzgets(fp,buf, maxlen);
+		if(!ret)return NULL;
+		if(ret[0]!='\n') return ret;
+	}
+}
+
+
+char * fgets_noempty(char * buf, int maxlen, FILE * fp)
+{
+	char * ret;
+	while(1)
+	{
+		ret = fgets(buf, maxlen, fp);
+		if(!ret)return NULL;
+		if(ret[0]!='\n') return ret;
+	}
+}
+
+
 int probe_file_type(char * fname, int * is_first_read_PE)
 {
 	FILE * fp = f_subr_open(fname, "rb");
@@ -2723,11 +2791,11 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 	{
 		if(nch == '@')	// FASTQ OR SAM
 		{
-			char * rptr = fgets(test_buf, 4999, fp);
+			char * rptr = fgets_noempty(test_buf, 4999, fp);
 			int second_line_len = 0;
 			if(rptr)
 			{
-				rptr = fgets(test_buf, 4999, fp);
+				rptr = fgets_noempty(test_buf, 4999, fp);
 				if(rptr)
 				{
 					second_line_len = strlen(test_buf);
@@ -2749,10 +2817,10 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 			}
 			if(ret == FILE_TYPE_UNKNOWN)
 			{
-				rptr = fgets(test_buf, 4999, fp);
+				rptr = fgets_noempty(test_buf, 4999, fp);
 				if(rptr[0] == '+')
 				{
-					rptr = fgets(test_buf, 4999, fp);
+					rptr = fgets_noempty(test_buf, 4999, fp);
 					if(rptr && second_line_len == strlen(test_buf))
 						ret = FILE_TYPE_FASTQ;
 				}

@@ -3135,6 +3135,8 @@ void clean_context_after_chunk(global_context_t * context)
 		memset(context ->chunk_subjunc_records , 0 , sizeof(subjunc_result_t) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.multi_best_reads);
 }
 
+#define SKIP_CORE_NOEMPTY(fp_loc, buf_loc)	{ while(1){char *ret_loc = fgets(buf_loc, 3000, fp_loc); if(buf_loc[0]!='\n' || !ret_loc) break; } }
+
 unsigned int split_read_files(global_context_t * global_context)
 {
 	unsigned int chunk_reads = global_context->config.reads_per_chunk;
