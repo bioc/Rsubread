@@ -56,14 +56,14 @@ void fastq_64_to_33(char * qs)
 
 double guess_reads_density(char * fname, int is_sam)
 {
-	return guess_reads_density_format(fname, is_sam, NULL);
+	return guess_reads_density_format(fname, is_sam, NULL, NULL);
 }
-double guess_reads_density_format(char * fname, int is_sam, int * phred_format)
+double guess_reads_density_format(char * fname, int is_sam, int * min_phred_score, int * max_phred_score)
 {
 	gene_input_t ginp;
 	long long int fpos =0, fpos2 = 0;
 	int i;
-	char max_qual_chr = 0, min_qual_chr = 127;
+	int max_qual_chr = -1, min_qual_chr = 127;
 	char buff[MAX_READ_LENGTH] , qbuf[MAX_READ_LENGTH];
 
 	if(is_sam == 0)
@@ -96,14 +96,10 @@ double guess_reads_density_format(char * fname, int is_sam, int * phred_format)
 			
 	}
 
-	if(phred_format)
+	if(min_phred_score)
 	{
-		if(max_qual_chr<'M')
-			*phred_format = FASTQ_PHRED33;
-		else if(min_qual_chr>='@' && max_qual_chr<'k')
-			*phred_format = FASTQ_PHRED64;
-		//else
-		//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_WARNING, "The fastq file is broken : %d %d.", min_qual_chr , max_qual_chr);
+		(*min_phred_score) = min_qual_chr;
+		(*max_phred_score) = max_qual_chr;
 
 	}	
 	fpos2 = ftello(ginp.input_fp) - fpos;
@@ -146,6 +142,49 @@ long long int guess_gene_bases(char ** files, int file_number)
 	}
 	return ret * 70 / 71;
 }
+
+
+int read_line_noempty(int max_read_len, FILE * fp, char * buff, int must_upper)
+{
+	int ret =0;
+	if(must_upper)
+	{
+		while(1)
+		{
+			char ch = fgetc(fp);
+			#ifdef WINDOWS
+			if(ch == '\r') continue;
+			#endif
+			if(ch == EOF) break;
+			if(ch == '\n'){
+					if(ret)
+						break;
+			}
+			else if(ret < max_read_len-1)
+				buff[ret++] = toupper(ch);
+		}
+	}
+	else
+	{
+		while(1)
+		{
+			char ch = fgetc(fp);
+			#ifdef WINDOWS
+			if(ch == '\r') continue;
+			#endif
+			if (ch == EOF) break;
+			if(ch == '\n'){
+					if(ret)
+						break;
+			}
+			else buff[ret++] = ch;
+		}
+	
+	}
+	buff[ret]=0;
+	return ret;
+}
+
 
 
 int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
@@ -304,7 +343,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 
 	while (1){
 		long long int last_pos = ftello(input->input_fp);
-		int rlen = read_line(1200, input->input_fp, in_buff, 0);
+		int rlen = read_line_noempty(1200, input->input_fp, in_buff, 0);
 		if (rlen<=0)
 			return 1;
 
@@ -330,7 +369,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 			input->file_type = GENE_INPUT_FASTQ;
 		//	printf("FILE %s OPENED AS FATSQ.\n", filename);
 
-			rlen += read_line(1200, input->input_fp, in_buff, 0);
+			rlen += read_line_noempty(1200, input->input_fp, in_buff, 0);
 			input->space_type = is_read(in_buff);
 
 
@@ -445,6 +484,7 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer_3000)
 }
 
 #define SKIP_LINE { nch=' '; while(nch != EOF && nch != '\n') nch = fgetc(input->input_fp); }
+#define SKIP_LINE_NOEMPTY {int content_line_l = 0; nch=' '; while(nch != EOF && (nch != '\n' ||! content_line_l)){nch = fgetc(input->input_fp); content_line_l += (nch != '\n');} }
 
 void geinput_jump_read(gene_input_t * input)
 {
@@ -483,10 +523,10 @@ void geinput_jump_read(gene_input_t * input)
 	}
 	else if(input->file_type == GENE_INPUT_FASTQ)
 	{
-		SKIP_LINE
-		SKIP_LINE
-		SKIP_LINE
-		SKIP_LINE
+		SKIP_LINE_NOEMPTY
+		SKIP_LINE_NOEMPTY
+		SKIP_LINE_NOEMPTY
+		SKIP_LINE_NOEMPTY
 	}
 }
 
@@ -645,9 +685,9 @@ int trim_read_inner(char * read_text, char * qual_text, int rlen, short t_5, sho
 
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string)
 {
-	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0);
+	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0, NULL);
 }
-int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3)
+int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary)
 {
 	if(input->file_type == GENE_INPUT_PLAIN)
 	{
@@ -673,7 +713,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 
 		while(1)
 		{
-				int is_second_map = 0;
+			//	int is_second_map = 0;
 				int linelen = read_line(3000, input->input_fp, in_buff, 0);
 				if(linelen <1)return -1;
 				if(read_name)
@@ -695,10 +735,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 						{
 							mask_buf[current_str_pos] = 0;
 							int flags = atoi(mask_buf) ;
-							if(flags & SAM_FLAG_SECONDARY_MAPPING) 
+							if(is_secondary && (flags & SAM_FLAG_SECONDARY_MAPPING))
 							{
-								is_second_map = 1;
-								break;
+								(*is_secondary) = 1;
 							}
 							need_reverse = ( flags & SAM_FLAG_REVERSE_STRAND_MATCHED )?1:0;
 							
@@ -731,7 +770,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 					// skip a line if not single-end
 					read_line(1, input->input_fp, in_buff, 0);
 
-				if(!is_second_map)break;
+				break;
 				//printf("Repeated read skipped : %s\n", read_name);
 		}
 
@@ -805,52 +844,52 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		//READ NAME
 		if (read_name == NULL)
 		{
-			SKIP_LINE;
+			SKIP_LINE_NOEMPTY;
 			if(nch == EOF) return -1;
 		}
 		else
 		{
-			nch = fgetc(input->input_fp);
-			if(nch==EOF) return -1;
-			#ifdef WINDOWS
-			if(nch=='\r')
+			while(1)
 			{
-				nch = fgetc(input->input_fp);
-				if(nch==EOF) return -1;
-			}
-			#endif
-			if(nch=='@')
-			{
-				read_line(MAX_READ_NAME_LEN, input->input_fp, read_name, 0);
-				int cursor = 1;
-				while(read_name[cursor])
-				{
-					if(read_name[cursor] == ' ' || read_name[cursor] == '\t')
+					nch = fgetc(input->input_fp);
+					if(nch==EOF) return -1;
+					#ifdef WINDOWS
+					if(nch=='\r')
 					{
-						read_name [cursor] = 0;
-						break;	
+						nch = fgetc(input->input_fp);
+						if(nch==EOF) return -1;
 					}
-					cursor++;
-				}
-			}
-			else
-			{
-				SUBREADprintf("WARNING: unexpected line: `%s', POS=%llu\nFASTQ file may be damaged.\n", read_string, (long long int)ftello(input->input_fp));
-				return -1;
+					#endif
+					if(nch == '@') break;
+					if(nch != '\n' && nch != '\r')
+					{
+							SKIP_LINE_NOEMPTY;
+					}
 			}
 
+			read_line_noempty(MAX_READ_NAME_LEN, input->input_fp, read_name, 0);
+			int cursor = 1;
+			while(read_name[cursor])
+			{
+				if(read_name[cursor] == ' ' || read_name[cursor] == '\t')
+				{
+					read_name [cursor] = 0;
+					break;	
+				}
+				cursor++;
+			}
 		}
 		// READ LINE 
-		ret = read_line(1200, input->input_fp, read_string, 1);
+		ret = read_line_noempty(1200, input->input_fp, read_string, 1);
 
 		// SKIP "+"
-		SKIP_LINE;
+		SKIP_LINE_NOEMPTY;
 
 		// QUAL LINE 
 		if (quality_string)
-			read_line(1200, input->input_fp, quality_string, 0);
+			read_line_noempty(1200, input->input_fp, quality_string, 0);
 		else
-			SKIP_LINE;
+			SKIP_LINE_NOEMPTY;
 
 		#ifdef MODIFIED_READ_LEN
 		{
@@ -2530,7 +2569,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		}
 
 		char hi_key [13];
-		if(hi_tag >=0)
+		if(hi_tag >=0 && pos_1 && pos_2)
 			sprintf(hi_key, ":%d", hi_tag);
 		else
 			hi_key[0]=0;
@@ -2540,6 +2579,9 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		else
 			sprintf(read_name+strlen(read_name), "\t%s:%u:%s:%u%s",chromosome_1_name, pos_1, chromosome_2_name, pos_2, hi_key);
 
+		//if(memcmp("V0112_0155:7:1101:4561:132881", read_name, 27)==0)
+		//	printf("RRN=%s\n", read_name);
+		
 		int read_name_len = strlen(read_name);
 		unsigned long long int read_line_hash = sort_SAM_hash(read_name);
 
@@ -2631,7 +2673,7 @@ int is_certainly_bam_file(char * fname, int * is_first_read_PE)
 {
 
 	int read_type = probe_file_type(fname, is_first_read_PE);
-	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY)
+	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY || read_type == FILE_TYPE_UNKNOWN)
 		return -1;
 	if(read_type == FILE_TYPE_BAM)
 		return 1;
@@ -2707,6 +2749,30 @@ int warning_file_type(char * fname, int expected_type)
 	return 0;
 }
 
+char * gzgets_noempty(void * fp, char * buf, int maxlen)
+{
+	char * ret;
+	while(1)
+	{
+		ret = gzgets(fp,buf, maxlen);
+		if(!ret)return NULL;
+		if(ret[0]!='\n') return ret;
+	}
+}
+
+
+char * fgets_noempty(char * buf, int maxlen, FILE * fp)
+{
+	char * ret;
+	while(1)
+	{
+		ret = fgets(buf, maxlen, fp);
+		if(!ret)return NULL;
+		if(ret[0]!='\n') return ret;
+	}
+}
+
+
 int probe_file_type(char * fname, int * is_first_read_PE)
 {
 	FILE * fp = f_subr_open(fname, "rb");
@@ -2725,11 +2791,11 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 	{
 		if(nch == '@')	// FASTQ OR SAM
 		{
-			char * rptr = fgets(test_buf, 4999, fp);
+			char * rptr = fgets_noempty(test_buf, 4999, fp);
 			int second_line_len = 0;
 			if(rptr)
 			{
-				rptr = fgets(test_buf, 4999, fp);
+				rptr = fgets_noempty(test_buf, 4999, fp);
 				if(rptr)
 				{
 					second_line_len = strlen(test_buf);
@@ -2751,10 +2817,10 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 			}
 			if(ret == FILE_TYPE_UNKNOWN)
 			{
-				rptr = fgets(test_buf, 4999, fp);
+				rptr = fgets_noempty(test_buf, 4999, fp);
 				if(rptr[0] == '+')
 				{
-					rptr = fgets(test_buf, 4999, fp);
+					rptr = fgets_noempty(test_buf, 4999, fp);
 					if(rptr && second_line_len == strlen(test_buf))
 						ret = FILE_TYPE_FASTQ;
 				}

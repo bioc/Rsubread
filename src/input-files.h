@@ -101,7 +101,7 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 // The memory space for read_string must be at least 512 bytes.
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string);
 int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_string, char * quality_string, gene_offset_t* offsets, unsigned int * pos, int * mapping_quality, int * mapping_flags, int need_reversed);
-int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3);
+int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary);
 
 void geinput_jump_read(gene_input_t * input);
 
@@ -155,7 +155,7 @@ int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_sta
 
 int does_file_exist (char * filename);
 
-double guess_reads_density_format(char * fname, int is_sam, int * phred_format);
+double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int * max_phred);
 
 FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table);
 
@@ -179,4 +179,8 @@ char color2char(char clr, char c1);
 int is_certainly_bam_file(char * fname, int * is_firstread_PE);
 
 unsigned long long int sort_SAM_hash(char * str);
+
+char * fgets_noempty(char * buf, int maxlen, FILE * fp);
+
+char * gzgets_noempty(void * fp, char * buf, int maxlen);
 #endif

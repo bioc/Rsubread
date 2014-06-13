@@ -110,6 +110,7 @@ typedef struct{
 	char output_prefix[MAX_FILE_NAME_LENGTH];
 	int report_sam_file;
 	int report_no_unpaired_reads;
+	int max_mismatch_entire_reads;
 	int max_mismatch_exonic_reads;
 	int max_mismatch_junction_reads;
 	int ignore_unmapped_reads;
@@ -152,6 +153,7 @@ typedef struct{
 	// subfusion
 	int do_fusion_detection;
 	int prefer_donor_receptor_junctions;
+	int more_accurate_fusions;
 
 	// indel
 	char do_superlong_indel_detection;
@@ -222,13 +224,18 @@ typedef struct
 	union
 	{
 		unsigned int Score_L;
-		int final_mismatched_bases;
+		struct{
+			short final_mismatched_bases;
+			short best_second_diff_bases;
+		};
 	};
 	unsigned long long int Score_H;
 
 } alignment_result_t;
 
 #define CORE_MAX_CIGAR_LEN (MAX_INDEL_SECTIONS * 3+5)
+#define CORE_MAX_CIGAR_STR_LEN 110
+#define CORE_ADDITIONAL_INFO_LENGTH 400
 
 typedef struct
 {
@@ -272,6 +279,7 @@ typedef struct{
 	int index_block_number;
 	int current_index_block_number;
 	int will_remove_input_file;
+	int is_phred_warning;
 
 	// global locks
 	subread_lock_t thread_initial_lock;

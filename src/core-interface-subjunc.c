@@ -45,6 +45,8 @@ static struct option long_options[] =
 	{"memoryMultiplex",  required_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
+	{"disableBigMargin",  no_argument, 0, 0},
+	{"maxMismatches",  required_argument, 0, 'M'},
 	{0, 0, 0, 0}
 };
 
@@ -113,6 +115,12 @@ void print_usage_core_subjunc()
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("   ");
+	SUBREADputs("    -M --maxMismatches <int> Specify the maximum number of mis-matched bases");
+	SUBREADputs("                            allowed in the alignment. 10 by default. Mis-matches");
+	SUBREADputs("                            found in soft-clipped bases are not counted.");
+	SUBREADputs("   ");
+//	SUBREADputs("       --disableBigMargin   disable big margin for calling junctions.");
+//	SUBREADputs("   ");
 	SUBREADputs("       --dnaseq             specify that the input read data are genomic DNA");
 	SUBREADputs("                            sequencing data. When specified, the program will");
 	SUBREADputs("                            perform read alignments and also detect fusion");
@@ -216,7 +224,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 		print_usage_core_subjunc();
 		return -1;
 	}
-	while ((c = getopt_long (argc, argv, "vExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:I:t:B:bQFcuUfM3:5:9:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "vExsJ1:2:S:L:AHd:D:n:m:p:P:R:r:i:l:o:G:T:I:t:B:bQFcuUfM:3:5:9:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
@@ -286,6 +294,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				if(global_context->config.all_threads <1) global_context->config.all_threads = 1;
 				if(global_context->config.all_threads >32) global_context->config.all_threads = 32;
 
+				break;
+			case 'M':
+				global_context->config.max_mismatch_entire_reads = atoi(optarg);
 				break;
 			case 'R':
 				global_context->input_reads.is_paired_end_reads = 1;
@@ -398,6 +409,12 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_gzip_fastq=1;
 				}
+				else if(strcmp("disableBigMargin", long_options[option_index].name)==0) 
+				{
+					global_context->config.max_mismatch_junction_reads = 10;
+					global_context->config.do_big_margin_filtering_for_junctions = 0;
+					global_context->config.limited_tree_scan = 0;
+				}
 				else if(strcmp("dnaseq", long_options[option_index].name)==0 || strcmp("allJunctions", long_options[option_index].name)==0)
 				{
 					global_context->config.do_fusion_detection = 1;
@@ -425,6 +442,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	}
 
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;
+	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
 
 
 	return 0;
