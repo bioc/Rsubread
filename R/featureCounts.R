@@ -30,10 +30,12 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	    if(sum(c("geneid","chr","start","end", "strand") %in% tolower(colnames(annot_df))) != 5)
 	      stop("One or more required columns are missing in the provided annotation data. Please refer to help page for annotation format.\n")
 		colnames(annot_df) <- tolower(colnames(annot_df))
-		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)		
+		annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)
 	    annot_df$chr <- as.character(annot_df$chr)
 	    fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
+		oldScipen <- options(scipen=999)
 	    write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
+		options(oldScipen)
 	    ann <- fout_annot
 	    flag <- TRUE
 	  }
