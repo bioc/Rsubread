@@ -162,7 +162,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 
 			matched_bases_to_site = match_chro(read_text, value_index, tested_chro_begin, tested_read_pos, explain_context -> current_is_strand_jumped, global_context -> config.space_type);
 
-			if(tested_read_pos >0 && (1+matched_bases_to_site)*10000/tested_read_pos > 9000)
+			if(tested_read_pos >0 && (matched_bases_to_site + global_context -> config.max_mismatch_junction_reads)*10000/tested_read_pos > 9000)
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
@@ -221,7 +221,9 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 
 						explain_context -> tmp_search_sections ++;
 
-						//if(explain_context -> pair_number == 23){printf("JUMP_IN: %u ; STRAND=%c ; REMENDER=%d ; 0=%d 0=%d\n", new_read_head_abs_offset, tested_event -> is_strand_jumped?'X':'=', new_remainder_len, tested_event -> indel_length,  tested_event -> indel_at_junction);}
+						//if(explain_context -> pair_number == 23){
+						//printf("JUMP_IN: %u ; STRAND=%c ; REMENDER=%d ; 0=%d 0=%d\n", new_read_head_abs_offset, tested_event -> is_strand_jumped?'X':'=', new_remainder_len, tested_event -> indel_length,  tested_event -> indel_at_junction);
+						//}
 
 						//printf("SUGGEST_NEXT = %d (! %d)\n", tested_event -> connected_next_event_distance,  tested_event -> connected_previous_event_distance);
 						search_events_to_front(global_context, thread_context, explain_context, read_text + tested_event -> indel_at_junction + tested_read_pos -  min(0, tested_event->indel_length), qual_text + tested_read_pos -  min(0, tested_event->indel_length), new_read_head_abs_offset, new_remainder_len, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_next_event_distance);
@@ -412,7 +414,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 			//if(explain_context->pair_number == 1503)
 			//	printf("B_JUMP?%d > %d TLEN=%d \n", (1+matched_bases_to_site)*10000 / (read_tail_pos - tested_read_pos) , 9000, read_tail_pos - tested_read_pos);
 
-			if((read_tail_pos>tested_read_pos) && (1+matched_bases_to_site)*10000/(read_tail_pos - tested_read_pos) > 9000)
+			if((read_tail_pos>tested_read_pos) && (matched_bases_to_site + global_context -> config.max_mismatch_junction_reads )*10000/(read_tail_pos - tested_read_pos) > 9000)
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
@@ -1524,10 +1526,16 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 		}
 	}
 
+	int read_mapped_fraction = read_len;
+	read_mapped_fraction -= max(0,tail_soft_clipped);
+	read_mapped_fraction -= max(0,head_soft_clipped);
+
 	if(head_soft_clipped>0) all_mismatched -= remedy_MM_head;
 	if(tail_soft_clipped>0) all_mismatched -= remedy_MM_tail;
 
-	if(rebuilt_read_len != read_len || all_mismatched > global_context->config.max_mismatch_entire_reads ){
+	//printf("QCR ALL MM=%d, RBLEN=%d, MAPPED_LEN=%d ; CIGAR=%s\n", all_mismatched, rebuilt_read_len , read_mapped_fraction, cigar_string);
+	
+	if(rebuilt_read_len != read_len || all_mismatched > global_context->config.max_mismatch_entire_reads || read_mapped_fraction < global_context->config.min_mapped_fraction){
 		(*mismatched_bases)=99999;
 		all_matched_bases = 0;
 		sprintf(cigar_string, "%dM", read_len);
@@ -1585,6 +1593,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 		strcpy(cigar_string, new_cigar_tmp);
 	}
 
+	(*mismatched_bases) = all_mismatched;
 	return max(0, (int)(all_matched_bases*60/read_len));
 }
 
@@ -1724,11 +1733,11 @@ int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t *
 	if(is_cigar_overflow) sprintf(tmp_cigar, "%dM",  explain_context -> full_read_len);
 
 	unsigned int final_position = explain_context -> back_search_junctions[0].abs_offset_for_start;
+
 	int final_qual = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases);
 
-
 	//if(explain_context -> pair_number == 27842025)
-	//	printf("%s : POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\tBEST_READ_NO=%d\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, final_qual, explain_context -> best_read_id);
+	//printf("%s : POS=%u\tCIGAR=%s\tMM=%d\tQUAL=%d\tBEST_READ_NO=%d\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, final_qual, explain_context -> best_read_id);
 
 	int applied_mismatch = is_junction_read? global_context->config.max_mismatch_junction_reads:global_context->config.max_mismatch_exonic_reads ;
 	if(explain_context->full_read_len > EXON_LONG_READ_LENGTH)

@@ -3678,6 +3678,7 @@ void init_global_context(global_context_t * context)
 	context->config.total_subreads = 10;
 	context->config.minimum_subread_for_first_read = 3;
 	context->config.minimum_subread_for_second_read = 1;
+	context->config.min_mapped_fraction = 0;
 	context->config.max_mismatch_entire_reads = 10;
 	context->config.max_mismatch_exonic_reads = 5;
 	context->config.max_mismatch_junction_reads = 2;

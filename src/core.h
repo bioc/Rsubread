@@ -110,6 +110,7 @@ typedef struct{
 	char output_prefix[MAX_FILE_NAME_LENGTH];
 	int report_sam_file;
 	int report_no_unpaired_reads;
+	int min_mapped_fraction;
 	int max_mismatch_entire_reads;
 	int max_mismatch_exonic_reads;
 	int max_mismatch_junction_reads;

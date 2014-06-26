@@ -46,6 +46,7 @@ static struct option long_options[] =
 	{"ignoreUnmapped",  no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"disableBigMargin",  no_argument, 0, 0},
+	{"relaxMismatchedBases",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
 	{0, 0, 0, 0}
 };
@@ -409,9 +410,15 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_gzip_fastq=1;
 				}
+				else if(strcmp("relaxMismatchedBases", long_options[option_index].name)==0) 
+				{
+					global_context->config.max_mismatch_junction_reads = 999;
+					global_context->config.max_mismatch_exonic_reads = 999;
+					global_context->config.max_mismatch_entire_reads = 3;
+					global_context->config.min_mapped_fraction = 61;
+				}
 				else if(strcmp("disableBigMargin", long_options[option_index].name)==0) 
 				{
-					global_context->config.max_mismatch_junction_reads = 10;
 					global_context->config.do_big_margin_filtering_for_junctions = 0;
 					global_context->config.limited_tree_scan = 0;
 				}
