@@ -1,3 +1,6 @@
+7 June 2014 - 1.15.9
+(1) Fixed a bug for reporting unmapped reads in SAM output.
+
 18 June 2014 - 1.15.8
 (1) Bug fix to scientifc notation issue in featureCounts.
 
