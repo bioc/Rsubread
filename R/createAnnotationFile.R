@@ -1,7 +1,7 @@
 createAnnotationFile <- function(GR) {
 
   if(!(is(GR, 'GRanges'))) {
-    message('To create Rsubread annotations from a TranscriptDb or FeatureDb,')
+    message('To create Rsubread annotations from a TxDb or FeatureDb,')
     message('extract a GRanges using exons(), transcripts(), or features().')
     stop('Aborting.')
   }
