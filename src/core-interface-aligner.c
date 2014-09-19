@@ -42,6 +42,7 @@ static struct option long_options[] =
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
+	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"reportFusions", no_argument, 0, 0},
 	{"gzFASTQinput", no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
@@ -210,6 +211,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
 	global_context->config.max_mismatch_exonic_reads = 200;
 	global_context->config.max_mismatch_junction_reads = 200;
+	global_context->config.max_mismatch_entire_reads = 9999;
 	global_context->config.use_dynamic_programming_indel = 1;
 
 	// config.extending_search_indels is changed from 1 to 0 on 10/mar/2014
@@ -294,7 +296,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'n':
 				global_context->config.total_subreads = atoi(optarg);
-				global_context->config.total_subreads = min(31,global_context->config.total_subreads );
+				//global_context->config.total_subreads = min(31,global_context->config.total_subreads );
 				break;
 			case 'm':
 				global_context->config.minimum_subread_for_first_read = atof(optarg);
@@ -412,6 +414,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_BAM_input = 0;
 					global_context->config.is_SAM_file_input = 1;
+				}
+				else if(strcmp("reportPairedMultiBest", long_options[option_index].name)==0) 
+				{
+					global_context->config.report_multiple_best_in_pairs = 1;
 				}
 				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
 				{

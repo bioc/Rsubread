@@ -1028,7 +1028,8 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 						dist -= read_2_anchors[j].piece_main_abs_offset;
 
 						if(read_1_anchors[i].piece_main_abs_offset > read_2_anchors[j].piece_main_abs_offset) dist += read_len_1;
-						else dist -= read_len_2;
+						else if(read_1_anchors[i].piece_main_abs_offset < read_2_anchors[j].piece_main_abs_offset) dist -= read_len_2;
+						else dist = abs(dist) + max(read_len_1, read_len_2);
 
 
 					}
@@ -1072,8 +1073,12 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 					alignment_result_t * alignment_1_best = _global_retrieve_alignment_ptr(global_context, pair_number, 0, 0);
 					alignment_result_t * alignment_2_best = _global_retrieve_alignment_ptr(global_context, pair_number, 1, 0);
 
+
+					//SUBREADprintf("PREV_POS_PE=%u at %d ;; %u at %d ; DIST=%lld\n", read_1_anchors[i].piece_main_abs_offset,  read_1_anchors[i].piece_main_votes , read_2_anchors[j].piece_main_abs_offset, read_2_anchors[j].piece_main_votes, dist);
+
 					if(!global_context -> config.do_fusion_detection)
 					{
+						// a junction read
 						if(global_context->config.is_rna_seq_reads && (read_1_anchors[i].piece_minor_votes || read_2_anchors[j].piece_minor_votes))
 						{
 							if((dist < 0 && is_negative_strand) || (dist > 0 && !is_negative_strand))
@@ -1083,18 +1088,37 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 						}
 						else
 						{
+							// an exonic read
+			
 							if(global_context -> config.is_first_read_reversed && !global_context -> config.is_second_read_reversed)
 								// if "--rf" : second read must on the positive strand
 								if(is_negative_strand) continue;
 
-							if((dist < 0 && is_negative_strand) || (dist > 0 && !is_negative_strand))
-								continue;
-			
+							if(global_context->config.restrected_read_order)
+							{
+								if(read_1_anchors[i].piece_main_abs_offset != read_2_anchors[j].piece_main_abs_offset)
+								{
+									if((dist < 0 && is_negative_strand) || (dist > 0 && !is_negative_strand))
+										continue;
+								}
+							}
+							else
+							{
+								
+								if((dist < 0 && is_negative_strand) || (dist > 0 && !is_negative_strand))
+								{
+									if(abs(dist) > abs(global_context->config.minimum_pair_distance ))
+										continue;
+								}
+							}
+
 							if(abs(dist) > global_context->config.maximum_pair_distance || abs(dist)  < global_context->config.minimum_pair_distance)
 								continue;
+							
 						}
 					}
 					
+					//SUBREADprintf("TEST_POS_PE=%u at %d ;; %u at %d ; RES=%u\n", read_1_anchors[i].piece_main_abs_offset,  read_1_anchors[i].piece_main_votes , read_2_anchors[j].piece_main_abs_offset, read_2_anchors[j].piece_main_votes, pair_number);
 					if(new_score_H  > alignment_1_best -> Score_H || (new_score_H == alignment_1_best-> Score_H && new_score_L >= alignment_1_best-> Score_L))
 					{
 						if(new_score_H > alignment_1_best-> Score_H || new_score_L > alignment_1_best-> Score_L)
@@ -1118,7 +1142,8 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 
 
 						//if(pair_number==25)
-				//		printf("BEST_POS_PE=%u at %d ;; %u at %d ; RES=%u\n", read_1_anchors[i].piece_main_abs_offset,  read_1_anchors[i].piece_main_votes , read_2_anchors[j].piece_main_abs_offset, read_2_anchors[j].piece_main_votes, pair_number);
+						//#warning "COMMENT THIS PRINTF "
+						//SUBREADprintf("BEST_POS_PE=%u at %d ;; %u at %d ; RES=%u\n", read_1_anchors[i].piece_main_abs_offset,  read_1_anchors[i].piece_main_votes , read_2_anchors[j].piece_main_abs_offset, read_2_anchors[j].piece_main_votes, pair_number);
 
 						set_alignment_result(global_context, pair_number, 0, best_read_id_r1, read_1_anchors[i].piece_main_abs_offset, read_1_anchors[i].piece_main_votes , read_1_anchors[i].piece_main_indel_record, read_1_anchors[i].piece_main_coverage_start, read_1_anchors[i].piece_main_coverage_end, 0!=(read_1_anchors[i].piece_main_masks & IS_NEGATIVE_STRAND), read_1_anchors[i].piece_minor_abs_offset, read_1_anchors[i].piece_minor_votes, read_1_anchors[i].piece_minor_coverage_start, read_1_anchors[i].piece_minor_coverage_end, read_1_anchors[i].split_point, read_1_anchors[i].inserted_bases, read_1_anchors[i].is_strand_jumped, read_1_anchors[i].is_donor_found?read_1_anchors[i].is_GT_AG_donors:-1, r1_used_subreads, vote_1-> noninformative_subreads, read_1_anchors[i].piece_main_indels, read_1_anchors[i].piece_minor_indel_offset);
 						set_alignment_result(global_context, pair_number, 1, best_read_id_r2, read_2_anchors[j].piece_main_abs_offset, read_2_anchors[j].piece_main_votes , read_2_anchors[j].piece_main_indel_record, read_2_anchors[j].piece_main_coverage_start, read_2_anchors[j].piece_main_coverage_end, 0!=(read_2_anchors[j].piece_main_masks & IS_NEGATIVE_STRAND), read_2_anchors[j].piece_minor_abs_offset, read_2_anchors[j].piece_minor_votes, read_2_anchors[j].piece_minor_coverage_start, read_2_anchors[j].piece_minor_coverage_end, read_2_anchors[j].split_point, read_2_anchors[j].inserted_bases, read_2_anchors[j].is_strand_jumped, read_2_anchors[j].is_donor_found?read_2_anchors[j].is_GT_AG_donors:-1, r2_used_subreads, vote_2-> noninformative_subreads, read_2_anchors[j].piece_main_indels, read_2_anchors[j].piece_minor_indel_offset);
@@ -1193,6 +1218,7 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 
 
 						//if(pair_number == 119){
+						//#warning " ======== COMMENT THIS LINE !! ========"
 						//	printf("RESULT _ 1 # %d : %llu, %u\n", best_read_id_r1-1, alignment_1_best -> Score_H, alignment_1_best -> Score_L);
 						//	print_votes(vote_1, global_context -> config.index_prefix);
 						//}
@@ -1533,6 +1559,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 	if(head_soft_clipped>0) all_mismatched -= remedy_MM_head;
 	if(tail_soft_clipped>0) all_mismatched -= remedy_MM_tail;
 
+	//#warning " ========== COMMENT THIS LINE !! ========="
 	//printf("QCR ALL MM=%d, RBLEN=%d, MAPPED_LEN=%d ; CIGAR=%s\n", all_mismatched, rebuilt_read_len , read_mapped_fraction, cigar_string);
 	
 	if(rebuilt_read_len != read_len || all_mismatched > global_context->config.max_mismatch_entire_reads || read_mapped_fraction < global_context->config.min_mapped_fraction){
@@ -1593,7 +1620,8 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 		strcpy(cigar_string, new_cigar_tmp);
 	}
 
-	(*mismatched_bases) = all_mismatched;
+	if((*mismatched_bases) != 99999)
+		(*mismatched_bases) = all_mismatched;
 	return max(0, (int)(all_matched_bases*60/read_len));
 }
 
@@ -2171,7 +2199,10 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 
 
 	if(read_len > EXON_LONG_READ_LENGTH)
+	{
+		assert(result -> selected_position <= 0xffff0000);
 		core_search_short_exons(global_context, thread_context,  read_text, qual_text, read_len, result -> selected_position, (subjunc_result -> minor_votes < 1)? result -> selected_position:subjunc_result -> minor_position, result -> confident_coverage_start, result -> confident_coverage_end);
+	}
 
 	int selected_real_split_point = subjunc_result->split_point;
 
@@ -2459,7 +2490,7 @@ int write_junction_final_results(global_context_t * global_context)
 
 		fprintf(ofp,"%s\t%u\t%u\tJUNC%08u%s\t%d\t%c\t%u\t%u\t%d,%d,%d\t2\t%d,%d\t0,%u\t\n", chro_name_left, feature_start,  feature_end,
 												all_junctions, indel_sect,  event_body -> final_counted_reads, event_body->is_negative_strand?'-':'+',
-												feature_start,  feature_end, event_body->is_negative_strand?0:255, event_body -> anti_supporting_reads, event_body->is_negative_strand?255:0,
+												feature_start,  feature_end, event_body->is_negative_strand?0:255, /*event_body -> anti_supporting_reads*/ event_body->is_negative_strand?255:0, event_body->is_negative_strand?255:0,
 												 event_body -> junction_flanking_left, event_body -> junction_flanking_right, feature_end-feature_start-event_body -> junction_flanking_right);
 	
 	}
@@ -2585,7 +2616,7 @@ void core_search_short_exons(global_context_t * global_context, thread_context_t
 	max_score = -999;
 	int max_is_GTAG = 0;
 
-	if(need_to_test)
+	if(need_to_test && pos_small >= 16)
 	{
 		unsigned int test_end = pos_small - SHORT_EXON_EXTEND;
 		if(SHORT_EXON_EXTEND > pos_small) test_end = 0;
@@ -2748,7 +2779,10 @@ void core_search_short_exons(global_context_t * global_context, thread_context_t
 		while(1)
 		{
 			if(new_pos +  test_end - new_pos < base_index-> start_base_offset + base_index->length)
+			{
+				assert(new_pos<0xffff0000);
 				new_pos = match_chro_range(inb + rl - SHORT_EXON_MIN_LENGTH,  base_index, new_pos, 7 , test_end - new_pos , SEARCH_FRONT);
+			}
 			else break;
 
 			if(new_pos==0xffffffff) break;

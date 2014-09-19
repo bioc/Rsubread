@@ -47,6 +47,7 @@ static struct option long_options[] =
 	{"extraColumns",  no_argument, 0, 0},
 	{"disableBigMargin",  no_argument, 0, 0},
 	{"relaxMismatchedBases",  no_argument, 0, 0},
+	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
 	{0, 0, 0, 0}
 };
@@ -282,10 +283,12 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'd':
 				global_context->config.minimum_pair_distance = atoi(optarg);
+				if(global_context->config.minimum_pair_distance <0)
+					global_context->config.restrected_read_order = 0;
 				break;
 			case 'n':
 				global_context->config.total_subreads = atoi(optarg);
-				global_context->config.total_subreads = min(31,global_context->config.total_subreads);
+				//global_context->config.total_subreads = min(31,global_context->config.total_subreads);
 				break;
 			case 'm':
 				global_context->config.minimum_subread_for_first_read = atoi(optarg);
@@ -416,6 +419,10 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.max_mismatch_exonic_reads = 999;
 					global_context->config.max_mismatch_entire_reads = 3;
 					global_context->config.min_mapped_fraction = 61;
+				}
+				else if(strcmp("reportPairedMultiBest", long_options[option_index].name)==0) 
+				{
+					global_context->config.report_multiple_best_in_pairs = 1;
 				}
 				else if(strcmp("disableBigMargin", long_options[option_index].name)==0) 
 				{

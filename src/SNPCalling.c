@@ -96,7 +96,7 @@ struct SNP_Calling_Parameters{
 	unsigned int reported_indels;
 };
 
-#define PRECALCULATE_FACTORIAL 150000
+#define PRECALCULATE_FACTORIAL 2000000
 
 double * precalculated_factorial;// [PRECALCULATE_FACTORIAL];
 
@@ -809,6 +809,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 		if(1)
 		{
+			unsigned int POI_MM = 0;
 			base_list[0]=0;
 			supporting_list[0]=0;
 
@@ -817,7 +818,8 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 				if(tested_int != true_value_int)
 				{
 					int midNexcellent_sup = snp_voting_piles[i*4+tested_int];
-					if( (midNexcellent_sup *1.0 / all_reads >= parameters->supporting_read_rate && midNexcellent_sup >= parameters->min_alternative_read_number))
+					POI_MM += midNexcellent_sup;
+					if(midNexcellent_sup >= parameters->min_alternative_read_number)
 					{
 						char int_buf[12];
 						sprintf(int_buf, "%u", midNexcellent_sup);
@@ -840,9 +842,9 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					}
 				}
 			}
-			if(snps)
+			if(snps && POI_MM *1. / all_reads >= parameters->supporting_read_rate )
 			{
-				if(snp_fisher_raw[i] >= 0. )
+				if(snp_fisher_raw[i] >= 0. || parameters -> fisher_exact_testlen < 1)
 				{
 					float Qvalue =  -1.0*log(max(1E-40,snp_fisher_raw[i]))/log(10);
 					char BGC_Qvalue_str [120];

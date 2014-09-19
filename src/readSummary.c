@@ -1375,6 +1375,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 										is_strand_ok = (is_fragment_negative_strand == global_context -> exontable_strand[search_item_id]);
 									else// if(global_context->is_strand_checked == 2)
 										is_strand_ok = (is_fragment_negative_strand != global_context -> exontable_strand[search_item_id]);
+									//SUBREADprintf("%d = %d == %d\n", is_strand_ok, is_fragment_negative_strand, global_context -> exontable_strand[search_item_id]);
 								}
 
 								if(is_strand_ok){

@@ -953,19 +953,17 @@ unsigned int match_chro_range(char * read, gene_value_index_t * index, unsigned 
 
 	gvindex_baseno2offset(pos, index , &offset_byte, &offset_bit);
 
-	//SUBREADprintf("POS=%u, OFFBYTE=%d\n" , pos, offset_byte);
-
+	/*
+	if(offset_byte > 0x35000000)
+		SUBREADprintf("POS=%u, OFFBYTE=%u, index->start_base_off=%u\n" , pos, offset_byte, index -> start_base_offset);
+	*/
 	
 	search_dist = search_length /4;
 	if(search_to_back == SEARCH_BACK)
 	{
 		if(search_dist > offset_byte - 500)search_dist = offset_byte- 500;
-	}
-	else
-	{
+	}else
 		if(search_dist + offset_byte >=  index -> values_bytes - 500) search_dist = index -> values_bytes - offset_byte -501;
-	}
-
 
 	for (i=2; i<search_dist; i++)
 	{

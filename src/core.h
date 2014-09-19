@@ -122,7 +122,8 @@ typedef struct{
 	int is_BAM_output;
 	int convert_color_to_base;
 	int SAM_extra_columns;
-	unsigned long long int multi_best_reads;
+	int report_multiple_best_in_pairs;
+	unsigned int multi_best_reads;
 
 	// basic voting
 	char index_prefix[MAX_FILE_NAME_LENGTH];
@@ -131,6 +132,7 @@ typedef struct{
 	int minimum_subread_for_second_read;
 	int minimum_pair_distance;
 	int maximum_pair_distance;
+	int restrected_read_order;
 	int show_soft_cliping;
 	int max_indel_length;
 	int expected_pair_distance;
@@ -403,5 +405,7 @@ int chimeric_cigar_parts(global_context_t * global_context , unsigned int sel_po
 void warning_file_limit();
 void quick_sort(void * arr,int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r));
 
-void merge_sort(void * arr, int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r), void merge(void * arr, int start, int items, int items2));
+// L_Minus_R should return -1, 0 or 1 when L<R, L==R or L>R.
+// The result is from Small to Large.
+void merge_sort(void * arr, int arr_size, int L_Minus_R (void * arr, int l, int r), void exchange(void * arr, int l, int r), void merge_SmallFirst(void * arr, int start, int items, int items2));
 #endif
