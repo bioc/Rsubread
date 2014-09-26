@@ -161,7 +161,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 int write_indel_final_results(global_context_t * context);
 int search_event(global_context_t * global_context,HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, char event_type, chromosome_event_t ** return_buffer);
 
-void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, char * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset);
+void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, gene_vote_number_t * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset);
 
 void put_new_event(HashTable * event_table, chromosome_event_t * new_event , int event_no);
 void remove_neighbour(global_context_t * global_context);

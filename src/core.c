@@ -1103,8 +1103,9 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		//printf("SM='%s'\n", r->additional_information);
 
-		//#warning "COMMENT THIS SPRINT LINE IN THE RELEASE VERSION!!!"
-		//sprintf(r->additional_information + strlen( r->additional_information), "\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tSP:Z:%s", current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, (current_result -> result_flags & CORE_IS_GAPPED_READ)?"GAPPED":"NOEVENT"); 
+		//#warning "THIS LINE CAN WORK VERY BADLY!!! DO NOT INCLUDE IT IN THE RELEASE UNTIL IT IS FULLY TESTED!"
+		if(global_context -> config.SAM_extra_columns)
+			sprintf(r->additional_information + strlen( r->additional_information), "\tSB:i:%d\tSC:i:%d\tSD:i:%d\tSN:i:%u\tSP:Z:%s", current_result -> used_subreads_in_vote, current_result -> selected_votes, current_result -> noninformative_subreads_in_vote, read_number, (current_result -> result_flags & CORE_IS_GAPPED_READ)?"GAPPED":"NOEVENT"); 
 
 		if(global_context -> config.do_fusion_detection)
 		{			
@@ -1157,11 +1158,12 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 			sprintf(r->additional_information + strlen(r->additional_information), "\tXS:A:%c", (current_result -> result_flags & CORE_IS_GT_AG_DONORS)?'+':'-');
 		}
 
+		/*
 		if(global_context -> config.more_accurate_fusions)
 		{
 			
 			sprintf(r->additional_information + strlen(r->additional_information), "\tDF:i:%d", current_result -> best_second_diff_bases >0?current_result -> best_second_diff_bases:9999 );
-		}
+		}*/
 
 
 	}
@@ -2902,7 +2904,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	int read_len_1, read_len_2=0;
 	unsigned int processed_reads=0;
 	int min_first_read_votes = global_context -> config.minimum_subread_for_first_read; 
-	int min_second_read_votes = global_context -> config.minimum_subread_for_second_read; 
 	int voting_max_indel_length = min(16, global_context->config.max_indel_length);
 	int sqr_interval=10000, sqr_read_number = 0;
 
@@ -2939,7 +2940,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	{
 		int is_second_read;
 		int subread_no;
-		int is_reversed;
+		int is_reversed, applied_subreads = 0, v1_all_subreads=0, v2_all_subreads=0;
 
 		ret = fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2,1);
 		if(ret)
@@ -2977,7 +2978,9 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 				int allsubreads_for_each_gap [GENE_SLIDING_STEP], noninformative_subreads_for_each_gap[GENE_SLIDING_STEP];
 
-				int applied_subreads = 1 + ((current_rlen - 15-GENE_SLIDING_STEP)<<16) / subread_step;
+				applied_subreads = 1 + ((current_rlen - 15-GENE_SLIDING_STEP)<<16) / subread_step;
+				if(is_second_read) v2_all_subreads = applied_subreads;
+				else	 v1_all_subreads = applied_subreads;
 
 				//SUBREADprintf("NSUBR=%d\tAPPLIED_SUBR=%d\tSTEP=%d\n", global_context -> config.total_subreads, applied_subreads, subread_step);
 
@@ -3003,7 +3006,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						if(global_context->config.SAM_extra_columns)
 						{
 							current_vote -> noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
-							current_vote -> all_used_subreads = allsubreads_for_each_gap[xk1];
 						}
 
 						int subread_offset = ((subread_step * subread_no) >> 16);
@@ -3035,7 +3037,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						if(global_context->config.SAM_extra_columns)
 						{
 							noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
-							allsubreads_for_each_gap[xk1] = current_vote -> all_used_subreads;
 						}
 
 
@@ -3049,17 +3050,14 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				if(global_context->config.SAM_extra_columns)
 				{
 					short max_noninformative_subreads = -1;
-					unsigned char max_all_subreads = 0;
 
 					for(xk1=0;xk1<GENE_SLIDING_STEP;xk1++)
 						if(noninformative_subreads_for_each_gap[xk1] > max_noninformative_subreads)
 						{
 							max_noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
-							max_all_subreads = allsubreads_for_each_gap[xk1];
 						}
 
 					current_vote -> noninformative_subreads = max_noninformative_subreads;
-					current_vote -> all_used_subreads = max_all_subreads;
 				}
 			}
 
@@ -3072,9 +3070,9 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				//if(current_read_number == 119) {
 				//	SUBREADprintf("NOINF=%d\n", vote_1 -> noninformative_subreads );
 				//#warning =============== COMMENT THIS LINE!!!! ======================
-					//print_votes(vote_1, global_context -> config.index_prefix);
+				//	print_votes(vote_1, global_context -> config.index_prefix);
 				//}
-					//print_votes(vote_2, global_context -> config.index_prefix);
+				//	print_votes(vote_2, global_context -> config.index_prefix);
 				//}
 
 				//finalise_vote(vote_1);
@@ -3088,19 +3086,13 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				//if(global_context -> input_reads.is_paired_end_reads) finalise_vote(vote_2);
 
 				if(global_context -> input_reads.is_paired_end_reads)
-				{
-					if((vote_1->max_vote >= min_first_read_votes || vote_2->max_vote >= min_first_read_votes)&& 
-						(vote_1->max_vote >= min_second_read_votes && vote_2->max_vote >= min_second_read_votes))
-							process_voting_junction(global_context, thread_context, current_read_number, vote_1, vote_2, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_reversed);
-					else
-						process_voting_junction(global_context, thread_context, current_read_number, vote_1, vote_2, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_reversed);
-				}
+					process_voting_junction(global_context, thread_context, current_read_number, vote_1, vote_2, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_reversed, v1_all_subreads, v2_all_subreads);
 				else{
 					if(vote_1->max_vote >= min_first_read_votes)
-						process_voting_junction(global_context, thread_context, current_read_number, vote_1, vote_2, read_name_1, NULL ,  read_text_1, NULL, read_len_1, 0, is_reversed);
+						process_voting_junction(global_context, thread_context, current_read_number, vote_1, vote_2, read_name_1, NULL ,  read_text_1, NULL, read_len_1, 0, is_reversed, v1_all_subreads, 0);
 					else if(_global_retrieve_alignment(global_context, current_read_number, 0,0).selected_votes < 1)
 					{
-						_global_retrieve_alignment_ptr(global_context, current_read_number, 0,0)->used_subreads_in_vote = max(_global_retrieve_alignment(global_context, current_read_number, 0,0).used_subreads_in_vote, vote_1 -> all_used_subreads);
+						_global_retrieve_alignment_ptr(global_context, current_read_number, 0,0)->used_subreads_in_vote = max(_global_retrieve_alignment(global_context, current_read_number, 0,0).used_subreads_in_vote, applied_subreads);
 						_global_retrieve_alignment_ptr(global_context, current_read_number, 0,0)->noninformative_subreads_in_vote = max(_global_retrieve_alignment(global_context, current_read_number, 0,0).noninformative_subreads_in_vote, vote_1 -> noninformative_subreads);
 					}
 				}
@@ -3277,7 +3269,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 void clean_context_after_chunk(global_context_t * context)
 {
 	memset(context -> chunk_alignment_records , 0 , sizeof(alignment_result_t) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.multi_best_reads);
-	memset(context -> big_margin_record  , 0 , context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.big_margin_record_size);
+	memset(context -> big_margin_record  , 0 , sizeof(*context -> big_margin_record) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.big_margin_record_size);
 	if(context ->chunk_subjunc_records)
 		memset(context ->chunk_subjunc_records , 0 , sizeof(subjunc_result_t) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.multi_best_reads);
 }
@@ -3657,8 +3649,6 @@ int print_configuration(global_context_t * context)
         print_in_box(80, 0, 0,         "    Unique mapping : %s", context->config.report_multi_mapping_reads?"no":"yes");
         print_in_box(80, 0, 0,         "  Hamming distance : %s", context->config.use_hamming_distance_break_ties?"yes":"no");
         print_in_box(80, 0, 0,         "    Quality scores : %s", context->config.use_quality_score_break_ties?"yes":"no");
-	if((context->config.max_mismatch_entire_reads != 10 && context->config.is_rna_seq_reads) ||(context->config.max_mismatch_entire_reads != 9999 && !context->config.is_rna_seq_reads))
-		print_in_box(80, 0, 0,         "    Max Mismatched : %d bases", context->config.max_mismatch_entire_reads);
 
         if(context->config.max_insertion_at_junctions)
                 print_in_box(80, 0, 0,         "Insertions at junc : %d", context->config.max_insertion_at_junctions);
@@ -3713,9 +3703,9 @@ int init_paired_votes(global_context_t *context)
 		return 1;
 	}
 
-	context -> big_margin_record = malloc( (context->input_reads.is_paired_end_reads?2:1) * context -> config.big_margin_record_size * context ->config.reads_per_chunk);
+	context -> big_margin_record = malloc( sizeof(*context -> big_margin_record) * (context->input_reads.is_paired_end_reads?2:1) * context -> config.big_margin_record_size * context ->config.reads_per_chunk);
 
-	memset(context ->big_margin_record  , 0 , context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context -> config.big_margin_record_size);
+	memset(context ->big_margin_record  , 0 , sizeof(*context -> big_margin_record) *context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context -> config.big_margin_record_size);
 	memset(context ->chunk_alignment_records , 0 , sizeof(alignment_result_t) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.multi_best_reads);
 
 		//fprintf(stderr, "MALLOC=%llu = %d * %d * %d \n", sizeof(alignment_result_t) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.multi_best_reads, sizeof(alignment_result_t), context ->config.reads_per_chunk, context->config.multi_best_reads);

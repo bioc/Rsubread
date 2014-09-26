@@ -111,7 +111,6 @@ typedef struct{
 	int report_sam_file;
 	int report_no_unpaired_reads;
 	int min_mapped_fraction;
-	int max_mismatch_entire_reads;
 	int max_mismatch_exonic_reads;
 	int max_mismatch_junction_reads;
 	int ignore_unmapped_reads;
@@ -130,6 +129,7 @@ typedef struct{
 	int total_subreads;
 	int minimum_subread_for_first_read;
 	int minimum_subread_for_second_read;
+	float minimum_exonic_subread_fraction;
 	int minimum_pair_distance;
 	int maximum_pair_distance;
 	int restrected_read_order;
@@ -204,35 +204,36 @@ typedef struct
 {
 
 	unsigned int selected_position;
-	// 4-bytes
-	unsigned char selected_votes;
+	// 4 bytes
+	gene_vote_number_t selected_votes;
+	gene_vote_number_t used_subreads_in_vote;
 	unsigned char noninformative_subreads_in_vote;
-	unsigned char used_subreads_in_vote;
 	unsigned char final_quality;
-	// 4-bytes
-
 	// this coverage is the range on reads, in point of view of "main piece" strand (i.e., "is_negative_strand")
 	char indels_in_confident_coverage; 
 	char result_flags;
+	// 12 bytes
 	union{
 		struct{
-			char selected_indel_record [MAX_INDEL_SECTIONS*3+1];
+			gene_vote_number_t selected_indel_record [MAX_INDEL_SECTIONS*3 + 1];
 			unsigned short confident_coverage_start; 
 			unsigned short confident_coverage_end; 
 		};
 		char cigar_string[MAX_INDEL_SECTIONS * 3+5];
 	};
-	// 28 bytes
+	// 4x bytes
 
 	union
 	{
-		unsigned int Score_L;
+		unsigned long long Score_L;
 		struct{
 			short final_mismatched_bases;
 			short best_second_diff_bases;
 		};
 	};
+	// 48 bytes
 	unsigned long long int Score_H;
+	// 56 butes
 
 } alignment_result_t;
 
@@ -243,7 +244,7 @@ typedef struct
 typedef struct
 {
 	short split_point;
-	unsigned char minor_votes;
+	gene_vote_number_t minor_votes;
 	char  double_indel_offset;
 	char indel_at_junction;
 	unsigned int minor_position;

@@ -88,7 +88,7 @@ void gehash_prealloc(gehash_t * the_table);
 
 size_t gehash_update(gehash_t * the_table, gehash_key_t key, gehash_data_t data_new);
 
-short indel_recorder_copy(char *dst, char * src);
+short indel_recorder_copy(gene_vote_number_t *dst, gene_vote_number_t* src);
 
 void assign_best_vote(gene_vote_t * vote, int i, int j);
 

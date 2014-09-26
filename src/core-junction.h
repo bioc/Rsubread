@@ -102,7 +102,7 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 
 int init_junction_tables(global_context_t * context);
 int destroy_junction_tables(global_context_t * context);
-int process_voting_junction(global_context_t * global_context, thread_context_t * thread_context, int pair_number, gene_vote_t * vote_1, gene_vote_t * vote_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2,  int read_len_1, int read_len_2, int is_negative_strand);
+int process_voting_junction(global_context_t * global_context, thread_context_t * thread_context, int pair_number, gene_vote_t * vote_1, gene_vote_t * vote_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2,  int read_len_1, int read_len_2, int is_negative_strand,  gene_vote_number_t v1_all_subreads, gene_vote_number_t v2_all_subreads);
 int init_junction_thread_contexts(global_context_t * global_context, thread_context_t * thread_context, int task);
 int finalise_junction_thread(global_context_t * global_context, thread_context_t * thread_context, int task);
 int explain_read(global_context_t * global_context, thread_context_t * thread_context, int pair_number,int read_len, char * read_name , char *read_text, char *qual, int is_second_read, int best_read_id, int is_negative_strand);

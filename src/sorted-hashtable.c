@@ -626,7 +626,7 @@ void assign_best_vote(gene_vote_t * vote, int i, int j)
 	vote->max_quality = vote->quality[i][j];
 	vote->max_coverage_start = vote->coverage_start [i][j];
 	vote->max_coverage_end = vote->coverage_end [i][j];
-	memcpy(vote->max_indel_recorder, vote->indel_recorder[i][j], 3*MAX_INDEL_TOLERANCE);
+	memcpy(vote->max_indel_recorder, vote->indel_recorder[i][j], 3*MAX_INDEL_TOLERANCE * sizeof(*vote->max_indel_recorder));
 }
 
 
@@ -641,7 +641,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 		gehash_key_t  *current_keys;//, *endp12;
 
-		vote -> all_used_subreads++;
 		current_bucket = _gehash_get_bucket (the_table, key);
 		items = current_bucket -> current_items;
 		current_keys = current_bucket -> item_keys;
@@ -857,8 +856,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 		short *current_keys;//, *endp12;
 		short key = raw_key / the_table->buckets_number;
 
-		vote -> all_used_subreads++;
-
 		current_bucket = _gehash_get_bucket (the_table, raw_key);
 		items = current_bucket -> current_items;
 		current_keys = current_bucket -> new_item_keys;
@@ -1025,7 +1022,7 @@ void select_best_vote(gene_vote_t * vote)
 		}
 }
 
-short indel_recorder_copy(char *dst, char * src)
+short indel_recorder_copy(gene_vote_number_t *dst, gene_vote_number_t * src)
 {
 	short all_indels = 0;
 //	memcpy(dst, src, 3*MAX_INDEL_TOLERANCE);  return;

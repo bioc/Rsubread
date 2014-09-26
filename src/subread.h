@@ -145,7 +145,8 @@ typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
 //typedef float gene_quality_score_t;
 typedef int gene_quality_score_t;
-typedef char gene_vote_number_t;
+//typedef unsigned char gene_vote_number_t;
+typedef short gene_vote_number_t;
 
 
 #define XOFFSET_TABLE_SIZE 250000
@@ -261,19 +262,18 @@ typedef struct {
 	gene_vote_number_t max_vote;
 	gehash_data_t max_position;
 	gene_quality_score_t max_quality;
-	char max_indel_recorder[MAX_INDEL_TOLERANCE*3];
-	char * max_tmp_indel_recorder;
+	gene_vote_number_t max_indel_recorder[MAX_INDEL_TOLERANCE*3];
+	gene_vote_number_t * max_tmp_indel_recorder;
 	short max_mask;
-	unsigned char all_used_subreads;
-	unsigned char noninformative_subreads;
+	gene_vote_number_t noninformative_subreads;
 
-        unsigned char items[GENE_VOTE_TABLE_SIZE];
+        unsigned short items[GENE_VOTE_TABLE_SIZE];
         unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-	char indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
+	gene_vote_number_t indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 

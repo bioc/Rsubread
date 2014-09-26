@@ -39,7 +39,7 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
-#define init_gene_vote(a) {memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof(char)); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0; (a) -> all_used_subreads = 0; (a) -> noninformative_subreads = 0; }
+#define init_gene_vote(a) {memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof( *((a)->items))); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;  (a) -> noninformative_subreads = 0; }
 // return current votes for a given position
 // if create_new_pos == 0 then do not take this position if it does not exist in the vote array
 //void add_gene_vote(gene_vote_t* vote, int position, int create_new_pos);
@@ -70,10 +70,10 @@ void print_window_scrolling_bar(char * hint, float percentage, int width, int * 
 void print_running_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads, int is_pair) ;
 
 
-int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1,  gene_quality_score_t * qual_r2, gehash_data_t * pos_read1, gehash_data_t * pos_read2, char * read1_indel_recorder, char* read2_indel_recorder, unsigned int max_pair_dist, unsigned int min_pair_dist, int min_major, int min_minor, int is_negatve, int number_of_anchors_quality, int max_indel_len, int * is_breakeven);
+int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * qual_r1,  gene_quality_score_t * qual_r2, gehash_data_t * pos_read1, gehash_data_t * pos_read2, gene_vote_number_t * read1_indel_recorder, gene_vote_number_t* read2_indel_recorder, unsigned int max_pair_dist, unsigned int min_pair_dist, int min_major, int min_minor, int is_negatve, int number_of_anchors_quality, int max_indel_len, int * is_breakeven);
 
 
-int select_positions_array(char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * q_r1, gene_quality_score_t *q_r2, char * indel_rec_r1, char * indel_rec_r2, gehash_data_t * pos_read1, gehash_data_t * pos_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int number_of_anchors_quality, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int * is_breakeven);
+int select_positions_array(char * read1_str, int read1_len, char * read2_str, int read2_len,  gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vote_number_t * numvote_read1, gene_vote_number_t * numvote_read2, gene_quality_score_t * sum_quality, gene_quality_score_t * q_r1, gene_quality_score_t *q_r2, gene_vote_number_t * indel_rec_r1, gene_vote_number_t * indel_rec_r2, gehash_data_t * pos_read1, gehash_data_t * pos_read2, unsigned int max_pair_dest, unsigned int min_pair_dest, int min_major, int min_minor,int is_negative_strand, gene_value_index_t * my_array_index, int color_space, int indel_tolerance, int number_of_anchors_quality, const char quality_str1 [], const char quality_str2 [], int quality_scale, int max_indel_len, int * is_breakeven);
 
 
 #define QUALITY_SCALE_NONE 0
@@ -89,7 +89,7 @@ gene_vote_number_t calculate_penalty_score(const char * quality_str, const char 
 
 int is_valid_subread(const char * read_str);
 
-void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, char * max_indel_recorder, int * max_coverage_start, int * max_coverage_end);
+void final_matchingness_scoring(const char read_str[], const char quality_str[], int read_len, gene_vote_t * vote, gehash_data_t * max_position, gene_vote_number_t * max_vote, short *max_mask, gene_quality_score_t * max_quality, gene_value_index_t * my_array_index, int space_type, int indel_tolerance, int quality_scale, gene_vote_number_t * max_indel_recorder, int * max_coverage_start, int * max_coverage_end);
 
 float match_read(const char read_str[], int read_len, unsigned int potential_position,  gene_value_index_t * my_array_index, int space_type, int indel_tolerance, const char quality_str [], int quality_scale) ;
 
@@ -134,7 +134,7 @@ void subread_init_lock(subread_lock_t * lock);
 void subread_lock_release(subread_lock_t * lock);
 void remove_indel_neighbours(HashTable * indel_table);
 float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int * all_MM, int ql_kill);
-int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int indel_size, char * indel_recorder, int total_subreads);
+int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int indel_size, gene_vote_number_t * indel_recorder, int total_subreads);
 float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch, int * all_MM, int ql_kill);
 void print_version_info();
 

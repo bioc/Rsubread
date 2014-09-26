@@ -119,7 +119,7 @@ void print_usage_core_aligner()
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("");
 	SUBREADputs("    -M --maxMismatches <int> Specify the maximum number of mis-matched bases");
-	SUBREADputs("                            allowed in the alignment. 10 by default. Mis-matches");
+	SUBREADputs("                            allowed in the alignment. 3 by default. Mis-matches");
 	SUBREADputs("                            found in soft-clipped bases are not counted.");
 	SUBREADputs("   ");
 	SUBREADputs("       --reportFusions      report discovered genomic fusion events such as");
@@ -209,9 +209,8 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	optopt = 63;
 
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
-	global_context->config.max_mismatch_exonic_reads = 200;
-	global_context->config.max_mismatch_junction_reads = 200;
-	global_context->config.max_mismatch_entire_reads = 9999;
+	global_context->config.max_mismatch_exonic_reads = 3;
+	global_context->config.max_mismatch_junction_reads = 3;
 	global_context->config.use_dynamic_programming_indel = 1;
 
 	// config.extending_search_indels is changed from 1 to 0 on 10/mar/2014
@@ -354,7 +353,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				}
 				break;
 			case 'M':
-				global_context->config.max_mismatch_entire_reads = atoi(optarg);
+				global_context->config.max_mismatch_exonic_reads = atoi(optarg);
 				break;
 			case 'P':
 				if (optarg[0]=='3')

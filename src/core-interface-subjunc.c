@@ -49,6 +49,7 @@ static struct option long_options[] =
 	{"relaxMismatchedBases",  no_argument, 0, 0},
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
+	{"exonicSubreadFrac",  required_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -118,7 +119,7 @@ void print_usage_core_subjunc()
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("   ");
 	SUBREADputs("    -M --maxMismatches <int> Specify the maximum number of mis-matched bases");
-	SUBREADputs("                            allowed in the alignment. 10 by default. Mis-matches");
+	SUBREADputs("                            allowed in the alignment. 3 by default. Mis-matches");
 	SUBREADputs("                            found in soft-clipped bases are not counted.");
 	SUBREADputs("   ");
 //	SUBREADputs("       --disableBigMargin   disable big margin for calling junctions.");
@@ -203,8 +204,8 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	optopt = 63;
 
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBJUNC;
-	global_context->config.max_mismatch_exonic_reads = 10;
-	global_context->config.max_mismatch_junction_reads = 1;
+	global_context->config.max_mismatch_exonic_reads = 3;
+	global_context->config.max_mismatch_junction_reads = 3;
 	global_context->config.ambiguous_mapping_tolerance = 39 - 20 ;
 	global_context->config.extending_search_indels = 0;
 	global_context->config.do_fusion_detection =0;
@@ -214,10 +215,12 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.total_subreads = 14;
 	global_context->config.minimum_subread_for_first_read =1;
 	global_context->config.minimum_subread_for_second_read = 1;
+	global_context->config.minimum_exonic_subread_fraction = 0.3;
 	global_context->config.high_quality_base_threshold = 990000;
 	global_context->config.do_big_margin_filtering_for_junctions = 1;
 	global_context->config.report_no_unpaired_reads = 0;
-	global_context->config.limited_tree_scan = 1;
+
+	global_context->config.limited_tree_scan = 0;
 	global_context->config.use_hamming_distance_in_exon = 0;
 	global_context->config.big_margin_record_size = 24;
 
@@ -300,7 +303,8 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 
 				break;
 			case 'M':
-				global_context->config.max_mismatch_entire_reads = atoi(optarg);
+				global_context->config.max_mismatch_exonic_reads = atoi(optarg);
+				global_context->config.max_mismatch_junction_reads = atoi(optarg);
 				break;
 			case 'R':
 				global_context->input_reads.is_paired_end_reads = 1;
@@ -417,12 +421,17 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.max_mismatch_junction_reads = 999;
 					global_context->config.max_mismatch_exonic_reads = 999;
-					global_context->config.max_mismatch_entire_reads = 3;
 					global_context->config.min_mapped_fraction = 61;
 				}
 				else if(strcmp("reportPairedMultiBest", long_options[option_index].name)==0) 
 				{
 					global_context->config.report_multiple_best_in_pairs = 1;
+				}
+				else if(strcmp("exonicSubreadFrac", long_options[option_index].name)==0) 
+				{
+					if(atof(optarg)>0)
+						global_context->config.minimum_exonic_subread_fraction = atof(optarg);
+					else	SUBREADprintf("WARNING: unknown parameter: --exonicSubreadFrac '%s'\n", optarg);
 				}
 				else if(strcmp("disableBigMargin", long_options[option_index].name)==0) 
 				{

@@ -308,7 +308,7 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 
 }
 
-void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, char * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset)
+void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, gene_vote_number_t* indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset)
 {
 	if(best_read_id >= global_context->config.multi_best_reads) return;
 	alignment_result_t * alignment_result = _global_retrieve_alignment_ptr(global_context, pair_number, is_second_read, best_read_id);
@@ -353,7 +353,8 @@ int is_ambiguous_indel_score(chromosome_event_t * e)
 }
 void remove_neighbour(global_context_t * global_context)
 {
-//	return;
+	//#warning "====================== MUST COMMENT THIS LINE!!  ====================="
+	//return;
 
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 
@@ -1152,7 +1153,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 	int last_correct_subread = 0;
 	int last_indel = 0;
 
-	char * indel_recorder;
+	gene_vote_number_t * indel_recorder;
 	unsigned int voting_position;
 
 	HashTable * event_table = NULL;
@@ -1248,9 +1249,10 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 							{
 								//if(pair_number == 17296)
 								//printf("R%d : NEW INDEL: %u; len = %d\n", is_second_read, indel_left_boundary - 1 , current_indel_len);
-								#ifdef indel_debug
-								printf("NEW INDEL: %u; len = %d\n", indel_left_boundary - 1 , current_indel_len);
-								#endif
+								//#ifdef indel_debug
+								//#warning "=========== COMMENT THIS LINE ==============="
+								//printf("NEW INDEL: %u; len = %d\n", indel_left_boundary - 1 , current_indel_len);
+								//#endif
 
 								// let's test if it is ambiguous:
 								gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
@@ -1264,7 +1266,8 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 									if(left_match+right_match == best_matched_bases) ambiguous_count ++;
 								}
 
-								//printf("INDEL_DDADD: I=%d; INDELS=%d; PN=%d; LOC=%u\n",i, current_indel_len, pair_number, indel_left_boundary-1);
+								//#warning "=========== COMMENT THIS LINE ==============="
+								//printf("INDEL_DDADD: abs(I=%d); INDELS=%d; PN=%d; LOC=%u\n",i, current_indel_len, pair_number, indel_left_boundary-1);
 								if(abs(current_indel_len)<=global_context -> config.max_indel_length)
 								{
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);
@@ -1537,6 +1540,7 @@ int write_indel_final_results(global_context_t * global_context)
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 
 
+		//#warning " ================= REMOVE '- 1' from the next LINE!!! ========================="
 		if((event_body -> event_type != CHRO_EVENT_TYPE_INDEL && event_body->event_type != CHRO_EVENT_TYPE_LONG_INDEL  && event_body -> event_type != CHRO_EVENT_TYPE_POTENTIAL_INDEL)|| (event_body -> final_counted_reads < 1 && event_body -> event_type == CHRO_EVENT_TYPE_INDEL) )
 			continue;
 
@@ -3669,6 +3673,7 @@ void init_global_context(global_context_t * context)
 	context->config.is_BAM_input = 0;
 	context->config.read_trim_5 = 0;
 	context->config.read_trim_3 = 0;
+	context->config.minimum_exonic_subread_fraction = -1.0;
 	context->config.is_first_read_reversed = 0;
 	context->config.is_second_read_reversed = 1;
 	context->config.space_type = GENE_SPACE_BASE;
@@ -3691,7 +3696,6 @@ void init_global_context(global_context_t * context)
 	context->config.minimum_subread_for_first_read = 3;
 	context->config.minimum_subread_for_second_read = 1;
 	context->config.min_mapped_fraction = 0;
-	context->config.max_mismatch_entire_reads = 10;
 	context->config.max_mismatch_exonic_reads = 5;
 	context->config.max_mismatch_junction_reads = 2;
 	context->config.all_threads = 1;
