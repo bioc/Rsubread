@@ -3069,8 +3069,8 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 				//if(current_read_number == 119) {
 				//	SUBREADprintf("NOINF=%d\n", vote_1 -> noninformative_subreads );
-				//#warning =============== COMMENT THIS LINE!!!! ======================
-				//	print_votes(vote_1, global_context -> config.index_prefix);
+		//		#warning =============== COMMENT THIS LINE!!!! ======================
+		//			print_votes(vote_1, global_context -> config.index_prefix);
 				//}
 				//	print_votes(vote_2, global_context -> config.index_prefix);
 				//}

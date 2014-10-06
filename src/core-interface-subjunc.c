@@ -277,6 +277,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'u':
 				global_context->config.report_multi_mapping_reads = 0;
+				global_context->config.use_hamming_distance_break_ties = 1;
 				break;
 			case 'b':
 				global_context->config.convert_color_to_base = 1;

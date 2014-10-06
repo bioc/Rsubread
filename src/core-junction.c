@@ -1466,7 +1466,8 @@ int find_soft_clipping(global_context_t * global_context,  thread_context_t * th
 		// find the first matched base, such that the matched bases >= SOFT_CLIPPING_WINDOW_SIZE - SOFT_CLIPPING_MAX_ERROR if this base is added into the window.
 		if(window_matched[0])
 		{
-			if(sum_matched > SOFT_CLIPPING_WINDOW_SIZE - SOFT_CLIPPING_MAX_ERROR)
+			//SUBREADprintf("SOFTCLIP: %d > %d?\n", sum_matched, SOFT_CLIPPING_WINDOW_SIZE - SOFT_CLIPPING_MAX_ERROR);
+			if(sum_matched >= SOFT_CLIPPING_WINDOW_SIZE - SOFT_CLIPPING_MAX_ERROR)
 			{
 				return max(0 , x0 - SOFT_CLIPPING_WINDOW_SIZE + 1);
 			}

@@ -1291,15 +1291,16 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if(is_this_negative_strand){
 						Section_Lengths [cigar_sections - 1] += global_context -> five_end_extension;
 					}else{
-						if( Starting_Points [0] > global_context -> five_end_extension)
+						//SUBREADprintf("5-end extension: %d [%d]\n", Starting_Points[0], Section_Lengths[0]);
+						if( read_pos > global_context -> five_end_extension)
 						{
-							Starting_Points [0]  -= global_context -> five_end_extension;
 							Section_Lengths [0] += global_context -> five_end_extension;
+							read_pos  -= global_context -> five_end_extension;
 						}
 						else
 						{
-							Section_Lengths [0] += Starting_Points [0]-1;
-							Starting_Points [0] = 1;
+							Section_Lengths [0] += read_pos-1;
+							read_pos = 1;
 						}
 					}
 				}
@@ -1308,15 +1309,15 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 
 					if(is_this_negative_strand){
-						if( Starting_Points [0] > global_context -> three_end_extension)
+						if( read_pos > global_context -> three_end_extension)
 						{
-							Starting_Points [0]  -= global_context -> three_end_extension;
 							Section_Lengths [0] += global_context -> three_end_extension;
+							read_pos -= global_context -> three_end_extension;
 						}
 						else
 						{
-							Section_Lengths [0] += Starting_Points [0]-1;
-							Starting_Points [0] = 1;
+							Section_Lengths [0] += read_pos - 1;
+							read_pos = 1;
 						}
 					}
 					else	Section_Lengths [cigar_sections - 1] += global_context -> three_end_extension;
@@ -2602,7 +2603,7 @@ void print_usage()
 	SUBREADputs("              \tmost base. Read summarization is then performed based on the");
 	SUBREADputs("              \tsingle base which the read is reduced to."); 
 	SUBREADputs("    "); 
-	SUBREADputs("    ----ignoreDup               If specified, reads that were marked as");
+	SUBREADputs("    --ignoreDup                 If specified, reads that were marked as");
 	SUBREADputs("              \tduplicates will be ignored. Bit Ox400 in FLAG field of SAM/BAM");
 	SUBREADputs("              \tfile is used for identifying duplicate reads. In paired end");
 	SUBREADputs("              \tdata, the entire read pair will be ignored if at least one end");
