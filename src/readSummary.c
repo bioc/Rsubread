@@ -1267,9 +1267,12 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Starting_Points, Section_Lengths);
 
+
 			if(cigar_sections>1 || !global_context->is_split_alignments_only) 
 			{
 
+		//	for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
+		//		SUBREADprintf("BCCC: %llu , sec[%d] %d ~ %d ; secs=%d ; flags=%d ; second=%d\n", read_pos, cigar_section_id , Starting_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections, alignment_masks, is_second_read);
 				if(global_context -> reduce_5_3_ends_to_one)
 				{
 					if((REDUCE_TO_5_PRIME_END == global_context -> reduce_5_3_ends_to_one) + is_this_negative_strand == 1) // reduce to 5' end (small coordinate if positive strand / large coordinate if negative strand)
@@ -1324,6 +1327,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				}
 
+		//	for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
+		//		SUBREADprintf("ACCC: %llu , sec[%d] %u ~ %d ; secs=%d\n", read_pos, cigar_section_id, Starting_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections);
 				if( global_context -> debug_command [0] == 'D')
 					SUBREADprintf("\n\nRead name = %s ; Second read = %d\n", read_name, is_second_read);
 
