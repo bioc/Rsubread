@@ -1463,6 +1463,13 @@ int find_soft_clipping(global_context_t * global_context,  thread_context_t * th
 		sum_matched += window_matched[0];
 		(*remedy) += !(window_matched[0]);
 
+		/*
+		for(x2 = 0; x2 < SOFT_CLIPPING_WINDOW_SIZE; x2++){
+			printf("%d ", window_matched[x2]);
+		}
+		printf("\nMA=%d  X0=%d\n", sum_matched, x0);
+		*/
+
 		// find the first matched base, such that the matched bases >= SOFT_CLIPPING_WINDOW_SIZE - SOFT_CLIPPING_MAX_ERROR if this base is added into the window.
 		if(window_matched[SOFT_CLIPPING_WINDOW_SIZE-1])
 		{
