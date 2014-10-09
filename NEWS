@@ -1,3 +1,22 @@
+CHANGES IN VERSION 1.16.0
+------------------------
+
+NEW FEATURES
+
+    o Subread aligner (align function) can accurately map micro RNA (miRNA) sequencing reads. A full index without gaps should be built for the reference genome before mapping miRNA-seq reads.
+
+    o Subjunc requires the number of consensus subreads to be at least 30 percent of the total number of extracted subreads when reporting hits for exonic reads. This improves the mapping accuracy of such reads.
+
+    o Reads are allowed to be extended in featureCounts.
+
+    o Minimum required number of overlapped bases can be specified when assigning reads to features in featureCounts.
+
+    o By default, Subread and Subjunc aligners do not allow more than three mismatches in the reported alignments. This however can be tuned via the `maxMismatches' parameter.
+
+    o A number of bug fixes.
+
+
+
 CHANGES IN VERSION 1.14.0
 ------------------------
 
