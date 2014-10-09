@@ -1,4 +1,4 @@
-subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,maxMismatches=10,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
 {
 	if(length(readfile1) != length(output_file))
 		stop("The number of input file names is different from the number of output file names.")

@@ -1,3 +1,11 @@
+9 Oct 2014 - 1.15.11
+(1) Fixed a bug in featureCounts for read extension.
+(1) When full index is built, subreads can be extracted from every position of the read and only one subread set is required for mapping. 
+(2) By default, the maximum allowed mismatches in the mapped reads are 3.
+(3) The soft-clipping bug in subread/subjunc is fixed.
+(6) Bug fix for Subindel in generating CIGAR for assembled contigs.
+(7) Subjunc requires the number of consensus subreads be at least 30% of the extracted subreads when reporting a hit for any exonic read.
+
 7 June 2014 - 1.15.9
 (1) Fixed a bug for reporting unmapped reads in SAM output.
 
