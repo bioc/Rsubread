@@ -1,3 +1,6 @@
+10 Oct 2014 - 1.15.12
+(1) updated users guide.
+
 9 Oct 2014 - 1.15.11
 (1) Fixed a bug in featureCounts for read extension.
 (1) When full index is built, subreads can be extracted from every position of the read and only one subread set is required for mapping. 
