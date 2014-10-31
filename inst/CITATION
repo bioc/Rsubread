@@ -2,13 +2,12 @@ citHeader("Please cite Rsubread as below:")
 
 citEntry(entry="Article",
     title = "The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote",
-    author = personList(as.person("Liao Y"),as.person("Smyth GK"),as.person("Shi W")),
+    author = "Yang Liao and Gordon K. Smyth and Wei Shi",
     journal="Nucleic Acids Research",
     year = 2013,
     volume = 41,
     issue = 10,
     pages = "e108",
 
-    textVersion = 
-    paste("Liao Y, Smyth GK and Shi W. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108, 2013")
+    textVersion = "Liao Y, Smyth GK and Shi W (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. Nucleic Acids Research, 41(10):e108."
     )
