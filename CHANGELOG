@@ -1,3 +1,7 @@
+19 June 2015 - 1.19.1
+(1) Added 'sortByName' and "fraction" parameters for featureCounts.
+(2) Improved the reporting of meta-features that have excessive number of features in featureCounts output.
+
 27 March 2005
 (1) Improved documentation for propmapped function.
 
