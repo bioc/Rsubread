@@ -1,3 +1,6 @@
+23 June 2015 - 1.19.2
+(1) Changed parameter 'sortByName' to 'autosort' in featureCounts.
+ 
 19 June 2015 - 1.19.1
 (1) Added 'sortByName' and "fraction" parameters for featureCounts.
 (2) Improved the reporting of meta-features that have excessive number of features in featureCounts output.

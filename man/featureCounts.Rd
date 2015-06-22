@@ -11,7 +11,7 @@ nthreads=1,strandSpecific=0,minMQS=0,
 readExtension5=0,readExtension3=0,read2pos=NULL,
 minReadOverlap=1,countSplitAlignmentsOnly=FALSE,
 countMultiMappingReads=FALSE,fraction=FALSE,countPrimaryAlignmentsOnly=FALSE,
-countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,sortByName=TRUE)
+countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
@@ -42,7 +42,7 @@ countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,so
   \item{ignoreDup}{ logical indicating whether reads marked as duplicates should be ignored. \code{FALSE} by default. Read duplicates are identified using bit Ox400 in the FLAG field in SAM/BAM files. The whole fragment (read pair) will be ignored if paired end.}
   \item{chrAliases}{ a character string giving the name of a file that contains aliases of chromosome names. The file should be a comma delimited text file that includes two columns. The first column gives the chromosome names used in the annotation and the second column gives the chromosome names used by reads. This file should not contain header lines. Names included in this file are case sensitive.}
   \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
-  \item{sortByName}{ logical indicating if reads in the input need to be sorted. This option is only applicable for paired end reads. This function requires the reads from the same pair to be placed next to each other in the input. If this is not the case, this option should be set to \code{TRUE} and the function will then sort the reads by their names before counting them. By default, its value is \code{TRUE}.}
+  \item{autosort}{ logical specifying if the automatic read sorting is enabled. This option is only applicable for paired-end reads. If \code{TRUE}, reads will be automatically sorted by their names if reads from the same pair are found not to be located next to each other in the input. No read sorting will be performed if there are no such reads found.}
   }
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.
