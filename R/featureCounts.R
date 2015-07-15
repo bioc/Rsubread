@@ -1,4 +1,4 @@
-featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,nthreads=1,strandSpecific=0,minMQS=0,readExtension5=0,readExtension3=0,read2pos=NULL,minReadOverlap=1,countSplitAlignmentsOnly=FALSE,countMultiMappingReads=FALSE,fraction=FALSE,countPrimaryAlignmentsOnly=FALSE,countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
+featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,nthreads=1,strandSpecific=0,minMQS=0,readExtension5=0,readExtension3=0,read2pos=NULL,minOverlap=1,countSplitAlignmentsOnly=FALSE,countMultiMappingReads=FALSE,fraction=FALSE,countPrimaryAlignmentsOnly=FALSE,countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
 {
 	flag <- FALSE
 
@@ -57,7 +57,7 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	read2pos_C <- read2pos
 	if(is.null(read2pos)) read2pos_C <- 0
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minReadOverlap,as.numeric(countSplitAlignmentsOnly),read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),sep=",")
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,as.numeric(countSplitAlignmentsOnly),read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
