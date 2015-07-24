@@ -23,11 +23,11 @@
 #include "subread.h"
 #include "HelperFunctions.h"
 
-int RSubread_parse_CIGAR_string(const char * CIGAR_Str, unsigned int * Staring_Points, unsigned short * Section_Length)
+int RSubread_parse_CIGAR_string(const char * CIGAR_Str, int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read)
 {
 	unsigned int tmp_int=0;
 	int cigar_cursor=0;
-	unsigned short read_cursor=0;
+	unsigned short current_section_chro_len=0, current_section_start_read_pos = 0, read_cursor = 0;
 	unsigned int chromosome_cursor=0;
 	int ret=0;
 
@@ -41,28 +41,32 @@ int RSubread_parse_CIGAR_string(const char * CIGAR_Str, unsigned int * Staring_P
 		}
 		else
 		{
-			if(ch == 'M' || ch == 'D')
-			{
+			if(ch == 'S')
 				read_cursor += tmp_int;
+			else if(ch == 'M') {
+				read_cursor += tmp_int;
+				current_section_chro_len += tmp_int;
 				chromosome_cursor += tmp_int;
-			}
-			else if(ch == 'N' || ch == 0)
-			{
-				if(ret <6)
+			} else if(ch == 'N' || ch == 'D' || ch=='I' || ch == 0) {
+				if('N' == ch)(*is_junction_read)=1;
+				if(ret < FC_CIGAR_PARSER_ITEMS)
 				{
-					if(read_cursor>0)
+					if(current_section_chro_len>0)
 					{
-						Staring_Points[ret] = chromosome_cursor - read_cursor;
-						Section_Length[ret] = read_cursor;
+						Section_Start_Chro_Pos[ret] = chromosome_cursor - current_section_chro_len;
+						Section_Start_Read_Pos[ret] = current_section_start_read_pos;
+						Section_Chro_Length[ret] = current_section_chro_len;
 						ret ++;
 					}
 				}
-				read_cursor = 0;
+				current_section_chro_len = 0;
+				if(ch == 'I') read_cursor += tmp_int;
+				else if(ch == 'N' || ch == 'D') chromosome_cursor += tmp_int;
+				current_section_start_read_pos = read_cursor;
 
-				if(ch == 'N') chromosome_cursor += tmp_int;
-				else break;
+				if(ch == 0) break;
 			}
-			//printf("C=%c, TV=%d, CC=%d, RC=%d\n", ch, tmp_int, chromosome_cursor, read_cursor);
+			//printf("C=%c, TV=%d, CC=%d, RC=%d\n", ch, tmp_int, chromosome_cursor, current_section_chro_len);
 			tmp_int = 0;
 		}
 		if(cigar_cursor>100) return -1;
@@ -73,15 +77,18 @@ int RSubread_parse_CIGAR_string(const char * CIGAR_Str, unsigned int * Staring_P
 
 void display_sections(char * CIGAR_Str)
 {
-	unsigned int Staring_Points[6];
-	unsigned short Section_Length[6];
-	int retv = RSubread_parse_CIGAR_string(CIGAR_Str, Staring_Points, Section_Length);
+	int is_junc=0;
+	int Section_Start_Chro_Pos[FC_CIGAR_PARSER_ITEMS];
+	unsigned short Section_Start_Read_Pos[FC_CIGAR_PARSER_ITEMS];
+	unsigned short Section_Chro_Length[FC_CIGAR_PARSER_ITEMS];
+
+	int retv = RSubread_parse_CIGAR_string(CIGAR_Str, Section_Start_Chro_Pos, Section_Start_Read_Pos, Section_Chro_Length, &is_junc);
 
 	int x1;
 	SUBREADprintf("Cigar=%s ; Sections=%d\n", CIGAR_Str, retv);
 	for(x1=0; x1<retv; x1++)
 	{
-		SUBREADprintf("   Section #%d: offset=%u  length=%u\n",x1, Staring_Points[x1], Section_Length[x1]);
+		SUBREADprintf("   Section #%d: chro_offset=%d, read_offset=%u  length=%u\n",x1, Section_Start_Chro_Pos[x1], Section_Start_Read_Pos[x1], Section_Chro_Length[x1]);
 	}
 	SUBREADprintf("\n");
 	
@@ -331,7 +338,7 @@ void main()
 void testi_helper_1_main()
 #endif
 {
-	hpl_test2_func();
+	hpl_test1_func();
 }
 
 char *str_replace(char *orig, char *rep, char *with) {

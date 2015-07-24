@@ -29,7 +29,7 @@
 
 // This function returns the number of sections found in the CIGAR string. It returns -1 if the CIGAR string cannot be parsed.
 
-int RSubread_parse_CIGAR_string(const char * CIGAR_Str, unsigned int * Staring_Points, unsigned short * Section_Length);
+int RSubread_parse_CIGAR_string(const char * CIGAR_Str, int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read);
 
 
 // This function try to find the attribute value of a given attribute name from the extra column string in GTF/GFF.

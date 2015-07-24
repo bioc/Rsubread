@@ -111,15 +111,22 @@ typedef struct
 	pthread_spinlock_t input_buffer_lock;
 
 
-	short hits_total_length1[MAX_HIT_NUMBER];
-	short hits_total_length2[MAX_HIT_NUMBER];
+	unsigned short hits_read_start_base1[MAX_HIT_NUMBER];
+	unsigned short hits_read_start_base2[MAX_HIT_NUMBER];
+
+	short hits_read_len1[MAX_HIT_NUMBER];
+	short hits_read_len2[MAX_HIT_NUMBER];
+
 	long hits_indices1 [MAX_HIT_NUMBER];
 	long hits_indices2 [MAX_HIT_NUMBER];
 	long decision_table_ids [MAX_HIT_NUMBER];
-	unsigned char decision_table_votes [MAX_HIT_NUMBER];
+	unsigned short decision_table_votes [MAX_HIT_NUMBER];
 	long decision_table_exon_ids [MAX_HIT_NUMBER];
+	char decision_table_read1_used[MAX_HIT_NUMBER];
+	char decision_table_read2_used[MAX_HIT_NUMBER];
 	long uniq_gene_exonid_table [MAX_HIT_NUMBER];
 	long uniq_gene_table [MAX_HIT_NUMBER];
+	char * read_coverage_bits;
 
 	char * chro_name_buff;
 	z_stream * strm_buffer;
@@ -180,7 +187,9 @@ typedef struct
 	int longest_chro_name;
 	int five_end_extension;
 	int three_end_extension;
-	int overlap_length_required;
+	int fragment_minimum_overlapping;
+	int calculate_overlapping_lengths;
+	int use_overlapping_break_tie;
 
 	unsigned long long int all_reads;
 
@@ -350,8 +359,8 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	print_in_box(80,0,0,"Multi-overlapping reads : %s", global_context->is_multi_overlap_allowed?"counted":"not counted");
 	if(global_context -> is_split_alignments_only)
 		print_in_box(80,0,0,"       Split alignments : required");
-	if(global_context -> overlap_length_required !=1)
-		print_in_box(80,0,0,"      Overlapping bases : %d", global_context -> overlap_length_required);
+	if(global_context -> fragment_minimum_overlapping !=1)
+		print_in_box(80,0,0,"      Overlapping bases : %d", global_context -> fragment_minimum_overlapping);
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
 		print_in_box(80,0,0,"        Read extensions : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
 	if(global_context -> reduce_5_3_ends_to_one)
@@ -1090,6 +1099,13 @@ void report_unpair_warning(fc_thread_global_context_t * global_context, fc_threa
 	(*this_noproperly_paired_added) = 1;
 }
 
+
+void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context,
+			long * hits_indices1, unsigned short * hits_read_start_base1, short * hits_read_len1, int nhits1, unsigned short rl1,
+			long * hits_indices2, unsigned short * hits_read_start_base2, short * hits_read_len2, int nhits2, unsigned short rl2,
+			int fixed_fractional_count, char * read_name);
+
+
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
 {
 
@@ -1098,7 +1114,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	unsigned int search_start = 0, search_end;
 	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
 	long * hits_indices1 = thread_context -> hits_indices1, * hits_indices2 = thread_context -> hits_indices2;
-	short * hits_total_length1 = thread_context -> hits_total_length1 ,  * hits_total_length2 = thread_context -> hits_total_length2;
+	unsigned short * hits_read_start_base1 = thread_context -> hits_read_start_base1 ,  * hits_read_start_base2 = thread_context -> hits_read_start_base2;
+	short * hits_read_len1 = thread_context -> hits_read_len1, * hits_read_len2 = thread_context -> hits_read_len2;
+	unsigned short cigar_read_len1 = 0, cigar_read_len2 = 0;
 
 	int is_second_read;
 	int maximum_NH_value = 1;
@@ -1382,8 +1400,12 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
-		int is_second_read_in_pair = alignment_masks & SAM_FLAG_SECOND_READ_IN_PAIR;
-		int is_fragment_negative_strand = is_second_read_in_pair?(!is_this_negative_strand):is_this_negative_strand;
+		int is_fragment_negative_strand = is_this_negative_strand;
+
+		if( global_context -> is_paired_end_mode_assign ){
+			int is_second_read_in_pair = alignment_masks & SAM_FLAG_SECOND_READ_IN_PAIR;
+			is_fragment_negative_strand = is_second_read_in_pair?(!is_this_negative_strand):is_this_negative_strand;
+		}
 
 		fc_chromosome_index_info * this_chro_info = HashTableGet(global_context -> exontable_chro_table, read_chr);
 		if(this_chro_info == NULL)
@@ -1411,21 +1433,25 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		{
 			int nhits = 0;
 
-			int cigar_section_id, cigar_sections;
-			unsigned int Starting_Points[6];
-			unsigned short Section_Lengths[6];
+			int cigar_section_id, cigar_sections, is_junction_read = 0;
+			int Starting_Chro_Points[FC_CIGAR_PARSER_ITEMS];
+			unsigned short Starting_Read_Points[FC_CIGAR_PARSER_ITEMS];
+			unsigned short Section_Lengths[FC_CIGAR_PARSER_ITEMS];
 			long * hits_indices = (is_second_read?hits_indices2:hits_indices1);
-			short * hits_total_length = (is_second_read?hits_total_length2:hits_total_length1);
+			unsigned short * hits_read_start_base = is_second_read?hits_read_start_base2:hits_read_start_base1;
+			short * hits_read_len = is_second_read?hits_read_len2:hits_read_len1;
+			unsigned short * cigar_read_len = is_second_read?&cigar_read_len2:&cigar_read_len1;
 
-			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Starting_Points, Section_Lengths);
+			cigar_sections = RSubread_parse_CIGAR_string(CIGAR_str, Starting_Chro_Points, Starting_Read_Points, Section_Lengths, &is_junction_read);
 
+			(*cigar_read_len) = Starting_Read_Points[cigar_sections-1] + Section_Lengths[cigar_sections-1];
 
-			if(cigar_sections>1 || !global_context->is_split_alignments_only) 
+			if(is_junction_read || !global_context->is_split_alignments_only) 
 			{
 
 			//#warning "=================== COMMENT THESE 2 LINES ================================"
 			//for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
-			//	SUBREADprintf("BCCC: %llu , sec[%d] %d ~ %d ; secs=%d ; flags=%d ; second=%d\n", read_pos, cigar_section_id , Starting_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections, alignment_masks, is_second_read);
+			//	SUBREADprintf("BCCC: %llu , sec[%d] %d ~ %d ; secs=%d ; flags=%d ; second=%d\n", read_pos, cigar_section_id , Starting_Chro_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections, alignment_masks, is_second_read);
 				if(global_context -> reduce_5_3_ends_to_one)
 				{
 					if((REDUCE_TO_5_PRIME_END == global_context -> reduce_5_3_ends_to_one) + is_this_negative_strand == 1) // reduce to 5' end (small coordinate if positive strand / large coordinate if negative strand)
@@ -1434,7 +1460,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					}
 					else
 					{
-						Starting_Points[0] = Starting_Points[cigar_sections-1] + Section_Lengths[cigar_sections-1] - 1;
+						Starting_Chro_Points[0] = Starting_Chro_Points[cigar_sections-1] + Section_Lengths[cigar_sections-1] - 1;
 						Section_Lengths[0]=1;
 					}
 
@@ -1447,16 +1473,16 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					if(is_this_negative_strand){
 						Section_Lengths [cigar_sections - 1] += global_context -> five_end_extension;
 					}else{
-						//SUBREADprintf("5-end extension: %d [%d]\n", Starting_Points[0], Section_Lengths[0]);
+						//SUBREADprintf("5-end extension: %d [%d]\n", Starting_Chro_Points[0], Section_Lengths[0]);
 						if( read_pos > global_context -> five_end_extension)
 						{
 							Section_Lengths [0] += global_context -> five_end_extension;
-							read_pos  -= global_context -> five_end_extension;
+							Starting_Chro_Points [0] -= global_context -> five_end_extension;
 						}
 						else
 						{
 							Section_Lengths [0] += read_pos-1;
-							read_pos = 1;
+							Starting_Chro_Points [0] -= read_pos-1;
 						}
 					}
 				}
@@ -1468,12 +1494,12 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						if( read_pos > global_context -> three_end_extension)
 						{
 							Section_Lengths [0] += global_context -> three_end_extension;
-							read_pos -= global_context -> three_end_extension;
+							Starting_Chro_Points [0] -= global_context -> three_end_extension;
 						}
 						else
 						{
 							Section_Lengths [0] += read_pos - 1;
-							read_pos = 1;
+							Starting_Chro_Points [0] -= read_pos - 1;
 						}
 					}
 					else	Section_Lengths [cigar_sections - 1] += global_context -> three_end_extension;
@@ -1482,19 +1508,14 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			//#warning "=================== COMMENT THESE 2 LINES ================================"
 			//for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
-			//	SUBREADprintf("ACCC: %llu , sec[%d] %u ~ %d ; secs=%d\n", read_pos, cigar_section_id, Starting_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections);
-				if( global_context -> debug_command [0] == 'D')
-					SUBREADprintf("\n\nRead name = %s ; Second read = %d\n", read_name, is_second_read);
+			//	SUBREADprintf("ACCC: %llu , sec[%d] %u ~ %d ; secs=%d\n", read_pos, cigar_section_id, Starting_Chro_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections);
 
 				for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
 				{
-					long section_begin_pos = read_pos + Starting_Points[cigar_section_id];
+					long section_begin_pos = read_pos + Starting_Chro_Points[cigar_section_id];
 					long section_end_pos = Section_Lengths[cigar_section_id] + section_begin_pos - 1;
 
 					
-					if(global_context -> debug_command [0] == 'D')
-						SUBREADprintf("Section [%d]: %d ~ %d\n", cigar_section_id , Starting_Points[cigar_section_id], Starting_Points[cigar_section_id]+Section_Lengths[cigar_section_id]);
-
 					int start_reverse_table_index = section_begin_pos / REVERSE_TABLE_BUCKET_LENGTH;
 					int end_reverse_table_index = (1+section_end_pos) / REVERSE_TABLE_BUCKET_LENGTH;
 
@@ -1520,6 +1541,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						int search_item_start = 0, search_item_end = global_context -> exontable_block_end_index[search_block_id];
 						if(search_block_id>0)search_item_start = global_context -> exontable_block_end_index[search_block_id-1];
 
+						// search_item_id is the inner number of the exons.
+						// the exontables in global_index has search_item_id as the index.
+
 						for(search_item_id = search_item_start ; search_item_id < search_item_end; search_item_id++)
 						{
 							if (global_context -> exontable_stop[search_item_id] >= section_begin_pos)
@@ -1543,11 +1567,12 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 									{
 										hits_indices[nhits] = search_item_id;
 
-										if(global_context -> overlap_length_required !=1)
+										if(global_context -> calculate_overlapping_lengths)
 										{
 											int section_overlapped = min(global_context -> exontable_stop[search_item_id] , section_end_pos) 
-												- max(global_context -> exontable_start[search_item_id] , section_begin_pos) + 1;
-											hits_total_length[nhits] = (short)section_overlapped;
+													       - max(global_context -> exontable_start[search_item_id] , section_begin_pos) + 1;
+											hits_read_len[nhits] = (short)section_overlapped;
+											hits_read_start_base[nhits] = (section_begin_pos > global_context -> exontable_start[search_item_id]?(Starting_Read_Points[cigar_section_id]):(Starting_Read_Points[cigar_section_id] + (global_context -> exontable_start[search_item_id] - section_begin_pos)));
 										}
 
 										nhits++;
@@ -1560,7 +1585,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				}
 			}
 			else{
-				if(global_context->is_split_alignments_only)
+				if(global_context->is_split_alignments_only) // must be true.
 				{
 					skipped_for_exonic ++;
 					if((is_second_read && skipped_for_exonic == 2) || (!global_context -> is_paired_end_mode_assign) || (alignment_masks & 0x8))
@@ -1586,60 +1611,57 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	}	// loop for is_second_read
 
 
-	if(global_context -> overlap_length_required !=1)
-	{
-		// merge feature : if a read overlaps with a feature twice or more times (by >=2 segments), the total length of the overlapped bases is calculated and the features with insufficient overlapped bases are removed.
-		// both meta-feature mode and feature mode use the same strategy.
-		// two ends in a fragment is considered individually; the overlapping bases are not added up.
-		int ends;
-		for(ends = 0; ends < global_context -> is_paired_end_mode_assign + 1; ends++)
-		{
-			long * hits_indices = ends?hits_indices2:hits_indices1;
-			short * hits_total_length = ends?hits_total_length2:hits_total_length1;
-			int  nhits = ends?nhits2:nhits1;
-			int x1;
-
-			// calculating the summed lengths of overlapping exons
-			for(x1=0; x1<nhits;x1++)
-			{
-				long exon_no = hits_indices[x1];
-				if(exon_no>=0x7fffffff) continue;	//already removed
-				int x2;
-				for(x2=x1+1; x2<nhits; x2++)
-				{
-					if(hits_indices[x2]==exon_no)
-					{
-						hits_total_length[x1]+=hits_total_length[x2];
-						hits_indices[x2]=0x7fffffff;
-					}
-				}
-
-				if( global_context -> debug_command [0] == 'D')
-					SUBREADprintf("HIT[%d]: OVERLAP=%d\n", x1, hits_total_length[x1]);
-				if(hits_total_length[x1]< global_context -> overlap_length_required)
-					hits_indices[x1]=0x7fffffff;
-			}
-
-			// remove the exons in the hits table when it is marked as removed (0x7fffffff)
-			int new_hits=0;
-			for(x1 = 0; x1< nhits; x1++)
-			{
-				if(hits_indices[x1]>=0x7fffffff) continue;
-				if(new_hits != x1)
-				{
-					hits_indices[new_hits]=hits_indices[x1];
-					hits_total_length[new_hits]=hits_total_length[x1];		
-				}
-				new_hits++;
-			}
-			if(ends) nhits2 = new_hits;
-			else nhits1 = new_hits;
-		}
-	}
-
 	int fixed_fractional_count = global_context -> use_fraction_multi_mapping ?calc_fixed_fraction(maximum_NH_value): NH_FRACTION_INT;
 
-	if(nhits2+nhits1==1)
+	// we have hits_indices1 and hits_indices2 and nhits1 and nhits2 here
+	// we also have fixed_fractional_count which is the value to add
+
+	vote_and_add_count(global_context, thread_context,
+			   hits_indices1, hits_read_start_base1, hits_read_len1, nhits1, cigar_read_len1,
+			   hits_indices2, hits_read_start_base2, hits_read_len2, nhits2, cigar_read_len2,
+			   fixed_fractional_count, read_name);
+	return;
+}
+
+void add_bitmap_overlapping(char * x1_bitmap, short start_base, short len){
+	int x1;
+	int rl16 = start_base+len-16;
+	for(x1 = start_base; x1 < start_base+len; x1++){
+		int bit = x1 % 8;
+		int byte = x1 / 8;
+		if(bit == 0 && x1 < rl16){
+			x1_bitmap[byte]=-1;
+			x1_bitmap[byte+1]=-1;
+			x1+=15;
+		}else{
+			x1_bitmap[byte] |= (1<<bit);
+		}
+	}
+}
+
+int count_bitmap_overlapping(char * x1_bitmap, unsigned short rl){
+
+	int x1;
+	int ret = 0;
+	for(x1 = 0; x1 < rl; x1++){
+		int byte = x1 / 8;
+		int bit = x1 % 8;
+
+		if(bit == 0 && x1_bitmap[byte]==-1){
+			x1 += 7;
+			ret += 8;
+		}else if(x1_bitmap[byte] &  (1<<bit)) ret ++;
+	}
+	return ret;
+}
+
+
+void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context,
+			long * hits_indices1, unsigned short * hits_read_start_base1, short * hits_read_len1, int nhits1, unsigned short rl1,
+			long * hits_indices2, unsigned short * hits_read_start_base2, short * hits_read_len2, int nhits2, unsigned short rl2,
+			int fixed_fractional_count, char * read_name)
+{
+	if(global_context -> calculate_overlapping_lengths == 0 && nhits2+nhits1==1)
 	{
 		long hit_exon_id = nhits2?hits_indices2[0]:hits_indices1[0];
 		thread_context->count_table[hit_exon_id] += fixed_fractional_count;
@@ -1652,7 +1674,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 		thread_context->read_counters.assigned_reads ++;
 	}
-	else if(nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0])
+	else if(global_context -> calculate_overlapping_lengths == 0 && nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0])
 	{
 		long hit_exon_id = hits_indices1[0];
 		thread_context->count_table[hit_exon_id] += fixed_fractional_count;
@@ -1667,204 +1689,242 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	}
 	else
 	{
+		int ends;
+		// Build a voting table.
+		// The voting table should be:
+		//      total_length [nhit_final] = total_length_overlapping
+		//      final_id [nhit_final] = final_exon_id
 
-		if(nhits2+nhits1>=MAX_HIT_NUMBER)
+		// if is_gene_leven, then decision_table_exon_ids[nhit_final] is the exon id where the count is added.
+
+		// After all, the count is added to all hits where total_length has the maximum value.
+		// If there are more than one locations having the same total_length, then the fragment is ambiguous. 
+		// Count is added when "-O" is specified.
+
+		// merge feature : if a read overlaps with an EXON twice or more times (by >=2 segments in cigar),
+		//                 then the total length of the overlapped bases is calculated.
+		// 
+		// two ends in a fragment is considered individually; the overlapping bases are not added up.
+		//
+		char * read_coverage_bits = thread_context -> read_coverage_bits;
+
+		for(ends = 0; ends < global_context -> is_paired_end_mode_assign + 1; ends++)
 		{
-			print_in_box(80,0,0,"A %s overlapped with %d features.", global_context -> is_paired_end_mode_assign?"fragment":"read", nhits2+nhits1);
-			print_in_box(80,0,0,"Please increase MAX_HIT_NUMBER in the program");
-		}
+			long * hits_indices = ends?hits_indices2:hits_indices1;
+			unsigned short * hits_read_start_base = ends?hits_read_start_base2:hits_read_start_base1;
+			short * hits_read_len = ends?hits_read_len2:hits_read_len1;
+			int  nhits = ends?nhits2:nhits1;
+			int x1;
 
-		long * decision_table_ids = thread_context -> decision_table_ids;
-		unsigned char * decision_table_votes = thread_context ->decision_table_votes;
-		long * decision_table_exon_ids = thread_context -> decision_table_exon_ids;
-		int decision_table_items = 0, xk1, xk2;
-
-		for(is_second_read = 0; is_second_read < 2; is_second_read++)
-		{
-			if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
-			long * hits_indices = is_second_read?hits_indices2:hits_indices1;
-			int nhits = is_second_read?nhits2:nhits1;
-			if (nhits<1) continue;
-			if(global_context -> is_gene_level)
+			if(read_coverage_bits)
 			{
-				long * uniq_gene_table = thread_context -> uniq_gene_table;
-				long * uniq_gene_exonid_table = thread_context -> uniq_gene_exonid_table;
-				int uniq_genes = 0;
-				for(xk1=0;xk1<nhits;xk1++)
-				{
-					int gene_id = global_context -> exontable_geneid[hits_indices[xk1]];
-					int is_unique = 1;
-					for(xk2=0; xk2<uniq_genes; xk2++)
-					{
-						if(gene_id == uniq_gene_table[xk2])
-						{
-							is_unique = 0;
-							break;
-						}
-					}
-					if(is_unique){
-						uniq_gene_exonid_table[uniq_genes] = hits_indices[xk1];
-						uniq_gene_table[uniq_genes++] = gene_id;
-						if(uniq_genes >= MAX_HIT_NUMBER) break;
-					}
-				}
+				int covergae_bitmap_size = max(rl1,rl2)/8+2; 
+				for(x1 = 0; x1 < nhits; x1++)
+					memset(read_coverage_bits +  x1 * (MAX_READ_LENGTH / 8 + 1), 0, covergae_bitmap_size);
+			}
 
-				for(xk1=0;xk1<uniq_genes; xk1++)
+			// calculating the summed lengths of overlapping exons
+			for(x1=0; x1<nhits;x1++)
+			{
+				long exon_no = hits_indices[x1];
+				if(exon_no>=0x7fffffff) continue;	//already removed
+
+				char * x1_bitmap = read_coverage_bits + (MAX_READ_LENGTH /8 +1) * x1;
+
+				//if(FIXLENstrcmp("V0112_0155:7:1308:19321:196983", read_name)==0)
+				//	SUBREADprintf("CREATE bitmap: for x1 = %d, on read %d len = %d \n", x1, hits_read_start_base[x1], hits_read_len[x1]);
+
+				if(read_coverage_bits)
+					add_bitmap_overlapping(x1_bitmap, hits_read_start_base[x1], hits_read_len[x1]);
+
+				long merge_key = global_context -> is_gene_level? global_context -> exontable_geneid[exon_no] : exon_no;
+				int x2;
+				for(x2=x1+1; x2<nhits; x2++)
 				{
-					long gene_id = uniq_gene_table[xk1];
-					int is_fresh = 1;
-					if(decision_table_items >= MAX_HIT_NUMBER) break;
-					for(xk2=0; xk2<decision_table_items; xk2++)
+					long tomerge_exon_no = hits_indices[x2];
+					if(tomerge_exon_no >=0x7fffffff) continue;
+
+					long tomerge_key = global_context -> is_gene_level? global_context -> exontable_geneid[tomerge_exon_no] : tomerge_exon_no;
+					if(tomerge_key==merge_key)
 					{
-						if(gene_id == decision_table_ids[xk2])
-						{
-							decision_table_votes[xk2]++;
-							is_fresh = 0;
-							break;
-						}
+						if(read_coverage_bits)
+							add_bitmap_overlapping(x1_bitmap, hits_read_start_base[x2], hits_read_len[x2]);
+
+						//if(FIXLENstrcmp("V0112_0155:7:1308:19321:196983", read_name)==0)
+						//	SUBREADprintf("APPEND bitmap: for x1 = %d, on read %d len = %d \n", x1, hits_read_start_base[x2], hits_read_len[x2]);
+
+						//TODO: change this part to uniquely-overlapping length. Not simply adding.
+						//hits_read_start_base[x1]+=hits_read_start_base[x2];
+						hits_indices[x2]=0x7fffffff;
 						
 					}
-					if(is_fresh)
-					{
-						decision_table_votes[decision_table_items] = 1;
-						decision_table_exon_ids[decision_table_items] = uniq_gene_exonid_table[xk1];
-						decision_table_ids[decision_table_items++] = gene_id;
-					}
 				}
 			}
-			else
+
+			// remove the exons in the hits table when it is marked as removed (0x7fffffff)
+			int new_hits=0;
+			for(x1 = 0; x1< nhits; x1++)
 			{
-				for(xk1=0;xk1<nhits;xk1++)
+				if(hits_indices[x1]>=0x7fffffff) continue;
+
+				if(new_hits != x1)
+					hits_indices[new_hits]=hits_indices[x1];
+				
+				if(global_context -> calculate_overlapping_lengths)
 				{
-					long exon_id = hits_indices[xk1];
-					//long exon_id = global_context -> exontable_geneid[hits_indices[xk1]];
-					int is_fresh = 1;
-					if(decision_table_items >= MAX_HIT_NUMBER) break;
-					for(xk2=0; xk2<decision_table_items; xk2++)
-					{
-						if(exon_id == decision_table_ids[xk2])
-						{
-							decision_table_votes[xk2]++;
-							is_fresh = 0;
-							break;
-						}
-					}
-					if(is_fresh)
-					{
-						decision_table_votes[decision_table_items] = 1;
-						decision_table_ids[decision_table_items++] = exon_id;
-					}
-
+					char * x1_bitmap = read_coverage_bits + (MAX_READ_LENGTH /8 +1) * x1;
+					hits_read_len[new_hits]=count_bitmap_overlapping(x1_bitmap, ends?rl2:rl1);//hits_read_len[x1];
 				}
-			}
 
+				new_hits++;
+			}
+			if(ends) nhits2 = new_hits;
+			else nhits1 = new_hits;
 		}
 
-		/*
-		printf("R has %d hits\n", decision_table_items);
-		int i;
-		for(i=0; i<decision_table_items; i++)
-		{
-			long geneid = global_context -> exontable_geneid[decision_table_ids[i]] ;
-			printf("%ld : %ld,   ",decision_table_ids[i], geneid);
-		}
-		puts("");
+		unsigned short * decision_total_lengths = thread_context ->decision_table_votes;
+		int decision_number = 0, decision_table_no;
+		long * decision_table_exon_ids = thread_context -> decision_table_exon_ids;
+		long * decision_table_keys = thread_context -> decision_table_ids;
+		char * read1_used =  thread_context -> decision_table_read1_used;
+		char * read2_used =  thread_context -> decision_table_read2_used;
 
-		*/
+		for(ends =0 ; ends < global_context -> is_paired_end_mode_assign + 1 ; ends++){
+			int nhits = ends?nhits2:nhits1;
+			short * hits_read_len = ends?hits_read_len2:hits_read_len1;
+			long * hits_indices = ends?hits_indices2:hits_indices1;
+			int hit_x1;
+			for(hit_x1 = 0; hit_x1 < nhits ; hit_x1++){
+				int decision_i;
+				long decision_key; // gene_id if is_gene_level, or exon_id.
+				long decision_exon_id;
+				if (global_context -> is_gene_level ){
+					decision_exon_id = hits_indices[hit_x1];
+					decision_key = global_context -> exontable_geneid[decision_exon_id];
+				}else
+					decision_exon_id = decision_key = hits_indices[hit_x1];
 
-		if(decision_table_items>0)
-		{
-			int max_votes = 0;
-			int top_voters = 0;
-			long top_voter_id = 0;
-
-			for(xk1 = 0; xk1 < decision_table_items; xk1++)
-			{
-				if(decision_table_votes[xk1] > max_votes)
-				{
-					max_votes = decision_table_votes[xk1];
-					top_voters = 1;
-					top_voter_id = (global_context -> is_gene_level)?decision_table_exon_ids[xk1]:decision_table_ids[xk1];
+				// get decision_table_no from decision_key
+				// add into decision_tables if decision_key is unfound.
+				decision_table_no = -1;
+				for(decision_i = 0; decision_i < decision_number ; decision_i ++){
+					if(decision_key == decision_table_keys[decision_i])
+					{
+						decision_table_no = decision_i;
+						break;
+					}
 				}
-				else
-					if(decision_table_votes[xk1] == max_votes) top_voters++;
-			}
 
-			if(top_voters == 1 && (!global_context -> is_multi_overlap_allowed))
+				if(decision_table_no<0){
+					decision_table_exon_ids[decision_number] = decision_exon_id;
+					decision_table_keys[decision_number] = decision_key;
+					decision_total_lengths[decision_number] = 0;
+					read1_used[decision_number]=0;
+					read2_used[decision_number]=0;
+
+					decision_table_no = decision_number;
+					decision_number ++;
+				}
+
+				if(ends)read2_used[decision_table_no] = 1;
+				else read1_used[decision_table_no] = 1;
+
+				assert(read2_used[decision_table_no]<2);
+				assert(read1_used[decision_table_no]<2);
+
+				if(global_context -> calculate_overlapping_lengths)
+					decision_total_lengths[decision_table_no] += hits_read_len[hit_x1];
+
+			}
+		}
+
+		int maximum_decision_score = 0;
+		int maximum_total_count = 0;
+		int maximum_decision_no = 0;
+		for(decision_table_no = 0; decision_table_no < decision_number; decision_table_no++)
+		{
+			if(global_context -> fragment_minimum_overlapping == 1 || decision_total_lengths[decision_table_no] >= global_context -> fragment_minimum_overlapping)
 			{
-				thread_context->count_table[top_voter_id] += fixed_fractional_count;
+				int this_decision_score = global_context -> use_overlapping_break_tie? decision_total_lengths[decision_table_no] :(read1_used[decision_table_no] + read2_used[decision_table_no]);
+				if(!global_context -> use_overlapping_break_tie)assert(this_decision_score<3);
+				//SUBREADprintf("%s LEN[%d] = %d , score=%d\n", read_name, decision_table_no ,  decision_total_lengths[decision_table_no], this_decision_score );
+				if(maximum_decision_score < this_decision_score){
+					maximum_total_count = 1;
+					maximum_decision_no = decision_table_no;
+					maximum_decision_score = this_decision_score;
+				}else if(maximum_decision_score == this_decision_score)
+					maximum_total_count ++;
+			}
+		}
+
+		if(maximum_total_count == 0){
+			if(global_context -> SAM_output_fp)
+				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\t*\t*\n", read_name);
+
+			thread_context->read_counters.unassigned_nofeatures ++;
+		}else{
+
+			// final adding votes.
+			if(1 == maximum_total_count && !global_context -> is_multi_overlap_allowed) {
+				// simple add to the exon ( EXON_ID = decision_table_exon_ids[maximum_decision_no])
+				long max_exon_id = decision_table_exon_ids[maximum_decision_no];
+				thread_context->count_table[max_exon_id] += fixed_fractional_count;
 				thread_context->nreads_mapped_to_exon++;
 				if(global_context -> SAM_output_fp)
 				{
-					int final_gene_number = global_context -> exontable_geneid[top_voter_id];
+					int final_gene_number = global_context -> exontable_geneid[max_exon_id];
 					unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-					if(decision_table_items>1)
-						// assigned by read-voting
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tVotes/Targets=%d/%d\n", read_name, final_feture_name, max_votes, decision_table_items);
+					if(decision_number>1)
+						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\t%s/Targets=%d/%d\n", read_name, final_feture_name, global_context -> use_overlapping_break_tie? "MaximumOverlapping":"Votes", maximum_decision_score, decision_number);
 					else
 						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\t*\n", read_name, final_feture_name);
 				}
 				thread_context->read_counters.assigned_reads ++;
 
-			}
-			else if(top_voters >1 || (global_context -> is_multi_overlap_allowed))
+			}else if(global_context -> is_multi_overlap_allowed)
 			{
-				if(global_context -> is_multi_overlap_allowed)
+				char final_feture_names[1000];
+				int assigned_no = 0, xk1;
+				final_feture_names[0]=0;
+				for(xk1 = 0; xk1 < decision_number; xk1++)
 				{
-					char final_feture_names[1000];
-					int assigned_no = 0;
-					final_feture_names[0]=0;
-					for(xk1 = 0; xk1 < decision_table_items; xk1++)
-					{
-						//if(decision_table_votes[xk1] == max_votes)
-						if(decision_table_votes[xk1] >= 1)
-						{
-							long tmp_voter_id = (global_context -> is_gene_level)?decision_table_exon_ids[xk1]:decision_table_ids[xk1];
-							//printf("TVID=%ld; HITID=%d\n", tmp_voter_id, xk1);
-							thread_context->count_table[tmp_voter_id] += fixed_fractional_count;
+					long tmp_voter_id = decision_table_exon_ids[xk1];
+					thread_context->count_table[tmp_voter_id] += fixed_fractional_count;
 
-							if(global_context -> SAM_output_fp)
-							{
-								if(strlen(final_feture_names)<700) 
-								{
-										int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
-										unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-										strncat(final_feture_names, (char *)final_feture_name, 999);
-										strncat(final_feture_names, ",", 999);
-										assigned_no++;
-								}
-							}
+					if(global_context -> SAM_output_fp)
+					{
+						if(strlen(final_feture_names)<700)
+						{
+							int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
+							unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+							strncat(final_feture_names, (char *)final_feture_name, 999);
+							strncat(final_feture_names, ",", 999);
+							assigned_no++;
 						}
 					}
-					final_feture_names[999]=0;
-					thread_context->nreads_mapped_to_exon++;
-					if(global_context -> SAM_output_fp)
-					{
-						int ffnn = strlen(final_feture_names);
-						if(ffnn>0) final_feture_names[ffnn-1]=0;
-						// overlapped but still assigned 
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=%d\n", read_name, final_feture_names, assigned_no);
-					}
-					thread_context->read_counters.assigned_reads ++;
-
 				}
-				else{
-					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguit\t*\tNumber_Of_Overlapped_Genes=%d\n", read_name, top_voters);
-
-					thread_context->read_counters.unassigned_ambiguous ++;
+				final_feture_names[999]=0;
+				thread_context->nreads_mapped_to_exon++;
+				if(global_context -> SAM_output_fp)
+				{
+					int ffnn = strlen(final_feture_names);
+					if(ffnn>0) final_feture_names[ffnn-1]=0;
+					// overlapped but still assigned 
+					fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=%d\n", read_name, final_feture_names, assigned_no);
 				}
+				thread_context->read_counters.assigned_reads ++;
+
+			}
+			else{
+				if(global_context -> SAM_output_fp)
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguit\t*\tNumber_Of_Overlapped_Genes=%d\n", read_name, maximum_total_count);
+
+				thread_context->read_counters.unassigned_ambiguous ++;
 			}
 		}
-		else{
-			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\t*\t*\n", read_name);
-
-			thread_context->read_counters.unassigned_nofeatures ++;
-		}
 	}
-
 }
+
 
 void * feature_count_worker(void * vargs)
 {
@@ -2143,7 +2203,7 @@ HashTable * load_alias_table(char * fname)
 	return ret;
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minReadOverlap, int is_split_alignments_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_alignments_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie)
 {
 
 	global_context -> input_buffer_max_size = buffer_size;
@@ -2180,7 +2240,9 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> feature_block_size = feature_block_size;
 	global_context -> five_end_extension = fiveEndExtension;
 	global_context -> three_end_extension = threeEndExtension;
-	global_context -> overlap_length_required = minReadOverlap;
+	global_context -> fragment_minimum_overlapping = minFragmentOverlap;
+	global_context -> use_overlapping_break_tie = useOverlappingBreakTie;
+	global_context -> calculate_overlapping_lengths = (global_context -> fragment_minimum_overlapping > 1) || global_context -> use_overlapping_break_tie;
 	global_context -> debug_command = debug_command;
 
 	global_context -> read_counters.unassigned_ambiguous=0;
@@ -2224,9 +2286,18 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 
 	if(global_context -> is_read_details_out)
 	{
-		char tmp_fname[350];
+		char tmp_fname[350], *modified_fname;
+		int i=0;
 		sprintf(tmp_fname, "%s.featureCounts", global_context -> raw_input_file_name);
-		global_context -> SAM_output_fp = f_subr_open(tmp_fname, "w");
+		modified_fname = tmp_fname;
+		while(modified_fname[0]=='/' || modified_fname[0]=='.' || modified_fname[0]=='\\'){
+			modified_fname ++;
+		}
+		while(modified_fname[i]){
+			if(modified_fname[i]=='\\' || modified_fname[i]=='/'||modified_fname[i]==' ')modified_fname[i]='.';
+			i++;
+		}
+		global_context -> SAM_output_fp = f_subr_open(modified_fname, "w");
 		if(!global_context -> SAM_output_fp)
 		{
 			SUBREADprintf("Unable to create file '%s'; the read assignment details are not written.\n", tmp_fname);
@@ -2266,6 +2337,9 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].line_buffer2 = malloc(global_context -> line_length + 2);
 		global_context -> thread_contexts[xk1].chro_name_buff = malloc(CHROMOSOME_NAME_LENGTH);
 		global_context -> thread_contexts[xk1].strm_buffer = malloc(sizeof(z_stream));
+		if(global_context -> calculate_overlapping_lengths)
+			global_context -> thread_contexts[xk1].read_coverage_bits = malloc((MAX_READ_LENGTH / 8 + 1)*MAX_HIT_NUMBER);
+		else global_context -> thread_contexts[xk1].read_coverage_bits = NULL;
 
 		global_context -> thread_contexts[xk1].unpaired_fragment_no = 0;
 		global_context -> thread_contexts[xk1].read_counters.assigned_reads = 0;
@@ -2304,6 +2378,8 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 	for(xk1=0; xk1<global_context-> thread_number; xk1++)
 	{
 		//printf("CHRR_FREE\n");
+		if(global_context -> thread_contexts[xk1].read_coverage_bits)
+			free(global_context -> thread_contexts[xk1].read_coverage_bits);	
 		free(global_context -> thread_contexts[xk1].count_table);	
 		free(global_context -> thread_contexts[xk1].line_buffer1);	
 		free(global_context -> thread_contexts[xk1].line_buffer2);	
@@ -2696,12 +2772,13 @@ static struct option long_options[] =
 	{"readExtension5", required_argument, 0, 0},
 	{"readExtension3", required_argument, 0, 0},
 	{"read2pos", required_argument, 0, 0},
-	{"minReadOverlap", required_argument, 0, 0},
+	{"minOverlap", required_argument, 0, 0},
 	{"countSplitAlignmentsOnly", no_argument, 0, 0},
 	{"debugCommand", required_argument, 0, 0},
 	{"ignoreDup", no_argument, 0, 0},
 	{"donotsort", no_argument, 0, 0},
 	{"fraction", no_argument, 0, 0},
+	{"largestOverlap", no_argument, 0,0},
 	{0, 0, 0, 0}
 };
 
@@ -2783,10 +2860,14 @@ void print_usage()
 	SUBREADputs("              \tthe file is the same as name of the input read file except a");
 	SUBREADputs("              \tsuffix `.featureCounts' is added.");
 	SUBREADputs("    "); 
-	SUBREADputs("    --minReadOverlap <int>      Specify the minimum number of overlapped bases");
-	SUBREADputs("              \trequired to assign a read to a feature. 1 by default. Negative");
-	SUBREADputs("              \tvalues are permitted, indicating a gap being allowed between a");
-	SUBREADputs("              \tread and a feature.");
+	SUBREADputs("    --largestOverlap            If specified, reads (or fragments) will be");
+	SUBREADputs("              \tassigned to the target that has the largest number of overlapping");
+	SUBREADputs("              \tbases.");
+	SUBREADputs("    "); 
+	SUBREADputs("    --minOverlap <int>          Specify the minimum required number of");
+	SUBREADputs("              \toverlapping bases between a read (or a fragment) and a feature.");
+	SUBREADputs("              \t1 by default. If a negative value is provided, the read will be");
+	SUBREADputs("              \textended from both ends.");
 	SUBREADputs("    "); 
 	SUBREADputs("    --readExtension5 <int>      Reads are extended upstream by <int> bases from");
 	SUBREADputs("              \ttheir 5' end."); 
@@ -2900,6 +2981,8 @@ int readSummary(int argc,char *argv[]){
 	30: debug_command # This is for debug only; RfeatureCounts should pass a space (" ") to this parameter, disabling the debug command.
 	31: as.numeric(is_duplicate_ignored) # 0 = INCLUDE DUPLICATE READS; 1 = IGNORE DUPLICATE READS (0x400 FLAG IS SET) ; "0" by default.
 	32: as.numeric(do_not_sort)   # 1 = NEVER SORT THE PE BAM/SAM FILES; 0 = SORT THE BAM/SAM FILE IF IT IS FOUND NOT SORTED.
+	33: as.numeric(fractionMultiMapping) # 1 = calculate fraction numbers if a read overlaps with multiple features or meta-features. "-M" must be specified when fractions are caculated.
+	34: as.numeric(useOverlappingBreakTie) # 1 = Select features or meta-features with a longer overlapping length; 0 = just use read-voting strategy: one overlapping read = 1 vote
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one;
@@ -2920,7 +3003,7 @@ int readSummary(int argc,char *argv[]){
 	curpos = 0;
 	curchr_name = "";
 
-	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minReadOverlap, isSplitAlignmentOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping;
+	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitAlignmentOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie;
 
 	int isSAM, isGTF, n_input_files=0;
 	char *  alias_file_name = NULL, * cmd_rebuilt = NULL;
@@ -2990,18 +3073,28 @@ int readSummary(int argc,char *argv[]){
 	if(thread_number<1) thread_number=1;
 	if(thread_number>16)thread_number=16;
 
+	int Param_fiveEndExtension, Param_threeEndExtension;
 	if(argc>25)
-		fiveEndExtension = atoi(argv[25]);
-	else 	fiveEndExtension = 0;
+		Param_fiveEndExtension = atoi(argv[25]);
+	else    Param_fiveEndExtension = 0;
 
 	if(argc>26)
-		threeEndExtension = atoi(argv[26]);
-	else	threeEndExtension = 0;
+		Param_threeEndExtension = atoi(argv[26]);
+	else    Param_threeEndExtension = 0;
 
 	if(argc>27)
-		minReadOverlap = atoi(argv[27]);
-	else	minReadOverlap = 1;
-	
+		minFragmentOverlap = atoi(argv[27]);
+	else    minFragmentOverlap = 1;
+
+	if(minFragmentOverlap <1){
+		fiveEndExtension = 1 - minFragmentOverlap;
+		threeEndExtension = 1 - minFragmentOverlap;
+		minFragmentOverlap = 1;
+	}else{
+		fiveEndExtension = Param_fiveEndExtension;
+		threeEndExtension = Param_threeEndExtension;
+	}
+
 	if(argc>28)
 		isSplitAlignmentOnly = atoi(argv[28]);
 	else	isSplitAlignmentOnly = 0;
@@ -3031,12 +3124,16 @@ int readSummary(int argc,char *argv[]){
 	else
 		fractionMultiMapping = 0;
 
+	if(argc>34)
+		useOverlappingBreakTie = atoi(argv[34]);
+	else	useOverlappingBreakTie = 0;
+
 
 	unsigned int buffer_size = 1024*1024*6;
 
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minReadOverlap, isSplitAlignmentOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitAlignmentOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie);
 
 	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && global_context.use_fraction_multi_mapping)
 	{
@@ -3692,7 +3789,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[34];
+	char * Rargv[35];
 	char annot_name[300];
 	char * out_name = malloc(300);
 	char * alias_file_name = malloc(300);
@@ -3729,12 +3826,13 @@ int feature_count_main(int argc, char ** argv)
 	int use_fraction_multimapping = 0;
 	int threads = 1;
 	int isGTF = 1;
+	int use_overlapping_length_break_tie = 0;
 	char nthread_str[4];
 	int option_index = 0;
 	int c;
 	int very_long_file_names_size = 200;
-	int fiveEndExtension = 0, threeEndExtension = 0, minReadOverlap = 1;
-	char strFiveEndExtension[11], strThreeEndExtension[11], strMinReadOverlap[11];
+	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
+	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11];
 	very_long_file_names = malloc(very_long_file_names_size);
 	very_long_file_names [0] = 0;
 
@@ -3862,9 +3960,9 @@ int feature_count_main(int argc, char ** argv)
 					threeEndExtension = max(0, threeEndExtension);
 				}
 
-				if(strcmp("minReadOverlap", long_options[option_index].name)==0)
+				if(strcmp("minOverlap", long_options[option_index].name)==0)
 				{
-					minReadOverlap = atoi(optarg);
+					minFragmentOverlap = atoi(optarg);
 				}
 
 				if(strcmp("debugCommand", long_options[option_index].name)==0)
@@ -3892,6 +3990,11 @@ int feature_count_main(int argc, char ** argv)
 						
 				}				
 
+				if(strcmp("largestOverlap", long_options[option_index].name)==0)
+				{
+					use_overlapping_length_break_tie = 1;
+				}
+
 				if(strcmp("donotsort", long_options[option_index].name)==0)
 				{
 					do_not_sort = 1;
@@ -3911,11 +4014,11 @@ int feature_count_main(int argc, char ** argv)
 		}
 
 
-	if(minReadOverlap<1)
+	if(minFragmentOverlap<1)
 	{
-		fiveEndExtension = - minReadOverlap + 1;
-		threeEndExtension =  - minReadOverlap + 1;
-		minReadOverlap = 1;
+		fiveEndExtension = - minFragmentOverlap + 1;
+		threeEndExtension =  - minFragmentOverlap + 1;
+		minFragmentOverlap = 1;
 	}
 
 	if(out_name[0]==0 || annot_name[0]==0||argc == optind)
@@ -3942,7 +4045,7 @@ int feature_count_main(int argc, char ** argv)
 
 	sprintf(strFiveEndExtension, "%d", fiveEndExtension);
 	sprintf(strThreeEndExtension, "%d", threeEndExtension);
-	sprintf(strMinReadOverlap, "%d", minReadOverlap);
+	sprintf(strMinFragmentOverlap, "%d", minFragmentOverlap);
 	sprintf(nthread_str,"%d", threads);
 	sprintf(min_dist_str,"%d",min_dist);
 	sprintf(max_dist_str,"%d",max_dist);
@@ -3976,14 +4079,15 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[24] = feature_block_size_str;
 	Rargv[25] = strFiveEndExtension;
 	Rargv[26] = strThreeEndExtension;
-	Rargv[27] = strMinReadOverlap;
+	Rargv[27] = strMinFragmentOverlap;
 	Rargv[28] = is_Split_Alignment_Only?"1":"0";
 	Rargv[29] = (reduce_5_3_ends_to_one == 0?"0":(reduce_5_3_ends_to_one==REDUCE_TO_3_PRIME_END?"3":"5"));
 	Rargv[30] = debug_command;
 	Rargv[31] = is_duplicate_ignored?"1":"0";
 	Rargv[32] = do_not_sort?"1":"0";
 	Rargv[33] = use_fraction_multimapping?"1":"0";
-	int retvalue = readSummary(34, Rargv);
+	Rargv[34] = use_overlapping_length_break_tie?"1":"0";
+	int retvalue = readSummary(35, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
