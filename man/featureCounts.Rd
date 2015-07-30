@@ -9,7 +9,7 @@ allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,
 checkFragLength=FALSE,minFragLength=50,maxFragLength=600,
 nthreads=1,strandSpecific=0,minMQS=0,
 readExtension5=0,readExtension3=0,read2pos=NULL,
-minOverlap=1,countSplitAlignmentsOnly=FALSE,
+minOverlap=1,largestOverlap=FALSE,countSplitAlignmentsOnly=FALSE,
 countMultiMappingReads=FALSE,fraction=FALSE,countPrimaryAlignmentsOnly=FALSE,
 countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
 }
@@ -34,6 +34,7 @@ countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,au
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
   \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
   \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), numbers of overlapping bases from each read in the same pair will be summed. If a negative value is provided, the read will be extended from both ends. \code{1} by default.}
+  \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
   \item{countSplitAlignmentsOnly}{ logical indicating whether only split alignments (their CIGAR strings containing letter 'N') should be used for summarization. \code{FALSE} by default. Example split alignments are exon-spanning reads from RNA-seq data. \code{useMetaFeatures} should be set to \code{FALSE} and \code{allowMultiOverlap} should be set to \code{TRUE}, if the purpose of summarization is to assign exon-spanning reads to all their overlapping exons.}
   \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
   \item{fraction}{ logical indicating if fractional counts will be produced for multi-mapping reads. If \code{TRUE}, a fractional count, 1/n, will be generated for each reported alignment of a multi-mapping read, where n is the total number of alignments reported for that read. \code{countMultiMappingReads} must be set to \code{TRUE} when \code{fraction} is \code{TRUE}.}
