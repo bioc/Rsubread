@@ -5,7 +5,7 @@
   Create an annotation file from a GRanges object, suitable for featureCounts() 
 }
 \description{
-  Any of rtracklayer::import.bed('samplesubjunc.bed', asRangedData=FALSE),
+  Any of rtracklayer::import.bed('samplesubjunc.bed'),
   unlist(spliceGraph(TxDb)), transcripts(TxDb), exons(TxDb), or features(FDB)
   will produce a GRanges object containing usable features for read counting.
 
