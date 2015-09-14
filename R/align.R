@@ -8,6 +8,17 @@ align <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_f
 			stop("The number of file names for the first reads is different from the number of file names for the second reads.")
 	}
 
+	if(!all(file.exists(readfile1)))
+		stop("One or more input files cannot be found (readfile1).")
+
+	if(!is.null(readfile2)){
+		if(!all(file.exists(readfile2)))
+			stop("One or more input files cannot be found (readfile2).")
+	}
+
+	if(!all(file.exists(dirname(output_file))))
+		stop("Invalid path was found in output file name(s).")
+
 	opt <- paste("-i",index,sep=",")
 
 	if(tolower(input_format) == "sam")

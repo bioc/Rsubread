@@ -86,7 +86,7 @@ After the index was successfully built, we map the read dataset (including 1,000
 \begin{scriptsize}
 <<>>=
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
-align(index="reference_index",readfile1=reads,output_file="alignResults.BAM")
+align(index="reference_index",readfile1=reads,output_file="alignResults.BAM",phredOffset=64)
 @
 \end{scriptsize}
 
@@ -97,7 +97,7 @@ Map paired-end reads:
 reads1 <- system.file("extdata","reads1.txt.gz",package="Rsubread")
 reads2 <- system.file("extdata","reads2.txt.gz",package="Rsubread")
 align(index="reference_index",readfile1=reads1,readfile2=reads2,
-output_file="alignResultsPE.BAM")
+output_file="alignResultsPE.BAM",phredOffset=64)
 @
 \end{scriptsize}
 
