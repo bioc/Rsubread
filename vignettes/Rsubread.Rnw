@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread package: high-performance read alignment, quantification and mutation discovery}
 \author{Wei Shi}
-\date{19 March 2014}
+\date{14 September 2015}
 \maketitle
 
 \section{Introduction}
