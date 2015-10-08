@@ -1,3 +1,6 @@
+8 Oct 2015 - 1.19.6
+(1) C code update.
+
 14 Sept 2015 - 1.19.5
 (1) Check if input and output file names in align() and subjunc() are valid.
 

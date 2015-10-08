@@ -6,16 +6,16 @@
 \usage{
 align(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
-TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
-tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
+TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,
+unique=TRUE,nBestLocations=1,minFragLength=50,
 maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,
 DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 
 subjunc(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,
-TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,tieBreakQS=FALSE,
-tieBreakHamming=TRUE,unique=TRUE,nBestLocations=1,minFragLength=50,
+TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,
+unique=TRUE,nBestLocations=1,minFragLength=50,
 maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
 }
@@ -33,9 +33,7 @@ readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.} 
   \item{indels}{ numeric value giving the maximum number of insertions/deletions allowed during the mapping. \code{5} by default.}
   \item{phredOffset}{ numeric value added to base-calling Phred scores to make quality scores (represented as ASCII letters). Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
-  \item{tieBreakQS}{logical indicating if the mapping quality score should be to break the tie when more than one best location was found for a read. \code{FALSE} by default. Note that the mapping quality score used for tie breaking was calcuated only from the perfectly matched subreads (16mers) extracted from the read, whereas the mapping quality scores included in the mapping output for mapped reads were calcuated from using all the bases in the read. Also note that there may still be more than one best mapping location found after tie breaking using this option.}
-  \item{tieBreakHamming}{ logical indicating if the Hamming distance should be used to break the tie when more than one best mapping location was found for a read. \code{TRUE} by default. The distance between the mapped read and the target region in the reference is calcuated using all the bases included in the read. Note that there may still be more than one best mapping location found after tie breaking using this option.}
-  \item{unique}{ logical indicating if uniquely mapped reads should be reported only. \code{TRUE} by default. It is recommended that this option is used together with \code{tieBreakHamming} or \code{tieBreakQS}.}
+  \item{unique}{ logical indicating if uniquely mapped reads should be reported only. \code{TRUE} by default. Uniquely mapped reads must have one (1) mapping location that has less mis-matched bases than other candidate locations.}
   \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The allowed value is between 1 to 16 (inclusive). `NH' tag is used to indicate how many alignments are reported for the read and `HI' tag is used for numbering the alignments reported for the same read, in the output. Note that the \code{unique} argument takes precedence over \code{nBestLocations} argument.}
   \item{minFragLength}{ numeric value giving the minimum fragment length. 50 by default.}
   \item{maxFragLength}{ numeric value giving the maximum fragment length. 600 by default.}

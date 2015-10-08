@@ -6,7 +6,7 @@
 featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,
 GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,
 allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,
-checkFragLength=FALSE,minFragLength=50,maxFragLength=600,
+checkFragLength=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",
 nthreads=1,strandSpecific=0,minMQS=0,
 readExtension5=0,readExtension3=0,read2pos=NULL,
 minOverlap=1,largestOverlap=FALSE,countSplitAlignmentsOnly=FALSE,
@@ -27,6 +27,7 @@ countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,au
   \item{checkFragLength}{ logical indicating if the two ends from the same fragment are required to satisify the fragment length criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. The fragment length criteria are specified via \code{minFragLength} and \code{maxFragLength}.}
   \item{minFragLength}{ \code{integer} giving the minimum fragment length for paired-end reads. \code{50} by default.}
   \item{maxFragLength}{ \code{integer} giving the maximum fragment length for paired-end reads. \code{600} by default. \code{minFragLength} and \code{maxFragLength} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a fragment spans two or more exons, the observed fragment length might be much bigger than the nominal fragment length.}
+  \item{PE_orientation}{ character string giving the orientation of the two reads from the same pair. It has three possible values including \code{fr}, \code{ff} and \code{rf}. Letter \code{f} denotes the forward strand and letter \code{r} the reverse strand. \code{fr} by default (ie. the first read in the pair is on the forward strand and the second read on the reverse strand).}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
