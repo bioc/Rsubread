@@ -298,10 +298,12 @@ int show_summary(global_context_t * global_context)
 	}
         print_in_box(80, 0,1,"");
         print_in_box(80, 0,0,"      Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);
+/*
         print_in_box(80, 0,0,"    Running time 0 : %.2f minutes", global_context->timecost_load_index/60);
         print_in_box(80, 0,0,"    Running time 1 : %.2f minutes", global_context->timecost_voting/60);
         print_in_box(80, 0,0,"    Running time 2 : %.2f minutes", global_context->timecost_before_realign/60);
         print_in_box(80, 0,0,"    Running time 3 : %.2f minutes", global_context->timecost_for_realign/60);
+*/
         print_in_box(80, 0,1,"");
         print_in_box(80, 2,1,"http://subread.sourceforge.net/");
         sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
