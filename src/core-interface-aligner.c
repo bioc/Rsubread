@@ -38,18 +38,26 @@ static struct option long_options[] =
 	{"trim3", required_argument, 0, '3'},
 	{"memoryMultiplex",  required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
+	{"gzFASTQinput",  no_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
+	{"fast", no_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"reportFusions", no_argument, 0, 0},
-	{"gzFASTQinput", no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
 	{"accurateFusions",  no_argument, 0, 0},
+	{"SVdetection",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
+	{"minMappedLength",  required_argument, 0, 0},
+	{"experiment",  required_argument, 0, 'e'},
+	{"maxVoteSimples",  required_argument, 0, 0},
+	{"complexIndels", no_argument, 0, 0},
+	{"minVoteCutoff",  required_argument, 0, 0},
+	{"maxRealignLocations",  required_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -65,12 +73,15 @@ void print_usage_core_aligner()
 	SUBREADputs("    ");
 	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("   ");
-	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format by default");
-	SUBREADputs("                            . See below for more supported formats). Both base-");
-	SUBREADputs("                            space and color-space read data are supported. For");
-	SUBREADputs("                            paired-end reads, this gives the first read file");
+	SUBREADputs("    -r --read      <input>  name of the input file(gzFASTQ/FASTQ/FASTA format by");
+	SUBREADputs("                            default. See below for more supported formats). Both");
+	SUBREADputs("                            base-space and color-space read data are supported.");
+	SUBREADputs("                            For paired-end reads, this gives the first read file");
 	SUBREADputs("                            and the other read file should be specified using");
 	SUBREADputs("                            the -R option.");
+	SUBREADputs("    ");
+	SUBREADputs("    -e --experiment <input> type of the experiment for generating the reads. The ");
+	SUBREADputs("                            value can be either DNA-seq or RNA-seq");
 	SUBREADputs("    ");
 	SUBREADputs("Optional general arguments:");
 	SUBREADputs("    ");
@@ -145,9 +156,6 @@ void print_usage_core_aligner()
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
 	SUBREADputs("");
-	SUBREADputs("       --gzFASTQinput       specify that the input read data is in gzipped");
-	SUBREADputs("                            FASTQ/FASTA format.");
-	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
 	SUBREADputs("");
 	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
@@ -192,6 +200,12 @@ void print_usage_core_aligner()
 	SUBREADputs("                            'fr' by default.");
 	SUBREADputs("");
 	SUBREADputs("");
+	SUBREADputs("Advanced arguments:");
+	SUBREADputs("");
+	SUBREADputs("    --complexIndels         Detect complex indels that are located very close to");
+	SUBREADputs("                            each other (minimum distance is 1bp). Indels of up");
+	SUBREADputs("                            to 16bp long will be reported.");
+	SUBREADputs("");
 	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
 	SUBREADputs("");
 
@@ -213,9 +227,12 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.max_mismatch_junction_reads = 3;
 	global_context->config.use_dynamic_programming_indel = 1;
 
+
 	// config.extending_search_indels is changed from 1 to 0 on 10/mar/2014
 	global_context->config.extending_search_indels = 0;
-	global_context->config.big_margin_record_size = 9; 
+
+	global_context->config.limited_tree_scan = 0 ;
+	//global_context->config.big_margin_record_size = 9; 
 
 	if(argc<2)
 	{
@@ -239,6 +256,16 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 'v':
 				core_version_number("Subread-align");
 				return -1;
+			case 'e':
+				if(strcmp(optarg, "DNA-seq") == 0){
+					global_context->config.experiment_type = CORE_EXPERIMENT_DNASEQ;
+				}else if(strcmp(optarg, "RNA-seq") == 0){
+					global_context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
+				}else{
+					SUBREADprintf("Error: unknown experiment type:%s\n", optarg);
+					return -1;
+				}
+				break;
 			case 'G':
 				global_context->config.DP_penalty_create_gap = atoi(optarg);
 				break;
@@ -262,8 +289,14 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'B':
 				global_context->config.multi_best_reads = atoi(optarg); 
+
 				if(global_context->config.multi_best_reads<1)
 					global_context->config.multi_best_reads=1;
+
+				global_context->config.reported_multi_best_reads = global_context->config.multi_best_reads;
+
+				global_context->config.max_vote_combinations = max(global_context->config.max_vote_combinations, global_context->config.reported_multi_best_reads + 1);
+				global_context->config.max_vote_simples = max(global_context->config.max_vote_simples, global_context->config.reported_multi_best_reads + 1);
 				break;
 			case 'H':
 				global_context->config.use_hamming_distance_break_ties = 1;
@@ -304,7 +337,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 'T':
 				global_context->config.all_threads = atoi(optarg);
 				if(global_context->config.all_threads <1) global_context->config.all_threads = 1;
-				if(global_context->config.all_threads >32) global_context->config.all_threads = 32;
+				if(global_context->config.all_threads > MAX_THREADS) global_context->config.all_threads = MAX_THREADS;
 
 				break;
 			case 'r':
@@ -402,10 +435,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.is_BAM_input = 1;
 					global_context->config.is_SAM_file_input = 1;
 				}
-				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
-				{
-					global_context->config.is_gzip_fastq=1;
-				}
 				else if(strcmp("extraColumns", long_options[option_index].name)==0) 
 				{
 					global_context->config.SAM_extra_columns=1;
@@ -419,20 +448,51 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.report_multiple_best_in_pairs = 1;
 				}
+				else if(strcmp("fast", long_options[option_index].name)==0) 
+				{
+					global_context -> config.fast_run = 1;
+				}
 				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
 				{
 					global_context->config.ignore_unmapped_reads = 1;
 				}
 				else if(strcmp("reportFusions", long_options[option_index].name)==0) 
 				{
-					global_context->config.is_rna_seq_reads = 1;
+					global_context->config.do_breakpoint_detection = 1;
 					global_context->config.do_fusion_detection = 1;
 					global_context->config.prefer_donor_receptor_junctions = 0;
-					global_context->config.do_big_margin_filtering_for_reads = 1;
+					//global_context->config.do_big_margin_filtering_for_reads = 1;
+				}
+				else if(strcmp("minMappedLength", long_options[option_index].name)==0) 
+				{
+					global_context->config.min_mapped_fraction = atoi(optarg);
 				}
 				else if(strcmp("accurateFusions", long_options[option_index].name)==0) 
 				{
 					global_context->config.more_accurate_fusions = 1;
+				}
+				else if(strcmp("SVdetection", long_options[option_index].name)==0) 
+				{
+					global_context -> config.do_structural_variance_detection = 1;
+				}
+				else if(strcmp("maxRealignLocations", long_options[option_index].name)==0)
+				{
+					global_context->config.max_vote_combinations = atoi(optarg);
+					global_context->config.multi_best_reads = atoi(optarg);
+				}
+				else if(strcmp("maxVoteSimples", long_options[option_index].name)==0)
+				{
+					global_context->config.max_vote_simples = atoi(optarg);
+				}
+				else if(strcmp("complexIndels", long_options[option_index].name)==0)
+				{
+					global_context->config.maximise_sensitivity_indel = 1;
+					global_context->config.realignment_minimum_variant_distance = 1;
+					global_context->config.max_indel_length = 16;
+				}
+				else if(strcmp("minVoteCutoff", long_options[option_index].name)==0)
+				{
+					global_context->config.max_vote_number_cutoff  = atoi(optarg);
 				}
 				break;
 			case '?':
@@ -447,9 +507,17 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	if(global_context->config.more_accurate_fusions)
 	{
 		global_context->config.high_quality_base_threshold = 999999;
-		global_context->config.max_mismatch_junction_reads = 0;
-		global_context->config.do_big_margin_filtering_for_junctions = 1;
-		global_context->config.total_subreads = 20;
+		//#warning "============ REMOVE THE NEXT LINE ======================"
+		global_context->config.show_soft_cliping = 1;
+		//#warning "============ REMOVE ' + 3' FROM NEXT LINE =============="
+		global_context->config.max_mismatch_junction_reads = 0 + 3;
+
+		//#warning "============ REMOVE ' - 1' FROM NEXT LINE =============="
+		global_context->config.do_big_margin_filtering_for_junctions = 1 - 1;
+		global_context->config.total_subreads = 28;
+
+		//#warning "============ REMOVE THE NEXT LINE BEFORE RELEASE ==============="
+		//global_context->config.multi_best_reads = 1;
 	}
 
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;
@@ -472,7 +540,7 @@ int main_align(int argc , char ** argv)
 {
 #endif
 
-//	printf("SIZE_OF_ALN=%d\n", sizeof(alignment_result_t));
+//	printf("SIZE_OF_ALN=%d\n", sizeof(mapping_result_t));
 //	printf("SIZE_OF_VOT=%d\n", sizeof(voting_context_t));
 	return core_main(argc, argv, parse_opts_aligner);
 }

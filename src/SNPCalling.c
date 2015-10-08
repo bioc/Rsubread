@@ -1134,12 +1134,13 @@ int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, ch
 		SUBREADprintf("Cannot open the output file: '%s'\n", out_BED_file);
 	}
 	fputs("##fileformat=VCFv4.0\n",out_fp);
+	fputs("##comment=The QUAL values for the SNPs in this VCF file are calculated as min(40, - log_10 (p_value)), where p_value is from the Fisher's Exact Test. The QUAL values for the Indels in this VCF file are always 1.0.\n", out_fp);
 	fputs("##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n", out_fp);
-	fputs("##INFO=<ID=BGMM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the background\">\n", out_fp);
-	fputs("##INFO=<ID=BGTOTAL,Number=1,Type=Integer,Description=\"Total number of bases in the background\">\n", out_fp);
-	fputs("##INFO=<ID=MM,Number=1,Type=String,Description=\"Number of supporting reads for each alternative allele\">\n", out_fp);
+	fputs("##INFO=<ID=BGMM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the background (for SNP only)\">\n", out_fp);
+	fputs("##INFO=<ID=BGTOTAL,Number=1,Type=Integer,Description=\"Total number of bases in the background (for SNP only)\">\n", out_fp);
+	fputs("##INFO=<ID=MM,Number=1,Type=String,Description=\"Number of supporting reads for each alternative allele (for SNP only)\">\n", out_fp);
 	fputs("##INFO=<ID=INDEL,Number=0,Type=Flag,Description=\"Indicates that the variant is an INDEL.\">\n", out_fp);
-	fputs("##INFO=<ID=SR,Number=1,Type=String,Description=\"Number of supporting reads for variants\">\n", out_fp);
+	fputs("##INFO=<ID=SR,Number=1,Type=Integer,Description=\"Number of supporting reads (for INDEL only)\">\n", out_fp);
 	fputs("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n", out_fp);
 	if(all_threads < 2)
 	{
@@ -1524,7 +1525,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	for(xk1=0;xk1<1;xk1++){
 
 
-	char c;
+	int c;
 	char in_SAM_file[5000];
 	char out_BED_file[300];
 	char temp_path[300];

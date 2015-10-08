@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include "subread.h"
+#include "core.h"
 #include "gene-algorithms.h"
 #include "sambam-file.h"
 
@@ -274,8 +275,8 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 				SB_RINC(fp,1);
 
 				//printf("NNCH=%c\n", nch);
-
-				if(nch == '\r'||nch=='\n' || nch <0) break;
+				if(nch == '\r')continue;
+				if(nch == '\n' || nch <0) break;
 				if(xk1 < buff_len-2)
 				{
 					buff[xk1]=nch;
@@ -577,7 +578,8 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	memcpy( aln-> buff_for_seq, chunk+(*chunk_ptr), seq_qual_bytes);
 	(*chunk_ptr) += seq_qual_bytes;
 
-	int nh_val = -1, hi_val = -1;
+	char extra_tags [CORE_ADDITIONAL_INFO_LENGTH];
+	extra_tags[0]=0;
 	while( (*chunk_ptr) < next_start)
 	{
 		char extag[2];
@@ -591,8 +593,8 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 		{
 			delta = 0;
 			// 'Z' columns are NULL-terminated.
-			while(chunk[*chunk_ptr]) (*chunk_ptr)++;
-			(*chunk_ptr)++;
+			while(chunk[delta + (*chunk_ptr)]) delta++;
+			delta += 1;
 		}
 		else if(extype == 'A' || extype == 'c' || extype=='C') delta=1;
 		else if(extype == 'i' || extype=='I' || extype == 'f') delta=4;
@@ -618,18 +620,19 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 		//	fprintf(stderr, "NO_EXTYPE: %c\n", extype);
 			break;
 		}
-		if(memcmp(extag,"HI",2)==0 && delta<=4)
-		{
-			hi_val=0;
-			memcpy(&hi_val, chunk+(*chunk_ptr),delta);
+
+		if(extype == 'c' || extype=='C' || extype == 'i' || extype=='I' || extype == 's' || extype=='S'){
+			int tmpi = 0;
+			memcpy(&tmpi, chunk+(*chunk_ptr),delta);
+			sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
+		}else if(extype == 'Z'){
+			sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
+			*(extra_tags + strlen(extra_tags)+delta-1) = 0;
+			memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
+		}else if(extype == 'A'){
+			sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
 		}
-	
-		if(memcmp(extag,"NH",2)==0 && delta<=4)
-		{
-			nh_val=0;
-			memcpy(&nh_val, chunk+(*chunk_ptr),delta);
-	//		printf("NH=%d\n", nh_val);
-		}
+
 		if((*chunk_ptr) + delta > chunk_limit) return -1;
 		(*chunk_ptr)+=delta;
 		
@@ -694,19 +697,10 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 
 	long long int templete_length = aln -> templete_length;
 
-	char nh_tag [20];
-	char hi_tag [20];
-	nh_tag[0]=0;
-	hi_tag[0]=0;
 
-	if(nh_val>=0)
-		sprintf(nh_tag, "\tNH:i:%d",nh_val);
-
-	if(hi_val>=0)
-		sprintf(hi_tag, "\tHI:i:%d",hi_val);
 	//fprintf(stderr, "HN_TAG=%d\n", nh_val	);
 
-	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, nh_tag, hi_tag);
+	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s\n%c", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, extra_tags, 0);
 
 	//fprintf(stderr,"%s", buff);
 

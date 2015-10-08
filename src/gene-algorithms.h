@@ -131,14 +131,16 @@ void bad_reverse_cigar(char * cigar);
 
 void subread_lock_occupy(subread_lock_t * lock);
 void subread_init_lock(subread_lock_t * lock);
+void subread_destroy_lock(subread_lock_t * lock);
 void subread_lock_release(subread_lock_t * lock);
 void remove_indel_neighbours(HashTable * indel_table);
-float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int * all_MM, int ql_kill);
+float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int is_negative, int phred_version, int * high_qual_unmatch, int * all_MM, int ql_kill, int head_clipped, int tail_clipped);
 int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int indel_size, gene_vote_number_t * indel_recorder, int total_subreads);
-float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch, int * all_MM, int ql_kill);
+float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  unsigned int pos, char * qual_txt, int read_len, int phred_version, int * high_qual_unmatch, int * all_MM, int ql_kill, int head_clipped, int tail_clipped);
 void print_version_info();
 
 int fc_strcmp_chro(const void * s1, const void * s2);
 unsigned long fc_chro_hash(const void *key) ;
+
 #endif
 

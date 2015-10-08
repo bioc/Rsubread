@@ -20,6 +20,20 @@
 #ifndef __HELPER_FUNCTIONS_H_
 #define __HELPER_FUNCTIONS_H_
 
+#include "hashtable.h"
+
+#define PARSE_STATUS_TAGNAME 1
+#define PARSE_STATUS_TAGTYPE 2
+#define PARSE_STATUS_TAGVALUE 3
+
+typedef struct{
+	HashTable * contig_table;
+	HashTable * size_table;
+} fasta_contigs_t;
+
+int read_contig_fasta(fasta_contigs_t * tab, char * fname);
+int get_contig_fasta(fasta_contigs_t * tab, char * chro, unsigned int pos, int len, char * out_bases);
+void destroy_contig_fasta(fasta_contigs_t * tab);
 
 // This function parses CIGAR_Str and extract the relative starting points and lengths of all sections (i.e., the sections of read that are separated by 'N').
 // CIGAR_Str is a CIGAR string containing 'S', 'M', 'I', 'D' and 'N' operations. Other operations are all ignored. The length of CIGAR_Str should be always less than 100 bytes or "-1" is returned.
@@ -29,8 +43,10 @@
 
 // This function returns the number of sections found in the CIGAR string. It returns -1 if the CIGAR string cannot be parsed.
 
-int RSubread_parse_CIGAR_string(const char * CIGAR_Str, int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read);
+int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char * CIGAR_Str, char ** Section_Chromosomes, unsigned int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read);
 
+
+int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int MainPos, const char * CIGAR_Str, const char * Extra_Tags, char ** Chros, unsigned int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read);
 
 // This function try to find the attribute value of a given attribute name from the extra column string in GTF/GFF.
 // If the value is found, it returns the length of the value (must be > 0 by definition), or -1 if no attribute is found or the format is wrong.
@@ -50,4 +66,6 @@ char *str_replace(char *orig, char *rep, char *with) ;
 // // Third, compare the remainder.
 int strcmp_number(char * s1, char * s2);
 
+unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
+unsigned int find_left_end_cigar(unsigned int right_pos, char * cigar);
 #endif

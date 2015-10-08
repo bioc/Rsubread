@@ -33,6 +33,7 @@
 #include"core.h"
 
 #define _gehash_hash(k) ((unsigned int)(k))
+#define WITHOUT_CLUSTER_ORDERING 0
 
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table)
 {
@@ -698,7 +699,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 					continue;
 				for (i=0;i<datalen;i++)
 				{
-					if (dat[i] == kv)
+					if (dat[i] == kv && (WITHOUT_CLUSTER_ORDERING || subread_number + 1 > vote -> last_subread_cluster[offsetX][i]))
 					{
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 						test_max += 1;
@@ -708,6 +709,8 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 							vote->coverage_start [offsetX][i] = offset_from_5;
 						if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
 							vote->coverage_end [offsetX][i] = offset_from_5+16;
+
+						vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
 
 						vote->max_vote = max(vote->max_vote , test_max);
 						i = 9999999;
@@ -728,6 +731,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 					vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
 					vote->coverage_start [offsetX][i] = offset_from_5;
 					vote->coverage_end [offsetX][i] = offset_from_5+16;
+					vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
 
 					if(vote->max_vote==0)
 						vote->max_vote = 1;
@@ -755,6 +759,10 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 					for (i=0;i<datalen;i++)
 					{
+
+						if((!WITHOUT_CLUSTER_ORDERING ) && subread_number + 1 <= vote -> last_subread_cluster[offsetX][i])
+							continue;
+
 						int di = dat[i];
 						int dist0 = kv-di;
 						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
@@ -796,6 +804,8 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 								else
 									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 
+								vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
+
 								vote->max_vote = max(vote->max_vote , test_max);
 								i = 9999999;
 							}
@@ -823,6 +833,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						vote -> quality[offsetX2][datalen2]=quality;
 						vote -> votes[offsetX2][datalen2]=1;
 						vote -> toli[offsetX2][datalen2]=0;
+						vote -> last_subread_cluster[offsetX2][datalen2] = subread_number + 1;
 
 						// data structure of recorder:
 						// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
@@ -849,6 +860,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 	{
 
 		// VER_1
+		// VER_2
 
 		struct gehash_bucket * current_bucket;
 		int i = 0, items;
@@ -910,6 +922,8 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 				unsigned int * dat2, *dat;
 				dat = dat2 = vote -> pos[offsetX2];
 
+				//SUBREADprintf("You can find KV at %u\n", kv);
+
 				for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
 				{
 					if(iix)
@@ -924,10 +938,12 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 					for (i=0;i<datalen;i++)
 					{
+						if((!WITHOUT_CLUSTER_ORDERING ) &&  subread_number + 1 <= vote -> last_subread_cluster[offsetX][i]) continue;
 						int di = dat[i];
 						int dist0 = kv-di;
 						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
 						{
+							//SUBREADprintf("IIX = %d, BASE=%u, change_dist=%d, subread=#%d\n", iix, dat[i], dist0, subread_number);
 							if(is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND)))
 							{
 
@@ -958,6 +974,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 								else
 									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
 
+								vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
 								vote->max_vote = max(vote->max_vote , test_max);
 								i = 9999999;
 							}
@@ -993,6 +1010,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						vote->current_indel_cursor [offsetX2][datalen2] = 0;
 						vote->coverage_start [offsetX2][datalen2] = offset;
 						vote->coverage_end [offsetX2][datalen2] = offset+16;
+						vote -> last_subread_cluster[offsetX2][datalen2] = subread_number + 1;
 
 						if (vote->max_vote==0)
 							vote->max_vote = 1;

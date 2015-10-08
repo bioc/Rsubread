@@ -41,7 +41,6 @@
 int GENE_SLIDING_STEP = 3;
 int IS_COLOR_SPACE = 0;
 int VALUE_ARRAY_INDEX = 1;
-int QUICK_BUILD = 0;
 int MARK_NONINFORMATIVE_SUBREADS = 0;
 int IS_FORCED_ONE_BLOCK = 0;
 
@@ -958,7 +957,7 @@ void SIGINT_hook(int param)
 	if(tmp_file_for_signal[0])
 	{
 		unlink(tmp_file_for_signal);
-		SUBREADprintf("\n\nReceived a terminal signal. The temporary file was removed. The index was NOT built sucessfully. Please DO NOT use the new index until they are rebuilt.\n\n");
+		SUBREADprintf("\n\nReceived a terminal signal. The temporary file was removed. The index was NOT built successfully. Please DO NOT use the new index until they are rebuilt.\n\n");
 	}
 
 	exit(param);
@@ -997,11 +996,11 @@ int main_buildindex(int argc,char ** argv)
 
 	optind = 0;
 	
-	while ((c = getopt_long (argc, argv, "kvcqBFM:o:f:D?", ib_long_options, &optindex)) != -1)
+	while ((c = getopt_long (argc, argv, "kvcBFM:o:f:D?", ib_long_options, &optindex)) != -1)
 		switch(c)
 		{
 			case 'B':
-				IS_FORCED_ONE_BLOCK = 1;
+				IS_FORCED_ONE_BLOCK =1;
 				break;
 			case 'F':
 				GENE_SLIDING_STEP =1;
@@ -1009,13 +1008,11 @@ int main_buildindex(int argc,char ** argv)
 			case 'v':
 				core_version_number("Subread-buildindex");
 				return 0;
-			case 'q':
-				QUICK_BUILD = 1;
-				break;
 			case 'c':
 				IS_COLOR_SPACE = 1;
 				break;
 			case 'M':
+				IS_FORCED_ONE_BLOCK = 0;
 				memory_limit = atoi(optarg);
 				break;
 			case 'f':
@@ -1040,6 +1037,7 @@ int main_buildindex(int argc,char ** argv)
 	{
 		SUBREADprintf("Version %s\n\n", SUBREAD_VERSION);
 
+	/*
 		SUBREADputs("Usage:");
 		SUBREADputs("");
 		SUBREADputs(" ./subread-buildindex [options] -o <basename> {FASTA file1} [FASTA file2] ...");
@@ -1050,18 +1048,9 @@ int main_buildindex(int argc,char ** argv)
 		SUBREADputs("");
 		SUBREADputs("Optional arguments:");
 		SUBREADputs("");
-		SUBREADputs("    -F              build a full index for the reference genome. 16bp subreads");
-		SUBREADputs("                    will be extracted from every position of the reference");
-		SUBREADputs("                    genome. Size of the index is typically 3 times the size of");
-		SUBREADputs("                    index built from using the default setting.");
+		SUBREADputs("    -G              build a gapped index for the reference genome. 16bp subreads");
 		SUBREADputs("");
-		SUBREADputs("    -B              create one block of index. The built index will not be split");
-		SUBREADputs("                    into multiple pieces. This makes the largest amount of");
-		SUBREADputs("                    memory be requested when running alignments, but it enables");
-		SUBREADputs("                    the maximum mapping speed to be achieved. This option");
-		SUBREADputs("                    overrides -M when it is provided as well.");
-		SUBREADputs("");
-		SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default.");
+		SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes. Index is split into blocks if necessary.");
 		SUBREADputs("");
 		SUBREADputs("    -f <int>        specify the threshold for removing uninformative subreads");
 		SUBREADputs("                    (highly repetitive 16mers in the reference). 24 by default.");
@@ -1071,6 +1060,39 @@ int main_buildindex(int argc,char ** argv)
 		SUBREADputs("    -v              output version of the program.");
 		SUBREADputs("");
 		SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
+	*/
+		 SUBREADputs("Usage:");
+		 SUBREADputs("");
+		 SUBREADputs(" ./subread-buildindex [options] -o <basename> {FASTA file1} [FASTA file2] ...");
+		 SUBREADputs("");
+		 SUBREADputs("Required arguments:");
+		 SUBREADputs("");
+		 SUBREADputs("    -o <basename>   base name of the index to be created");
+		 SUBREADputs("");
+		 SUBREADputs("Optional arguments:");
+		 SUBREADputs("");
+		 SUBREADputs("    -F              build a full index for the reference genome. 16bp subreads");
+		 SUBREADputs("                    will be extracted from every position of the reference");
+		 SUBREADputs("                    genome. Size of the index is typically 3 times the size of");
+		 SUBREADputs("                    index built from using the default setting.");
+		 SUBREADputs("");
+		 SUBREADputs("    -B              create one block of index. The built index will not be split");
+		 SUBREADputs("                    into multiple pieces. This makes the largest amount of");
+		 SUBREADputs("                    memory be requested when running alignments, but it enables");
+		 SUBREADputs("                    the maximum mapping speed to be achieved. This option");
+		 SUBREADputs("                    overrides -M when it is provided as well.");
+		 SUBREADputs("");
+		 SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default.");
+		 SUBREADputs("");
+		 SUBREADputs("    -f <int>        specify the threshold for removing uninformative subreads");
+		 SUBREADputs("                    (highly repetitive 16mers in the reference). 24 by default.");
+		 SUBREADputs("");
+		 SUBREADputs("    -c              build a color-space index.");
+		 SUBREADputs("");
+		 SUBREADputs("    -v              output version of the program.");
+		 SUBREADputs("");
+		 SUBREADputs("For more information about these arguments, please refer to the User Manual.\n");
+
 		return -1 ;
 	}
 
@@ -1108,13 +1130,34 @@ int main_buildindex(int argc,char ** argv)
 
 	int x1;
 	for(x1=0;x1< argc - optind; x1++)
-		print_in_box(94, 0, 0, "                            %c[32mo%c[36m %s%c[0m", CHAR_ESC, CHAR_ESC,  *(argv+optind+x1) , CHAR_ESC);
+	{
+		char * fasta_fn = *(argv+optind+x1);
+		int f_type = probe_file_type_fast(fasta_fn);
+		char o_char = 'o';
+		if(f_type != FILE_TYPE_FASTA){
+			o_char = '?';
+		}
+		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  fasta_fn , CHAR_ESC);
+	}
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
 	SUBREADputs("");
 
 	print_in_box(80, 1, 1, "Running");
 	print_in_box(80, 0, 0, "");
+
+	for(x1=0;x1< argc - optind; x1++)
+	{
+		char * fasta_fn = *(argv+optind+x1);
+		int f_type = probe_file_type_fast(fasta_fn);
+		if(f_type != FILE_TYPE_FASTA && f_type != FILE_TYPE_NONEXIST){
+			SUBREADprintf("WARNING: '%s' is not a FASTA file.\n", fasta_fn);
+			if(f_type == FILE_TYPE_GZIP_FASTA){
+				SUBREADprintf("         The index builder does not accept gzipped files. The outcome is undefined.\n");
+			}
+		}
+	}
+
 
 	begin_ftime = miltime();
 

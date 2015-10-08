@@ -28,7 +28,10 @@
 // if it is an insertion event, event_large_site = event_small_site+1.
 
 //#define MAX_EVENT_ENTRIES_PER_SITE 5
-#define MAX_EVENT_ENTRIES_PER_SITE 12 
+//#define MAX_EVENT_ENTRIES_PER_SITE 12 
+//
+#define EVENT_ENTRIES_INIT_SIZE 9
+#define MAX_EVENT_ENTRIES_PER_SITE 9
 #define CHRO_EVENT_TYPE_REMOVED 0
 #define CHRO_EVENT_TYPE_INDEL 8
 #define CHRO_EVENT_TYPE_LONG_INDEL 16 
@@ -48,37 +51,37 @@
 #define is_target_window_X(x) 0
 //#define MAXIMUM_EVENT_NUMBER 300000
 
+
 typedef struct{
-	unsigned int event_small_side;
-	unsigned int event_large_side;
-	//union
-	//{
-		short indel_length;
-		short junction_flanking_left;
-	//};
-	short junction_flanking_right;
+	int is_precisely_called;
+	unsigned int source_left_side;	// the base BEFORE the translocated sequence.
+	unsigned int target_left_side;  // tge base BEFORE the inserted translocated sequence.
+	unsigned int length;
 
-	unsigned char event_type;
-	char indel_at_junction;
-	char is_negative_strand;	// this only works to junction detection, according to 'GT/AG' or 'CT/AC' donors. This only applys to junctions.
-	char is_strand_jumped;		// "strand jumped" means that the left and right sides are on different strands. This only applys to fusions.
-	char is_donor_found;		// only for junctions: GT/AG is found at the location.
-						// Also, if "is_strand_jumped" is true, all coordinates (e.g., splicing points, cover_start, cover_end, etc) are on "reversed read" view.
+	unsigned int event_P_number;
+	unsigned int event_Q_number;
+	unsigned int event_R_number;
 
-	//char is_ambiguous;
-	char connected_next_event_distance;	// the distance (negative or positive) to the next event in the table. For example, if the cigar string is 10M3I1M1I10M, event "3I" will have 1 here .
-	char connected_previous_event_distance;	// the distance (negative or positive) to the next event in the table. For example, if the cigar string is 10M3I1M1I10M, event "1I" will have 1 here.
+	int is_inv;
+	unsigned int all_sup_P;
+	unsigned int max_sup_QR;
+} translocation_result_t;
 
-	//char inserted_bases[(1+MAX_INSERTION_LENGTH) / 4 + 1];
-	char * inserted_bases;
-	unsigned short supporting_reads;
-	unsigned short anti_supporting_reads;
-	unsigned short final_counted_reads;
-	unsigned short final_reads_mismatches;
-	unsigned int global_event_id;
-	float event_quality;
-} chromosome_event_t;
+typedef struct{
+	int is_precisely_called;
 
+	unsigned int event_Y_rough_small_abs;
+	unsigned int event_Z_rough_large_abs;
+
+	unsigned int small_side;	// the base BEFORE the reversed sequence
+	unsigned int length;
+
+	unsigned int event_Y_number;	// event_no in the event space.
+	unsigned int event_Z_number;
+
+	unsigned int all_sup_D;
+	unsigned int max_sup_E;
+} inversion_result_t;
 
 struct reassmebly_window_allele
 {
@@ -161,11 +164,11 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 int write_indel_final_results(global_context_t * context);
 int search_event(global_context_t * global_context,HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, char event_type, chromosome_event_t ** return_buffer);
 
-void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, gene_vote_number_t * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset);
+void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, gene_vote_number_t * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, int is_PE, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset, int main_hamming, int minor_hamming, int main_quality, int minor_quality);
 
 void put_new_event(HashTable * event_table, chromosome_event_t * new_event , int event_no);
 void remove_neighbour(global_context_t * global_context);
-int build_local_reassembly(global_context_t *global_context , thread_context_t *thread_context , int pair_number, char * read_name_1 , char * read_text_1 ,char * qual_text_1 , int read_len_1, int read_len_2, int is_second_read, int best_read_id, int is_paired_unmapped);
+int build_local_reassembly(global_context_t *global_context , thread_context_t *thread_context , int pair_number, char * read_name_1 , char * read_text_1 ,char * qual_text_1 , int read_len_1, int read_len_2, int is_second_read, int best_read_id, int is_paired_unmapped, mapping_result_t * current_res, mapping_result_t * mate_res);
 int finalise_long_insertions(global_context_t * global_context);
 
 // This function sets the global context with default values.
@@ -182,4 +185,8 @@ chromosome_event_t * reallocate_event_space(global_context_t* global_context,thr
 int there_are_events_in_range(char * bitmap, unsigned int pos, int sec_len);
 
 int anti_supporting_read_scan(global_context_t * global_context);
+
+int core_dynamic_align(global_context_t * global_context, thread_context_t * thread_context, char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, char * read_name);
+
+chromosome_event_t * local_add_indel_event(global_context_t * global_context, thread_context_t * thread_context, HashTable * event_table, char * read_text, unsigned int left_edge, int indels, int score_supporting_read_added, int is_ambiguous, int mismatched_bases);
 #endif

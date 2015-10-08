@@ -19,16 +19,312 @@
   
 #include <ctype.h>
 #include <string.h>
+#include <assert.h>
 
 #include "subread.h"
+#include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
-int RSubread_parse_CIGAR_string(const char * CIGAR_Str, int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read)
+
+
+// This assumes the first part of Cigar has differet strandness to the main part of the cigar.
+// Pos is the LAST WANTED BASE location before the first strand jump (split by 'b' or 'n').
+// The first base in the read actually has a larger coordinate than Pos. 
+// new_cigar has to be at least 100 bytes.
+unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar) {
+	int cigar_cursor = 0;
+	new_cigar[0]=0;
+	unsigned int tmpi=0;
+	int last_piece_end = 0;
+	int last_sec_start = 0;
+	unsigned int chro_pos = pos, this_section_start = pos, ret = pos;
+	int is_positive_dir = 0;
+	int read_cursor = 0;
+	int section_no = 0;
+
+	for(cigar_cursor = 0 ;  ; cigar_cursor++)
+	{
+		if( cigar [cigar_cursor] == 'n' ||  cigar [cigar_cursor] == 'b' ||  cigar [cigar_cursor] == 0)
+		{
+			int xk1, jmlen=0, nclen=strlen(new_cigar);
+			char jump_mode [13];
+
+			if(cigar [cigar_cursor] !=0)
+			{
+				sprintf(jump_mode, "%u%c", tmpi,  cigar [cigar_cursor] == 'b'?'n':'b');
+				jmlen = strlen(jump_mode);
+			}
+
+			for(xk1=nclen-1;xk1>=0; xk1--)
+				new_cigar[ xk1 +  last_piece_end + jmlen - last_sec_start ] = new_cigar[ xk1 ];
+			new_cigar [nclen + jmlen + last_piece_end - last_sec_start ] = 0;
+
+			memcpy(new_cigar , jump_mode, jmlen);
+			memcpy(new_cigar + jmlen , cigar + last_sec_start, last_piece_end - last_sec_start);
+
+			last_sec_start = cigar_cursor+1;
+
+			if(is_positive_dir && cigar [cigar_cursor] !=0)
+			{
+				if(cigar [cigar_cursor] == 'b') chro_pos -= tmpi - read_cursor - 1;
+				else	chro_pos += tmpi - read_cursor - 1;
+			}
+			if((!is_positive_dir) && cigar [cigar_cursor] !=0)
+			{
+				if(cigar [cigar_cursor] == 'b') chro_pos = this_section_start - tmpi - read_cursor - 1;
+				else	chro_pos = this_section_start + tmpi - read_cursor - 1;
+			}
+
+			this_section_start = chro_pos;
+
+			if(section_no == 0)
+				ret = chro_pos;
+
+			is_positive_dir = ! is_positive_dir;
+			section_no++;
+			tmpi=0;
+		}
+		else if(isalpha(cigar [cigar_cursor]))
+		{
+			if(cigar [cigar_cursor]=='M' || cigar [cigar_cursor] == 'S')
+				read_cursor += tmpi;
+			tmpi=0;
+			last_piece_end = cigar_cursor+1;
+		}
+		else tmpi = tmpi*10 + (cigar [cigar_cursor] - '0');
+
+		if(cigar [cigar_cursor] == 0)break;
+	}
+
+	SUBREADprintf("REV CIGAR: %s  =>  %s\n", cigar, new_cigar);
+	return ret;
+}
+
+unsigned int find_left_end_cigar(unsigned int right_pos, char * cigar){
+	int delta_from_right = 0;
+	int cigar_cursor = 0;
+	unsigned int tmpi = 0;
+	while(1){
+		int nch = cigar[cigar_cursor++];
+		if(nch == 0) break;
+		if(isdigit(nch)){
+			tmpi = tmpi * 10 + nch - '0';
+		}else{
+			if(nch == 'M'||nch == 'D' || nch == 'N'){
+				delta_from_right +=tmpi;
+			}
+			tmpi = 0;
+		}
+	}
+	return right_pos - delta_from_right;
+}
+
+
+char contig_fasta_int2base(int v){
+	if(v == 1) return 'A';
+	if(v == 2) return 'T';
+	if(v == 3) return 'G';
+	if(v == 4) return 'C';
+	return 'N';
+}
+
+int contig_fasta_base2int(char base){
+	base = tolower(base);
+	if((base) == 'a'){ return 1;}
+	else if((base) == 't' || (base) == 'u'){ return 2;}
+	else if((base) == 'g'){ return 3;}
+	else if((base) == 'c'){ return 4;}
+	else return 15 ;
+}
+
+int get_contig_fasta(fasta_contigs_t * tab, char * chro, unsigned int pos, int len, char * out_bases){
+	unsigned int this_size = HashTableGet( tab -> size_table, chro ) - NULL;
+	if(this_size > 0){
+		if(this_size >= len && pos <= this_size - len){
+			char * bin_block = HashTableGet(tab -> contig_table, chro );
+			unsigned int bin_byte = pos / 2;
+			int bin_bit = 4*(pos % 2), x1;
+
+			for(x1 = 0 ;x1 < len; x1++)
+			{
+				int bin_int = (bin_block[bin_byte] >> bin_bit) & 0xf;
+				if(bin_bit == 4) bin_byte++;
+				bin_bit = (bin_bit == 4)?0:4;
+				out_bases[x1] = contig_fasta_int2base(bin_int);
+			}
+
+			return 0;
+		}
+	} 
+	return 1;
+}
+
+void destroy_contig_fasta(fasta_contigs_t * tab){
+	HashTableDestroy( tab -> size_table );
+	HashTableDestroy( tab -> contig_table );
+}
+int read_contig_fasta(fasta_contigs_t * tab, char * fname){
+	FILE * fp = f_subr_open(fname, "r");
+	if(fp != NULL){
+		tab -> contig_table = HashTableCreate(3943);
+		tab -> size_table = HashTableCreate(3943);
+
+		HashTableSetDeallocationFunctions(tab -> contig_table, free, free);
+		HashTableSetDeallocationFunctions(tab -> size_table, NULL, NULL);
+
+		HashTableSetKeyComparisonFunction(tab -> contig_table, fc_strcmp_chro);
+		HashTableSetKeyComparisonFunction(tab -> size_table, fc_strcmp_chro);
+
+		HashTableSetHashFunction(tab -> contig_table, fc_chro_hash);
+		HashTableSetHashFunction(tab -> size_table, fc_chro_hash);
+
+		char chro_name[MAX_CHROMOSOME_NAME_LEN];
+		unsigned int inner_cursor = 0, current_bin_space = 0;
+		int status = 0;
+		char * bin_block = NULL;
+		chro_name[0]=0;
+
+		while(1){
+			char nch = fgetc(fp);
+			if(status == 0){
+				assert(nch == '>');
+				status = 1;
+			}else if(status == 1){
+				if(inner_cursor == 0){
+					bin_block = calloc(sizeof(char),10000);
+					current_bin_space = 10000;
+				}
+				if(nch == '|' || nch == ' ') status = 2;
+				else if(nch == '\n'){
+					status = 3;
+					inner_cursor = 0;
+				}else{
+					chro_name[inner_cursor++] = nch;
+					chro_name[inner_cursor] = 0;
+				}
+			}else if(status == 2){
+				if(nch == '\n'){
+					status = 3;
+					inner_cursor = 0;
+				}
+			}else if(status == 3){
+				if(nch == '>' || nch <= 0){
+					char * mem_chro = malloc(strlen(chro_name)+1);
+					strcpy(mem_chro, chro_name);
+					HashTablePut(tab -> size_table , mem_chro, NULL + inner_cursor);
+					HashTablePut(tab -> contig_table , mem_chro, bin_block);
+					SUBREADprintf("Read '%s' : %u bases\n", chro_name, inner_cursor);
+					inner_cursor = 0;
+					status = 1;
+					if(nch <= 0) break;
+				}else if(nch != '\n'){
+					int bin_bytes = inner_cursor / 2;
+					int bin_bits = 4*(inner_cursor % 2);
+					int base_int = contig_fasta_base2int(nch);
+					if(bin_bytes >= current_bin_space){
+						unsigned int new_bin_space = current_bin_space / 4 * 5;
+						if(current_bin_space > 0xffff0000 /5 * 4){
+							assert(0);
+						}
+						bin_block = realloc(bin_block, new_bin_space);
+						memset(bin_block + current_bin_space, 0, new_bin_space - current_bin_space);
+						current_bin_space = new_bin_space;
+					}
+					bin_block[bin_bytes] |= (base_int << bin_bits);
+					inner_cursor++;
+				}
+			}
+		}
+
+		fclose(fp);
+	}
+	return 1;
+}
+
+int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int MainPos, const char * CIGAR_Str, const char * Extra_Tags, char ** Chros, unsigned int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read){
+	int ret = RSubread_parse_CIGAR_string(MainChro, MainPos, CIGAR_Str, Chros, Staring_Chro_Points, Section_Start_Read_Pos, Section_Length, is_junction_read);
+
+	char read_main_strand = (((FLAG & 0x40)==0x40) == ((FLAG & 0x10) == 0x10 ))?'-':'+';
+	int tag_cursor=0;
+	//SUBREADprintf("EXTRA=%s\n", Extra_Tags);
+	int status = PARSE_STATUS_TAGNAME;
+	char tag_name[2], typechar=0;
+	int tag_inner_cursor=0;
+
+	char current_fusion_char[MAX_CHROMOSOME_NAME_LEN];
+	unsigned int current_fusion_pos = 0;
+	char current_fusion_strand = 0;
+	char current_fusion_cigar[FC_CIGAR_PARSER_ITEMS * 15];
+	current_fusion_cigar [0] =0;
+	current_fusion_char [0]=0;
+
+	while(1){
+		int nch = Extra_Tags[tag_cursor];
+		if(status == PARSE_STATUS_TAGNAME){
+			tag_name[tag_inner_cursor++] = nch;
+			if(tag_inner_cursor == 2){
+				status = PARSE_STATUS_TAGTYPE;
+				tag_cursor += 1;
+				assert(Extra_Tags[tag_cursor] == ':');
+			}
+		}else if(status == PARSE_STATUS_TAGTYPE){
+			typechar = nch;
+			tag_cursor +=1;
+			assert(Extra_Tags[tag_cursor] == ':');
+			tag_inner_cursor = 0;
+			status = PARSE_STATUS_TAGVALUE;
+		}else if(status == PARSE_STATUS_TAGVALUE){
+			if(nch == '\t' || nch == 0 || nch == '\n'){
+				if(current_fusion_cigar[0] && current_fusion_char[0] && current_fusion_pos && current_fusion_strand){
+					//SUBREADprintf("ENTER CALC:%s\n", current_fusion_char );
+					unsigned int left_pos = current_fusion_pos;
+					if(current_fusion_strand!=read_main_strand)
+						left_pos = find_left_end_cigar(current_fusion_pos, current_fusion_cigar);
+					ret += RSubread_parse_CIGAR_string(current_fusion_char, left_pos, current_fusion_cigar, Chros + ret, Staring_Chro_Points+ ret, Section_Start_Read_Pos+ ret, Section_Length + ret, is_junction_read);
+
+					current_fusion_pos = 0;
+					current_fusion_strand = 0;
+					current_fusion_cigar [0] =0;
+					current_fusion_char [0]=0;
+					//SUBREADprintf("EXIT CALC:%s\n", current_fusion_char );
+				}
+
+				tag_inner_cursor = 0;
+				status = PARSE_STATUS_TAGNAME;
+			}else{
+				if(tag_name[0]=='C' && tag_name[1]=='C' && typechar == 'Z'){
+					current_fusion_char[tag_inner_cursor++]=nch;
+					current_fusion_char[tag_inner_cursor]=0;
+				}else if(tag_name[0]=='C' && tag_name[1]=='G' && typechar == 'Z'){
+					current_fusion_cigar[tag_inner_cursor++]=nch;
+					current_fusion_cigar[tag_inner_cursor]=0;
+				}else if(tag_name[0]=='C' && tag_name[1]=='P' && typechar == 'i'){
+					current_fusion_pos = current_fusion_pos * 10 + (nch - '0');
+				}else if(tag_name[0]=='C' && tag_name[1]=='T' && typechar == 'Z'){
+					//SUBREADprintf("pos=%d %c -> %c\n", tag_cursor, current_fusion_strand, nch);
+					current_fusion_strand = nch;
+					//SUBREADprintf("spo=%d %c -> %c\n", tag_cursor, current_fusion_strand, nch);
+				}
+			}
+		}
+
+		if(nch == 0 || nch == '\n'){
+			assert(status == PARSE_STATUS_TAGNAME);
+			break;
+		}
+
+		tag_cursor++;
+		//SUBREADprintf("CUR=%d [%s], c=%d\n", tag_cursor, Extra_Tags, Extra_Tags[tag_cursor]);
+	}
+	return ret;
+}
+
+int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char * CIGAR_Str, char ** Section_Chromosomes, unsigned int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read)
 {
 	unsigned int tmp_int=0;
 	int cigar_cursor=0;
 	unsigned short current_section_chro_len=0, current_section_start_read_pos = 0, read_cursor = 0;
-	unsigned int chromosome_cursor=0;
+	unsigned int chromosome_cursor=first_pos;
 	int ret=0;
 
 	for(cigar_cursor=0; ; cigar_cursor++)
@@ -53,6 +349,7 @@ int RSubread_parse_CIGAR_string(const char * CIGAR_Str, int * Section_Start_Chro
 				{
 					if(current_section_chro_len>0)
 					{
+						Section_Chromosomes[ret] = chro;
 						Section_Start_Chro_Pos[ret] = chromosome_cursor - current_section_chro_len;
 						Section_Start_Read_Pos[ret] = current_section_start_read_pos;
 						Section_Chro_Length[ret] = current_section_chro_len;
@@ -77,12 +374,12 @@ int RSubread_parse_CIGAR_string(const char * CIGAR_Str, int * Section_Start_Chro
 
 void display_sections(char * CIGAR_Str)
 {
-	int is_junc=0;
+	//int is_junc=0;
 	int Section_Start_Chro_Pos[FC_CIGAR_PARSER_ITEMS];
 	unsigned short Section_Start_Read_Pos[FC_CIGAR_PARSER_ITEMS];
 	unsigned short Section_Chro_Length[FC_CIGAR_PARSER_ITEMS];
 
-	int retv = RSubread_parse_CIGAR_string(CIGAR_Str, Section_Start_Chro_Pos, Section_Start_Read_Pos, Section_Chro_Length, &is_junc);
+	int retv = 0;//RSubread_parse_CIGAR_string(CIGAR_Str, Section_Start_Chro_Pos, Section_Start_Read_Pos, Section_Chro_Length, &is_junc);
 
 	int x1;
 	SUBREADprintf("Cigar=%s ; Sections=%d\n", CIGAR_Str, retv);

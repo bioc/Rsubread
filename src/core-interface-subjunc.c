@@ -33,6 +33,7 @@ static struct option long_options[] =
 	{"multi",  required_argument, 0, 'B'},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
+	{"gzFASTQinput",  no_argument, 0, 'u'},
 	{"unique",  no_argument, 0, 'u'},
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
@@ -40,7 +41,8 @@ static struct option long_options[] =
 	{"hamming",  no_argument, 0, 'H'},
 	{"quality",  no_argument, 0, 'Q'},
 	{"dnaseq",  no_argument, 0, 0},
-	{"gzFASTQinput", no_argument, 0, 0},
+	{"fast",  no_argument, 0, 0},
+	{"extendIndelDetection", no_argument, 0, 0},
 	{"allJunctions",  no_argument, 0, 0},
 	{"memoryMultiplex",  required_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
@@ -50,6 +52,14 @@ static struct option long_options[] =
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
 	{"exonicSubreadFrac",  required_argument, 0, 0},
+	{"SVdetection", no_argument, 0, 0},
+	{"experiment",  required_argument, 0, 'e'},
+	{"maxVoteSimples",  required_argument, 0, 0},
+	{"maxRealignLocations",  required_argument, 0, 0},
+	{"minVoteCutoff",  required_argument, 0, 0},
+	{"minMappedFraction",  required_argument, 0, 0},
+	{"disableBigMargin",  no_argument, 0, 0},
+	{"complexIndels", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -65,12 +75,15 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("");
-	SUBREADputs("    -r --read      <input>  name of the input file(FASTQ/FASTA format by default");
-	SUBREADputs("                            . See below for more supported formats). Both base-");
-	SUBREADputs("                            space and color-space read data are supported. For");
-	SUBREADputs("                            paired-end reads, this gives the first read file");
+	SUBREADputs("    -r --read      <input>  name of the input file(gzFASTQ/FASTQ/FASTA format by");
+	SUBREADputs("                            default. See below for more supported formats). Both");
+	SUBREADputs("                            base-space and color-space read data are supported.");
+	SUBREADputs("                            For paired-end reads, this gives the first read file");
 	SUBREADputs("                            and the other read file should be specified using");
 	SUBREADputs("                            the -R option.");
+	SUBREADputs("    ");
+	SUBREADputs("    -e --experiment <input> type of the experiment for generating the reads. The ");
+	SUBREADputs("                            value can be either DNA-seq or RNA-seq");
 	SUBREADputs("");
 	SUBREADputs("Optional general arguments:");
 	SUBREADputs("");
@@ -118,31 +131,34 @@ void print_usage_core_subjunc()
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
 	SUBREADputs("                            itself will still be performed at color-space.");
 	SUBREADputs("   ");
-	SUBREADputs("    -M --maxMismatches <int> Specify the maximum number of mis-matched bases");
+	SUBREADputs("    -M --maxMismatches <int> specify the maximum number of mis-matched bases");
 	SUBREADputs("                            allowed in the alignment. 3 by default. Mis-matches");
 	SUBREADputs("                            found in soft-clipped bases are not counted.");
 	SUBREADputs("   ");
 //	SUBREADputs("       --disableBigMargin   disable big margin for calling junctions.");
 //	SUBREADputs("   ");
-	SUBREADputs("       --dnaseq             specify that the input read data are genomic DNA");
-	SUBREADputs("                            sequencing data. When specified, the program will");
-	SUBREADputs("                            perform read alignments and also detect fusion");
-	SUBREADputs("                            events such as chimeras. Discovered fusions will");
-	SUBREADputs("                            be saved to a file (*.fusions.txt). Detailed");
-	SUBREADputs("                            mapping results for fusion reads will be saved to");
-	SUBREADputs("                            the SAM/BAM output file as well. Secondary");
-	SUBREADputs("                            alignments of fusion reads will be saved to the");
-	SUBREADputs("                            following optional fields: CC(Chr), CP(Position),");
-	SUBREADputs("                            CG(CIGAR) and CT(strand). Note that each fusion");
-	SUBREADputs("                            read occupies only one row in the SAM/BAM output");
-	SUBREADputs("                            file.");
+	SUBREADputs("       --dnaseq             when specified, genomic DNA sequencing data should");
+	SUBREADputs("                            be provided and the program will search for long");
+	SUBREADputs("                            deletions, inversions and translocations. Locations");
+	SUBREADputs("                            of breakpoints for these structural variants will");
+	SUBREADputs("                            be saved to a file with a suffix name ");
+	SUBREADputs("                            \".breakpoints.txt\". Breakpoint-containing reads");
+	SUBREADputs("                            may include the following fields for their minor");
+	SUBREADputs("                            mapped regions in mapping output: CC(Chr),");
+	SUBREADputs("                            CP(Position),CG(CIGAR) and CT(strand). Note that");
+	SUBREADputs("                            each breakpoint-containing read occupies only one");
+	SUBREADputs("                            row in the SAM/BAM output.");
 	SUBREADputs("   ");
 	SUBREADputs("       --allJunctions       this option should only be used for RNA-seq data.");
-	SUBREADputs("                            If specified, the program will report non-canonical");
-	SUBREADputs("                            exon-exon junctions and fusions (eg. chimeras), in");
-	SUBREADputs("                            addition to canonical exon-exon junctions. Non-");
-	SUBREADputs("                            canonical junctions and fusions are reported in the");
-	SUBREADputs("                            same format as that in `--dnaseq' option.");
+	SUBREADputs("                            If specified, the program will also report non-");
+	SUBREADputs("                            canonical exon-exon junctions and structural");
+	SUBREADputs("                            variants, in addition to the canonical exon-exon");
+	SUBREADputs("                            junctions (canonical donor/receptor sites detected");
+	SUBREADputs("                            ). Both canonical and non-canonical junctions will");
+	SUBREADputs("                            be saved to a file with a suffix name ");
+	SUBREADputs("                            \".junction.bed\". Locations of breakpoints for");
+	SUBREADputs("                            structural variants will be saved to a file with a");
+	SUBREADputs("                            suffix name \".breakpoints.txt\".  ");
 	SUBREADputs("   ");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
@@ -156,9 +172,6 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
 	SUBREADputs("                            in the mapping output.");
-	SUBREADputs("");
-	SUBREADputs("       --gzFASTQinput       specify that the input read data is in gzipped");
-	SUBREADputs("                            FASTQ/FASTA format.");
 	SUBREADputs("");
 	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
 	SUBREADputs("");
@@ -187,6 +200,13 @@ void print_usage_core_subjunc()
 	SUBREADputs("    -S --order     <ff:fr:rf>  specifying if the first/second reads are forward");
 	SUBREADputs("                            or reversed, 'fr' by default");
 	SUBREADputs("");
+	SUBREADputs("");
+	SUBREADputs("Advanced arguments:");
+	SUBREADputs("");
+	SUBREADputs("    --complexIndels         Detect complex indels that are located very close to");
+	SUBREADputs("                            each other (minimum distance is 1bp). Indels of up");
+	SUBREADputs("                            to 16bp long will be reported.");
+	SUBREADputs("");
 	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
 	SUBREADputs("");
 
@@ -209,9 +229,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.ambiguous_mapping_tolerance = 39 - 20 ;
 	global_context->config.extending_search_indels = 0;
 	global_context->config.do_fusion_detection =0;
-	global_context->config.use_dynamic_programming_indel = 0;
+	global_context->config.use_dynamic_programming_indel = 1;
 
-	global_context->config.is_rna_seq_reads = 1;
+	global_context->config.do_breakpoint_detection = 1;
 	global_context->config.total_subreads = 14;
 	global_context->config.minimum_subread_for_first_read =1;
 	global_context->config.minimum_subread_for_second_read = 1;
@@ -220,9 +240,10 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 	global_context->config.do_big_margin_filtering_for_junctions = 1;
 	global_context->config.report_no_unpaired_reads = 0;
 
+	//#warning " ========================= REMOVE ' + 1 ' FROM THE NEXT LINE !! =========================="
 	global_context->config.limited_tree_scan = 0;
 	global_context->config.use_hamming_distance_in_exon = 0;
-	global_context->config.big_margin_record_size = 24;
+	//global_context->config.big_margin_record_size = 24;
 
 	if(argc<2)
 	{
@@ -236,6 +257,17 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 			case 'v':
 				core_version_number("Subjunc");
 				return -1;
+			case 'e':
+				if(strcmp(optarg, "DNA-seq") == 0){
+					global_context->config.experiment_type = CORE_EXPERIMENT_DNASEQ;
+				}else if(strcmp(optarg, "RNA-seq") == 0){
+					global_context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
+				}else{
+					SUBREADprintf("Error: unknown experiment type:%s\n", optarg);
+					return -1;
+				}
+				break;
+			case 'G':
 			case '3':
 				global_context->config.read_trim_3 = atoi(optarg); 
 				break;
@@ -249,7 +281,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				strncpy(global_context->config.first_read_file, optarg, MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'J':
-				global_context->config.show_soft_cliping = 1;
+				global_context->config.show_soft_cliping = 0;
 				break;
 			case 'Q':
 				global_context->config.use_quality_score_break_ties = 1;
@@ -300,7 +332,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 			case 'T':
 				global_context->config.all_threads = atoi(optarg);
 				if(global_context->config.all_threads <1) global_context->config.all_threads = 1;
-				if(global_context->config.all_threads >32) global_context->config.all_threads = 32;
+				if(global_context->config.all_threads > MAX_THREADS) global_context->config.all_threads = MAX_THREADS;
 
 				break;
 			case 'M':
@@ -361,11 +393,15 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.report_sam_file = 0;
 				break;
 			case 'B':
-				//global_context->config.is_first_iteration_running = 0;
-				//strcpy(global_context->config.medium_result_prefix, optarg);
 				global_context->config.multi_best_reads = atoi(optarg); 
+
 				if(global_context->config.multi_best_reads<1)
 					global_context->config.multi_best_reads=1;
+
+				global_context->config.reported_multi_best_reads = global_context->config.multi_best_reads;
+
+				global_context->config.max_vote_combinations = max(global_context->config.max_vote_combinations, global_context->config.reported_multi_best_reads + 1);
+				global_context->config.max_vote_simples = max(global_context->config.max_vote_simples, global_context->config.reported_multi_best_reads + 1);
 
 				break;
 			case 'c':
@@ -414,9 +450,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.SAM_extra_columns=1;
 				}
-				else if(strcmp("gzFASTQinput", long_options[option_index].name)==0) 
+				else if(strcmp("minMappedFraction", long_options[option_index].name)==0) 
 				{
-					global_context->config.is_gzip_fastq=1;
+					global_context->config.min_mapped_fraction = atoi(optarg);
 				}
 				else if(strcmp("relaxMismatchedBases", long_options[option_index].name)==0) 
 				{
@@ -434,10 +470,52 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 						global_context->config.minimum_exonic_subread_fraction = atof(optarg);
 					else	SUBREADprintf("WARNING: unknown parameter: --exonicSubreadFrac '%s'\n", optarg);
 				}
+				else if(strcmp("fast", long_options[option_index].name)==0) 
+				{
+					global_context -> config.fast_run = 1;
+				}
+				else if(strcmp("SVdetection", long_options[option_index].name)==0) 
+				{
+					global_context -> config.do_structural_variance_detection = 1;
+				}
+				else if(strcmp("minDistanceBetweenVariants", long_options[option_index].name)==0)
+				{
+					int newdist = atoi(optarg);
+					newdist = max(newdist, 1);
+					newdist = min(newdist, MAX_READ_LENGTH);
+					global_context->config.realignment_minimum_variant_distance = newdist;
+				}
 				else if(strcmp("disableBigMargin", long_options[option_index].name)==0) 
 				{
 					global_context->config.do_big_margin_filtering_for_junctions = 0;
 					global_context->config.limited_tree_scan = 0;
+				}
+				else if(strcmp("maxVoteSimples", long_options[option_index].name)==0)
+				{
+					global_context->config.max_vote_simples = atoi(optarg);
+				}
+				else if(strcmp("maxRealignLocations", long_options[option_index].name)==0)
+				{
+					global_context->config.max_vote_combinations = atoi(optarg);
+					global_context->config.multi_best_reads = atoi(optarg);
+				}
+				else if(strcmp("complexIndels", long_options[option_index].name)==0)
+				{
+					global_context->config.maximise_sensitivity_indel = 1;
+					global_context->config.realignment_minimum_variant_distance = 1;
+					global_context->config.max_indel_length = 16;
+				}
+				else if(strcmp("disableBigMargin", long_options[option_index].name)==0)
+				{
+					global_context->config.big_margin_record_size = 0;
+				}
+				else if(strcmp("extendIndelDetection", long_options[option_index].name)==0)
+				{
+					global_context->config.extending_search_indels = 1;
+				}
+				else if(strcmp("minVoteCutoff", long_options[option_index].name)==0)
+				{
+					global_context->config.max_vote_number_cutoff  = atoi(optarg);
 				}
 				else if(strcmp("dnaseq", long_options[option_index].name)==0 || strcmp("allJunctions", long_options[option_index].name)==0)
 				{
@@ -445,7 +523,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					if(strcmp("dnaseq", long_options[option_index].name)==0)
 						global_context->config.prefer_donor_receptor_junctions = 0;
 					//global_context->config.report_multi_mapping_reads = 1 ;
-					global_context->config.limited_tree_scan = 1 ;
+					//global_context->config.limited_tree_scan = 1 ;
 
 					// To maximise sensitivity of junction detection:
 					// 1, Disable big margin for junctions.

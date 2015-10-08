@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.6 2013/06/20 07:26:26 cvs Exp $
+ * $Id: hashtable.h,v 9999.7 2015/01/25 21:32:56 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -39,6 +39,8 @@ typedef struct {
     long long int counter2;
     long long int counter3;
 } HashTable;
+
+void HashTableIteration(HashTable * tab, void process_item(void * hashed_obj, HashTable * tab) );
 
 /*--------------------------------------------------------------------------*\
  *  NAME:

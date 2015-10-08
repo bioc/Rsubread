@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.10 2014/03/04 23:53:25 cvs Exp $
+ * $Id: hashtable.c,v 9999.11 2015/01/25 21:32:56 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -741,4 +741,17 @@ void free_values_destroy(HashTable * tab)
 	}
 
 	HashTableDestroy(tab);
+}
+
+void HashTableIteration(HashTable * tab, void process_item(void * hashed_obj, HashTable * tab) )
+{
+    int i;
+    for (i=0; i< tab ->numOfBuckets; i++) {
+        KeyValuePair *pair = tab ->bucketArray[i];
+        while (pair != NULL) {
+            process_item(pair -> value, tab);
+            KeyValuePair *nextPair = pair->next;
+            pair = nextPair;
+        }
+    }
 }

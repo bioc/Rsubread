@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <zlib.h>
 
 #ifndef MAKE_STANDALONE
 #ifndef RUNNING_ENV
@@ -31,6 +32,9 @@
 #endif
 
 #include "hashtable.h" 
+
+#define INPUT_BUFFER_SIZE (8*1024*1024) 
+#define OUTPUT_BUFFER_SIZE (32*1024*1024) 
 
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
@@ -52,18 +56,26 @@
 
 
 
-#define MAX_PIECE_JUNCTION_READ 7
-#define MAX_READ_LENGTH 1210
+#define MAX_THREADS 40
+#define MAX_EVENTS_IN_READ 8
+
+//#warning "============== REMOVE '* 15' FROM THE NEXT LINE ================"
+#define MAX_READ_LENGTH ( 1210 )
 #define MAX_READ_NAME_LEN 100 
 #define MAX_CHROMOSOME_NAME_LEN 100 
 #define MAX_FILE_NAME_LENGTH 300
 
+#define MULTI_THREAD_OUTPUT_ITEMS  4096 
+
+//#warning "============ CHANGE THE NEXT LINE TO 120 ========"
 #define EXON_LONG_READ_LENGTH 120
 #define EXON_MAX_CIGAR_LEN 48
 #define FC_CIGAR_PARSER_ITEMS 9
+
 #define MAX_INDEL_SECTIONS 7
 //#define XBIG_MARGIN_RECORD_SIZE 24 
 #define MAX_INSERTION_LENGTH 200
+#define MAX_DELETION_LENGTH 1000
 //#define BASE_BLOCK_LENGTH 15000000
 //#define NEED_SUBREAD_STATISTIC
 
@@ -86,7 +98,9 @@
 #define	IS_BREAKEVEN_READ (8192*4)
 #define IS_R1R2_EQUAL_LEN 1024
 
-#if defined(MACOS) || defined(FREEBSD)
+#define USE_POSIX_MUTEX_LOCK
+
+#if defined(MACOS) || defined(FREEBSD) || defined(USE_POSIX_MUTEX_LOCK)
 typedef pthread_mutex_t subread_lock_t;
 #define pthread_spinlock_t pthread_mutex_t
 #define pthread_spin_lock pthread_mutex_lock
@@ -141,7 +155,7 @@ typedef pthread_spinlock_t subread_lock_t;
 //#define QUALITY_KILL_SUBREAD	150
 
 
-
+typedef long long subread_read_number_t;
 typedef unsigned int gehash_key_t;
 typedef unsigned int gehash_data_t;
 //typedef float gene_quality_score_t;
@@ -153,6 +167,7 @@ typedef short gene_vote_number_t;
 #define XOFFSET_TABLE_SIZE 250000
 
 #define ANCHORS_NUMBER 259
+#define MAX_ALIGNMENT_PER_ANCHOR 2
 
 #define BEXT_RESULT_LIMIT 16
 
@@ -162,11 +177,11 @@ typedef short gene_vote_number_t;
 //#define LARGE_GENE_VOTE_TABLE
 #ifdef LARGE_GENE_VOTE_TABLE
 #warning "Using LARGE_GENE_VOTE_TABLE"
-#define GENE_VOTE_SPACE 32 
-#define GENE_VOTE_TABLE_SIZE 109 
+#define GENE_VOTE_SPACE 173 
+#define GENE_VOTE_TABLE_SIZE 331
 #else
-#define GENE_VOTE_SPACE 8
-#define GENE_VOTE_TABLE_SIZE 61
+#define GENE_VOTE_SPACE 24 
+#define GENE_VOTE_TABLE_SIZE 30
 #endif
 
 #define MAX_ANNOTATION_EXONS 30000 
@@ -273,7 +288,7 @@ typedef struct {
         gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
         gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-	short last_offset [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	gene_vote_number_t last_subread_cluster [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
@@ -348,14 +363,61 @@ struct thread_input_buffer {
 
 };
 
+#define SEEKGZ_ZLIB_WINDOW_SIZE (32*1024)
+
+
+typedef struct {
+	FILE * gz_fp;
+	char * current_chunk_txt;
+	char * current_chunk_bin;
+	z_stream stem;
+	unsigned int in_pointer;
+	unsigned int in_chunk_offset;
+	unsigned int in_block_offset;
+	unsigned int txt_buffer_size;
+	unsigned int txt_buffer_used;
+	unsigned long long block_start_in_file_offset;
+	unsigned int block_start_in_file_bits;
+
+	unsigned long long next_block_file_offset;
+	unsigned int next_block_file_bits;
+
+	int is_the_last_chunk;
+	int internal_error;
+
+	unsigned int dict_window_pointer;
+	unsigned int dict_window_used;
+	char dict_window[SEEKGZ_ZLIB_WINDOW_SIZE];
+
+	unsigned int block_dict_window_size;
+	char block_dict_window[SEEKGZ_ZLIB_WINDOW_SIZE];
+} seekable_zfile_t;
+
+typedef struct{
+	char dict_window[SEEKGZ_ZLIB_WINDOW_SIZE];
+	unsigned long long block_gzfile_offset;
+	unsigned int block_gzfile_bits;
+	unsigned int block_dict_window_size;
+
+	unsigned int in_block_text_offset;
+} seekable_position_t;
+
+
 
 typedef struct {
 	char filename [300];
 	int space_type ;
 	int file_type ;
-	FILE * input_fp;
-	unsigned int read_chunk_start;
+	void * input_fp;   // can be system (FILE * sam or fastq or fasta), (seekable_zfile_t *)
+	unsigned long long read_chunk_start;
 } gene_input_t;
+
+typedef struct{
+	union{
+		unsigned long long simple_file_position;
+		seekable_position_t seekable_gzip_position;
+	};
+} gene_inputfile_position_t;
 
 
 typedef struct{

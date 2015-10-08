@@ -22,7 +22,6 @@
 
 #include "subread.h"
 #include "hashtable.h"
-#include "core-indel.h"
 
 #define GENE_SPACE_BASE 1
 #define GENE_SPACE_COLOR 2
@@ -30,6 +29,7 @@
 #define GENE_INPUT_PLAIN 0
 #define GENE_INPUT_FASTQ 1
 #define GENE_INPUT_FASTA 2
+#define GENE_INPUT_GZIP_FASTQ 51
 
 #define GENE_INPUT_SAM_SINGLE   93
 #define GENE_INPUT_SAM_PAIR_1   94
@@ -53,26 +53,93 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-
+#include "core-indel.h"
 
 
 #define SAM_SORT_BLOCKS 229
 #define SAM_SORT_BLOCK_SIZE 512333303LLU
 //#define SAM_SORT_BLOCK_SIZE 11123333LLU
-
-typedef struct
-{
+//
+typedef struct {
 	unsigned long long int output_file_size;
 	unsigned long long int current_chunk_size;
 	unsigned int current_chunk;
 	unsigned long long int written_reads;
 	unsigned long long int unpaired_reads;
+
 	FILE * current_block_fp_array [SAM_SORT_BLOCKS];
 	FILE * all_chunks_header_fp;
 
 	FILE * out_fp;
 	char tmp_path[MAX_FILE_NAME_LENGTH];
 } SAM_sort_writer;
+
+
+typedef struct {
+	int thread_id;
+
+	char * input_buff_SBAM;
+	int input_buff_SBAM_used;
+	int input_buff_SBAM_ptr;
+
+	unsigned char * input_buff_BIN;
+	int input_buff_BIN_used;
+	int input_buff_BIN_ptr;
+	int orphant_block_no;
+	unsigned long long orphant_space;
+	z_stream strm;
+
+	HashTable * orphant_table;
+	pthread_t thread_stab;
+} SAM_pairer_thread_t;
+
+typedef struct {
+	FILE * input_fp;
+	int input_is_BAM;
+	int tiny_mode;
+	int display_progress;
+	subread_lock_t input_fp_lock;
+
+	unsigned long long total_input_reads;
+	unsigned long long total_orphan_reads;
+
+	int total_threads;
+	int input_buff_SBAM_size;
+	int input_buff_BIN_size;
+	char tmp_file_prefix[MAX_FILE_NAME_LENGTH];
+
+	SAM_pairer_thread_t * threads;
+	int BAM_header_parsed;
+	unsigned int BAM_l_text;
+	unsigned int BAM_n_ref;
+
+	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
+	int (* output_header) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len); 
+	// reserved for the application passing its own data to the output function.
+	void * appendix1;
+	void * appendix2;
+	void * appendix3;
+	void * appendix4;
+
+} SAM_pairer_context_t;
+
+
+#define SAM_PAIRER_WRITE_BUFFER ( 64000 )
+typedef struct {
+	unsigned char BIN_buffer[SAM_PAIRER_WRITE_BUFFER];
+	int BIN_buffer_ptr;
+	z_stream strm;
+
+} SAM_pairer_writer_thread_t;
+
+typedef struct {
+	SAM_pairer_writer_thread_t * threads;	
+	int all_threads;
+	int compression_level;
+	int has_dummy;
+	FILE * bam_fp;
+	subread_lock_t output_fp_lock;
+} SAM_pairer_writer_main_t;
 
 
 void fastq_64_to_33(char * qs);
@@ -100,7 +167,6 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 // Return the length of this read or -1 if EOF. 
 // The memory space for read_string must be at least 512 bytes.
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string);
-int geinput_next_read_sam(gene_input_t * input, char * read_name, char * read_string, char * quality_string, gene_offset_t* offsets, unsigned int * pos, int * mapping_quality, int * mapping_flags, int need_reversed);
 int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary);
 
 void geinput_jump_read(gene_input_t * input);
@@ -155,7 +221,7 @@ int is_in_exon_annotations(gene_t *output_genes, unsigned int offset, int is_sta
 
 int does_file_exist (char * filename);
 
-double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int * max_phred);
+double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int * max_phred, int * tested_reads);
 
 FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table);
 
@@ -183,4 +249,20 @@ unsigned long long int sort_SAM_hash(char * str);
 char * fgets_noempty(char * buf, int maxlen, FILE * fp);
 
 char * gzgets_noempty(void * fp, char * buf, int maxlen);
+int probe_file_type(char * fname, int * is_first_PE);
+int probe_file_type_fast(char * fname);
+void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos);
+void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos);
+unsigned long long geinput_file_offset( gene_input_t * input);
+
+
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int display_progress, char * in_file, int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
+int SAM_pairer_run( SAM_pairer_context_t * pairer);
+void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
+
+int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * rname, char * bin1, char * bin2 );
+int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len);
+
+int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);
+void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 #endif
