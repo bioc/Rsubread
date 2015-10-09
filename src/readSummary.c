@@ -4495,12 +4495,16 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 					if(!ret) break;
 
 					int curr_line_len = strlen(preload_line+preload_line_ptr);
-					if(curr_line_len >= MAX_LINE_LENGTH || preload_line[preload_line_ptr + curr_line_len-1]!='\n')
-					{
-						print_in_box(80,0,0,"ERROR: the lines are too long. Please check the input format!!\n");
-						ret = NULL;
-						preload_line_ptr = 0;
-						break;
+					if(curr_line_len >= MAX_LINE_LENGTH || preload_line[preload_line_ptr + curr_line_len-1]!='\n') {
+						if(feof(fp_in) && curr_line_len < MAX_LINE_LENGTH - 1){
+							preload_line[preload_line_ptr + curr_line_len] = '\n';
+							curr_line_len ++;
+						}else{
+							print_in_box(80,0,0,"ERROR: the lines are too long. Please check the input format.\n");
+							ret = NULL;
+							preload_line_ptr = 0;
+							break;
+						}
 					}
 					preload_line_ptr += curr_line_len;
 
