@@ -2088,7 +2088,7 @@ void delete_with_prefix(char * prefix){
 				{
 					if(strstr(dir->d_name, del_suffix))
 					{
-						//printf("%s\n", dir->d_name);
+						//SUBREADprintf("DEL:%s\n", dir->d_name);
 						strcpy(del_name, del2);
 						strcat(del_name, "/");
 						strcat(del_name, dir->d_name);
@@ -2123,7 +2123,7 @@ int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_thre
 	memset(bam_main, 0, sizeof(SAM_pairer_writer_main_t));
 	bam_main -> bam_fp = f_subr_open(out_file, "wb");
 	if(NULL == bam_main -> bam_fp) return 1;
-
+	strcpy(bam_main -> bam_name, out_file);
 	bam_main -> threads = malloc(all_threads * sizeof(SAM_pairer_writer_thread_t));
 	bam_main -> all_threads = all_threads;
 	bam_main -> has_dummy = has_dummy;
@@ -2181,17 +2181,39 @@ int SAM_pairer_multi_thread_compress(SAM_pairer_writer_main_t * bam_main ,  SAM_
 {
 	#define BAM_compressed_space 65536
 	char * BAM_compressed = malloc(BAM_compressed_space);
-	deflateReset(&bam_thread -> strm);
-	bam_thread -> strm.avail_in = bam_thread -> BIN_buffer_ptr;
-	bam_thread -> strm.next_in = bam_thread -> BIN_buffer;
-	bam_thread -> strm.avail_out = BAM_compressed_space;
-	bam_thread -> strm.next_out = (unsigned char *)BAM_compressed;
-	int ret = deflate( &bam_thread -> strm , Z_FINISH);
+	int ret, have;
+	if(bam_thread -> BIN_buffer_ptr>0){
+		deflateReset(&bam_thread -> strm);
+		bam_thread -> strm.avail_in = bam_thread -> BIN_buffer_ptr;
+		bam_thread -> strm.next_in = bam_thread -> BIN_buffer;
+		bam_thread -> strm.avail_out = BAM_compressed_space;
+		bam_thread -> strm.next_out = (unsigned char *)BAM_compressed;
+		ret = deflate( &bam_thread -> strm , Z_FINISH);
+
+		have = BAM_compressed_space - bam_thread -> strm.avail_out;
+		assert(bam_thread -> strm.avail_in == 0);
+	}else{
+		z_stream nstrm;
+		nstrm.zalloc = Z_NULL;
+		nstrm.zfree = Z_NULL;
+		nstrm.opaque = Z_NULL;
+		nstrm.avail_in = 0;
+		nstrm.next_in = Z_NULL;
+	
+		deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
+			PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+
+		nstrm.avail_in = 0;
+		nstrm.next_in = bam_thread -> BIN_buffer;
+		nstrm.avail_out = BAM_compressed_space;
+		nstrm.next_out = (unsigned char *)BAM_compressed;
+		ret = deflate(&nstrm, Z_FINISH);
+		deflateEnd(&nstrm);
+		have = BAM_compressed_space - nstrm.avail_out;
+	}
 	if(ret == Z_OK || 1){
 
-		int have = BAM_compressed_space - bam_thread -> strm.avail_out;
 		//SUBREADprintf("Compress: %d -> %d  %p\n", bam_thread -> BIN_buffer_ptr, have, bam_main -> bam_fp);
-		assert(bam_thread -> strm.avail_in == 0);
 		//if(bam_thread -> BIN_buffer_ptr == 0) have = 0;
 		unsigned int crc0 = crc32(0, NULL, 0);
 		unsigned int CRC32 = crc32(crc0, (unsigned char *)  bam_thread -> BIN_buffer ,bam_thread -> BIN_buffer_ptr);
@@ -2531,7 +2553,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					SUBREADprintf("\nThe header was parsed: %d reference sequences were found.\nScanning the input file.\n", pairer -> BAM_n_ref);
 				SAM_pairer_fetch_BAM_block(pairer, thread_contaxt);
 			}
-			while( thread_contaxt -> input_buff_BIN_used <= thread_contaxt -> input_buff_BIN_ptr){
+			while( thread_contaxt -> input_buff_BIN_used == thread_contaxt -> input_buff_BIN_ptr){
 				//SUBREADprintf("LOAD BLOCK: BINPTR = %d\n", thread_contaxt -> input_buff_BIN_ptr);
 				int ret_fetch = SAM_pairer_fetch_BAM_block(pairer, thread_contaxt);
 				//SUBREADprintf("LOAD BLOCK: BINLEN = %d\n", thread_contaxt -> input_buff_BIN_used);
@@ -2621,9 +2643,12 @@ int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_nam
 			skip_content ++;
                 } else if(bin[bin_cursor+2]=='B'){
                         char cell_type = tolower(bin[bin_cursor+3]);
+			
                         memcpy(&skip_content, bin + bin_cursor + 4, 4);
+		//	SUBREADprintf("Array Type=%c, cells=%d\n", cell_type, skip_content);
                         if(cell_type == 's')skip_content *=2;
                         else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
+			skip_content += 4 + 1;
                 }else{
 			assert(0);
 		}
@@ -2801,8 +2826,13 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 	int x1;
 	pairer -> BAM_header_parsed = 0;
+	pairer -> total_input_reads = 0;
 	for(x1 = 0; x1 < pairer -> total_threads ; x1 ++){
 		pairer -> threads[x1].input_buff_BIN_used = 0;
+		pairer -> threads[x1].input_buff_BIN_ptr = 0;
+		pairer -> threads[x1].input_buff_SBAM_used = 0;
+		pairer -> threads[x1].input_buff_SBAM_ptr = 0;
+		pairer -> threads[x1].orphant_block_no = 0;
 		HashTableDestroy(pairer -> threads[x1].orphant_table);
 		pairer -> threads[x1].orphant_table = HashTableCreate(pairer -> input_buff_SBAM_size / 100);
 		HashTableSetHashFunction(pairer -> threads[x1].orphant_table, fc_chro_hash);
@@ -2815,7 +2845,9 @@ void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 void SAM_pairer_writer_reset( void * pairer_vp ) {
 	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
 	SAM_pairer_writer_main_t * bam_main = (SAM_pairer_writer_main_t * )pairer -> appendix1;
-	fseek(bam_main -> bam_fp, SEEK_SET, 0);
+	ftruncate(fileno(bam_main -> bam_fp), 0);
+	fclose(bam_main -> bam_fp);
+	bam_main -> bam_fp = f_subr_open(bam_main -> bam_name, "wb");
 	int x1;
 	for(x1 = 0; x1 < pairer -> total_threads ; x1 ++){
 		bam_main -> threads[x1].BIN_buffer_ptr = 0;
@@ -2869,6 +2901,7 @@ int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t
 	int has_next_read = SAM_pairer_get_next_read_BIN(pairer, thread_contaxt, &bin, &bin_len);
 	if(has_next_read){
 		int name_len = SAM_pairer_get_read_full_name(pairer, thread_contaxt, bin, bin_len, read_full_name, & this_flags);
+		//SUBREADprintf("FNNM:%s\n", read_full_name);
 		unsigned char * mate_bin = HashTableGet(thread_contaxt -> orphant_table, read_full_name);
 		if(mate_bin){
 			if(pairer -> output_function)
@@ -3067,6 +3100,7 @@ void * SAM_pairer_rescure_orphants(void * params){
 				if(!read_has) *(names + max_name_len*min2_name_fileno)=0;
 				rescured++;
 			}else{
+				//SUBREADprintf("FINAL_ORPHAN:%s\n" , names + max_name_len*min_name_fileno);
 				pairer -> output_function(pairer, thread_no,  names + max_name_len*min_name_fileno, (char*) bin_tmp1, NULL);
 				died++;
 			}
@@ -3241,7 +3275,6 @@ int fix_load_next_block(FILE * in, char * binbuf, z_stream * strm){
 		int bsize = -1, xlen_ptr = 0;
 
 		while(xlen_ptr < xlen){
-			int x2;
 			int si1 = fgetc(in);
 			int si2 = fgetc(in);
 			int slen = fgetc(in);
@@ -3260,9 +3293,9 @@ int fix_load_next_block(FILE * in, char * binbuf, z_stream * strm){
 		fseek(in, 8, SEEK_CUR);
 
 		strm -> avail_in = bsize - xlen - 19;
-		strm -> next_in = bam_buf;
+		strm -> next_in = (unsigned char*)bam_buf;
 		strm -> avail_out = 70000;
-		strm -> next_out = binbuf;
+		strm -> next_out = (unsigned char*)binbuf;
 		int ret_inf = inflate(strm, Z_FINISH);
 		if(ret_inf == Z_STREAM_END){
 			ret = 70000 - strm -> avail_out;
@@ -3283,9 +3316,9 @@ void fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 
 	if(binlen > 0){
 		strm -> avail_in = binlen;
-		strm -> next_in = bin;
+		strm -> next_in = (unsigned char*)bin;
 		strm -> avail_out = 70000;
-		strm -> next_out = bam_buf;
+		strm -> next_out = (unsigned char*)bam_buf;
 		retbam = deflate(strm , Z_FINISH);
 		bam_len = 70000 - strm -> avail_out;
 		deflateReset(strm);
@@ -3297,14 +3330,14 @@ void fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 		nstrm.avail_in = 0;
 		nstrm.next_in = Z_NULL;
 	
-		retbam = deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
+		deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
 			PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 
 		nstrm.avail_in = 0;
-		nstrm.next_in = bin;
+		nstrm.next_in = (unsigned char*)bin;
 		nstrm.avail_out = 70000;
-		nstrm.next_out = bam_buf;
-		deflate(&nstrm, Z_FINISH);
+		nstrm.next_out = (unsigned char*)bam_buf;
+		retbam = deflate(&nstrm, Z_FINISH);
 		bam_len = 70000 - nstrm.avail_out;
 		deflateEnd(&nstrm);
 	}
@@ -3439,6 +3472,7 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	FIX_FLASH_OUT;
 
 	// ===== The reads
+	unsigned long long reads =0;
 	while(1){
 		int block_size = 0;
 		FIX_GET_NEXT_NCH;
@@ -3454,11 +3488,13 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 			FIX_GET_NEXT_NCH;
 			FIX_APPEND_READ(&nch, 1);
 		}
+		reads ++;
 		if(out_bin_ptr > 60000){
 			FIX_FLASH_OUT;
 		}
 	}
 	FIX_FLASH_OUT;
+	//SUBREADprintf("FIX READS=%llu\n", reads);
 	fix_write_block(new_fp, out_bin, 0, &out_strm);
 	deflateEnd(&out_strm);
 	inflateEnd(&in_strm);
@@ -3479,6 +3515,7 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 			assert(0 == corrected_run);
 			if(pairer -> display_progress)
 				SUBREADprintf("Retrying with the corrected format...\n");
+			delete_with_prefix(pairer -> tmp_file_prefix);
 			SAM_pairer_fix_format(pairer);
 			SAM_pairer_reset(pairer);
 			pairer -> reset_output_function(pairer);

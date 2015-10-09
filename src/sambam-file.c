@@ -584,7 +584,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	{
 		char extag[2];
 		char extype;
-		int delta;
+		int delta, need_tag = 1;
 		memcpy(extag,  chunk+(*chunk_ptr), 2);
 		extype = chunk[2+(*chunk_ptr)];
 		(*chunk_ptr)+=3;
@@ -612,6 +612,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 			else break;
 
 			int array_len;
+			need_tag = 0;
 			memcpy(&array_len, chunk+(*chunk_ptr), 4);
 			(*chunk_ptr)+=4;
 			delta *= array_len;
@@ -621,16 +622,19 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 			break;
 		}
 
-		if(extype == 'c' || extype=='C' || extype == 'i' || extype=='I' || extype == 's' || extype=='S'){
-			int tmpi = 0;
-			memcpy(&tmpi, chunk+(*chunk_ptr),delta);
-			sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
-		}else if(extype == 'Z'){
-			sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
-			*(extra_tags + strlen(extra_tags)+delta-1) = 0;
-			memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
-		}else if(extype == 'A'){
-			sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
+		if(need_tag){
+			if(extype == 'c' || extype=='C' || extype == 'i' || extype=='I' || extype == 's' || extype=='S'){
+				int tmpi = 0;
+				memcpy(&tmpi, chunk+(*chunk_ptr),delta);
+				if(tmpi >= 0)
+					sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
+			}else if(extype == 'Z'){
+				sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
+				*(extra_tags + strlen(extra_tags)+delta-1) = 0;
+				memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
+			}else if(extype == 'A'){
+				sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
+			}
 		}
 
 		if((*chunk_ptr) + delta > chunk_limit) return -1;

@@ -140,6 +140,7 @@ typedef struct {
 	int compression_level;
 	int has_dummy;
 	FILE * bam_fp;
+	char bam_name[MAX_FILE_NAME_LENGTH];
 	subread_lock_t output_fp_lock;
 } SAM_pairer_writer_main_t;
 
