@@ -3495,8 +3495,8 @@ int write_junction_final_results(global_context_t * global_context)
 
 		if(event_body->indel_at_junction)
 			sprintf(indel_sect,"INS%d", event_body->indel_at_junction);
-		else if(event_body->critical_supporting_reads < 1)
-			strcpy(indel_sect, "NOCRT");
+		//else if(event_body->critical_supporting_reads < 1)
+		//	strcpy(indel_sect, "NOCRT");
 		else	indel_sect[0]=0;
 
 		fprintf(ofp,"%s\t%u\t%u\tJUNC%08u%s\t%d\t%c\t%u\t%u\t%d,%d,%d\t2\t%d,%d\t0,%u\n", chro_name_left, feature_start,  feature_end,
