@@ -3400,13 +3400,13 @@ int print_configuration(global_context_t * context)
         {
                 if(context->config.do_fusion_detection)
                 {
-                        print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection%s", context->config.prefer_donor_receptor_junctions?" (RNA-Seq)":" (DNA-Seq)");
+                        print_in_box(80, 0, 0,         "          Function : Read alignment + Junction/Fusion detection%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
                 }
                 else
-                        print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection (RNA-Seq)");
+                        print_in_box(80, 0, 0,         "          Function : Read alignment + Junction detection (%s)", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?"DNA-Seq":"RNA-Seq");
         }
         else
-                print_in_box(80, 0, 0,         "          Function : Read alignment");
+                print_in_box(80, 0, 0,         "          Function : Read alignment%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
         print_in_box(80, 0, 0,         "           Threads : %d", context->config.all_threads);
         if( context->config.second_read_file[0])
         {
