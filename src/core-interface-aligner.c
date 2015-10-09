@@ -43,6 +43,7 @@ static struct option long_options[] =
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"fast", no_argument, 0, 0},
+	{"type", required_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"reportFusions", no_argument, 0, 0},
@@ -493,6 +494,16 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("minVoteCutoff", long_options[option_index].name)==0)
 				{
 					global_context->config.max_vote_number_cutoff  = atoi(optarg);
+				}
+				else if (strcmp("type", long_options[option_index].name)==0){
+						if(strcmp(optarg, "1") == 0){
+							global_context->config.experiment_type = CORE_EXPERIMENT_DNASEQ;
+						}else if(strcmp(optarg, "0") == 0){
+							global_context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
+						}else{
+							SUBREADprintf("Error: unknown experiment type:%s  (only 0 and 1 are allowed)\n", optarg);
+							return -1;
+						}
 				}
 				break;
 			case '?':
