@@ -2908,7 +2908,7 @@ int resort_input_file(fc_thread_global_context_t * global_context)
 		SAM_pairer_context_t pairer;
 		SAM_pairer_writer_main_t writer_main;
 		SAM_pairer_writer_create(&writer_main, global_context -> thread_number, 1, 1, Z_NO_COMPRESSION, temp_file_name);
-		SAM_pairer_create(&pairer, global_context -> thread_number, 64, 1, 1, 0, global_context-> input_file_name, SAM_pairer_multi_thread_header, SAM_pairer_multi_thread_output, temp_temp_name, &writer_main);
+		SAM_pairer_create(&pairer, global_context -> thread_number, 64, 1, 1, 0, global_context-> input_file_name, SAM_pairer_writer_reset, SAM_pairer_multi_thread_header, SAM_pairer_multi_thread_output, temp_temp_name, &writer_main);
 		SAM_pairer_run(&pairer);
 		SAM_pairer_destroy(&pairer);
 		SAM_pairer_writer_destroy(&writer_main);

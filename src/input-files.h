@@ -98,6 +98,7 @@ typedef struct {
 	int input_is_BAM;
 	int tiny_mode;
 	int display_progress;
+	int is_bad_format;
 	subread_lock_t input_fp_lock;
 
 	unsigned long long total_input_reads;
@@ -113,6 +114,7 @@ typedef struct {
 	unsigned int BAM_l_text;
 	unsigned int BAM_n_ref;
 
+	void (* reset_output_function) (void * pairer);
 	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
 	int (* output_header) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len); 
 	// reserved for the application passing its own data to the output function.
@@ -256,9 +258,10 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos);
 unsigned long long geinput_file_offset( gene_input_t * input);
 
 
-int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int display_progress, char * in_file, int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
 int SAM_pairer_run( SAM_pairer_context_t * pairer);
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
+void SAM_pairer_writer_reset(void * pairer);
 
 int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * rname, char * bin1, char * bin2 );
 int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len);
