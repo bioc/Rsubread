@@ -1,3 +1,7 @@
+9 Oct 2015 - 1.19.7
+(1) Added parameters "type" and "complexIndels" to align.
+(2) Added parameter "complexIndels" to subjunc.
+
 8 Oct 2015 - 1.19.6
 (1) C code update.
 

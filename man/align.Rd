@@ -4,9 +4,9 @@
 \title{Read mapping for genomic DNA-seq and RNA-seq data via seed-and-vote (Subread and Subjunc)}
 \description{Subread and Subjunc perform local and global alignments respectively. The seed-and-vote paradigm enables efficient and accurate alignments to be carried out.}
 \usage{
-align(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
+align(index,readfile1,readfile2=NULL,type=0,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
-TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,
+TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,
 unique=TRUE,nBestLocations=1,minFragLength=50,
 maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,
@@ -14,7 +14,7 @@ DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
 
 subjunc(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,
-TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,phredOffset=33,
+TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,
 unique=TRUE,nBestLocations=1,minFragLength=50,
 maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,
 readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
@@ -23,6 +23,7 @@ readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
   \item{readfile1}{ a character vector including names of files that include sequence reads to be aligned. For paired-end reads, this gives the list of files including first reads in each library. File format is FASTQ/FASTA by default. See \code{input_format} option for more supported formats.}
   \item{readfile2}{ a character vector giving names of files that include second reads in paired-end read data. Files included in \code{readfile2} should be in the same order as their mate files included in \code{readfile1} .\code{NULL} by default.}
+  \item{type}{ an integer giving the type of sequencing data. Possible values include \code{0} (RNA-seq data) and \code{1} (genomic DNA-seq data).}
   \item{input_format}{ character string specifying format of the read input file(s). \code{gzFASTQ} by default (this includes FASTA format as well). Acceptable formats include \code{FASTQ} (including FASTA), \code{gzFASTQ} (gzipped FASTQ or FASTA), \code{SAM} and \code{BAM}. The character string is case insensitive.}
   \item{output_format}{ character string specifying format of the output file. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
   \item{output_file}{ a character vector specifying names of output files. By default, names of output files are set as the file names provided in \code{readfile1} added with an suffix string.}
@@ -30,8 +31,9 @@ readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This is the threshold for the first reads if paired-end read data are provided.}
   \item{TH2}{ numeric value giving the consensus threhold for the second reads in paired-end data.}
   \item{maxMismatches}{ numeric value giving the maximum number of mis-matched bases allowed in the alignment. \code{3} by default. Mis-matches found in soft-clipped bases are not counted.}
-  \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.} 
+  \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.}
   \item{indels}{ numeric value giving the maximum number of insertions/deletions allowed during the mapping. \code{5} by default.}
+  \item{complexIndels}{ logical indicating if complex indels will be detected. If \code{TRUE}, the program will try to detect multiple short indels that occurs concurrently in a small genomic region (indels could be as close as 1bp apart).}
   \item{phredOffset}{ numeric value added to base-calling Phred scores to make quality scores (represented as ASCII letters). Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
   \item{unique}{ logical indicating if uniquely mapped reads should be reported only. \code{TRUE} by default. Uniquely mapped reads must have one (1) mapping location that has less mis-matched bases than other candidate locations.}
   \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The allowed value is between 1 to 16 (inclusive). `NH' tag is used to indicate how many alignments are reported for the read and `HI' tag is used for numbering the alignments reported for the same read, in the output. Note that the \code{unique} argument takes precedence over \code{nBestLocations} argument.}
