@@ -1,3 +1,20 @@
+CHANGES IN VERSION 1.20.0
+------------------------
+
+NEW FEATURES
+
+    o Fast sorting of input bam files in featureCounts.
+
+    o Fractional counting of multi-mapping reads in featureCounts.
+
+    o Detection of complex indels in Subread and Subjunc aligners. 
+
+    o Including more candidate locations in read re-alignment step to improve mapping performance.
+
+    o New formula for mapping paired-end reads that takes into account paired-end distance, number of subread votes and number of mismatched bases.
+
+
+
 CHANGES IN VERSION 1.16.0
 ------------------------
 
