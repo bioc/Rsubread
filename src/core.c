@@ -3585,8 +3585,8 @@ int load_global_context(global_context_t * context)
 	}
 
 	context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
-	context -> context -> config.max_vote_simples = max(context -> context -> config.max_vote_simples ,  context -> config.reported_multi_best_reads);
-	context -> context -> config.max_vote_combinations = max(context -> context -> config.max_vote_combinations ,  context -> config.reported_multi_best_reads);
+	context -> config.max_vote_simples = max(context -> config.max_vote_simples ,  context -> config.reported_multi_best_reads);
+	context -> config.max_vote_combinations = max(context -> config.max_vote_combinations ,  context -> config.reported_multi_best_reads);
 
 	if(context->config.reads_per_chunk > 384*1024*1024){
 			if(context->input_reads.is_paired_end_reads)
