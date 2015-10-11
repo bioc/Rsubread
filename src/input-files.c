@@ -399,6 +399,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 			seekgz_open(filename, input->input_fp);
 		}	
 	}else{
+		input->file_type = GENE_INPUT_FASTQ;
 		input->input_fp = TMP_FP;
 		fseek(input->input_fp, 0, SEEK_SET);
 		while (1){
