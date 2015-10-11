@@ -3596,6 +3596,8 @@ int load_global_context(global_context_t * context)
 	}else{
 		if(context->input_reads.is_paired_end_reads) context->config.reads_per_chunk /= 2;
 		if(context->config.multi_best_reads>1) context->config.reads_per_chunk /= context->config.multi_best_reads;
+	//#warning "COMMENT NEXT LINE!!!!!!"
+	//	context->config.reads_per_chunk /= 16;	
 	}
 
 	struct stat ginp1_stat;

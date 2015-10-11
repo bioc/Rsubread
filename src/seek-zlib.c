@@ -11,6 +11,12 @@ unsigned long long seekgz_ftello(seekable_zfile_t * fp){
 	return ret;
 }
 
+unsigned int crc_pos(char * bin, int len){
+	unsigned int crc0 = crc32(0, NULL, 0);
+	unsigned int CRC32 = crc32(crc0, (unsigned char *) bin, len);
+	return CRC32;
+}
+
 void seekgz_binreadmore(seekable_zfile_t * fp){
 	if(feof(fp->gz_fp))return;
 
@@ -28,6 +34,7 @@ void seekgz_binreadmore(seekable_zfile_t * fp){
 		if(readlen>0)
 			fp -> stem.avail_in += readlen;
 		fp -> stem.next_in = (unsigned char *)fp -> current_chunk_bin;
+		//SUBREADprintf("READIN: %d,  POS: %llu,  CRC:%u\n", fp -> stem.avail_in , ftello(fp -> gz_fp) , crc_pos(fp -> current_chunk_bin , fp -> stem.avail_in));
 	}
 }
 
@@ -136,16 +143,20 @@ void seekgz_tell(seekable_zfile_t * fp, seekable_position_t * pos){
 }
 
 void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
-	//fprintf(stderr, "SEEK => %d[%d] + %u\n", pos -> block_gzfile_offset, pos -> block_gzfile_bits, pos -> in_block_text_offset);
+	//#warning "COMMENT THIS LINE !!!!!"
+	//fprintf(stderr, "SEEK => %llu[%d] + %u ; WIN=%d CRC=%u\n", pos -> block_gzfile_offset, pos -> block_gzfile_bits, pos -> in_block_text_offset, pos -> block_dict_window_size, crc_pos( pos -> dict_window, pos -> block_dict_window_size));
 	fseeko(fp->gz_fp, pos -> block_gzfile_offset - (pos -> block_gzfile_bits?1:0), SEEK_SET);
 
-	inflateReset(&fp->stem);
+	if(Z_OK!=inflateReset(&fp->stem))
+		SUBREADprintf("FATAL: UNABLE TO INIT STREAM!\n\n\n");
 	if(pos -> block_dict_window_size>0){
 		if(pos -> block_gzfile_bits){
 			char nch = fgetc(fp->gz_fp);
+			//fprintf(stderr, "SEEK 2 FPPOS:%llu, NCH=%d\n", ftello(fp->gz_fp) , nch);
 			inflatePrime(&fp->stem, pos -> block_gzfile_bits, nch>>(8-pos -> block_gzfile_bits));
 		}
-		assert(Z_OK == inflateSetDictionary(&fp->stem, (unsigned char *)pos -> dict_window, pos -> block_dict_window_size));
+		if(Z_OK != inflateSetDictionary(&fp->stem, (unsigned char *)pos -> dict_window, pos -> block_dict_window_size))
+			SUBREADprintf("FATAL: UNABLE TO RESET STREAM!\n\n\n");
 	}
 
 	fp -> stem.avail_in = 0;
@@ -189,13 +200,16 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 		fp -> stem.next_out = (unsigned char *)(fp -> current_chunk_txt + out_start);
 
 		int inlen = fp -> stem.avail_in ;
+		//fprintf(stderr,"INFLATING_0 : LEN=%u, CRC=%u\n", fp -> stem.avail_in , crc_pos( fp -> stem.next_in  , fp -> stem.avail_in ));
+
 		int ret = inflate(&(fp -> stem), Z_BLOCK);
 		int have = (SEEKGZ_INIT_TEXT_SIZE - fp -> txt_buffer_used) - fp -> stem.avail_out;
 		int is_chunk_end = 0;
 
-		//fprintf(stderr,"INFLATING: INLEN=%d , OLEN=%d, RET=%d\n", inlen , have, ret);
+		//#warning "COMMENT NEXT LINE!!!!!!"
+		//fprintf(stderr,"INFLATING: INLEN=%d , OLEN=%d, POS=%lld, RET=%d, TOOL=%s\n", inlen , have, seekgz_ftello(fp), ret, zlibVersion());
 		if(ret != Z_OK && ret != Z_STREAM_END){ //any error
-			SUBREADprintf("INFLATE-ERROR=%d   POS=%lld\n", ret, seekgz_ftello(fp));
+			SUBREADprintf("FATAL: INFLATE-ERROR=%d   POS=%lld\n", ret, seekgz_ftello(fp));
 			fp -> internal_error = 1;
 			return -1;
 		}
