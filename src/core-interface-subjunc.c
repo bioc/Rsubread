@@ -33,7 +33,7 @@ static struct option long_options[] =
 	{"multi",  required_argument, 0, 'B'},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
-	{"gzFASTQinput",  no_argument, 0, 'u'},
+	{"gzFASTQinput",  no_argument, 0, 0},
 	{"unique",  no_argument, 0, 'u'},
 	{"BAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
