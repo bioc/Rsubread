@@ -3934,7 +3934,7 @@ void init_global_context(global_context_t * context)
 	context->config.PE_predominant_weight = 0;
 
 	//#warning "============= best values for the SVs application: 3 ====================="
-	context->config.multi_best_reads = 3;
+	context->config.multi_best_reads = 1;
 	context->config.reported_multi_best_reads = 1;
 	context->config.is_SAM_file_input=0;
 	context->config.use_dynamic_programming_indel=0;
@@ -4007,6 +4007,7 @@ void init_global_context(global_context_t * context)
 
 	context->config.max_insertion_at_junctions=0;
 	context->config.check_donor_at_junctions=1;
+	memset(&context -> input_reads, 0, sizeof(read_input_t));
 
 	signal (SIGTERM, COREMAIN_SIGINT_hook);
 	signal (SIGINT, COREMAIN_SIGINT_hook);
