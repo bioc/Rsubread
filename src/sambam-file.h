@@ -177,4 +177,7 @@ int is_badBAM(char * fn);
 int SamBam_unzip(char * out , char * in , int inlen);
 
 int SamBam_fetch_next_chunk(SamBam_FILE *fp);
+
+int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage);
+char cigar_op_char(int ch);
 #endif

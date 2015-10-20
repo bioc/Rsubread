@@ -3912,7 +3912,7 @@ void init_global_context(global_context_t * context)
 	context->config.max_vote_simples = 5;
 	context->config.max_vote_number_cutoff = 1;
 
-	context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
+	context->config.experiment_type = 0;
 	context->config.prefer_donor_receptor_junctions = 1;
 	context->config.maximum_translocation_length = 10000;
 	context->config.maximum_colocating_distance = 500;
@@ -3942,7 +3942,7 @@ void init_global_context(global_context_t * context)
 	context->config.convert_color_to_base = 0;
 	context->config.is_gzip_fastq = 0;
 
-	context->config.is_BAM_output = 0;
+	context->config.is_BAM_output = 1;
 	context->config.is_BAM_input = 0;
 	context->config.read_trim_5 = 0;
 	context->config.read_trim_3 = 0;

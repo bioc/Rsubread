@@ -54,6 +54,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "core-indel.h"
+#include "hashtable.h"
 
 
 #define SAM_SORT_BLOCKS 229
@@ -81,13 +82,24 @@ typedef struct {
 	char * input_buff_SBAM;
 	int input_buff_SBAM_used;
 	int input_buff_SBAM_ptr;
+	int reads_in_SBAM;
+	subread_lock_t SBAM_lock;
+
+	unsigned long long input_buff_SBAM_file_start;
+	unsigned long long input_buff_SBAM_file_end;
 
 	unsigned char * input_buff_BIN;
 	int input_buff_BIN_used;
 	int input_buff_BIN_ptr;
 	int orphant_block_no;
+	int need_find_start;
 	unsigned long long orphant_space;
 	z_stream strm;
+
+	char immediate_last_read_bin[3000];
+	char immediate_last_read_full_name[MAX_READ_NAME_LEN*2 +80 ];
+	int immediate_last_read_bin_len;
+	int immediate_last_read_name_len;
 
 	HashTable * orphant_table;
 	pthread_t thread_stab;
@@ -99,10 +111,16 @@ typedef struct {
 	int tiny_mode;
 	int display_progress;
 	int is_bad_format;
+	int is_single_end_mode;
+	int force_do_not_sort;
+	int is_finished;
 	subread_lock_t input_fp_lock;
 
 	unsigned long long total_input_reads;
 	unsigned long long total_orphan_reads;
+
+	HashTable * sam_contig_number_table;
+	HashTable * bam_margin_table;
 
 	int total_threads;
 	int input_buff_SBAM_size;
@@ -122,6 +140,7 @@ typedef struct {
 	void * appendix2;
 	void * appendix3;
 	void * appendix4;
+	void * appendix5;
 
 } SAM_pairer_context_t;
 
@@ -259,7 +278,7 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos);
 unsigned long long geinput_file_offset( gene_input_t * input);
 
 
-int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
 int SAM_pairer_run( SAM_pairer_context_t * pairer);
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
 void SAM_pairer_writer_reset(void * pairer);
@@ -269,4 +288,5 @@ int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text
 
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);
 void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
+int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
 #endif

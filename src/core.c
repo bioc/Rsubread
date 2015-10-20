@@ -3427,6 +3427,7 @@ int print_configuration(global_context_t * context)
         print_in_box(80, 0, 1, "");
         if( context->config.second_read_file[0])
         {
+		print_in_box(80, 0, 0, "      All subreads : %d", context->config.total_subreads);
                 print_in_box(80, 0, 0, "   Min read1 votes : %d", context->config.minimum_subread_for_first_read);
                 print_in_box(80, 0, 0, "   Min read2 votes : %d", context->config.minimum_subread_for_second_read);
                 print_in_box(80, 0, 0, " Max fragment size : %d", context->config.maximum_pair_distance);
@@ -3452,6 +3453,12 @@ int print_configuration(global_context_t * context)
         print_in_box(80, 0, 1, "");
         print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
         sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
+
+
+	if(!context->config.experiment_type){
+		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify the experiment type by using the '-t' option.\n");
+		return -1;
+	}
 
         if(!context->config.first_read_file[0])
         {

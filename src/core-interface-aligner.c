@@ -32,7 +32,7 @@ static struct option long_options[] =
 	{"unique",  no_argument, 0, 'u'},
 	{"color-convert",  no_argument, 0, 'b'},
 	{"multi",  required_argument, 0, 'B'},
-	{"hamming",  no_argument, 0, 'H'},
+	{"type",  required_argument, 0, 't'},
 	{"quality",  no_argument, 0, 'Q'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
@@ -40,13 +40,12 @@ static struct option long_options[] =
 	{"rg",  required_argument, 0, 0},
 	{"gzFASTQinput",  no_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
-	{"BAMoutput", no_argument, 0, 0},
+	{"SAMoutput", no_argument, 0, 0},
 	{"BAMinput", no_argument, 0, 0},
 	{"fast", no_argument, 0, 0},
-	{"type", required_argument, 0, 0},
 	{"SAMinput", no_argument, 0, 0},
 	{"reportPairedMultiBest",  no_argument, 0, 0},
-	{"reportFusions", no_argument, 0, 0},
+	{"sv", no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
@@ -54,7 +53,6 @@ static struct option long_options[] =
 	{"SVdetection",  no_argument, 0, 0},
 	{"maxMismatches",  required_argument, 0, 'M'},
 	{"minMappedLength",  required_argument, 0, 0},
-	{"experiment",  required_argument, 0, 'e'},
 	{"maxVoteSimples",  required_argument, 0, 0},
 	{"complexIndels", no_argument, 0, 0},
 	{"minVoteCutoff",  required_argument, 0, 0},
@@ -68,27 +66,25 @@ void print_usage_core_aligner()
 	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs(" ./subread-align [options] -i <index_name> -r <input> -o <output>");
+	SUBREADputs(" ./subread-align [options] -i <index_name> -r <input> -o <output> -t <type>");
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
 	SUBREADputs("    ");
 	SUBREADputs("    -i --index     <index>  base name of the index.");
 	SUBREADputs("   ");
-	SUBREADputs("    -r --read      <input>  name of the input file(gzFASTQ/FASTQ/FASTA format by");
-	SUBREADputs("                            default. See below for more supported formats). Both");
-	SUBREADputs("                            base-space and color-space read data are supported.");
-	SUBREADputs("                            For paired-end reads, this gives the first read file");
-	SUBREADputs("                            and the other read file should be specified using");
-	SUBREADputs("                            the -R option.");
+	SUBREADputs("    -r --read      <input>  name of the input file. Several input formats can be");
+	SUBREADputs("                            automatically detected, including gzipped fastq,");
+	SUBREADputs("                            fastq, and fasta. If paired-end, this should give");
+	SUBREADputs("                            the name of file including first reads.");
 	SUBREADputs("    ");
-	SUBREADputs("    -e --experiment <input> type of the experiment for generating the reads. The ");
-	SUBREADputs("                            value can be either DNA-seq or RNA-seq");
+	SUBREADputs("    -t --type       <int>   type of input sequencing data. Its values include");
+	SUBREADputs("                             0: RNA-seq data");
+	SUBREADputs("                             1: genomic DNA-seq data.");
 	SUBREADputs("    ");
 	SUBREADputs("Optional general arguments:");
 	SUBREADputs("    ");
-	SUBREADputs("    -o --output    <output> name of the output file(SAM format by default). If");
-	SUBREADputs("                            not provided, mapping results will be output to the");
-	SUBREADputs("                            standard output (stdout).");
+	SUBREADputs("    -o --output    <output> name of the output file. By default, the output file");
+	SUBREADputs("                            includes BAM-format mapping result.");
 	SUBREADputs("");
 	SUBREADputs("    -n --subreads  <int>    number of selected subreads, 10 by default.");
 	SUBREADputs("    ");
@@ -98,33 +94,22 @@ void print_usage_core_aligner()
 	SUBREADputs("                            threshold for the read which receives more votes");
 	SUBREADputs("                            than the other read from the same pair. 3 by default");
 	SUBREADputs("    ");
-	SUBREADputs("    -T --threads   <int>    number of threads, 1 by default.");
+	SUBREADputs("    -T --threads   <int>    number of CPU threads, 1 by default.");
 	SUBREADputs("    ");
-	SUBREADputs("    -I --indel     <int>    number of indels allowed, 5 by default. Indels of up");
-	SUBREADputs("                            to 200bp long can be detected.");
+	SUBREADputs("    -I --indel     <int>    maximum length (in bp) of indels that can be");
+	SUBREADputs("                            detected. 5 by default. The program can detect");
+	SUBREADputs("                            indels of up to 200bp long.");
 	SUBREADputs("    ");
-	SUBREADputs("    -B --multi     <int>    Specify the maximal number of equally-best mapping");
-	SUBREADputs("                            locations allowed to be reported for each read. 1");
-	SUBREADputs("                            by default. Allowed values are between 1 to 16");
-	SUBREADputs("                            (inclusive). 'NH' tag is used to indicate how many");
-	SUBREADputs("                            alignments are reported for the read and 'HI' tag");
-	SUBREADputs("                            is used for numbering the alignments reported for");
-	SUBREADputs("                            the same read, in the output. Note that -u option");
-	SUBREADputs("                            takes precedence over -B.");
+	SUBREADputs("    -B --multi     <int>    maximal number of equally-best mapping locations to");
+	SUBREADputs("                            be reported. 1 by default. Note that -u option takes");
+	SUBREADputs("                            precedence over -B.  ");
 	SUBREADputs("");
 	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores in input files, '3' for");
 	SUBREADputs("                            phred+33 and '6' for phred+64. '3' by default.");
 	SUBREADputs("");
-	SUBREADputs("    -u --unique             only uniquely mapped reads will be reported (reads");
-	SUBREADputs("                            mapped to multiple locations in the reference genome");
-	SUBREADputs("                            will not be reported). This option can be used");
-	SUBREADputs("                            together with option '-H' or '-Q'.");
-	SUBREADputs("");
-	SUBREADputs("    -Q --quality            using mapping quality scores to break ties when more");
-	SUBREADputs("                            than one best mapping location is found.");
-	SUBREADputs("");
-	SUBREADputs("    -H --hamming            using Hamming distance to break ties when more than");
-	SUBREADputs("                            one best mapping location is found.");
+	SUBREADputs("    -u --unique             report uniquely mapped reads only. Number of matched");
+	SUBREADputs("                            bases (for RNA-seq) or mis-matched bases(for genomic");
+	SUBREADputs("                            DNA-seq) is used to break the tie.");
 	SUBREADputs("");
 	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
 	SUBREADputs("                            bases in the mapping output. Note that the mapping");
@@ -134,15 +119,16 @@ void print_usage_core_aligner()
 	SUBREADputs("                            allowed in the alignment. 3 by default. Mis-matches");
 	SUBREADputs("                            found in soft-clipped bases are not counted.");
 	SUBREADputs("   ");
-	SUBREADputs("       --reportFusions      report discovered genomic fusion events such as");
-	SUBREADputs("                            chimeras. Discovered fusions will be saved to a file");
-	SUBREADputs("                            (*.fusions.txt). Detailed mapping results for fusion");
-	SUBREADputs("                            reads will be saved to the SAM/BAM output file as");
-	SUBREADputs("                            well. Secondary alignments of fusion reads will be");
-	SUBREADputs("                            saved to the following optional fields: CC(Chr),");
-	SUBREADputs("                            CP(Position), CG(CIGAR) and CT(strand). Note that");
-	SUBREADputs("                            each fusion read occupies only one row in the");
-	SUBREADputs("                            SAM/BAM output file.");
+	SUBREADputs("       --sv                 detect structural variants (eg. long deletion,");
+	SUBREADputs("                            inversion and translocation) and report breakpoints.");
+	SUBREADputs("                            Refer to Users Guide for breakpoint reporting.");
+	SUBREADputs("");
+	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
+	SUBREADputs("");
+	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
+	SUBREADputs("");
+	SUBREADputs("       --SAMoutput          specify that mapping results are saved in the SAM");
+	SUBREADputs("                            format.");
 	SUBREADputs("");
 	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
 	SUBREADputs("                            read. 0 by default.");
@@ -150,62 +136,44 @@ void print_usage_core_aligner()
 	SUBREADputs("       --trim3     <int>    trim off <int> number of bases from 3' end of each");
 	SUBREADputs("                            read. 0 by default.");
 	SUBREADputs("");
-	SUBREADputs("       --rg-id     <string> specify the read group ID. If specified,the read");
-	SUBREADputs("                            group ID will be added to the read group header");
-	SUBREADputs("                            field and also to each read in the mapping output.");
+	SUBREADputs("       --rg-id     <string> add read group ID to the output.");
 	SUBREADputs("");
 	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
-	SUBREADputs("                            in the mapping output.");
+	SUBREADputs("                            in the output.");
 	SUBREADputs("");
-	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
+	SUBREADputs("       --DPGapOpen  <int>   penalty for gap opening in short indel detection. -1");
+	SUBREADputs("                            by default.");
 	SUBREADputs("");
-	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
+	SUBREADputs("       --DPGapExt   <int>   penalty for gap extension in short indel detection.");
+	SUBREADputs("                            0 by default.");
 	SUBREADputs("");
-	SUBREADputs("       --BAMoutput          specify that mapping results are saved into a BAM");
-	SUBREADputs("                            format file.");
+	SUBREADputs("       --DPMismatch <int>   penalty for mis-matched bases in short indel");
+	SUBREADputs("                            detection. 0 by default.");
 	SUBREADputs("");
-	SUBREADputs("       --DPGapOpen  <int>   a numeric value giving the penalty for opening a");
-	SUBREADputs("                            gap when using the Smith-Waterman dynamic");
-	SUBREADputs("                            programming algorithm to detect insertions and");
-	SUBREADputs("                            deletions. The Smith-Waterman algorithm is only");
-	SUBREADputs("                            applied for those reads which are found to contain");
-	SUBREADputs("                            insertions or deletions. -1 by default.");
+	SUBREADputs("       --DPMatch    <int>   score for matched bases in short indel detection. 2");
+	SUBREADputs("                            by default.");
 	SUBREADputs("");
-	SUBREADputs("       --DPGapExt   <int>   a numeric value giving the penalty for extending the");
-	SUBREADputs("                            gap, used by the Smith-Waterman algorithm. 0 by");
-	SUBREADputs("                            default.");
-	SUBREADputs("");
-	SUBREADputs("       --DPMismatch <int>   a numeric value giving the penalty for mismatches,");
-	SUBREADputs("                            used by the Smith-Waterman algorithm. 0 by default.");
-	SUBREADputs("");
-	SUBREADputs("       --DPMatch    <int>   a numeric value giving the score for matches used by");
-	SUBREADputs("                            the Smith-Waterman algorithm. 2 by default.");
+	SUBREADputs("       --complexIndels      detect multiple short indels that occur concurrently");
+	SUBREADputs("                            in a small genomic region (these indels could be as");
+	SUBREADputs("                            close as 1bp apart).");
 	SUBREADputs("");
 	SUBREADputs("    -v                      output version of the program.");
 	SUBREADputs("");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
-	SUBREADputs("    -R --read2     <input>  name of the second input file. The program will then");
-	SUBREADputs("                            be switched to the paired-end read mapping mode.");
+	SUBREADputs("    -R --read2     <input>  name of the file including second reads.");
 	SUBREADputs("");
-	SUBREADputs("    -p --minmatch2 <int>    consensus threshold for the read which receives less");
-	SUBREADputs("                            votes than the other read from the same pair, 1 by");
-	SUBREADputs("                            default.");
+	SUBREADputs("    -p --minmatch2 <int>    consensus threshold for the non-anchor read ");
+	SUBREADputs("                            (receiving less votes than the anchor read from the");
+	SUBREADputs("                            same pair). 1 by default.");
 	SUBREADputs("");
 	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
 	SUBREADputs("");
 	SUBREADputs("    -D --maxdist   <int>    maximum fragment/template length, 600bp by default.");
 	SUBREADputs("");
-	SUBREADputs("    -S --order     <ff:fr:rf> orientation of the two read from the same pair,");
-	SUBREADputs("                            'fr' by default.");
-	SUBREADputs("");
-	SUBREADputs("");
-	SUBREADputs("Advanced arguments:");
-	SUBREADputs("");
-	SUBREADputs("    --complexIndels         Detect complex indels that are located very close to");
-	SUBREADputs("                            each other (minimum distance is 1bp). Indels of up");
-	SUBREADputs("                            to 16bp long will be reported.");
+	SUBREADputs("    -S --order     <ff:fr:rf> orientation of first and second reads, 'fr' by");
+	SUBREADputs("                            default (forward/reverse).");
 	SUBREADputs("");
 	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
 	SUBREADputs("");
@@ -231,7 +199,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 
 	// config.extending_search_indels is changed from 1 to 0 on 10/mar/2014
 	global_context->config.extending_search_indels = 0;
-
 	global_context->config.limited_tree_scan = 0 ;
 	//global_context->config.big_margin_record_size = 9; 
 
@@ -257,16 +224,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 'v':
 				core_version_number("Subread-align");
 				return -1;
-			case 'e':
-				if(strcmp(optarg, "DNA-seq") == 0){
-					global_context->config.experiment_type = CORE_EXPERIMENT_DNASEQ;
-				}else if(strcmp(optarg, "RNA-seq") == 0){
-					global_context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
-				}else{
-					SUBREADprintf("Error: unknown experiment type:%s\n", optarg);
-					return -1;
-				}
-				break;
 			case 'G':
 				global_context->config.DP_penalty_create_gap = atoi(optarg);
 				break;
@@ -400,7 +357,15 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.minimum_subread_for_second_read = atoi(optarg);
 				break;
 			case 't':
-				sprintf(global_context->config.temp_file_prefix, "%s/core-temp-sum-%06u-%05u", optarg, getpid(), rand());
+				if(strcmp(optarg, "1") == 0){
+					global_context->config.experiment_type = CORE_EXPERIMENT_DNASEQ;
+				}else if(strcmp(optarg, "0") == 0){
+					global_context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
+				}else{
+					SUBREADprintf("Error: unknown experiment type:%s  (only 0 and 1 are allowed)\n", optarg);
+					return -1;
+				}
+
 				break;
 			case 'F':
 				global_context->config.is_second_iteration_running = 0;
@@ -427,9 +392,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					strcat(global_context->config.read_group_txt, "\t");
 					strcat(global_context->config.read_group_txt, optarg);
 				}
-				else if(strcmp("BAMoutput", long_options[option_index].name)==0) 
+				else if(strcmp("SAMoutput", long_options[option_index].name)==0) 
 				{
-					global_context->config.is_BAM_output = 1;
+					global_context->config.is_BAM_output = 0;
 				}
 				else if(strcmp("BAMinput", long_options[option_index].name)==0) 
 				{
@@ -457,7 +422,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.ignore_unmapped_reads = 1;
 				}
-				else if(strcmp("reportFusions", long_options[option_index].name)==0) 
+				else if(strcmp("sv", long_options[option_index].name)==0) 
 				{
 					global_context->config.do_breakpoint_detection = 1;
 					global_context->config.do_fusion_detection = 1;
@@ -495,16 +460,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.max_vote_number_cutoff  = atoi(optarg);
 				}
-				else if (strcmp("type", long_options[option_index].name)==0){
-						if(strcmp(optarg, "1") == 0){
-							global_context->config.experiment_type = CORE_EXPERIMENT_DNASEQ;
-						}else if(strcmp(optarg, "0") == 0){
-							global_context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
-						}else{
-							SUBREADprintf("Error: unknown experiment type:%s  (only 0 and 1 are allowed)\n", optarg);
-							return -1;
-						}
-				}
+
 				break;
 			case '?':
 			default:

@@ -366,6 +366,7 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 		fseeko(bam_fp, 4, SEEK_CUR);
 		fread(&real_len, 4, 1, bam_fp);
 
+	//	SUBREADprintf("read_data=%u\n", CDATA_LEN);
 		return CDATA_READING;
 	}
 	else
@@ -1385,11 +1386,13 @@ int SamBam_unzip(char * out , char * in , int inlen)
 	if(ret != Z_STREAM_END)
 	{
 		inflateEnd(&strm);
+		SUBREADprintf("DATA ERROR! code=%d\n", ret);
 		return -1;
 	}
 	int have = unzip_out_max_len - strm.avail_out;
 
 	inflateEnd(&strm);
+	//SUBREADprintf("DECOMPRESS GENERATED=%d\n", have);
 
 	return have;
 }

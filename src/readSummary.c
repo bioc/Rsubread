@@ -105,8 +105,6 @@ typedef unsigned long long read_count_type_t;
 
 typedef struct {
 	unsigned short thread_id;
-	char * line_buffer1;
-	char * line_buffer2;
 	unsigned long long int nreads_mapped_to_exon;
 	unsigned long long int all_reads;
 	//unsigned short current_read_length1;
@@ -176,7 +174,6 @@ typedef struct {
 	int is_chimertc_disallowed;
 	int is_PE_distance_checked;
 	int is_multi_mapping_allowed;
-	int is_input_file_resort_needed;
 	int is_SAM_file;
 	int is_read_details_out;
 	int is_SEPEmix_warning_shown;
@@ -212,6 +209,8 @@ typedef struct {
 	int is_all_finished;
 	unsigned int input_buffer_max_size;
 	SamBam_Reference_Info * sambam_chro_table;
+	int sambam_chro_table_items;
+	SAM_pairer_context_t read_pairer;
 
 	char * debug_command;
 	char * unistr_buffer_space;
@@ -1415,42 +1414,385 @@ void print_read_wrapping(char * rl, int is_second){
 
 }
 
-void report_unpair_warning(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, int * this_noproperly_paired_added){
-	//printf("WARN:%d [%d]\n", global_context->is_unpaired_warning_shown, thread_context -> thread_id);
-	if(!global_context->is_unpaired_warning_shown)
-	{
-		global_context->is_unpaired_warning_shown=1;
-		print_in_box(80,0,0,"   Found reads that are not properly paired.");
-		print_in_box(80,0,0,"   (missing mate or the mate is not the next read)");
-
-		if(global_context -> do_not_sort){
-			print_in_box(85,0,0,"   %c[31mHowever, the reads will not be re-ordered.", 27);
-		}else{
-			global_context->redo = 1;
-		}
-		print_in_box(80,0,0,"   Below are the two reads that are not properly paired:");
-		print_read_wrapping(thread_context -> line_buffer1,0);
-		print_read_wrapping(thread_context -> line_buffer2,1);
-
-	}
-	if(0==(*this_noproperly_paired_added))thread_context -> unpaired_fragment_no++;
-	(*this_noproperly_paired_added) = 1;
-}
-
-
 void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context,
 			long * hits_indices1, unsigned short * hits_read_start_base1, short * hits_read_len1, int nhits1, unsigned short rl1,
 			long * hits_indices2, unsigned short * hits_read_start_base2, short * hits_read_len2, int nhits2, unsigned short rl2,
 			int fixed_fractional_count, char * read_name, fc_junction_info_t * supported_junctions1, int njunc1, fc_junction_info_t * supported_junctions2, int njunc2);
 
 
-void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context)
+void process_pairer_reset(void * pairer_vp){
+	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
+	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
+	if(global_context -> sambam_chro_table) free(global_context -> sambam_chro_table);
+	global_context -> sambam_chro_table = NULL;
+	global_context -> sambam_chro_table_items = 0;
+
+	int xk1, xk2;
+	for(xk1=0; xk1<global_context-> thread_number; xk1++)
+	{
+		for(xk2=0; xk2<global_context -> exontable_exons; xk2++)
+		{
+			global_context -> thread_contexts[xk1].count_table[xk2] = 0;
+		}
+
+		global_context -> thread_contexts[xk1].all_reads = 0;
+		global_context -> thread_contexts[xk1].nreads_mapped_to_exon = 0;
+		global_context -> thread_contexts[xk1].unpaired_fragment_no = 0;
+
+
+
+		global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_secondary = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_nonjunction = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_duplicate = 0;
+		global_context -> thread_contexts[xk1].read_counters.assigned_reads = 0;
+	}
+
+	if(global_context -> SAM_output_fp){
+		ftruncate(fileno(global_context -> SAM_output_fp), 0);
+		fseek(global_context -> SAM_output_fp, 0 , SEEK_SET);
+	}
+}
+
+int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len){
+	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
+	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
+	if( !is_text ){
+		if(global_context -> sambam_chro_table)
+			global_context -> sambam_chro_table = realloc(global_context -> sambam_chro_table, (items + global_context -> sambam_chro_table_items) * sizeof(SamBam_Reference_Info));
+		else global_context -> sambam_chro_table = malloc(items * sizeof(SamBam_Reference_Info));
+
+		int x1, bin_ptr = 0;
+		for(x1 =  global_context -> sambam_chro_table_items; x1 <  global_context -> sambam_chro_table_items+items; x1++){
+			int l_name;
+			memcpy(&l_name, bin + bin_ptr, 4);
+			bin_ptr += 4;
+			memcpy(global_context -> sambam_chro_table[x1].chro_name ,  bin + bin_ptr, l_name);
+			//SUBREADprintf("The %d-th is '%s'\n", x1, ref_table[x1].chro_name);
+			bin_ptr += l_name;
+			memcpy(&global_context -> sambam_chro_table[x1].chro_length ,  bin + bin_ptr, 4);
+			bin_ptr += 4;
+		}
+		global_context -> sambam_chro_table_items += items;
+	}
+
+	return 0;
+}
+
+void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2);
+
+void make_dummy(char * rname, char * bin1, char * out_txt2,  SamBam_Reference_Info * sambam_chro_table){
+	char * tmptr = NULL;
+
+	//SUBREADprintf("S=%s  ", rname);
+	char * realname = strtok_r(rname, "\027", &tmptr);
+	//int len_name = strlen(realname);
+	int r1_chro = atoi(strtok_r(NULL, "\027", &tmptr));
+	int r1_pos = atoi(strtok_r(NULL, "\027", &tmptr));
+	int r2_chro = atoi(strtok_r(NULL, "\027", &tmptr));
+	int r2_pos = atoi(strtok_r(NULL, "\027", &tmptr));
+	int HItag = atoi(strtok_r(NULL, "\027", &tmptr));
+	int mate_FLAG = 0;
+	memcpy(&mate_FLAG, bin1 + 16, 4);
+	mate_FLAG = 0xffff&(mate_FLAG >>16);
+	int mate_tlen = 0;
+	memcpy(&mate_tlen, bin1 + 32, 4);
+
+	if(r1_chro<0) r1_pos=-1;
+	if(r2_chro<0) r2_pos=-1;
+
+	int my_chro = (mate_FLAG&0x40)? r2_chro : r1_chro;
+	int my_pos = (mate_FLAG&0x40)? r2_pos : r1_pos;
+	int mate_chro = (mate_FLAG&0x40)? r1_chro : r2_chro;
+	int mate_pos = (mate_FLAG&0x40)? r1_pos : r2_pos;
+
+	//int bin_mq_nl = (len_name+1);
+	int my_flag = (mate_FLAG&0x40)? 0x80:0x40;
+	my_flag |= 1;
+	if(mate_FLAG & 8)my_flag |=4;
+	if(mate_FLAG & 4)my_flag |=8;
+	if(mate_FLAG & 0x10) my_flag |= 0x20;
+	if(mate_FLAG & 0x20) my_flag |= 0x10;
+
+	char HItagStr[20];
+	if(HItag>=0){
+		sprintf(HItagStr, "\tHI:i:%d", HItag);
+	}else{
+		HItagStr[0]=0;
+	}
+
+	char * my_chro_str = "*";
+	if(my_chro >= 0) my_chro_str = sambam_chro_table[my_chro].chro_name;
+
+	char * mate_chro_str = "*";
+	if(mate_chro >= 0) mate_chro_str = sambam_chro_table[mate_chro].chro_name;
+
+	sprintf(out_txt2, "%s\t%d\t%s\t%d\t0\t*\t%s\t%d\t0\tN\tI\t%s", realname, my_flag, my_chro_str, max(0, my_pos),
+		mate_chro_str, max(0,mate_pos), HItagStr);
+}
+
+
+void convert_bin_to_read(char * bin, char * txt, SamBam_Reference_Info * sambam_chro_table){
+	unsigned int block_len;
+	memcpy(&block_len, bin, 4);
+	int ref_id;
+	memcpy(&ref_id, bin + 4, 4);
+	int pos;
+	memcpy(&pos, bin + 8, 4);
+	unsigned int bin_mq_nl;
+	memcpy(&bin_mq_nl, bin + 12, 4);
+	unsigned int flag_nc;
+	memcpy(&flag_nc, bin + 16, 4);
+	int l_seq;
+	memcpy(&l_seq, bin + 20, 4);
+	int next_refID;
+	memcpy(&next_refID, bin + 24, 4);
+	int next_pos;
+	memcpy(&next_pos, bin + 28, 4);
+	int tlen;
+	memcpy(&tlen, bin + 32, 4);
+
+	int txt_ptr = 0;
+	int l_read_name = bin_mq_nl & 0xff;
+	memcpy(txt , bin + 36, l_read_name);
+	txt_ptr += l_read_name - 1;
+	txt_ptr += sprintf(txt+txt_ptr, "\t%d", flag_nc >> 16);
+	if(ref_id < 0){
+		strcpy(txt+txt_ptr, "\t*\t0\t0");
+		txt_ptr += 6;
+	}else 	txt_ptr += sprintf(txt+txt_ptr, "\t%s\t%d\t%d", sambam_chro_table[ref_id].chro_name, pos + 1, (bin_mq_nl >> 8 & 0xff));
+
+	int cigar_ops = flag_nc & 0xffff;
+	if(cigar_ops < 1){
+		strcpy(txt+txt_ptr, "\t*");
+		txt_ptr += 2;
+	}else{
+		int x1;
+		strcpy(txt+txt_ptr, "\t");
+		txt_ptr++;
+		for(x1=0; x1 < cigar_ops; x1++){
+			unsigned int cigar_sec;
+			memcpy(&cigar_sec, bin + 36 + l_read_name + 4 * x1 , 4);
+			txt_ptr += sprintf(txt+txt_ptr, "%u%c", cigar_sec >> 4 , cigar_op_char( cigar_sec & 15 ));
+		}
+	}
+
+	if(next_refID < 0)
+		txt_ptr += sprintf(txt+txt_ptr, "\t*\t0\t%d", tlen);
+	else 	txt_ptr += sprintf(txt+txt_ptr, "\t%s\t%d\t%d", sambam_chro_table[next_refID].chro_name, next_pos + 1, tlen);
+	strcpy(txt+txt_ptr, "\tN\tI");
+	txt_ptr += 4;
+
+	int bin_ptr = 36 + l_read_name + 4 * cigar_ops + l_seq + (l_seq+1)/2;
+
+	while(bin_ptr < block_len + 4){
+		char tag_name[3];
+		tag_name[0]=bin[bin_ptr];
+		tag_name[1]=bin[bin_ptr+1];
+		tag_name[2]=0;
+
+		char tagtype = bin[bin_ptr+2];
+		int delta = 0;
+		int tmpi = 0;
+		if(tagtype == 'i' || tagtype == 'I'){
+			delta = 4;
+			memcpy(&tmpi, bin + bin_ptr + 3, 4);
+			txt_ptr += sprintf(txt+txt_ptr, "\t%s:i:%d", tag_name,tmpi);
+		}else if(tagtype == 's' || tagtype == 'S'){
+			delta = 2;
+			memcpy(&tmpi, bin + bin_ptr + 3, 2);
+			txt_ptr += sprintf(txt+txt_ptr, "\t%s:i:%d", tag_name,tmpi);
+		}else if(tagtype == 'c' || tagtype == 'C'){
+			delta = 1;
+			memcpy(&tmpi, bin + bin_ptr + 3, 1);
+			txt_ptr += sprintf(txt+txt_ptr, "\t%s:i:%d", tag_name,tmpi);
+		}else if(tagtype == 'A'){
+			delta = 1;
+			txt_ptr += sprintf(txt+txt_ptr, "\t%s:%c:%c", tag_name, tagtype, *(bin + bin_ptr + 3));
+		}else if(tagtype == 'f')
+			delta = 4;
+		else if(tagtype == 'Z' ||tagtype == 'H'){
+			txt_ptr += sprintf(txt+txt_ptr, "\t%s:%c", tag_name, tagtype);
+			while(bin[bin_ptr + 3+delta]){
+				*(txt+txt_ptr) = bin[bin_ptr + 3+delta];
+				txt_ptr ++;
+				delta ++;
+			}
+			*(txt+txt_ptr) = 0;
+		}else if(tagtype == 'B'){
+			char celltype = bin[bin_ptr + 4];
+			int cellitems ;
+			memcpy(&cellitems, bin + bin_ptr + 5, 4);
+			int celldelta = 1;
+			if(celltype == 's' || celltype == 'S') celldelta = 2;
+			else if(celltype == 'i' || celltype == 'I' || celltype == 'f') celldelta = 4;
+			delta = cellitems * celldelta;
+		}
+		bin_ptr += 3 + delta;
+	}
+}
+
+int process_pairer_output(void * pairer_vp, int thread_no, char * rname, char * bin1, char * bin2){
+	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
+	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
+	fc_thread_thread_context_t * thread_context = global_context -> thread_contexts + thread_no;
+
+	/*if(bin1) convert_bin_to_read( bin1, thread_context -> line_buffer1 , global_context -> sambam_chro_table);
+	else    make_dummy(rname, bin2, thread_context -> line_buffer1,  global_context -> sambam_chro_table);
+	if(bin2) convert_bin_to_read( bin2, thread_context -> line_buffer2 , global_context -> sambam_chro_table );
+	else	make_dummy(rname, bin1, thread_context -> line_buffer2,  global_context -> sambam_chro_table);*/
+	process_line_buffer(global_context, thread_context, bin1, bin2);
+	return 0;
+}
+
+int reverse_flag(int mf){
+	int ret = mf & 3;
+	if(mf & 4) ret |= 8;
+	if(mf & 8) ret |= 4;
+
+	if(mf & 0x10) ret |= 0x20;
+	if(mf & 0x20) ret |= 0x10;
+
+	if(mf & 0x40) ret |= 0x80;
+	if(mf & 0x80) ret |= 0x40;
+	return ret;
+}
+
+void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin2, char ** read_name, int * flag, char ** chro, long * pos, int * mapq, char ** mate_chro, long * mate_pos, long * tlen, int * is_junction_read, int * cigar_sect, unsigned int * Starting_Chro_Points, unsigned short * Starting_Read_Points, unsigned short * Section_Lengths, char ** ChroNames, int * NH_value){
+	int x1;
+	*cigar_sect = 0;
+	*NH_value = 1;
+	*flag = 0;
+	*is_junction_read = 0;
+	assert(bin||bin2);
+
+	if(bin){
+		(*read_name) = bin + 36;
+		memcpy(flag, bin + 16, 4);
+		int cigar_opts = (*flag) & 0xffff;
+		(*flag) = (*flag) >> 16;
+		int refID, mate_refID;
+		memcpy(&refID, bin + 4, 4);
+		if(refID >= 0)
+			(*chro) = sambam_chro_table[refID].chro_name;
+		else (*chro) = NULL;
+		(*pos) = 0;
+		memcpy(pos, bin+8, 4);
+		(*pos) ++;
+		
+		memcpy(mapq, bin+12, 4);
+		int l_read_name = (*mapq)& 0xff;
+		(*mapq) = ((*mapq)>>8)&0xff;
+
+		int seq_len;
+		memcpy(&seq_len, bin + 20,4);
+		memcpy(&mate_refID, bin+24, 4);
+		if(mate_refID>=0)
+			(*mate_chro) = sambam_chro_table[mate_refID].chro_name;
+		else	(*mate_chro) = NULL;
+
+		(*mate_pos)=0;
+		memcpy(mate_pos, bin+28, 4);
+		(*mate_pos)++;
+
+		(*tlen) = 0;
+		memcpy(tlen, bin+32, 4);
+
+		int * cigar_opt_ints = (int *)(bin + 36 + l_read_name);
+		unsigned int chro_cursor = (*pos), section_start_chro = (*pos);
+		unsigned short read_cursor = 0, this_section_length = 0, section_start_read = 0;
+		for(x1 = 0 ; x1 < cigar_opts; x1++){
+			int optype = cigar_opt_ints[x1]&0xf;
+			int optval = (cigar_opt_ints[x1]>>4)& 0xfffffff;
+			if(optype == 0){ // 'M'
+				chro_cursor += optval;
+				read_cursor += optval;
+				this_section_length += optval;
+			}else if(optype == 1){ // 'I'
+				read_cursor += optval;
+			}else if(optype == 2){ // 'D'
+				chro_cursor += optval;
+				this_section_length += optval;
+			}else if(optype == 3){ // 'N'
+				(*is_junction_read) = 1;
+
+				Starting_Chro_Points[*cigar_sect] = section_start_chro; 
+				Starting_Read_Points[*cigar_sect] = section_start_read;
+				Section_Lengths[*cigar_sect] = chro_cursor - section_start_chro;
+				ChroNames[*cigar_sect] = (*chro);
+				(*cigar_sect)++;
+
+				chro_cursor += optval;
+
+				section_start_chro = chro_cursor;
+				this_section_length = 0;
+				section_start_read = read_cursor;
+			}else if(optype == 4){ // 'S'
+				if(read_cursor==0)
+				{
+					section_start_read = optval;
+					read_cursor += optval;
+				}
+			}
+		}
+		if(this_section_length>0){
+			// add new section
+			Starting_Chro_Points[*cigar_sect] = section_start_chro; 
+			Starting_Read_Points[*cigar_sect] = section_start_read;
+			Section_Lengths[*cigar_sect] = chro_cursor - section_start_chro;
+			ChroNames[*cigar_sect] = (*chro);
+			(*cigar_sect)++;
+		}
+		
+		int bin_ptr = 36 + l_read_name + seq_len + (seq_len+1)/2 + 4 * cigar_opts;
+		int block_len;
+		memcpy(&block_len, bin, 4);
+		int found_NH = SAM_pairer_iterate_int_tags((unsigned char *)bin+bin_ptr, block_len + 4 - bin_ptr, "NH", NH_value);
+		if(!found_NH) *(NH_value) = 1;
+		//SUBREADprintf("FOUND=%d, NH=%d, TAG=%.*s\n", found_NH, *(NH_value), 3 , bin+bin_ptr);
+	}else{
+		(*read_name) = bin2 + 36;
+		int mate_flag;
+		memcpy(&mate_flag, bin2 + 16, 4);
+		mate_flag = mate_flag >> 16;
+		(*flag) = reverse_flag(mate_flag);
+
+		int refID, mate_refID;
+		memcpy(&refID, bin2 + 24, 4);
+		memcpy(&mate_refID, bin2 + 4, 4);
+		if(refID < 0) *chro = NULL; 
+		else (*chro) = sambam_chro_table[refID].chro_name;
+
+		if(mate_refID < 0) *mate_chro = NULL;
+		else (*mate_chro) = sambam_chro_table[mate_refID].chro_name; 
+
+		*pos=0;
+		memcpy(pos, bin2+28, 4);
+		(*pos)++;
+
+		*mate_pos=0;
+		memcpy(mate_pos, bin2+8, 4);
+		(*mate_pos)++;
+	
+		(*tlen) = 0;
+		memcpy(tlen, bin2+32, 4);
+		(*tlen) = -(*tlen);
+	}
+}
+
+void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2)
 {
 
-	char * read_chr, *read_1_chr = NULL, *tmp_tok_ptr= NULL, *CIGAR_str , *read_name = NULL, *read_name1 = NULL;
-	long read_pos, fragment_length = 0, read_1_pos = 0;
+	char * read_chr, *read_name, *mate_chr;
+	long read_pos, fragment_length = 0, mate_pos;
 	unsigned int search_start = 0, search_end;
-	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id;
+	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id, mapping_qual;
 	long * hits_indices1 = thread_context -> hits_indices1, * hits_indices2 = thread_context -> hits_indices2;
 	unsigned short * hits_read_start_base1 = thread_context -> hits_read_start_base1 ,  * hits_read_start_base2 = thread_context -> hits_read_start_base2;
 	short * hits_read_len1 = thread_context -> hits_read_len1, * hits_read_len2 = thread_context -> hits_read_len2;
@@ -1458,11 +1800,17 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	fc_junction_info_t supported_junctions1[FC_CIGAR_PARSER_ITEMS], supported_junctions2[FC_CIGAR_PARSER_ITEMS];
 	int njunc1, njunc2;
 
+
+	int cigar_sections, is_junction_read;
+	unsigned int Starting_Chro_Points[FC_CIGAR_PARSER_ITEMS];
+	unsigned short Starting_Read_Points[FC_CIGAR_PARSER_ITEMS];
+	unsigned short Section_Lengths[FC_CIGAR_PARSER_ITEMS];
+	char * ChroNames[FC_CIGAR_PARSER_ITEMS];
+
 	int is_second_read;
-	int maximum_NH_value = 1;
+	int maximum_NH_value = 1, NH_value;
 	int skipped_for_exonic = 0;
 	int first_read_quality_score = 0;
-	int this_noproperly_paired_added = 0;
 
 	thread_context->all_reads++;
 	//if(thread_context->all_reads>1000000) printf("TA=%llu\n%s\n",thread_context->all_reads, thread_context -> line_buffer1);
@@ -1475,39 +1823,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	{
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
 
-		char * line = is_second_read? thread_context -> line_buffer2:thread_context -> line_buffer1;
-//		if(strstr(line, "CG:Z:"))
-	//	SUBREADprintf("LINE_BUF=%s\n",line);
+		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Lengths, ChroNames, &NH_value);
 
-		read_name = strtok_r(line,"\t", &tmp_tok_ptr);	// read name
-		if(!read_name)return;
-
-		if(is_second_read)
-		{
-			if(read_name)
-			{
-				int x1;
-				for(x1=0; read_name[x1]; x1++)
-				{
-					if(read_name[x1]=='/')
-					{
-						read_name[x1]=0;
-						read_name1[x1]=0;
-						break;
-					}
-				}
-				//printf("R1=%s; R2=%s\n",read_name,read_name1 );
-				if(strcmp_slash(read_name,read_name1)!=0)
-					report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-			}
-		}
-		else
-				read_name1 = read_name;
-
-		char * mask_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if((!mask_str) || !isdigit(mask_str[0])) return;
-
-		alignment_masks = atoi(mask_str);
+	//	SUBREADprintf("  RNAME=%s\n", read_name);
 
 		if(is_second_read == 0)
 		{
@@ -1521,11 +1839,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(global_context -> SAM_output_fp)
 					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped\t*\t*\n", read_name);
 
-				if(global_context -> is_paired_end_mode_assign){
-					char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-					if(strcmp_slash(read_name,read_name2)!=0)
-						report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-				}
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
@@ -1537,26 +1850,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
-
-
-		read_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if(!read_chr) return;
-		char * read_pos_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if(!read_pos_str) return;
-
-		read_pos = atoi(read_pos_str);
-		if(read_pos < 1 && read_pos_str[0]!='0') return;
-
-		char * mapping_qual_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-
-		CIGAR_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-		if(!CIGAR_str)
-			continue;
-
 		if(global_context -> min_mapping_quality_score>0)
 		{
-			int mapping_qual =atoi(mapping_qual_str);
-
 			//printf("SECOND=%d; FIRST=%d; THIS=%d; Q=%d\n", is_second_read, first_read_quality_score, mapping_qual, );
 			if(( mapping_qual < global_context -> min_mapping_quality_score  && ! global_context -> is_paired_end_mode_assign)||( is_second_read  && max( first_read_quality_score, mapping_qual ) < global_context -> min_mapping_quality_score))
 			{
@@ -1574,19 +1869,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
-		long mate_pos = 0;
-		char * mate_chr = NULL;
-		char * mate_chr_abs_pos = tmp_tok_ptr;
-
-		if(is_second_read)
-		{
-			mate_chr = strtok_r(NULL,"\t", &tmp_tok_ptr);// mate_chr
-			if(mate_chr[0]=='=') mate_chr = read_chr;
-			char * mate_pos_str = strtok_r(NULL,"\t", &tmp_tok_ptr);	// mate_pos
-			mate_pos = atol(mate_pos_str);
-
-		}
-
 		if(is_second_read == 0 && global_context -> is_paired_end_mode_assign && 
 	   	  (global_context -> is_PE_distance_checked || global_context -> is_chimertc_disallowed)
 		  )
@@ -1595,29 +1877,16 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			if(!is_half_mapped)
 			{
-				char * mate_chrx = strtok_r(NULL,"\t", &tmp_tok_ptr); //get chr which the mate read is mapped to
-				if(!mate_chrx) return;
-				strtok_r(NULL,"\t", &tmp_tok_ptr);
-				if(!tmp_tok_ptr) return;
-				char * frag_len_str = strtok_r(NULL,"\t", &tmp_tok_ptr);
-				if(!tmp_tok_ptr) return;
-
-				fragment_length = abs(atoi(frag_len_str)); //get the fragment length
+				fragment_length = abs( fragment_length ); //get the fragment length
 
 				int is_first_read_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
 				int is_second_read_negative_strand = (alignment_masks & SAM_FLAG_MATE_REVERSE_STRAND_MATCHED)?1:0; 
 
-				if(mate_chrx[0]=='=' && is_first_read_negative_strand!=is_second_read_negative_strand)
-				{
+				if(mate_chr == read_chr && is_first_read_negative_strand!=is_second_read_negative_strand) {
+				 //^^^^^^^^^^^^^^^^^^^^ They are directly compared because they are both pointers in the same contig name table.
+				 //
 					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance) || (fragment_length < global_context -> min_paired_end_distance)))
 					{
-
-						if(global_context -> is_paired_end_mode_assign && 0==is_second_read){
-							char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-							if(strcmp_slash(read_name,read_name2)!=0)
-								report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-						}
-
 						thread_context->read_counters.unassigned_fragmentlength ++;
 
 						if(global_context -> SAM_output_fp)
@@ -1629,13 +1898,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 					if(global_context -> is_chimertc_disallowed)
 					{
-
-						if(global_context -> is_paired_end_mode_assign && 0==is_second_read){
-							char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-							if(strcmp_slash(read_name,read_name2)!=0)
-								report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-						}
-
 						thread_context->read_counters.unassigned_chimericreads ++;
 
 						if(global_context -> SAM_output_fp)
@@ -1646,21 +1908,12 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
-		if(!tmp_tok_ptr) return;
-
-
 		// This filter has to be put here because the 0x400 FLAG is not about mapping but about sequencing.
 		// A unmapped read with 0x400 FLAG should be able to kill the mapped mate which may have no 0x400 FLAG. 
 		if(global_context -> is_duplicate_ignored)
 		{
 			if(alignment_masks & SAM_FLAG_DUPLICATE)
 			{
-				if(global_context -> is_paired_end_mode_assign && 0==is_second_read){
-					char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-					if(strcmp_slash(read_name,read_name2)!=0)
-						report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-				}
-
 				thread_context->read_counters.unassigned_duplicate ++;
 				if(global_context -> SAM_output_fp)
 					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Duplicate\t*\t*\n", read_name);
@@ -1672,64 +1925,25 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(SAM_FLAG_UNMAPPED & alignment_masks) continue;
 
-		int NH_value = 1;
-		char * NH_pos = strstr(tmp_tok_ptr,"\tNH:i:");
-		if(NH_pos)
-		{
-			if(NH_pos[6]>'1' || isdigit(NH_pos[7]))
+		if( NH_value > 1 ) {
+			if(global_context -> is_multi_mapping_allowed == 0)
 			{
+				// now it is a NH>1 read!
+				// not allow multimapping -> discard!
+				thread_context->read_counters.unassigned_multimapping ++;
 
-				if(is_second_read && read_1_chr)
-				{
-					if((strcmp(read_1_chr, mate_chr)!=0 || mate_pos!=read_1_pos) && read_1_chr[0] != '*'  && mate_chr[0]!='*')
-						report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-				}
-				else
-				{
-					read_1_chr = read_chr;
-					read_1_pos = read_pos;
-				}
+				if(global_context -> SAM_output_fp)
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\t*\t*\n", read_name);
 
-
-				if(global_context -> is_multi_mapping_allowed == 0)
-				{
-					// now it is a NH>1 read!
-					// not allow multimapping -> discard!
-					thread_context->read_counters.unassigned_multimapping ++;
-
-					if(global_context -> SAM_output_fp)
-						fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\t*\t*\n", read_name);
-
-					if(global_context -> is_paired_end_mode_assign && is_second_read == 0){
-						char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-						if(strcmp_slash(read_name,read_name2)!=0)
-							report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-					}
-					return;
-				}
+				return;
 			}
-			int nh_i, NHtmpi=0;
-			for(nh_i = 6; nh_i < 15; nh_i++){
-				char nch = NH_pos[nh_i];
-				if(isdigit(nch)){
-					NHtmpi = NHtmpi * 10 + (nch-'0');
-				}else{break; }
-			}
-			NH_value = NHtmpi;
 		}
-
 
 		maximum_NH_value = max(maximum_NH_value, NH_value);
 
 		// if a pair of reads have one secondary, the entire fragment is seen as secondary.
 		if((alignment_masks & SAM_FLAG_SECONDARY_MAPPING) && (global_context -> is_multi_mapping_allowed == ALLOW_PRIMARY_MAPPING))
 		{
-			if(global_context -> is_paired_end_mode_assign && is_second_read == 0){
-				char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-				if(strcmp_slash(read_name,read_name2)!=0)
-					report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-			}
-
 			thread_context->read_counters.unassigned_secondary ++;
 
 			if(global_context -> SAM_output_fp)
@@ -1751,16 +1965,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		int nhits = 0;
 
-		int cigar_section_id, cigar_sections, is_junction_read = 0;
-		unsigned int Starting_Chro_Points[FC_CIGAR_PARSER_ITEMS];
-		unsigned short Starting_Read_Points[FC_CIGAR_PARSER_ITEMS];
-		unsigned short Section_Lengths[FC_CIGAR_PARSER_ITEMS];
-		char * ChroNames[FC_CIGAR_PARSER_ITEMS];
+		int cigar_section_id;
 		long * hits_indices = (is_second_read?hits_indices2:hits_indices1);
 		unsigned short * hits_read_start_base = is_second_read?hits_read_start_base2:hits_read_start_base1;
 		short * hits_read_len = is_second_read?hits_read_len2:hits_read_len1;
 		unsigned short * cigar_read_len = is_second_read?&cigar_read_len2:&cigar_read_len1;
 
+		/*
 		if(global_context -> do_junction_counting)
 		{
 			int this_col = 6;
@@ -1770,15 +1981,18 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 			cigar_sections = RSubread_parse_CIGAR_Extra_string(alignment_masks, read_chr, read_pos, CIGAR_str, mate_chr_abs_pos, ChroNames, Starting_Chro_Points, Starting_Read_Points, Section_Lengths, &is_junction_read);
 		} else  cigar_sections = RSubread_parse_CIGAR_string(read_chr, read_pos, CIGAR_str, ChroNames, Starting_Chro_Points, Starting_Read_Points, Section_Lengths, &is_junction_read);
+		*/
 
 		(*cigar_read_len) = Starting_Read_Points[cigar_sections-1] + Section_Lengths[cigar_sections-1];
 
 		if(is_junction_read || !global_context->is_split_alignments_only) 
 		{
 			if(global_context -> do_junction_counting){
+				/*
 				int * njunc_current = is_second_read?&njunc2:&njunc1;
 				fc_junction_info_t * junctions_current = is_second_read?supported_junctions2:supported_junctions1;
 				(*njunc_current) = calc_junctions_from_cigar(global_context, alignment_masks , read_chr, read_pos , CIGAR_str, mate_chr_abs_pos, junctions_current);
+				*/
 			}
 
 		//#warning "=================== COMMENT THESE 2 LINES ================================"
@@ -1944,12 +2158,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			skipped_for_exonic ++;
 			if((is_second_read && skipped_for_exonic == 2) || (!global_context -> is_paired_end_mode_assign) || (alignment_masks & 0x8))
 			{
-				if(global_context -> is_paired_end_mode_assign && is_second_read == 0){
-					char * read_name2 = strtok_r(thread_context -> line_buffer2,"\t", &tmp_tok_ptr);
-					if(strcmp_slash(read_name,read_name2)!=0)
-						report_unpair_warning(global_context, thread_context, &this_noproperly_paired_added);
-				}
-
 				if(global_context -> SAM_output_fp)
 					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Nonjunction\t*\t*\n", read_name);
 
@@ -2327,185 +2535,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 	}
 }
 
-
-void * feature_count_worker(void * vargs)
-{
-	void ** args = (void **) vargs;
-
-	fc_thread_global_context_t * global_context = args[0];
-	fc_thread_thread_context_t * thread_context = args[1];
-
-	free(vargs);
-
-
-	//printf("QQQ0:T%d\n", thread_context->thread_id);
-	//Rprintf("QQQ1:T%d\n", thread_context->thread_id);
-	//printf("QQQ2:T%d\n", thread_context->thread_id);
-
-	if(global_context -> is_SAM_file)
-	{
-		//thread_context -> current_read_length1 = global_context -> read_length;
-		//thread_context -> current_read_length2 = global_context -> read_length;
-		while (1)
-		{
-			while(1)
-			{
-				int is_retrieved = 0;
-				pthread_spin_lock(&thread_context->input_buffer_lock);
-				if(thread_context->input_buffer_remainder)
-				{
-					int is_second_read;
-					unsigned int buffer_read_bytes ;
-					unsigned int buffer_read_ptr;
-					if(thread_context->input_buffer_remainder <= thread_context->input_buffer_write_ptr)
-						buffer_read_ptr = thread_context->input_buffer_write_ptr - thread_context->input_buffer_remainder; 
-					else
-						buffer_read_ptr = thread_context->input_buffer_write_ptr + global_context->input_buffer_max_size - thread_context->input_buffer_remainder;
-
-					//if(buffer_read_ptr>= global_context->input_buffer_max_size)
-					//	if(buffer_read_ptr>6*1024*1024) printf("REALLY BIG PTR:%u = %u + %u - %u\n", buffer_read_ptr, thread_context->input_buffer_write_ptr , global_context->input_buffer_max_size, thread_context->input_buffer_remainder);
-
-					for(is_second_read = 0; is_second_read < (global_context->is_paired_end_mode_assign ? 2:1); is_second_read++)
-					{
-						char * curr_line_buff = is_second_read?thread_context -> line_buffer2:thread_context -> line_buffer1;
-						//printf("R=%u; WPTR=%u ;RPTR=%u\n", thread_context->input_buffer_remainder, thread_context->input_buffer_write_ptr, buffer_read_ptr);
-						//if(buffer_read_ptr % 7 == 0)
-						//	fflush(stdout);
-						
-						for(buffer_read_bytes=0; ; buffer_read_bytes++)
-						{
-							//printf("%p + %d\n", thread_context->input_buffer, buffer_read_ptr);
-							//if(buffer_read_ptr>6*1024*1024) printf("VERY BIG PTR:%u > %u\n", buffer_read_ptr , global_context->input_buffer_max_size);
-							char nch =  thread_context->input_buffer[buffer_read_ptr ++];
-							curr_line_buff[buffer_read_bytes] = nch;
-							if(buffer_read_ptr >= global_context->input_buffer_max_size)
-								buffer_read_ptr = 0; 
-							if(nch=='\n' || buffer_read_bytes>2998){
-								curr_line_buff[buffer_read_bytes+1]=0;
-								curr_line_buff[buffer_read_bytes+2]=0;
-								break;
-							}
-						}
-
-						//printf("%s\n", curr_line_buff);
-
-						//if(buffer_read_bytes + 1 > thread_context->input_buffer_remainder)
-						//	(*(int*)NULL) = 1;
-						thread_context->input_buffer_remainder -= buffer_read_bytes + 1;
-					}
-					is_retrieved = 1;
-
-				}
-
-				pthread_spin_unlock(&thread_context->input_buffer_lock);
-				if(global_context->is_all_finished && !is_retrieved) return NULL;
-
-				if(is_retrieved) break;
-				else
-					usleep(tick_time);
-			}
-
-
-
-			process_line_buffer(global_context, thread_context);
-
-		}
-	}
-	else
-	{	// if is BAM: decompress the chunk and process reads.
-		char * PDATA = malloc(2*70000);
-		SamBam_Alignment * aln = &thread_context->aln_buffer;
-
-		//thread_context -> current_read_length1 = global_context -> read_length;
-		//thread_context -> current_read_length2 = global_context -> read_length;
-		while(1)
-		{
-			int PDATA_len = 0;
-			while(1)
-			{
-				int is_retrieved = 0;
-				PDATA_len = 0;
-				//retrieve the next chunk.
-
-				pthread_spin_lock(&thread_context->input_buffer_lock);
-				if(thread_context->input_buffer_remainder)
-				{
-					assert(thread_context->input_buffer_remainder>4);
-					unsigned int tail_bytes = global_context->input_buffer_max_size - thread_context -> chunk_read_ptr ;
-					if(tail_bytes<4)
-					{
-						thread_context -> chunk_read_ptr = 0;
-						thread_context -> input_buffer_remainder -= tail_bytes;
-						memcpy(&PDATA_len, thread_context->input_buffer + thread_context -> chunk_read_ptr , 4);
-					}
-					else
-					{
-						memcpy(&PDATA_len, thread_context->input_buffer + thread_context -> chunk_read_ptr , 4);
-						if(PDATA_len==0)
-						{
-							thread_context -> chunk_read_ptr = 0;
-							thread_context -> input_buffer_remainder -= tail_bytes;
-							memcpy(&PDATA_len, thread_context->input_buffer , 4);
-						}
-					}
-					thread_context -> chunk_read_ptr+=4;
-					thread_context -> input_buffer_remainder -= 4;
-
-					//fprintf(stderr,"chunk_read_ptr=%d , input_buffer_remainder = %d\n", thread_context -> chunk_read_ptr , thread_context -> input_buffer_remainder);
-					if(PDATA_len<0 || PDATA_len > 140000)
-					{
-						SUBREADprintf("THREAD ABNORMALLY QUIT\n");
-						return NULL;
-					}
-
-					memcpy(PDATA, thread_context -> input_buffer + thread_context -> chunk_read_ptr , PDATA_len);
-					thread_context -> chunk_read_ptr += PDATA_len;
-					thread_context -> input_buffer_remainder -= PDATA_len;
-
-					if( PDATA_len > 0 )
-						is_retrieved = 1;
-				}
-
-
-				pthread_spin_unlock(&thread_context->input_buffer_lock);
-				if(global_context->is_all_finished && !is_retrieved){
-					free(PDATA);
-					return NULL;
-				}
-
-				if(is_retrieved) break;
-				else
-					usleep(tick_time);
-
-			}
-			
-			// convert binary reads into sam lines and process;
-			int processed_reads = 0, PDATA_ptr = 0;
-			while(PDATA_ptr < PDATA_len)
-			{
-				int is_second_read;
-				for(is_second_read = 0; is_second_read <= global_context -> is_paired_end_mode_assign; is_second_read++)
-				{
-					int binary_read_len, local_PDATA_ptr = PDATA_ptr;
-					char * curr_line_buff = is_second_read?thread_context -> line_buffer2:thread_context -> line_buffer1;
-
-					memcpy(&binary_read_len, PDATA + PDATA_ptr, 4);
-					int ret = PBam_chunk_gets(PDATA, &local_PDATA_ptr, PDATA_len, global_context -> sambam_chro_table, curr_line_buff, 2999, aln,0);
-					//printf("LL=%s\n", curr_line_buff);
-					if(ret<0)
-						SUBREADprintf("READ DECODING ERROR!\n");
-
-					PDATA_ptr += 4+binary_read_len;
-					processed_reads++;
-				}
-
-				process_line_buffer(global_context, thread_context);
-				//printf("LE\n\n");
-			}
-		}
-	}
-}
-
 void fc_thread_merge_results(fc_thread_global_context_t * global_context, read_count_type_t * nreads , unsigned long long int *nreads_mapped_to_exon, fc_read_counters * my_read_counter, HashTable * junction_global_table, HashTable * splicing_global_table)
 {
 	int xk1, xk2;
@@ -2514,6 +2543,8 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, read_c
 	read_count_type_t unpaired_fragment_no = 0;
 
 	(*nreads_mapped_to_exon)=0;
+
+	SAM_pairer_destroy(&global_context -> read_pairer);
 
 	for(xk1=0; xk1<global_context-> thread_number; xk1++)
 	{
@@ -2679,7 +2710,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> unistr_buffer_space = malloc(global_context -> unistr_buffer_size);
 	global_context -> annot_chro_name_alias_table = NULL;
 	global_context -> cmd_rebuilt = cmd_rebuilt;
-	global_context -> is_input_file_resort_needed = is_input_file_resort_needed;
 	global_context -> feature_block_size = feature_block_size;
 	global_context -> five_end_extension = fiveEndExtension;
 	global_context -> three_end_extension = threeEndExtension;
@@ -2761,6 +2791,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	global_context -> exontable_block_end_index = et_bk_end_index;
 	global_context -> exontable_block_max_end = et_bk_max_end;
 	global_context -> exontable_block_min_start = et_bk_min_start;
+	global_context -> sambam_chro_table_items = 0;
+	global_context -> sambam_chro_table = NULL;
 
 	global_context -> is_all_finished = 0;
 	global_context -> thread_contexts = malloc(sizeof(fc_thread_thread_context_t) * global_context -> thread_number);
@@ -2776,8 +2808,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].count_table = calloc(sizeof(read_count_type_t), et_exons);
 		global_context -> thread_contexts[xk1].nreads_mapped_to_exon = 0;
 		global_context -> thread_contexts[xk1].all_reads = 0;
-		global_context -> thread_contexts[xk1].line_buffer1 = malloc(global_context -> line_length + 2);
-		global_context -> thread_contexts[xk1].line_buffer2 = malloc(global_context -> line_length + 2);
 		global_context -> thread_contexts[xk1].chro_name_buff = malloc(CHROMOSOME_NAME_LENGTH);
 		global_context -> thread_contexts[xk1].strm_buffer = malloc(sizeof(z_stream));
 		if(global_context -> calculate_overlapping_lengths)
@@ -2814,10 +2844,12 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		void ** thread_args = malloc(sizeof(void *)*2);
 		thread_args[0] = global_context;
 		thread_args[1] = & global_context -> thread_contexts[xk1];
-
-		if(global_context -> thread_number>1 || ! global_context -> is_SAM_file)
-			pthread_create(&global_context -> thread_contexts[xk1].thread_object, NULL, feature_count_worker, thread_args);
 	}
+
+	char rand_prefix[200];
+	sprintf(rand_prefix, "./temp-core-%06u-%08X.sam", getpid(), rand());
+
+	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , 64, !global_context-> is_SAM_file, 1, !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, global_context -> input_file_name, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context);
 
 	return 0;
 }
@@ -2837,8 +2869,6 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		if(global_context -> thread_contexts[xk1].read_coverage_bits)
 			free(global_context -> thread_contexts[xk1].read_coverage_bits);	
 		free(global_context -> thread_contexts[xk1].count_table);	
-		free(global_context -> thread_contexts[xk1].line_buffer1);	
-		free(global_context -> thread_contexts[xk1].line_buffer2);	
 		free(global_context -> thread_contexts[xk1].input_buffer);
 		free(global_context -> thread_contexts[xk1].chro_name_buff);
 		free(global_context -> thread_contexts[xk1].strm_buffer);
@@ -2852,78 +2882,8 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 }
 void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 {
-	int xk1;
-	for(xk1=0; xk1<global_context-> thread_number; xk1++)
-		pthread_join(global_context -> thread_contexts[xk1].thread_object, NULL);
+	SAM_pairer_run(&global_context -> read_pairer);
 }
-
-int resort_input_file(fc_thread_global_context_t * global_context)
-{
-	char * temp_file_name = malloc(300), * fline = malloc(3000);
-
-	if(!global_context->redo)
-		print_in_box(80,0,0,"   Resort the input file ...");
-	sprintf(temp_file_name, "./temp-core-%06u-%08X.sam", getpid(), rand());
-
-	unsigned long long unpaired_in_sort = 0;
-	if( global_context-> is_SAM_file ){
-		SamBam_FILE * sambam_reader ;
-		sambam_reader = SamBam_fopen(global_context-> input_file_name, global_context-> is_SAM_file?SAMBAM_FILE_SAM:SAMBAM_FILE_BAM);
-
-		if(!sambam_reader){
-			SUBREADprintf("Unable to open %s.\n", global_context-> input_file_name);
-			return -1;
-		}
-		SAM_sort_writer writer;
-		int ret = sort_SAM_create(&writer, temp_file_name, ".");
-		if(ret)
-		{
-			SUBREADprintf("Unable to sort input file because temporary file '%s' cannot be created.\n", temp_file_name);
-			return -1;
-		}
-		int is_read_len_warned = 0;
-
-		while(1)
-		{
-			//#warning "Find out why I ndded the sequences, then replace '1 - 1' with 0"
-			char * is_ret = SamBam_fgets(sambam_reader, fline, 2999, 1 - 1);
-			if(!is_ret) break;
-			int ret = sort_SAM_add_line(&writer, fline, strlen(fline));
-			if(ret<0) 
-			{
-				if(!is_read_len_warned)
-					print_in_box(80,0,0,"WARNING: reads with very long names were found.");
-				is_read_len_warned = 1;
-			//	break;
-			}
-		//printf("N1=%llu\n",  writer.unpaired_reads);
-		}
-
-		sort_SAM_finalise(&writer);
-		global_context->is_SAM_file = 1;
-		SamBam_fclose(sambam_reader);
-	}else{
-		char temp_temp_name[300];
-		sprintf(temp_temp_name, "./fspr-FC-%06u-%08X",  getpid(), rand());
-		SAM_pairer_context_t pairer;
-		SAM_pairer_writer_main_t writer_main;
-		SAM_pairer_writer_create(&writer_main, global_context -> thread_number, 1, 1, Z_NO_COMPRESSION, temp_file_name);
-		SAM_pairer_create(&pairer, global_context -> thread_number, 64, 1, 1, 0, global_context-> input_file_name, SAM_pairer_writer_reset, SAM_pairer_multi_thread_header, SAM_pairer_multi_thread_output, temp_temp_name, &writer_main);
-		SAM_pairer_run(&pairer);
-		SAM_pairer_destroy(&pairer);
-		SAM_pairer_writer_destroy(&writer_main);
-		unpaired_in_sort = pairer.total_orphan_reads;
-		global_context->is_SAM_file = 0;
-	}
-	print_in_box(80,0,0,"   %llu read%s ha%s missing mates.", unpaired_in_sort, unpaired_in_sort>1?"s":"", unpaired_in_sort>1?"ve":"s");
-	print_in_box(80,0,0,"   Input was converted to a format accepted by featureCounts.");
-
-	strcpy(global_context-> input_file_name, temp_file_name);
-	free(temp_file_name);
-	free(fline);
-	return 0;
-}
-
 
 void BUFstrcat(char * targ, char * src, char ** buf){
 	int srclen = strlen(src);
@@ -3756,7 +3716,7 @@ int readSummary(int argc,char *argv[]){
 
 	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitAlignmentOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting;
 
-	int isSAM, isGTF, n_input_files=0;
+	int  isGTF, n_input_files=0;
 	char *  alias_file_name = NULL, * cmd_rebuilt = NULL;
 
 	int isMultiOverlapAllowed, isGeneLevel;
@@ -3767,7 +3727,7 @@ int readSummary(int argc,char *argv[]){
 	minPEDistance = atoi(argv[5]);
 	maxPEDistance = atoi(argv[6]);
 
-	isSAM = atoi(argv[7]);
+	//  isSAM = atoi(argv[7]);
 	isMultiOverlapAllowed = atoi(argv[8]);
 	isGeneLevel = atoi(argv[9]);
 	unsigned short thread_number;
@@ -3897,7 +3857,7 @@ int readSummary(int argc,char *argv[]){
 
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, isSAM, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitAlignmentOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitAlignmentOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting);
 
 	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && global_context.use_fraction_multi_mapping)
 	{
@@ -3967,7 +3927,7 @@ int readSummary(int argc,char *argv[]){
 	}
 
 	for(;;){
-		int redoing, original_sorting = global_context.is_input_file_resort_needed, orininal_isPE = global_context.is_paired_end_mode_assign;
+		int orininal_isPE = global_context.is_paired_end_mode_assign;
 		if(next_fn==NULL || strlen(next_fn)<1) break;
 
 		read_count_type_t * column_numbers = calloc(nexons, sizeof(read_count_type_t));
@@ -3978,57 +3938,41 @@ int readSummary(int argc,char *argv[]){
 		strcpy(global_context.raw_input_file_name, next_fn);
 		global_context.redo=0;
 		
-		for(redoing = 0; redoing < 1 + !original_sorting; redoing++)
-		{
 
-			if(global_context.do_junction_counting){
-				junction_global_table = HashTableCreate(156679);
-				splicing_global_table = HashTableCreate(156679);
+		if(global_context.do_junction_counting){
+			junction_global_table = HashTableCreate(156679);
+			splicing_global_table = HashTableCreate(156679);
 
-				HashTableSetHashFunction(junction_global_table,HashTableStringHashFunction);
-				HashTableSetDeallocationFunctions(junction_global_table, free, NULL);
-				HashTableSetKeyComparisonFunction(junction_global_table, fc_strcmp_chro);
+			HashTableSetHashFunction(junction_global_table,HashTableStringHashFunction);
+			HashTableSetDeallocationFunctions(junction_global_table, free, NULL);
+			HashTableSetKeyComparisonFunction(junction_global_table, fc_strcmp_chro);
 
-				HashTableSetHashFunction(splicing_global_table,HashTableStringHashFunction);
-				HashTableSetDeallocationFunctions(splicing_global_table, free, NULL);
-				HashTableSetKeyComparisonFunction(splicing_global_table, fc_strcmp_chro);
-			}
+			HashTableSetHashFunction(splicing_global_table,HashTableStringHashFunction);
+			HashTableSetDeallocationFunctions(splicing_global_table, free, NULL);
+			HashTableSetKeyComparisonFunction(splicing_global_table, fc_strcmp_chro);
+		}
 
-			fc_read_counters * my_read_counter = &(read_counters[i_files]);
-			memset(my_read_counter, 0, sizeof(fc_read_counters));
+		fc_read_counters * my_read_counter = &(read_counters[i_files]);
+		memset(my_read_counter, 0, sizeof(fc_read_counters));
 
-			int ret_int = readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end, my_read_counter, junction_global_table, splicing_global_table);
-			if(ret_int!=0 || (global_context.redo && redoing)){
-				// give up this file.
+		int ret_int = readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end, my_read_counter, junction_global_table, splicing_global_table);
+		if(ret_int!=0){
+			// give up this file.
 
-				table_columns[i_files] = NULL;
-				if(global_context.do_junction_counting){
-					HashTableDestroy(junction_global_table);
-					HashTableDestroy(splicing_global_table);
-				}
-				free(column_numbers);
-				break;
-			} else {
-				// maybe finished or need redoing
-				table_columns[i_files] = column_numbers;
-				if(global_context.do_junction_counting){
-					junction_global_table_list[ i_files ] = junction_global_table;
-					splicing_global_table_list[ i_files ] = splicing_global_table;
-				}
-			}
-
-			if(redoing || !global_context.redo) break;
-			
-			global_context.is_input_file_resort_needed = 1;
-			memset(column_numbers, 0, nexons * sizeof(read_count_type_t));
-
+			table_columns[i_files] = NULL;
 			if(global_context.do_junction_counting){
 				HashTableDestroy(junction_global_table);
 				HashTableDestroy(splicing_global_table);
 			}
+			free(column_numbers);
+		} else {
+			// finished
+			table_columns[i_files] = column_numbers;
+			if(global_context.do_junction_counting){
+				junction_global_table_list[ i_files ] = junction_global_table;
+				splicing_global_table_list[ i_files ] = splicing_global_table;
+			}
 		}
-		global_context.is_SAM_file = isSAM;
-		global_context.is_input_file_resort_needed = original_sorting;
 		global_context.is_paired_end_mode_assign = orininal_isPE;
 
 		i_files++;
@@ -4139,7 +4083,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
 		int file_probe = is_certainly_bam_file(global_context->input_file_name, &is_first_read_PE);
-
 		
 		global_context -> is_paired_end_input_file = is_first_read_PE;
 		// a Singel-end SAM/BAM file cannot be assigned as a PE SAM/BAM file;
@@ -4147,10 +4090,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 		if(is_first_read_PE==0)
 				global_context -> is_paired_end_mode_assign = 0;
 
-		if(file_probe == 1){
-			global_context->is_SAM_file = 0;
-		}
-		else if(file_probe == 0) global_context->is_SAM_file = 1;
+		global_context->is_SAM_file = 1;
+		if(file_probe == 1) global_context->is_SAM_file = 0;
 
 		global_context -> start_time = miltime();
 
@@ -4169,8 +4110,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 		
 	}
 
-	int isInputFileResortNeeded = global_context->is_input_file_resort_needed;
-
 	if(strcmp( global_context->input_file_name,"STDIN")!=0)
 	{
 		FILE * exist_fp = f_subr_open( global_context->input_file_name,"r");
@@ -4184,12 +4123,11 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 		fclose(exist_fp);
 	}
 
+	/*
 	if(strcmp(global_context->input_file_name,"STDIN")!=0)
 		if(warning_file_type(global_context->input_file_name, global_context->is_SAM_file?FILE_TYPE_SAM:FILE_TYPE_BAM))
 			global_context->is_unpaired_warning_shown=1;
-	if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
-		if(resort_input_file( global_context)) return -1;
-	int isSAM = global_context->is_SAM_file;
+	*/
 	// Open the SAM/BAM file
 	// Nothing is done if the file does not exist.
 
@@ -4215,393 +4153,13 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 			print_in_box(80,0,0,"   Assign reads to features...");
 	}
 
-
-
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
 
-	int buffer_pairs = global_context -> thread_number>1?512:1;
-	int isPE = global_context->is_paired_end_mode_assign;
-	char * preload_line = malloc(sizeof(char) * (2+MAX_LINE_LENGTH)*(isPE?2:1)*buffer_pairs);
-	int preload_line_ptr;
-	int current_thread_id = 0;
-	fc_thread_thread_context_t * one_thread_context = global_context->thread_contexts;
-
-	SamBam_Reference_Info * sb_header_tab = NULL;
-	
-	unsigned long long int chunk_id = 0;
-	int binary_remainder = 0, binary_read_ptr = 0;
-	char * chunk_in_buff = malloc(70000);
-	char * binary_in_buff = malloc(80000 * 2);
-
-	if(!isSAM)
-	{
-		int remainder_read_data_len = 0;
-
-		PBum_load_header(fp_in, &sb_header_tab, binary_in_buff,  & remainder_read_data_len);
-		//printf("RMD=%d\n", remainder_read_data_len);
-
-		if(remainder_read_data_len)
-		{
-			binary_remainder = remainder_read_data_len;
-		}
-		global_context->sambam_chro_table = sb_header_tab;
-	}
-
-	while (1){
-		int pair_no;
-		int is_second_read;
-		int fresh_read_no = 0;
-		preload_line[0] = 0;
-		preload_line_ptr = 0;
-
-		char * ret = NULL;
-		
-		// one-thread BAM is not supported.
-		if( isSAM && global_context->thread_number==1)
-		{
-			int is_second_read;
-
-			for(is_second_read=0;is_second_read<(isPE?2:1);is_second_read++)
-			{
-				char * lbuf = is_second_read?one_thread_context -> line_buffer2:one_thread_context -> line_buffer1;
-				while(1)
-				{
-					ret = fgets(lbuf, MAX_LINE_LENGTH, fp_in);
-					if(global_context -> redo) ret = NULL;
-					if(!ret) break;
-					if(lbuf[0] == '@') 
-					{
-						int retlen = strlen(ret);
-						if(ret[retlen-1]!='\n')
-						{
-							while(1){
-								int nch = getc(fp_in);
-								if(nch == EOF || nch == '\n') break;
-							}
-						}
-					}
-					else break;
-				}
-
-				if(!ret) break;
-				if(read_length < 1)
-				{
-					int tab_no = 0;
-					int read_len_tmp=0, read_cursor;
-					int curr_line_len = strlen(lbuf);
-					for(read_cursor=0; read_cursor<curr_line_len; read_cursor++)
-					{
-						if(lbuf[read_cursor] == '\t')
-							tab_no++;
-						else
-						{
-							if(tab_no == 9)	// SEQ
-								read_len_tmp++;
-						}
-					}
-					read_length = read_len_tmp;
-					global_context->read_length = read_length;
-				}
-				lbuf[strlen(lbuf)+1]=0;
-			}
-
-			//printf("RRR=%d\n",ret);
-			
-			//one_thread_context -> current_read_length1 = global_context->read_length;
-			//one_thread_context -> current_read_length2 = global_context->read_length;
-
-			if(is_second_read == 1 && isPE){
-				print_in_box(85,0,0,"   %c[31mThere are odd number of reads in the paired-end data.", CHAR_ESC);
-				print_in_box(80,0,0,"   Please make sure that the format is correct.");
-			}
-
-			if(ret)
-			{
-				global_context->all_reads ++;
-				process_line_buffer(global_context, one_thread_context);
-			}
-
-			if(!ret)break;
-		}
-		else if(!isSAM)
-		{
-			int no_of_reads = 0;
-			unsigned int real_len = 0;
-			// most of the data must have been given out before this step.
-
-			int cdata_size = 0;
-
-			if(binary_remainder > 70000)
-				SUBREADprintf("SOMETHING IS WRONG!\n");
-
-			if(global_context -> redo)
-				cdata_size = -1;
-			else{
-				if(binary_remainder<10000)
-					cdata_size = PBam_get_next_zchunk(fp_in, chunk_in_buff, 65537, & real_len);
-			}
-
-			if(cdata_size>0 || binary_remainder>0)
-			{
-				int x1;
-
-
-				if(binary_read_ptr>0)
-				{
-					for(x1=0; x1< binary_remainder; x1++)
-						binary_in_buff[x1] = binary_in_buff [x1 + binary_read_ptr];
-					binary_read_ptr = 0;
-				}
-
-				//fprintf(stderr,"NBN=%d, OBN=%d\n", cdata_size , binary_remainder);
-				if(cdata_size>0)
-				{
-					int new_binary_bytes = SamBam_unzip(binary_in_buff + binary_remainder , chunk_in_buff , cdata_size);
-					if(new_binary_bytes>=0)
-						binary_remainder += new_binary_bytes;
-					else	SUBREADprintf("ERROR: BAM GZIP FORMAT ERROR.\n");
-				//	fprintf(stderr,"BBN=%d\n", new_binary_bytes);
-				}
-
-				while(binary_remainder>4)
-				{
-					unsigned int binary_read_len = 0;
-					memcpy(& binary_read_len , binary_in_buff + binary_read_ptr , 4);
-					//printf("RLEN=%d; PTR=%d; RMD=%d\n", binary_read_len , binary_read_ptr, binary_remainder);
-					if(binary_read_len > 10000)
-					{
-						binary_remainder = -1;
-						//SUBREADprintf("FATAL ERROR: BAM RECORD SIZE = %u ; PTR=%d ; REM=%d.\n", binary_read_len, binary_read_ptr , binary_remainder);
-						print_in_box(80,0,0,"   A format error was detected in this BAM file.");
-						print_in_box(80,0,0,"   The remaining part in the file is skipped.");
-						print_in_box(80,0,0,"   Please check the file format using samtools.");
-						print_in_box(80,0,0,"");
-						break;
-					}
-					// if the program runs on PE mode, no_of_reads must be even.
-
-					if(isPE)
-					{
-						if(4 + binary_read_len + 4 < binary_remainder)
-						{
-							int binary_read2_len=0;
-							memcpy(&binary_read2_len , binary_in_buff + binary_read_ptr + 4 + binary_read_len, 4);
-							if(4 + binary_read_len + 4 + binary_read2_len <= binary_remainder)
-							{
-								no_of_reads +=2;
-								binary_read_ptr += 4 + binary_read_len + 4 + binary_read2_len;
-								binary_remainder -= 4 + binary_read_len + 4 + binary_read2_len;
-							}
-							else break;
-						}
-						else break;
-					}
-					else
-					{
-						if(binary_read_len + 4<= binary_remainder)
-						{
-							no_of_reads ++;
-							binary_read_ptr  += 4 + binary_read_len;
-							binary_remainder -= 4 + binary_read_len;
-						}
-						else break;
-					}
-				}
-			}
-
-			if(binary_remainder <0)break;
-
-			if(no_of_reads>0) 
-			{
-				while(1)
-				{
-					int is_finished = 0;
-
-					fc_thread_thread_context_t * thread_context = global_context->thread_contexts+current_thread_id;
-
-					pthread_spin_lock(&thread_context->input_buffer_lock);
-
-					// the number of bytes can be utilised given the two_chunk_len.
-					int empty_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_remainder;
-					int tail_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_write_ptr;
-					
-					if(thread_context->input_buffer_remainder > global_context->input_buffer_max_size)
-					{
-						SUBREADprintf("RMD=%d\n", thread_context->input_buffer_remainder );
-						assert(0);
-					}
-
-					if(tail_bytes < binary_read_ptr + 4)
-						empty_bytes -= tail_bytes;
-
-					// copy the new buffer to thread buffer.
-					// format: read_number=n, read_chunk1, read_chunk2, ..., read_chunk_n
-					if(empty_bytes >= binary_read_ptr + 4)
-					{
-
-						if(tail_bytes < binary_read_ptr + 4)
-						{
-							if(tail_bytes>=4)
-								memset(thread_context->input_buffer + thread_context->input_buffer_write_ptr, 0, 4);
-							thread_context->input_buffer_write_ptr = 0;
-							thread_context->input_buffer_remainder += tail_bytes;
-						}
-
-						memcpy( thread_context->input_buffer + thread_context->input_buffer_write_ptr, & binary_read_ptr, 4);
-						memcpy( thread_context->input_buffer + thread_context->input_buffer_write_ptr + 4, binary_in_buff , binary_read_ptr);
-						thread_context->input_buffer_write_ptr += 4 + binary_read_ptr;
-						thread_context->input_buffer_remainder += 4 + binary_read_ptr;
-						is_finished = 1;
-					}
-
-					pthread_spin_unlock(&thread_context->input_buffer_lock);
-					current_thread_id++;
-					if(current_thread_id >= global_context->thread_number) current_thread_id = 0;
-
-					if(is_finished) break;
-					else usleep(tick_time);
-
-				}
-
-				chunk_id++;
-			}
-			else if(cdata_size<0)
-				break;
-	
-		}
-		else
-		{
-			for(pair_no=0; pair_no < buffer_pairs; pair_no++)
-			{
-				for(is_second_read=0;is_second_read<(isPE?2:1);is_second_read++)
-				{
-					while(1)
-					{
-						ret = fgets(preload_line+preload_line_ptr, MAX_LINE_LENGTH, fp_in);
-						if(global_context -> redo ) ret = NULL;
-						if(!ret) break;
-						if(preload_line[preload_line_ptr] == '@'){
-							int retlen = strlen(ret);
-							if(ret[retlen-1]!='\n')
-							{
-								while(1){
-									int nch = getc(fp_in);
-									if(nch == EOF || nch == '\n') break;
-								}
-							}
-						}else break;
-					}
-
-					if(!ret) break;
-
-					int curr_line_len = strlen(preload_line+preload_line_ptr);
-					if(curr_line_len >= MAX_LINE_LENGTH || preload_line[preload_line_ptr + curr_line_len-1]!='\n') {
-						if(feof(fp_in) && curr_line_len < MAX_LINE_LENGTH - 1){
-							preload_line[preload_line_ptr + curr_line_len] = '\n';
-							curr_line_len ++;
-						}else{
-							print_in_box(80,0,0,"ERROR: the lines are too long. Please check the input format.\n");
-							ret = NULL;
-							preload_line_ptr = 0;
-							break;
-						}
-					}
-					preload_line_ptr += curr_line_len;
-
-					fresh_read_no++;
-				}
-				if(!ret) break;
-				else
-					global_context->all_reads ++;
-			}
-
-			int line_length = preload_line_ptr;
-			if(line_length >= global_context->input_buffer_max_size-1)
-			{
-				SUBREADprintf("ERROR: the lines are too long. Please check the input format!!\n");
-				break;
-			}
-			if(isPE && (fresh_read_no%2>0))
-			{
-				// Safegarding -- it should not happen if the SAM file has a correct format.
-				//line_length = 0;
-				if( (!global_context -> redo)){
-					print_in_box(85,0,0,"   %c[31mThere are odd number of reads in the paired-end data.", CHAR_ESC);
-					print_in_box(80,0,0,"   Please make sure that the format is correct.");
-				}
-				if(line_length > 0){
-					int xx1, enters = 0;
-					for(xx1 = line_length; xx1 >=0; xx1--){
-						if( preload_line[xx1]=='\n' ) enters ++;
-						if(2 == enters){
-							line_length = xx1+1;
-							break;
-						}
-					}
-					if(xx1 <= 0) line_length = 0;
-				}
-			}
-
-			//printf("FRR=%d\n%s\n", fresh_read_no, preload_line);
-
-			if(line_length > 0)
-			{
-				while(1)
-				{
-					int is_finished = 0;
-					fc_thread_thread_context_t * thread_context = global_context->thread_contexts+current_thread_id;
-					//printf("WRT_THR_IBUF_REM [%d]=%d\n", current_thread_id , thread_context->input_buffer_remainder);
-
-					pthread_spin_lock(&thread_context->input_buffer_lock);
-					unsigned int empty_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_remainder; 
-					if(empty_bytes > line_length)
-					{
-						unsigned int tail_bytes = global_context->input_buffer_max_size -  thread_context->input_buffer_write_ptr; 
-						unsigned int write_p1_len = (tail_bytes > line_length)?line_length:tail_bytes;
-						unsigned int write_p2_len = (tail_bytes > line_length)?0:(line_length - tail_bytes);
-						memcpy(thread_context->input_buffer + thread_context->input_buffer_write_ptr, preload_line, write_p1_len);
-						if(write_p2_len)
-						{
-							memcpy(thread_context->input_buffer, preload_line + write_p1_len, write_p2_len);
-							thread_context->input_buffer_write_ptr = write_p2_len;
-						}
-						else	thread_context->input_buffer_write_ptr += write_p1_len;
-						if(thread_context->input_buffer_write_ptr == global_context->input_buffer_max_size) 
-							thread_context->input_buffer_write_ptr=0;
-
-
-						thread_context->input_buffer_remainder += line_length;
-						//printf("WRT_THR_IBUF_REM [%d] + %d =%d\n", current_thread_id, line_length , thread_context->input_buffer_remainder);
-						is_finished = 1;
-					}
-
-					pthread_spin_unlock(&thread_context->input_buffer_lock);
-
-					current_thread_id++;
-					if(current_thread_id >= global_context->thread_number) current_thread_id = 0;
-
-					if(is_finished) break;
-					else usleep(tick_time);
-				}
-			}
-			if(!ret) break;
-		}
-	}
-
-	free(chunk_in_buff);
-	free(binary_in_buff);
-	free(preload_line);
 	global_context->is_all_finished = 1;
-
-	if(global_context->thread_number > 1 || !isSAM)
-		fc_thread_wait_threads(global_context);
+	fc_thread_wait_threads(global_context);
 
 	unsigned long long int nreads_mapped_to_exon = 0;
-
-
-	if(!global_context->redo)
-		fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon, my_read_counter, junction_global_table, splicing_global_table);
-
+	fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon, my_read_counter, junction_global_table, splicing_global_table);
 	fc_thread_destroy_thread_context(global_context);
 
 	//global_context .read_counters.assigned_reads = nreads_mapped_to_exon;
@@ -4611,9 +4169,9 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	#endif
 		fclose(fp_in);
 
-	if(sb_header_tab) free(sb_header_tab);
-	if(strcmp(global_context->input_file_name,"STDIN")!=0 && isInputFileResortNeeded)
-		unlink(global_context->input_file_name);
+	if(global_context -> sambam_chro_table) free(global_context -> sambam_chro_table);
+	global_context -> sambam_chro_table = NULL;
+
 	free(line);
 	return 0;
 }
@@ -4698,6 +4256,8 @@ int feature_count_main(int argc, char ** argv)
 	optind=0;
 	opterr=1;
 	optopt=63;
+
+	strcpy(Pair_Orientations,"fr");
 
 	while ((c = getopt_long (argc, argv, "A:g:t:T:o:a:d:D:L:Q:pbF:fs:S:CBJPMORv?", long_options, &option_index)) != -1)
 		switch(c)

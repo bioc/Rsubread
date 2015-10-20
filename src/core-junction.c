@@ -3342,7 +3342,8 @@ int write_fusion_final_results(global_context_t * global_context)
 
 	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.breakpoints.txt", global_context->config.output_prefix);
 	FILE * ofp = f_subr_open(fn2, "wb");
-	fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport	BreakPoint1_GoUp	BreakPoint2_GoUp\n");
+	fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport\n");
+	//fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport	BreakPoint1_GoUp	BreakPoint2_GoUp\n");
 
 	int xk1;
 	unsigned int all_junctions = 0;
@@ -3371,7 +3372,8 @@ int write_fusion_final_results(global_context_t * global_context)
 		chro_pos_left++;
 		all_junctions ++;
 
-		fprintf(ofp, "%s\t%u\t%s\t%u\t%s\t%d\t%s\t%s\n", chro_name_left, chro_pos_left, chro_name_right, chro_pos_right+1, event_body -> is_strand_jumped?"No":"Yes", event_body -> final_counted_reads, event_body -> small_side_increasing_coordinate?"Yes":"No", event_body -> large_side_increasing_coordinate?"Yes":"No");
+		fprintf(ofp, "%s\t%u\t%s\t%u\t%s\t%d\n", chro_name_left, chro_pos_left, chro_name_right, chro_pos_right+1, event_body -> is_strand_jumped?"No":"Yes", event_body -> final_counted_reads);
+		//fprintf(ofp, "%s\t%u\t%s\t%u\t%s\t%d\t%s\t%s\n", chro_name_left, chro_pos_left, chro_name_right, chro_pos_right+1, event_body -> is_strand_jumped?"No":"Yes", event_body -> final_counted_reads, event_body -> small_side_increasing_coordinate?"Yes":"No", event_body -> large_side_increasing_coordinate?"Yes":"No");
 	}
 
 	global_context -> all_fusions = all_junctions;
