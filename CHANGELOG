@@ -1,3 +1,6 @@
+20 Oct 2015 - 1.20.1
+(1) Changed default value of TH_subread to 100 in buildindex().
+
 12 Oct 2015 - 1.19.8
 (1) updated users guide.
 

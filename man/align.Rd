@@ -23,7 +23,7 @@ readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
   \item{readfile1}{ a character vector including names of files that include sequence reads to be aligned. For paired-end reads, this gives the list of files including first reads in each library. File format is FASTQ/FASTA by default. See \code{input_format} option for more supported formats.}
   \item{readfile2}{ a character vector giving names of files that include second reads in paired-end read data. Files included in \code{readfile2} should be in the same order as their mate files included in \code{readfile1} .\code{NULL} by default.}
-  \item{type}{ an integer giving the type of sequencing data. Possible values include \code{0} (RNA-seq data) and \code{1} (genomic DNA-seq data).}
+  \item{type}{ an integer giving the type of sequencing data. Possible values include \code{0} (RNA-seq data) and \code{1} (genomic DNA-seq data such as WGS, WES, ChIP-seq data etc.).}
   \item{input_format}{ character string specifying format of the read input file(s). \code{gzFASTQ} by default (this also includes gzipped FASTA format). Other supported formats include \code{FASTQ} (including FASTA), \code{SAM} and \code{BAM}. Character values are case insensitive.}
   \item{output_format}{ character string specifying format of the output file. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
   \item{output_file}{ a character vector specifying names of output files. By default, names of output files are set as the file names provided in \code{readfile1} added with an suffix string.}
