@@ -3896,6 +3896,7 @@ void init_global_context(global_context_t * context)
 {
 	srand(time(NULL));
 
+	memset(context, 0, sizeof(global_context_t));
 	memset(context->module_contexts, 0, 5*sizeof(void *));
 
 	context->config.fast_run = 0;
