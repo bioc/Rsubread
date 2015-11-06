@@ -37,13 +37,14 @@
 
 int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table)
 {
-	return gehash_create_ex(the_table, expected_size, is_small_table, SUBINDEX_VER0, 3);
+	return gehash_create_ex(the_table, expected_size, is_small_table, SUBINDEX_VER0, 3, 0);
 }
-int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int index_gap)
+int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int index_gap, int padding)
 {
 	int expected_bucket_number;
 	int i;
 
+	memset(the_table, 0, sizeof(gehash_t));
 	if(expected_size ==0)
 		expected_size = GEHASH_DEFAULT_SIZE;
 
@@ -86,6 +87,7 @@ int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_t
 			  expected_bucket_number *
   			  sizeof(struct gehash_bucket )
 			);
+	the_table -> padding = padding;
 
 	if(!the_table -> buckets)
 	{
@@ -633,6 +635,7 @@ void assign_best_vote(gene_vote_t * vote, int i, int j)
 
 size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int read_len, int is_reversed, gene_vote_t * vote, gene_quality_score_t quality, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border)
 {
+	//SUBREADprintf("Q=%u, OFFSET=%d, B=%u ~ %u\n", raw_key, offset, low_border, high_border);
 
 	if(the_table->version_number == SUBINDEX_VER0)
 	{
@@ -1247,7 +1250,40 @@ long long int load_int64(FILE * fp)
 }
 
 
+int gehash_load_option(const char fname [], int option_no, int * result){
+	char tabname[MAX_FILE_NAME_LENGTH];
+	char magic_chars[8];
+	int found = 0;
+	sprintf(tabname, "%s.00.b.tab", fname);
+	FILE * fp = f_subr_open(tabname, "rb");
+	if(fp == NULL){
+		sprintf(tabname, "%s.00.c.tab", fname);
+		fp = f_subr_open(tabname, "rb");
+	}
+	if(fp){	
+		fread(magic_chars,1,8,fp);
+		if(memcmp(magic_chars, "2subindx",7)==0) {
+			while(1) {
+				short option_key, option_length;
 
+				fread(&option_key, 2, 1, fp);
+				if(!option_key) break;
+
+				fread(&option_length, 2, 1, fp);
+
+				if(option_key == option_no){
+					*result = 0;
+					fread(result ,option_length,1,fp);
+					found = 1;
+				}
+				else
+					fseek(fp, option_length, SEEK_CUR);
+			}
+		}
+		fclose(fp);
+	}
+	return found;
+}
 
 int gehash_load(gehash_t * the_table, const char fname [])
 {
@@ -1294,6 +1330,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 				if(option_key == SUBREAD_INDEX_OPTION_INDEX_GAP)
 					fread(&(the_table -> index_gap),2,1,fp);
+				else if (option_key ==SUBREAD_INDEX_OPTION_INDEX_PADDING)
+					fread(&(the_table -> padding),2,1,fp);
 				else
 					fseek(fp, option_length, SEEK_CUR);
 			}
@@ -1436,6 +1474,12 @@ void write_options(FILE * fp, gehash_t * the_table)
 {
 	short option_key, option_length;
 	short option_value;
+
+	option_key = SUBREAD_INDEX_OPTION_INDEX_PADDING;
+	option_length = 2;
+	option_value = the_table -> padding;
+
+	write_cell(option_key, option_length, (char *) &option_value,fp);
 
 	option_key = SUBREAD_INDEX_OPTION_INDEX_GAP;
 	option_length = 2;

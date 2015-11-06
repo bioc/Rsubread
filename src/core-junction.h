@@ -153,5 +153,5 @@ int is_funky_fragment(global_context_t * global_context, char * rname1, char * c
 
 void finalise_structural_variances(global_context_t * global_context);
 
-void get_event_two_coordinates(global_context_t * global_context, unsigned int event_no, char ** small_chro, unsigned int * small_pos, unsigned int * small_abs, char ** large_chro, unsigned int * large_pos, unsigned int * large_abs);
+void get_event_two_coordinates(global_context_t * global_context, unsigned int event_no, char ** small_chro, int * small_pos, unsigned int * small_abs, char ** large_chro,  int * large_pos, unsigned int * large_abs);
 #endif

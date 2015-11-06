@@ -115,6 +115,7 @@ typedef struct {
 	int force_do_not_sort;
 	int is_finished;
 	subread_lock_t input_fp_lock;
+	subread_lock_t output_header_lock;
 
 	unsigned long long total_input_reads;
 	unsigned long long total_orphan_reads;
@@ -245,7 +246,7 @@ int does_file_exist (char * filename);
 
 double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int * max_phred, int * tested_reads);
 
-FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table);
+FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * close_immediately);
 
 void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len);
 

@@ -43,10 +43,10 @@ void destroy_contig_fasta(fasta_contigs_t * tab);
 
 // This function returns the number of sections found in the CIGAR string. It returns -1 if the CIGAR string cannot be parsed.
 
-int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char * CIGAR_Str, char ** Section_Chromosomes, unsigned int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read);
+int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char * CIGAR_Str, int max_M, char ** Section_Chromosomes, unsigned int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read);
 
 
-int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int MainPos, const char * CIGAR_Str, const char * Extra_Tags, char ** Chros, unsigned int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read);
+int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int MainPos, const char * CIGAR_Str, const char * Extra_Tags, int max_M, char ** Chros, unsigned int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read);
 
 // This function try to find the attribute value of a given attribute name from the extra column string in GTF/GFF.
 // If the value is found, it returns the length of the value (must be > 0 by definition), or -1 if no attribute is found or the format is wrong.

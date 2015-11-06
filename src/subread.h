@@ -69,8 +69,8 @@
 
 //#warning "============ CHANGE THE NEXT LINE TO 120 ========"
 #define EXON_LONG_READ_LENGTH 120
-#define EXON_MAX_CIGAR_LEN 48
-#define FC_CIGAR_PARSER_ITEMS 9
+#define EXON_MAX_CIGAR_LEN 256 
+#define FC_CIGAR_PARSER_ITEMS 11 
 
 #define MAX_INDEL_SECTIONS 7
 //#define XBIG_MARGIN_RECORD_SIZE 24 
@@ -196,6 +196,7 @@ typedef short gene_vote_number_t;
 #define SUBINDEX_VER2 201
 
 #define SUBREAD_INDEX_OPTION_INDEX_GAP 0x0101
+#define SUBREAD_INDEX_OPTION_INDEX_PADDING 0x0102
 
 
 #define CHAR_ESC 27
@@ -271,6 +272,7 @@ typedef struct {
 	char is_small_table;
 	struct gehash_bucket * buckets;
 	int index_gap;
+	int padding;
 } gehash_t;
 
 
@@ -346,6 +348,7 @@ typedef struct{
         char *read_names;
         unsigned int *read_offsets;
 	HashTable * read_name_to_index;
+	int padding;
 } gene_offset_t;
 
 

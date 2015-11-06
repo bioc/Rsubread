@@ -16,8 +16,8 @@ static struct option long_options[] =
 	{"read2",  required_argument, 0, 'R'},
 	{"output",  required_argument, 0, 'o'},
 	{"subreads",  required_argument, 0, 'n'},
-	{"minmatch",  required_argument, 0, 'm'},
-	{"minmatch2",  required_argument, 0, 'p'},
+	{"minvotes",  required_argument, 0, 'm'},
+	{"minvotes2",  required_argument, 0, 'p'},
 	{"singleSAM",  required_argument, 0, '1'},
 	{"pairedSAM",  required_argument, 0, '2'},
 	{"threads",  required_argument, 0, 'T'},
@@ -75,114 +75,101 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
 	SUBREADputs("");
-	SUBREADputs("    -i --index     <index>  base name of the index.");
+	SUBREADputs("  -i <index>        Base name of the index.");
 	SUBREADputs("");
-	SUBREADputs("    -r --read      <input>  name of the input file. Several input formats can be");
-	SUBREADputs("                            automatically detected, including gzipped fastq,");
-	SUBREADputs("                            fastq, and fasta. If paired-end, this should give");
-	SUBREADputs("                            the name of file including first reads.");
+	SUBREADputs("  -r <string>       Name of the input file. Input formats including gzipped");
+	SUBREADputs("                    fastq, fastq, and fasta can be automatically detected. If");
+	SUBREADputs("                    paired-end, this should give the name of file including");
+	SUBREADputs("                    first reads.");
 	SUBREADputs("");
-	SUBREADputs("Optional general arguments:");
+	SUBREADputs("Optional arguments:");
 	SUBREADputs("");
-	SUBREADputs("    -o --output    <output> name of the output file. By default, the output file");
-	SUBREADputs("                            includes BAM-format mapping result.");
+	SUBREADputs("  -o <string>       Name of the output file. By default, the output is in BAM");
+	SUBREADputs("                    format.");
 	SUBREADputs("");
-	SUBREADputs("    -n --subreads  <int>    number of selected subreads, 14 by default.");
+	SUBREADputs("  -n <int>          Number of selected subreads, 14 by default.");
 	SUBREADputs("");
-	SUBREADputs("    -m --minmatch  <int>    consensus threshold (minimal number of consensus");
-	SUBREADputs("                            subreads required) for reporting a hit. If paired-");
-	SUBREADputs("                            end read data are provided, this gives the consensus");
-	SUBREADputs("                            threshold for the read which receives more votes");
-	SUBREADputs("                            than the other read from the same pair. 1 by default");
+	SUBREADputs("  -m <int>          Consensus threshold for reporting a hit (minimal number of");
+	SUBREADputs("                    subreads that map in consensus) . If paired-end, this gives");
+	SUBREADputs("                    the consensus threshold for the anchor read. 1 by default");
 	SUBREADputs("");
-	SUBREADputs("    -T --threads   <int>    number of CPU threads, 1 by default.");
+	SUBREADputs("  -M <int>          Specify the maximum number of mis-matched bases allowed in");
+	SUBREADputs("                    the alignment. 3 by default. Mis-matches found in soft-");
+	SUBREADputs("                    clipped bases are not counted.");
 	SUBREADputs("");
-	SUBREADputs("    -I --indel     <int>    maximum length (in bp) of indels that can be");
-	SUBREADputs("                            detected. 5 by default. The program can detect");
-	SUBREADputs("                            indels of up to 200bp long.");
+	SUBREADputs("  -T <int>          Number of CPU threads used, 1 by default.");
 	SUBREADputs("");
-	SUBREADputs("    -B --multi     <int>    maximal number of equally-best mapping locations to");
-	SUBREADputs("                            be reported. 1 by default. Note that -u option takes");
-	SUBREADputs("                            precedence over -B.  ");
+	SUBREADputs("  -I <int>          Maximum length (in bp) of indels that can be detected. 5 by");
+	SUBREADputs("                    default. The program can detect indels of up to 200bp long.");
 	SUBREADputs("");
-	SUBREADputs("    -P --phred     <3:6>    the format of Phred scores used in input files, '3'");
-	SUBREADputs("                            for phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("  -B <int>          Maximal number of equally-best mapping locations to be");
+	SUBREADputs("                    reported. 1 by default. Note that -u option takes precedence");
+	SUBREADputs("                    over -B.");
 	SUBREADputs("");
-	SUBREADputs("    -u --unique             report uniquely mapped reads only. Number of matched");
-	SUBREADputs("                            bases (for RNA-seq) or mis-matched bases(for genomic");
-	SUBREADputs("                            DNA-seq) is used to break the tie.");
+	SUBREADputs("  -P <3:6>          Format of Phred scores used in input files, '3' for phred+33");
+	SUBREADputs("                    and '6' for phred+64. '3' by default.");
 	SUBREADputs("");
-	SUBREADputs("    -b --color-convert      convert color-space read bases to base-space read");
-	SUBREADputs("                            bases in the mapping output. Note that the mapping");
-	SUBREADputs("                            itself will still be performed at color-space.");
-	SUBREADputs("   ");
-	SUBREADputs("    -M --maxMismatches <int> specify the maximum number of mis-matched bases");
-	SUBREADputs("                            allowed in the alignment. 3 by default. Mis-matches");
-	SUBREADputs("                            found in soft-clipped bases are not counted.");
-	SUBREADputs("   ");
-	SUBREADputs("       --SAMinput           specify that the input read data is in SAM format.");
+	SUBREADputs("  -u                Report uniquely mapped reads only. Number of mis-matched");
+	SUBREADputs("                    bases is used to break the tie.");
 	SUBREADputs("");
-	SUBREADputs("       --BAMinput           specify that the input read data is in BAM format.");
+	SUBREADputs("  -b                Convert color-space read bases to base-space read bases in");
+	SUBREADputs("                    the mapping output. Note that read mapping is performed at");
+	SUBREADputs("                    color-space.");
 	SUBREADputs("");
-	SUBREADputs("       --SAMoutput          specify that mapping results are saved in the SAM");
-	SUBREADputs("                            format.");
+	SUBREADputs("  --SAMinput        Input reads are in SAM format.");
 	SUBREADputs("");
-	SUBREADputs("       --trim5     <int>    trim off <int> number of bases from 5' end of each");
-	SUBREADputs("                            read. 0 by default.");
+	SUBREADputs("  --BAMinput        Input reads are in BAM format.");
 	SUBREADputs("");
-	SUBREADputs("       --trim3     <int>    trim off <int> number of bases from 3' end of each");
-	SUBREADputs("                            read. 0 by default.");
+	SUBREADputs("  --SAMoutput       Save mapping result in SAM format.");
 	SUBREADputs("");
-	SUBREADputs("       --rg-id     <string> specify the read group ID. If specified,the read");
-	SUBREADputs("                            group ID will be added to the read group header");
-	SUBREADputs("                            field and also to each read in the mapping output.");
+	SUBREADputs("  --trim5 <int>     Trim off <int> number of bases from 5' end of each read. 0");
+	SUBREADputs("                    by default.");
 	SUBREADputs("");
-	SUBREADputs("       --rg        <string> add a <tag:value> to the read group (RG) header in");
-	SUBREADputs("                            in the mapping output.");
+	SUBREADputs("  --trim3 <int>     Trim off <int> number of bases from 3' end of each read. 0");
+	SUBREADputs("                    by default.");
 	SUBREADputs("");
-	SUBREADputs("       --DPGapOpen  <int>   penalty for gap opening in short indel detection. -1");
-	SUBREADputs("                            by default.");
+	SUBREADputs("  --rg-id <string>  Add read group ID to the output.");
 	SUBREADputs("");
-	SUBREADputs("       --DPGapExt   <int>   penalty for gap extension in short indel detection.");
-	SUBREADputs("                            0 by default.");
+	SUBREADputs("  --rg <string>     Add <tag:value> to the read group (RG) header in the output.");
 	SUBREADputs("");
-	SUBREADputs("       --DPMismatch <int>   penalty for mis-matched bases in short indel");
-	SUBREADputs("                            detection. 0 by default.");
+	SUBREADputs("  --DPGapOpen <int> Penalty for gap opening in short indel detection. -1 by");
+	SUBREADputs("                    default.");
 	SUBREADputs("");
-	SUBREADputs("       --DPMatch    <int>   score for matched bases in short indel detection. 2");
-	SUBREADputs("                            by default.");
-	SUBREADputs("   ");
-	SUBREADputs("       --allJunctions       detect exon-exon junctions (both canonical and non-");
-	SUBREADputs("                            canonical junctions) and fusion breakpoints in RNA-");
-	SUBREADputs("                            seq data. Refer to Users Guide for reporting of");
-	SUBREADputs("                            junctions and fusions.");
-	SUBREADputs("   ");
-	SUBREADputs("       --complexIndels      detect multiple short indels that occur concurrently");
-	SUBREADputs("                            in a small genomic region (these indels could be as");
-	SUBREADputs("                            close as 1bp apart).");
+	SUBREADputs("  --DPGapExt <int>  Penalty for gap extension in short indel detection. 0 by");
+	SUBREADputs("                    default.");
 	SUBREADputs("");
-	SUBREADputs("    -v                      output version of the program.");
+	SUBREADputs("  --DPMismatch <int> Penalty for mismatches in short indel detection. 0 by");
+	SUBREADputs("                    default.");
 	SUBREADputs("");
+	SUBREADputs("  --DPMatch <int>   Score for matched bases in short indel detection. 2 by");
+	SUBREADputs("                    default.");
+	SUBREADputs("");
+	SUBREADputs("  --allJunctions    Detect exon-exon junctions (both canonical and non-canonical");
+	SUBREADputs("                    junctions) and structural variants in RNA-seq data. Refer to");
+	SUBREADputs("                    Users Guide for reporting of junctions and fusions.");
+	SUBREADputs("");
+	SUBREADputs("  --complexIndels   Detect multiple short indels that occur concurrently in a");
+	SUBREADputs("                    small genomic region (these indels could be as close as 1bp");
+	SUBREADputs("                    apart).");
+	SUBREADputs("");
+	SUBREADputs("  -v                Output version of the program.");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments for paired-end reads:");
 	SUBREADputs("");
-	SUBREADputs("    -R --read2     <input>  name of the file including second reads.");
+	SUBREADputs("  -R <string>       Name of the file including second reads.");
 	SUBREADputs("");
-	SUBREADputs("    -p --minmatch2 <int>    consensus threshold for the non-anchor read ");
-	SUBREADputs("                            (receiving less votes than the anchor read from the");
-	SUBREADputs("                            same pair). 1 by default.");
+	SUBREADputs("  -p <int>          Consensus threshold for the non-anchor read (receiving less");
+	SUBREADputs("                    votes than the anchor read from the same pair). 1 by");
+	SUBREADputs("                    default.");
 	SUBREADputs("");
-	SUBREADputs("    -d --mindist   <int>    minimum fragment/template length, 50bp by default.");
+	SUBREADputs("  -d <int>          Minimum fragment/insert length, 50bp by default.");
 	SUBREADputs("");
-	SUBREADputs("    -D --maxdist   <int>    maximum fragment/template length, 600bp by default.");
+	SUBREADputs("  -D <int>          Maximum fragment/insert length, 600bp by default.");
 	SUBREADputs("");
-	SUBREADputs("    -S --order     <ff:fr:rf> orientation of first and second reads, 'fr' by");
-	SUBREADputs("                            default (forward/reverse).");
+	SUBREADputs("  -S <ff:fr:rf>     Orientation of first and second reads, 'fr' by default (");
+	SUBREADputs("                    forward/reverse).");
 	SUBREADputs("");
-	SUBREADputs("");
-	SUBREADputs("Advanced arguments:");
-	SUBREADputs("");
-	SUBREADputs("For more information about these arguments, please refer to the User Manual.");
+	SUBREADputs("Refer to Users Manual for detailed description to the arguments.");
 	SUBREADputs("");
 
 
@@ -234,21 +221,39 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				core_version_number("Subjunc");
 				return -1;
 			case 'G':
+				if(!is_valid_digit(optarg, "G"))
+					exit(-1);
+
 				global_context->config.DP_penalty_create_gap = atoi(optarg);
 				break;
 			case 'Y':
+				if(!is_valid_digit(optarg, "Y"))
+					exit(-1);
+
 				global_context->config.DP_match_score = atoi(optarg);
 				break;
 			case 'E':
+				if(!is_valid_digit(optarg, "E"))
+					exit(-1);
+
 				global_context->config.DP_penalty_extend_gap = atoi(optarg);
 				break;
 			case 'X':
+				if(!is_valid_digit(optarg, "X"))
+					exit(-1);
+
 				global_context->config.DP_mismatch_penalty = atoi(optarg);
 				break;
 			case '3':
+				if(!is_valid_digit(optarg, "3"))
+					exit(-1);
+
 				global_context->config.read_trim_3 = atoi(optarg); 
 				break;
 			case '5':
+				if(!is_valid_digit(optarg, "5"))
+					exit(-1);
+
 				global_context->config.read_trim_5 = atoi(optarg); 
 				break;
 
@@ -287,27 +292,45 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.convert_color_to_base = 1;
 				break;
 			case 'D':
+				if(!is_valid_digit(optarg, "D"))
+					exit(-1);
+
 				global_context->config.maximum_pair_distance = atoi(optarg);
 				break;
 			case 'd':
+				if(!is_valid_digit(optarg, "d"))
+					exit(-1);
+
 				global_context->config.minimum_pair_distance = atoi(optarg);
 				if(global_context->config.minimum_pair_distance <0)
 					global_context->config.restrected_read_order = 0;
 				break;
 			case 'n':
+				if(!is_valid_digit(optarg, "n"))
+					exit(-1);
+
 				global_context->config.total_subreads = atoi(optarg);
 				//global_context->config.total_subreads = min(31,global_context->config.total_subreads);
 				break;
 			case 'm':
+				if(!is_valid_digit(optarg, "m"))
+					exit(-1);
+
 				global_context->config.minimum_subread_for_first_read = atoi(optarg);
 				break;
 			case 'T':
+				if(!is_valid_digit_range(optarg, "T", 1, 64))
+					exit(-1);
+
 				global_context->config.all_threads = atoi(optarg);
 				if(global_context->config.all_threads <1) global_context->config.all_threads = 1;
 				if(global_context->config.all_threads > MAX_THREADS) global_context->config.all_threads = MAX_THREADS;
 
 				break;
 			case 'M':
+				if(!is_valid_digit(optarg, "M"))
+					exit(-1);
+
 				global_context->config.max_mismatch_exonic_reads = atoi(optarg);
 				global_context->config.max_mismatch_junction_reads = atoi(optarg);
 				break;
@@ -322,6 +345,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				strncpy(global_context->config.output_prefix, optarg, MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'I':
+				if(!is_valid_digit(optarg, "I"))
+					exit(-1);
+
 				global_context->config.max_indel_length = atoi(optarg);
 
 				if(!is_64_bit_computer) global_context->config.max_indel_length = min(global_context->config.max_indel_length , 16); 
@@ -355,6 +381,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.phred_score_format = FASTQ_PHRED64;
 				break;
 			case 'p':
+				if(!is_valid_digit(optarg, "p"))
+					exit(-1);
+
 				global_context->config.minimum_subread_for_second_read = atoi(optarg);
 				break;
 			case 'F':
@@ -362,6 +391,9 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				global_context->config.report_sam_file = 0;
 				break;
 			case 'B':
+				if(!is_valid_digit(optarg, "B"))
+					exit(-1);
+
 				global_context->config.multi_best_reads = atoi(optarg); 
 
 				if(global_context->config.multi_best_reads<1)
@@ -411,6 +443,8 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("junctionIns", long_options[option_index].name)==0)
 				{
+					if(!is_valid_digit(optarg, "junctionIns"))
+						exit(-1);
 					global_context->config.check_donor_at_junctions=0;
 					global_context->config.limited_tree_scan = 0;
 					global_context->config.max_insertion_at_junctions = atoi(optarg);
@@ -421,6 +455,8 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("minMappedFraction", long_options[option_index].name)==0) 
 				{
+					if(!is_valid_digit(optarg, "minMappedFraction"))
+						exit(-1);
 					global_context->config.min_mapped_fraction = atoi(optarg);
 				}
 				else if(strcmp("relaxMismatchedBases", long_options[option_index].name)==0) 

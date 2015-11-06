@@ -115,7 +115,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		return -1;
 	}
 
-	if(gehash_create_ex(& table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP)) return 1;
+	int padding_around_contigs = MAX_READ_LENGTH;
+	if(gehash_create_ex(& table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP, padding_around_contigs)) return 1;
 
 	if(MARK_NONINFORMATIVE_SUBREADS)
 		copy_non_informative_subread(&table, huge_table);
@@ -124,7 +125,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		if(gvindex_init(&value_array_index, 0)) return 1;
 
 	file_number = 0;
-	offset = 0;
+	offset = table.padding;
 	table_no = 0;
 	read_no = 0;
 
@@ -175,7 +176,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 					gehash_destory(&table);
 
-					read_offsets[read_no-1] = offset;
+					read_offsets[read_no-1] = offset + table.padding;
 
 					for(i=table_no+1; i<100; i++)
 					{
@@ -207,8 +208,13 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				geinput_readline(&ginp, fn, 0);
 
-				if(read_no>0)
-					read_offsets[read_no-1] = offset;
+				if(offset==table.padding)
+					local_begin_ftime = miltime();
+
+				if(read_no>0){
+					read_offsets[read_no-1] = offset + table.padding;
+					offset += 2*table.padding;
+				}
 
 				//printf("TTTXT FN=%s\n",fn);
 
@@ -251,8 +257,6 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				else
 					array_int_key = int_key = genekey2int(window,GENE_SPACE_BASE);
 	
-				if(offset==0)
-					local_begin_ftime = miltime();
 			}
 			if (status == FULL_PARTITION) 
 			{
@@ -319,7 +323,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				else
 					array_int_key = int_key = genekey2int(window, GENE_SPACE_BASE);
 				
-				if(gehash_create_ex(&table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP)) return 1;
+				if(gehash_create_ex(&table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP, padding_around_contigs)) return 1;
 				if(MARK_NONINFORMATIVE_SUBREADS)
 					copy_non_informative_subread(&table, huge_table);
 				if(VALUE_ARRAY_INDEX)
@@ -335,11 +339,12 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				int is_no_info = gehash_exist(huge_table, int_key);
 				if(!is_no_info)
 				{
+					//SUBREADprintf("INSERT KEY=%u AT %u\n", int_key, offset);
 					if(gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0))) return 1;
 				}
 				if(VALUE_ARRAY_INDEX)
 				{
-					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key);
+					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
 				}
 			}
 
@@ -359,6 +364,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					if (next_char == -3) return 0;
 					break;
 				}
+				//SUBREADprintf("NEXT_CH=%c\n", next_char);
 
 				if (next_char == 'N' )skips = 16;
 				else if (skips>0){
@@ -388,13 +394,15 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					array_int_key = int_key;
 				}
 
-				if (offset>0 && offset % (all_bases / 12) == 0)
-				{
-					double finished_rate = offset*1.0/all_bases;
-					double base_per_second = offset / (miltime()-local_begin_ftime);
-					double ETA = (all_bases-offset) / base_per_second;
-					print_build_log(finished_rate,base_per_second,ETA, all_bases);
-					SUBREADfflush(stdout) ;
+				if(all_bases > 12){
+					if (offset>0 && offset % (all_bases / 12) == 0)
+					{
+						double finished_rate = offset*1.0/all_bases;
+						double base_per_second = offset / (miltime()-local_begin_ftime);
+						double ETA = (all_bases-offset) / base_per_second;
+						print_build_log(finished_rate,base_per_second,ETA, all_bases);
+						SUBREADfflush(stdout) ;
+					}
 				}
 
 				offset ++;
@@ -613,13 +621,15 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				read_len ++;
 
 
-				if (offset % (all_bases / 12) == 0)
-				{
-					double finished_rate = offset*1.0/all_bases;
-					double base_per_second = offset / (miltime()-local_begin_ftime);
-					double ETA = (all_bases-offset) / base_per_second;
-					print_build_log(finished_rate,base_per_second,ETA, all_bases);
-					SUBREADfflush(stdout) ;
+				if (all_bases>12){
+					if (offset % (all_bases / 12) == 0)
+					{
+						double finished_rate = offset*1.0/all_bases;
+						double base_per_second = offset / (miltime()-local_begin_ftime);
+						double ETA = (all_bases-offset) / base_per_second;
+						print_build_log(finished_rate,base_per_second,ETA, all_bases);
+						SUBREADfflush(stdout) ;
+					}
 				}
 
 				if(offset > 0xFFFFFFFDU)	
@@ -974,7 +984,7 @@ int main(int argc,char ** argv)
 int main_buildindex(int argc,char ** argv)
 #endif
 {
-	int threshold = 24, optindex=0;
+	int threshold = 100, optindex=0;
 	int memory_limit;	// 8000 MBytes
 	char output_file[300], c, tmp_fa_file[300], log_file_name[300];
 	char *ptr_tmp_fa_file[1];
@@ -1085,7 +1095,7 @@ int main_buildindex(int argc,char ** argv)
 		 SUBREADputs("    -M <int>        size of requested memory(RAM) in megabytes, 8000 by default.");
 		 SUBREADputs("");
 		 SUBREADputs("    -f <int>        specify the threshold for removing uninformative subreads");
-		 SUBREADputs("                    (highly repetitive 16mers in the reference). 24 by default.");
+		 SUBREADputs("                    (highly repetitive 16mers in the reference). 100 by default.");
 		 SUBREADputs("");
 		 SUBREADputs("    -c              build a color-space index.");
 		 SUBREADputs("");
@@ -1151,10 +1161,11 @@ int main_buildindex(int argc,char ** argv)
 		char * fasta_fn = *(argv+optind+x1);
 		int f_type = probe_file_type_fast(fasta_fn);
 		if(f_type != FILE_TYPE_FASTA && f_type != FILE_TYPE_NONEXIST){
-			SUBREADprintf("WARNING: '%s' is not a FASTA file.\n", fasta_fn);
+			SUBREADprintf("ERROR: '%s' is not a Fasta file.\n", fasta_fn);
 			if(f_type == FILE_TYPE_GZIP_FASTA){
-				SUBREADprintf("         The index builder does not accept gzipped files. The outcome is undefined.\n");
+				SUBREADprintf("The index builder does not accept gzipped Fasta files.\nPlease decompress the gzipped Fasza files before building the index.\n");
 			}
+			exit(-1);
 		}
 	}
 
@@ -1170,6 +1181,7 @@ int main_buildindex(int argc,char ** argv)
 
 	signal (SIGTERM, SIGINT_hook);
 	signal (SIGINT, SIGINT_hook);
+
 
 	int ret = check_and_convert_FastA(argv+optind , argc - optind, tmp_fa_file, &chromosome_lengths, log_fp, log_file_name);
 	if(log_fp)

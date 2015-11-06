@@ -438,7 +438,7 @@ unsigned int get_gene_linear(int chrono, int offset, const unsigned int offsets 
 }
 
 
-int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, unsigned int * pos, int rl)
+int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos, int rl)
 {
 	int n = 0;
 
@@ -469,6 +469,8 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 			else
 				*pos = linear - offsets->read_offsets[n-1];
 
+			(*pos) -= offsets -> padding;
+
 			*chro_name = (char *)offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
 
 			return 0;
@@ -479,7 +481,7 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 
 
-int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, unsigned int * pos)
+int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos)
 {
 	return locate_gene_position_max(linear, offsets, chro_name, pos, 0);
 }
@@ -1459,7 +1461,10 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	char fn[300];
 	FILE * fp;
 	int n=0;
+	int padding = 0;
 
+	gehash_load_option(index_prefix, SUBREAD_INDEX_OPTION_INDEX_PADDING , &padding);
+	memset(offsets, 0, sizeof( gene_offset_t));
 	sprintf(fn, "%s.reads", index_prefix);
 
 	fp = f_subr_open(fn, "r");
@@ -1474,6 +1479,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	offsets->read_names = malloc(current_max_n * MAX_READ_NAME_LEN);
 	offsets->read_offsets= malloc(current_max_n * sizeof(int));
 	offsets->read_name_to_index = HashTableCreate(5000);
+	offsets->padding = padding;
 
 	HashTableSetKeyComparisonFunction(offsets->read_name_to_index, my_strcmp);
 	HashTableSetHashFunction(offsets->read_name_to_index ,HashTableStringHashFunction);
@@ -2469,7 +2475,7 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 	gene_offset_t offsets;
 	int i,j;
 	char * chrname = NULL;
-	unsigned int chrpos = 0;
+	int chrpos = 0;
 	load_offsets (&offsets, index_prefix);
 	//locate_gene_position(vote -> max_position, &offsets, &chrname, &chrpos);
 
@@ -2480,7 +2486,7 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 			locate_gene_position(vote -> pos[i][j], &offsets, &chrname, &chrpos);
 			int toli = vote->toli [i][j];
 			int last_offset = vote -> indel_recorder[i][j][toli+2];
-			SUBREADprintf("  %s\tVote = %d , Position is %s,%u (+%u) Coverage is (%d, %d) Indel %d %s\n", vote->votes[i][j] == vote->max_vote?"***":"   ", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j],last_offset, (vote -> masks[i][j] & IS_NEGATIVE_STRAND)?"NEG":"POS");
+			SUBREADprintf("  %s\tVote = %d , Position is %s,%d (+%u) Coverage is (%d, %d) Indel %d %s\n", vote->votes[i][j] == vote->max_vote?"***":"   ", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j],last_offset, (vote -> masks[i][j] & IS_NEGATIVE_STRAND)?"NEG":"POS");
 		}
 	
 

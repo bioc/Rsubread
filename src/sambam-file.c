@@ -80,6 +80,7 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 {
 	SamBam_FILE * ret = (SamBam_FILE *)malloc(sizeof(SamBam_FILE));
+	memset(ret, 0, sizeof(SamBam_FILE));
 	ret -> file_type = file_type;
 
 	if(file_type ==SAMBAM_FILE_SAM) 
@@ -251,6 +252,22 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 				}
 				ret[strlenbuff-1] = '\n';
 			}
+			if(fp -> is_paired_end < 10){
+				if(buff[0]!='@'){
+					int tabs = 0,x1=0, tmpi=0;
+					for(x1 = 0; x1 < strlenbuff; x1++){
+						if(buff[x1] == '\t'){
+							if(tabs == 1){
+		//						SUBREADprintf("TMPI_SAM = %d\n", tmpi);
+								fp -> is_paired_end = 10 + (tmpi & 1);
+								break;
+							} else tabs ++;
+						}else{
+							if(tabs == 1)tmpi = tmpi * 10 + buff[x1]-'0';
+						}
+					}
+				}
+			}
 			return ret;
 		}
 	}
@@ -271,12 +288,13 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 				if(fp -> input_binary_stream_read_ptr >= fp -> bam_file_next_section_start)
 					break;
 
+				SB_FETCH(fp);
 				nch = *(SB_READ(fp));
 				SB_RINC(fp,1);
 
-				//printf("NNCH=%c\n", nch);
+				//printf("%c", nch);
 				if(nch == '\r')continue;
-				if(nch == '\n' || nch <0) break;
+				if(SB_EOF(fp)||nch == '\n' || nch <0) break;
 				if(xk1 < buff_len-2)
 				{
 					buff[xk1]=nch;
@@ -287,7 +305,8 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 			buff[xk1]='\n';
 			buff[xk1+1]=0;
 
-//			printf("%d > %d\n", fp -> input_binary_stream_read_ptr , fp -> bam_file_next_section_start);
+			//SUBREADprintf("BUFF=%s\n========================================================================\n\n", buff);
+			//printf("RL=%d , PTR %d >? RECORD_START %d\n\n\n", xk1, fp -> input_binary_stream_read_ptr , fp -> bam_file_next_section_start);
 
 			if(fp -> input_binary_stream_read_ptr >= fp -> bam_file_next_section_start)
 			{
@@ -303,6 +322,8 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 			SB_FETCH(fp);
 			if(SB_EOF(fp)) return NULL;
 
+			fp -> is_paired_end = 10 + ((*(fp -> input_binary_stream_buffer + fp -> input_binary_stream_read_ptr - fp -> input_binary_stream_buffer_start_ptr + 18)) & 1);
+			//SUBREADprintf("FLAG=%d\n",  *(fp -> input_binary_stream_buffer + fp -> input_binary_stream_read_ptr - fp -> input_binary_stream_buffer_start_ptr + 18) );
 			int text_len = PBam_chunk_gets(SB_READ(fp) , &chunk_ptr, fp -> input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr , fp -> bam_chro_table, buff , buff_len, aln, seq_needed);
 			SB_RINC(fp, chunk_ptr);
 
@@ -501,6 +522,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	if((*chunk_ptr) +4> chunk_limit) return -1;
 
 	memcpy(&block_size, chunk+(*chunk_ptr), 4);
+	//SUBREADprintf("PBSIZE=%u\n", block_size);
 	(*chunk_ptr)+=4;
 	unsigned int next_start = block_size+(*chunk_ptr);
 
@@ -569,6 +591,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 		{
 			SUBREADprintf("WARNING: cigar string is too long to the buffer.\n");
 			SUBREADprintf("Please only use the compressed BAM format.\n");
+			assert(0);
 			return -1;
 		}
 	}
@@ -576,7 +599,8 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	char read_2_seq = 0;
 	int seq_qual_bytes = read_len + (read_len /2)+(read_len%2);
 
-	memcpy( aln-> buff_for_seq, chunk+(*chunk_ptr), seq_qual_bytes);
+	if(seq_needed)
+		memcpy( aln-> buff_for_seq, chunk+(*chunk_ptr), seq_qual_bytes);
 	(*chunk_ptr) += seq_qual_bytes;
 
 	char extra_tags [CORE_ADDITIONAL_INFO_LENGTH];
@@ -1116,7 +1140,8 @@ int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsig
 	return 0;
 }
 
-int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage)
+
+int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage, int max_secs)
 {
 	int tmp_int=0;
 	int cigar_cursor = 0, num_opt = 0;
@@ -1141,7 +1166,7 @@ int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage)
 			for(; int_opt<8; int_opt++) if("MIDNSHP=X"[int_opt] == nch)break;
 			cigar_int[num_opt ++] = (tmp_int << 4) | int_opt; 
 			tmp_int = 0;
-			if(num_opt>=24)break;
+			if(num_opt>=max_secs)break;
 		}
 	}
 
@@ -1284,6 +1309,8 @@ int SamBam_reg2bin(int beg, int end)
 	return 0;
 }
 
+#define FC_MAX_CIGAR_SECTIONS 96
+
 int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_position, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns)
 {
 	if(writer -> writer_state == 0)	// no reads were added
@@ -1300,8 +1327,8 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 
 	writer -> writer_state = 10;
 	char additional_bin[300];
-	int cigar_opts[24], xk1, cover_length = 0;
-	int cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length);
+	int cigar_opts[FC_MAX_CIGAR_SECTIONS], xk1, cover_length = 0;
+	int cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, FC_MAX_CIGAR_SECTIONS);
 	int read_name_len = 1+strlen(read_name) ;
 	int additional_bin_len = SamBam_compress_additional(additional_columns, additional_bin);
 	int record_length = 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len + additional_bin_len;

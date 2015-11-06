@@ -92,13 +92,14 @@ int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 
 }
 
-void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_values)
+void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_values, int padding)
 {
 	unsigned int offset_byte, offset_bit;
 	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
 	int i;
 
-	if(index -> memory_block_size <= offset_byte + 2)
+	unsigned int offset_byte_margin = offset_byte + (padding / 8 +1);
+	if(index -> memory_block_size <= offset_byte_margin + 2)
 	{
 		index -> memory_block_size *= 1.5;
 		index->values = realloc(index->values, index -> memory_block_size);
@@ -119,7 +120,7 @@ void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 		}
 	}
 
-	index -> length = offset + 16 - index -> start_point ;
+	index -> length = offset + 16 - index -> start_point + padding;
 }
 
 void gvindex_dump(gene_value_index_t * index, const char filename [])
