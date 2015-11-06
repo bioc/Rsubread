@@ -2427,7 +2427,7 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 	int read_len = fread(gz_header_12, 1, 12, fp );
 	if(read_len < 12) return -1;
 	if(gz_header_12[0]!=31 || gz_header_12[1]!=139){
-		SUBREADprintf("BAD GZ BAM: %u, %u\n", gz_header_12[0], gz_header_12[1]);
+		SUBREADprintf("Unrecognized Gzip headers: %u, %u\nPlease make sure if the input file is in the BAM format.\n", gz_header_12[0], gz_header_12[1]);
 		return -1;
 	}
 	unsigned short xlen = 0, bsize = 0;
