@@ -598,7 +598,7 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	if(isReadSummaryReport)
 		print_in_box(80,0,0,"     Assignment details : <input_file>.featureCounts");
 	if(global_context -> do_junction_counting)
-		print_in_box(80,0,0,"      Junction Counting : <output_file>.junctions");
+		print_in_box(80,0,0,"      Junction Counting : <output_file>.jcounts");
 
 	if(global_context -> alias_file_name[0])
 		print_in_box(80,0,0,"  Chromosome alias file : %s", global_context -> alias_file_name);
@@ -3369,6 +3369,10 @@ void print_usage()
 	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
 	SUBREADputs("");
+	SUBREADputs("  -J                  Generate read counts for exon-exon junctions. Reads with");
+	SUBREADputs("                      'N' in their CIGAR string are counted. Counting results");
+	SUBREADputs("                      are saved to a file named '<output_file>.jcounts'.");
+	SUBREADputs("");
 	SUBREADputs("  -R                  Output detailed assignment result for each read. A text ");
 	SUBREADputs("                      file will be generated for each input file, including ");
 	SUBREADputs("                      names of reads and meta-features/features reads were ");
@@ -3538,7 +3542,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	merge_sort(key_list,  merged_junction_table -> numOfElements , junckey_sort_compare, junckey_sort_exchange, junckey_sort_merge);
 
 	char outfname[300];
-	sprintf(outfname, "%s.junctions", output_file_name);
+	sprintf(outfname, "%s.jcounts", output_file_name);
 
 	int max_junction_genes = 3000;
 	char * gene_names = malloc(max_junction_genes * FEATURE_NAME_LENGTH), * gene_name_tail;

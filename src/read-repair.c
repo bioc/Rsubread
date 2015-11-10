@@ -16,7 +16,7 @@ void print_usage_pairer(char * cmd){
 	SUBREADputs("");
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs("  ./removeDup [options] -i <input_file> -o <output_file>\n");
+	SUBREADputs("  ./repair [options] -i <input_file> -o <output_file>\n");
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
 	SUBREADputs("");
@@ -37,8 +37,8 @@ void print_usage_pairer(char * cmd){
 	SUBREADputs("");
 	SUBREADputs("  -d           Do not add dummy reads for singleton reads.");
 	SUBREADputs("");
-	SUBREADputs("  -t           Output file does not include sequences and quality scores of");
-	SUBREADputs("               reads.");
+	SUBREADputs("  -t           Do not include sequences and quality scores of reads in the");
+	SUBREADputs("               output file.");
 	SUBREADputs("");
 }
 
