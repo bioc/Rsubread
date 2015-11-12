@@ -2484,7 +2484,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			//if(explain_context -> pair_number == 999999)
 			
 			// ACDB PVDB TTTS
-			if(0 && FIXLENstrcmp("R001135677", explain_context -> read_name) ==0)
+			if(0 && FIXLENstrcmp("R004469535", explain_context -> read_name) ==0)
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%u\tCIGAR=%s\tMM=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\n\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id);
 
 
@@ -3022,7 +3022,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	{
 
 
-		if(0 && FIXLENstrcmp("R000000052", read_name) == 0 ) 
+		if(0 && FIXLENstrcmp("R004469535", read_name) == 0 ) 
 		{
 			char posout[100];
 			int xk1;

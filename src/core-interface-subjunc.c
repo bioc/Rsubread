@@ -222,37 +222,37 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				return -1;
 			case 'G':
 				if(!is_valid_digit(optarg, "G"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.DP_penalty_create_gap = atoi(optarg);
 				break;
 			case 'Y':
 				if(!is_valid_digit(optarg, "Y"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.DP_match_score = atoi(optarg);
 				break;
 			case 'E':
 				if(!is_valid_digit(optarg, "E"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.DP_penalty_extend_gap = atoi(optarg);
 				break;
 			case 'X':
 				if(!is_valid_digit(optarg, "X"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.DP_mismatch_penalty = atoi(optarg);
 				break;
 			case '3':
 				if(!is_valid_digit(optarg, "3"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.read_trim_3 = atoi(optarg); 
 				break;
 			case '5':
 				if(!is_valid_digit(optarg, "5"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.read_trim_5 = atoi(optarg); 
 				break;
@@ -293,13 +293,13 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'D':
 				if(!is_valid_digit(optarg, "D"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.maximum_pair_distance = atoi(optarg);
 				break;
 			case 'd':
 				if(!is_valid_digit(optarg, "d"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.minimum_pair_distance = atoi(optarg);
 				if(global_context->config.minimum_pair_distance <0)
@@ -307,20 +307,20 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'n':
 				if(!is_valid_digit(optarg, "n"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.total_subreads = atoi(optarg);
 				//global_context->config.total_subreads = min(31,global_context->config.total_subreads);
 				break;
 			case 'm':
 				if(!is_valid_digit(optarg, "m"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.minimum_subread_for_first_read = atoi(optarg);
 				break;
 			case 'T':
 				if(!is_valid_digit_range(optarg, "T", 1, 64))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.all_threads = atoi(optarg);
 				if(global_context->config.all_threads <1) global_context->config.all_threads = 1;
@@ -329,7 +329,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'M':
 				if(!is_valid_digit(optarg, "M"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.max_mismatch_exonic_reads = atoi(optarg);
 				global_context->config.max_mismatch_junction_reads = atoi(optarg);
@@ -346,7 +346,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'I':
 				if(!is_valid_digit(optarg, "I"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.max_indel_length = atoi(optarg);
 
@@ -382,7 +382,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'p':
 				if(!is_valid_digit(optarg, "p"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.minimum_subread_for_second_read = atoi(optarg);
 				break;
@@ -392,7 +392,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				break;
 			case 'B':
 				if(!is_valid_digit(optarg, "B"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				global_context->config.multi_best_reads = atoi(optarg); 
 
@@ -444,7 +444,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("junctionIns", long_options[option_index].name)==0)
 				{
 					if(!is_valid_digit(optarg, "junctionIns"))
-						exit(-1);
+						STANDALONE_exit(-1);
 					global_context->config.check_donor_at_junctions=0;
 					global_context->config.limited_tree_scan = 0;
 					global_context->config.max_insertion_at_junctions = atoi(optarg);
@@ -456,7 +456,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("minMappedFraction", long_options[option_index].name)==0) 
 				{
 					if(!is_valid_digit(optarg, "minMappedFraction"))
-						exit(-1);
+						STANDALONE_exit(-1);
 					global_context->config.min_mapped_fraction = atoi(optarg);
 				}
 				else if(strcmp("relaxMismatchedBases", long_options[option_index].name)==0) 

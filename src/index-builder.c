@@ -1165,7 +1165,7 @@ int main_buildindex(int argc,char ** argv)
 			if(f_type == FILE_TYPE_GZIP_FASTA){
 				SUBREADprintf("The index builder does not accept gzipped Fasta files.\nPlease decompress the gzipped Fasza files before building the index.\n");
 			}
-			exit(-1);
+			STANDALONE_exit(-1);
 		}
 	}
 

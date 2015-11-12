@@ -20,8 +20,7 @@ void print_usage_pairer(char * cmd){
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
 	SUBREADputs("");
-	SUBREADputs("  -i <string>  Name of input file in BAM or SAM format. Use '-S' option if the");
-	SUBREADputs("               input file is in SAM format");
+	SUBREADputs("  -i <string>  Name of input file. BAM format by default.");
 	SUBREADputs("");
 	SUBREADputs("  -o <string>  Name of output file. The output file is in BAM format.");
 	SUBREADputs("");
@@ -70,7 +69,7 @@ int main_read_repair(int argc, char ** argv)
 			case '?':
 			case 'v':
 				print_usage_pairer(argv[0]);
-				exit(0);
+				STANDALONE_exit(0);
 				break;
 			case 'S':
 				is_BAM = 0;
@@ -105,7 +104,7 @@ int main_read_repair(int argc, char ** argv)
 	if(in_BAM_file[0]==0 || out_BAM_file[0]==0){
 		print_usage_pairer(argv[0]);
 		//SUBREADprintf("\nNo input or output files are specified.\n");
-		exit(-1);
+		STANDALONE_exit(-1);
 	}
 
 	srand( (unsigned int) (miltime()*1000));

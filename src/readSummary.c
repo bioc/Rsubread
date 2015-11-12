@@ -184,6 +184,7 @@ typedef struct {
 	int is_multi_mapping_allowed;
 	int is_SAM_file;
 	int is_read_details_out;
+	int is_junction_no_chro_shown;
 	int is_SEPEmix_warning_shown;
 	int is_unpaired_warning_shown;
 	int is_stake_warning_shown;
@@ -3313,7 +3314,8 @@ static struct option long_options[] =
 	{"donotsort", no_argument, 0, 0},
 	{"fraction", no_argument, 0, 0},
 	{"order", required_argument, 0, 'S'},
-	{"fasta", required_argument, 0, 0},
+	{"genome", required_argument, 0, 'G'},
+	{"maxMOp", required_argument, 0, 0},
 	{"largestOverlap", no_argument, 0,0},
 	{0, 0, 0, 0}
 };
@@ -3369,9 +3371,14 @@ void print_usage()
 	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
 	SUBREADputs("");
-	SUBREADputs("  -J                  Generate read counts for exon-exon junctions. Reads with");
-	SUBREADputs("                      'N' in their CIGAR string are counted. Counting results");
-	SUBREADputs("                      are saved to a file named '<output_file>.jcounts'.");
+	SUBREADputs("  -J                  Count number of reads supporting each exon-exon junction.");
+	SUBREADputs("                      Junctions were identified from those exon-spanning reads");
+	SUBREADputs("                      in the input (containing 'N' in CIGAR string). Counting");
+	SUBREADputs("                      results are saved to a file named '<output_file>.jcounts'");
+	SUBREADputs("");
+	SUBREADputs("  -G <string>         The Fasta file containing the reference genome used in");
+	SUBREADputs("                      generating the input SAM or BAM files. This argument is");
+	SUBREADputs("                      only needed when doing junction counting.");
 	SUBREADputs("");
 	SUBREADputs("  -R                  Output detailed assignment result for each read. A text ");
 	SUBREADputs("                      file will be generated for each input file, including ");
@@ -3428,15 +3435,78 @@ void print_usage()
 	SUBREADputs("                      the same pair are required to be located next to each ");
 	SUBREADputs("                      other in the input.");
 	SUBREADputs("");
-	SUBREADputs("  --maxM <int>        Maximum number of 'M' sections allowed in each CIGAR");
-	SUBREADputs("                      string. 10 by default. 'X' and '=' are both treated as 'M'");
-	SUBREADputs("                      and adjacent 'M' sections are merged.");
+	SUBREADputs("  --maxMOp <int>      Maximum number of 'M' operations allowed in a CIGAR string");
+	SUBREADputs("                      . 10 by default. Both 'X' and '=' are treated as 'M' and");
+	SUBREADputs("                      adjacent 'M' operations are merged in the CIGAR string.");
 	SUBREADputs("");
 }
 
 int junckey_sort_compare(void * inptr, int i, int j){
 	char ** inp = (char **) inptr;
-	return strcmp(inp[i], inp[j]);
+	int x1;
+
+	int chrI=-1, chrJ=-1;
+
+	if(atoi(inp[i])>0) chrI = atoi(inp[i]);
+	if(atoi(inp[j])>0) chrJ = atoi(inp[j]);
+
+	if(inp[i][0]=='X' && !isdigit(inp[i][1])&& !isalpha(inp[i][1])) chrI = 90;
+	if(inp[i][0]=='Y' && !isdigit(inp[i][1])&& !isalpha(inp[i][1])) chrI = 91;
+	if(inp[i][0]=='M' && !isdigit(inp[i][1])&& !isalpha(inp[i][1])) chrI = 99;
+	if(inp[j][0]=='X' && !isdigit(inp[j][1])&& !isalpha(inp[j][1])) chrJ = 90;
+	if(inp[j][0]=='Y' && !isdigit(inp[j][1])&& !isalpha(inp[j][1])) chrJ = 91;
+	if(inp[j][0]=='M' && !isdigit(inp[j][1])&& !isalpha(inp[j][1])) chrJ = 99;
+
+
+
+	if(memcmp(inp[i], "chr", 3)==0){
+		chrI=atoi(inp[i]+3);
+		if(0 == chrI && inp[i][3] == 'X') chrI = 90;
+		if(0 == chrI && inp[i][3] == 'Y') chrI = 91;
+		if(0 == chrI && inp[i][3] == 'M') chrI = 99;
+	}
+	if(memcmp(inp[j], "chr", 3)==0){
+		chrJ=atoi(inp[j]+3);
+		if(0 == chrJ && inp[j][3] == 'X') chrJ = 90;
+		if(0 == chrJ && inp[j][3] == 'Y') chrJ = 91;
+		if(0 == chrJ && inp[j][3] == 'M') chrJ = 99;
+	}
+
+	int len_I_long = 9;
+	for(x1 = 0 ; x1 < FEATURE_NAME_LENGTH + 15 ; x1++){
+		int c1 = inp[i][x1];
+		int c2 = inp[j][x1];
+		if(c1 == '\t' && c2 != '\t')
+			len_I_long = -1;
+		else if(c1 != '\t' && c2 == '\t')
+			len_I_long = 1;
+		else if(c1 == '\t' && c2 == '\t')
+			len_I_long = 0;
+
+		if(len_I_long != 9) break;
+	}
+
+	if(chrI != chrJ || len_I_long != 0){
+		return (chrI * 100 + len_I_long) - (chrJ * 100);
+	}
+
+	for(x1 = 0 ; x1 < FEATURE_NAME_LENGTH + 15 ; x1++){
+		int c1 = inp[i][x1];
+		int c2 = inp[j][x1];
+		if(c1 != c2){
+			return c1 - c2;
+		}else if(c1 == '\t' && c1 == c2){
+			int pos1 = atoi(inp[i]+x1+1);
+			int pos2 = atoi(inp[j]+x1+1);
+			if( pos1 == pos2)
+				return strcmp(inp[i], inp[j]);
+			else
+				return pos1 - pos2;
+		}
+
+		if(c1 == 0 || c2 == 0)return c1 - c2;
+	}
+	return 0;
 }
 
 void junckey_sort_exchange(void * inptr, int i, int j){
@@ -3557,7 +3627,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	char * tmpp = NULL;
 	char * next_fn = input_file_names;
 
-	fprintf(ofp, "#PrimaryGene\tSecondaryGenes\tChro1\tSplicePoint1\tStrand1\tChro2\tSplicePoint2\tStrand2");
+	fprintf(ofp, "PrimaryGene\tSecondaryGenes\tSite1_chr\tSite1_location\tSite1_strand\tSite2_chr\tSite2_location\tSite2_strand");
 
 	for(infile_i=0; infile_i < n_input_files; infile_i++)
 	{
@@ -3585,15 +3655,21 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		int found_features_small = locate_junc_features(global_context, chro_small, pos_small, ret_juncs_small , max_junction_genes); 
 		int found_features_large = locate_junc_features(global_context, chro_large, pos_large, ret_juncs_large , max_junction_genes);
 
-		char strand = '?';
+		char * strand = "NA";
 		if(global_context -> fasta_contigs){
 			char donor[3], receptor[3];
 			donor[2]=receptor[2]=0;
 			int has = !get_contig_fasta(global_context -> fasta_contigs, chro_small, pos_small, 2, donor);
 			has = has && !get_contig_fasta(global_context -> fasta_contigs, chro_large, pos_large-3, 2, receptor);
 			if(has){
-				if(donor[0]=='G' && donor[1]=='T' && receptor[0]=='A' && receptor[1]=='G') strand = '+';
-				else if(donor[0]=='C' && donor[1]=='T' && receptor[0]=='A' && receptor[1]=='C') strand = '-';
+				if(donor[0]=='G' && donor[1]=='T' && receptor[0]=='A' && receptor[1]=='G') strand = "+";
+				else if(donor[0]=='C' && donor[1]=='T' && receptor[0]=='A' && receptor[1]=='C') strand = "-";
+			}else if(!global_context ->is_junction_no_chro_shown){
+				global_context ->is_junction_no_chro_shown = 1;
+				print_in_box(80,0,0, "   WARNING contig `%s' is not found in the", chro_small);
+				print_in_box(80,0,0, "   provided genome file!");
+				print_in_box(80,0,0,"");
+
 			}
 		}
 
@@ -3679,7 +3755,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		else strcpy(gene_names, "NA");
 		fprintf(ofp, "\t%s", gene_names);
 
-		fprintf(ofp, "\t%s\t%c\t%s\t%c", chro_small, strand, chro_large, strand);
+		fprintf(ofp, "\t%s\t%s\t%s\t%s", chro_small, strand, chro_large, strand);
 
 		chro_large[-1]='\t';
 
@@ -3698,6 +3774,10 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	free(junction_support_list);
 	free(key_list);
 	free(junction_source_list);
+
+	print_in_box(80,0,PRINT_BOX_CENTER,"Found %llu junctions in all the input files.", merged_junction_table -> numOfElements);
+	print_in_box(80,0,0,"");
+
 	HashTableDestroy(merged_junction_table);
 	HashTableDestroy(merged_splicing_table);
 }
@@ -3750,8 +3830,8 @@ int readSummary(int argc,char *argv[]){
 	34: as.numeric(useOverlappingBreakTie) # 1 = Select features or meta-features with a longer overlapping length; 0 = just use read-voting strategy: one overlapping read = 1 vote
 	35: Pair_Orientations # FF, FR, RF or RR. This parameter matters only if "-s" option is 1 or 2.
 	36: as.numeric(doJunctionCounting)  # 1 = count the number of junction reads spaining each exon-exon pairs;  0 = do not.
-	37: file name of fasta (for determine the strandness of junctions by looking for GT/AG or CT/AC).
-	38: as.numeric(max_M) # maximum "M" sections allowed in the CIGAR string. This parameter is needed in parse_BIN()
+	37: file name of genome fasta (for determine the strandness of junctions by looking for GT/AG or CT/AC).
+	38: as.numeric(max_M_Ops) # maximum "M" sections allowed in the CIGAR string. This parameter is needed in parse_BIN()
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one;
@@ -4376,7 +4456,7 @@ int feature_count_main(int argc, char ** argv)
 
 	strcpy(Pair_Orientations,"fr");
 
-	while ((c = getopt_long (argc, argv, "A:g:t:T:o:a:d:D:L:Q:pbF:fs:S:CBJPMORv?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "G:A:g:t:T:o:a:d:D:L:Q:pbF:fs:S:CBJPMORv?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'S':
@@ -4389,6 +4469,9 @@ int feature_count_main(int argc, char ** argv)
 				Pair_Orientations[1]=(optarg[1]=='f'?'f':'r');
 				Pair_Orientations[2]=0;
 
+				break;
+			case 'G':
+				strcpy(fasta_contigs_name , optarg);
 				break;
 			case 'J':
 				do_junction_cnt = 1;
@@ -4405,7 +4488,7 @@ int feature_count_main(int argc, char ** argv)
 				return 0;
 			case 'Q':
 				if(!is_valid_digit_range(optarg, "Q", 0 , 255))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				min_qual_score = atoi(optarg);
 				break;
@@ -4418,19 +4501,19 @@ int feature_count_main(int argc, char ** argv)
 				break;
 			case 'T':
 				if(!is_valid_digit_range(optarg, "T", 1, 64))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				threads = atoi(optarg);
 				break;
 			case 'd':
 				if(!is_valid_digit(optarg, "d"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				min_dist = atoi(optarg);
 				break;
 			case 'D':
 				if(!is_valid_digit(optarg, "D"))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				max_dist = atoi(optarg);
 				break;
@@ -4467,7 +4550,7 @@ int feature_count_main(int argc, char ** argv)
 				break;
 			case 's':
 				if(!is_valid_digit_range(optarg, "s", 0 , 2))
-					exit(-1);
+					STANDALONE_exit(-1);
 
 				Strand_Sensitive_Mode = atoi(optarg);
 					
@@ -4494,7 +4577,7 @@ int feature_count_main(int argc, char ** argv)
 				if(strcmp("readExtension5", long_options[option_index].name)==0)
 				{
 					if(!is_valid_digit(optarg, "readExtension5"))
-						exit(-1);
+						STANDALONE_exit(-1);
 					fiveEndExtension = atoi(optarg);
 					fiveEndExtension = max(0, fiveEndExtension);
 				}
@@ -4502,7 +4585,7 @@ int feature_count_main(int argc, char ** argv)
 				if(strcmp("readExtension3", long_options[option_index].name)==0)
 				{
 					if(!is_valid_digit(optarg, "readExtension3"))
-						exit(-1);
+						STANDALONE_exit(-1);
 					threeEndExtension = atoi(optarg);
 					threeEndExtension = max(0, threeEndExtension);
 				}
@@ -4510,7 +4593,7 @@ int feature_count_main(int argc, char ** argv)
 				if(strcmp("minOverlap", long_options[option_index].name)==0)
 				{
 					if(!is_valid_digit(optarg, "minOverlap"))
-						exit(-1);
+						STANDALONE_exit(-1);
 					minFragmentOverlap = atoi(optarg);
 				}
 
@@ -4529,14 +4612,10 @@ int feature_count_main(int argc, char ** argv)
 				{
 					use_fraction_multimapping = 1;
 				}
-				if(strcmp("maxM", long_options[option_index].name)==0){
-					if(!is_valid_digit_range(optarg, "maxM", 1 , 64))
-						exit(-1);
+				if(strcmp("maxMOp", long_options[option_index].name)==0){
+					if(!is_valid_digit_range(optarg, "maxMOp", 1 , 64))
+						STANDALONE_exit(-1);
 					strcpy(max_M_str, optarg);
-				}
-				if(strcmp("fasta", long_options[option_index].name)==0)
-				{
-					strcpy(fasta_contigs_name , optarg);
 				}
 				if(strcmp("read2pos", long_options[option_index].name)==0)
 				{

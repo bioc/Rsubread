@@ -119,12 +119,14 @@ typedef pthread_spinlock_t subread_lock_t;
 #endif
 
 #if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+#define STANDALONE_exit(i) exit(i)
 #define SUBREADprintf(...) fprintf(stderr, __VA_ARGS__)
 #define SUBREADputs(x) fprintf(stderr, "%s\n", x)
 #define SUBREADputchar(x) fputc(x, stderr)
 #define SUBREADfflush(x) fflush(x)
 #define CORE_SOFT_BR_CHAR '\n'
 #else
+#define STANDALONE_exit(i) return i;
 #define SUBREADprintf Rprintf
 #define SUBREADputs(x) Rprintf("%s\n",(x))
 #define SUBREADputchar(X) Rprintf("%c",(X)) 
