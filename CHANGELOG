@@ -1,3 +1,14 @@
+12 Nov 2015
+(1) Add repair function
+(2) New parameters for featureCounts -- juncCounts, genome and maxMOp.
+(3) Removed 'DNAseq' option from subjunc() function.
+(3) Parameter 'reportFusions' is changed to 'detectSV' in align() function.
+
+20 Oct 2015
+(1) Default value of TH_subread in buildindex() was changed to 100.
+
+Devel version changed to 1.21.0 after Bioc 3.2 release.
+
 12 Oct 2015 - 1.19.8
 (1) updated users guide.
 

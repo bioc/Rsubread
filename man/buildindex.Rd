@@ -4,7 +4,7 @@
 \description{An index needs to be built before read mapping can be performed. This function creates a hash table for the reference genome, which can then be used by Subread and Subjunc aligners for read alignment.}
 \usage{
 buildindex(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,
-TH_subread=24,colorspace=FALSE)
+TH_subread=100,colorspace=FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
@@ -12,7 +12,7 @@ TH_subread=24,colorspace=FALSE)
   \item{gappedIndex}{ logical. If \code{FALSE}, 16mers (subreads) will be extracted from every chromosomal location of a reference genome and then they will be used to build a hash table index. By default(\code{TRUE}), subreads are extracted in every three bases from the genome.}
   \item{indexSplit}{ logical. If \code{TRUE}, the built index is allowed to be splitted into multiple segments. The number of such segments is determined by \code{memory} value, genome size and permitting of gaps between subreads(\code{gappedIndex}). If \code{indexSplit} is set to \code{FALSE}, a single-segment index (no splitting) will be generated regardless of what value is chosen for \code{memory}.}
   \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 8000 MB by default.}
-  \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16 mers). 24 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
+  \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16bp mers). 100 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
   }
 \details{

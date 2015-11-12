@@ -1,4 +1,4 @@
-align <- function(index,readfile1,readfile2=NULL,type=0,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportFusions=FALSE)
+align <- function(index,readfile1,readfile2=NULL,type=0,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE)
 {
 	if(length(readfile1) != length(output_file))
 		stop("The number of input file names is different from the number of output file names.")
@@ -27,11 +27,9 @@ align <- function(index,readfile1,readfile2=NULL,type=0,input_format="gzFASTQ",o
 		opt <- paste(opt,"--SAMinput",sep=",")
 	if(tolower(input_format) == "bam")
 		opt <- paste(opt,"--BAMinput",sep=",")
-	if(tolower(input_format) == "gzfastq")
-		opt <- paste(opt,"--gzFASTQinput",sep=",")
 
-	if(tolower(output_format) == "bam")
-		opt <- paste(opt,"--BAMoutput",sep=",")	  
+	if(tolower(output_format) == "sam")
+		opt <- paste(opt,"--SAMoutput",sep=",")	  
 
 	opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")
 	
@@ -52,8 +50,8 @@ align <- function(index,readfile1,readfile2=NULL,type=0,input_format="gzFASTQ",o
 
 	opt <- paste(opt,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
 
-	if(reportFusions)
-		opt <- paste(opt,"--reportFusions",sep=",")
+	if(detectSV)
+		opt <- paste(opt,"--sv",sep=",")
 	if(phredOffset == 33)
 		opt <- paste(opt,"-P",3,sep=",")
 	else

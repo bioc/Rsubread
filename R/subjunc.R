@@ -1,4 +1,4 @@
-subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DNAseq=FALSE,reportAllJunctions=FALSE)
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,reportAllJunctions=FALSE)
 {
 	if(length(readfile1) != length(output_file))
 		stop("The number of input file names is different from the number of output file names.")
@@ -24,12 +24,10 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 	if(tolower(input_format) == "sam")
 	  opt <- paste(opt,"--SAMinput",sep=",")
 	if(tolower(input_format) == "bam")
-	  opt <- paste(opt,"--BAMinput",sep=",")	
-	if(tolower(input_format) == "gzfastq")
-		opt <- paste(opt,"--gzFASTQinput",sep=",")
+	  opt <- paste(opt,"--BAMinput",sep=",")
 	
-	if(tolower(output_format) == "bam")
-	  opt <- paste(opt,"--BAMoutput",sep=",")
+	if(tolower(output_format) == "sam")
+	  opt <- paste(opt,"--SAMoutput",sep=",")
 
 	opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")	
 
@@ -48,8 +46,6 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 	if(color2base)
 		opt <- paste(opt,"-b",sep=",")
 
-	if(DNAseq)
-		opt <- paste(opt,"--dnaseq",sep=",")
 	if(reportAllJunctions)
 		opt <- paste(opt,"--allJunctions",sep=",")
 

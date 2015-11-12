@@ -1,4 +1,4 @@
-buildindex <- function(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,TH_subread=24,colorspace=FALSE)
+buildindex <- function(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,TH_subread=100,colorspace=FALSE)
 {
 	opt <- paste("-o",basename,"-f",TH_subread,"-M",memory,reference,sep=",")
 
