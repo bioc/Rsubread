@@ -1,3 +1,6 @@
+16 Nov 2015 - 1.21.4
+(1) Fix usage section in Rd file for repair function.
+
 12 Nov 2015
 (1) Add repair function
 (2) New parameters for featureCounts -- juncCounts, genome and maxMOp.

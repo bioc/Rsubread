@@ -3,7 +3,7 @@
 \title{Re-order paired-end reads to place reads from the same pair next to each other}
 \description{Fast re-odering of paired-end reads using read names and mapping locations.}
 \usage{
-repair <- function(inFiles,inFormat="BAM",outFiles=paste(inFiles,"repair",sep="."),
+repair(inFiles,inFormat="BAM",outFiles=paste(inFiles,"repair",sep="."),
 addDummy=TRUE,fullData=TRUE,compress=FALSE,nthreads=8)
 }
 \arguments{
