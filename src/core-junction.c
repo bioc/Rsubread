@@ -1213,7 +1213,7 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 					}
 				}
 
-				if(0 && FIXLENstrcmp("R000002444", read_name) == 0) 
+				if(0 && FIXLENstrcmp("R006856515", read_name) == 0) 
 				{
 					char posout[100];
 					absoffset_to_posstr(global_context, current_vote -> pos[i][j], posout);
@@ -2484,7 +2484,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			//if(explain_context -> pair_number == 999999)
 			
 			// ACDB PVDB TTTS
-			if(0 && FIXLENstrcmp("R004469535", explain_context -> read_name) ==0)
+			if(0 && FIXLENstrcmp("R000238666", explain_context -> read_name) ==0)
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%u\tCIGAR=%s\tMM=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\n\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id);
 
 
@@ -2650,6 +2650,8 @@ void print_big_margin(global_context_t * global_context, subread_read_number_t p
 
 int is_ambiguous_voting(global_context_t * global_context, subread_read_number_t pair_number, int is_second_read, int selected_vote, int max_start,int max_end, int read_len, int is_negative)
 {
+//	#warning "=========== THE NEXT LINE IS ONLY FOR COMPARING WITH STAR!! ============== "
+//	return 0;
 	if( global_context->config.big_margin_record_size<3) return 0;
 	int xk1;
 	int encounter = 0;
@@ -2823,7 +2825,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 	int real_split_point_i;
 	int real_split_point_numbers = guess_end - guess_start;
 
-	if(0 && FIXLENstrcmp("R006633992", read_name) == 0) 
+	if(0 && FIXLENstrcmp("R006856515", read_name) == 0) 
 		SUBREADprintf("TESTDON: LR=%d; RR=%d\n", left_indel_offset, right_indel_offset);
 	
 	for(real_split_point_i = 0 ; real_split_point_i < real_split_point_numbers; real_split_point_i++)
@@ -2861,7 +2863,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 
 	//	donor_left[2]=0; donor_right[2]=0;
 
-		if(0 && FIXLENstrcmp("R002403247", read_name) == 0) 
+		if(0 && FIXLENstrcmp("R006856515", read_name) == 0) 
 		{
 			donor_left[2]=0;
 			donor_right[2]=0;
@@ -2952,7 +2954,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 		*is_GT_AG_strand = selected_junction_strand;
 		*final_inserted_bases = selected_inserted_bases;
 
-		if(0 && FIXLENstrcmp("R000000029", read_name)==0)
+		if(0 && FIXLENstrcmp("R006856515", read_name)==0)
 			SUBREADprintf("FINAL_INS_LEN=%d; BEST_SCORE=%d  %s\n", selected_inserted_bases, best_score, read_name);
 		return (1+best_score)/100;
 	}
@@ -3022,7 +3024,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	{
 
 
-		if(0 && FIXLENstrcmp("R004469535", read_name) == 0 ) 
+		if(0 && FIXLENstrcmp("R006856515", read_name) == 0 ) 
 		{
 			char posout[100];
 			int xk1;
@@ -3046,11 +3048,11 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	}
 
 	if(0){
-		#define TEST_SUBJUNC_POS0 100182270
+		#define TEST_SUBJUNC_POS0 225127476 
 		if((result -> selected_position > TEST_SUBJUNC_POS0 - 100 && result -> selected_position < TEST_SUBJUNC_POS0 + 100)||
 			(subjunc_result -> minor_position > TEST_SUBJUNC_POS0 - 100 && subjunc_result -> minor_position < TEST_SUBJUNC_POS0 + 100))
 		//if(FIXLENstrcmp("V0112_0155:7:1101:14157:2012", read_name)==0)
-			SUBREADprintf("NEWJUNC: %s , L1 MAIN_POS=%u; MINOR_POS=%u ; LEN=%d ; SPL=%d\nMNVT=%d ; RSSV=%d\n", read_name, result -> selected_position, subjunc_result -> minor_position, read_len, selected_real_split_point, subjunc_result -> minor_votes , result -> selected_votes ); 
+			SUBREADprintf("NEWJUNC: %s , L1 MAIN_POS=%u; MINOR_POS=%u ; LEN=%d ; SPL=%d\nMNVT=%d ; RSSV=%d\nENCOUNTER=%d\n", read_name, result -> selected_position, subjunc_result -> minor_position, read_len, selected_real_split_point, subjunc_result -> minor_votes , result -> selected_votes , is_ambiguous_voting(global_context, pair_number, is_second_read, result->selected_votes, result -> confident_coverage_start, result -> confident_coverage_end, read_len, (result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0)); 
 	}
 
 

@@ -237,6 +237,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 		}
 
 		fclose(fp);
+		return 0;
 	}
 	return 1;
 }

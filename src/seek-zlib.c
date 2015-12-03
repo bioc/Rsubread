@@ -79,13 +79,12 @@ int seekgz_skip_header(seekable_zfile_t * fp, int tail_size){
 
 	//fprintf(stderr, "FLG=%d, XFL=%d\n" , FLG, XFL);
 
-	if(FLG & 1){	// FEXT
+	if(FLG & (1<<2)){	// FEXT
 		unsigned short XLEN=0;
 		XLEN = seekgz_bingetc(fp);
 		XLEN += seekgz_bingetc(fp)*256;
-		for(; XLEN>0; XLEN--){
+		for(; XLEN>0; XLEN--)
 			seekgz_bingetc(fp);
-		}
 	}
 
 	for(id1 = 3; id1 <=4; id1++){

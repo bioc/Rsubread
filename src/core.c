@@ -104,7 +104,7 @@ void warning_file_limit()
 			print_in_box(80,0,0,"WARNING This operation needs to open many files at same time,");
 			print_in_box(80,0,0,"	but your OS only allows to open %d files.", min(limit_st.rlim_cur , limit_st.rlim_max));
 			print_in_box(80,0,0,"	You can use command 'ulimit -n 500' to raise this limit");
-			print_in_box(80,0,0,"	to 500, or the program may crash or terminate unexpectedly.");
+			print_in_box(80,0,0,"	to 500, or the program may become very slow.");
 			print_in_box(80,0,0,"");
 		}
 	}
@@ -681,6 +681,7 @@ int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_co
 
 	global_context_t * global_context;
 	global_context = (global_context_t*)malloc(sizeof(global_context_t));
+	memset(global_context, 0, sizeof(global_context_t));
 	init_global_context(global_context);
 
 
@@ -1360,7 +1361,7 @@ int getFirstM(char * cig){
 
 int calc_tlen(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int read_len_1, int  read_len_2);
 
-int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int is_second_read, int read_len_1, int read_len_2, int current_location_no , int tlen)
+int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int is_second_read, int read_len_1, int read_len_2, int current_location_no , int tlen, int this_OK, int mate_OK)
 {
 	int ret;
 
@@ -1372,11 +1373,11 @@ int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , 
 		subread_output_tmp_t * this_rec = is_second_read?rec2:rec1;
 		subread_output_tmp_t * mate_rec = is_second_read?rec1:rec2;
 
-		if(this_rec == NULL)  ret |= SAM_FLAG_UNMAPPED;
+		if(this_OK == 0)  ret |= SAM_FLAG_UNMAPPED;
 		else
 			if(this_rec->strand + is_second_read == 1) ret |= SAM_FLAG_REVERSE_STRAND_MATCHED;
 
-		if(mate_rec == NULL)  ret |= SAM_FLAG_MATE_UNMATCHED;
+		if(mate_OK == 0)  ret |= SAM_FLAG_MATE_UNMATCHED;
 		else
 			if(mate_rec->strand + is_second_read != 1) ret |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
 
@@ -1413,7 +1414,7 @@ int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , 
 	{
 		ret = 0;
 
-		if(rec1 == NULL)  ret |= SAM_FLAG_UNMAPPED;
+		if(this_OK == 0)  ret |= SAM_FLAG_UNMAPPED;
 		else
 			if(rec1->strand) ret |= SAM_FLAG_REVERSE_STRAND_MATCHED;
 	}
@@ -1708,14 +1709,14 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 #define write_chunk_results_145 write_chunk_results
 
 // rec1 or rec2 is OK if they are not NULL.
-void write_single_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_tmp_t * rec1, realignment_result_t * raw_r1, subread_output_tmp_t * rec2, realignment_result_t * raw_r2, int all_locations , int current_location , char * read_name_1, char * read_name_2, int read_len_1, int read_len_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2, subread_read_number_t pair_number, int non_informative_subread_r1, int non_informative_subread_r2)
+void write_single_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_tmp_t * rec1, realignment_result_t * raw_r1, subread_output_tmp_t * rec2, realignment_result_t * raw_r2, int all_locations , int current_location , char * read_name_1, char * read_name_2, int read_len_1, int read_len_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2, subread_read_number_t pair_number, int non_informative_subread_r1, int non_informative_subread_r2, int is_R1_OK, int is_R2_OK)
 {
 
 
 	//assert(all_locations <= global_context -> config.reported_multi_best_reads);
 	int tlen = 0;
 
-	if(rec1 && rec2 && rec1->chro == rec2->chro)tlen = calc_tlen(global_context , rec1, rec2,  read_len_1,  read_len_2);
+	if(is_R1_OK && is_R2_OK && rec1->chro == rec2->chro)tlen = calc_tlen(global_context , rec1, rec2,  read_len_1,  read_len_2);
 
 	if(0)
 	if(global_context -> config.do_fusion_detection && rec1 && rec2 && current_location == 0 && rec1 -> chimeric_sections == 1 && rec2 -> chimeric_sections == 1){
@@ -1738,13 +1739,13 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 	}
 
-	int flag1 = calc_flags( global_context , rec1, rec2, 0,  read_len_1,  read_len_2, current_location, tlen);
+	int flag1 = calc_flags( global_context , rec1, rec2, 0,  read_len_1,  read_len_2, current_location, tlen, is_R1_OK, is_R2_OK);
 
 	int flag2 = -1;
 
 	if(global_context->input_reads.is_paired_end_reads)
 	{
-		flag2 = calc_flags( global_context , rec1, rec2, 1,  read_len_1,  read_len_2, current_location, tlen);
+		flag2 = calc_flags( global_context , rec1, rec2, 1,  read_len_1,  read_len_2, current_location, tlen, is_R2_OK, is_R1_OK);
 		if((0 == current_location) && (flag2 & SAM_FLAG_MATCHED_IN_PAIR)) global_context->all_correct_PE_reads  ++;
 	}
 
@@ -1851,11 +1852,11 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 
 
 	if(global_context -> config.space_type == GENE_SPACE_BASE){ 
-		if(rec1) {// && !strstr(rec1->additional_information, "\tNM:i:")){
+		if(is_R1_OK) {// && !strstr(rec1->additional_information, "\tNM:i:")){
 			short rec1_edit = calc_edit_dist(global_context, rec1->raw_result, rec1->cigar , rec1->linear_position, read_text_1, raw_r1 -> final_mismatched_bases);
 			sprintf(rec1->additional_information + strlen( rec1->additional_information), "\tNM:i:%d", rec1_edit );
 		}
-		if(global_context->input_reads.is_paired_end_reads && rec2) //&& !strstr(rec2->additional_information, "\tNM:i:"))
+		if(global_context->input_reads.is_paired_end_reads && is_R2_OK) //&& !strstr(rec2->additional_information, "\tNM:i:"))
 		{
 			short rec2_edit = calc_edit_dist(global_context, rec2->raw_result, rec2->cigar , rec2->linear_position, read_text_2, raw_r2 -> final_mismatched_bases);
 			sprintf(rec2->additional_information + strlen( rec2->additional_information), "\tNM:i:%d", rec2_edit );
@@ -1878,10 +1879,8 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 
-	if(1||rec1)
-		sprintf(extra_additional_1 +strlen(extra_additional_1), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
-	if(1||rec2)
-		sprintf(extra_additional_2 +strlen(extra_additional_2), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	sprintf(extra_additional_1 +strlen(extra_additional_1), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	sprintf(extra_additional_2 +strlen(extra_additional_2), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
 
 	if(global_context->config.read_group_id[0])
 	{
@@ -1890,12 +1889,9 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 	char * out_chro1, * out_chro2, *out_cigar1, *out_cigar2;
-	if(rec1)
+	if(is_R1_OK)
 	{
-		assert(rec1->chro);
 		strcat(extra_additional_1, rec1->additional_information);
-		assert(rec1->chro);
-		//printf("STRCAT: + '%s' = '%s'\n",  rec1->additional_information, extra_additional_1);
 		out_chro1 = rec1->chro;
 		out_cigar1 = rec1->cigar;
 	}
@@ -1905,11 +1901,9 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		out_cigar1 = "*";
 	}
 
-	if(rec2)
+	if(is_R2_OK)
 	{
-		assert(rec2->chro);
 		strcat(extra_additional_2, rec2->additional_information);
-		assert(rec2->chro);
 		out_chro2 = rec2->chro;
 		out_cigar2 = rec2->cigar;
 	}
@@ -1921,10 +1915,11 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 
 	int out_offset1=0, out_offset2=0;
 	long long int out_tlen1, out_tlen2;
+	int  out_mapping_quality1 = 0, out_mapping_quality2 = 0;
 
 	out_tlen1 = tlen;
 	out_tlen2 = tlen;
-	if(rec1 && rec2)
+	if(is_R1_OK && is_R2_OK)
 	{
 		if( rec1->offset >  rec2->offset) out_tlen1 = - out_tlen1;
 		else	out_tlen2 = -out_tlen2;
@@ -1934,33 +1929,31 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	{
 		if(global_context -> input_reads.is_paired_end_reads)
 		{
-			if(rec1 || rec2){
+			if(is_R1_OK || is_R2_OK){
 				//SUBREADprintf("MAPTOLEN\n");
 				if(thread_context)
 					thread_context -> all_mapped_reads ++;
 				else
-					global_context -> all_mapped_reads++;
+					global_context -> all_mapped_reads ++;
 			}
 		}
-		else if(rec1){
+		else if(is_R1_OK){
 			if(thread_context)
 				thread_context -> all_mapped_reads ++;
 			else
-				global_context -> all_mapped_reads++;
+				global_context -> all_mapped_reads ++;
 		}
 	}
 
-	if(rec1)
+	if(is_R1_OK){
 		out_offset1 = max(1, rec1->offset + rec1 -> soft_clipping_movements);
-	if(rec2)
+		out_mapping_quality1 = rec1->mapping_quality;
+	}
+	if(is_R2_OK){
 		out_offset2 = max(1, rec2->offset + rec2 -> soft_clipping_movements);
+		out_mapping_quality2 = rec2->mapping_quality;
+	}
 
-
-	int  out_mapping_quality1 = 0, out_mapping_quality2 = 0;
-	if(rec1)
-		 out_mapping_quality1 = rec1->mapping_quality;
-	if(rec2)
-		 out_mapping_quality2 = rec2->mapping_quality;
 
 	char * mate_chro_for_1  = out_chro2;
 	char * mate_chro_for_2  = out_chro1;
@@ -1996,8 +1989,8 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 
-	if(rec1) rec1->raw_result->selected_position += rec1->soft_clipping_movements;
-	if(rec2) rec2->raw_result->selected_position += rec2->soft_clipping_movements;
+	if(is_R1_OK) rec1->raw_result->selected_position += rec1->soft_clipping_movements;
+	if(is_R2_OK) rec2->raw_result->selected_position += rec2->soft_clipping_movements;
 
 }
 
@@ -2301,8 +2294,8 @@ void write_realignments_for_fragment(global_context_t * global_context, thread_c
 		r2_output = out_context -> r2;
 	}
 
-	write_single_fragment(global_context, thread_context, r1_output, res1, r2_output, res2, multi_mapping_number , this_multi_mapping_i , read_name_1, read_name_2, rlen1, rlen2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_number, non_informative_subreads_r1, non_informative_subreads_r2);
-	
+	if((!global_context->config.ignore_unmapped_reads) || (is_2_OK || is_1_OK))
+		write_single_fragment(global_context, thread_context, r1_output, res1, r2_output, res2, multi_mapping_number , this_multi_mapping_i , read_name_1, read_name_2, rlen1, rlen2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_number, non_informative_subreads_r1, non_informative_subreads_r2, is_1_OK, is_2_OK);
 }
 
 
@@ -2991,7 +2984,8 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !global_context->config.do_fusion_detection)
 			{
 
-				if(0 && FIXLENstrcmp("R004469535", read_name_1) ==0 )
+				//SUBREADprintf("P%d %llu %s\n", is_reversed, current_read_number, read_name_1);
+				if(0 && FIXLENstrcmp("R006856515", read_name_1) ==0 )
 				{
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);

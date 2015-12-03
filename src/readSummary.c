@@ -105,7 +105,7 @@ typedef struct {
 	unsigned long long unassigned_fragmentlength;
 	unsigned long long unassigned_chimericreads;
 	unsigned long long unassigned_secondary;
-	unsigned long long unassigned_nonjunction;
+	unsigned long long unassigned_junction_condition;
 	unsigned long long unassigned_duplicate;
 } fc_read_counters;
 
@@ -177,6 +177,7 @@ typedef struct {
 	int is_paired_end_input_file;
 	int is_paired_end_mode_assign;
 	int is_multi_overlap_allowed;
+	int restricted_no_multi_overlap;
 	int is_strand_checked;
 	int is_both_end_required;
 	int is_chimertc_disallowed;
@@ -188,7 +189,7 @@ typedef struct {
 	int is_SEPEmix_warning_shown;
 	int is_unpaired_warning_shown;
 	int is_stake_warning_shown;
-	int is_split_alignments_only;
+	int is_split_or_exonic_only;
 	int is_duplicate_ignored;
 	int is_first_read_reversed;
 	int is_second_read_straight;
@@ -623,8 +624,8 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 
 	print_in_box(80,0,0,"     Multimapping reads : %s", multi_mapping_allow_mode);
 	print_in_box(80,0,0,"Multi-overlapping reads : %s", global_context->is_multi_overlap_allowed?"counted":"not counted");
-	if(global_context -> is_split_alignments_only)
-		print_in_box(80,0,0,"       Split alignments : required");
+	if(global_context -> is_split_or_exonic_only)
+		print_in_box(80,0,0,"       Split alignments : %s", (1 == global_context -> is_split_or_exonic_only)?"only split alignments":"only exonic alignments");
 	if(global_context -> fragment_minimum_overlapping !=1)
 		print_in_box(80,0,0,"      Overlapping bases : %d", global_context -> fragment_minimum_overlapping);
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
@@ -1476,7 +1477,7 @@ void process_pairer_reset(void * pairer_vp){
 		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_secondary = 0;
-		global_context -> thread_contexts[xk1].read_counters.unassigned_nonjunction = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_junction_condition = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_duplicate = 0;
 		global_context -> thread_contexts[xk1].read_counters.assigned_reads = 0;
 	}
@@ -1747,7 +1748,8 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 			}else if(optype == 2){ // 'D'
 				chro_cursor += optval;
 */			}else if(optype == 1 || optype == 2 || optype == 3){ // 'I', 'D' or 'N'
-				(*is_junction_read) = 1;
+				if(3 == optype)
+					(*is_junction_read) = 1;
 				char event_char=0;
 				if(optype == 3) event_char = 'N';
 				if(optype == 2) event_char = 'D';
@@ -2084,7 +2086,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		(*cigar_read_len) = Starting_Read_Points[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1];
 
-		if(is_junction_read || !global_context->is_split_alignments_only) 
+		if( (is_junction_read && 1 == global_context->is_split_or_exonic_only) || (2 == global_context->is_split_or_exonic_only && !is_junction_read) || !global_context->is_split_or_exonic_only)
 		{
 		//#warning "=================== COMMENT THESE 2 LINES ================================"
 		//for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
@@ -2247,17 +2249,21 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					}
 				}
 			}
-		}else if(global_context->is_split_alignments_only) // must be true.
-		{
+		}else if(global_context->is_split_or_exonic_only == 1 && !is_junction_read) {
 			skipped_for_exonic ++;
 			if((is_second_read && skipped_for_exonic == 2) || (!global_context -> is_paired_end_mode_assign) || (alignment_masks & 0x8))
 			{
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Nonjunction\t*\t*\n", read_name);
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_%s\t*\t*\n", read_name, (global_context->is_split_or_exonic_only == 2)?"Hasjunction":"Nonjunction");
 
-				thread_context->read_counters.unassigned_nonjunction ++;
+				thread_context->read_counters.unassigned_junction_condition ++;
 				return;
 			}
+		}else if(global_context->is_split_or_exonic_only == 2 && is_junction_read) {
+				if(global_context -> SAM_output_fp)
+					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_%s\t*\t*\n", read_name, (global_context->is_split_or_exonic_only == 2)?"Hasjunction":"Nonjunction");
+				thread_context->read_counters.unassigned_junction_condition ++;
+				return;
 		}
 
 		if(is_second_read) nhits2 = nhits;
@@ -2551,8 +2557,16 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			//	SUBREADprintf("READ DECIDE LEN=%d for %s\n", decision_total_lengths[decision_table_no] , read_name);
 			if(global_context -> fragment_minimum_overlapping == 1 || decision_total_lengths[decision_table_no] >= global_context -> fragment_minimum_overlapping)
 			{
-				int this_decision_score = global_context -> use_overlapping_break_tie? decision_total_lengths[decision_table_no] :(read1_used[decision_table_no] + read2_used[decision_table_no]);
-				if(!global_context -> use_overlapping_break_tie)assert(this_decision_score<3);
+				int this_decision_score;
+				if(global_context -> use_overlapping_break_tie) {
+					this_decision_score = decision_total_lengths[decision_table_no];
+				} else {
+					if(global_context -> restricted_no_multi_overlap) {
+						this_decision_score = (read1_used[decision_table_no] || read2_used[decision_table_no])?1:0;
+					} else {
+						this_decision_score = read1_used[decision_table_no] + read2_used[decision_table_no];
+					}
+				}
 
 			//	if(0 && FIXLENstrcmp("R0002957", read_name)==0)
 			//		SUBREADprintf("%s LEN[%d] = %d , score=%d <? %d # %d\n", read_name, decision_table_no ,  decision_total_lengths[decision_table_no], this_decision_score, maximum_decision_score , maximum_total_count);
@@ -2659,7 +2673,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, read_c
 		global_context -> read_counters.unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
 		global_context -> read_counters.unassigned_multimapping += global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping;
 		global_context -> read_counters.unassigned_secondary += global_context -> thread_contexts[xk1].read_counters.unassigned_secondary;
-		global_context -> read_counters.unassigned_nonjunction += global_context -> thread_contexts[xk1].read_counters.unassigned_nonjunction;
+		global_context -> read_counters.unassigned_junction_condition += global_context -> thread_contexts[xk1].read_counters.unassigned_junction_condition;
 		global_context -> read_counters.unassigned_duplicate += global_context -> thread_contexts[xk1].read_counters.unassigned_duplicate;
 		global_context -> read_counters.assigned_reads += global_context -> thread_contexts[xk1].read_counters.assigned_reads;
 
@@ -2671,7 +2685,7 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, read_c
 		my_read_counter->unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
 		my_read_counter->unassigned_multimapping += global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping;
 		my_read_counter->unassigned_secondary += global_context -> thread_contexts[xk1].read_counters.unassigned_secondary;
-		my_read_counter->unassigned_nonjunction += global_context -> thread_contexts[xk1].read_counters.unassigned_nonjunction;
+		my_read_counter->unassigned_junction_condition += global_context -> thread_contexts[xk1].read_counters.unassigned_junction_condition;
 		my_read_counter->unassigned_duplicate += global_context -> thread_contexts[xk1].read_counters.unassigned_duplicate;
 		my_read_counter->assigned_reads += global_context -> thread_contexts[xk1].read_counters.assigned_reads;
 
@@ -2768,7 +2782,7 @@ HashTable * load_alias_table(char * fname)
 	return ret;
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_alignments_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping)
 {
 	memset(global_context, 0, sizeof(fc_thread_global_context_t));
 	global_context -> input_buffer_max_size = buffer_size;
@@ -2780,6 +2794,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> isCVersion = isCVersion;
 	global_context -> is_read_details_out = is_sam_out;
 	global_context -> is_multi_overlap_allowed = is_overlap_allowed;
+	global_context -> restricted_no_multi_overlap = isRestrictlyNoOvelrapping;
 	global_context -> is_paired_end_mode_assign = is_PE_data;
 	global_context -> is_gene_level = is_gene_level;
 	global_context -> is_strand_checked = is_strand_checked;
@@ -2787,7 +2802,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_chimertc_disallowed = is_chimertc_disallowed;
 	global_context -> is_PE_distance_checked = is_PE_distance_checked;
 	global_context -> is_multi_mapping_allowed = is_multi_mapping_allowed;
-	global_context -> is_split_alignments_only = is_split_alignments_only;
+	global_context -> is_split_or_exonic_only = is_split_or_exonic_only;
 	global_context -> is_duplicate_ignored = is_duplicate_ignored;
 	global_context -> is_first_read_reversed = (pair_orientations[0]=='r');
 	global_context -> is_second_read_straight = (pair_orientations[1]=='f');
@@ -2822,7 +2837,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> read_counters.unassigned_chimericreads=0;
 	global_context -> read_counters.unassigned_multimapping=0;
 	global_context -> read_counters.unassigned_secondary=0;
-	global_context -> read_counters.unassigned_nonjunction=0;
+	global_context -> read_counters.unassigned_junction_condition=0;
 	global_context -> read_counters.unassigned_duplicate=0;
 	global_context -> read_counters.assigned_reads=0;
 	
@@ -2921,7 +2936,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_multimapping = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_secondary = 0;
-		global_context -> thread_contexts[xk1].read_counters.unassigned_nonjunction = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_junction_condition = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_duplicate = 0;
 
 		if(global_context -> do_junction_counting)
@@ -3222,7 +3237,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	}
 
 	fprintf(fp_out,"\n");
-	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragmentLength", "Unassigned_Chimera", "Unassigned_Secondary", "Unassigned_Nonjunction", "Unassigned_Duplicate"};
+	char * keys [] ={ "Assigned" , "Unassigned_Ambiguity", "Unassigned_MultiMapping" ,"Unassigned_NoFeatures", "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_FragmentLength", "Unassigned_Chimera", "Unassigned_Secondary", (global_context->is_split_or_exonic_only == 2)?"Unassigned_Hasjunction":"Unassigned_Nonjunction", "Unassigned_Duplicate"};
 
 	for(xk1=0; xk1<11; xk1++)
 	{
@@ -3309,9 +3324,11 @@ static struct option long_options[] =
 	{"read2pos", required_argument, 0, 0},
 	{"minOverlap", required_argument, 0, 0},
 	{"countSplitAlignmentsOnly", no_argument, 0, 0},
+	{"countExonicAlignmentsOnly", no_argument, 0, 0},
 	{"debugCommand", required_argument, 0, 0},
 	{"ignoreDup", no_argument, 0, 0},
 	{"donotsort", no_argument, 0, 0},
+	{"restrictedlyNoOverlap", no_argument, 0, 0},
 	{"fraction", no_argument, 0, 0},
 	{"order", required_argument, 0, 'S'},
 	{"genome", required_argument, 0, 'G'},
@@ -3821,7 +3838,7 @@ int readSummary(int argc,char *argv[]){
 	25: as.numeric(Five_End_Extension_Length)  # 5' end extension
 	26: as.numeric(Three_End_Extension_Length)  # 3' end extension
 	27: as.numeric(Minimum_Overlap_Between_Read_And_Feature) # 1 by default
-	28: as.numeric(is_Split_Alignment_Only) # 0 by default
+	28: as.numeric(is_Split_or_Exonic_Only) # 0 by default; 0: all reads are counted ; 1: only split (Cigar has "N") reads are counted ; 2: only exonic (no "N" in Cigar) are counted.
 	29: as.numeric(reduce_5_3_ends_to_one) # 0= no reduction; 1= reduce to 5' end; 2= reduce to 3' end
 	30: debug_command # This is for debug only; RfeatureCounts should pass a space (" ") to this parameter, disabling the debug command.
 	31: as.numeric(is_duplicate_ignored) # 0 = INCLUDE DUPLICATE READS; 1 = IGNORE DUPLICATE READS (0x400 FLAG IS SET) ; "0" by default.
@@ -3832,6 +3849,7 @@ int readSummary(int argc,char *argv[]){
 	36: as.numeric(doJunctionCounting)  # 1 = count the number of junction reads spaining each exon-exon pairs;  0 = do not.
 	37: file name of genome fasta (for determine the strandness of junctions by looking for GT/AG or CT/AC).
 	38: as.numeric(max_M_Ops) # maximum "M" sections allowed in the CIGAR string. This parameter is needed in parse_BIN()
+	39: as.numeric(is_Restrictly_No_Overlapping) # when "1", disable the voting-based tie breaking (e.g., when the reads are paired-end and one gene receives two votes but the other gene only has one.). "0" by default.
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one;
@@ -3852,7 +3870,7 @@ int readSummary(int argc,char *argv[]){
 	curpos = 0;
 	curchr_name = "";
 
-	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitAlignmentOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M;
+	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
 
 	int  isGTF, n_input_files=0;
 	char *  alias_file_name = NULL, * cmd_rebuilt = NULL;
@@ -3945,8 +3963,8 @@ int readSummary(int argc,char *argv[]){
 	}
 
 	if(argc>28)
-		isSplitAlignmentOnly = atoi(argv[28]);
-	else	isSplitAlignmentOnly = 0;
+		isSplitOrExonicOnly = atoi(argv[28]);
+	else	isSplitOrExonicOnly = 0;
 
 	if(argc>29)
 		reduce_5_3_ends_to_one = atoi(argv[29]);	// 0 : no reduce; 1: reduce to 5' end; 2: reduce to 3' end.
@@ -3994,12 +4012,18 @@ int readSummary(int argc,char *argv[]){
 	if(argc>38)
 		max_M = atoi(argv[38]);
 	else	max_M = 10;
+
+	if(argc>39)
+		isRestrictlyNoOvelrapping = atoi(argv[39]);
+	else	isRestrictlyNoOvelrapping = 0;
+	
+
 	
 	unsigned int buffer_size = 1024*1024*6;
 
 
 	fc_thread_global_context_t global_context;
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitAlignmentOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M);
+	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping);
 
 	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && global_context.use_fraction_multi_mapping)
 	{
@@ -4009,8 +4033,8 @@ int readSummary(int argc,char *argv[]){
 	print_FC_configuration(&global_context, argv[1], argv[2], argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport);
 
 
-	//print_in_box(80,0,0,"IG=%d, IS=%d", isGeneLevel, isSplitAlignmentOnly);
-	if(isSplitAlignmentOnly && ( isGeneLevel || !isMultiOverlapAllowed) )
+	//print_in_box(80,0,0,"IG=%d, IS=%d", isGeneLevel, isSplitOrExonicOnly);
+	if(0)if(isSplitOrExonicOnly && ( isGeneLevel || !isMultiOverlapAllowed) )
 	{
 		print_in_box(80,0,0,"NOTICE --countSplitAlignmentsOnly is specified, but '-O' and '-f' are not");
 		print_in_box(80,0,0,"       both specified. Please read the manual for details.");
@@ -4040,9 +4064,14 @@ int readSummary(int argc,char *argv[]){
 	if(fasta_contigs_fname){
 		print_in_box(80,0,0,"Loading FASTA contigs : %s", fasta_contigs_fname);
 		global_context.fasta_contigs = malloc(sizeof(fasta_contigs_t));
-		read_contig_fasta(global_context.fasta_contigs, fasta_contigs_fname);
-		print_in_box(80,0,0,"   %lu contigs were loaded", global_context.fasta_contigs -> contig_table -> numOfElements);
-		print_in_box(80,0,0,"");
+		int ret_fq = read_contig_fasta(global_context.fasta_contigs, fasta_contigs_fname);
+		if(ret_fq){
+			print_in_box(80,0,0,"   WARNING unable to open the FASTA file.");
+			print_in_box(80,0,0,"");
+		}else{
+			print_in_box(80,0,0,"   %lu contigs were loaded", global_context.fasta_contigs -> contig_table -> numOfElements);
+			print_in_box(80,0,0,"");
+		}
 	}else	global_context.fasta_contigs = NULL;
 	
 
@@ -4378,7 +4407,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[39];
+	char * Rargv[40];
 	char annot_name[300];
 	char * out_name = malloc(300);
 	char * fasta_contigs_name = malloc(300);
@@ -4405,13 +4434,14 @@ int feature_count_main(int argc, char ** argv)
 	int is_GeneLevel = 1;
 	int is_Overlap = 0;
 	int is_Both_End_Mapped = 0;
+	int is_Restrictedly_No_Overlap = 0;
 	int feature_block_size = 14;
 	int Strand_Sensitive_Mode = 0;
 	int is_ReadSummary_Report = 0;
 	int is_Chimeric_Disallowed = 0;
 	int is_PE_Dist_Checked = 0;
 	int is_Multi_Mapping_Allowed = 0;
-	int is_Split_Alignment_Only = 0;
+	int is_Split_or_Exonic_Only = 0;
 	int is_duplicate_ignored = 0;
 	int do_not_sort = 0;
 	int do_junction_cnt = 0;
@@ -4638,9 +4668,17 @@ int feature_count_main(int argc, char ** argv)
 
 				if(strcmp("countSplitAlignmentsOnly", long_options[option_index].name)==0)
 				{
-					is_Split_Alignment_Only = 1;
+					is_Split_or_Exonic_Only = 1;
 				}
 
+				if(strcmp("restrictedlyNoOverlap", long_options[option_index].name)==0)
+				{
+					is_Restrictedly_No_Overlap = 1;
+				}
+				if(strcmp("countExonicAlignmentsOnly", long_options[option_index].name)==0)
+				{
+					is_Split_or_Exonic_Only = 2;
+				}
 				break;
 			case '?':
 			default :
@@ -4716,7 +4754,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[25] = strFiveEndExtension;
 	Rargv[26] = strThreeEndExtension;
 	Rargv[27] = strMinFragmentOverlap;
-	Rargv[28] = is_Split_Alignment_Only?"1":"0";
+	Rargv[28] = is_Split_or_Exonic_Only == 1?"1":(is_Split_or_Exonic_Only ==  2 ? "2":"0");
 	Rargv[29] = (reduce_5_3_ends_to_one == 0?"0":(reduce_5_3_ends_to_one==REDUCE_TO_3_PRIME_END?"3":"5"));
 	Rargv[30] = debug_command;
 	Rargv[31] = is_duplicate_ignored?"1":"0";
@@ -4727,7 +4765,8 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[36] = do_junction_cnt?"1":"0";
 	Rargv[37] = fasta_contigs_name;
 	Rargv[38] = max_M_str;
-	int retvalue = readSummary(39, Rargv);
+	Rargv[39] = is_Restrictedly_No_Overlap?"1":"0"; 
+	int retvalue = readSummary(40, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
