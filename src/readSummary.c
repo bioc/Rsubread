@@ -1730,8 +1730,9 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 		memcpy(mate_pos, bin+28, 4);
 		(*mate_pos)++;
 
-		(*tlen) = 0;
-		memcpy(tlen, bin+32, 4);
+		int tlen_int;
+		memcpy(&tlen_int, bin+32, 4);
+		(*tlen) = tlen_int;
 
 		int * cigar_opt_ints = (int *)(bin + 36 + l_read_name);
 		unsigned int chro_cursor = (*pos), section_start_chro = (*pos);
@@ -1936,7 +1937,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
 
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M);
-
 	//	SUBREADprintf("  RNAME=%s\n", read_name);
 
 		if(is_second_read == 0)
