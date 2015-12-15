@@ -376,10 +376,11 @@ typedef struct {
 	char * current_chunk_txt;
 	char * current_chunk_bin;
 	z_stream stem;
+	int current_chunk_txt_size;
 	unsigned int in_pointer;
 	unsigned int in_chunk_offset;
 	unsigned int in_block_offset;
-	unsigned int txt_buffer_size;
+	//unsigned int txt_buffer_size;
 	unsigned int txt_buffer_used;
 	unsigned long long block_start_in_file_offset;
 	unsigned int block_start_in_file_bits;

@@ -1213,7 +1213,7 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 					}
 				}
 
-				if(0 && FIXLENstrcmp("R006856515", read_name) == 0) 
+				if(0 && ( FIXLENstrcmp("R001968841", read_name) == 0 ||  FIXLENstrcmp("XXR002430582", read_name) == 0 ) )
 				{
 					char posout[100];
 					absoffset_to_posstr(global_context, current_vote -> pos[i][j], posout);
@@ -1444,7 +1444,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 					if(used_comb_buffer < global_context -> config.max_vote_combinations)
 						used_comb_buffer ++;
 
-					if(0 && FIXLENstrcmp("V0112_0155:7:1101:19612:13380", read_name_1)==0)
+					if(0 && FIXLENstrcmp("R005717815", read_name_1)==0)
 						SUBREADprintf("Vadj [%d][%d] = %d (raw = %d + %d), PE=%d, Target=%d/%d\n", i,j , adjusted_votes, vote_simple_1_buffer[i].major_half_votes, vote_simple_2_buffer[j].major_half_votes, is_PE_distance, target_index, used_comb_buffer);
 
 				}
@@ -2484,7 +2484,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			//if(explain_context -> pair_number == 999999)
 			
 			// ACDB PVDB TTTS
-			if(0 && FIXLENstrcmp("R000238666", explain_context -> read_name) ==0)
+			if(0 && FIXLENstrcmp("R001968841", explain_context -> read_name) ==0)
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%u\tCIGAR=%s\tMM=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\n\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id);
 
 

@@ -1893,6 +1893,9 @@ int process_pairer_output(void * pairer_vp, int thread_no, char * rname, char * 
 	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
 	fc_thread_thread_context_t * thread_context = global_context -> thread_contexts + thread_no;
 
+	//#warning "++++++ REMOVE THIS RETURN ++++++"
+	//return 0;
+
 	/*if(bin1) convert_bin_to_read( bin1, thread_context -> line_buffer1 , global_context -> sambam_chro_table);
 	else    make_dummy(rname, bin2, thread_context -> line_buffer1,  global_context -> sambam_chro_table);
 	if(bin2) convert_bin_to_read( bin2, thread_context -> line_buffer2 , global_context -> sambam_chro_table );
@@ -1998,19 +2001,15 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(mate_chr == read_chr && is_first_read_negative_strand!=is_second_read_negative_strand) {
 				 //^^^^^^^^^^^^^^^^^^^^ They are directly compared because they are both pointers in the same contig name table.
 				 //
-					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance) || (fragment_length < global_context -> min_paired_end_distance)))
-					{
+					if(global_context -> is_PE_distance_checked && ((fragment_length > global_context -> max_paired_end_distance) || (fragment_length < global_context -> min_paired_end_distance))) {
 						thread_context->read_counters.unassigned_fragmentlength ++;
 
 						if(global_context -> SAM_output_fp)
 							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_FragmentLength\t*\tLength=%ld\n", read_name, fragment_length);
 						return;
 					}
-				}
-				else
-				{
-					if(global_context -> is_chimertc_disallowed)
-					{
+				} else {
+					if(global_context -> is_chimertc_disallowed) {
 						thread_context->read_counters.unassigned_chimericreads ++;
 
 						if(global_context -> SAM_output_fp)
@@ -2859,6 +2858,20 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 
 
 }
+
+
+void pairer_unsorted_notification(void * pairer_vp, char * bin1, char * bin2){
+	print_in_box(80,0,0,"");
+	print_in_box(80,0,PRINT_BOX_NOCOLOR_FOR_COLON,"   WARNING: reads from the same pair were found not adjacent to each");
+	print_in_box(80,0,0,"            other in the input (due to read sorting by location or");
+	print_in_box(80,0,0,"            reporting of multi-mapping read pairs).");
+	print_in_box(80,0,0,"");
+	print_in_box(80,0,0,"   Read re-ordering is performed.");
+	print_in_box(80,0,0,"");
+}
+
+
+
 int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, long * et_anno_chr_heads, long * et_bk_end_index, long * et_bk_min_start, long * et_bk_max_end, int read_length)
 {
 	int xk1;
@@ -2962,6 +2975,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	sprintf(rand_prefix, "./temp-core-%06u-%08X.sam", getpid(), rand());
 
 	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , 64, !global_context-> is_SAM_file, 1, !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, global_context -> input_file_name, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context);
+	SAM_pairer_set_unsorted_notification(&global_context -> read_pairer, pairer_unsorted_notification);
 
 	return 0;
 }
@@ -3409,10 +3423,16 @@ void print_usage()
 	SUBREADputs("                      between a read and a meta-feature/feature that the read ");
 	SUBREADputs("                      is assigned to. 1 by default.");
 	SUBREADputs("");
-	SUBREADputs("  --read2pos <5:3>    Reduce reads to their 5' most base or 3' most base. Read ");
+	SUBREADputs("  --read2pos <5:3>    Reduce reads to their 5' most base or 3' most base. Read");
 	SUBREADputs("                      counting is then performed based on the single base the ");
 	SUBREADputs("                      read is reduced to.");
 	SUBREADputs("");
+        SUBREADputs("  --readExtension5 <int> Reads are extended upstream by <int> bases from their");
+        SUBREADputs("                      5' end.");
+        SUBREADputs("");
+        SUBREADputs("  --readExtension3 <int> Reads are extended upstream by <int> bases from their");
+        SUBREADputs("                      3' end.");
+        SUBREADputs("");
 	SUBREADputs("  --fraction          Use a fractional count 1/n, instead of 1 (one) count, for ");
 	SUBREADputs("                      each reported alignment of a multi-mapping read in read ");
 	SUBREADputs("                      counting. n is total number of alignments reported for ");
@@ -3437,6 +3457,10 @@ void print_usage()
 	SUBREADputs("");
 	SUBREADputs("  -P                  Check validity of paired-end distance when counting read ");
 	SUBREADputs("                      pairs. Use -d and -D to set thresholds.");
+	SUBREADputs("");
+        SUBREADputs("  -d <int>            Minimum fragment/template length, 50 by default.");
+        SUBREADputs("");
+        SUBREADputs("  -D <int>            Maximum fragment/template length, 600 by default.");
 	SUBREADputs("");
 	SUBREADputs("  -B                  Count read pairs that have both ends successfully aligned ");
 	SUBREADputs("                      only.");

@@ -20,8 +20,8 @@ unsigned int crc_pos(char * bin, int len){
 void seekgz_binreadmore(seekable_zfile_t * fp){
 	if(feof(fp->gz_fp))return;
 
-	if(fp -> stem.avail_in < SEEKGZ_BINBUFF_SIZE / 2 )
-	{
+	assert(fp -> stem.avail_in >= 0);
+	if(fp -> stem.avail_in < SEEKGZ_BINBUFF_SIZE / 2 ) {
 		if(fp -> in_pointer > 0 && fp -> stem.avail_in > 0){
 			int i;
 			for(i = 0 ; i <  fp -> stem.avail_in ; i ++){
@@ -118,7 +118,8 @@ int seekgz_open(const char * fname, seekable_zfile_t * fp){
 	if(NULL==fp -> gz_fp)return -1;
 	fp -> current_chunk_bin = malloc(SEEKGZ_BINBUFF_SIZE);
 	fp -> current_chunk_txt = malloc(SEEKGZ_INIT_TEXT_SIZE);
-	fp -> txt_buffer_size = SEEKGZ_INIT_TEXT_SIZE;
+	fp -> current_chunk_txt_size = SEEKGZ_INIT_TEXT_SIZE;
+	//fp -> txt_buffer_size = SEEKGZ_INIT_TEXT_SIZE;
 
 	fp -> stem.zalloc = Z_NULL;
 	fp -> stem.zfree = Z_NULL;
@@ -181,7 +182,7 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 			fp -> in_block_offset = pos -> in_block_text_offset;
 			break;
 		}
-		assert(chunk_end_block_offset < SEEKGZ_INIT_TEXT_SIZE && !feof(fp->gz_fp));
+		assert(chunk_end_block_offset < fp -> current_chunk_txt_size && !feof(fp->gz_fp));
 		fp -> txt_buffer_used=0;
 	}
 }
@@ -190,11 +191,19 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 
 int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 	unsigned int this_chunk_size = 0;
+	int loaded_blocks = 0;
 	while(1){
 		seekgz_binreadmore(fp);
-		assert(fp -> txt_buffer_used < SEEKGZ_INIT_TEXT_SIZE * 7 / 8);
+		if(loaded_blocks > 0)
+			//SUBREADprintf("LOADED BLOCKS=%d\n", loaded_blocks);
+		if(fp -> txt_buffer_used >=  fp -> current_chunk_txt_size * 7 / 8){
+			//SUBREADprintf("TRE ALLOC CHUNK_TXT: %d -> %d\n", fp -> current_chunk_txt_size, (int)(fp -> current_chunk_txt_size*1.5));
+			fp -> current_chunk_txt_size *= 1.5;
+			assert(fp -> current_chunk_txt_size < 3*512*1024*1024);
+			fp -> current_chunk_txt = realloc(fp -> current_chunk_txt, fp -> current_chunk_txt_size );
+		}
 
-		fp -> stem.avail_out = SEEKGZ_INIT_TEXT_SIZE - fp -> txt_buffer_used;
+		fp -> stem.avail_out =  fp -> current_chunk_txt_size  - fp -> txt_buffer_used;
 		int out_start = fp -> txt_buffer_used;
 		fp -> stem.next_out = (unsigned char *)(fp -> current_chunk_txt + out_start);
 
@@ -202,7 +211,7 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 		//fprintf(stderr,"INFLATING_0 : LEN=%u, CRC=%u\n", fp -> stem.avail_in , crc_pos( fp -> stem.next_in  , fp -> stem.avail_in ));
 
 		int ret = inflate(&(fp -> stem), Z_BLOCK);
-		int have = (SEEKGZ_INIT_TEXT_SIZE - fp -> txt_buffer_used) - fp -> stem.avail_out;
+		int have = ( fp -> current_chunk_txt_size  - fp -> txt_buffer_used) - fp -> stem.avail_out;
 		int is_chunk_end = 0;
 
 		//#warning "COMMENT NEXT LINE!!!!!!"
@@ -259,6 +268,7 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 			}
 			this_chunk_size += have;
 		}
+		loaded_blocks ++;
 
 		if( 0 == fp -> stem.avail_in ) this_chunk_size = 0;
 

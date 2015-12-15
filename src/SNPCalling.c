@@ -506,7 +506,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 					flanking_matched = d;
 				}
 
-			//	SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d\n", chro_name, i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail);
+				//SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail);
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
 				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
@@ -1008,8 +1008,12 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 
 				if( (*task_no) % all_threads == thread_no && all_offset <= chro_len)
 				{
-					process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
-					print_in_box(89,0,0,"processed block %c[36m%s@%d%c[0m by thread %d/%d [block number=%d/%d]", CHAR_ESC, chro_name, all_offset, CHAR_ESC , thread_no+1, all_threads, 1+(*task_no)-parameters->empty_blocks, parameters->all_blocks);
+					//#warning "=== ONLY TEST ONE BLOCK                                   ==="
+					//if(strcmp(chro_name,"chr7")==0 && all_offset == 45000000){
+					if(1){
+						process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
+						print_in_box(89,0,0,"processed block %c[36m%s@%d%c[0m by thread %d/%d [block number=%d/%d]", CHAR_ESC, chro_name, all_offset, CHAR_ESC , thread_no+1, all_threads, 1+(*task_no)-parameters->empty_blocks, parameters->all_blocks);
+					}
 				}
 				else if((*task_no) % all_threads == thread_no)
 				{

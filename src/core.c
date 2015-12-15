@@ -1879,8 +1879,10 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 
-	sprintf(extra_additional_1 +strlen(extra_additional_1), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
-	sprintf(extra_additional_2 +strlen(extra_additional_2), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	if(is_R1_OK || is_R2_OK){	// no NH and HI only if both ends are unmapped.
+		sprintf(extra_additional_1 +strlen(extra_additional_1), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+		sprintf(extra_additional_2 +strlen(extra_additional_2), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	}
 
 	if(global_context->config.read_group_id[0])
 	{
@@ -2985,7 +2987,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			{
 
 				//SUBREADprintf("P%d %llu %s\n", is_reversed, current_read_number, read_name_1);
-				if(0 && FIXLENstrcmp("R006856515", read_name_1) ==0 )
+				if(0 && FIXLENstrcmp("R001968841", read_name_1) ==0 )
 				{
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);

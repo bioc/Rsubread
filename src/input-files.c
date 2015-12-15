@@ -244,7 +244,8 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 			if(ch == '\r') continue;
 			#endif
 			if (ch == '\n' || ch == EOF) break;
-			buff[ret++] = ch;
+			if(ret < max_read_len-1)
+				buff[ret++] = ch;
 		}
 	
 	}
@@ -2314,6 +2315,10 @@ void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) {
 	free(bam_main -> threads);
 }
 
+void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (* unsorted_notification) (void * pairer, char * bin1, char * bin2)){
+	pairer -> unsorted_notification = unsorted_notification;
+}
+
 // Tiny_Mode only write the following information:
 // Name   Flag   Chro   Pos   Mapq   Cigar   MateChro   MatePos   Tlen  N  I  NH:i:xx  HI:i:xx
 // Tiny_Mode does not work when output and input are both in BAM format
@@ -2334,6 +2339,8 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 	pairer -> display_progress = display_progress;
 	pairer -> is_single_end_mode = is_single_end_mode;
 	pairer -> force_do_not_sort = force_do_not_sort;
+
+	subread_init_lock(&pairer -> unsorted_notification_lock);
 	subread_init_lock(&pairer -> input_fp_lock);
 	subread_init_lock(&pairer -> output_header_lock);
 
@@ -2362,6 +2369,11 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 		HashTableSetKeyComparisonFunction(pairer -> sam_contig_number_table, fc_strcmp_chro);
 		HashTableSetDeallocationFunctions(pairer -> sam_contig_number_table, free, NULL);
 	}
+
+	pairer -> unsorted_notification_table = HashTableCreate(2191);
+	HashTableSetHashFunction(pairer -> unsorted_notification_table, fc_chro_hash);
+	HashTableSetKeyComparisonFunction(pairer -> unsorted_notification_table, fc_strcmp_chro);
+	HashTableSetDeallocationFunctions(pairer -> unsorted_notification_table, free, free);
 
 	int x1;
 
@@ -2409,7 +2421,9 @@ void SAM_pairer_destroy(SAM_pairer_context_t * pairer){
 	if(pairer->input_is_BAM)
 	     HashTableDestroy(pairer -> bam_margin_table);
 	else HashTableDestroy(pairer -> sam_contig_number_table);
+	HashTableDestroy(pairer -> unsorted_notification_table);
 
+	subread_destroy_lock(&pairer -> unsorted_notification_lock);
 	subread_destroy_lock(&pairer -> input_fp_lock);
 	subread_destroy_lock(&pairer -> output_header_lock);
 	delete_with_prefix(pairer -> tmp_file_prefix);
@@ -2542,6 +2556,7 @@ void SAM_pairer_fill_BIN_buff(SAM_pairer_context_t * pairer ,  SAM_pairer_thread
 	thread_context -> input_buff_SBAM_ptr = 0;
 	thread_context -> input_buff_BIN_used = 0;
 	thread_context -> input_buff_BIN_ptr = 0;
+	thread_context -> readno_in_chunk = 0; 
 }
 
 int SAM_pairer_find_start(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context );
@@ -2957,26 +2972,37 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 				break;
 			}
 			in_ptr ++;
+
+			int is_important_tag =  (in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'H') ||
+						(in_str[in_ptr+0] == 'H' && in_str[in_ptr+1] == 'I') ||
+						(in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'M') ;
 			int xxnch;
 			if(in_str[in_ptr + 3] == 'Z'){
-				bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
-				bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
-				bin_tmp[bin_ptr+2] = 'Z';
-				bin_ptr += 3;
+				if(!pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'Z';
+					bin_ptr += 3;
+				}
 				in_ptr += 5;
 				while(1){
 					xxnch = *(in_str + in_ptr);
 					if(xxnch == '\n' || xxnch == '\t') break;
-					*(bin_tmp + (bin_ptr++)) = xxnch;
+					if(!pairer -> tiny_mode)
+						*(bin_tmp + (bin_ptr++)) = xxnch;
 					in_ptr ++;
 				}
-				*(bin_tmp + (bin_ptr++)) = 0;
+				if(!pairer -> tiny_mode)
+					*(bin_tmp + (bin_ptr++)) = 0;
 			}else if(in_str[in_ptr + 3] == 'i'){
 				int tmpi = 0, tmpi_sign = 1;
-				bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
-				bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
-				bin_tmp[bin_ptr+2] = 'i';
-				bin_ptr += 3;
+				if(is_important_tag || !pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'i';
+					bin_ptr += 3;
+				}
+
 				in_ptr += 5;
 
 				while(1){
@@ -2987,14 +3013,18 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 					in_ptr ++;
 				}
 				tmpi *= tmpi_sign;
-				set_memory_int(bin_tmp+bin_ptr, tmpi);
-				bin_ptr += 4;
+				if(is_important_tag || !pairer -> tiny_mode){
+					set_memory_int(bin_tmp+bin_ptr, tmpi);
+					bin_ptr += 4;
+				}
 			}else if(in_str[in_ptr + 3] == 'A'){
-				bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
-				bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
-				bin_tmp[bin_ptr+2] = 'A';
-				bin_tmp[bin_ptr+3] = in_str[in_ptr+5];
-				bin_ptr += 4;
+				if(!pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'A';
+					bin_tmp[bin_ptr+3] = in_str[in_ptr+5];
+					bin_ptr += 4;
+				}
 				in_ptr += 6;
 			}else{
 				in_ptr += 5;
@@ -3216,6 +3246,7 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 	//if(mate_FLAG & 8)my_flag |=4;
 
 	if(mate_FLAG & 4)my_flag |=8;
+	if(mate_FLAG & 8)my_flag |=4;
 	if(mate_FLAG & 0x10) my_flag |= 0x20;
 	if(mate_FLAG & 0x20) my_flag |= 0x10;
 	my_flag = my_flag << 16;
@@ -3263,6 +3294,7 @@ void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 	pairer -> is_finished = 0;
 	pairer -> BAM_header_parsed = 0;
 	pairer -> total_input_reads = 0;
+	pairer -> input_chunk_no = 0;
 	for(x1 = 0; x1 < pairer -> total_threads ; x1 ++){
 		pairer -> threads[x1].reads_in_SBAM = 0;
 		pairer -> threads[x1].input_buff_BIN_used = 0;
@@ -3270,6 +3302,7 @@ void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 		pairer -> threads[x1].input_buff_SBAM_used = 0;
 		pairer -> threads[x1].input_buff_SBAM_ptr = 0;
 		pairer -> threads[x1].orphant_block_no = 0;
+		pairer -> threads[x1].readno_in_chunk = 0;
 		pairer -> threads[x1].immediate_last_read_full_name[0]=0;
 		HashTableDestroy(pairer -> threads[x1].orphant_table);
 		pairer -> threads[x1].orphant_table = HashTableCreate(pairer -> input_buff_SBAM_size / 100);
@@ -3278,6 +3311,11 @@ void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 		HashTableSetDeallocationFunctions(pairer -> threads[x1].orphant_table, free, free);
 		inflateReset(&pairer -> threads[x1].strm);
 	}
+	HashTableDestroy(pairer -> unsorted_notification_table);
+	pairer -> unsorted_notification_table = HashTableCreate(2191);
+	HashTableSetHashFunction(pairer -> unsorted_notification_table, fc_chro_hash);
+	HashTableSetKeyComparisonFunction(pairer -> unsorted_notification_table, fc_strcmp_chro);
+	HashTableSetDeallocationFunctions(pairer -> unsorted_notification_table, free, free);
 
 }
 void SAM_pairer_writer_reset( void * pairer_vp ) {
@@ -3331,7 +3369,7 @@ int SAM_pairer_multi_thread_output(void * pairer_vp, int thread_no, char * rname
 	return 0;
 }
 
-void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , int read_name_len, char * read_full_name, int bin_len, char * bin ){
+void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , int read_name_len, char * read_full_name, int bin_len, char * bin , int flags){
 	unsigned char * mate_bin = HashTableGet(thread_context -> orphant_table, read_full_name);
 	if(mate_bin){
 		if(pairer -> output_function)
@@ -3341,7 +3379,7 @@ void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_
 			thread_context -> orphant_space -= bin_len;
 		else	thread_context -> orphant_space = 0;
 		//SUBREADprintf("Mate_found: %s\n", read_full_name);
-	}else{
+	} else {
 		char * mem_name = malloc(read_name_len + 1);
 		memcpy(mem_name, read_full_name, read_name_len);
 		mem_name[read_name_len] = 0;
@@ -3355,6 +3393,25 @@ void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_
 	}
 }
 
+
+void SAM_pairer_register_matcher(SAM_pairer_context_t * pairer , unsigned int chunk_number, unsigned int readno_in_chunk, char * read_full_name , char * bin, int bin_len , int this_flags){
+
+	char * mem_bin = malloc(bin_len);
+	memcpy(mem_bin, bin , bin_len);
+	subread_lock_occupy(&pairer -> unsorted_notification_lock);
+	char * mem_name = malloc(24);
+	sprintf(mem_name, "B:%u:%d", chunk_number , (readno_in_chunk>0)?1:0);
+	HashTablePut(pairer -> unsorted_notification_table, mem_name, mem_bin);
+
+	mem_bin = malloc(bin_len);
+	sprintf(mem_bin,"%010u %d", chunk_number, (readno_in_chunk>0)?1:0);
+	mem_name = malloc(strlen(read_full_name) + 5);
+	sprintf(mem_name, "C:%s:%d", read_full_name , (this_flags & 0x80)?1:0);
+
+	HashTablePut(pairer -> unsorted_notification_table, mem_name, mem_bin);
+	subread_lock_release(&pairer -> unsorted_notification_lock);
+}
+
 int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context ){
 	char read_full_name[ MAX_READ_NAME_LEN*2 +80 ];	// rname:chr_r1:pos_r1:chr_r2:pos_r2:HI_tag
 	unsigned char * bin = NULL;
@@ -3364,20 +3421,36 @@ int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t
 	if(has_next_read){
 		int name_len = SAM_pairer_get_read_full_name(pairer, thread_context, bin, bin_len, read_full_name, & this_flags);
 		if(0 && FIXLENstrcmp("V0112_0155:7:1206:5677:116578", read_full_name) == 0)
-			SUBREADprintf("FNNM:%s, FLAG=%d\n", read_full_name , this_flags);
+			SUBREADprintf("FNNM:%s, FLAG=%d, LASTFN=%s\n", read_full_name , this_flags, thread_context -> immediate_last_read_full_name);
 
 		if(pairer -> is_single_end_mode == 0 && ( this_flags & 1 ) == 1){ // if the reads are PE
+
 			if(strcmp(read_full_name , thread_context -> immediate_last_read_full_name) == 0){
 				if(pairer -> output_function)
 					pairer -> output_function(pairer, thread_context -> thread_id, read_full_name, (char*) bin, (char*)thread_context -> immediate_last_read_bin);
 
 				thread_context -> immediate_last_read_full_name[0] = 0;
 			}else{
-				if(thread_context -> immediate_last_read_full_name[0])
-					SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin);
+
+				if(thread_context -> immediate_last_read_full_name[0]){
+					if(thread_context -> readno_in_chunk>1){
+						if(pairer -> is_unsorted_notified == 0){
+							if(pairer -> unsorted_notification){
+								//SUBREADprintf("BEFORE NEXT : %s != %s\n",  thread_context -> immediate_last_read_full_name , read_full_name);
+								pairer -> unsorted_notification(pairer , thread_context -> immediate_last_read_bin, (char *) bin);
+							}
+							pairer -> is_unsorted_notified = 1;
+						}
+					}else if(thread_context -> readno_in_chunk == 1) {
+						SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name,  thread_context -> immediate_last_read_bin,  thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_flags );
+					}
+
+					SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
+				}
 
 				thread_context -> immediate_last_read_bin_len = bin_len;
 				thread_context -> immediate_last_read_name_len = name_len;
+				thread_context -> immediate_last_read_flags = this_flags;
 				strcpy(thread_context -> immediate_last_read_full_name, read_full_name);
 				memcpy(thread_context -> immediate_last_read_bin, bin, bin_len);
 			}
@@ -3385,7 +3458,9 @@ int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t
 			if(pairer -> output_function)
 				pairer -> output_function(pairer, thread_context -> thread_id, NULL, (char*) bin, NULL);
 		}
+		thread_context -> readno_in_chunk ++;
 		return 0;
+
 	}else pairer -> BAM_header_parsed = 1;
 	return 1;
 }
@@ -3487,6 +3562,19 @@ void SAM_pairer_osr_next_bin(FILE * fp, char * bin){
 	fread(bin, 1, rlen, fp);
 }
 
+int SAM_pairer_is_matched_chunks(char * c1, char * c2){
+	if(c1==NULL || c2==NULL)return 0;
+
+	unsigned int i1 = (unsigned int) atoi(c1);
+	unsigned int i2 = (unsigned int) atoi(c2);
+	int start_1 = c1[11]=='0';
+	int start_2 = c2[11]=='0';
+
+	if(start_1+start_2!=1)return 0;
+	if(start_1) i2++;else i1++;
+	return i2==i1;
+}
+
 void * SAM_pairer_rescure_orphants(void * params){
 
 	void ** param_ptr = (void **) params;
@@ -3557,6 +3645,25 @@ void * SAM_pairer_rescure_orphants(void * params){
 			if( min2_name_fileno >=0){
 				SAM_pairer_osr_next_bin( orphant_fps[ min2_name_fileno ] , bin_tmp2);
 				pairer -> output_function(pairer, thread_no,  names + max_name_len*min_name_fileno , (char*) bin_tmp1, (char*)bin_tmp2);
+
+				if(0 == pairer -> is_unsorted_notified){
+					char *name_tmp_1 = malloc(strlen(names+(min_name_fileno * max_name_len))+5), *name_tmp_2 = malloc(strlen(names+(min_name_fileno * max_name_len))+5);
+					char * min1_chunk_info, * min2_chunk_info;
+					sprintf(name_tmp_1, "C:%s:%d", names+(min_name_fileno * max_name_len), 0);
+					sprintf(name_tmp_2, "C:%s:%d", names+(min2_name_fileno * max_name_len), 1);
+					min1_chunk_info = HashTableGet( pairer -> unsorted_notification_table , name_tmp_1);
+					min2_chunk_info = HashTableGet( pairer -> unsorted_notification_table , name_tmp_2);
+					//SUBREADprintf("RESCURE MATCHER:  %s , %s ==  %s , %s, %s\n", name_tmp_1, name_tmp_2, min1_chunk_info, min2_chunk_info,
+					//	SAM_pairer_is_matched_chunks(min1_chunk_info, min2_chunk_info)?"MATCH":"XXXXX");
+					if(min1_chunk_info == NULL || min2_chunk_info == NULL || !SAM_pairer_is_matched_chunks(min1_chunk_info, min2_chunk_info)){
+						sprintf(name_tmp_1, "B:%s:%d", names+(min_name_fileno * max_name_len), 0);
+						if( pairer -> unsorted_notification ){
+							//SUBREADprintf("FINAL STEP\n");
+							pairer -> unsorted_notification(pairer ,  HashTableGet( pairer -> unsorted_notification_table , name_tmp_1), NULL);
+						}
+						pairer -> is_unsorted_notified = 1;
+					}
+				}
 
 				int read_has = SAM_pairer_osr_next_name( orphant_fps[min2_name_fileno],  names + max_name_len*min2_name_fileno, thread_no,  pairer-> total_threads);
 				if(!read_has) *(names + max_name_len*min2_name_fileno)=0;
@@ -3733,6 +3840,8 @@ void * SAM_pairer_thread_run( void * params ){
 		if(pairer -> BAM_header_parsed || thread_no == 0){
 			SAM_pairer_fill_BIN_buff(pairer, thread_context, &is_finished);
 			thread_context -> need_find_start = pairer -> BAM_header_parsed;
+			thread_context -> chunk_number = pairer -> input_chunk_no;
+			pairer -> input_chunk_no ++;
 		}
 		subread_lock_release(&pairer -> input_fp_lock);
 
@@ -3751,7 +3860,8 @@ void * SAM_pairer_thread_run( void * params ){
 		if(pairer -> is_bad_format) break;
 
 		if(thread_context -> immediate_last_read_full_name[0]){
-			SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin);
+			SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name, thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_bin_len ,  thread_context -> immediate_last_read_flags);
+			SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
 			thread_context -> immediate_last_read_full_name[0] = 0;
 		}
 
@@ -4059,6 +4169,7 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 
 		if(pairer -> tiny_mode){
 			// block_remainder
+			int extag_new_len = 0;
 			for(x1 = 0; x1 < block_size; x1++){
 				FIX_GET_NEXT_NCH;
 				if(x1 == 8) name_len = nch;
@@ -4074,16 +4185,78 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 						continue;
 					}
 				}
-				//SUBREADprintf("WR[%d]: %d = %c, SL=%d, RNL=%d, COP=%d\n", out_bin_ptr, nch, nch, seq_len, name_len, cigar_opts);
-				FIX_APPEND_READ(&nch, 1);
-			}
-		//	SUBREADprintf("SQL=%d, CIGAROPT=%d, RNLEN=%d\n", seq_len , cigar_opts , name_len);
-			if(seq_len > 1) {
-				sqlen_ptr[0]=1; sqlen_ptr[1]=0, sqlen_ptr[2]=0; sqlen_ptr[3]=0;
-				new_block_size = block_size - seq_len - (seq_len+1)/2 + 2;
-			} else
-				new_block_size = block_size;
+				char etag_name0 = -1, etag_name1, etag_type;
+				if(x1 == 32 + name_len + 4 * cigar_opts + seq_len + (seq_len+1)/2){
+					while(x1 < block_size){
+						int this_tag_output = 0;
+						if(etag_name0 > 0){
+							FIX_GET_NEXT_NCH;
+						}
+						etag_name0 = nch;
+						FIX_GET_NEXT_NCH;
+						etag_name1 = nch;
+						FIX_GET_NEXT_NCH;
+						etag_type = nch;
+						x1 += 3;
 
+						//SUBREADprintf("ETAG_NAME: %c%c (%c), x1 = %d < %d\n", etag_name0,etag_name1,etag_type, x1, block_size);
+
+						if((( etag_name0 == 'H' && etag_name1 == 'I' ) ||
+						    ( etag_name0 == 'N' && etag_name1 == 'H' ) ||
+						    ( etag_name0 == 'N' && etag_name1 == 'M' )
+						    ) && ( etag_type == 'c' || etag_type == 'C'||etag_type == 's'||etag_type == 'S'||etag_type == 'i'||etag_type == 'I') 
+						  ){
+							FIX_APPEND_READ(&etag_name0,1);
+							FIX_APPEND_READ(&etag_name1,1);
+							FIX_APPEND_READ(&etag_type,1);
+							this_tag_output = 1;
+						//	SUBREADprintf("ADDED INTO BAM\n");
+						}
+						if(etag_type == 'Z'||etag_type =='H'){
+							while(1){
+								FIX_GET_NEXT_NCH;
+								x1++;
+								if(nch == 0)break;
+							}
+						}else if(etag_type == 'A'){
+							FIX_GET_NEXT_NCH;
+							x1++;
+						}else if(etag_type =='B'){
+							FIX_GET_NEXT_NCH;
+							char array_type = nch;
+							int x2, adlen = 1, aditems = 0;
+							if(array_type == 's'||array_type == 'S')adlen = 2;
+							if(array_type == 'i'||array_type == 'I'||array_type == 'f')adlen = 4;
+							for(x2=0;x2<4; x2++) {
+								FIX_GET_NEXT_NCH;
+								aditems += nch << (8*x2);
+							}
+							x1 += 5 + aditems * adlen;
+							for(x2 = 0; x2 < aditems * adlen; x2++) FIX_GET_NEXT_NCH;
+						}else{
+							int dlen = 1;
+							if(etag_type == 's'||etag_type == 'S') dlen = 2;
+							if(etag_type == 'i'||etag_type == 'I' || etag_type == 'f') dlen = 4;
+							if(this_tag_output) extag_new_len += dlen + 3;
+							x1 += dlen;
+							while(dlen > 0){
+								FIX_GET_NEXT_NCH;
+								if(this_tag_output)
+									FIX_APPEND_READ(&nch, 1);
+								dlen--;
+							}
+						}
+					}
+					break;
+				}
+				FIX_APPEND_READ(&nch, 1);
+				//SUBREADprintf("WR[%d]: %d = %c, SL=%d, RNL=%d, COP=%d\n", out_bin_ptr, nch, nch, seq_len, name_len, cigar_opts);
+			}
+
+			seq_len = min(1, seq_len);
+			sqlen_ptr[0]=seq_len; sqlen_ptr[1]=0, sqlen_ptr[2]=0; sqlen_ptr[3]=0;
+			new_block_size = 32 + name_len + 4 * cigar_opts + seq_len + (seq_len+1)/2 + extag_new_len;
+			//SUBREADprintf("ETAG_NLEN=%d, ETAGS=%d\n", new_block_size, extag_new_len);
 			memcpy(block_size_ptr, &new_block_size, 4);
 		}else{
 			for(x1 = 0; x1 < block_size; x1++){

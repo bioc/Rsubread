@@ -88,6 +88,9 @@ typedef struct {
 	unsigned long long input_buff_SBAM_file_start;
 	unsigned long long input_buff_SBAM_file_end;
 
+	unsigned int chunk_number;
+	unsigned int readno_in_chunk;
+
 	unsigned char * input_buff_BIN;
 	int input_buff_BIN_used;
 	int input_buff_BIN_ptr;
@@ -96,8 +99,9 @@ typedef struct {
 	unsigned long long orphant_space;
 	z_stream strm;
 
-	char immediate_last_read_bin[3000];
+	char immediate_last_read_bin[66000];
 	char immediate_last_read_full_name[MAX_READ_NAME_LEN*2 +80 ];
+	int immediate_last_read_flags;
 	int immediate_last_read_bin_len;
 	int immediate_last_read_name_len;
 
@@ -116,14 +120,17 @@ typedef struct {
 	int is_finished;
 	subread_lock_t input_fp_lock;
 	subread_lock_t output_header_lock;
+	subread_lock_t unsorted_notification_lock;
 
 	unsigned long long total_input_reads;
 	unsigned long long total_orphan_reads;
 
+	HashTable * unsorted_notification_table;
 	HashTable * sam_contig_number_table;
 	HashTable * bam_margin_table;
 
 	int total_threads;
+	int input_chunk_no;
 	int input_buff_SBAM_size;
 	int input_buff_BIN_size;
 	char tmp_file_prefix[MAX_FILE_NAME_LENGTH];
@@ -132,10 +139,12 @@ typedef struct {
 	int BAM_header_parsed;
 	unsigned int BAM_l_text;
 	unsigned int BAM_n_ref;
+	int is_unsorted_notified;
 
 	void (* reset_output_function) (void * pairer);
 	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
 	int (* output_header) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len); 
+	void (* unsorted_notification) (void * pairer, char * bin1, char * bin2); // it is called only once
 	// reserved for the application passing its own data to the output function.
 	void * appendix1;
 	void * appendix2;
@@ -283,6 +292,7 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 int SAM_pairer_run( SAM_pairer_context_t * pairer);
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
 void SAM_pairer_writer_reset(void * pairer);
+void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (* unsorted_notification) (void * pairer, char * bin1, char * bin2));
 
 int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * rname, char * bin1, char * bin2 );
 int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len);
