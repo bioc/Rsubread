@@ -285,7 +285,7 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 
 int seekgz_next_char(seekable_zfile_t * fp){
 	if(fp -> internal_error) return -1;
-	if(fp -> in_chunk_offset >= fp -> txt_buffer_used){
+	while(fp -> in_chunk_offset >= fp -> txt_buffer_used){
 		if(feof(fp -> gz_fp) && fp -> stem.avail_in < 10 )
 			return EOF;
 		else {
@@ -299,7 +299,6 @@ int seekgz_next_char(seekable_zfile_t * fp){
 	char retc = fp -> current_chunk_txt[fp -> in_chunk_offset++];
 
 	if(fp -> is_the_last_chunk && fp -> in_chunk_offset == fp -> txt_buffer_used){
-		//fprintf(stderr,"BLOCK_END_POINT ; POS=%llu ; BITS=%u\n", fp -> block_start_in_file_offset, fp -> block_start_in_file_bits);
 		fp -> in_block_offset = 0;
 		fp -> block_start_in_file_offset = fp -> next_block_file_offset;
 		fp -> block_start_in_file_bits   = fp -> next_block_file_bits;

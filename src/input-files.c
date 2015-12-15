@@ -857,8 +857,21 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			if(nch==EOF) return -1;
 			
 			if(nch != '@') {
-				long long int lineno = tell_current_line_no(input);
-				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+				if(input->file_type == GENE_INPUT_FASTQ){
+					long long int lineno = tell_current_line_no(input);
+					SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+				} else {
+					SUBREADprintf("ERROR: a format issue %c is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
+					SUBREADprintf("The lines after the error point:\n");
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+				}
 				return -1;
 			}
 
@@ -883,8 +896,20 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			nch = geinput_getc(input);
 		} while( nch == '\n' );
 		if(nch != '+'){
-			long long int lineno = tell_current_line_no(input);
-			SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+			if(input->file_type == GENE_INPUT_FASTQ){
+				long long int lineno = tell_current_line_no(input);
+				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+			}else{
+				SUBREADprintf("ERROR: a format issue %c is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+			}
 			return -1;
 		}
 		SKIP_LINE;
