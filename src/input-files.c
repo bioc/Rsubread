@@ -2532,8 +2532,6 @@ int SAM_pairer_read_SAM_MB( FILE * fp, int max_read_len, char * inbuff ){
 		while(1){
 			nch = fgetc(fp);
 			if(nch < 0 || nch == '\n'){
-				if(last != '\n') inbuff[ret++]='\n';
-				inbuff[ret] = 0;
 				break;
 			}else{
 				inbuff[ret++]=nch;
@@ -2541,6 +2539,8 @@ int SAM_pairer_read_SAM_MB( FILE * fp, int max_read_len, char * inbuff ){
 			last = nch;
 		}
 	}
+	if(inbuff[ret] != '\n') inbuff[ret++]='\n';
+	inbuff[ret] = 0;
 	return ret;
 }
 
