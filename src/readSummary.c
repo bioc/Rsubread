@@ -3402,6 +3402,14 @@ void print_usage()
 	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
 	SUBREADputs("");
+	SUBREADputs("  -Q <int>            The minimum mapping quality score a read must satisfy in");
+	SUBREADputs("                      order to be counted. For paired-end reads, at least one");
+	SUBREADputs("                      end should satisfy this criteria. 0 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -T <int>            Number of the threads. 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -v                  Output version of the program.");
+	SUBREADputs("");
 	SUBREADputs("  -J                  Count number of reads supporting each exon-exon junction.");
 	SUBREADputs("                      Junctions were identified from those exon-spanning reads");
 	SUBREADputs("                      in the input (containing 'N' in CIGAR string). Counting");

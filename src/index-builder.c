@@ -218,7 +218,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				//printf("TTTXT FN=%s\n",fn);
 
-				for(i=0;(fn[i+1] != ' ' && fn[i+1] != '\0' && fn[i+1] != '\t' && i<47); i++)
+				for(i=0;(fn[i+1] != ' ' && fn[i+1] != '\0' && fn[i+1] != '\t' && i<MAX_CHROMOSOME_NAME_LEN - 1); i++)
 					*(read_names + MAX_READ_NAME_LEN*read_no + i) = fn[i+1];
 
 				*(read_names + MAX_READ_NAME_LEN*read_no + i) = 0;

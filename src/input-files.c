@@ -4312,8 +4312,8 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 
 
 unsigned int nosort_tick_time = 100;
-#define NOSORT_SBAM_BUFF_SIZE 66000
-#define NOSORT_BIN_BUFF_SIZE (2*70000)
+#define NOSORT_SBAM_BUFF_SIZE 500000
+#define NOSORT_BIN_BUFF_SIZE (2*500100)
 
 
 void * SAM_nosort_thread_run( void * params ){
@@ -4339,12 +4339,12 @@ void * SAM_nosort_thread_run( void * params ){
 		//		SUBREADprintf("LOAD BY THREAD %d:", thread_no);
 				memcpy(&record_len, thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4);
 	//			SUBREADprintf("RLEN=%d\n", record_len);
-				assert(record_len > 32 &&record_len < 65000);
+				assert(record_len > 32 &&record_len < 500000);
 				memcpy(read_ptr_1 , thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4 + record_len);
 				thread_context -> input_buff_SBAM_ptr += record_len + 4;
 
 				memcpy(&record_len, thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4);
-				assert(record_len > 32 &&record_len < 65000);
+				assert(record_len > 32 &&record_len < 500000);
 				memcpy(read_ptr_2 , thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4 + record_len);
 				thread_context -> input_buff_SBAM_ptr += record_len + 4;
 				has_found = 1;
@@ -4496,7 +4496,9 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 					for(x2 = 0 ;  ; x2++){
 						int record_len;
 						NOSORT_BAM_next_u32(record_len);
-						if(record_len < 32 || record_len > 65000){
+						if(record_len < 32 || record_len > 500000){
+							if(record_len!=-1)
+								SUBREADprintf("Unexpected record length: %d, program will terminate now.\n", record_len);
 							pairer -> is_finished = 1;
 							break;
 						}
