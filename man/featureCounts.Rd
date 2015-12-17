@@ -3,18 +3,58 @@
 \title{featureCounts: a general-purpose read summarization function}
 \description{This function assigns mapped sequencing reads to genomic features}
 \usage{
-featureCounts(files,annot.inbuilt="mm9",annot.ext=NULL,
-isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",
-useMetaFeatures=TRUE,allowMultiOverlap=FALSE,
-juncCounts=FALSE,genome=NULL,
-isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,
-minFragLength=50,maxFragLength=600,PE_orientation="fr",
-nthreads=1,strandSpecific=0,minMQS=0,
-readExtension5=0,readExtension3=0,read2pos=NULL,
-minOverlap=1,largestOverlap=FALSE,countSplitAlignmentsOnly=FALSE,
-countMultiMappingReads=FALSE,fraction=FALSE,
-countPrimaryAlignmentsOnly=FALSE,countChimericFragments=TRUE,
-ignoreDup=FALSE,maxMOp=10,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
+featureCounts(files,
+
+	# annotation
+	annot.inbuilt="mm9",
+	annot.ext=NULL,
+	isGTFAnnotationFile=FALSE,
+	GTF.featureType="exon",
+	GTF.attrType="gene_id",
+	chrAliases=NULL,
+	
+	# level of summarization
+	useMetaFeatures=TRUE,
+	
+	# overlap between reads and features
+	allowMultiOverlap=FALSE,
+	minOverlap=1,
+	largestOverlap=FALSE,
+	readExtension5=0,
+	readExtension3=0,
+	read2pos=NULL,
+	
+	# multi-mapping reads
+	countMultiMappingReads=FALSE,
+	fraction=FALSE,
+
+	# read filtering
+	minMQS=0,
+	countSplitAlignmentsOnly=FALSE,
+	countPrimaryAlignmentsOnly=FALSE,
+	ignoreDup=FALSE,
+	
+	# strandness
+	strandSpecific=0,
+	
+	# exon-exon junctions
+	juncCounts=FALSE,
+	genome=NULL,
+	
+	# parameters specific to paired end reads
+	isPairedEnd=FALSE,
+	requireBothEndsMapped=FALSE,
+	checkFragLength=FALSE,
+	minFragLength=50,
+	maxFragLength=600,
+	PE_orientation="fr",
+	countChimericFragments=TRUE,	
+	autosort=TRUE,
+	
+	# miscellaneous
+	nthreads=1,
+	maxMOp=10,
+	reportReads=FALSE)
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
@@ -23,8 +63,21 @@ ignoreDup=FALSE,maxMOp=10,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{exon} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
   \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{gene_id} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
+  \item{chrAliases}{ a character string giving the name of a file that contains aliases of chromosome names. The file should be a comma delimited text file that includes two columns. The first column gives the chromosome names used in the annotation and the second column gives the chromosome names used by reads. This file should not contain header lines. Names included in this file are case sensitive.}
   \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features using their values in the ``GeneID" column in the SAF-format annotation file or using the ``gene_id" attribute in the GTF-format annotation file, and reads will assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
+  \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), numbers of overlapping bases from each read in the same pair will be summed. If a negative value is provided, the read will be extended from both ends. \code{1} by default.}
+  \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
+  \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
+  \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
+  \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
+  \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
+  \item{fraction}{ logical indicating if fractional counts will be produced for multi-mapping reads. If \code{TRUE}, a fractional count, 1/n, will be generated for each reported alignment of a multi-mapping read, where n is the total number of alignments reported for that read. \code{countMultiMappingReads} must be set to \code{TRUE} when \code{fraction} is \code{TRUE}.}
+  \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
+  \item{countSplitAlignmentsOnly}{ logical indicating whether only split alignments (their CIGAR strings containing letter 'N') should be used for summarization. \code{FALSE} by default. Example split alignments are exon-spanning reads from RNA-seq data. \code{useMetaFeatures} should be set to \code{FALSE} and \code{allowMultiOverlap} should be set to \code{TRUE}, if the purpose of summarization is to assign exon-spanning reads to all their overlapping exons.}
+  \item{countPrimaryAlignmentsOnly}{ logical indicating if only primary alignments should be counted. Primary and secondary alignments are identified using bit 0x100 in the Flag field of SAM/BAM files. If \code{TRUE}, all primary alignments in a dataset will be counted no matter they are from multi-mapping reads or not (ie. \code{countMultiMappingReads} is ignored).}
+  \item{ignoreDup}{ logical indicating whether reads marked as duplicates should be ignored. \code{FALSE} by default. Read duplicates are identified using bit Ox400 in the FLAG field in SAM/BAM files. The whole fragment (read pair) will be ignored if paired end.}
+  \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{juncCounts}{ logical indicating if number of reads supporting each exon-exon junction will be reported. Junctions are identified from those exon-spanning reads in input data. \code{FALSE} by default.}
   \item{genome}{ a character string giving the name of a FASTA-format file that includes the reference genome sequences. The reference genome provided here should be the same as the one used in read mapping. \code{NULL} by default.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (templates or read pairs) will be counted instead of individual reads. \code{FALSE} by default.}
@@ -33,24 +86,11 @@ ignoreDup=FALSE,maxMOp=10,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
   \item{minFragLength}{ \code{integer} giving the minimum fragment length for paired-end reads. \code{50} by default.}
   \item{maxFragLength}{ \code{integer} giving the maximum fragment length for paired-end reads. \code{600} by default. \code{minFragLength} and \code{maxFragLength} are only applicable when \code{isPairedEnd} is \code{TRUE}. Note that when a fragment spans two or more exons, the observed fragment length might be much bigger than the nominal fragment length.}
   \item{PE_orientation}{ character string giving the orientation of the two reads from the same pair. It has three possible values including \code{fr}, \code{ff} and \code{rf}. Letter \code{f} denotes the forward strand and letter \code{r} the reverse strand. \code{fr} by default (ie. the first read in the pair is on the forward strand and the second read on the reverse strand).}
-  \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
-  \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
-  \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
-  \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
-  \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
-  \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
-  \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), numbers of overlapping bases from each read in the same pair will be summed. If a negative value is provided, the read will be extended from both ends. \code{1} by default.}
-  \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
-  \item{countSplitAlignmentsOnly}{ logical indicating whether only split alignments (their CIGAR strings containing letter 'N') should be used for summarization. \code{FALSE} by default. Example split alignments are exon-spanning reads from RNA-seq data. \code{useMetaFeatures} should be set to \code{FALSE} and \code{allowMultiOverlap} should be set to \code{TRUE}, if the purpose of summarization is to assign exon-spanning reads to all their overlapping exons.}
-  \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
-  \item{fraction}{ logical indicating if fractional counts will be produced for multi-mapping reads. If \code{TRUE}, a fractional count, 1/n, will be generated for each reported alignment of a multi-mapping read, where n is the total number of alignments reported for that read. \code{countMultiMappingReads} must be set to \code{TRUE} when \code{fraction} is \code{TRUE}.}
-  \item{countPrimaryAlignmentsOnly}{ logical indicating if only primary alignments should be counted. Primary and secondary alignments are identified using bit 0x100 in the Flag field of SAM/BAM files. If \code{TRUE}, all primary alignments in a dataset will be counted no matter they are from multi-mapping reads or not (ie. \code{countMultiMappingReads} is ignored).}
-  \item{countChimericFragments}{ logical indicating whether a chimeric fragment, which has its two reads mapped to different chromosomes, should be counted or not. If this fragment overlaps with only one feature (or one meta-feature), typically by one of its two read, this fragment will be assigned to that feature (or meta-feature). If it is found to overlap more than one feature (or meta-feature), for example one of its two reads overlaps meta-feature A and the other overlaps meta-feature B, and \code{allowMultiOverlap} is \code{FALSE}, then this fragment will not be counted. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
-  \item{ignoreDup}{ logical indicating whether reads marked as duplicates should be ignored. \code{FALSE} by default. Read duplicates are identified using bit Ox400 in the FLAG field in SAM/BAM files. The whole fragment (read pair) will be ignored if paired end.}
-  \item{maxMOp}{ \code{integer} giving the maximum number of `M' operations (matches or mis-matches) allowed in a CIGAR string. \code{10} by default. Both `X' and `=' operations are treated as `M' and adjacent `M' operations are merged in the CIGAR string.}
-  \item{chrAliases}{ a character string giving the name of a file that contains aliases of chromosome names. The file should be a comma delimited text file that includes two columns. The first column gives the chromosome names used in the annotation and the second column gives the chromosome names used by reads. This file should not contain header lines. Names included in this file are case sensitive.}
-  \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
+  \item{countChimericFragments}{ logical indicating whether a chimeric fragment, which has its two reads mapped to different chromosomes, should be counted or not. \code{TRUE} by default.}
   \item{autosort}{ logical specifying if the automatic read sorting is enabled. This option is only applicable for paired-end reads. If \code{TRUE}, reads will be automatically sorted by their names if reads from the same pair are found not to be located next to each other in the input. No read sorting will be performed if there are no such reads found.}
+  \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
+  \item{maxMOp}{ \code{integer} giving the maximum number of `M' operations (matches or mis-matches) allowed in a CIGAR string. \code{10} by default. Both `X' and `=' operations are treated as `M' and adjacent `M' operations are merged in the CIGAR string.}
+  \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
   }
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.

@@ -1,3 +1,6 @@
+1 Dec 2015
+(1) Change order of parameters of featureCounts function.
+
 16 Nov 2015 - 1.21.4
 (1) Fix usage section in Rd file for repair function.
 
