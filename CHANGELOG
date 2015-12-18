@@ -1,5 +1,9 @@
+18 Dec 2015 - 1.21.5
+(1) Incorporate changes made in SourceForge Subread 1.5.0-p1 release.
+
 1 Dec 2015
 (1) Change order of parameters of featureCounts function.
+
 
 16 Nov 2015 - 1.21.4
 (1) Fix usage section in Rd file for repair function.
