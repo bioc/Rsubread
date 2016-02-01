@@ -4,7 +4,7 @@
 \title{Read mapping for genomic DNA-seq and RNA-seq data via seed-and-vote (Subread and Subjunc)}
 \description{Subread and Subjunc perform local and global alignments respectively. The seed-and-vote paradigm enables efficient and accurate alignments to be carried out.}
 \usage{
-align(index,readfile1,readfile2=NULL,type=0,input_format="gzFASTQ",output_format="BAM",
+align(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",
 output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
 TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,
 unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",
@@ -23,7 +23,7 @@ reportAllJunctions=FALSE)
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
   \item{readfile1}{ a character vector including names of files that include sequence reads to be aligned. For paired-end reads, this gives the list of files including first reads in each library. File format is FASTQ/FASTA by default. See \code{input_format} option for more supported formats.}
   \item{readfile2}{ a character vector giving names of files that include second reads in paired-end read data. Files included in \code{readfile2} should be in the same order as their mate files included in \code{readfile1} .\code{NULL} by default.}
-  \item{type}{ an integer giving the type of sequencing data. Possible values include \code{0} (RNA-seq data) and \code{1} (genomic DNA-seq data such as WGS, WES, ChIP-seq data etc.).}
+  \item{type}{ a character string or an integer giving the type of sequencing data. Possible values include \code{rna} (or \code{0}; RNA-seq data) and \code{dna} (or \code{1}; genomic DNA-seq data such as WGS, WES, ChIP-seq data etc.). Character strings are case insensitive.}
   \item{input_format}{ character string specifying format of read input files. \code{gzFASTQ} by default (this also includes FASTQ, FASTA and gzipped FASTA formats). Other supported formats include \code{SAM} and \code{BAM}. Character values are case insensitive.}
   \item{output_format}{ character string specifying format of output file. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
   \item{output_file}{ a character vector specifying names of output files. By default, names of output files are set as the file names provided in \code{readfile1} added with an suffix string.}
