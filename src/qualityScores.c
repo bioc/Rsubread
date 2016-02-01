@@ -455,11 +455,40 @@ static struct option qs_long_options[] =
 
 void qualscore_usage()
 {
-	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
+	SUBREADprintf("\nqualityScore Version %s\n\n", SUBREAD_VERSION);
+	SUBREADputs("  Retrieve Phred score for read bases\n");
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs(" ./qualityScores -i input_file -o output_file {--FASTQinput --BAMinput or --SAMinput or --gzFASTQinput} {--first-end or --second-end or --both-ends} {--counted-reads <int>} {--phred-offset 33|64}");
+	SUBREADputs("  ./qualityScores [options] -i <input_file> -o <output_file>");
 	SUBREADputs("");
+	SUBREADputs("Required arguments:");
+	SUBREADputs("");
+	SUBREADputs("  -i <string>  Name of input file including read data. The default format is");
+	SUBREADputs("               Fastq.");
+	SUBREADputs("");
+	SUBREADputs("  -o <string>  Name of output file that is a text file including Phred scores");
+	SUBREADputs("               for each read base.");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments:");
+	SUBREADputs("");
+	SUBREADputs("  --gzFASTQinput Input file is in gzipped Fastq format.");
+	SUBREADputs("");
+	SUBREADputs("  --BAMinput     Input file is in BAM format.");
+	SUBREADputs("");
+	SUBREADputs("  --SAMinput     Input file is in SAM format.");
+	SUBREADputs("");
+	SUBREADputs("  --first-end    Use only first reads in paired-end data. Only applicable for");
+	SUBREADputs("                 paired-end BAM/SAM input.");
+	SUBREADputs("");
+	SUBREADputs("  --second-end   Use only second reads in paired-end data. Only applicable for");
+	SUBREADputs("                 paired-end BAM/SAM input.");
+	SUBREADputs("");
+	SUBREADputs("  --counted-reads <int> Total number of reads to be extracted from the input");
+	SUBREADputs("                 file. 10,000 by default.");
+	SUBREADputs("");
+	SUBREADputs("  --phred-offset <33|64> refer to subread aligner.");
+	SUBREADputs("");
+
 }
 
 #ifdef MAKE_STANDALONE

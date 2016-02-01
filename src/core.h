@@ -451,6 +451,7 @@ typedef struct{
 	int output_buffer_item;
 	int output_buffer_pointer;
 	int is_finished;
+	unsigned int all_mapped_reads;
 	subread_lock_t output_lock;
 } thread_context_t;
 
@@ -632,4 +633,8 @@ void absoffset_to_posstr(global_context_t * global_context, unsigned int pos, ch
 void test_PE_and_same_chro(global_context_t * global_context , unsigned int pos1, unsigned int pos2, int * is_PE_distance, int * is_same_chromosome , int rlen1, int rlen2);
 
 int FIXLENstrcmp(char * fixed_len, char * rname);
+
+int is_valid_digit(char * optarg, char * optname);
+int is_valid_digit_range(char * optarg, char * optname, int min, int max_inc);
+int exec_cmd(char * cmd, char * outstr, int out_limit);
 #endif

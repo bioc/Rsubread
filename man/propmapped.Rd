@@ -21,7 +21,7 @@ A data frame containing the total number of reads, number of mapped reads and pr
 }
 %\references{
 %}
-\author{Wei Shi}
+\author{Wei Shi and Yang Liao}
 %\note{}
 %\seealso{}
 \examples{

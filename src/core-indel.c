@@ -700,7 +700,18 @@ int init_indel_tables(global_context_t * context)
 	
 	if(context->config.is_third_iteration_running)
 	{
+		char * fns = malloc(200);
+		fns[0]=0;
+		exec_cmd("ulimit -n", fns, 200);
+		int max_open_file = atoi(fns);
+		//SUBREADprintf("SYS FILE LIMIT=%d\n", max_open_file);
+		free(fns);
+		max_open_file = max(100, max_open_file);
+		max_open_file = min(3000, max_open_file);
+
+
 		indel_context -> local_reassembly_pileup_files = HashTableCreate(100);
+		indel_context -> local_reassembly_pileup_files -> appendix1 = NULL + max_open_file  * 2/ 3;
 		HashTableSetDeallocationFunctions(indel_context -> local_reassembly_pileup_files, NULL, NULL);
 		HashTableSetKeyComparisonFunction(indel_context -> local_reassembly_pileup_files, my_strcmp);
 		HashTableSetHashFunction(indel_context -> local_reassembly_pileup_files ,HashTableStringHashFunction);
@@ -1790,7 +1801,7 @@ int write_indel_final_results(global_context_t * global_context)
 	for(xk1 = 0; xk1 <  indel_context -> total_events ; xk1++)
 	{ 
 		char * chro_name;
-		unsigned int chro_pos; 
+		int chro_pos; 
 
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 
@@ -1946,7 +1957,7 @@ int write_local_reassembly(global_context_t *global_context, HashTable *pileup_f
 {
 
 	char * chro_name;
-	unsigned int chro_offset;
+	int chro_offset;
 	int delta_pos = 0;
 	int new_read_len = trim_read(global_context, NULL, read_text, qual_text, read_len, &delta_pos);
 
@@ -1973,12 +1984,14 @@ int write_local_reassembly(global_context_t *global_context, HashTable *pileup_f
 	if(0 == locate_gene_position_max(anchor_pos, &global_context -> chromosome_table, &chro_name, &chro_offset, read_len))
 	{
 		char temp_file_name[MAX_FILE_NAME_LENGTH];
+		int close_now = 0;
 
 		sprintf(temp_file_name,"%s@%s-%04u.bin", global_context -> config.temp_file_prefix, chro_name , chro_offset / BASE_BLOCK_LENGTH );
 
-		FILE * pileup_fp = get_temp_file_pointer(temp_file_name, pileup_fp_table); 
+		FILE * pileup_fp = get_temp_file_pointer(temp_file_name, pileup_fp_table, &close_now); 
 		//assert(read_len == strlen(read_text) && read_len > 90);
 		write_read_block_file(pileup_fp , 0, read_name, 0, chro_name , chro_offset, NULL, 0, read_text , qual_text, read_len , 1 , is_anchor_certain , anchor_pos, read_len);
+		if(close_now) fclose(pileup_fp);
 	}
 
 
@@ -3639,8 +3652,8 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 						{
 							int write_cursor;
 							char * chro_begin;
-							unsigned int chro_offset_start = 0;
-							unsigned int chro_offset_end = 0;
+							int chro_offset_start = 0;
+							int chro_offset_end = 0;
 							locate_gene_position_max(contig_start_pos + head_removed_bases ,& global_context -> chromosome_table, &chro_begin, &chro_offset_start, 0);
 							locate_gene_position_max(contig_end_pos - tail_removed_bases ,& global_context -> chromosome_table, &chro_begin, &chro_offset_end, 0);
 							if(full_rebuilt_window_size - read_position_cursor - tail_removed_bases)
@@ -3811,7 +3824,8 @@ void destroy_pileup_table(HashTable* local_reassembly_pileup_files)
 		{
 			if (!cursor) break;
 			FILE * fp = (FILE *)cursor->value;
-			fclose(fp);
+			if(fp != NULL+1)
+				fclose(fp);
 			free((void *)cursor->key);
 			cursor = cursor->next;
 		}
@@ -3896,8 +3910,8 @@ void init_global_context(global_context_t * context)
 {
 	srand(time(NULL));
 
-	memset(context, 0, sizeof(global_context_t));
 	memset(context->module_contexts, 0, 5*sizeof(void *));
+	memset(&context->config, 0, sizeof(configuration_t));
 
 	context->config.fast_run = 0;
 	context->config.memory_use_multiplex = 1;
@@ -3913,7 +3927,7 @@ void init_global_context(global_context_t * context)
 	context->config.max_vote_simples = 5;
 	context->config.max_vote_number_cutoff = 1;
 
-	context->config.experiment_type = CORE_EXPERIMENT_RNASEQ;
+	context->config.experiment_type = 0;
 	context->config.prefer_donor_receptor_junctions = 1;
 	context->config.maximum_translocation_length = 10000;
 	context->config.maximum_colocating_distance = 500;
@@ -3943,7 +3957,7 @@ void init_global_context(global_context_t * context)
 	context->config.convert_color_to_base = 0;
 	context->config.is_gzip_fastq = 0;
 
-	context->config.is_BAM_output = 0;
+	context->config.is_BAM_output = 1;
 	context->config.is_BAM_input = 0;
 	context->config.read_trim_5 = 0;
 	context->config.read_trim_3 = 0;

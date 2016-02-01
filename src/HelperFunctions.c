@@ -213,7 +213,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 					strcpy(mem_chro, chro_name);
 					HashTablePut(tab -> size_table , mem_chro, NULL + inner_cursor);
 					HashTablePut(tab -> contig_table , mem_chro, bin_block);
-					SUBREADprintf("Read '%s' : %u bases\n", chro_name, inner_cursor);
+		//			SUBREADprintf("Read '%s' : %u bases\n", chro_name, inner_cursor);
 					inner_cursor = 0;
 					status = 1;
 					if(nch <= 0) break;
@@ -237,12 +237,13 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 		}
 
 		fclose(fp);
+		return 0;
 	}
 	return 1;
 }
 
-int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int MainPos, const char * CIGAR_Str, const char * Extra_Tags, char ** Chros, unsigned int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read){
-	int ret = RSubread_parse_CIGAR_string(MainChro, MainPos, CIGAR_Str, Chros, Staring_Chro_Points, Section_Start_Read_Pos, Section_Length, is_junction_read);
+int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int MainPos, const char * CIGAR_Str, const char * Extra_Tags, int max_M, char ** Chros, unsigned int * Staring_Chro_Points, unsigned short * Section_Start_Read_Pos, unsigned short * Section_Length, int * is_junction_read){
+	int ret = RSubread_parse_CIGAR_string(MainChro, MainPos, CIGAR_Str, max_M, Chros, Staring_Chro_Points, Section_Start_Read_Pos, Section_Length, is_junction_read);
 
 	char read_main_strand = (((FLAG & 0x40)==0x40) == ((FLAG & 0x10) == 0x10 ))?'-':'+';
 	int tag_cursor=0;
@@ -254,7 +255,7 @@ int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int Ma
 	char current_fusion_char[MAX_CHROMOSOME_NAME_LEN];
 	unsigned int current_fusion_pos = 0;
 	char current_fusion_strand = 0;
-	char current_fusion_cigar[FC_CIGAR_PARSER_ITEMS * 15];
+	char current_fusion_cigar[max_M * 15];
 	current_fusion_cigar [0] =0;
 	current_fusion_char [0]=0;
 
@@ -280,7 +281,7 @@ int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int Ma
 					unsigned int left_pos = current_fusion_pos;
 					if(current_fusion_strand!=read_main_strand)
 						left_pos = find_left_end_cigar(current_fusion_pos, current_fusion_cigar);
-					ret += RSubread_parse_CIGAR_string(current_fusion_char, left_pos, current_fusion_cigar, Chros + ret, Staring_Chro_Points+ ret, Section_Start_Read_Pos+ ret, Section_Length + ret, is_junction_read);
+					ret += RSubread_parse_CIGAR_string(current_fusion_char, left_pos, current_fusion_cigar, max_M - ret, Chros + ret, Staring_Chro_Points+ ret, Section_Start_Read_Pos+ ret, Section_Length + ret, is_junction_read);
 
 					current_fusion_pos = 0;
 					current_fusion_strand = 0;
@@ -319,7 +320,7 @@ int RSubread_parse_CIGAR_Extra_string(int FLAG, char * MainChro, unsigned int Ma
 	return ret;
 }
 
-int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char * CIGAR_Str, char ** Section_Chromosomes, unsigned int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read)
+int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char * CIGAR_Str, int max_M, char ** Section_Chromosomes, unsigned int * Section_Start_Chro_Pos,unsigned short * Section_Start_Read_Pos, unsigned short * Section_Chro_Length, int * is_junction_read)
 {
 	unsigned int tmp_int=0;
 	int cigar_cursor=0;
@@ -339,13 +340,13 @@ int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char
 		{
 			if(ch == 'S')
 				read_cursor += tmp_int;
-			else if(ch == 'M') {
+			else if(ch == 'M' || ch == 'X' || ch == '=') {
 				read_cursor += tmp_int;
 				current_section_chro_len += tmp_int;
 				chromosome_cursor += tmp_int;
 			} else if(ch == 'N' || ch == 'D' || ch=='I' || ch == 0) {
 				if('N' == ch)(*is_junction_read)=1;
-				if(ret < FC_CIGAR_PARSER_ITEMS)
+				if(ret < max_M)
 				{
 					if(current_section_chro_len>0)
 					{
@@ -355,7 +356,7 @@ int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char
 						Section_Chro_Length[ret] = current_section_chro_len;
 						ret ++;
 					}
-				}
+				}else assert(0);
 				current_section_chro_len = 0;
 				if(ch == 'I') read_cursor += tmp_int;
 				else if(ch == 'N' || ch == 'D') chromosome_cursor += tmp_int;

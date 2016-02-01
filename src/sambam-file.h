@@ -95,6 +95,7 @@ typedef struct
 
 	char * input_binary_stream_buffer;
 	int is_eof;
+	int is_paired_end;
 } SamBam_FILE;
 
 
@@ -177,4 +178,8 @@ int is_badBAM(char * fn);
 int SamBam_unzip(char * out , char * in , int inlen);
 
 int SamBam_fetch_next_chunk(SamBam_FILE *fp);
+
+int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage, int max_secs);
+char cigar_op_char(int ch);
+void SamBam_read2bin(char * read_txt, char * read_bin);
 #endif

@@ -69,8 +69,8 @@
 
 //#warning "============ CHANGE THE NEXT LINE TO 120 ========"
 #define EXON_LONG_READ_LENGTH 120
-#define EXON_MAX_CIGAR_LEN 48
-#define FC_CIGAR_PARSER_ITEMS 9
+#define EXON_MAX_CIGAR_LEN 256 
+#define FC_CIGAR_PARSER_ITEMS 11 
 
 #define MAX_INDEL_SECTIONS 7
 //#define XBIG_MARGIN_RECORD_SIZE 24 
@@ -119,12 +119,14 @@ typedef pthread_spinlock_t subread_lock_t;
 #endif
 
 #if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
+#define STANDALONE_exit(i) exit(i)
 #define SUBREADprintf(...) fprintf(stderr, __VA_ARGS__)
 #define SUBREADputs(x) fprintf(stderr, "%s\n", x)
 #define SUBREADputchar(x) fputc(x, stderr)
 #define SUBREADfflush(x) fflush(x)
 #define CORE_SOFT_BR_CHAR '\n'
 #else
+#define STANDALONE_exit(i) return i;
 #define SUBREADprintf Rprintf
 #define SUBREADputs(x) Rprintf("%s\n",(x))
 #define SUBREADputchar(X) Rprintf("%c",(X)) 
@@ -196,6 +198,7 @@ typedef short gene_vote_number_t;
 #define SUBINDEX_VER2 201
 
 #define SUBREAD_INDEX_OPTION_INDEX_GAP 0x0101
+#define SUBREAD_INDEX_OPTION_INDEX_PADDING 0x0102
 
 
 #define CHAR_ESC 27
@@ -271,6 +274,7 @@ typedef struct {
 	char is_small_table;
 	struct gehash_bucket * buckets;
 	int index_gap;
+	int padding;
 } gehash_t;
 
 
@@ -346,6 +350,7 @@ typedef struct{
         char *read_names;
         unsigned int *read_offsets;
 	HashTable * read_name_to_index;
+	int padding;
 } gene_offset_t;
 
 
@@ -371,10 +376,11 @@ typedef struct {
 	char * current_chunk_txt;
 	char * current_chunk_bin;
 	z_stream stem;
+	int current_chunk_txt_size;
 	unsigned int in_pointer;
 	unsigned int in_chunk_offset;
 	unsigned int in_block_offset;
-	unsigned int txt_buffer_size;
+	//unsigned int txt_buffer_size;
 	unsigned int txt_buffer_used;
 	unsigned long long block_start_in_file_offset;
 	unsigned int block_start_in_file_bits;

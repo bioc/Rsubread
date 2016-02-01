@@ -63,6 +63,36 @@ void core_version_number(char * program)
 	SUBREADprintf("\n%s v%s\n\n" , program, SUBREAD_VERSION);
 }
 
+int is_valid_digit(char * optarg, char * optname){
+	int xk1=0;
+	while(1){
+		int nch = optarg[xk1++];
+		if(!nch){
+			if(xk1 == 1){
+				SUBREADprintf("Value for argumant %s-%s is missing.\n", optname[1]?"-":"", optname);
+				return 0;
+			}
+			break;
+		}
+		if(( nch!='-' || xk1 > 1 ) && !isdigit(nch)){
+			SUBREADprintf("Value for argumant %s-%s is not a valid number: '%s'\n", optname[1]?"-":"", optname, optarg);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int is_valid_digit_range(char * optarg, char * optname, int min, int max_inc){
+	if(!is_valid_digit( optarg, optname )) return 0;
+
+	int tv = atoi(optarg);
+	if(tv < min || tv > max_inc){
+		SUBREADprintf("Value for argumant %s-%s is out of range: %d to %d\n", optname[1]?"-":"", optname, min, max_inc);
+		return 0;
+	}
+	return 1;
+}
+
 void warning_file_limit()
 {
 	struct rlimit limit_st;
@@ -74,10 +104,31 @@ void warning_file_limit()
 			print_in_box(80,0,0,"WARNING This operation needs to open many files at same time,");
 			print_in_box(80,0,0,"	but your OS only allows to open %d files.", min(limit_st.rlim_cur , limit_st.rlim_max));
 			print_in_box(80,0,0,"	You can use command 'ulimit -n 500' to raise this limit");
-			print_in_box(80,0,0,"	to 500, or the program may crash or terminate unexpectedly.");
+			print_in_box(80,0,0,"	to 500, or the program may become very slow.");
 			print_in_box(80,0,0,"");
 		}
 	}
+}
+
+int exec_cmd(char * cmd, char * outstr, int out_limit){
+	FILE* pipe = popen(cmd, "r");
+	if (!pipe) return -1;
+
+	outstr[0]=0;
+	char * linebuf = malloc(3000);
+	int out_ptr = 0;
+
+	while (!feof(pipe)) {
+		if (fgets(linebuf, 128, pipe) != NULL){
+			if(out_ptr + strlen(linebuf) < out_limit){
+				strcat(outstr+out_ptr, linebuf);
+				out_ptr += strlen(linebuf);
+			}
+		}
+	}
+	pclose(pipe);
+	free(linebuf);
+	return out_ptr;
 }
 
 void print_in_box(int line_width, int is_boundary, int options, char * pattern,...)
@@ -386,7 +437,8 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 			sprintf(minchr, "%.01f", min_value);
 		else sprintf(minchr, "% 3d", (int)min_value);
 
-		print_in_box(81,0,0, "%4d%%%% completed, %s mins elapsed, total=%dk %s, rate=%2.1fk/s\r", (int)(finished_rate*100), minchr,(int)(guessed_all_reads*1./1000), global_context -> input_reads.is_paired_end_reads?"frags":"reads", reads_per_second/1000);
+	//	print_in_box(81,0,0, "%4d%%%% completed, %s mins elapsed, total=%dk %s, rate=%2.1fk/s\r", (int)(finished_rate*100), minchr,(int)(guessed_all_reads*1./1000), global_context -> input_reads.is_paired_end_reads?"frags":"reads", reads_per_second/1000);
+		print_in_box(81,0,0, "%4d%%%% completed, %s mins elapsed, rate=%2.1fk %s per second\r", (int)(finished_rate*100), minchr, reads_per_second/1000, global_context -> input_reads.is_paired_end_reads?"fragments":"reads");
 	}
 
 	if(progress_report_callback)
@@ -629,6 +681,7 @@ int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_co
 
 	global_context_t * global_context;
 	global_context = (global_context_t*)malloc(sizeof(global_context_t));
+	memset(global_context, 0, sizeof(global_context_t));
 	init_global_context(global_context);
 
 
@@ -975,7 +1028,7 @@ typedef struct{
 	unsigned int linear_position;
 	short soft_clipping_movements;
 	char * chro;
-	unsigned int offset;
+	int offset;
 	int strand;
 	int is_first_section_jumpped;
 
@@ -1057,6 +1110,20 @@ int calc_edit_dist(global_context_t * global_context, mapping_result_t * current
 	return all_mm;
 }
 
+unsigned int move_to_read_head(unsigned int tailpos, char * cigar){
+	int cigar_i = 0, nch;
+	unsigned int tmpi = 0;
+	while(0<(nch = cigar[cigar_i++])){
+		if(isdigit(nch)){
+			tmpi = tmpi * 10 + nch - '0';
+		}else{
+			if(nch == 'N' || nch == 'M' || nch == 'D') tailpos -= tmpi;
+			tmpi = 0;
+		}
+	}
+	return tailpos;
+} 
+
 int convert_read_to_tmp(global_context_t * global_context , subread_output_context_t * output_context, int read_number, int is_second_read, int read_len, char * read_text, char * qual_text, realignment_result_t * current_result, subread_output_tmp_t * r, char * read_name)
 {
 
@@ -1098,24 +1165,27 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		if(global_context -> config.do_fusion_detection)
 		{			
-			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped ,  r->current_cigar_decompress , r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens);
+			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped, r->current_cigar_decompress, r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens);
 
 			int xk1;
 			r->chimeric_sections = chimeric_sections;
 			strcpy(r->out_cigars[0], output_context->out_cigar_buffer[0]);
 			for(xk1=1; xk1<chimeric_sections; xk1++)
 			{
-				unsigned int chimeric_pos;
+				int chimeric_pos;
 				char * chimaric_chr;
 				strcpy(r->out_cigars[xk1], output_context->out_cigar_buffer[xk1]);
+				unsigned int vitual_head_pos = r->out_poses[xk1];
+				char strand_xor = (r->out_strands[xk1] == '-') != is_second_read;//!= (r->out_strands[0]=='-') ;
 
-				if(0==locate_gene_position_max(r->out_poses[xk1],& global_context -> chromosome_table, & chimaric_chr, & chimeric_pos, 0+r->out_lens[xk1]))
+				//if(( r->out_strands[xk1] == '-' ) != (r->out_strands[0]=='-' )) vitual_head_pos = move_to_read_head(vitual_head_pos, r->out_cigars[xk1]);
+
+				if(0==locate_gene_position_max(vitual_head_pos ,& global_context -> chromosome_table, & chimaric_chr, & chimeric_pos, 0+r->out_lens[xk1]))
 				{
 					int soft_clipping_movement = 0;
 					soft_clipping_movement = get_soft_clipping_length(r->out_cigars[xk1]);
-					char strand_xor = (r->out_strands[xk1] == '-');
 					assert(chimaric_chr);
-					sprintf(r->additional_information + strlen(r->additional_information), "\tCG:Z:%s\tCP:i:%u\tCT:Z:%c\tCC:Z:%s", r->out_cigars[xk1] , chimeric_pos + soft_clipping_movement + 1, strand_xor?'-':'+' , chimaric_chr );
+					sprintf(r->additional_information + strlen(r->additional_information), "\tCG:Z:%s\tCP:i:%u\tCT:Z:%c\tCC:Z:%s", r->out_cigars[xk1] , max(1,chimeric_pos + soft_clipping_movement + 1), strand_xor?'-':'+' , chimaric_chr );
 				}
 				else is_r_OK = 0;
 			}
@@ -1291,7 +1361,7 @@ int getFirstM(char * cig){
 
 int calc_tlen(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int read_len_1, int  read_len_2);
 
-int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int is_second_read, int read_len_1, int read_len_2, int current_location_no , int tlen)
+int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , subread_output_tmp_t * rec2, int is_second_read, int read_len_1, int read_len_2, int current_location_no , int tlen, int this_OK, int mate_OK)
 {
 	int ret;
 
@@ -1303,11 +1373,11 @@ int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , 
 		subread_output_tmp_t * this_rec = is_second_read?rec2:rec1;
 		subread_output_tmp_t * mate_rec = is_second_read?rec1:rec2;
 
-		if(this_rec == NULL)  ret |= SAM_FLAG_UNMAPPED;
+		if(this_OK == 0)  ret |= SAM_FLAG_UNMAPPED;
 		else
 			if(this_rec->strand + is_second_read == 1) ret |= SAM_FLAG_REVERSE_STRAND_MATCHED;
 
-		if(mate_rec == NULL)  ret |= SAM_FLAG_MATE_UNMATCHED;
+		if(mate_OK == 0)  ret |= SAM_FLAG_MATE_UNMATCHED;
 		else
 			if(mate_rec->strand + is_second_read != 1) ret |= SAM_FLAG_MATE_REVERSE_STRAND_MATCHED;
 
@@ -1344,7 +1414,7 @@ int calc_flags(global_context_t * global_context, subread_output_tmp_t * rec1 , 
 	{
 		ret = 0;
 
-		if(rec1 == NULL)  ret |= SAM_FLAG_UNMAPPED;
+		if(this_OK == 0)  ret |= SAM_FLAG_UNMAPPED;
 		else
 			if(rec1->strand) ret |= SAM_FLAG_REVERSE_STRAND_MATCHED;
 	}
@@ -1639,14 +1709,14 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 #define write_chunk_results_145 write_chunk_results
 
 // rec1 or rec2 is OK if they are not NULL.
-void write_single_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_tmp_t * rec1, realignment_result_t * raw_r1, subread_output_tmp_t * rec2, realignment_result_t * raw_r2, int all_locations , int current_location , char * read_name_1, char * read_name_2, int read_len_1, int read_len_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2, subread_read_number_t pair_number, int non_informative_subread_r1, int non_informative_subread_r2)
+void write_single_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_tmp_t * rec1, realignment_result_t * raw_r1, subread_output_tmp_t * rec2, realignment_result_t * raw_r2, int all_locations , int current_location , char * read_name_1, char * read_name_2, int read_len_1, int read_len_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2, subread_read_number_t pair_number, int non_informative_subread_r1, int non_informative_subread_r2, int is_R1_OK, int is_R2_OK)
 {
 
 
 	//assert(all_locations <= global_context -> config.reported_multi_best_reads);
 	int tlen = 0;
 
-	if(rec1 && rec2 && rec1->chro == rec2->chro)tlen = calc_tlen(global_context , rec1, rec2,  read_len_1,  read_len_2);
+	if(is_R1_OK && is_R2_OK && rec1->chro == rec2->chro)tlen = calc_tlen(global_context , rec1, rec2,  read_len_1,  read_len_2);
 
 	if(0)
 	if(global_context -> config.do_fusion_detection && rec1 && rec2 && current_location == 0 && rec1 -> chimeric_sections == 1 && rec2 -> chimeric_sections == 1){
@@ -1669,13 +1739,13 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 	}
 
-	int flag1 = calc_flags( global_context , rec1, rec2, 0,  read_len_1,  read_len_2, current_location, tlen);
+	int flag1 = calc_flags( global_context , rec1, rec2, 0,  read_len_1,  read_len_2, current_location, tlen, is_R1_OK, is_R2_OK);
 
 	int flag2 = -1;
 
 	if(global_context->input_reads.is_paired_end_reads)
 	{
-		flag2 = calc_flags( global_context , rec1, rec2, 1,  read_len_1,  read_len_2, current_location, tlen);
+		flag2 = calc_flags( global_context , rec1, rec2, 1,  read_len_1,  read_len_2, current_location, tlen, is_R2_OK, is_R1_OK);
 		if((0 == current_location) && (flag2 & SAM_FLAG_MATCHED_IN_PAIR)) global_context->all_correct_PE_reads  ++;
 	}
 
@@ -1782,11 +1852,11 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 
 
 	if(global_context -> config.space_type == GENE_SPACE_BASE){ 
-		if(rec1) {// && !strstr(rec1->additional_information, "\tNM:i:")){
+		if(is_R1_OK) {// && !strstr(rec1->additional_information, "\tNM:i:")){
 			short rec1_edit = calc_edit_dist(global_context, rec1->raw_result, rec1->cigar , rec1->linear_position, read_text_1, raw_r1 -> final_mismatched_bases);
 			sprintf(rec1->additional_information + strlen( rec1->additional_information), "\tNM:i:%d", rec1_edit );
 		}
-		if(global_context->input_reads.is_paired_end_reads && rec2) //&& !strstr(rec2->additional_information, "\tNM:i:"))
+		if(global_context->input_reads.is_paired_end_reads && is_R2_OK) //&& !strstr(rec2->additional_information, "\tNM:i:"))
 		{
 			short rec2_edit = calc_edit_dist(global_context, rec2->raw_result, rec2->cigar , rec2->linear_position, read_text_2, raw_r2 -> final_mismatched_bases);
 			sprintf(rec2->additional_information + strlen( rec2->additional_information), "\tNM:i:%d", rec2_edit );
@@ -1809,10 +1879,10 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 
-	if(rec1)
+	if(is_R1_OK || is_R2_OK){	// no NH and HI only if both ends are unmapped.
 		sprintf(extra_additional_1 +strlen(extra_additional_1), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
-	if(rec2)
 		sprintf(extra_additional_2 +strlen(extra_additional_2), "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+	}
 
 	if(global_context->config.read_group_id[0])
 	{
@@ -1821,12 +1891,9 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 	char * out_chro1, * out_chro2, *out_cigar1, *out_cigar2;
-	if(rec1)
+	if(is_R1_OK)
 	{
-		assert(rec1->chro);
 		strcat(extra_additional_1, rec1->additional_information);
-		assert(rec1->chro);
-		//printf("STRCAT: + '%s' = '%s'\n",  rec1->additional_information, extra_additional_1);
 		out_chro1 = rec1->chro;
 		out_cigar1 = rec1->cigar;
 	}
@@ -1836,11 +1903,9 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		out_cigar1 = "*";
 	}
 
-	if(rec2)
+	if(is_R2_OK)
 	{
-		assert(rec2->chro);
 		strcat(extra_additional_2, rec2->additional_information);
-		assert(rec2->chro);
 		out_chro2 = rec2->chro;
 		out_cigar2 = rec2->cigar;
 	}
@@ -1852,10 +1917,11 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 
 	int out_offset1=0, out_offset2=0;
 	long long int out_tlen1, out_tlen2;
+	int  out_mapping_quality1 = 0, out_mapping_quality2 = 0;
 
 	out_tlen1 = tlen;
 	out_tlen2 = tlen;
-	if(rec1 && rec2)
+	if(is_R1_OK && is_R2_OK)
 	{
 		if( rec1->offset >  rec2->offset) out_tlen1 = - out_tlen1;
 		else	out_tlen2 = -out_tlen2;
@@ -1865,24 +1931,31 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	{
 		if(global_context -> input_reads.is_paired_end_reads)
 		{
-			if(rec1 || rec2)
-				global_context -> all_mapped_reads++;
+			if(is_R1_OK || is_R2_OK){
+				//SUBREADprintf("MAPTOLEN\n");
+				if(thread_context)
+					thread_context -> all_mapped_reads ++;
+				else
+					global_context -> all_mapped_reads ++;
+			}
 		}
-		else if(rec1)
-			global_context -> all_mapped_reads++;
+		else if(is_R1_OK){
+			if(thread_context)
+				thread_context -> all_mapped_reads ++;
+			else
+				global_context -> all_mapped_reads ++;
+		}
 	}
 
-	if(rec1)
-		out_offset1 = rec1->offset + rec1 -> soft_clipping_movements;
-	if(rec2)
-		out_offset2 = rec2->offset + rec2 -> soft_clipping_movements;
+	if(is_R1_OK){
+		out_offset1 = max(1, rec1->offset + rec1 -> soft_clipping_movements);
+		out_mapping_quality1 = rec1->mapping_quality;
+	}
+	if(is_R2_OK){
+		out_offset2 = max(1, rec2->offset + rec2 -> soft_clipping_movements);
+		out_mapping_quality2 = rec2->mapping_quality;
+	}
 
-
-	int  out_mapping_quality1 = 0, out_mapping_quality2 = 0;
-	if(rec1)
-		 out_mapping_quality1 = rec1->mapping_quality;
-	if(rec2)
-		 out_mapping_quality2 = rec2->mapping_quality;
 
 	char * mate_chro_for_1  = out_chro2;
 	char * mate_chro_for_2  = out_chro1;
@@ -1918,8 +1991,8 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 
-	if(rec1) rec1->raw_result->selected_position += rec1->soft_clipping_movements;
-	if(rec2) rec2->raw_result->selected_position += rec2->soft_clipping_movements;
+	if(is_R1_OK) rec1->raw_result->selected_position += rec1->soft_clipping_movements;
+	if(is_R2_OK) rec2->raw_result->selected_position += rec2->soft_clipping_movements;
 
 }
 
@@ -2223,8 +2296,8 @@ void write_realignments_for_fragment(global_context_t * global_context, thread_c
 		r2_output = out_context -> r2;
 	}
 
-	write_single_fragment(global_context, thread_context, r1_output, res1, r2_output, res2, multi_mapping_number , this_multi_mapping_i , read_name_1, read_name_2, rlen1, rlen2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_number, non_informative_subreads_r1, non_informative_subreads_r2);
-	
+	if((!global_context->config.ignore_unmapped_reads) || (is_2_OK || is_1_OK))
+		write_single_fragment(global_context, thread_context, r1_output, res1, r2_output, res2, multi_mapping_number , this_multi_mapping_i , read_name_1, read_name_2, rlen1, rlen2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_number, non_informative_subreads_r1, non_informative_subreads_r2, is_1_OK, is_2_OK);
 }
 
 
@@ -2913,7 +2986,8 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !global_context->config.do_fusion_detection)
 			{
 
-				if(0 && FIXLENstrcmp("R000002689", read_name_1) ==0 )
+				//SUBREADprintf("P%d %llu %s\n", is_reversed, current_read_number, read_name_1);
+				if(0 && FIXLENstrcmp("R001968841", read_name_1) ==0 )
 				{
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
@@ -3096,7 +3170,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 	else if(task == STEP_ITERATION_ONE)
 		print_in_box(80,0,0, "Detect indels%s...", global_context->config.do_breakpoint_detection?" and junctions":"");
 	else if(task == STEP_ITERATION_TWO)
-		print_in_box(80,0,0, "Finish the %'u %s...", global_context -> processed_reads_in_chunk, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
+		print_in_box(80,0,0, "Finish the %'llu %s...", global_context -> processed_reads_in_chunk, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
 
 	if(global_context->config.all_threads<2)
 	{
@@ -3116,8 +3190,11 @@ int run_maybe_threads(global_context_t *global_context, int task)
 
 		memset(thread_contexts, 0, sizeof(thread_context_t)*64);
 		global_context -> all_thread_contexts = thread_contexts;
-		if(task == STEP_ITERATION_TWO)
+		if(task == STEP_ITERATION_TWO){
 			global_context -> last_written_fragment_number = 0;
+			for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++)
+				thread_contexts[current_thread_no].all_mapped_reads = 0;
+		}
 
 		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++)
 		{
@@ -3150,8 +3227,11 @@ int run_maybe_threads(global_context_t *global_context, int task)
 		{
 			if(thread_contexts[current_thread_no].output_buffer_item > 0)
 				SUBREADprintf("ERROR: UNFINISHED OUTPUT!\n");
-			finalise_indel_thread(global_context, thread_contexts+current_thread_no, task);
-			finalise_junction_thread(global_context, thread_contexts+current_thread_no, task);
+			thread_context_t * thread_context = thread_contexts+current_thread_no;
+
+			finalise_indel_thread(global_context, thread_context, task);
+			finalise_junction_thread(global_context, thread_context, task);
+			global_context -> all_mapped_reads += thread_context -> all_mapped_reads;
 		}
 	}
 
@@ -3427,6 +3507,7 @@ int print_configuration(global_context_t * context)
         print_in_box(80, 0, 1, "");
         if( context->config.second_read_file[0])
         {
+		print_in_box(80, 0, 0, "      All subreads : %d", context->config.total_subreads);
                 print_in_box(80, 0, 0, "   Min read1 votes : %d", context->config.minimum_subread_for_first_read);
                 print_in_box(80, 0, 0, "   Min read2 votes : %d", context->config.minimum_subread_for_second_read);
                 print_in_box(80, 0, 0, " Max fragment size : %d", context->config.maximum_pair_distance);
@@ -3452,6 +3533,12 @@ int print_configuration(global_context_t * context)
         print_in_box(80, 0, 1, "");
         print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
         sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"");
+
+
+	if(!context->config.experiment_type){
+		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"You have to specify the experiment type by using the '-t' option.\n");
+		return -1;
+	}
 
         if(!context->config.first_read_file[0])
         {
@@ -3497,17 +3584,21 @@ int init_paired_votes(global_context_t *context)
 	return 0;
 }
 
+#define FETCH_SEQ_LEN(x1) (context->chromosome_table.read_offsets[xk1] - last_offset+16 - ( 2 * context->chromosome_table.padding ))
+
 void write_sam_headers(global_context_t * context)
 {
 	if(context -> config.is_BAM_output)
 	{
 		SamBam_writer_add_header(context -> output_bam_writer,"@HD\tVN:1.0\tSO:unsorted", 0);
 		int xk1;
-		unsigned int last_offset = 0;
+		int last_offset = 0;
 		char obuf[300];
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
 		{
-			SamBam_writer_add_chromosome(context -> output_bam_writer, context->chromosome_table.read_names+ xk1 * MAX_CHROMOSOME_NAME_LEN, context->chromosome_table.read_offsets[xk1] - last_offset+16, 1);
+			int seq_len = FETCH_SEQ_LEN(x1);
+			//context->chromosome_table.read_offsets[xk1] - last_offset+16
+			SamBam_writer_add_chromosome(context -> output_bam_writer, context->chromosome_table.read_names+ xk1 * MAX_CHROMOSOME_NAME_LEN, seq_len, 1);
 			last_offset = context->chromosome_table.read_offsets[xk1];
 		}
 
@@ -3524,10 +3615,11 @@ void write_sam_headers(global_context_t * context)
 	{
 		sambamout_fprintf(context -> output_sam_fp, "@HD\tVN:1.0\tSO:unsorted\n");
 		int xk1;
-		unsigned int last_offset = 0;
+		int last_offset = 0;
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
 		{
-			sambamout_fprintf(context -> output_sam_fp, "@SQ\tSN:%s\tLN:%u\n", context->chromosome_table.read_names+ xk1 * MAX_CHROMOSOME_NAME_LEN, context->chromosome_table.read_offsets[xk1] - last_offset+16);
+			int seq_len = FETCH_SEQ_LEN(x1);
+			sambamout_fprintf(context -> output_sam_fp, "@SQ\tSN:%s\tLN:%u\n", context->chromosome_table.read_names+ xk1 * MAX_CHROMOSOME_NAME_LEN, seq_len);
 			last_offset = context->chromosome_table.read_offsets[xk1];
 		}
 
@@ -3966,7 +4058,7 @@ int term_strncpy(char * dst, char * src, int max_dst_mem)
 }
 void absoffset_to_posstr(global_context_t * global_context, unsigned int pos, char * res){
 	char * ch;
-	unsigned int off;
+	int off;
 
 	locate_gene_position(pos, &global_context -> chromosome_table, &  ch, &off);
 
@@ -3988,7 +4080,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 
 	int cigar_cursor;
 
-	out_poses[0] = current_perfect_map_start;
+	out_poses[0] = current_perfect_map_start - (is_reversed?1:0);
 	out_strands[0] = is_negative?'-':'+';
 	char main_piece_strand = (is_first_section_negative_strand == is_first_section_reversed)?'+':'-';
 
@@ -4028,7 +4120,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 			if(ncch == 'N')
 			{
 				char * curr_chr, * new_chr;
-				unsigned int curr_offset, new_offset;
+				int curr_offset, new_offset;
 				locate_gene_position_max(current_perfect_cursor, &global_context -> chromosome_table, & curr_chr, & curr_offset, 1);
 				locate_gene_position_max(jummped_location      , &global_context -> chromosome_table, &  new_chr, &  new_offset, 1);
 				assert(curr_chr);
@@ -4051,6 +4143,9 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				if(islower(ncch)){
 					is_reversed = !is_reversed;
 					is_negative = !is_negative;
+
+					if(is_reversed)
+						current_perfect_cursor --;
 				}
 
 				current_perfect_map_start = current_perfect_cursor;
@@ -4062,7 +4157,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				perfect_len = 0;
 
 				current_perfect_section_no++;
-				if(current_perfect_section_no>CIGAR_PERFECT_SECTIONS)break;
+				if(current_perfect_section_no>=CIGAR_PERFECT_SECTIONS)break;
 
 				out_poses[current_perfect_section_no] = current_perfect_map_start - read_cursor;
 				out_strands[current_perfect_section_no] = is_negative?'-':'+';
@@ -4082,13 +4177,17 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				read_cursor += tmpi;
 				if(ncch == 'M')
 					perfect_len += tmpi;
-				if(!is_reversed)
+				if(is_reversed)
+					out_poses[current_perfect_section_no] += tmpi;
+				else
 					current_perfect_cursor += tmpi;
 				tmpi = 0;
 			}
 			else if(ncch == 'D' || ncch == 'N')
 			{
-				if(!is_reversed)
+				if(is_reversed)
+					out_poses[current_perfect_section_no] += tmpi;
+				else
 					current_perfect_cursor += tmpi;
 				tmpi = 0;
 			}
@@ -4228,7 +4327,7 @@ unsigned int calc_end_pos(unsigned int p, char * cigar, unsigned int * all_skipp
 
 void test_PE_and_same_chro_cigars(global_context_t * global_context , unsigned int pos1, unsigned int pos2, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * cigar1, char * cigar2, char *read_name){
  	char * r1_chr, * r2_chr;
-	unsigned int r1_pos, r2_pos;
+	int r1_pos, r2_pos;
 
 	(*is_same_chromosome) = 0;
 	(*is_PE_distance) = 0;
@@ -4263,7 +4362,7 @@ void test_PE_and_same_chro_align(global_context_t * global_context , realignment
 void test_PE_and_same_chro(global_context_t * global_context , unsigned int pos1, unsigned int pos2, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2)
 {
  	char * r1_chr, * r2_chr;
-	unsigned int r1_pos, r2_pos;
+	int r1_pos, r2_pos;
 
 	locate_gene_position(pos1, &global_context -> chromosome_table, & r1_chr, & r1_pos);
 	locate_gene_position(pos2, &global_context -> chromosome_table, & r2_chr, & r2_pos);

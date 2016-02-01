@@ -250,10 +250,10 @@ int write_read_pos(char * chro_name, unsigned int chro_offset_anchor, unsigned s
 
 		if(window_no != last_window_no)
 		{
-
+			int close_now = 0;
 			sprintf(temp_file_name,"%s@%s-%04u.bin", temp_file_prefix, chro_name , window_point / BASE_BLOCK_LENGTH_INDEX );
 
-			FILE * pileup_fp = get_temp_file_pointer(temp_file_name, pileup_fp_table); 
+			FILE * pileup_fp = get_temp_file_pointer(temp_file_name, pileup_fp_table, &close_now); 
 			struct read_position_info record;
 
 			record.chro_offset = htonl(chro_offset_anchor);
@@ -263,6 +263,7 @@ int write_read_pos(char * chro_name, unsigned int chro_offset_anchor, unsigned s
 			strcpy(record.cigar, cigar_str);
 
 			fwrite(&record, sizeof(record), 1, pileup_fp);
+			if(close_now) fclose(pileup_fp);
 
 			last_window_no = window_no;
 		}

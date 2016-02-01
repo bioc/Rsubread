@@ -186,23 +186,23 @@ void propMapped_usage()
 	SUBREADputs("");
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs("  ./prommapped -i <file> {optional arguments}");
+	SUBREADputs("  ./prommapped [options] -i <file>");
 	SUBREADputs("");
 	SUBREADputs("Required arguments:");
 	SUBREADputs("");
-	SUBREADputs("  -i <file> : An input file containing read mapping results. Both SAM or BAM");
-	SUBREADputs("              formats are supported.");
+	SUBREADputs("  -i <string>  An input file containing read mapping results. Both SAM or BAM");
+	SUBREADputs("               formats are supported.");
 	SUBREADputs("");
 	SUBREADputs("Optional arguments:");
 	SUBREADputs("");
-	SUBREADputs("  -o <file> : Name of the file containing the output of this program.");
+	SUBREADputs("  -o <string>  Name of output file including mapping statistics.");
 	SUBREADputs("");
-	SUBREADputs("  -f        : If specified, fragments (read pairs) will be counted instead of");
-	SUBREADputs("              individual reads. This option is only applicable for paired-end");
-	SUBREADputs("              reads.");
+	SUBREADputs("  -f           If specified, fragments (read pairs) will be counted instead of");
+	SUBREADputs("               individual reads. This option is only applicable for paired-end");
+	SUBREADputs("               reads.");
 	SUBREADputs("");
-	SUBREADputs("  -p        : If specified, only properly paired reads will be counted. This");
-	SUBREADputs("              option is only applicable for paired-end reads.");
+	SUBREADputs("  -p           If specified, only properly paired reads will be counted. This");
+	SUBREADputs("               option is only applicable for paired-end reads.");
 	SUBREADputs("");
 
 }

@@ -31,9 +31,13 @@
 #include <stdio.h>
 #include <assert.h>
 #include "input-files.h"
+#include "sambam-file.h"
+#include "hashtable.h"
 #include "seek-zlib.h"
 #include "gene-algorithms.h"
 #include "sublog.h"
+
+#define FAST_PICARD_BAM_PROCESSING 0
 
 unsigned int BASE_BLOCK_LENGTH = 15000000;
 int is_R_warnned = 0;
@@ -152,13 +156,13 @@ long long int guess_gene_bases(char ** files, int file_number)
 
 		if (stat(fname , &statbuf))
 		{
-			//printf("NOT FOUND!!%s\n", fname);
+			//SUBREADprintf("guess_gene_bases NOT FOUND!!%s\n", fname);
 			return -i-1;
 		}
 
 		ret += statbuf.st_size;
 		ret -= 150;
-		if(ret<0)ret=0;
+		if(ret<2)ret=2;
 	}
 	return ret * 70 / 71;
 }
@@ -240,7 +244,8 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 			if(ch == '\r') continue;
 			#endif
 			if (ch == '\n' || ch == EOF) break;
-			buff[ret++] = ch;
+			if(ret < max_read_len-1)
+				buff[ret++] = ch;
 		}
 	
 	}
@@ -452,8 +457,8 @@ int geinput_next_char(gene_input_t * input)
 		int last_br = 0;
 		while (1)
 		{
-			char nch = fgetc(input->input_fp);
-			if (nch <0 && feof(input->input_fp))
+			char nch = fgetc((FILE *)input->input_fp);
+			if (nch <0 && feof((FILE *)input->input_fp))
 				return -2;
 			else if (nch < 0 || nch > 126)SUBREADprintf("\nUnrecognised char = #%d\n", nch);
 
@@ -852,8 +857,21 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			if(nch==EOF) return -1;
 			
 			if(nch != '@') {
-				long long int lineno = tell_current_line_no(input);
-				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+				if(input->file_type == GENE_INPUT_FASTQ){
+					long long int lineno = tell_current_line_no(input);
+					SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+				} else {
+					SUBREADprintf("ERROR: a format issue %c is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
+					SUBREADprintf("The lines after the error point:\n");
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+					SUBREADprintf("%s\n", read_string);
+				}
 				return -1;
 			}
 
@@ -878,8 +896,20 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			nch = geinput_getc(input);
 		} while( nch == '\n' );
 		if(nch != '+'){
-			long long int lineno = tell_current_line_no(input);
-			SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+			if(input->file_type == GENE_INPUT_FASTQ){
+				long long int lineno = tell_current_line_no(input);
+				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+			}else{
+				SUBREADprintf("ERROR: a format issue %c is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
+				SUBREADprintf("%s\n", read_string);
+			}
 			return -1;
 		}
 		SKIP_LINE;
@@ -1208,6 +1238,33 @@ int find_subread_end(int len, int TOTAL_SUBREADS, int subread)
 	}
 }
 
+void fix_cigar_SAM14(char * cig){
+	int tmpi = 0, ci = 0, tmpM = 0, wi = 0;
+	char ncig[EXON_MAX_CIGAR_LEN];
+
+	if(cig[0]=='*'){
+		return;
+	}
+	while(1){
+		int nch = cig[ci];
+		if(isdigit(nch)) tmpi = tmpi * 10 + nch - '0';
+		else{
+			if(nch == '=' || nch == 'X' || nch == 'M'){
+				tmpM += tmpi;
+			}else{
+				if(tmpM > 0){
+					wi += sprintf(ncig + wi, "%dM", tmpM);
+					tmpM = 0;
+				}
+				if(0 == nch) break;
+				else wi += sprintf(ncig + wi, "%d%c", tmpi, nch);
+			}
+			tmpi = 0;
+		}
+		ci++;
+	}
+	memcpy(cig, ncig, wi+1);
+}
 
 //This function returns 0 if the line is a mapped read; -1 if the line is in a wrong format and 1 if the read is unmapped.
 int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, unsigned int * pair_dist, char * sequence , char * quality_string, int * rl, int * repeated)
@@ -1288,6 +1345,8 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 	(*pair_dist) = ret_pairdist;
 	//printf("FLAG=%d\n", (*flags));
 	if(((*flags) & 4) == 4) return 1;
+
+	fix_cigar_SAM14(cigar);
 	return 0;
 	
 }
@@ -1321,17 +1380,19 @@ int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromos
 	return 0;
 }
 
-FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
+FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * close_immediately)
 {
 	FILE * temp_file_pointer = (FILE *) HashTableGet(fp_table, temp_file_name);
-	if(!temp_file_pointer)
-	{
+	*close_immediately = 0;
+
+	if(temp_file_pointer == NULL || temp_file_pointer == NULL + 1) {
+		int need_put = (temp_file_pointer == NULL );
 		char *key_name;
 		key_name = (char *)SUBREAD_malloc(300);
 		if(!key_name)
 			return NULL;
 		strcpy(key_name, temp_file_name);
-		temp_file_pointer = f_subr_open(key_name,"wb");
+		temp_file_pointer = f_subr_open(key_name,"ab");
 
 		if(0&&!temp_file_pointer)
 		{
@@ -1353,7 +1414,14 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 			return NULL;
 		}
 
-		HashTablePut(fp_table, key_name ,temp_file_pointer);
+		int maximum_open_file =  fp_table -> appendix1 - NULL;
+		if( fp_table -> numOfElements < maximum_open_file && need_put)
+			HashTablePut(fp_table, key_name ,temp_file_pointer);
+		else{
+			if(need_put)
+				HashTablePut(fp_table, key_name , NULL + 1);
+			*close_immediately = 1;
+		}
 	}
 
 	return temp_file_pointer;
@@ -1361,7 +1429,8 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table)
 
 void my_fclose(void * fp)
 {
-	fclose((FILE *)fp);
+	if(fp && fp != NULL+1)
+		fclose((FILE *)fp);
 }
 
 int my_strcmp(const void * s1, const void * s2)
@@ -1567,6 +1636,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 {
 	FILE * vfp=fopen(vcf_file, "r");
 	char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
+	int close_now = 0;
 
 	if(!vfp)
 	{
@@ -1620,7 +1690,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 
 		if(get_read_block(chro, atoi(pos_str) , temp_file_suffix, known_chromosomes, &max_section_pos))continue;
 		sprintf(tmpfname, "%s%s", temp_file_prefix , temp_file_suffix);
-		FILE * temp_fp = get_temp_file_pointer(tmpfname, fp_table);
+		FILE * temp_fp = get_temp_file_pointer(tmpfname, fp_table, &close_now);
 		if(temp_fp)
 		{
 			VCF_temp_read_t datum;
@@ -1628,6 +1698,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 			datum.pos = atoi(pos_str);
 			datum.type = CHRO_EVENT_TYPE_SNP;
 			fwrite(&datum, sizeof(VCF_temp_read_t), 1, temp_fp);
+			if(close_now) fclose(temp_fp);
 		}
 	}
 
@@ -1655,6 +1726,18 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
 	HashTableSetKeyComparisonFunction(fp_table, my_strcmp);
 	HashTableSetHashFunction(fp_table,HashTableStringHashFunction);
+
+	char * fns = malloc(200);
+	fns[0]=0;
+	exec_cmd("ulimit -n", fns, 200);
+	int max_open_file = atoi(fns);
+	//SUBREADprintf("SYS FILE LIMIT=%d\n", max_open_file);
+	free(fns);
+
+	max_open_file = max(100, max_open_file);
+	max_open_file = min(3000, max_open_file);
+
+	fp_table -> appendix1 = NULL + max_open_file  * 2/ 3;
 
 	if(event_table!=NULL && event_table->appendix1==NULL)
 	{
@@ -1726,7 +1809,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 			char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
 			char temp_file_name[MAX_CHROMOSOME_NAME_LEN+20+300];
 			FILE * temp_fp;
-			int repeated = -1;
+			int repeated = -1, close_now = 0;
 
 			if(is_first_read)
 			{
@@ -1829,11 +1912,12 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 								if(need_write && insert_length >= 5)
 								{
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
-									temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
+									temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
 									if(!temp_fp) return -1;
 									if(all_mapped_bases)
 										(*all_mapped_bases) += insert_length;
 									write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl);
+									if(close_now) fclose(temp_fp);
 								}
 								insertion_cursor += insert_length;
 								read_cursor += insert_length;
@@ -1880,10 +1964,9 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 				}
 				sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 	
-				temp_fp = get_temp_file_pointer(temp_file_name, fp_table);
-				assert(temp_fp);
-
+				temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
 				write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand, 0,rl);
+				if(close_now)fclose(temp_fp);
 			}
 			read_number ++;
 		}
@@ -2257,13 +2340,17 @@ void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) {
 	free(bam_main -> threads);
 }
 
+void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (* unsorted_notification) (void * pairer, char * bin1, char * bin2)){
+	pairer -> unsorted_notification = unsorted_notification;
+}
+
 // Tiny_Mode only write the following information:
 // Name   Flag   Chro   Pos   Mapq   Cigar   MateChro   MatePos   Tlen  N  I  NH:i:xx  HI:i:xx
 // Tiny_Mode does not work when output and input are both in BAM format
 // in_format can be either 
 // bin_buff_size_per_thread is in Mega-Bytes.
 // It returns 0 if no error
-int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * readname, char * bin1, char * bin2), char * tmp_path, void * appendix1) {
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * readname, char * bin1, char * bin2), char * tmp_path, void * appendix1) {
 
 	memset(pairer, 0, sizeof(SAM_pairer_context_t));
 	pairer -> input_fp = f_subr_open(in_file, "rb");
@@ -2275,7 +2362,12 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 	pairer -> output_function = output_function;
 	pairer -> output_header = output_header_function;
 	pairer -> display_progress = display_progress;
+	pairer -> is_single_end_mode = is_single_end_mode;
+	pairer -> force_do_not_sort = force_do_not_sort;
+
+	subread_init_lock(&pairer -> unsorted_notification_lock);
 	subread_init_lock(&pairer -> input_fp_lock);
+	subread_init_lock(&pairer -> output_header_lock);
 
 	pairer -> total_threads = all_threads;
 	pairer -> input_buff_SBAM_size = bin_buff_size_per_thread * 1024 * 1024;
@@ -2291,12 +2383,31 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 	pairer -> threads = malloc(all_threads * sizeof(SAM_pairer_thread_t));
 	memset(pairer -> threads, 0, all_threads * sizeof(SAM_pairer_thread_t));
 
+	if(pairer ->input_is_BAM){
+		pairer ->bam_margin_table = HashTableCreate(2191);
+		HashTableSetHashFunction(pairer -> bam_margin_table, fc_chro_hash);
+		HashTableSetKeyComparisonFunction(pairer -> bam_margin_table, fc_strcmp_chro);
+		HashTableSetDeallocationFunctions(pairer -> bam_margin_table, free, free);
+	}else{
+		pairer -> sam_contig_number_table = HashTableCreate(21907);
+		HashTableSetHashFunction(pairer -> sam_contig_number_table, fc_chro_hash);
+		HashTableSetKeyComparisonFunction(pairer -> sam_contig_number_table, fc_strcmp_chro);
+		HashTableSetDeallocationFunctions(pairer -> sam_contig_number_table, free, NULL);
+	}
+
+	pairer -> unsorted_notification_table = HashTableCreate(2191);
+	HashTableSetHashFunction(pairer -> unsorted_notification_table, fc_chro_hash);
+	HashTableSetKeyComparisonFunction(pairer -> unsorted_notification_table, fc_strcmp_chro);
+	HashTableSetDeallocationFunctions(pairer -> unsorted_notification_table, free, free);
+
 	int x1;
 
 	for(x1 = 0; x1 < all_threads ; x1++){
 		pairer -> threads[x1].thread_id = x1;
+		pairer -> threads[x1].reads_in_SBAM = 0;
 		pairer -> threads[x1].input_buff_SBAM = malloc(pairer -> input_buff_SBAM_size);
 		pairer -> threads[x1].input_buff_BIN = malloc(pairer -> input_buff_BIN_size);
+
 		pairer -> threads[x1].input_buff_BIN_used = 0;
 		pairer -> threads[x1].orphant_table = HashTableCreate(pairer -> input_buff_SBAM_size / 100);
 		HashTableSetHashFunction(pairer -> threads[x1].orphant_table, fc_chro_hash);
@@ -2309,6 +2420,9 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 		pairer -> threads[x1].strm.next_in = Z_NULL;
 		
 		inflateInit2(&pairer -> threads[x1].strm, PAIRER_GZIP_WINDOW_BITS);
+
+		if(force_do_not_sort)
+			subread_init_lock(&pairer -> threads[x1].SBAM_lock);
 	}
 	return 0;
 }
@@ -2319,14 +2433,24 @@ void SAM_pairer_destroy(SAM_pairer_context_t * pairer){
 	unsigned long long all_orphants = 0;
 	for(x1 = 0; x1 < pairer -> total_threads ; x1++){
 		inflateEnd(&pairer -> threads[x1].strm);
-		free(pairer -> threads[x1].input_buff_SBAM);
 		free(pairer -> threads[x1].input_buff_BIN);
+		free(pairer -> threads[x1].input_buff_SBAM);
 		
+		if(pairer -> force_do_not_sort)
+			subread_destroy_lock(&pairer -> threads[x1].SBAM_lock);
+
 		all_orphants += pairer -> threads[x1].orphant_table->numOfElements;
 		HashTableDestroy(pairer -> threads[x1].orphant_table);
 	}
 
+	if(pairer->input_is_BAM)
+	     HashTableDestroy(pairer -> bam_margin_table);
+	else HashTableDestroy(pairer -> sam_contig_number_table);
+	HashTableDestroy(pairer -> unsorted_notification_table);
+
+	subread_destroy_lock(&pairer -> unsorted_notification_lock);
 	subread_destroy_lock(&pairer -> input_fp_lock);
+	subread_destroy_lock(&pairer -> output_header_lock);
 	delete_with_prefix(pairer -> tmp_file_prefix);
 	fclose(pairer -> input_fp);
 	free(pairer -> threads);
@@ -2338,10 +2462,11 @@ void SAM_pairer_destroy(SAM_pairer_context_t * pairer){
 // always assume that fp is at the start of a BAM GZ block.
 int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 	unsigned char gz_header_12 [12];
+	//SUBREADprintf("STAT GZ  POS=%llu\n", ftello(fp));
 	int read_len = fread(gz_header_12, 1, 12, fp );
 	if(read_len < 12) return -1;
 	if(gz_header_12[0]!=31 || gz_header_12[1]!=139){
-		SUBREADprintf("BAD GZ BAM: %u, %u\n", gz_header_12[0], gz_header_12[1]);
+		SUBREADprintf("Unrecognized Gzip headers: %u, %u\nPlease make sure if the input file is in the BAM format.\n", gz_header_12[0], gz_header_12[1]);
 		return -1;
 	}
 	unsigned short xlen = 0, bsize = 0;
@@ -2374,7 +2499,7 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 		return -1;
 	}
 	read_len = fread(inbuff, 1, bsize - xlen - 19, fp);
-	//SUBREADprintf("GOOD GZ\n");
+	//SUBREADprintf("GOOD GZ , LEN=%d , POS=%llu\n", read_len, ftello(fp));
 
 	// seek over CRC and ISIZE
 	fseek(fp, 8, SEEK_CUR);
@@ -2382,86 +2507,138 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 	return read_len;
 }
 
-#define MIN_BAM_BLOCK_SIZE 66000
+//#define MIN_BAM_BLOCK_SIZE 66000
+#define MIN_BAM_BLOCK_SIZE (1024*1024) 
 
-int SAM_pairer_read_SAM_line( FILE * fp, int max_read_len, char * inbuff ){
-	return read_line(max_read_len, fp, inbuff, 0);
-}
-
-void SAM_pairer_fill_BIN_buff(SAM_pairer_context_t * pairer ,  SAM_pairer_thread_t * thread_contaxt , int * is_finished){
-	// load continuous K blocks and decompress.
-	int current_buffer_used = 0;
-	int current_blocks = 0;
+int SAM_pairer_read_SAM_MB( FILE * fp, int max_read_len, char * inbuff ){
+	int ret = 0;
+	
 	while(1){
-		if(feof(pairer -> input_fp)){
-			*is_finished = 1;
-			break;
-		}
-		if(pairer -> input_buff_SBAM_size - current_buffer_used < MIN_BAM_BLOCK_SIZE) {
-			break;
-		}
-		int this_size = 0;
-
-		if(pairer -> input_is_BAM){
-			this_size = SAM_pairer_read_BAM_block( pairer -> input_fp , pairer -> input_buff_SBAM_size - current_buffer_used , thread_contaxt -> input_buff_SBAM + current_buffer_used);
-		}else{
-			this_size = SAM_pairer_read_SAM_line( pairer -> input_fp , pairer -> input_buff_SBAM_size - current_buffer_used , thread_contaxt -> input_buff_SBAM + current_buffer_used);
-		}
-
-		current_blocks ++;
-		if(this_size >= 0) {
-			current_buffer_used += this_size;
-		} else {
-			*is_finished = 1;
-			break;
+		if(ret >= max_read_len - MIN_BAM_BLOCK_SIZE || feof(fp))break;
+		int rlen = fread(inbuff +ret , 1, max_read_len - MIN_BAM_BLOCK_SIZE - ret , fp);
+		//SUBREADprintf("RLEN=%d, BUF=%d\n", rlen, max_read_len - MIN_BAM_BLOCK_SIZE - ret );
+		if(rlen > 0){
+			int x1;
+			for(x1 = 0; x1 < min(200, rlen); x1++)
+				if(*(inbuff+ret+x1)<8 || *(inbuff+ret+x1)> 127){
+	//				SUBREADprintf("NOT_SAM_ACTUALLY\n");
+					return -1;
+				}
+			ret += rlen;
 		}
 	}
-
-	//SUBREADprintf("PAPA:READ=%d by %d blocks  %p\n", current_buffer_used, current_blocks, thread_contaxt);
-	thread_contaxt -> input_buff_SBAM_used = current_buffer_used;
-	thread_contaxt -> input_buff_SBAM_ptr = 0;
+	if(!feof(fp)){
+		int nch, last=-1;
+		while(1){
+			nch = fgetc(fp);
+			if(nch < 0 || nch == '\n'){
+				break;
+			}else{
+				inbuff[ret++]=nch;
+			}
+			last = nch;
+		}
+	}
+	if(inbuff[ret] != '\n') inbuff[ret++]='\n';
+	inbuff[ret] = 0;
+	return ret;
 }
 
-#define BAM_next_nch { \
-	while(thread_contaxt -> input_buff_BIN_ptr >= thread_contaxt -> input_buff_BIN_used){int retXX = SAM_pairer_fetch_BAM_block(pairer, thread_contaxt);  if(retXX) break;}\
-	nch = thread_contaxt -> input_buff_BIN[thread_contaxt -> input_buff_BIN_ptr++];}
+void SAM_pairer_fill_BIN_buff(SAM_pairer_context_t * pairer ,  SAM_pairer_thread_t * thread_context , int * is_finished){
+	// load continuous 64MB of data into the SBAM buffer of the current thread
+	// For BAM files: must be the entire blocks.
+	// For SAM files: must be the full lines.
+	int current_buffer_used = 0;
+	int current_blocks = 0;
+	if(pairer -> input_is_BAM){
+		while(1){
+			if(feof(pairer -> input_fp)){
+				*is_finished = 1;
+				break;
+			}
+			if(pairer -> input_buff_SBAM_size - current_buffer_used < MIN_BAM_BLOCK_SIZE) {
+				break;
+			}
+			int this_size = 0;
 
-int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_contaxt){
-	if(thread_contaxt -> input_buff_SBAM_used <=  thread_contaxt -> input_buff_SBAM_ptr){
+			this_size = SAM_pairer_read_BAM_block( pairer -> input_fp , pairer -> input_buff_SBAM_size - current_buffer_used , thread_context -> input_buff_SBAM + current_buffer_used);
+
+			current_blocks ++;
+			if(this_size >= 0) {
+				current_buffer_used += this_size;
+			} else {
+				*is_finished = 1;
+				break;
+			}
+		}
+	}else{
+		current_buffer_used = SAM_pairer_read_SAM_MB(pairer -> input_fp , pairer -> input_buff_SBAM_size , thread_context -> input_buff_SBAM);
+		if(current_buffer_used < 1) *is_finished = 1;
+	}
+
+	//SUBREADprintf("PAPA:READ=%d by %d blocks  %p, PTRS=%p %p\n", current_buffer_used, current_blocks, thread_context, thread_context -> input_buff_SBAM, thread_context -> input_buff_BIN);
+	thread_context -> input_buff_SBAM_used = current_buffer_used;
+	thread_context -> input_buff_SBAM_ptr = 0;
+	thread_context -> input_buff_BIN_used = 0;
+	thread_context -> input_buff_BIN_ptr = 0;
+	thread_context -> readno_in_chunk = 0; 
+}
+
+int SAM_pairer_find_start(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context );
+#define BAM_next_nch { \
+	int retXX = 0; while(thread_context -> input_buff_BIN_ptr >= thread_context -> input_buff_BIN_used){retXX = SAM_pairer_fetch_BAM_block(pairer, thread_context);  if(retXX) break;}\
+	if(retXX) nch=-1; else nch = thread_context -> input_buff_BIN[thread_context -> input_buff_BIN_ptr++];}
+
+#define SAM_next_line {\
+	if( thread_context -> input_buff_SBAM_used <= thread_context -> input_buff_SBAM_ptr ){ line_ptr = NULL;}else{\
+	line_ptr = thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr;line_len = 0;\
+	while(line_len + thread_context -> input_buff_SBAM_ptr < thread_context -> input_buff_SBAM_used){ int ccch = thread_context -> input_buff_SBAM[ thread_context -> input_buff_SBAM_ptr + line_len ]; if(ccch == '\n')break; line_len ++;}\
+	thread_context -> input_buff_SBAM_ptr += line_len+1;}}
+
+int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context){
+	if(thread_context -> input_buff_SBAM_used <=  thread_context -> input_buff_SBAM_ptr){
 		return 1;
 	}
 
-	if(thread_contaxt -> input_buff_BIN_ptr < thread_contaxt -> input_buff_BIN_used) {
+	int remained_BIN =  thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr;
+	if( remained_BIN > 0) {
 		int x1;
-		for(x1 = 0 ; x1 < thread_contaxt -> input_buff_BIN_used - thread_contaxt -> input_buff_BIN_ptr; x1++)
-			thread_contaxt -> input_buff_BIN[x1] = thread_contaxt -> input_buff_BIN[x1+thread_contaxt -> input_buff_BIN_ptr];
-		thread_contaxt -> input_buff_BIN_used -= thread_contaxt -> input_buff_BIN_ptr;
-	} else thread_contaxt -> input_buff_BIN_used = 0;
+		for(x1 = 0 ; x1 < thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr; x1++)
+			thread_context -> input_buff_BIN[x1] = thread_context -> input_buff_BIN[x1+thread_context -> input_buff_BIN_ptr];
+		thread_context -> input_buff_BIN_used -= thread_context -> input_buff_BIN_ptr;
+	} else thread_context -> input_buff_BIN_used = 0;
 
-	thread_contaxt -> input_buff_BIN_ptr = 0;
+	thread_context -> input_buff_BIN_ptr = 0;
 
-	thread_contaxt -> strm.zalloc = Z_NULL;
-	thread_contaxt -> strm.zfree = Z_NULL;
-	thread_contaxt -> strm.opaque = Z_NULL;
-	thread_contaxt -> strm.avail_in = 0;
-	thread_contaxt -> strm.next_in = Z_NULL;
+	thread_context -> strm.zalloc = Z_NULL;
+	thread_context -> strm.zfree = Z_NULL;
+	thread_context -> strm.opaque = Z_NULL;
+	thread_context -> strm.avail_in = 0;
+	thread_context -> strm.next_in = Z_NULL;
 
-	inflateReset(&thread_contaxt -> strm);
+	inflateReset(&thread_context -> strm);
 
-	thread_contaxt -> strm.avail_in = (unsigned int)(thread_contaxt -> input_buff_SBAM_used - thread_contaxt -> input_buff_SBAM_ptr);
-	thread_contaxt -> strm.next_in = (unsigned char *)thread_contaxt -> input_buff_SBAM + thread_contaxt -> input_buff_SBAM_ptr;
-	thread_contaxt -> strm.avail_out = pairer -> input_buff_BIN_size - thread_contaxt -> input_buff_BIN_used; 
-	thread_contaxt -> strm.next_out = (unsigned char *)thread_contaxt -> input_buff_BIN + thread_contaxt -> input_buff_BIN_used;
+	thread_context -> strm.avail_in = (unsigned int)(thread_context -> input_buff_SBAM_used - thread_context -> input_buff_SBAM_ptr);
+	thread_context -> strm.next_in = (unsigned char *)thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr;
+	thread_context -> strm.avail_out = pairer -> input_buff_BIN_size - thread_context -> input_buff_BIN_used; 
+	thread_context -> strm.next_out = (unsigned char *)thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_used;
 
-	int ret = inflate(&thread_contaxt ->strm, Z_FINISH);
+	int ret = inflate(&thread_context ->strm, Z_FINISH);
 	if(ret == Z_OK || ret == Z_STREAM_END)
 	{
-		int have = pairer -> input_buff_BIN_size - thread_contaxt ->strm.avail_out - thread_contaxt -> input_buff_BIN_used;
-		int used_BAM = (unsigned int)(thread_contaxt -> input_buff_SBAM_used - thread_contaxt -> input_buff_SBAM_ptr) - thread_contaxt -> strm.avail_in;
+		int have = pairer -> input_buff_BIN_size - thread_context ->strm.avail_out - thread_context -> input_buff_BIN_used;
+		int used_BAM = (unsigned int)(thread_context -> input_buff_SBAM_used - thread_context -> input_buff_SBAM_ptr) - thread_context -> strm.avail_in;
 		
-		thread_contaxt -> input_buff_BIN_used += have;
-		thread_contaxt -> input_buff_SBAM_ptr += used_BAM;
-		//SUBREADprintf("BAM USED=%d, BIN GENERATED=%d\n", used_BAM, have);
+		thread_context -> input_buff_BIN_used += have;
+		thread_context -> input_buff_SBAM_ptr += used_BAM;
+
+		if(thread_context -> need_find_start){
+			int test_read_bin = SAM_pairer_find_start(pairer, thread_context);
+			if(test_read_bin<1){
+				pairer -> is_bad_format = 1;
+				SUBREADprintf("BIN REMAIN=%d, BAM USED=%d, BIN GENERATED=%d, BAM REMAIN=%d, TEST_READ_BIN=%d\n", remained_BIN, used_BAM, have, thread_context -> input_buff_SBAM_used - thread_context -> input_buff_SBAM_ptr, test_read_bin);
+			}
+		}
 	} else {
 		SUBREADprintf("GZIP ERROR:%d\n", ret);
 		return 1;
@@ -2477,7 +2654,7 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
   BAM_next_nch; (v) += nch*poww;\
 }
 
-void SAM_pairer_reduce_BAM_bin(SAM_pairer_context_t * pairer, SAM_pairer_thread_t * thread_contaxt,  unsigned char * bin_where, int * bin_len){
+void SAM_pairer_reduce_BAM_bin(SAM_pairer_context_t * pairer, SAM_pairer_thread_t * thread_context,  unsigned char * bin_where, int * bin_len){
 	unsigned int seq_len, name_len, cigar_ops;
 	memcpy(&seq_len, bin_where + 20, 4);
 	if(seq_len<=1) return;
@@ -2503,11 +2680,13 @@ void SAM_pairer_reduce_BAM_bin(SAM_pairer_context_t * pairer, SAM_pairer_thread_
 	
 }
 
-int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_contaxt , unsigned char ** bin_where, int * bin_len ) {
-	int read_is_load = 0;
+#define MAX_BIN_RECORD_LENGTH (1024*1024)
+int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context, int include_sequence);
+
+int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , unsigned char ** bin_where, int * bin_len ) {
 	if( pairer -> input_is_BAM ){
 		int nch = 0;
-		while(!read_is_load){
+		while(1){
 			if(!pairer -> BAM_header_parsed){
 				int x1;
 				unsigned int bam_signature;
@@ -2515,20 +2694,21 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				BAM_next_u32(pairer -> BAM_l_text);
 				char * header_txt = malloc(pairer->BAM_l_text);
 
-			//	SUBREADprintf("HEAD_TXT=%d\n", pairer -> BAM_l_text);
+				//SUBREADprintf("HEAD_TXT=%d\n", pairer -> BAM_l_text);
 				for(x1 = 0 ; x1 < pairer -> BAM_l_text; x1++){
 					BAM_next_nch;
 					header_txt [x1] = nch;
 				}
-				pairer -> output_header(pairer, thread_contaxt -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
+				pairer -> output_header(pairer, thread_context -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
 
 				BAM_next_u32(pairer -> BAM_n_ref);
-			//	SUBREADprintf("HEAD_CHRO=%d\n", pairer -> BAM_n_ref);
+				//SUBREADprintf("HEAD_CHRO=%d\n", pairer -> BAM_n_ref);
 				unsigned int ref_bin_len = 0;
 				for(x1 = 0; x1 < pairer -> BAM_n_ref; x1++) {
 					unsigned int l_name, l_ref, x2;
 					char ref_name[MAX_CHROMOSOME_NAME_LEN];
 					BAM_next_u32(l_name);
+					assert(l_name < 256);
 					memcpy(header_txt + ref_bin_len, &l_name, 4);
 					ref_bin_len += 4;
 					for(x2 = 0; x2 < l_name; x2++){
@@ -2545,57 +2725,356 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				}
 
 				//exit(0);
-				pairer -> output_header(pairer, thread_contaxt -> thread_id, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
+				pairer -> output_header(pairer, thread_context -> thread_id, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
 
 				free(header_txt);
 
 				pairer -> BAM_header_parsed = 1;
 				if(pairer -> display_progress)
 					SUBREADprintf("\nThe header was parsed: %d reference sequences were found.\nScanning the input file.\n", pairer -> BAM_n_ref);
-				SAM_pairer_fetch_BAM_block(pairer, thread_contaxt);
+				SAM_pairer_fetch_BAM_block(pairer, thread_context);
+
+				//SUBREADprintf("HEAD_FINISHED, BAD=%d\n", pairer -> is_bad_format);
 			}
-			while( thread_contaxt -> input_buff_BIN_used == thread_contaxt -> input_buff_BIN_ptr){
-				//SUBREADprintf("LOAD BLOCK: BINPTR = %d\n", thread_contaxt -> input_buff_BIN_ptr);
-				int ret_fetch = SAM_pairer_fetch_BAM_block(pairer, thread_contaxt);
-				//SUBREADprintf("LOAD BLOCK: BINLEN = %d\n", thread_contaxt -> input_buff_BIN_used);
+
+			if(pairer -> is_bad_format) return 0;
+
+			while(thread_context -> input_buff_BIN_used <= thread_context -> input_buff_BIN_ptr){
+				int ret_fetch = SAM_pairer_fetch_BAM_block(pairer, thread_context);
 				if(ret_fetch) 
 					return 0;
-			}		
+			}
 
 			unsigned int record_len=0;
+			memcpy(&record_len, thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr, 4);
+			thread_context -> input_buff_BIN_ptr += 4;
 
-			if(thread_contaxt -> input_buff_BIN_ptr + 4 > thread_contaxt -> input_buff_BIN_used )
-			{
-				if(!pairer -> is_bad_format){
-					pairer -> is_bad_format = 1;
-					//SUBREADprintf("FORMAT ERROR 1 ; ptr=%u\n", thread_contaxt -> input_buff_BIN_ptr);
-					return 0;
-				}
-			}
-			memcpy(&record_len, thread_contaxt -> input_buff_BIN + thread_contaxt -> input_buff_BIN_ptr, 4);
-			thread_contaxt -> input_buff_BIN_ptr += 4;
+			//SUBREADprintf("RECLEN=%d, MAX=%d\n", record_len, MAX_BIN_RECORD_LENGTH);
 
-			if(thread_contaxt -> input_buff_BIN_ptr + record_len > thread_contaxt -> input_buff_BIN_used ){
-				if(!pairer -> is_bad_format){
-					pairer -> is_bad_format = 1;
-					//SUBREADprintf("FORMAT ERROR 2 ; len=%u, ptr=%u\n", record_len, thread_contaxt -> input_buff_BIN_ptr);
-					return 0;
-				}
+			if(record_len < 32 || record_len > MAX_BIN_RECORD_LENGTH || thread_context -> input_buff_BIN_used < thread_context -> input_buff_BIN_ptr + record_len ){
+				//SUBREADprintf("BAD FORMAT:%u\n", record_len);
+				pairer -> is_bad_format = 1;
+				return 0;
 			}
 
-			//SUBREADprintf("BIN-LEN=%u\n" , record_len);
-			(* bin_where) = thread_contaxt -> input_buff_BIN + thread_contaxt -> input_buff_BIN_ptr - 4;
+			/*
+			while(thread_context -> input_buff_BIN_used <= thread_context -> input_buff_BIN_ptr + record_len){
+				int ret_fetch = SAM_pairer_fetch_BAM_block(pairer, thread_context);
+				if(ret_fetch) 
+					return 0;
+			}*/
+
+			(* bin_where) = thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr - 4;
 			(* bin_len) = record_len + 4;
-			thread_contaxt -> input_buff_BIN_ptr += record_len;
+			thread_context -> input_buff_BIN_ptr += record_len;
 
-			if( pairer -> tiny_mode )SAM_pairer_reduce_BAM_bin(pairer, thread_contaxt, *bin_where, bin_len);
-			//SUBREADprintf("FORMAT OK 2 ; len=%u, ptr=%u\n", record_len, thread_contaxt -> input_buff_BIN_ptr);
+			if( pairer -> tiny_mode )SAM_pairer_reduce_BAM_bin(pairer, thread_context, *bin_where, bin_len);
+
 			return 1;
 		}
 	} else {
+		char *line_ptr;
+		int line_len=0, passed_read_SBAM_ptr = -1;
+		if(!pairer -> BAM_header_parsed){
+			char * header_start = NULL;
+			int header_len = 0;
+			while(1){
+				SAM_next_line;
+				if(NULL == header_start && line_ptr[0] == '@') header_start = line_ptr;
+
+				if(NULL == line_ptr){
+					passed_read_SBAM_ptr = line_ptr - thread_context -> input_buff_SBAM;
+					//SUBREADprintf("FATAL: the header is too large to the buffer!\n");
+					break;
+				}else{
+					//SUBREADprintf("LINELEN=%d, PTR=%d, FIRST=%c\n", line_len, thread_context -> input_buff_SBAM_ptr , line_ptr[0]);
+				}
+				if(line_ptr[0]=='@'){
+					header_len += 1+line_len;
+				}else{
+					passed_read_SBAM_ptr = line_ptr - thread_context -> input_buff_SBAM;
+					break;
+				}
+			}
+
+			pairer -> output_header(pairer, thread_context -> thread_id, 1, header_len , header_start , header_len);
+			thread_context -> input_buff_SBAM_ptr = 0;
+			int header_bin_ptr = 0, header_contigs = 0;
+			while(1){
+				SAM_next_line;
+				if(line_ptr == NULL || line_ptr[0]!='@') break;
+				if(memcmp(line_ptr, "@SQ\t",4)==0){
+					unsigned int ct_len = 0, ctptr = 4, status = 0, sqname_len = 0;
+					char * sqname = NULL;
+					while(1){
+						char ctnch = line_ptr[ctptr++];
+						if( status == 0){
+							if(ctnch=='S' && line_ptr[ctptr] == 'N' && line_ptr[ctptr+1] == ':'){
+								ctptr += 2;
+								status = 10;
+								sqname = line_ptr + ctptr;
+							}else if(ctnch=='L' && line_ptr[ctptr] == 'N' && line_ptr[ctptr+1] == ':'){
+								ctptr += 2;
+								status = 20;
+							}else	status = 30;
+						}else if(status == 10 || status == 20 || status == 30){
+							if(ctnch == '\t' || ctnch == '\n'){
+								status = 0;
+								if(ctnch == '\n') break;
+								//break;
+							}
+							if(status == 10) sqname_len ++;
+							else if(status == 20) ct_len = ct_len * 10 + ctnch - '0';
+						}
+					}
+
+
+					sqname_len += 1;
+					memcpy(header_start + header_bin_ptr, &sqname_len, 4);
+					header_bin_ptr += 4;
+					memcpy(header_start + header_bin_ptr, sqname, sqname_len-1);
+					*(header_start + header_bin_ptr + sqname_len - 1) = 0;
+					char * mem_contig_name = malloc(sqname_len);
+					strcpy(mem_contig_name , header_start + header_bin_ptr);
+					//SUBREADprintf("CONTIG %d : %s (len=%d = %d)\n", header_contigs, header_start + header_bin_ptr , sqname_len, strlen(mem_contig_name));
+					HashTablePut(pairer -> sam_contig_number_table , mem_contig_name, NULL + 1 + header_contigs);
+					header_bin_ptr += sqname_len;
+
+					memcpy(header_start + header_bin_ptr, &ct_len, 4);
+					header_bin_ptr += 4;
+					header_contigs++;
+				}
+			}
+
+			pairer -> output_header(pairer, thread_context -> thread_id, 0, header_contigs , header_start , header_bin_ptr);
+			pairer -> BAM_header_parsed = 1;
+		}
+
+		if(passed_read_SBAM_ptr >=0)
+			thread_context -> input_buff_SBAM_ptr = passed_read_SBAM_ptr;
+
+		if( thread_context -> input_buff_SBAM_ptr < thread_context -> input_buff_SBAM_used ){
+			thread_context -> input_buff_BIN_ptr = 0;
+			*bin_len = reduce_SAM_to_BAM(pairer, thread_context,!pairer -> tiny_mode);
+			*bin_where = (unsigned char *)thread_context -> input_buff_BIN;
+
+			return ((*bin_len) > 0 && !pairer->is_bad_format)?1:0;
+		}
 		return 0;
 	}
 	return 0;
+}
+
+int online_register_contig(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context, char * ref){
+	int reflen = strlen(ref);
+	char * header_sec = malloc(reflen + 20);
+	reflen++;
+	memcpy(header_sec, &reflen, 4);
+	memcpy(header_sec + 4, ref, reflen);
+	memset(header_sec + 4+reflen, 0, 4);
+	subread_lock_occupy(&pairer -> output_header_lock);
+	
+	int refId = HashTableGet(pairer->sam_contig_number_table, ref) - NULL - 1;
+	if(refId < 0){
+		refId = pairer->sam_contig_number_table->numOfElements;
+		pairer -> output_header(pairer, thread_context -> thread_id, 0, 1 , header_sec , 8+reflen);
+		char * mem_ref = malloc(reflen);
+		memcpy(mem_ref, ref, reflen);
+		HashTablePut(pairer->sam_contig_number_table, mem_ref, NULL + refId + 1);
+	}
+	subread_lock_release(&pairer -> output_header_lock);
+	free(header_sec);
+	return refId;
+}
+
+#define set_memory_int(ptr, iii)  { *(ptr) = (iii)&0xff; *(ptr+1) = (iii>>8)&0xff;  *(ptr+2) = (iii>>16)&0xff;*(ptr+3) = (iii>>24); }
+
+int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context, int include_sequence){
+
+
+	int column_no = 0, in_ptr = 0;
+	char * in_str = thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr;
+	char * read_name = NULL, * ref = NULL, * mate_ref = NULL, * cigar = NULL, * seq = NULL, * qual = NULL;
+	int flag = 0, pos = 0, mapq = 0, mate_pos = 0, tlen = 0, l_read_name = 0, tlen_sign = 1, l_seq = 0;
+
+	read_name = in_str;
+	while(1){
+		int nch = in_str[in_ptr];
+		if(nch == '\n' || nch == '\0') {
+			break;
+		}else if(nch == '\t'){
+			if(column_no == 0 || column_no == 2 || column_no == 5 || column_no == 6 || column_no == 9)
+				in_str[in_ptr] = 0;
+			column_no ++;
+			if(column_no == 2) ref = in_str + in_ptr + 1;
+			else if(column_no == 5) cigar = in_str + in_ptr + 1;
+			else if(column_no == 6) mate_ref  = in_str + in_ptr + 1;
+			else if(column_no == 9) seq = in_str + in_ptr + 1;
+			else if(column_no == 10) qual = in_str + in_ptr + 1;
+			else if(column_no == 11) break;
+		}else{
+			if(column_no == 0) l_read_name ++;
+			else if(column_no == 1) flag = flag *10 + nch - '0';
+			else if(column_no == 3) pos = pos *10 + nch - '0';
+			else if(column_no == 4) mapq = mapq *10 + nch - '0';
+			else if(column_no == 7) mate_pos = mate_pos *10 + nch - '0';
+			else if(column_no == 9) l_seq ++;
+			else if(column_no == 8){
+				if(nch == '-') tlen_sign = -1;
+				else tlen = tlen *10 + nch - '0';
+			} 
+		}
+
+		in_ptr++;
+	}
+	if(column_no < 10){
+		//SUBREADprintf("RETURN_LESS:%d\n", column_no);
+		return -1;
+	}
+	l_read_name++;
+
+	char * bin_tmp = (char *)thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr;
+
+	int refID = HashTableGet(pairer->sam_contig_number_table, ref) - NULL - 1;
+	if(refID < 0 && ref[0]!='*')
+		refID = online_register_contig(pairer, thread_context, ref);
+	set_memory_int(bin_tmp + 4, refID);
+
+	pos -= 1;
+	set_memory_int(bin_tmp + 8, pos);
+
+	int mapq_nl = mapq << 8 | l_read_name;
+	set_memory_int(bin_tmp + 12, mapq_nl);
+
+	int coverage;
+	int cigar_ops = SamBam_compress_cigar(cigar, (int *)(bin_tmp + 36 + l_read_name), &coverage, 10000);
+	int flag_nc = flag << 16 | cigar_ops;
+	set_memory_int(bin_tmp + 16, flag_nc);
+
+	if(include_sequence){
+		set_memory_int(bin_tmp + 20, l_seq); // SEQ_LEN
+	}else	set_memory_int(bin_tmp + 20, 1);
+
+	int mate_refID = refID;
+	if(mate_ref[0]!='=' || mate_ref[1]!=0)
+		mate_refID = HashTableGet(pairer->sam_contig_number_table, mate_ref) - NULL - 1;
+
+	if(mate_refID < 0 && mate_ref[0]!='*')
+		mate_refID = online_register_contig(pairer, thread_context, mate_ref);
+
+	set_memory_int(bin_tmp + 24, mate_refID);
+
+	mate_pos -= 1;
+	set_memory_int(bin_tmp + 28, mate_pos);
+
+	tlen = tlen * tlen_sign;
+	set_memory_int(bin_tmp + 32, tlen);
+
+	memcpy(bin_tmp + 36, read_name, l_read_name);
+
+	int bin_ptr = 36 + l_read_name + 4 * cigar_ops;
+
+	if(include_sequence){
+		int xk1, nch;
+		//SUBREADprintf("SEQ (%d = %d) = %s\n", strlen(seq), l_seq, seq);
+		//SUBREADprintf("QUA (%d = %d) = %s\n\n", strlen(qual), l_seq, qual);
+		SamBam_read2bin(seq  , bin_tmp +  bin_ptr);
+		bin_ptr += (l_seq + 1) / 2;
+		for(xk1=0; xk1 < l_seq; xk1++){
+			nch = qual[xk1];
+			bin_tmp[bin_ptr++] = nch - 33;
+		}
+	}else{
+		bin_tmp[bin_ptr ++] = 0xff;
+		bin_tmp[bin_ptr ++] = 0xff;
+	}
+
+	if(column_no == 11)	// has extra tags
+	{
+		while(in_str[in_ptr] == '\t'){
+			if((!isalpha(in_str[in_ptr+1])) || (!isalpha(in_str[in_ptr+2])) || (!isalpha(in_str[in_ptr+4]))){
+				while(in_str[in_ptr] !='\n')in_ptr++;
+				break;
+			}
+			in_ptr ++;
+
+			int is_important_tag =  (in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'H') ||
+						(in_str[in_ptr+0] == 'H' && in_str[in_ptr+1] == 'I') ||
+						(in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'M') ;
+			int xxnch;
+			if(in_str[in_ptr + 3] == 'Z'){
+				if(!pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'Z';
+					bin_ptr += 3;
+				}
+				in_ptr += 5;
+				while(1){
+					xxnch = *(in_str + in_ptr);
+					if(xxnch == '\n' || xxnch == '\t') break;
+					if(!pairer -> tiny_mode)
+						*(bin_tmp + (bin_ptr++)) = xxnch;
+					in_ptr ++;
+				}
+				if(!pairer -> tiny_mode)
+					*(bin_tmp + (bin_ptr++)) = 0;
+			}else if(in_str[in_ptr + 3] == 'i'){
+				int tmpi = 0, tmpi_sign = 1;
+				if(is_important_tag || !pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'i';
+					bin_ptr += 3;
+				}
+
+				in_ptr += 5;
+
+				while(1){
+					xxnch = *(in_str + in_ptr);
+					if(xxnch == '\n' || xxnch == '\t') break;
+					else if(xxnch == '-') tmpi_sign = -1;
+					else tmpi = tmpi * 10 + xxnch - '0';
+					in_ptr ++;
+				}
+				tmpi *= tmpi_sign;
+				if(is_important_tag || !pairer -> tiny_mode){
+					set_memory_int(bin_tmp+bin_ptr, tmpi);
+					bin_ptr += 4;
+				}
+			}else if(in_str[in_ptr + 3] == 'A'){
+				if(!pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'A';
+					bin_tmp[bin_ptr+3] = in_str[in_ptr+5];
+					bin_ptr += 4;
+				}
+				in_ptr += 6;
+			}else{
+				in_ptr += 5;
+				while(1){
+					xxnch = *(in_str + in_ptr);
+					if(xxnch == '\n' || xxnch == '\t') break;
+					in_ptr++;
+				}
+			}
+		}
+		
+	}
+
+	thread_context -> input_buff_SBAM_ptr += in_ptr + 1;
+	if(bin_ptr > 60000){
+		SUBREADprintf("ERROR: the read record length (%d) is longer than the limit. The program has to terminate. \n", bin_ptr);
+		pairer -> is_bad_format = 1;
+	}
+
+	bin_ptr -= 4;
+	set_memory_int(bin_tmp, bin_ptr);
+	bin_ptr += 4;
+	//memcpy(buf, bin_tmp, bin_ptr);
+	
+	return bin_ptr;
 }
 
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value){
@@ -2651,6 +3130,7 @@ int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_nam
                         else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
 			skip_content += 4 + 1;
                 }else{
+			SUBREADprintf("UnknownTag=%c\n", bin[bin_cursor+2]);
 			assert(0);
 		}
 		//SUBREADprintf("SKIP=%d\n", skip_content);
@@ -2659,68 +3139,72 @@ int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_nam
         return found;
 }
 
-int SAM_pairer_get_read_full_name( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_contaxt , unsigned char * bin, int bin_len , char * full_name, int * this_flag){
+int SAM_pairer_get_read_full_name( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , unsigned char * bin, int bin_len , char * full_name, int * this_flag){
         full_name[0]=0;
         int rlen = 0;
-        if( pairer -> input_is_BAM ){
-                unsigned int l_read_name = 0;
-                unsigned int refID = 0;
-                unsigned int next_refID = 0;
-                unsigned int pos = 0, l_seq = 0, cigar_opts;
-                unsigned int next_pos = 0, tmpi = 0;
-                int FLAG;
+	unsigned int l_read_name = 0;
+	unsigned int refID = 0;
+	unsigned int next_refID = 0;
+	unsigned int pos = 0, l_seq = 0, cigar_opts;
+	unsigned int next_pos = 0, tmpi = 0;
+	int FLAG;
 
-                int HItag = -1;
-
-
-                memcpy(&refID, bin + 4, 4);
-                memcpy(&pos, bin + 8, 4);
-                memcpy(&tmpi, bin + 12, 4);
-		l_read_name = tmpi & 0xff;
-		memcpy(&tmpi, bin + 16, 4);
-		FLAG = (tmpi >> 16)&0xffff;
-		(*this_flag) = FLAG;
-		cigar_opts = tmpi & 0xffff;
-		memcpy(&next_refID, bin + 24, 4);
-		memcpy(&next_pos, bin + 28, 4);
-		memcpy(full_name, bin+36, l_read_name);
-		unsigned int r1_refID, r1_pos, r2_refID, r2_pos;
-
-		if(FLAG & 4){
-			refID = -1;
-			pos = 0;
-		}
-
-		if(FLAG & 8){
-			next_refID = -1;
-			next_pos = 0;
-		}
-
-		if((FLAG & 0x40) == 0x40){
-			r1_refID = refID;
-			r1_pos = pos;
-			r2_refID = next_refID;
-			r2_pos = next_pos;
-		} else {
-			r2_refID = refID;
-			r2_pos = pos;
-			r1_refID = next_refID;
-			r1_pos = next_pos;
-		}
+	int HItag = -1;
 
 
-		memcpy(&l_seq, bin + 20, 4);
-		//SUBREADprintf("LQ=%d, RL=%d, CIGAR_OPT=%d\n", l_seq, (l_seq+1)/2, cigar_opts);
+	memcpy(&refID, bin + 4, 4);
+	memcpy(&pos, bin + 8, 4);
+	memcpy(&tmpi, bin + 12, 4);
+	l_read_name = tmpi & 0xff;
+	memcpy(&tmpi, bin + 16, 4);
+	FLAG = (tmpi >> 16)&0xffff;
+	(*this_flag) = FLAG;
+	cigar_opts = tmpi & 0xffff;
+	memcpy(&next_refID, bin + 24, 4);
+	memcpy(&next_pos, bin + 28, 4);
+	memcpy(full_name, bin+36, l_read_name);
+	unsigned int r1_refID, r1_pos, r2_refID, r2_pos;
 
-		unsigned int tags_start = 36+l_read_name+4*cigar_opts+(l_seq+1)/2+l_seq;
-		unsigned int tags_len = bin_len - tags_start;
-
-		if(tags_len > 2){
-			SAM_pairer_iterate_int_tags(bin + tags_start, tags_len, "HI", &HItag);
-		}
-
-		rlen = l_read_name-1 + sprintf(full_name+l_read_name-1, "\027%d\027%u\027%d\027%u\027%d", r1_refID, r1_pos, r2_refID, r2_pos, HItag);
+	if(FLAG & 4){
+		refID = -1;
+		pos = 0;
 	}
+
+	if(FLAG & 8){
+		next_refID = -1;
+		next_pos = 0;
+	}
+
+	if((FLAG & 0x40) == 0x40){
+		r1_refID = refID;
+		r1_pos = pos;
+		r2_refID = next_refID;
+		r2_pos = next_pos;
+	} else {
+		r2_refID = refID;
+		r2_pos = pos;
+		r1_refID = next_refID;
+		r1_pos = next_pos;
+	}
+
+
+	memcpy(&l_seq, bin + 20, 4);
+	//SUBREADprintf("LQ=%d, RL=%d, CIGAR_OPT=%d\n", l_seq, (l_seq+1)/2, cigar_opts);
+
+	unsigned int tags_start = 36+l_read_name+4*cigar_opts+(l_seq+1)/2+l_seq;
+	unsigned int tags_len = bin_len - tags_start;
+
+	if(tags_len > 2){
+		SAM_pairer_iterate_int_tags(bin + tags_start, tags_len, "HI", &HItag);
+	}
+
+	int slash_pos = 0;
+	for(; slash_pos < l_read_name - 1; slash_pos++){
+		if(full_name[slash_pos] == '/') break;
+	}
+
+	rlen = slash_pos + sprintf(full_name+slash_pos, "\027%d\027%u\027%d\027%u\027%d", r1_refID, r1_pos, r2_refID, r2_pos, HItag);
+
 	return rlen;
 }
 
@@ -2730,6 +3214,7 @@ int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text
 	SAM_pairer_writer_main_t * bam_main = (SAM_pairer_writer_main_t * )pairer -> appendix1; 
 	SAM_pairer_writer_thread_t * bam_thread = bam_main -> threads + thread_no;
 	unsigned int BIN_block_cursor = 0, bin_cursor = 0;
+	//SUBREADprintf("WRITE HEADER TYPE=%d; ITEMS=%d\n", is_text, items);
 	if(is_text){
 		memcpy( bam_thread -> BIN_buffer, "BAM\1", 4 );
 		memcpy( bam_thread -> BIN_buffer + 4 , & items , 4 );
@@ -2740,6 +3225,7 @@ int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text
 	}
 	while( bin_cursor  < bin_len ){
 		int write_text_len = min(SAM_PAIRER_WRITE_BUFFER - BIN_block_cursor, bin_len - bin_cursor);
+	//	SUBREADprintf("WRITE TLEN=%d\n", write_text_len);
 		memcpy(bam_thread -> BIN_buffer + BIN_block_cursor , bin + bin_cursor, write_text_len);
 		bam_thread -> BIN_buffer_ptr = write_text_len + BIN_block_cursor;
 
@@ -2780,8 +3266,12 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 	int bin_mq_nl = (len_name+1);
 	int my_flag = (mate_FLAG&0x40)? 0x80:0x40;
 	my_flag |= 1;
-	if(mate_FLAG & 8)my_flag |=4;
+
+	// Dummy reads should always be unmapped!
+	//if(mate_FLAG & 8)my_flag |=4;
+
 	if(mate_FLAG & 4)my_flag |=8;
+	if(mate_FLAG & 8)my_flag |=4;
 	if(mate_FLAG & 0x10) my_flag |= 0x20;
 	if(mate_FLAG & 0x20) my_flag |= 0x10;
 	my_flag = my_flag << 16;
@@ -2826,14 +3316,19 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 
 void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 	int x1;
+	pairer -> is_finished = 0;
 	pairer -> BAM_header_parsed = 0;
 	pairer -> total_input_reads = 0;
+	pairer -> input_chunk_no = 0;
 	for(x1 = 0; x1 < pairer -> total_threads ; x1 ++){
+		pairer -> threads[x1].reads_in_SBAM = 0;
 		pairer -> threads[x1].input_buff_BIN_used = 0;
 		pairer -> threads[x1].input_buff_BIN_ptr = 0;
 		pairer -> threads[x1].input_buff_SBAM_used = 0;
 		pairer -> threads[x1].input_buff_SBAM_ptr = 0;
 		pairer -> threads[x1].orphant_block_no = 0;
+		pairer -> threads[x1].readno_in_chunk = 0;
+		pairer -> threads[x1].immediate_last_read_full_name[0]=0;
 		HashTableDestroy(pairer -> threads[x1].orphant_table);
 		pairer -> threads[x1].orphant_table = HashTableCreate(pairer -> input_buff_SBAM_size / 100);
 		HashTableSetHashFunction(pairer -> threads[x1].orphant_table, fc_chro_hash);
@@ -2841,6 +3336,11 @@ void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 		HashTableSetDeallocationFunctions(pairer -> threads[x1].orphant_table, free, free);
 		inflateReset(&pairer -> threads[x1].strm);
 	}
+	HashTableDestroy(pairer -> unsorted_notification_table);
+	pairer -> unsorted_notification_table = HashTableCreate(2191);
+	HashTableSetHashFunction(pairer -> unsorted_notification_table, fc_chro_hash);
+	HashTableSetKeyComparisonFunction(pairer -> unsorted_notification_table, fc_strcmp_chro);
+	HashTableSetDeallocationFunctions(pairer -> unsorted_notification_table, free, free);
 
 }
 void SAM_pairer_writer_reset( void * pairer_vp ) {
@@ -2864,7 +3364,7 @@ int SAM_pairer_multi_thread_output(void * pairer_vp, int thread_no, char * rname
 	SAM_pairer_writer_thread_t * bam_thread = bam_main -> threads + thread_no;
 
 	char dummy_bin2 [MAX_READ_NAME_LEN*2 + 180 ];
-	if(bin2==NULL && bam_main -> has_dummy){
+	if(bin2==NULL && rname != NULL && bam_main -> has_dummy){
 		SAM_pairer_make_dummy( rname, bin1, dummy_bin2 );
 		bin2 = dummy_bin2;
 	}
@@ -2894,38 +3394,99 @@ int SAM_pairer_multi_thread_output(void * pairer_vp, int thread_no, char * rname
 	return 0;
 }
 
-int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_contaxt ){
+void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , int read_name_len, char * read_full_name, int bin_len, char * bin , int flags){
+	unsigned char * mate_bin = HashTableGet(thread_context -> orphant_table, read_full_name);
+	if(mate_bin){
+		if(pairer -> output_function)
+			pairer -> output_function(pairer, thread_context -> thread_id, read_full_name, bin, (char*)mate_bin);
+		HashTableRemove(thread_context -> orphant_table, read_full_name);
+		if(thread_context -> orphant_space > bin_len)
+			thread_context -> orphant_space -= bin_len;
+		else	thread_context -> orphant_space = 0;
+		//SUBREADprintf("Mate_found: %s\n", read_full_name);
+	} else {
+		char * mem_name = malloc(read_name_len + 1);
+		memcpy(mem_name, read_full_name, read_name_len);
+		mem_name[read_name_len] = 0;
+
+		char * mem_bin = malloc(bin_len);
+		memcpy(mem_bin, bin , bin_len);
+
+		HashTablePut(thread_context -> orphant_table, mem_name, mem_bin);
+		thread_context -> orphant_space += bin_len;
+		//SUBREADprintf("Orphant_created [%d]: %s\n", thread_context -> thread_id, read_full_name);
+	}
+}
+
+
+void SAM_pairer_register_matcher(SAM_pairer_context_t * pairer , unsigned int chunk_number, unsigned int readno_in_chunk, char * read_full_name , char * bin, int bin_len , int this_flags){
+
+	char * mem_bin = malloc(bin_len);
+	memcpy(mem_bin, bin , bin_len);
+	subread_lock_occupy(&pairer -> unsorted_notification_lock);
+	char * mem_name = malloc(24);
+	sprintf(mem_name, "B:%u:%d", chunk_number , (readno_in_chunk>0)?1:0);
+	HashTablePut(pairer -> unsorted_notification_table, mem_name, mem_bin);
+
+	mem_bin = malloc(bin_len);
+	sprintf(mem_bin,"%010u %d", chunk_number, (readno_in_chunk>0)?1:0);
+	mem_name = malloc(strlen(read_full_name) + 5);
+	sprintf(mem_name, "C:%s:%d", read_full_name , (this_flags & 0x80)?1:0);
+
+	HashTablePut(pairer -> unsorted_notification_table, mem_name, mem_bin);
+	subread_lock_release(&pairer -> unsorted_notification_lock);
+}
+
+int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context ){
 	char read_full_name[ MAX_READ_NAME_LEN*2 +80 ];	// rname:chr_r1:pos_r1:chr_r2:pos_r2:HI_tag
 	unsigned char * bin = NULL;
 	int bin_len = 0, this_flags = 0;
 
-	int has_next_read = SAM_pairer_get_next_read_BIN(pairer, thread_contaxt, &bin, &bin_len);
+	int has_next_read = SAM_pairer_get_next_read_BIN(pairer, thread_context, &bin, &bin_len);
 	if(has_next_read){
-		int name_len = SAM_pairer_get_read_full_name(pairer, thread_contaxt, bin, bin_len, read_full_name, & this_flags);
-		//SUBREADprintf("FNNM:%s\n", read_full_name);
-		unsigned char * mate_bin = HashTableGet(thread_contaxt -> orphant_table, read_full_name);
-		if(mate_bin){
+		int name_len = SAM_pairer_get_read_full_name(pairer, thread_context, bin, bin_len, read_full_name, & this_flags);
+		if(0 && FIXLENstrcmp("V0112_0155:7:1206:5677:116578", read_full_name) == 0)
+			SUBREADprintf("FNNM:%s, FLAG=%d, LASTFN=%s\n", read_full_name , this_flags, thread_context -> immediate_last_read_full_name);
+
+		if(pairer -> is_single_end_mode == 0 && ( this_flags & 1 ) == 1){ // if the reads are PE
+
+			if(strcmp(read_full_name , thread_context -> immediate_last_read_full_name) == 0){
+				if(pairer -> output_function)
+					pairer -> output_function(pairer, thread_context -> thread_id, read_full_name, (char*) bin, (char*)thread_context -> immediate_last_read_bin);
+
+				thread_context -> immediate_last_read_full_name[0] = 0;
+			}else{
+
+				if(thread_context -> immediate_last_read_full_name[0]){
+					if(thread_context -> readno_in_chunk>1){
+						if(pairer -> is_unsorted_notified == 0){
+							if(pairer -> unsorted_notification){
+								//SUBREADprintf("BEFORE NEXT : %s != %s\n",  thread_context -> immediate_last_read_full_name , read_full_name);
+								pairer -> unsorted_notification(pairer , thread_context -> immediate_last_read_bin, (char *) bin);
+							}
+							pairer -> is_unsorted_notified = 1;
+						}
+					}else if(thread_context -> readno_in_chunk == 1) {
+						SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name,  thread_context -> immediate_last_read_bin,  thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_flags );
+					}
+
+					SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
+				}
+
+				thread_context -> immediate_last_read_bin_len = bin_len;
+				thread_context -> immediate_last_read_name_len = name_len;
+				thread_context -> immediate_last_read_flags = this_flags;
+				strcpy(thread_context -> immediate_last_read_full_name, read_full_name);
+				memcpy(thread_context -> immediate_last_read_bin, bin, bin_len);
+			}
+		}else{ // else just write.
 			if(pairer -> output_function)
-				pairer -> output_function(pairer, thread_contaxt -> thread_id, read_full_name, (char*) bin, (char*)mate_bin);
-			HashTableRemove(thread_contaxt -> orphant_table, read_full_name);
-			if(thread_contaxt -> orphant_space > bin_len)
-				thread_contaxt -> orphant_space -= bin_len;
-			else	thread_contaxt -> orphant_space = 0;
-			//SUBREADprintf("Mate_found: %s\n", read_full_name);
-		}else{
-			char * mem_name = malloc(name_len + 1);
-			memcpy(mem_name, read_full_name, name_len);
-			mem_name[name_len] = 0;
-
-			char * mem_bin = malloc(bin_len);
-			memcpy(mem_bin, bin , bin_len);
-
-			HashTablePut(thread_contaxt -> orphant_table, mem_name, mem_bin);
-			thread_contaxt -> orphant_space += bin_len;
-			//SUBREADprintf("Orphant_created [%d]: %s\n", thread_contaxt -> thread_id, read_full_name);
+				pairer -> output_function(pairer, thread_context -> thread_id, NULL, (char*) bin, NULL);
 		}
+		thread_context -> readno_in_chunk ++;
 		return 0;
-	}
+
+	}else pairer -> BAM_header_parsed = 1;
 	return 1;
 }
 
@@ -3026,6 +3587,19 @@ void SAM_pairer_osr_next_bin(FILE * fp, char * bin){
 	fread(bin, 1, rlen, fp);
 }
 
+int SAM_pairer_is_matched_chunks(char * c1, char * c2){
+	if(c1==NULL || c2==NULL)return 0;
+
+	unsigned int i1 = (unsigned int) atoi(c1);
+	unsigned int i2 = (unsigned int) atoi(c2);
+	int start_1 = c1[11]=='0';
+	int start_2 = c2[11]=='0';
+
+	if(start_1+start_2!=1)return 0;
+	if(start_1) i2++;else i1++;
+	return i2==i1;
+}
+
 void * SAM_pairer_rescure_orphants(void * params){
 
 	void ** param_ptr = (void **) params;
@@ -3097,6 +3671,25 @@ void * SAM_pairer_rescure_orphants(void * params){
 				SAM_pairer_osr_next_bin( orphant_fps[ min2_name_fileno ] , bin_tmp2);
 				pairer -> output_function(pairer, thread_no,  names + max_name_len*min_name_fileno , (char*) bin_tmp1, (char*)bin_tmp2);
 
+				if(0 == pairer -> is_unsorted_notified){
+					char *name_tmp_1 = malloc(strlen(names+(min_name_fileno * max_name_len))+5), *name_tmp_2 = malloc(strlen(names+(min_name_fileno * max_name_len))+5);
+					char * min1_chunk_info, * min2_chunk_info;
+					sprintf(name_tmp_1, "C:%s:%d", names+(min_name_fileno * max_name_len), 0);
+					sprintf(name_tmp_2, "C:%s:%d", names+(min2_name_fileno * max_name_len), 1);
+					min1_chunk_info = HashTableGet( pairer -> unsorted_notification_table , name_tmp_1);
+					min2_chunk_info = HashTableGet( pairer -> unsorted_notification_table , name_tmp_2);
+					//SUBREADprintf("RESCURE MATCHER:  %s , %s ==  %s , %s, %s\n", name_tmp_1, name_tmp_2, min1_chunk_info, min2_chunk_info,
+					//	SAM_pairer_is_matched_chunks(min1_chunk_info, min2_chunk_info)?"MATCH":"XXXXX");
+					if(min1_chunk_info == NULL || min2_chunk_info == NULL || !SAM_pairer_is_matched_chunks(min1_chunk_info, min2_chunk_info)){
+						sprintf(name_tmp_1, "B:%s:%d", names+(min_name_fileno * max_name_len), 0);
+						if( pairer -> unsorted_notification ){
+							//SUBREADprintf("FINAL STEP\n");
+							pairer -> unsorted_notification(pairer ,  HashTableGet( pairer -> unsorted_notification_table , name_tmp_1), NULL);
+						}
+						pairer -> is_unsorted_notified = 1;
+					}
+				}
+
 				int read_has = SAM_pairer_osr_next_name( orphant_fps[min2_name_fileno],  names + max_name_len*min2_name_fileno, thread_no,  pairer-> total_threads);
 				if(!read_has) *(names + max_name_len*min2_name_fileno)=0;
 				rescured++;
@@ -3126,6 +3719,7 @@ void * SAM_pairer_rescure_orphants(void * params){
 void SAM_pairer_update_orphant_table(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context){
 	unsigned int x2 = 0;
 	unsigned char ** name_list, ** bin_list;
+	//SUBREADprintf("ELES=%lu\n",  thread_context->orphant_table->numOfElements);
 	name_list = malloc(sizeof(char*) * thread_context->orphant_table->numOfElements);
 	bin_list  = malloc(sizeof(char*) * thread_context->orphant_table->numOfElements);
 
@@ -3172,6 +3766,90 @@ void SAM_pairer_update_orphant_table(SAM_pairer_context_t * pairer , SAM_pairer_
 }
 
 
+int is_read_bin(char * bin, int bin_len, int max_refID){
+	int block_len;
+	memcpy(&block_len, bin, 4);
+	if(block_len > MAX_BIN_RECORD_LENGTH - 4 || block_len < 32) return -1;
+	if(block_len > bin_len - 4) return -2;
+	int refID, mate_refID;
+	memcpy(&refID, bin + 4, 4);
+	memcpy(&mate_refID, bin + 24, 4);
+	if(refID != -1 && (refID< 0 || refID >=max_refID)) return -3;
+	if(mate_refID != -1 && (mate_refID< 0 || mate_refID >=max_refID)) return -4;
+	int l_seq;
+	memcpy(&l_seq, bin + 20, 4);
+	if(l_seq > MAX_BIN_RECORD_LENGTH || l_seq  < 0) return -5;
+
+	int min_mq_nl;
+	memcpy(&min_mq_nl, bin + 12, 4);
+	int name_len = min_mq_nl & 0xff;
+	int flag_nc;
+	memcpy(&flag_nc, bin + 16, 4);
+	int cigar_opts = flag_nc & 0xffff;
+	if(cigar_opts > 100) return -6;
+
+	int rname_cursor = 36;
+	if(bin[rname_cursor] == '@') return -7;
+	for(; rname_cursor< 36 + name_len - 1; rname_cursor ++){
+		int nch = bin[rname_cursor];
+		if(nch < 0x20 || nch > 0x80) return -9;
+		if(nch == '\t') return -8;
+	}
+
+	if(bin[rname_cursor]!=0)return -10;
+
+	if(block_len <  32 + name_len + 4*cigar_opts + l_seq + (l_seq+1)/2) return -11;
+
+
+	int cigar_i;
+	for(cigar_i = 0; cigar_i < cigar_opts ; cigar_i++){
+		int cigar_v;
+		memcpy(&cigar_v , bin + 36 + name_len + 4*cigar_i, 4);
+		int cigar_op = cigar_v & 0xf;
+		int cigar_value = cigar_v & 0xfffffff;
+		if(cigar_op > 8) return -12;
+		if((cigar_op == 0 || cigar_op == 1 || cigar_op > 4) && (cigar_value < 1 || cigar_value > MAX_BIN_RECORD_LENGTH)) return -13;
+	}
+
+	int ext_cursor = 36 + name_len + 4*cigar_opts + l_seq + (l_seq+1)/2;
+	if(ext_cursor > block_len + 4){
+		if(ext_cursor < block_len + 4 + 4) return -17;
+		if((!isalpha(bin[ext_cursor]))|| (!isalpha(bin[ext_cursor+1]))||!isalpha(bin[ext_cursor+2])){
+	//		SUBREADprintf("TAGERR: %c%c%c\n", bin[ext_cursor], bin[ext_cursor+1], bin[ext_cursor+2]);
+			return -16;
+		}
+	}
+
+	if(bin_len > 4+block_len){
+		int next_block_len;
+
+		if(bin_len < 8+block_len) return -17;
+		memcpy(&next_block_len, bin + 4 + block_len, 4);
+
+		if(next_block_len > MAX_BIN_RECORD_LENGTH - 4 || next_block_len < 32) return -18;
+		if(next_block_len > bin_len - 4) return -19;
+	}
+
+	return 1;
+}
+
+int SAM_pairer_find_start(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context ){
+	thread_context -> need_find_start = 0;
+	if(FAST_PICARD_BAM_PROCESSING){
+		int start_pos = 0;
+		for(start_pos = 0; start_pos < min(MAX_BIN_RECORD_LENGTH, thread_context -> input_buff_BIN_used); start_pos++){
+			if(is_read_bin((char *)thread_context -> input_buff_BIN + start_pos, thread_context -> input_buff_SBAM_used - start_pos , pairer -> BAM_n_ref)){
+				break;
+			}
+		}
+		thread_context -> input_buff_BIN_ptr = start_pos;
+		SUBREADprintf("FOUND START : %d\n", start_pos);
+		return start_pos < min(MAX_BIN_RECORD_LENGTH, thread_context -> input_buff_BIN_used);
+	}else{
+		return is_read_bin((char *)thread_context -> input_buff_BIN  , thread_context -> input_buff_SBAM_used , pairer -> BAM_n_ref);
+	}
+}
+
 #define PAIRER_WAIT_TICK_TIME 10000
 
 void * SAM_pairer_thread_run( void * params ){
@@ -3180,20 +3858,24 @@ void * SAM_pairer_thread_run( void * params ){
 	int thread_no = (int)(param_ptr[1]-NULL);
 	free(params);
 
-	SAM_pairer_thread_t * thread_contaxt = pairer -> threads + thread_no;
+	SAM_pairer_thread_t * thread_context = pairer -> threads + thread_no;
 	int is_finished = 0;
 	while(1){
 		subread_lock_occupy(&pairer -> input_fp_lock);
 		if(pairer -> BAM_header_parsed || thread_no == 0){
-			SAM_pairer_fill_BIN_buff(pairer, thread_contaxt, &is_finished);
+			SAM_pairer_fill_BIN_buff(pairer, thread_context, &is_finished);
+			thread_context -> need_find_start = pairer -> BAM_header_parsed;
+			thread_context -> chunk_number = pairer -> input_chunk_no;
+			pairer -> input_chunk_no ++;
 		}
 		subread_lock_release(&pairer -> input_fp_lock);
+
 		if(!pairer -> BAM_header_parsed && thread_no > 0) {
 			usleep(PAIRER_WAIT_TICK_TIME);
-		} else if(thread_contaxt -> input_buff_SBAM_used>0) {
+		} else if(thread_context -> input_buff_SBAM_used>0) {
 			unsigned int processed_reads = 0;
 			while(1){
-				int has_no_more = SAM_pairer_do_next_read(pairer, thread_contaxt);
+				int has_no_more = SAM_pairer_do_next_read(pairer, thread_context);
 				if(has_no_more)break;
 				processed_reads++;
 			}
@@ -3201,14 +3883,24 @@ void * SAM_pairer_thread_run( void * params ){
 			pairer -> total_input_reads += processed_reads;
 		}
 		if(pairer -> is_bad_format) break;
-		if(thread_contaxt -> orphant_space > pairer -> input_buff_SBAM_size)
-			SAM_pairer_update_orphant_table(pairer, thread_contaxt);
 
-		if(is_finished) break;
+		if(thread_context -> immediate_last_read_full_name[0]){
+			SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name, thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_bin_len ,  thread_context -> immediate_last_read_flags);
+			SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
+			thread_context -> immediate_last_read_full_name[0] = 0;
+		}
+
+		if(thread_context -> orphant_space > pairer -> input_buff_SBAM_size)
+			SAM_pairer_update_orphant_table(pairer, thread_context);
+
+		if(is_finished){
+			pairer -> BAM_header_parsed = 1;
+			break;
+		}
 	}
 
-	if(thread_contaxt -> orphant_table -> numOfElements > 0)
-		SAM_pairer_update_orphant_table(pairer, thread_contaxt);
+	if(thread_context -> orphant_table -> numOfElements > 0)
+		SAM_pairer_update_orphant_table(pairer, thread_context);
 
 	return NULL;
 }
@@ -3474,21 +4166,130 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 
 	// ===== The reads
 	unsigned long long reads =0;
+	pairer -> is_bad_format = 0;
 	while(1){
-		int block_size = 0;
+		int block_size = 0, new_block_size;
+		int seq_len = 0, name_len = 0, cigar_opts = 0;
+		char * block_size_ptr = out_bin + out_bin_ptr;
+		char * sqlen_ptr = NULL;
+
+		// block_length
 		FIX_GET_NEXT_NCH;
 		if(nch<0) break;
-		FIX_APPEND_READ(&nch, 1);
 		block_size = nch;
 		for(x1 = 1; x1 < 4; x1++){
 			FIX_GET_NEXT_NCH;
 			block_size += (nch << (8 * x1));
-			FIX_APPEND_READ(&nch, 1);
 		}
-		for(x1 = 0; x1 < block_size; x1++){
-			FIX_GET_NEXT_NCH;
-			FIX_APPEND_READ(&nch, 1);
+
+		//SUBREADprintf("Bsize=%d\n", block_size);
+		if(block_size > 60000 && !pairer -> tiny_mode){
+			pairer -> is_bad_format = 1;
+			SUBREADprintf("ERROR: the read record length (%d) is longer than the limit. The program has to terminate. \n", block_size);
+			break;
+		}else if(block_size + out_bin_ptr > 60000 && !pairer -> tiny_mode)
+			FIX_FLASH_OUT;
+
+		FIX_APPEND_READ(&block_size, 4);
+
+		if(pairer -> tiny_mode){
+			// block_remainder
+			int extag_new_len = 0;
+			for(x1 = 0; x1 < block_size; x1++){
+				FIX_GET_NEXT_NCH;
+				if(x1 == 8) name_len = nch;
+				else if(x1 >= 16 && x1 < 20){
+					seq_len += ( nch << (8 * (x1 - 16)));
+					if(x1 == 16)  sqlen_ptr = out_bin + out_bin_ptr;
+				}else if(x1 == 12 || x1 == 13){
+					cigar_opts += ( nch << (8 * (x1 - 12))); 
+				}else if(seq_len > 1){
+					if(x1 == 32 + name_len + 4 * cigar_opts || x1 == 32 + name_len + 4 * cigar_opts + 1){
+						nch = 0xff;
+					}else if(x1 > 32 + name_len + 4 * cigar_opts + 1 && x1 < 32 + name_len + 4 * cigar_opts + seq_len + (seq_len+1)/2){
+						continue;
+					}
+				}
+				char etag_name0 = -1, etag_name1, etag_type;
+				if(x1 == 32 + name_len + 4 * cigar_opts + seq_len + (seq_len+1)/2){
+					while(x1 < block_size){
+						int this_tag_output = 0;
+						if(etag_name0 > 0){
+							FIX_GET_NEXT_NCH;
+						}
+						etag_name0 = nch;
+						FIX_GET_NEXT_NCH;
+						etag_name1 = nch;
+						FIX_GET_NEXT_NCH;
+						etag_type = nch;
+						x1 += 3;
+
+						//SUBREADprintf("ETAG_NAME: %c%c (%c), x1 = %d < %d\n", etag_name0,etag_name1,etag_type, x1, block_size);
+
+						if((( etag_name0 == 'H' && etag_name1 == 'I' ) ||
+						    ( etag_name0 == 'N' && etag_name1 == 'H' ) ||
+						    ( etag_name0 == 'N' && etag_name1 == 'M' )
+						    ) && ( etag_type == 'c' || etag_type == 'C'||etag_type == 's'||etag_type == 'S'||etag_type == 'i'||etag_type == 'I') 
+						  ){
+							FIX_APPEND_READ(&etag_name0,1);
+							FIX_APPEND_READ(&etag_name1,1);
+							FIX_APPEND_READ(&etag_type,1);
+							this_tag_output = 1;
+						//	SUBREADprintf("ADDED INTO BAM\n");
+						}
+						if(etag_type == 'Z'||etag_type =='H'){
+							while(1){
+								FIX_GET_NEXT_NCH;
+								x1++;
+								if(nch == 0)break;
+							}
+						}else if(etag_type == 'A'){
+							FIX_GET_NEXT_NCH;
+							x1++;
+						}else if(etag_type =='B'){
+							FIX_GET_NEXT_NCH;
+							char array_type = nch;
+							int x2, adlen = 1, aditems = 0;
+							if(array_type == 's'||array_type == 'S')adlen = 2;
+							if(array_type == 'i'||array_type == 'I'||array_type == 'f')adlen = 4;
+							for(x2=0;x2<4; x2++) {
+								FIX_GET_NEXT_NCH;
+								aditems += nch << (8*x2);
+							}
+							x1 += 5 + aditems * adlen;
+							for(x2 = 0; x2 < aditems * adlen; x2++) FIX_GET_NEXT_NCH;
+						}else{
+							int dlen = 1;
+							if(etag_type == 's'||etag_type == 'S') dlen = 2;
+							if(etag_type == 'i'||etag_type == 'I' || etag_type == 'f') dlen = 4;
+							if(this_tag_output) extag_new_len += dlen + 3;
+							x1 += dlen;
+							while(dlen > 0){
+								FIX_GET_NEXT_NCH;
+								if(this_tag_output)
+									FIX_APPEND_READ(&nch, 1);
+								dlen--;
+							}
+						}
+					}
+					break;
+				}
+				FIX_APPEND_READ(&nch, 1);
+				//SUBREADprintf("WR[%d]: %d = %c, SL=%d, RNL=%d, COP=%d\n", out_bin_ptr, nch, nch, seq_len, name_len, cigar_opts);
+			}
+
+			seq_len = min(1, seq_len);
+			sqlen_ptr[0]=seq_len; sqlen_ptr[1]=0, sqlen_ptr[2]=0; sqlen_ptr[3]=0;
+			new_block_size = 32 + name_len + 4 * cigar_opts + seq_len + (seq_len+1)/2 + extag_new_len;
+			//SUBREADprintf("ETAG_NLEN=%d, ETAGS=%d\n", new_block_size, extag_new_len);
+			memcpy(block_size_ptr, &new_block_size, 4);
+		}else{
+			for(x1 = 0; x1 < block_size; x1++){
+				FIX_GET_NEXT_NCH;
+				FIX_APPEND_READ(&nch, 1);
+			}
 		}
+
 		reads ++;
 		if(out_bin_ptr > 60000){
 			FIX_FLASH_OUT;
@@ -3508,19 +4309,367 @@ void SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	free(out_bin);
 }
 
+
+
+unsigned int nosort_tick_time = 100;
+#define NOSORT_SBAM_BUFF_SIZE 500000
+#define NOSORT_BIN_BUFF_SIZE (2*500100)
+
+
+void * SAM_nosort_thread_run( void * params ){
+	void ** param_ptr = (void **) params;
+	SAM_pairer_context_t * pairer = param_ptr[0];
+	int thread_no = (int)(param_ptr[1]-NULL);
+	free(params);
+
+	SAM_pairer_thread_t * thread_context = pairer -> threads + thread_no;
+
+	char * read_ptr_1 = (char *)thread_context -> input_buff_BIN;
+	char * read_ptr_2 = (char *)thread_context -> input_buff_BIN + NOSORT_BIN_BUFF_SIZE / 2;
+
+	while(1){
+		int has_found = 0, to_quit = 0;
+		subread_lock_occupy(&thread_context -> SBAM_lock);
+
+	//	SUBREADprintf("CONSUME:RINS=%d, PTR=%d\n", thread_context -> reads_in_SBAM, thread_context -> input_buff_BIN_ptr );
+
+		if(thread_context -> reads_in_SBAM > 1){
+			if(pairer -> input_is_BAM){
+				int record_len;
+		//		SUBREADprintf("LOAD BY THREAD %d:", thread_no);
+				memcpy(&record_len, thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4);
+	//			SUBREADprintf("RLEN=%d\n", record_len);
+				assert(record_len > 32 &&record_len < 500000);
+				memcpy(read_ptr_1 , thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4 + record_len);
+				thread_context -> input_buff_SBAM_ptr += record_len + 4;
+
+				memcpy(&record_len, thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4);
+				assert(record_len > 32 &&record_len < 500000);
+				memcpy(read_ptr_2 , thread_context -> input_buff_SBAM + thread_context -> input_buff_SBAM_ptr, 4 + record_len);
+				thread_context -> input_buff_SBAM_ptr += record_len + 4;
+				has_found = 1;
+				thread_context -> reads_in_SBAM -= 2;
+			}else{
+				thread_context -> input_buff_BIN_ptr = 0;
+				int rret = reduce_SAM_to_BAM(pairer, thread_context , 0);
+				thread_context -> reads_in_SBAM -- ;
+				if(rret > 0){ 
+					thread_context -> input_buff_BIN_ptr = NOSORT_BIN_BUFF_SIZE/2;
+					rret = reduce_SAM_to_BAM(pairer, thread_context, 0);
+					thread_context -> reads_in_SBAM -- ;
+					if(rret > 0){
+						has_found = 1;
+					}
+				}
+			}
+		}
+		if(pairer -> is_finished) to_quit = 1;
+		subread_lock_release(&thread_context -> SBAM_lock);
+
+		if(has_found)
+			pairer -> output_function(pairer, thread_no,  NULL, (char*) read_ptr_1,(char*) read_ptr_2);
+		else{
+			if(to_quit) break;
+			usleep(nosort_tick_time);
+		}
+	}
+
+	return NULL;
+}
+
+int SAM_nosort_decompress_next_block(SAM_pairer_context_t * pairer){
+	int SBAM_used;
+	unsigned int decompressed_len;
+
+	char * SBAM_buff = pairer -> appendix2;
+	char * BIN_buff = pairer -> appendix3;
+	int * BIN_buff_used = pairer -> appendix4;
+	int * BIN_buff_ptr = pairer -> appendix5;
+
+	SBAM_used = PBam_get_next_zchunk(pairer -> input_fp, SBAM_buff, NOSORT_SBAM_BUFF_SIZE, &decompressed_len);
+	if(SBAM_used<0) return -1;
+
+	//SUBREADprintf("PRE-LOAD BAM: USED %d,  PTR %d\n", * BIN_buff_used , * BIN_buff_ptr);
+	if((* BIN_buff_ptr) < (* BIN_buff_used)){
+		int diff =  (* BIN_buff_used) - (* BIN_buff_ptr);
+		int x1;
+		for(x1 = 0; x1 < diff; x1++){
+			BIN_buff[x1] = BIN_buff[x1 + (* BIN_buff_ptr)];
+		}
+		(* BIN_buff_used) = diff;
+	} else (* BIN_buff_used) = 0;
+	(* BIN_buff_ptr) = 0;
+
+	int binlen = SamBam_unzip(BIN_buff + (* BIN_buff_used), SBAM_buff , SBAM_used);
+	//assert(binlen == decompressed_len);
+	if(binlen < 0) return -1;
+	(* BIN_buff_used) += binlen;
+	return binlen;
+}
+
+#define NOSORT_BAM_next_nch { while( BIN_buff_used == BIN_buff_ptr ){int rlen = SAM_nosort_decompress_next_block(pairer); if(rlen < 0) { BIN_buff_used = -1 ; break;}} if(BIN_buff_used < 0) nch = -1; else nch = BIN_buff[BIN_buff_ptr++]; }
+#define NOSORT_BAM_next_u32(v){ NOSORT_BAM_next_nch; if(nch < 0)v=-1;else{; v= nch; NOSORT_BAM_next_nch; v+=nch*256; NOSORT_BAM_next_nch; v+=nch*65536; NOSORT_BAM_next_nch; v+=nch*16777216;} }
+
+#define NOSORT_SAM_next_line {NOSORT_SAM_eof  = fgets(line_ptr, NOSORT_SBAM_BUFF_SIZE, pairer -> input_fp);}
+
+#define NOSORT_REFILL_LOWBAR 6000*1000
+#define NOSORT_REFILL_HIGHBAR 18000*1000
+
+void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
+	int x1;
+	for(x1 = 0; x1 < pairer -> total_threads ; x1++){
+		// this 16-byte memory block is freed in the thread worker.
+		void ** init_params = malloc(sizeof(void *) * 2);
+
+		init_params[0] = pairer;
+		init_params[1] = (void *)(NULL+x1);
+		pthread_create(&(pairer -> threads[x1].thread_stab), NULL, SAM_nosort_thread_run, init_params);
+	}
+
+	char * SBAM_buff = malloc(NOSORT_SBAM_BUFF_SIZE);
+	int nch;
+	unsigned char * BIN_buff = malloc(NOSORT_BIN_BUFF_SIZE);
+	char *NOSORT_SAM_eof=NULL;
+	int BIN_buff_used = 0;
+	int BIN_buff_ptr = 0;
+
+	pairer -> appendix2 = SBAM_buff;
+	pairer -> appendix3 = BIN_buff;
+	pairer -> appendix4 = &BIN_buff_used;
+	pairer -> appendix5 = &BIN_buff_ptr;
+
+	if(pairer -> input_is_BAM){
+		int x1;
+		unsigned int bam_signature;
+		NOSORT_BAM_next_u32(bam_signature);
+		NOSORT_BAM_next_u32(pairer -> BAM_l_text);
+		char * header_txt = malloc(pairer->BAM_l_text);
+
+		for(x1 = 0 ; x1 < pairer -> BAM_l_text; x1++){
+			NOSORT_BAM_next_nch;
+			header_txt [x1] = nch;
+		}
+
+		pairer -> output_header(pairer, 0, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
+		NOSORT_BAM_next_u32(pairer -> BAM_n_ref);
+		unsigned int ref_bin_len = 0;
+		for(x1 = 0; x1 < pairer -> BAM_n_ref; x1++) {
+			unsigned int l_name, l_ref, x2;
+			char ref_name[MAX_CHROMOSOME_NAME_LEN];
+			NOSORT_BAM_next_u32(l_name);
+			assert(l_name < 256);
+			memcpy(header_txt + ref_bin_len, &l_name, 4);
+			ref_bin_len += 4;
+			for(x2 = 0; x2 < l_name; x2++){
+				NOSORT_BAM_next_nch;
+				header_txt[ref_bin_len++] = nch;
+				ref_name[x2]=nch;
+			}
+			NOSORT_BAM_next_u32(l_ref);
+			memcpy(header_txt + ref_bin_len, &l_ref, 4);
+			ref_bin_len += 4;
+
+			assert(ref_bin_len < pairer -> BAM_l_text);
+		}
+
+		pairer -> output_header(pairer, 0, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
+		free(header_txt);
+
+		while(1){
+			if(pairer -> is_finished) break;
+			int need_sleep = 1;
+			for(x1 = 0; x1 < pairer -> total_threads ; x1++){
+				if(pairer -> is_finished) break;
+				SAM_pairer_thread_t * this_thread = pairer -> threads + x1;
+				if(this_thread -> input_buff_SBAM_used - this_thread -> input_buff_SBAM_ptr < NOSORT_REFILL_LOWBAR && (this_thread -> input_buff_SBAM_used == 0 || this_thread -> input_buff_SBAM_ptr > 0)){
+					subread_lock_occupy(&this_thread -> SBAM_lock);
+					int to_be_add = NOSORT_REFILL_HIGHBAR - (this_thread -> input_buff_SBAM_used - this_thread -> input_buff_SBAM_ptr);
+
+					int x2, x3;
+					if(this_thread -> input_buff_SBAM_ptr < this_thread -> input_buff_SBAM_used){
+						for(x2 = 0; x2 < this_thread -> input_buff_SBAM_used - this_thread -> input_buff_SBAM_ptr; x2++)
+							this_thread -> input_buff_SBAM[x2] = this_thread -> input_buff_SBAM[x2 + this_thread -> input_buff_SBAM_ptr];
+						this_thread -> input_buff_SBAM_used -= this_thread -> input_buff_SBAM_ptr;
+					}else this_thread -> input_buff_SBAM_used =0;
+
+					this_thread -> input_buff_SBAM_ptr = 0;
+					for(x2 = 0 ;  ; x2++){
+						int record_len;
+						NOSORT_BAM_next_u32(record_len);
+						if(record_len < 32 || record_len > 500000){
+							if(record_len!=-1)
+								SUBREADprintf("Unexpected record length: %d, program will terminate now.\n", record_len);
+							pairer -> is_finished = 1;
+							break;
+						}
+
+						memcpy(this_thread -> input_buff_SBAM + this_thread -> input_buff_SBAM_used , &record_len, 4);
+						this_thread -> input_buff_SBAM_used += 4;
+						for(x3 =0; x3 < record_len; x3++){
+							NOSORT_BAM_next_nch;
+							this_thread -> input_buff_SBAM[this_thread -> input_buff_SBAM_used++] = nch;
+						}
+						this_thread -> reads_in_SBAM ++;
+						if(x2 % 2 == 1 && to_be_add <= this_thread -> input_buff_SBAM_used + 20000 )break;
+					}
+					need_sleep = 0;
+					subread_lock_release(&this_thread -> SBAM_lock);
+				}
+			}
+			if(need_sleep) usleep(nosort_tick_time);
+		}
+	}else{
+		char * line_ptr = SBAM_buff;
+		char * header_start = NULL;
+		int passed_read_SBAM_ptr = -1;
+		unsigned int header_buffer_safe_size = 0;
+		while(1){
+			passed_read_SBAM_ptr = ftello(pairer -> input_fp);
+			NOSORT_SAM_next_line;	
+			if(NOSORT_SAM_eof == NULL)break;
+
+			header_buffer_safe_size += strlen(line_ptr);
+			if(NULL== header_start && line_ptr[0] == '@') header_start = line_ptr;
+
+			if(NULL == line_ptr){
+				SUBREADprintf("FATAL: the header is too large to the buffer!\n");
+				break;
+			}else{
+				//SUBREADprintf("LINELEN=%d, PTR=%d, FIRST=%c\n", line_len, thread_context -> input_buff_SBAM_ptr , line_ptr[0]);
+			}
+			if(line_ptr[0]!='@'){
+				break;
+			}
+		}
+
+		fseek(pairer -> input_fp, 0 , SEEK_SET);
+		int header_bin_ptr = 0, header_contigs = 0;
+		char * header_bin = malloc(header_buffer_safe_size);
+		
+
+		while(1){
+			NOSORT_SAM_next_line;
+			if(NOSORT_SAM_eof == NULL)break;
+			if(line_ptr[0]!='@') break;
+			if(memcmp(line_ptr, "@SQ\t",4)==0){
+				unsigned int ct_len = 0, ctptr = 4, status = 0, sqname_len = 0;
+				char * sqname = NULL;
+				while(1){
+					char ctnch = line_ptr[ctptr++];
+					if( status == 0){
+						if(ctnch=='S' && line_ptr[ctptr] == 'N' && line_ptr[ctptr+1] == ':'){
+							ctptr += 2;
+							status = 10;
+							sqname = line_ptr + ctptr;
+						}else if(ctnch=='L' && line_ptr[ctptr] == 'N' && line_ptr[ctptr+1] == ':'){
+							ctptr += 2;
+							status = 20;
+						}else	status = 30;
+					}else if(status == 10 || status == 20 || status == 30){
+						if(ctnch == '\t' || ctnch == '\n'){
+							status = 0;
+							if(ctnch == '\n') break;
+							//break;
+						}
+						if(status == 10) sqname_len ++;
+						else if(status == 20) ct_len = ct_len * 10 + ctnch - '0';
+					}
+				}
+
+
+				sqname_len += 1;
+				memcpy(header_bin + header_bin_ptr, &sqname_len, 4);
+				header_bin_ptr += 4;
+				memcpy(header_bin + header_bin_ptr, sqname, sqname_len-1);
+				*(header_bin + header_bin_ptr + sqname_len - 1) = 0;
+				char * mem_contig_name = malloc(sqname_len);
+				strcpy(mem_contig_name , header_bin + header_bin_ptr);
+		//		SUBREADprintf("CONTIG %d : %s (len=%d = %d)\n", header_contigs, header_bin + header_bin_ptr , sqname_len, strlen(mem_contig_name));
+				HashTablePut(pairer -> sam_contig_number_table , mem_contig_name, NULL + 1 + header_contigs);
+				header_bin_ptr += sqname_len;
+
+				memcpy(header_bin + header_bin_ptr, &ct_len, 4);
+				header_bin_ptr += 4;
+				header_contigs++;
+			}
+		}
+
+		pairer -> BAM_header_parsed = 1;
+		pairer -> output_header(pairer, 0, 0, header_contigs , header_bin , header_bin_ptr);
+		free(header_bin);
+
+		fseek(pairer -> input_fp, passed_read_SBAM_ptr, SEEK_SET);
+
+		line_ptr = SBAM_buff;
+
+		while(1){
+			if(pairer -> is_finished) break;
+			int need_sleep = 1;
+			for(x1 = 0; x1 < pairer -> total_threads ; x1++){
+				if(pairer -> is_finished) break;
+				SAM_pairer_thread_t * this_thread = pairer -> threads + x1;
+				if(this_thread -> input_buff_SBAM_used - this_thread -> input_buff_SBAM_ptr < NOSORT_REFILL_LOWBAR && (this_thread -> input_buff_SBAM_used == 0 || this_thread -> input_buff_SBAM_ptr > 0)){
+					subread_lock_occupy(&this_thread -> SBAM_lock);
+					int to_be_add = NOSORT_REFILL_HIGHBAR - (this_thread -> input_buff_SBAM_used - this_thread -> input_buff_SBAM_ptr);
+
+					int x2;
+					if(this_thread -> input_buff_SBAM_ptr < this_thread -> input_buff_SBAM_used){
+						for(x2 = 0; x2 < this_thread -> input_buff_SBAM_used - this_thread -> input_buff_SBAM_ptr; x2++)
+							this_thread -> input_buff_SBAM[x2] = this_thread -> input_buff_SBAM[x2 + this_thread -> input_buff_SBAM_ptr];
+						this_thread -> input_buff_SBAM_used -= this_thread -> input_buff_SBAM_ptr;
+					}else this_thread -> input_buff_SBAM_used =0;
+
+					this_thread -> input_buff_SBAM_ptr = 0;
+					for(x2 = 0 ; ; x2++){
+						int record_len;
+						NOSORT_SAM_next_line;
+
+						if(NULL==NOSORT_SAM_eof || line_ptr[0]==0){
+							pairer -> is_finished = 1;
+							break;
+						}
+
+						record_len = strlen(line_ptr);
+	//					SUBREADprintf("1CHR=%c, ECHR=%d , RL=%d, RINS=%d, USED=%d\n", line_ptr[0], line_ptr[record_len - 1], record_len, this_thread -> reads_in_SBAM, this_thread -> input_buff_SBAM_used);
+						memcpy(this_thread -> input_buff_SBAM + this_thread -> input_buff_SBAM_used , line_ptr, record_len);
+						this_thread -> input_buff_SBAM_used += record_len;
+						this_thread -> reads_in_SBAM ++;
+						if(x2 % 2 == 1 && to_be_add <= this_thread -> input_buff_SBAM_used + 20000 )break;
+					}
+					need_sleep = 0;
+					subread_lock_release(&this_thread -> SBAM_lock);
+				}
+			}
+			if(need_sleep) usleep(nosort_tick_time);
+		}
+	}
+
+	free(SBAM_buff);
+	free(BIN_buff);
+
+
+	for(x1 = 0; x1 < pairer -> total_threads ; x1++){
+		pthread_join(pairer -> threads[x1].thread_stab, NULL);
+	}
+}
+
 int SAM_pairer_run( SAM_pairer_context_t * pairer){
 	int corrected_run;
-	for(corrected_run = 0; corrected_run < 2 ; corrected_run ++){
+
+	if(pairer -> force_do_not_sort){
+		SAM_nosort_run_once(pairer);
+	}else for(corrected_run = 0; corrected_run < 2 ; corrected_run ++){
 		SAM_pairer_run_once(pairer);
-		if(pairer -> is_bad_format){
+		if(pairer -> is_bad_format && pairer->input_is_BAM){
 			assert(0 == corrected_run);
 			if(pairer -> display_progress)
 				SUBREADprintf("Retrying with the corrected format...\n");
 			delete_with_prefix(pairer -> tmp_file_prefix);
 			SAM_pairer_fix_format(pairer);
+			if(pairer -> is_bad_format)
+				return -1;
 			SAM_pairer_reset(pairer);
 			pairer -> reset_output_function(pairer);
-			pairer -> is_bad_format = 0;
 		}else break;
 	}
 
@@ -4441,6 +5590,7 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 
 	if(fp)fclose(fp);
 
+	//SUBREADprintf("RET=%d, FIRSTPE=%p\n" , ret, is_first_read_PE);
 	if(FILE_TYPE_BAM == ret || FILE_TYPE_SAM == ret)
 		if(is_first_read_PE)
 		{
@@ -4448,37 +5598,17 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 			while(1)
 			{
 				char * tbr = SamBam_fgets(tpfp, test_buf, 4999, 0);
-				if(!tbr){
-					ret = FILE_TYPE_EMPTY;
-					break;
-				}
-				if(tbr[0]=='\n' || tbr[0]=='\r'){
-					ret = FILE_TYPE_UNKNOWN;
-					break;
-				}
+				if( tpfp -> is_paired_end >= 10)
+					(*is_first_read_PE) = tpfp -> is_paired_end - 10;
+				if(tbr == NULL)break;
 				if(tbr[0]=='@') continue;
-				char * rname_str, *tmpstr;
-				rname_str = strtok_r(tbr, "\t", &tmpstr);
-				if(!rname_str)
-				{
-					ret = FILE_TYPE_UNKNOWN;
-					break;
-				}
-				rname_str = strtok_r(NULL, "\t", &tmpstr);
-				if((!rname_str)|| (!isdigit(rname_str[0]))) 
-				{
-					ret = FILE_TYPE_UNKNOWN;
-					break;
-				}
-
-				int flags = atoi(rname_str);
-				(*is_first_read_PE) = flags &1;
 				break;
 			}
 			SamBam_fclose(tpfp);
 		}
 
 	free(test_buf);
+	//if(is_first_read_PE)assert(0);
 	return ret;
 }
 

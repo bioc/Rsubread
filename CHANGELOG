@@ -1,3 +1,7 @@
+1 Feb 2016 - 1.20.3
+(1) Fix a bug in processing gzipped fastq files in align() and subjunc().
+(2) Allow 'rna' and 'dna' to be specified as possible values for 'type' parameter in align.
+
 5 Nov 2015 - 1.20.2
 (1) Initialized the value of a switch that controls the detection of complex indels in C code.
 

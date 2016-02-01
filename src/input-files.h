@@ -54,6 +54,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "core-indel.h"
+#include "hashtable.h"
 
 
 #define SAM_SORT_BLOCKS 229
@@ -81,13 +82,28 @@ typedef struct {
 	char * input_buff_SBAM;
 	int input_buff_SBAM_used;
 	int input_buff_SBAM_ptr;
+	int reads_in_SBAM;
+	subread_lock_t SBAM_lock;
+
+	unsigned long long input_buff_SBAM_file_start;
+	unsigned long long input_buff_SBAM_file_end;
+
+	unsigned int chunk_number;
+	unsigned int readno_in_chunk;
 
 	unsigned char * input_buff_BIN;
 	int input_buff_BIN_used;
 	int input_buff_BIN_ptr;
 	int orphant_block_no;
+	int need_find_start;
 	unsigned long long orphant_space;
 	z_stream strm;
+
+	char immediate_last_read_bin[66000];
+	char immediate_last_read_full_name[MAX_READ_NAME_LEN*2 +80 ];
+	int immediate_last_read_flags;
+	int immediate_last_read_bin_len;
+	int immediate_last_read_name_len;
 
 	HashTable * orphant_table;
 	pthread_t thread_stab;
@@ -99,12 +115,22 @@ typedef struct {
 	int tiny_mode;
 	int display_progress;
 	int is_bad_format;
+	int is_single_end_mode;
+	int force_do_not_sort;
+	int is_finished;
 	subread_lock_t input_fp_lock;
+	subread_lock_t output_header_lock;
+	subread_lock_t unsorted_notification_lock;
 
 	unsigned long long total_input_reads;
 	unsigned long long total_orphan_reads;
 
+	HashTable * unsorted_notification_table;
+	HashTable * sam_contig_number_table;
+	HashTable * bam_margin_table;
+
 	int total_threads;
+	int input_chunk_no;
 	int input_buff_SBAM_size;
 	int input_buff_BIN_size;
 	char tmp_file_prefix[MAX_FILE_NAME_LENGTH];
@@ -113,15 +139,18 @@ typedef struct {
 	int BAM_header_parsed;
 	unsigned int BAM_l_text;
 	unsigned int BAM_n_ref;
+	int is_unsorted_notified;
 
 	void (* reset_output_function) (void * pairer);
 	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
 	int (* output_header) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len); 
+	void (* unsorted_notification) (void * pairer, char * bin1, char * bin2); // it is called only once
 	// reserved for the application passing its own data to the output function.
 	void * appendix1;
 	void * appendix2;
 	void * appendix3;
 	void * appendix4;
+	void * appendix5;
 
 } SAM_pairer_context_t;
 
@@ -226,7 +255,7 @@ int does_file_exist (char * filename);
 
 double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int * max_phred, int * tested_reads);
 
-FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table);
+FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * close_immediately);
 
 void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len);
 
@@ -259,14 +288,16 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos);
 unsigned long long geinput_file_offset( gene_input_t * input);
 
 
-int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
 int SAM_pairer_run( SAM_pairer_context_t * pairer);
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
 void SAM_pairer_writer_reset(void * pairer);
+void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (* unsorted_notification) (void * pairer, char * bin1, char * bin2));
 
 int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * rname, char * bin1, char * bin2 );
 int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len);
 
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);
 void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
+int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
 #endif

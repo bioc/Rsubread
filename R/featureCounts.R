@@ -1,4 +1,4 @@
-featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE,allowMultiOverlap=FALSE,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,strandSpecific=0,minMQS=0,readExtension5=0,readExtension3=0,read2pos=NULL,minOverlap=1,largestOverlap=FALSE,countSplitAlignmentsOnly=FALSE,countMultiMappingReads=FALSE,fraction=FALSE,countPrimaryAlignmentsOnly=FALSE,countChimericFragments=TRUE,ignoreDup=FALSE,chrAliases=NULL,reportReads=FALSE,autosort=TRUE)
+featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,largestOverlap=FALSE,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,PE_orientation="fr",countChimericFragments=TRUE,autosort=TRUE,nthreads=1,maxMOp=10,reportReads=FALSE)
 {
 	flag <- FALSE
 
@@ -46,18 +46,26 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	files_C <- paste(files,collapse=";")
 	
 	if(nchar(files_C) == 0) stop("No read files provided!")
+
+	genome_C <- genome
+	if(is.null(genome))
+	  genome_C <- " "
 	
 	chrAliases_C <- chrAliases
 	if(is.null(chrAliases))
 	  chrAliases_C <- " "
 	  
 	countMultiMappingReads_C <- countMultiMappingReads
-	if(countPrimaryAlignmentsOnly) countMultiMappingReads_C <- 2
+	if(primaryOnly) countMultiMappingReads_C <- 2
 
 	read2pos_C <- read2pos
 	if(is.null(read2pos)) read2pos_C <- 0
+
+	split_C <- 0
+	if(splitOnly) split_C <- 1
+	if(nonSplitOnly) split_C <- 2
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,as.numeric(countSplitAlignmentsOnly),read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,sep=",")
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
@@ -66,8 +74,14 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 
 	x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
 
+	if(juncCounts)
+		x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
+
 	file.remove(fout)
 	file.remove(paste(fout,".summary",sep=""))
+
+	if(juncCounts)
+		file.remove(paste(fout,".jcounts",sep=""))
 	
 	if(flag) 
 	  file.remove(fout_annot)
@@ -79,9 +93,12 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	y <- as.matrix(x[,-c(1:6)])
 	colnames(y) <- colnames(x)[-c(1:6)]
 	rownames(y) <- x$GeneID
-	
-	z <- list(counts=y,annotation=x[,1:6],targets=colnames(y),stat=x_summary)
-	z
-	
+
+	if(juncCounts)
+		z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:6],targets=colnames(y),stat=x_summary)
+	else
+		z <- list(counts=y,annotation=x[,1:6],targets=colnames(y),stat=x_summary)	
+
+	z	
 }
 

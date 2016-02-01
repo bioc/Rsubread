@@ -1213,7 +1213,7 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 					}
 				}
 
-				if(0 && FIXLENstrcmp("R000002444", read_name) == 0) 
+				if(0 && ( FIXLENstrcmp("R001968841", read_name) == 0 ||  FIXLENstrcmp("XXR002430582", read_name) == 0 ) )
 				{
 					char posout[100];
 					absoffset_to_posstr(global_context, current_vote -> pos[i][j], posout);
@@ -1444,7 +1444,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 					if(used_comb_buffer < global_context -> config.max_vote_combinations)
 						used_comb_buffer ++;
 
-					if(0 && FIXLENstrcmp("V0112_0155:7:1101:19612:13380", read_name_1)==0)
+					if(0 && FIXLENstrcmp("R005717815", read_name_1)==0)
 						SUBREADprintf("Vadj [%d][%d] = %d (raw = %d + %d), PE=%d, Target=%d/%d\n", i,j , adjusted_votes, vote_simple_1_buffer[i].major_half_votes, vote_simple_2_buffer[j].major_half_votes, is_PE_distance, target_index, used_comb_buffer);
 
 				}
@@ -2484,7 +2484,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			//if(explain_context -> pair_number == 999999)
 			
 			// ACDB PVDB TTTS
-			if(0 && FIXLENstrcmp("V0112_0155:7:1101:14795:2882", explain_context -> read_name) ==0)
+			if(0 && FIXLENstrcmp("R001968841", explain_context -> read_name) ==0)
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%u\tCIGAR=%s\tMM=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\n\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id);
 
 
@@ -2650,6 +2650,8 @@ void print_big_margin(global_context_t * global_context, subread_read_number_t p
 
 int is_ambiguous_voting(global_context_t * global_context, subread_read_number_t pair_number, int is_second_read, int selected_vote, int max_start,int max_end, int read_len, int is_negative)
 {
+//	#warning "=========== THE NEXT LINE IS ONLY FOR COMPARING WITH STAR!! ============== "
+//	return 0;
 	if( global_context->config.big_margin_record_size<3) return 0;
 	int xk1;
 	int encounter = 0;
@@ -2823,7 +2825,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 	int real_split_point_i;
 	int real_split_point_numbers = guess_end - guess_start;
 
-	if(0 && FIXLENstrcmp("R006633992", read_name) == 0) 
+	if(0 && FIXLENstrcmp("R006856515", read_name) == 0) 
 		SUBREADprintf("TESTDON: LR=%d; RR=%d\n", left_indel_offset, right_indel_offset);
 	
 	for(real_split_point_i = 0 ; real_split_point_i < real_split_point_numbers; real_split_point_i++)
@@ -2861,7 +2863,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 
 	//	donor_left[2]=0; donor_right[2]=0;
 
-		if(0 && FIXLENstrcmp("R002403247", read_name) == 0) 
+		if(0 && FIXLENstrcmp("R006856515", read_name) == 0) 
 		{
 			donor_left[2]=0;
 			donor_right[2]=0;
@@ -2952,7 +2954,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 		*is_GT_AG_strand = selected_junction_strand;
 		*final_inserted_bases = selected_inserted_bases;
 
-		if(0 && FIXLENstrcmp("R000000029", read_name)==0)
+		if(0 && FIXLENstrcmp("R006856515", read_name)==0)
 			SUBREADprintf("FINAL_INS_LEN=%d; BEST_SCORE=%d  %s\n", selected_inserted_bases, best_score, read_name);
 		return (1+best_score)/100;
 	}
@@ -3016,13 +3018,13 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	if(global_context -> config.do_fusion_detection && subjunc_result -> minor_votes < 1)return;
 	if((!global_context -> config.do_fusion_detection) && subjunc_result -> minor_votes < 1)return;
 
-	if(result -> selected_votes < global_context->config.minimum_subread_for_first_read)return;
+	//if(result -> selected_votes < global_context->config.minimum_subread_for_first_read)return;
 
 	if(global_context->config.do_big_margin_filtering_for_junctions)
 	{
 
 
-		if(0 && FIXLENstrcmp("R000000052", read_name) == 0 ) 
+		if(0 && FIXLENstrcmp("R006856515", read_name) == 0 ) 
 		{
 			char posout[100];
 			int xk1;
@@ -3046,11 +3048,11 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	}
 
 	if(0){
-		#define TEST_SUBJUNC_POS0 100182270
+		#define TEST_SUBJUNC_POS0 225127476 
 		if((result -> selected_position > TEST_SUBJUNC_POS0 - 100 && result -> selected_position < TEST_SUBJUNC_POS0 + 100)||
 			(subjunc_result -> minor_position > TEST_SUBJUNC_POS0 - 100 && subjunc_result -> minor_position < TEST_SUBJUNC_POS0 + 100))
 		//if(FIXLENstrcmp("V0112_0155:7:1101:14157:2012", read_name)==0)
-			SUBREADprintf("NEWJUNC: %s , L1 MAIN_POS=%u; MINOR_POS=%u ; LEN=%d ; SPL=%d\nMNVT=%d ; RSSV=%d\n", read_name, result -> selected_position, subjunc_result -> minor_position, read_len, selected_real_split_point, subjunc_result -> minor_votes , result -> selected_votes ); 
+			SUBREADprintf("NEWJUNC: %s , L1 MAIN_POS=%u; MINOR_POS=%u ; LEN=%d ; SPL=%d\nMNVT=%d ; RSSV=%d\nENCOUNTER=%d\n", read_name, result -> selected_position, subjunc_result -> minor_position, read_len, selected_real_split_point, subjunc_result -> minor_votes , result -> selected_votes , is_ambiguous_voting(global_context, pair_number, is_second_read, result->selected_votes, result -> confident_coverage_start, result -> confident_coverage_end, read_len, (result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0)); 
 	}
 
 
@@ -3148,7 +3150,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 		}
 
 		char * chro_name_left, *chro_name_right;
-		unsigned int chro_pos_left,chro_pos_right;
+		int chro_pos_left,chro_pos_right;
 			
 		locate_gene_position( left_edge_wanted , &global_context -> chromosome_table, &chro_name_left, &chro_pos_left);
 		locate_gene_position( right_edge_wanted , &global_context -> chromosome_table, &chro_name_right, &chro_pos_right);
@@ -3342,7 +3344,8 @@ int write_fusion_final_results(global_context_t * global_context)
 
 	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.breakpoints.txt", global_context->config.output_prefix);
 	FILE * ofp = f_subr_open(fn2, "wb");
-	fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport	BreakPoint1_GoUp	BreakPoint2_GoUp\n");
+	fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport\n");
+	//fprintf(ofp,"#Chr	Location	Chr	Location	SameStrand	nSupport	BreakPoint1_GoUp	BreakPoint2_GoUp\n");
 
 	int xk1;
 	unsigned int all_junctions = 0;
@@ -3352,7 +3355,7 @@ int write_fusion_final_results(global_context_t * global_context)
 	for(xk1 = 0; xk1 < indel_context -> total_events ; xk1++)
 	{ 
 		char * chro_name_left,* chro_name_right;
-		unsigned int chro_pos_left, chro_pos_right; 
+		int chro_pos_left, chro_pos_right; 
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 		if(event_body -> event_type != CHRO_EVENT_TYPE_FUSION && (global_context->config.entry_program_name != CORE_PROGRAM_SUBREAD || event_body -> event_type != CHRO_EVENT_TYPE_JUNCTION))
 			continue;
@@ -3371,7 +3374,8 @@ int write_fusion_final_results(global_context_t * global_context)
 		chro_pos_left++;
 		all_junctions ++;
 
-		fprintf(ofp, "%s\t%u\t%s\t%u\t%s\t%d\t%s\t%s\n", chro_name_left, chro_pos_left, chro_name_right, chro_pos_right+1, event_body -> is_strand_jumped?"No":"Yes", event_body -> final_counted_reads, event_body -> small_side_increasing_coordinate?"Yes":"No", event_body -> large_side_increasing_coordinate?"Yes":"No");
+		fprintf(ofp, "%s\t%u\t%s\t%u\t%s\t%d\n", chro_name_left, chro_pos_left, chro_name_right, chro_pos_right+1, event_body -> is_strand_jumped?"No":"Yes", event_body -> final_counted_reads);
+		//fprintf(ofp, "%s\t%u\t%s\t%u\t%s\t%d\t%s\t%s\n", chro_name_left, chro_pos_left, chro_name_right, chro_pos_right+1, event_body -> is_strand_jumped?"No":"Yes", event_body -> final_counted_reads, event_body -> small_side_increasing_coordinate?"Yes":"No", event_body -> large_side_increasing_coordinate?"Yes":"No");
 	}
 
 	global_context -> all_fusions = all_junctions;
@@ -3402,11 +3406,11 @@ void write_inversion_results_final(void * buckv, HashTable * tab){
 			inversion_result_t * inv_res = buck -> details[x1];
 
 			char * src_chr;
-			unsigned int src_pos;
+			int src_pos;
 
 			locate_gene_position(inv_res -> small_side,  &global_context -> chromosome_table, &src_chr , &src_pos);
-			fprintf(ofp, "INV\t%s\t%u\t%s\t%u\t%s\n",  src_chr, src_pos + 1, src_chr, src_pos + 1 + inv_res -> length,  inv_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
-			fprintf(ofp, "INV\t%s\t%u\t%s\t%u\t%s\n",  src_chr, src_pos + 2, src_chr, src_pos + inv_res -> length,  inv_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
+			fprintf(ofp, "INV\t%s\t%d\t%s\t%u\t%s\n",  src_chr, src_pos + 1, src_chr, src_pos + 1 + inv_res -> length,  inv_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
+			fprintf(ofp, "INV\t%s\t%d\t%s\t%u\t%s\n",  src_chr, src_pos + 2, src_chr, src_pos + inv_res -> length,  inv_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
 
 			//fprintf(ofp, "INVERSION\t%s\t%u\t%u\t%u\t%u\n", src_chr, src_pos, inv_res -> length, inv_res -> all_sup_D , inv_res -> max_sup_E);
 		}
@@ -3425,7 +3429,7 @@ void write_translocation_results_final(void * buckv, HashTable * tab){
 		if(buck->positions[x1] - buck->positions[x1] % buck -> maximum_interval_length == buck -> keyed_bucket)
 		{
 			char * src_chr, *targ_chr;
-			unsigned int src_pos, targ_pos;
+			int src_pos, targ_pos;
 
 			translocation_result_t * trans_res = buck -> details[x1];
 
@@ -3438,9 +3442,9 @@ void write_translocation_results_final(void * buckv, HashTable * tab){
 			SUBREADprintf("%u, %u\n", src_pos, targ_pos);
 			SUBREADprintf("%s, %s\n", src_chr, targ_chr);
 			*/
-			fprintf(ofp, "%s\t%s\t%u\t%s\t%u\t%s\t%s\n", src_chr == targ_chr?"ITX":"CTX", src_chr, src_pos + 1, targ_chr, targ_pos + 1, trans_res -> is_inv?"X":"=",  trans_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
-			fprintf(ofp, "%s\t%s\t%u\t%s\t%u\t%s\t%s\n", src_chr == targ_chr?"ITX":"CTX", src_chr, src_pos + trans_res -> length + 1, targ_chr, targ_pos + 1, trans_res -> is_inv?"X":"=", trans_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
-			fprintf(ofp, "DEL\t%s\t%u\t%u\t%s\n", src_chr, src_pos + 1, trans_res -> length ,  trans_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
+			fprintf(ofp, "%s\t%s\t%u\t%s\t%d\t%s\t%s\n", src_chr == targ_chr?"ITX":"CTX", src_chr, src_pos + 1, targ_chr, targ_pos + 1, trans_res -> is_inv?"X":"=",  trans_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
+			fprintf(ofp, "%s\t%s\t%u\t%s\t%d\t%s\t%s\n", src_chr == targ_chr?"ITX":"CTX", src_chr, src_pos + trans_res -> length + 1, targ_chr, targ_pos + 1, trans_res -> is_inv?"X":"=", trans_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
+			fprintf(ofp, "DEL\t%s\t%d\t%u\t%s\n", src_chr, src_pos + 1, trans_res -> length ,  trans_res -> is_precisely_called ? "PRECISE":"IMPRECISE");
 		}
 	}
 
@@ -3465,7 +3469,7 @@ int write_junction_final_results(global_context_t * global_context)
 	for(xk1 = 0; xk1 < indel_context -> total_events ; xk1++)
 	{ 
 		char * chro_name_left,* chro_name_right, indel_sect[10];
-		unsigned int chro_pos_left, chro_pos_right; 
+		int chro_pos_left, chro_pos_right; 
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 		if(event_body -> event_type != CHRO_EVENT_TYPE_JUNCTION)
 			continue;
@@ -3899,7 +3903,7 @@ int core_select_best_matching_halves_maxone(global_context_t * global_context, g
 {
 	int best_splicing_point = -1, i,j;
 	char * best_chro_name, is_reversed;
-	unsigned int best_chro_pos;
+	int best_chro_pos;
 	int selected_max_votes = -1;
 
 
@@ -3909,7 +3913,7 @@ int core_select_best_matching_halves_maxone(global_context_t * global_context, g
 		{
 			char * chro_name;
 			char is_partner_reversed;
-			unsigned int chro_pos;
+			int chro_pos;
 
 			int overlapped_len, overlap_start, overlap_end;
 			// All logical conditions
@@ -4868,7 +4872,7 @@ int find_translocation_brk_PQR(global_context_t * global_context, mapping_result
 	void * event_ptr_list_A1[_PQR_LIST_SIZE];
 
 	char * chroA=NULL;
-	unsigned int posA1=0;
+	int posA1=0;
 	
 	locate_gene_position(resA1 -> selected_position,  &global_context -> chromosome_table, &chroA, &posA1);
 
@@ -4911,7 +4915,7 @@ int find_translocation_brk_PQR(global_context_t * global_context, mapping_result
 		void * event_ptr_list_R[_PQR_LIST_SIZE];
 
 		char * charAncQ = NULL, * charAncR = NULL;
-		unsigned int posAncQ=0, posAncR = 0;
+		int posAncQ=0, posAncR = 0;
 		locate_gene_position(anchor_for_brkQ, &global_context -> chromosome_table, &charAncQ, &posAncQ);
 		locate_gene_position(anchor_for_brkR, &global_context -> chromosome_table, &charAncR, &posAncR);
 
@@ -4968,7 +4972,7 @@ int find_translocation_brk_PQR(global_context_t * global_context, mapping_result
 }
 
 
-void get_event_two_coordinates(global_context_t * global_context, unsigned int event_no, char ** small_chro, unsigned int * small_pos, unsigned int * small_abs, char ** large_chro, unsigned int * large_pos, unsigned int * large_abs){
+void get_event_two_coordinates(global_context_t * global_context, unsigned int event_no, char ** small_chro, int * small_pos, unsigned int * small_abs, char ** large_chro, int * large_pos, unsigned int * large_abs){
 
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
 	chromosome_event_t * event_body = indel_context -> event_space_dynamic + event_no;
@@ -4986,7 +4990,7 @@ void get_event_two_coordinates(global_context_t * global_context, unsigned int e
 void create_or_update_translocation_imprecise_result(global_context_t * global_context , unsigned int guessed_P_small, unsigned int guessed_tra_len, unsigned int guessed_Q_small , int paired_BC_reads, int isInv){
 
 	char * brkPchr;
-	unsigned int brkPsmall;
+	int brkPsmall;
 	void * trans_old_ptrs [_PQR_LIST_SIZE];
 	unsigned int trans_old_poses [_PQR_LIST_SIZE];
 
@@ -5030,7 +5034,8 @@ void create_or_update_translocation_imprecise_result(global_context_t * global_c
 void create_or_update_translocation_result(global_context_t * global_context , unsigned int brkPno, unsigned int brkQno, unsigned int brkRno , int paired_BC_reads, int isInv){
 
 	char *brkPchr, *brkQchr, *tmpchr;
-	unsigned int brkPsmall, brkPlarge, brkQsmall, tmpint, brkPabs_small, brkQabs_small, brkRabs_small, brkRabs_large, brkQabs_large;
+	int brkPsmall, brkPlarge, brkQsmall, tmpint;
+	unsigned int brkPabs_small, brkQabs_small, brkRabs_small, brkRabs_large, brkQabs_large;
 
 	SUBREADprintf("\nTRALOG: FINALLY_CONFIRMED: %s ; %d PE_MATES\n", isInv?"INV":"STR", paired_BC_reads);
 
@@ -5163,7 +5168,8 @@ void finalise_translocations(global_context_t * global_context){
 
 		for(frag_Q_larger_read = 0; frag_Q_larger_read < 2; frag_Q_larger_read++){
 			void ** s_ptrs = frag_Q_larger_read?s2_ptrs:s1_ptrs;
-			unsigned int * s_poses = frag_Q_larger_read?s2_poses:s1_poses, q_res_offset = 0;
+			unsigned int * s_poses = frag_Q_larger_read?s2_poses:s1_poses;
+			int q_res_offset = 0;
 			mapping_result_t * q_res = frag_Q_larger_read?q_res_2:q_res_1;
 
 			char * q_res_chro = NULL;
@@ -5349,7 +5355,8 @@ void finalise_inversions(global_context_t * global_context){
 			for(frag_Q_larger_read = 0; frag_Q_larger_read < 2; frag_Q_larger_read++){
 				int * s_list_items = frag_Q_larger_read?&s2_list_items:&s1_list_items;
 				void ** s_ptrs = frag_Q_larger_read?s2_ptrs:s1_ptrs;
-				unsigned int * s_poses = frag_Q_larger_read?s2_poses:s1_poses, q_res_offset = 0;
+				unsigned int * s_poses = frag_Q_larger_read?s2_poses:s1_poses;
+				int q_res_offset = 0;
 				mapping_result_t * q_res = frag_Q_larger_read?q_res_2:q_res_1;
 				unsigned long long * s_selected_list = frag_Q_larger_read?s2_selected_list:s1_selected_list;
 				mapping_result_t ** s_result_ptr_list = frag_Q_larger_read?s2_result_ptr_list:s1_result_ptr_list;
@@ -5435,7 +5442,7 @@ void finalise_inversions(global_context_t * global_context){
 		if(found_INV_frags > 0)
 		{
 			char * q_small_chro = NULL;
-			unsigned int q_small_pos = 0;
+			int q_small_pos = 0;
 
 			guessed_Y_small_abs_sum /= found_INV_frags;
 			guessed_Z_large_abs_sum /= found_INV_frags;
@@ -5502,7 +5509,8 @@ void finalise_inversions(global_context_t * global_context){
 
 		
 		char *brkYchr = "NULL";
-		unsigned int brkYlarge = 0, brkYsmall = 0, brkYabs_small = 0, brkYabs_large;
+		unsigned int brkYabs_small = 0, brkYabs_large = 0;
+		int brkYsmall = 0, brkYlarge = 0;
 		int is_precisely_called = 0, is_roughly_called = 0;
 		if(brkYno < 0xffffffff){
 			// s1_selected_list : 2 * fragment_S_no + frag_S_larger_read
@@ -5592,7 +5600,7 @@ void build_breakpoint_tables(global_context_t  * global_context){
 	for(xk1 = 0; xk1 < indel_context -> total_events ; xk1++)
 	{ 
 		char * chro_name_left= NULL,* chro_name_right = NULL;
-		unsigned int chro_pos_left= 0, chro_pos_right = 0;
+		int chro_pos_left= 0, chro_pos_right = 0;
 
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic + xk1;
 
