@@ -23,6 +23,8 @@ detectionCallAnnotation <- function(species="hg", binsize=2000)
 		.C("detectionCallAnnotation", as.character(exonfile), as.character(irfile), as.character(species), as.integer(binsize), PACKAGE="Rsubread")
 	
 	}
+	
+	NULL
 
 }
 

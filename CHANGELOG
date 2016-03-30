@@ -1,3 +1,8 @@
+30 Mar 2016 - 1.21.9
+(1) processExons() and detectionCallAnnotation() functions return NULL object.
+(2) Update documentation for processExons() and detectionCallAnnotation() functions.
+(3) Update DESCRIPTION for the package.
+
 24 Mar 2016 - 1.21.8
 (1) Removed 'PE_orientation' parameter from featureCounts.
 

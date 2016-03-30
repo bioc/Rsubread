@@ -10,13 +10,20 @@ processExons(filename="human_seq_gene.md", species="hg")
   \item{species}{a character string specifying the species}
 }
 \details{
-The NCBI annotation file gives the chromosomal coordinates of UTR (Untranslated region) and CDS (Coding sequence).
-This function uses these information to derive the chromosomal coordinates of exons.
-The first and last exons of genes usually contain both UTR sequence and CDS sequence.
-}
+This is an internal function and should not be called by users directly.
 
+It processes the NCBI mapview annotation data downloaded from the following links: (these annotations include chromosomal coordinates of UTR and CDS regions of genes).
+
+\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/mapview/seq_gene.md.gz}
+
+\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/mapview/seq_gene.md.gz}
+
+This function finds the chromosomal coordinates of intergenic regions (regions between neighbouring genes) and then outputs them to a file.
+It also outputs to a file chromosomal coordinates of exons of genes by concatenating UTRs with CDSs and merging overlapping CDSs within each gene.
+The generated annotation files will then be used by \code{\link{detectionCallAnnotation}} function to produce annotation data required by \code{\link{detectionCall}} function.
+}
 \value{ 
-A text file containing chromosomal coordinates of each exon.  
+Two annotation files are written to the current working directory. This function returns a \code{NULL} object.
 }
 %\references{}
 \author{Zhiyin Dai and Wei Shi}
