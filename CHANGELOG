@@ -1,3 +1,8 @@
+30 Mar 2016 - 1.20.4
+(1) processExons() and detectionCallAnnotation() functions return NULL object.
+(2) Update documentation for processExons() and detectionCallAnnotation() functions.
+(3) Update DESCRIPTION for the package.
+
 1 Feb 2016 - 1.20.3
 (1) Fix a bug in processing gzipped fastq files in align() and subjunc().
 (2) Allow 'rna' and 'dna' to be specified as possible values for 'type' parameter in align.

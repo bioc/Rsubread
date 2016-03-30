@@ -92,6 +92,8 @@ processExons <- function(filename = "human_seq_gene.md", species="hg")
 		}
 	
 	}
+	
+	NULL
 
 }
 
