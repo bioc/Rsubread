@@ -1,3 +1,18 @@
+CHANGES IN VERSION 1.22.0
+------------------------
+
+NEW FEATURES
+
+    o featureCounts() is able to count reads of up to 250kb long.
+
+    o A parameter `juncCounts' is added to featureCounts() function to report counts for exon-exon junctions in RNA-seq data.
+
+    o A parameter `nonSplitOnly' is added to featureCounts() function to count non-split alignments only.
+	
+    o Improved parsing of gzipped fastq files in align() and subjunc() aligners.
+
+
+
 CHANGES IN VERSION 1.20.0
 ------------------------
 
