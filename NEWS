@@ -11,6 +11,8 @@ NEW FEATURES
 	
     o Improved parsing of gzipped fastq files in align() and subjunc() aligners.
 
+    o Improved screen output and error reporting for align(), subjunc() and featureCounts().
+
 
 
 CHANGES IN VERSION 1.20.0
