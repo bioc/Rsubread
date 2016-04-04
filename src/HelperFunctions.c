@@ -21,6 +21,27 @@
 #include <string.h>
 #include <assert.h>
 
+
+#ifdef MACOS
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/sysctl.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#else
+
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#endif
+
+
 #include "subread.h"
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
@@ -740,3 +761,130 @@ int strcmp_number(char * s1, char * s2)
 		return ret;
 	}
 }
+
+
+
+int mac_str(char * str_buff)
+{
+#ifdef FREEBSD
+	return 1;
+#else
+#ifdef MACOS
+    int         mib[6], x1, ret = 1;
+	size_t		len;
+    char            *buf;
+    unsigned char       *ptr;
+    struct if_msghdr    *ifm;
+    struct sockaddr_dl  *sdl;
+
+
+	for(x1 = 0 ; x1 < 40; x1++)
+    {
+		mib[0] = CTL_NET;
+		mib[1] = AF_ROUTE;
+		mib[2] = 0;
+		mib[3] = AF_LINK;
+		mib[4] = NET_RT_IFLIST;
+		mib[5] = x1;
+
+		if (sysctl(mib, 6, NULL, &len, NULL, 0) >=0) {
+			buf = malloc(len);
+			if (sysctl(mib, 6, buf, &len, NULL, 0) >=0) {
+
+				ifm = (struct if_msghdr *)buf;
+				sdl = (struct sockaddr_dl *)(ifm + 1);
+				ptr = (unsigned char *)LLADDR(sdl);
+
+				if(sdl -> sdl_nlen < 1) continue;
+
+				char * ifname = malloc(sdl -> sdl_nlen + 1);
+
+				memcpy(ifname, sdl -> sdl_data, sdl -> sdl_nlen);
+				ifname[sdl -> sdl_nlen] = 0;
+				if(ifname[0]!='e'){
+					free(ifname);
+					continue;
+				}
+				free(ifname);
+
+				sprintf(str_buff,"%02X%02X%02X%02X%02X%02X",  *ptr, *(ptr+1), *(ptr+2),
+					*(ptr+3), *(ptr+4), *(ptr+5));
+				ret = 0;
+				break;
+			}
+			free(buf);
+		}
+	}
+    return ret;
+#else
+    struct ifreq ifr;
+    struct ifconf ifc;
+    char buf[1024];
+    int success = 0;
+
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    if (sock == -1) { /* handle error*/ };
+
+    ifc.ifc_len = sizeof(buf);
+    ifc.ifc_buf = buf;
+    if (ioctl(sock, SIOCGIFCONF, &ifc) == -1) { /* handle error */ }
+
+    struct ifreq* it = ifc.ifc_req;
+    const struct ifreq* const end = it + (ifc.ifc_len / sizeof(struct ifreq));
+
+    for (; it != end; ++it) {
+        strcpy(ifr.ifr_name, it->ifr_name);
+        if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0) {
+            if (! (ifr.ifr_flags & IFF_LOOPBACK)) { // don't count loopback
+                if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0) {
+                      success = 1;
+                      break;
+                }
+            }
+        }
+    }
+
+    unsigned char mac_address[6];
+
+    if (success){
+	memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
+	    int x1;
+	    for(x1 = 0; x1 < 6; x1++){
+		 sprintf(str_buff+2*x1, "%02X",mac_address[x1]);
+	    }
+		return 0;
+	}
+	return 1;
+#endif
+#endif
+}
+
+int rand_str(char * str_buff){
+	int ret = 1;
+	FILE * fp = fopen("/dev/urandom","r");
+	if(fp){
+		int x1;
+		for(x1=0; x1<6; x1++){
+			sprintf(str_buff + 2*x1 , "%02X", fgetc(fp));
+		}
+		fclose(fp);
+		ret = 0;
+	}
+	return ret;
+}
+
+int mathrand_str(char * str_buff){
+	srand((int)(miltime()*100));
+	int x1;
+	for(x1 = 0; x1 < 6; x1++){
+		sprintf(str_buff+2*x1, "%02X", rand() & 0xff );
+	}
+	return 0;
+}
+
+int mac_or_rand_str(char * str_buff){
+	return mac_str(str_buff) && rand_str(str_buff) && mathrand_str(str_buff);
+}
+
+
+

@@ -6,6 +6,7 @@
 #include "subread.h"
 #include "core.h"
 #include "input-files.h"
+#include "HelperFunctions.h"
 
 void print_usage_pairer(char * cmd){
 	SUBREADprintf("\nrepair Version %s\n\n", SUBREAD_VERSION);
@@ -107,9 +108,10 @@ int main_read_repair(int argc, char ** argv)
 		STANDALONE_exit(-1);
 	}
 
-	srand( (unsigned int) (miltime()*1000));
+	char mac_rand[13];
+	mac_or_rand_str(mac_rand);
 
-	sprintf(rand_prefix, "fsbm-p%06d-%04X%04X%04X", getpid(), rand()&0xffff, rand()&0xffff,rand()&0xffff);
+	sprintf(rand_prefix, "fsbm-p%06d-%s", getpid(), mac_rand);
 
 	SAM_pairer_context_t pairer;
 	SAM_pairer_writer_main_t writer_main;

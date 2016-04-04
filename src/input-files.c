@@ -32,6 +32,7 @@
 #include <assert.h>
 #include "input-files.h"
 #include "sambam-file.h"
+#include "HelperFunctions.h"
 #include "hashtable.h"
 #include "seek-zlib.h"
 #include "gene-algorithms.h"
@@ -1471,7 +1472,7 @@ void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes)
 {
 	int i, is_first_read_PE;
-	int is_BAM = is_certainly_bam_file(in_SAM_file,  &is_first_read_PE);
+	int is_BAM = is_certainly_bam_file(in_SAM_file,  &is_first_read_PE, NULL);
 	SamBam_FILE * fp = SamBam_fopen(in_SAM_file,is_BAM?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
 
 	while(1)
@@ -2513,6 +2514,8 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 int SAM_pairer_read_SAM_MB( FILE * fp, int max_read_len, char * inbuff ){
 	int ret = 0;
 	
+	if(feof(fp)) return 0;
+
 	while(1){
 		if(ret >= max_read_len - MIN_BAM_BLOCK_SIZE || feof(fp))break;
 		int rlen = fread(inbuff +ret , 1, max_read_len - MIN_BAM_BLOCK_SIZE - ret , fp);
@@ -2521,14 +2524,14 @@ int SAM_pairer_read_SAM_MB( FILE * fp, int max_read_len, char * inbuff ){
 			int x1;
 			for(x1 = 0; x1 < min(200, rlen); x1++)
 				if(*(inbuff+ret+x1)<8 || *(inbuff+ret+x1)> 127){
-	//				SUBREADprintf("NOT_SAM_ACTUALLY\n");
+					SUBREADprintf("NOT_SAM_ACTUALLY\n");
 					return -1;
 				}
 			ret += rlen;
 		}
 	}
 	if(!feof(fp)){
-		int nch, last=-1;
+		int nch;
 		while(1){
 			nch = fgetc(fp);
 			if(nch < 0 || nch == '\n'){
@@ -2536,11 +2539,11 @@ int SAM_pairer_read_SAM_MB( FILE * fp, int max_read_len, char * inbuff ){
 			}else{
 				inbuff[ret++]=nch;
 			}
-			last = nch;
 		}
 	}
-	if(inbuff[ret] != '\n') inbuff[ret++]='\n';
+	if(inbuff[ret-1] != '\n') inbuff[ret++]='\n';
 	inbuff[ret] = 0;
+
 	return ret;
 }
 
@@ -4678,13 +4681,14 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 
 int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_path)
 {
-	char tmp_fname[MAX_FILE_NAME_LENGTH+40];
+	char tmp_fname[MAX_FILE_NAME_LENGTH+40], mac_rand[13];
 	memset(writer, 0, sizeof(SAM_sort_writer));
 
 	old_sig_TERM = signal (SIGTERM, SAM_SORT_SIGINT_hook);
 	old_sig_INT = signal (SIGINT, SAM_SORT_SIGINT_hook);
 
-	sprintf(writer -> tmp_path, "%s/temp-sort-%06u-%08X-", tmp_path, getpid(), rand());
+	mac_or_rand_str(mac_rand);
+	sprintf(writer -> tmp_path, "%s/temp-sort-%06u-%s-", tmp_path, getpid(), mac_rand);
 	_SAMSORT_SNP_delete_temp_prefix = writer -> tmp_path;
 
 	sprintf(tmp_fname, "%s%s", writer -> tmp_path, "headers.txt");
@@ -5249,10 +5253,10 @@ int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, uns
 	return 0;
 }
 
-int is_certainly_bam_file(char * fname, int * is_first_read_PE)
+int is_certainly_bam_file(char * fname, int * is_first_read_PE, long long * SAMBAM_header_size)
 {
 
-	int read_type = probe_file_type(fname, is_first_read_PE);
+	int read_type = probe_file_type_EX(fname, is_first_read_PE, SAMBAM_header_size);
 	if(read_type == FILE_TYPE_NONEXIST || read_type == FILE_TYPE_EMPTY || read_type == FILE_TYPE_UNKNOWN)
 		return -1;
 	if(read_type == FILE_TYPE_BAM)
@@ -5458,6 +5462,10 @@ int probe_file_type_fast(char * fname){
 }
 int probe_file_type(char * fname, int * is_first_read_PE)
 {
+	return probe_file_type_EX(fname, is_first_read_PE, NULL);
+}
+int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_header_length)
+{
 	FILE * fp = f_subr_open(fname, "rb");
 	if(!fp) return FILE_TYPE_NONEXIST;
 
@@ -5590,20 +5598,22 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 
 	if(fp)fclose(fp);
 
-	//SUBREADprintf("RET=%d, FIRSTPE=%p\n" , ret, is_first_read_PE);
+	//SUBREADprintf("RET=%d, FIRSTPE=%p, SAMLEN=%p\n" , ret, is_first_read_PE, SAMBAM_header_length);
 	if(FILE_TYPE_BAM == ret || FILE_TYPE_SAM == ret)
-		if(is_first_read_PE)
+		if(is_first_read_PE || SAMBAM_header_length)
 		{
 			SamBam_FILE * tpfp = SamBam_fopen(fname, (FILE_TYPE_BAM  == ret)?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
 			while(1)
 			{
 				char * tbr = SamBam_fgets(tpfp, test_buf, 4999, 0);
-				if( tpfp -> is_paired_end >= 10)
+				if( is_first_read_PE &&  tpfp -> is_paired_end >= 10)
 					(*is_first_read_PE) = tpfp -> is_paired_end - 10;
 				if(tbr == NULL)break;
 				if(tbr[0]=='@') continue;
 				break;
 			}
+			
+			if( SAMBAM_header_length) (*SAMBAM_header_length) = tpfp -> header_length;
 			SamBam_fclose(tpfp);
 		}
 

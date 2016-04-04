@@ -274,7 +274,7 @@ void colorread2base(char * read_buffer, int read_len);
 int warning_file_type(char * fname, int expected_type);
 char color2char(char clr, char c1);
 
-int is_certainly_bam_file(char * fname, int * is_firstread_PE);
+int is_certainly_bam_file(char * fname, int * is_firstread_PE, long long  * SAMBAM_header_length);
 
 unsigned long long int sort_SAM_hash(char * str);
 
@@ -286,6 +286,7 @@ int probe_file_type_fast(char * fname);
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos);
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos);
 unsigned long long geinput_file_offset( gene_input_t * input);
+int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_header_length);
 
 
 int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;

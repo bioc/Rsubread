@@ -359,6 +359,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				next_char = geinput_next_char(&ginp);
 				if(next_char < 0)
 				{
+					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
+
 					if (next_char == -1) status = NEXT_READ;
 					if (next_char == -2) status = NEXT_FILE;
 					if (next_char == -3) return 0;

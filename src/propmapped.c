@@ -35,7 +35,7 @@
 #include "sambam-file.h" 
 #include "input-files.h" 
 #include "gene-algorithms.h"
-
+#include "HelperFunctions.h"
 
 
 typedef struct {
@@ -279,8 +279,10 @@ void add_read_flags(propMapped_context * context, FILE * fp, char * read_name, u
 
 int init_PE_sambam(propMapped_context * context)
 {
+	char mac_rand[13];
+	mac_or_rand_str(mac_rand);
 	srand(time(NULL));
-	sprintf(context->temp_file_prefix, "prpm-temp-sum-%06u-%05u", getpid(), rand());
+	sprintf(context->temp_file_prefix, "prpm-temp-sum-%06u-%s", getpid(), mac_rand);
 
 	_PROPMAPPED_delete_tmp_prefix = context -> temp_file_prefix;
 	signal (SIGTERM, PROPMAPPED_SIGINT_hook);
@@ -469,7 +471,7 @@ int propmapped(int argc, char ** argv)
 		return 0;
 	}
 
-	int is_bam = is_certainly_bam_file(context -> input_file_name, NULL);
+	int is_bam = is_certainly_bam_file(context -> input_file_name, NULL, NULL);
 
 	if(1==is_bam){
 		context -> is_BAM_input = 1;

@@ -33,7 +33,7 @@ void destroy_offsets(gene_offset_t* offsets);
 // Return 0 if the linear position is in a reasonable range or -1 if it is out of range.
 // The pointer to the name of the chromosome is put into chro_name, and the position in this chromosome is in pos.
 int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos);
-int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos, int rl);
+int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos, int * head_cut, int * tail_cut, int rl);
 
 unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name, unsigned int chro_pos);
 

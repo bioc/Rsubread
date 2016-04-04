@@ -60,7 +60,6 @@ static struct option long_options[] =
 	{"maxRealignLocations",  required_argument, 0, 0},
 	{"minVoteCutoff",  required_argument, 0, 0},
 	{"minMappedFraction",  required_argument, 0, 0},
-	{"disableBigMargin",  no_argument, 0, 0},
 	{"complexIndels", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
@@ -482,6 +481,8 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("SVdetection", long_options[option_index].name)==0) 
 				{
 					global_context -> config.do_structural_variance_detection = 1;
+					global_context -> config.use_memory_buffer = 1;
+					global_context -> config.reads_per_chunk = 300llu*1024*1024;
 				}
 				else if(strcmp("minDistanceBetweenVariants", long_options[option_index].name)==0)
 				{
@@ -539,6 +540,23 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;
 	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
+
+	if(global_context->config.more_accurate_fusions)
+	{
+		global_context->config.high_quality_base_threshold = 999999;
+		//#warning "============ REMOVE THE NEXT LINE ======================"
+		global_context->config.show_soft_cliping = 1;
+		//#warning "============ REMOVE ' + 3' FROM NEXT LINE =============="
+		global_context->config.max_mismatch_junction_reads = 0 + 3;
+
+		//#warning "============ REMOVE ' - 1' FROM NEXT LINE =============="
+		global_context->config.do_big_margin_filtering_for_junctions = 1 - 1;
+		global_context->config.total_subreads = 28;
+
+		//#warning "============ REMOVE THE NEXT LINE BEFORE RELEASE ==============="
+		//global_context->config.multi_best_reads = 1;
+	}
+
 
 
 	return 0;

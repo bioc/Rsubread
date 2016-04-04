@@ -149,6 +149,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 		SB_RINC(ret, 4);
 
 		ret -> bam_file_next_section_start = ret -> input_binary_stream_read_ptr + l_text;
+		ret -> header_length =  ret -> bam_file_next_section_start;
 	}
 	return ret;
 }
@@ -268,6 +269,10 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 					}
 				}
 			}
+
+			if(buff[0] == '@'){
+				fp -> header_length = ftello(fp->os_file) + strlenbuff+1;
+			}
 			return ret;
 		}
 	}
@@ -312,6 +317,7 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 			{
 				SamBam_read_ref_info(fp);
 				fp -> bam_file_stage = BAM_FILE_STAGE_ALIGNMENT;
+				fp -> header_length = fp-> input_binary_stream_read_ptr;
 			}
 			return buff;
 		}

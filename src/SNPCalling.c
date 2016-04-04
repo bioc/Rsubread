@@ -32,6 +32,7 @@
 #include <getopt.h>
 #include "subread.h"
 #include "hashtable.h"
+#include "HelperFunctions.h"
 #include "gene-algorithms.h"
 #include "SNPCalling.h"
 #include "input-files.h"
@@ -506,8 +507,8 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 					flanking_matched = d;
 				}
 
-				//SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail);
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
+				SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
 				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
@@ -842,6 +843,8 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					}
 				}
 			}
+
+			SUBREADprintf("OUTTEXT: i=%d, all_reads=%d, Fisher-p=%f, SNPs=%d, POI-MM=%d\n", i, all_reads, snp_fisher_raw[i], snps, POI_MM);
 			if(snps && POI_MM *1. / all_reads >= parameters->supporting_read_rate )
 			{
 				if(snp_fisher_raw[i] >= 0. || parameters -> fisher_exact_testlen < 1)
@@ -1008,8 +1011,8 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 
 				if( (*task_no) % all_threads == thread_no && all_offset <= chro_len)
 				{
-					//#warning "=== ONLY TEST ONE BLOCK                                   ==="
-					//if(strcmp(chro_name,"chr7")==0 && all_offset == 45000000){
+					//#warning "=== ONLY TEST ONE BLOCK   , USE 'if(1)' IN RELEASE          ==="
+					//if(strcmp(chro_name,"chr7")==0 && all_offset == 60000000){
 					if(1){
 						process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
 						print_in_box(89,0,0,"processed block %c[36m%s@%d%c[0m by thread %d/%d [block number=%d/%d]", CHAR_ESC, chro_name, all_offset, CHAR_ESC , thread_no+1, all_threads, 1+(*task_no)-parameters->empty_blocks, parameters->all_blocks);
@@ -1382,11 +1385,14 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		HashTableSetKeyComparisonFunction(parameters-> cigar_event_table, my_strcmp);
 
 		memcpy(rand48_seed, &start_time, 6);
-		srand(time(NULL));
 		if(temp_location)
 			strcpy(temp_file_prefix, temp_location);
-		else
-			sprintf(temp_file_prefix, "./temp-snps-%06u-%08X-", getpid(), rand());
+		else{
+			char mac_rand[13];
+			mac_or_rand_str(mac_rand);
+
+			sprintf(temp_file_prefix, "./temp-snps-%06u-%s-", getpid(), mac_rand);
+		}
 		_EXSNP_SNP_delete_temp_prefix = temp_file_prefix;
 
 		print_in_box(89,0,0,"Split %s file into %c[36m%s*%c[0m ..." , parameters -> is_BAM_file_input?"BAM":"SAM" , CHAR_ESC, temp_file_prefix, CHAR_ESC);

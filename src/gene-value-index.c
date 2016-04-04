@@ -59,9 +59,12 @@ int gvindex_get(gene_value_index_t * index, gehash_data_t offset)
 	unsigned int offset_byte, offset_bit;
 	gvindex_baseno2offset_m(offset, index , offset_byte, offset_bit);
 
-	if(offset_byte >= index-> values_bytes)return 'N';
+	if(offset_byte >= index-> values_bytes -1)return 'N';
 
 	unsigned int one_base_value = (index->values [offset_byte]) >> (offset_bit);
+
+
+	//SUBREADprintf("RECV_BASE=%d (%d -  %d)\n",one_base_value & 3, offset_byte , offset_bit);
 
 	return int2base(one_base_value & 3);
 }
@@ -92,7 +95,7 @@ int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 
 }
 
-void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_values, int padding)
+void gvindex_set(gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_values, int padding)
 {
 	unsigned int offset_byte, offset_bit;
 	gvindex_baseno2offset(offset, index , &offset_byte, &offset_bit);
@@ -112,6 +115,7 @@ void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 		index->values [offset_byte] &= mask;
 		index->values [offset_byte] |= ((base_values >> (30 - i*2))&0x03) << (offset_bit);
 
+		//SUBREADprintf("PUT_BASE=%d (%d - %d)\n", (base_values  >> (30 - i*2))&0x03, offset_byte, offset_bit);
 		offset_bit +=2;
 		if(offset_bit >=8)
 		{
@@ -133,7 +137,7 @@ void gvindex_dump(gene_value_index_t * index, const char filename [])
 	unsigned int useful_bytes, useful_bits;
 	gvindex_baseno2offset (index -> length+ index -> start_point, index,&useful_bytes,&useful_bits);
 
-	fwrite(index->values, 1, useful_bytes, fp);
+	fwrite(index->values, 1, useful_bytes+1, fp);
 
 	fclose(fp);
 }
@@ -153,8 +157,8 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	unsigned int useful_bytes, useful_bits;
 	index -> start_base_offset = index -> start_point - index -> start_point%4;
 	gvindex_baseno2offset (index -> length+ index -> start_point, index ,&useful_bytes,&useful_bits);
-	index -> values = malloc(useful_bytes);
-	index -> values_bytes = useful_bytes;
+	index -> values = malloc(useful_bytes+1);
+	index -> values_bytes = useful_bytes+1;
 	if(!index->values)
 	{
 		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
@@ -162,7 +166,7 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	}
 	
 
-	read_length =fread(index->values, 1, useful_bytes, fp);
+	read_length =fread(index->values, 1, useful_bytes+1, fp);
 	assert(read_length>0);
 
 	fclose(fp);

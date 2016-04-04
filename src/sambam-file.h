@@ -88,6 +88,7 @@ typedef struct
 	unsigned long long input_binary_stream_read_ptr;
 	unsigned long long input_binary_stream_write_ptr;
 	unsigned long long input_binary_stream_buffer_start_ptr;
+	unsigned long long header_length;
 
 	SamBam_Reference_Info * bam_chro_table; 
 	int bam_chro_table_size;
