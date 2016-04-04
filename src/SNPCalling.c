@@ -508,7 +508,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				}
 
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
-				SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
+				//SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
 				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
@@ -844,7 +844,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 				}
 			}
 
-			SUBREADprintf("OUTTEXT: i=%d, all_reads=%d, Fisher-p=%f, SNPs=%d, POI-MM=%d\n", i, all_reads, snp_fisher_raw[i], snps, POI_MM);
+		//	SUBREADprintf("OUTTEXT: i=%d, all_reads=%d, Fisher-p=%f, SNPs=%d, POI-MM=%d\n", i, all_reads, snp_fisher_raw[i], snps, POI_MM);
 			if(snps && POI_MM *1. / all_reads >= parameters->supporting_read_rate )
 			{
 				if(snp_fisher_raw[i] >= 0. || parameters -> fisher_exact_testlen < 1)
