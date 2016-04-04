@@ -1021,7 +1021,7 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 				else if((*task_no) % all_threads == thread_no)
 				{
 					print_in_box(80,0,0,"Ignored in: %s@%d by thr %d/%d [tid=%d]\n", chro_name, all_offset, thread_no, all_threads, *task_no);
-					SUBREADprintf("LEN %u > %u\n", all_offset, chro_len);
+	//				SUBREADprintf("LEN %u > %u\n", all_offset, chro_len);
 				}
 				offset = 0;
 				(*task_no)++;
