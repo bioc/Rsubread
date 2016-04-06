@@ -2558,8 +2558,8 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	back_search_read_tail = min(explain_context.full_read_len , current_result -> confident_coverage_end );//- 5;
 	back_search_tail_position = current_result -> selected_position + back_search_read_tail +  current_result -> indels_in_confident_coverage;
 
-	if( back_search_read_tail > 102)
-		SUBREADprintf("MAX back_search_read_tail : MIN %d , %d\n", explain_context.full_read_len , current_result -> confident_coverage_end);
+	//if( back_search_read_tail > 102)
+	//	SUBREADprintf("MAX back_search_read_tail : MIN %d , %d\n", explain_context.full_read_len , current_result -> confident_coverage_end);
 
 	explain_context.tmp_search_junctions[0].read_pos_end = back_search_read_tail;
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = back_search_tail_position;

@@ -4062,8 +4062,6 @@ void init_global_context(global_context_t * context)
 	int CORE_DPALIGN_MISMATCH_PENALTY = 0;
 
 
-int pr00=0;
-
 int core_dynamic_align(global_context_t * global_context, thread_context_t * thread_context, char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, char * read_name)
 // read must be converted to the positive strand.
 // movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch

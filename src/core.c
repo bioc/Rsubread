@@ -2205,7 +2205,7 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 			}
 		}
 
-		bigtable_release_result(global_context, thread_context, current_read_number, 1);
+		//bigtable_release_result(global_context, thread_context, current_read_number, 1);
 
 	}
 
@@ -2824,7 +2824,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				sqr_read_number=0;
 			}
 		}
-		bigtable_release_result(global_context, thread_context, current_read_number, 1);
+		//bigtable_release_result(global_context, thread_context, current_read_number, 1);
 	}
 
 	free(final_realignments);
@@ -3169,7 +3169,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		}
 
 
-		bigtable_release_result(global_context, thread_context, current_read_number, 1);
+		//bigtable_release_result(global_context, thread_context, current_read_number, 1);
 		sqr_read_number++;
 
 	}

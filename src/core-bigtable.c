@@ -295,16 +295,16 @@ unsigned short * _global_retrieve_big_margin_ptr(global_context_t * global_conte
 
 
 void bigtable_release_result(global_context_t * global_context , thread_context_t * thread_context , subread_read_number_t pair_number, int commit_change){
-	long long inner_pair_number = get_inner_pair(global_context, pair_number);
-	long long load_start_pair_no = inner_pair_number - inner_pair_number % global_context -> bigtable_chunked_fragments;
 	if(global_context -> bigtable_cache_file_fp){
+		long long inner_pair_number = get_inner_pair(global_context, pair_number);
+		long long load_start_pair_no = inner_pair_number - inner_pair_number % global_context -> bigtable_chunked_fragments;
 		//SUBREADprintf("REAL RELEASE:%lld\n", inner_pair_number - load_start_pair_no);
 		global_context -> bigtable_cache[inner_pair_number - load_start_pair_no].status = CACHE_STATUS_RELEASED;
 		//SUBREADprintf("OCCUPYXX0 = %d\n", global_context -> bigtable_cache[0].status);
-	}
 
-	if(commit_change){
-		global_context -> bigtable_dirty_data=1;
+		if(commit_change){
+			global_context -> bigtable_dirty_data=1;
+		}
 	}
 }
 

@@ -933,7 +933,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 			if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
 				SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
-				return -1;
+				return -2;
 			}
 
 			ret_features[xk1].chro_name_pos_delta = chro_name_pos - ret_features[xk1].feature_name_pos;
@@ -999,7 +999,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
 					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
-					return -1;
+					return -2;
 				}
 
 				ret_features[xk1].start = atoi(start_ptr);// start 
@@ -4181,7 +4181,7 @@ int readSummary(int argc,char *argv[]){
 	print_in_box(84,0,0,"Load annotation file %s %c[0m...", argv[1], CHAR_ESC);
 	nexons = load_feature_info(&global_context,argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
-		SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect, or it contains no '%s' features.\n",argv[1], nameFeatureTypeColumn);
+		if(nexons >= -1) SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect, or it contains no '%s' features.\n",argv[1], nameFeatureTypeColumn);
 		return -1;
 	}
 
