@@ -1807,7 +1807,7 @@ int align_cluster(global_context_t * global_context, thread_context_t * thread_c
 		}
 
 		(*this_score) = highest_score + max(0, front_score) + max(0, tail_score);
-		int applied_score_cut;
+		int applied_score_cut=0;
 		if(((*R1R2_mapped) & CLUSTER_ALIGNMENT_DONOR_R1_MAPPED)&&( (*R1R2_mapped) & CLUSTER_ALIGNMENT_DONOR_R2_MAPPED ) )
 			applied_score_cut = read_len_2 + read_len_1 - 70;
 		else if((*R1R2_mapped) & CLUSTER_ALIGNMENT_DONOR_R1_MAPPED)
@@ -3273,7 +3273,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			//if(explain_context -> pair_number == 999999)
 			
 			// ACDB PVDB TTTS
-			if(0 && FIXLENstrcmp("R003738400", explain_context -> read_name) ==0)
+			if(0 && FIXLENstrcmp("V0112_0155:7:1101:19789:7753", explain_context -> read_name) ==0)
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%u\tCIGAR=%s\tMM=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\n\n", explain_context -> read_name, final_position , tmp_cigar, mismatch_bases, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id);
 
 

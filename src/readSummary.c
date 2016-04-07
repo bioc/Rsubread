@@ -3060,7 +3060,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	mac_or_rand_str(MAC_or_random);
 	sprintf(rand_prefix, "./temp-core-%06u-%s.sam", getpid(), MAC_or_random);
 
-
 	//#warning "REMOVE ' * 2 ' FROM NEXT LINE !!!!!!"
 	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, 1, !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, global_context -> input_file_name, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context);
 	SAM_pairer_set_unsorted_notification(&global_context -> read_pairer, pairer_unsorted_notification);
@@ -4209,7 +4208,6 @@ int readSummary(int argc,char *argv[]){
 	}else	global_context.fasta_contigs = NULL;
 	
 
-
 	global_context.exontable_exons = nexons;
 	unsigned int x1, * nreads = (unsigned int *) calloc(nexons,sizeof(int));
 
@@ -4231,7 +4229,7 @@ int readSummary(int argc,char *argv[]){
 		char * loop_ptr = NULL;
 		int x2;
 		for(x2 = 0;;x2++){
-			char * test_loopfn = strtok_r(loop_ptr?NULL:file_list_used2, ";", &loop_ptr);
+			char * test_loopfn = strtok_r(x2?NULL:file_list_used2, ";", &loop_ptr);
 			if(NULL == test_loopfn) break;
 			if(x1==x2)continue;
 
