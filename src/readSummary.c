@@ -623,7 +623,7 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 		print_in_box(80,0,0,"");
 	}
 
-	print_in_box(80,0,0,"        Strand specific : %s", global_context->is_strand_checked?(global_context->is_strand_checked==1?"yes":"inversed"):"no");
+	print_in_box(80,0,0,"        Strand specific : %s", global_context->is_strand_checked?(global_context->is_strand_checked==1?"stranded":"reversely stranded"):"no");
 	char * multi_mapping_allow_mode = "not counted";
 	if(global_context->is_multi_mapping_allowed == ALLOW_PRIMARY_MAPPING)
 		multi_mapping_allow_mode = "primary only";
