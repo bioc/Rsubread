@@ -3037,7 +3037,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 
 	(*non_clipped_length) = my_non_clipped_length;
 	(*matched_bases) = my_non_clipped_length - all_mismatched - total_insertion_length;
-	(*chromosomal_length) = current_perfect_section_abs - read_head_abs_offset;
+	(*chromosomal_length) = current_perfect_section_abs - read_head_abs_offset + total_insertion_length;
 
 	return max(0, (int)(all_matched_bases*60/my_non_clipped_length));
 }
