@@ -1131,7 +1131,7 @@ int add_head_tail_cut_softclipping(char * cigar, int rlen, int head_cut, int tai
 
 	char cigar_added [CORE_MAX_CIGAR_STR_LEN];
 	int cigar_cursor = 0, read_cursor = 0, next_read_cursor = 0;
-	int tmpi = 0, nch;
+	int tmpi = 0, nch, has_M = 0;
 
 	cigar_added[0]=0;
 
@@ -1161,8 +1161,10 @@ int add_head_tail_cut_softclipping(char * cigar, int rlen, int head_cut, int tai
 				if(head_S >0 || tail_S > 0) if(nch !='M') return 0; 
 
 				if(head_S > 0) sprintf(cigar_added + strlen(cigar_added), "%dS", head_S );
-				if(remainder_tmpi > 0)
+				if(remainder_tmpi > 0){
 					sprintf(cigar_added + strlen(cigar_added), "%d%c", remainder_tmpi , nch );
+					if( nch == 'M' ) has_M = 1;
+				}
 				if(tail_S > 0) sprintf(cigar_added + strlen(cigar_added), "%dS", tail_S );
 			}
 
@@ -1172,7 +1174,7 @@ int add_head_tail_cut_softclipping(char * cigar, int rlen, int head_cut, int tai
 	}
 	//SUBREADprintf("RPCIGAR: %s => %s\n", cigar, cigar_added);
 	strcpy(cigar, cigar_added);
-	return 1;
+	return has_M;
 }
 
 
@@ -1252,13 +1254,13 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 	if(is_r_OK)
 	{
 		int head_cut = 0 , tail_cut = 0;
-		if(locate_gene_position_max(r->linear_position,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:current_result->chromosomal_length))
-		{
+		if(locate_gene_position_max(r->linear_position,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:current_result->chromosomal_length)) {
 			is_r_OK = 0;
-		}
-		else
-		{
+		} else {
 			int is_added_OK = 1;
+			if(0 && FIXLENstrcmp("V0112_0155:7:1101:4751:45557", read_name) == 0){
+					SUBREADprintf("CIG=%s, RLEN=%d, HC=%d, TC=%d\n", r->cigar , read_len, head_cut, tail_cut);
+			}
 			//SUBREADprintf("CUT-LEN=%d,%d\n", head_cut, tail_cut);
 			if(head_cut!=0 || tail_cut!=0)
 				is_added_OK = add_head_tail_cut_softclipping(r->cigar , read_len, head_cut, tail_cut);
