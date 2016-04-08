@@ -931,8 +931,13 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			long long int tv1 = atoll(start_ptr);
 			long long int tv2 = atoll(end_ptr);
 
-			if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-				SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+			if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
+				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
+					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+					return -2;
+				}
+			}else{
+				SUBREADprintf("\nError: Line %d contains a format error. The expected annotation format is SAF.\n", lineno);
 				return -2;
 			}
 
@@ -997,11 +1002,15 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				long long int tv1 = atoll(start_ptr);
 				long long int tv2 = atoll(end_ptr);
 
-				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+				if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
+					if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
+						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+						return -2;
+					}
+				}else{
+					SUBREADprintf("\nError: Line %d contains a format error. The expected annotation format is GTF/GFF.\n", lineno);
 					return -2;
 				}
-
 				ret_features[xk1].start = atoi(start_ptr);// start 
 				ret_features[xk1].end = atoi(end_ptr);//end 
 
