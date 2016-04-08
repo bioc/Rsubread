@@ -1254,13 +1254,11 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 	if(is_r_OK)
 	{
 		int head_cut = 0 , tail_cut = 0;
+
 		if(locate_gene_position_max(r->linear_position,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:current_result->chromosomal_length)) {
 			is_r_OK = 0;
 		} else {
 			int is_added_OK = 1;
-			if(0 && FIXLENstrcmp("V0112_0155:7:1101:4751:45557", read_name) == 0){
-					SUBREADprintf("CIG=%s, RLEN=%d, HC=%d, TC=%d\n", r->cigar , read_len, head_cut, tail_cut);
-			}
 			//SUBREADprintf("CUT-LEN=%d,%d\n", head_cut, tail_cut);
 			if(head_cut!=0 || tail_cut!=0)
 				is_added_OK = add_head_tail_cut_softclipping(r->cigar , read_len, head_cut, tail_cut);
