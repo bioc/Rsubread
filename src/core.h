@@ -371,7 +371,7 @@ typedef struct{
 	short best_second_diff_bases;
 	short realign_flags;
 	short final_quality;
-	short hamming_matched;
+	short chromosomal_length;
 	
 } realignment_result_t;
 
@@ -623,6 +623,7 @@ int chimeric_cigar_parts(global_context_t * global_context , unsigned int sel_po
 
 void warning_file_limit();
 void quick_sort(void * arr,int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r));
+void basic_sort(void * arr,int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r));
 
 // L_Minus_R should return -1, 0 or 1 when L<R, L==R or L>R.
 // The result is from Small to Large.

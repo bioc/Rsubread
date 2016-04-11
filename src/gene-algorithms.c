@@ -438,7 +438,7 @@ unsigned int get_gene_linear(int chrono, int offset, const unsigned int offsets 
 }
 
 
-int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos, int rl)
+int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos, int * head_cut_length, int * tail_cut_length, int rl)
 {
 	int n = 0;
 
@@ -462,12 +462,26 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 			//SUBREADprintf("max=%u <= lim=%u : ACCEPTED.\n", rl + linear , offsets->read_offsets[n] + 16);
 
 			// the end of the read should not excess the end of the chromosome
-			if(rl + linear > offsets->read_offsets[n] + 16) return 1;
+			if(tail_cut_length == NULL){ 
+				if(rl + linear > offsets->read_offsets[n] + 15 - offsets -> padding) return 1;
+			} else {
+				(*tail_cut_length) = linear + rl - ( offsets->read_offsets[n] + 15 - offsets -> padding);
+				if( (*tail_cut_length) >= rl )return 1;
+			}
 
 			if (n==0)
 				*pos = linear;
 			else
 				*pos = linear - offsets->read_offsets[n-1];
+
+			if( (*pos) < offsets -> padding ) {
+				if(head_cut_length == NULL || (*pos) + rl <= offsets -> padding){
+					return 1;
+				}else{
+					(*head_cut_length) = offsets -> padding - (*pos);
+					(*pos) = offsets -> padding;
+				}
+			}
 
 			(*pos) -= offsets -> padding;
 
@@ -483,7 +497,7 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos)
 {
-	return locate_gene_position_max(linear, offsets, chro_name, pos, 0);
+	return locate_gene_position_max(linear, offsets, chro_name, pos, NULL, NULL, 0);
 }
 
 #define _index_vote(key) (((unsigned int)key)%GENE_VOTE_TABLE_SIZE)

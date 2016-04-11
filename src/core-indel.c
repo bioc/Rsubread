@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include "hashtable.h"
+#include "HelperFunctions.h"
 #include "gene-value-index.h"
 #include "gene-algorithms.h"
 #include "input-files.h"
@@ -1981,7 +1982,7 @@ int write_local_reassembly(global_context_t *global_context, HashTable *pileup_f
 
 
 
-	if(0 == locate_gene_position_max(anchor_pos, &global_context -> chromosome_table, &chro_name, &chro_offset, read_len))
+	if(0 == locate_gene_position_max(anchor_pos, &global_context -> chromosome_table, &chro_name, &chro_offset, NULL, NULL, read_len))
 	{
 		char temp_file_name[MAX_FILE_NAME_LENGTH];
 		int close_now = 0;
@@ -3654,8 +3655,8 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 							char * chro_begin;
 							int chro_offset_start = 0;
 							int chro_offset_end = 0;
-							locate_gene_position_max(contig_start_pos + head_removed_bases ,& global_context -> chromosome_table, &chro_begin, &chro_offset_start, 0);
-							locate_gene_position_max(contig_end_pos - tail_removed_bases ,& global_context -> chromosome_table, &chro_begin, &chro_offset_end, 0);
+							locate_gene_position_max(contig_start_pos + head_removed_bases ,& global_context -> chromosome_table, &chro_begin, &chro_offset_start, NULL, NULL, 0);
+							locate_gene_position_max(contig_end_pos - tail_removed_bases ,& global_context -> chromosome_table, &chro_begin, &chro_offset_end, NULL, NULL, 0);
 							if(full_rebuilt_window_size - read_position_cursor - tail_removed_bases)
 								fprintf(global_context -> long_insertion_FASTA_fp, ">%s-%u-%u-%s%dM\n", chro_name, chro_offset_start, chro_offset_end - 1, contig_CIGAR, full_rebuilt_window_size - read_position_cursor - tail_removed_bases);
 							else
@@ -4003,9 +4004,6 @@ void init_global_context(global_context_t * context)
 	context->config.show_soft_cliping = 1 ;
 	context->config.big_margin_record_size = 9;
 
-	//#warning "====== FOR HIGH JUNCTION ACCURACT ==========="
-	context->config.big_margin_record_size = 15;
-
 	context->config.read_group_id[0] = 0;
 	context->config.read_group_txt[0] = 0;
 	context->config.first_read_file[0] = 0;
@@ -4033,7 +4031,10 @@ void init_global_context(global_context_t * context)
 	memcpy(seed_rand, &double_time, 2*sizeof(int));
 	srand(seed_rand[0]^seed_rand[1]);
 
-	sprintf(context->config.temp_file_prefix, "./core-temp-sum-%06u-%06u", getpid(),rand());
+	char mac_rand[13];
+	mac_or_rand_str(mac_rand);
+
+	sprintf(context->config.temp_file_prefix, "./core-temp-sum-%06u-%s", getpid(), mac_rand );
 	_COREMAIN_delete_temp_prefix = context->config.temp_file_prefix;
 
 
@@ -4060,6 +4061,7 @@ void init_global_context(global_context_t * context)
 	int CORE_DPALIGN_MATCH_SCORE = 2;
 	int CORE_DPALIGN_MISMATCH_PENALTY = 0;
 
+
 int core_dynamic_align(global_context_t * global_context, thread_context_t * thread_context, char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, char * read_name)
 // read must be converted to the positive strand.
 // movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch
@@ -4081,6 +4083,9 @@ int core_dynamic_align(global_context_t * global_context, thread_context_t * thr
 	gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
 
 	indel_context_t * indel_context = (indel_context_t*)global_context -> module_contexts[MODULE_INDEL_ID];
+
+	//unsigned long long table_ptr = (unsigned long long) indel_context -> dynamic_align_table;
+
 	short ** table = indel_context -> dynamic_align_table;
 	char ** table_mask = indel_context -> dynamic_align_table_mask;
 	if(thread_context)

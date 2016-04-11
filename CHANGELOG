@@ -1,3 +1,6 @@
+11 April 2016 - 1.20.5
+(1) C code update from 1.5.0-p2.
+
 30 Mar 2016 - 1.20.4
 (1) processExons() and detectionCallAnnotation() functions return NULL object.
 (2) Update documentation for processExons() and detectionCallAnnotation() functions.

@@ -68,4 +68,5 @@ int strcmp_number(char * s1, char * s2);
 
 unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
 unsigned int find_left_end_cigar(unsigned int right_pos, char * cigar);
+int mac_or_rand_str(char * char_14);
 #endif

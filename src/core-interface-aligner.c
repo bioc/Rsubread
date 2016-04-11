@@ -467,6 +467,8 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("SVdetection", long_options[option_index].name)==0) 
 				{
 					global_context -> config.do_structural_variance_detection = 1;
+					global_context -> config.use_memory_buffer = 1;
+					global_context -> config.reads_per_chunk = 600llu*1024*1024;
 				}
 				else if(strcmp("maxRealignLocations", long_options[option_index].name)==0)
 				{

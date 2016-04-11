@@ -86,21 +86,23 @@ int init_bigtable_results(global_context_t * global_context, int is_rewinding)
 		global_context -> bigtable_chunked_fragments = global_context -> config.reads_per_chunk+1;
 		global_context -> bigtable_cache_size = global_context -> bigtable_chunked_fragments * (1+global_context -> input_reads.is_paired_end_reads);
 	} else {
-		global_context -> bigtable_chunked_fragments = 300000 - 260000;
-		global_context -> bigtable_cache_size = global_context -> config.all_threads * global_context -> bigtable_chunked_fragments * (1+global_context -> input_reads.is_paired_end_reads);
+		global_context -> bigtable_chunked_fragments = 110llu*1024*1024;
+		global_context -> bigtable_cache_size = (1+0*global_context -> config.all_threads) * global_context -> bigtable_chunked_fragments * (1+global_context -> input_reads.is_paired_end_reads);
 	}
 
 
 	//SUBREADprintf("reads_per_chunk = %u ; cached_single_reads = %u ; size of each read = %d + %d\n",  global_context -> config.reads_per_chunk,  global_context -> bigtable_cache_size, sizeof(mapping_result_t) , sizeof(subjunc_result_t));
 
-	if(!is_rewinding)
+	if(!is_rewinding){
 		global_context -> bigtable_cache = malloc(sizeof(bigtable_cached_result_t) *  global_context -> bigtable_cache_size);
-
+	}
 
 	int xk1;
 	for(xk1 = 0; xk1 < global_context -> bigtable_cache_size; xk1++){
-		if(!is_rewinding)
+		if(!is_rewinding){
 			global_context -> bigtable_cache [xk1].alignment_res = malloc(sizeof(mapping_result_t) *  global_context -> config.multi_best_reads);
+			assert(global_context -> bigtable_cache [xk1].alignment_res!=NULL);
+		}
 
 		if(global_context -> config.use_memory_buffer)
 		{
@@ -134,6 +136,7 @@ int init_bigtable_results(global_context_t * global_context, int is_rewinding)
 
 	return 0;
 }
+
 mapping_result_t * _global_retrieve_alignment_ptr(global_context_t * global_context, subread_read_number_t pair_number, int is_second_read, int best_read_id){
 	mapping_result_t * ret;
 	bigtable_retrieve_result(global_context, NULL, pair_number, best_read_id, is_second_read, &ret, NULL);
@@ -191,8 +194,13 @@ bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_con
 	long long load_start_pair_no = inner_pair_number - inner_pair_number % global_context -> bigtable_chunked_fragments;
 
 	if(global_context -> bigtable_cache_file_fp){
+
+
+		//SUBREADprintf("MARK_OCCPY=%lld BY THREAD %d\n", pair_number, thread_context ? thread_context -> thread_id : -1);
+
 		if(global_context -> bigtable_cache_file_loaded_fragments_begin == -1 ||  inner_pair_number >= global_context -> bigtable_cache_file_loaded_fragments_begin + global_context -> bigtable_chunked_fragments || inner_pair_number < global_context -> bigtable_cache_file_loaded_fragments_begin)
 		{
+			SUBREADprintf("THREAD # %d WAITING FOR %llu for RETRIEVE %llu\n", thread_context? thread_context -> thread_id:-1, global_context -> bigtable_cache_file_loaded_fragments_begin, pair_number);
 			wait_occupied(global_context, global_context -> bigtable_cache_file_loaded_fragments_begin);
 		}
 
@@ -238,7 +246,7 @@ bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_con
 						if(0 && xk1 < 10)
 						{
 							//SUBREADprintf("CACHEP_211: %p (%d from %llu)\n", current_cache, xk1, pair_number);
-							SUBREADprintf("NENSET_211: %p\n", current_cache -> alignment_res);
+							SUBREADprintf("NENSET_211: %p + %d\n", current_cache -> alignment_res, xk1 * (1+global_context -> input_reads.is_paired_end_reads) + xk2);
 						}
 						memset( current_cache -> alignment_res , 0, sizeof(mapping_result_t) * global_context -> config.multi_best_reads);
 
@@ -259,8 +267,9 @@ bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_con
 		bigtable_unlock(global_context);
 	}
 
-	if(global_context -> bigtable_cache_file_fp)
+	if(global_context -> bigtable_cache_file_fp){
 		global_context -> bigtable_cache[inner_pair_number - load_start_pair_no].status = CACHE_STATUS_OCCUPIED;
+	}
 	bigtable_cached_result_t * ret_cache = global_context -> bigtable_cache + (inner_pair_number - load_start_pair_no)* (1+global_context -> input_reads.is_paired_end_reads) + is_second_read;
 
 	return ret_cache;
@@ -285,15 +294,17 @@ unsigned short * _global_retrieve_big_margin_ptr(global_context_t * global_conte
 }
 
 
-// do nothing : the data is automatically saved into the temporary file when using mmap. 
 void bigtable_release_result(global_context_t * global_context , thread_context_t * thread_context , subread_read_number_t pair_number, int commit_change){
-	long long inner_pair_number = get_inner_pair(global_context, pair_number);
-	long long load_start_pair_no = inner_pair_number - inner_pair_number % global_context -> bigtable_chunked_fragments;
-	if(global_context -> bigtable_cache_file_fp)
+	if(global_context -> bigtable_cache_file_fp){
+		long long inner_pair_number = get_inner_pair(global_context, pair_number);
+		long long load_start_pair_no = inner_pair_number - inner_pair_number % global_context -> bigtable_chunked_fragments;
+		//SUBREADprintf("REAL RELEASE:%lld\n", inner_pair_number - load_start_pair_no);
 		global_context -> bigtable_cache[inner_pair_number - load_start_pair_no].status = CACHE_STATUS_RELEASED;
+		//SUBREADprintf("OCCUPYXX0 = %d\n", global_context -> bigtable_cache[0].status);
 
-	if(commit_change){
-		global_context -> bigtable_dirty_data=1;
+		if(commit_change){
+			global_context -> bigtable_dirty_data=1;
+		}
 	}
 }
 
@@ -479,8 +490,11 @@ void fraglist_destroy(fragment_list_t * list){
 
 void fraglist_append(fragment_list_t * list, subread_read_number_t fragment_number){
 	if(list -> fragments >= list -> capacity){
+		//#warning "============== COMMENT DEBUG INFO ====================="
+		//SUBREADprintf("REALLOC_PRT_IN = %d , %p\n",list -> capacity , list -> fragment_numbers );
 		list -> capacity = max(list -> capacity + 5, list -> capacity * 1.3);
 		list -> fragment_numbers = realloc(list -> fragment_numbers, sizeof(subread_read_number_t) * list -> capacity);
+	//	SUBREADprintf("REALLOC_PRT_OUT = %d , %p\n",list -> capacity , list -> fragment_numbers );
 	}
 
 	list -> fragment_numbers[ list -> fragments ++ ] = fragment_number;

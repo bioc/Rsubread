@@ -211,7 +211,7 @@ typedef short gene_vote_number_t;
 //#define base2int(c) ("\x0\x0\x2\x0\x0\x0\x1\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3\x3"[(c)-'A'])
 //#define int2base(c) ((c)==1?'G':((c)==0?'A':((c)==2?'C':'T')))
 //#define int2base(c) ("AGCT"[(c)]) 
-#define int2base(c) (1413695297 >> (8*(c))&0xff);
+#define int2base(c) (1413695297 >> (8*(c))&0xff)
 #define color2int(c) ((c) - '0')
 #define int2color(c) ("0123"[(c)])
 #define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} }
