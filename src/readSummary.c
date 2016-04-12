@@ -122,12 +122,6 @@ typedef struct {
 	unsigned int chunk_read_ptr;
 	pthread_t thread_object;
 
-	char * input_buffer;
-	unsigned int input_buffer_remainder;
-	unsigned int input_buffer_write_ptr;	
-	pthread_spinlock_t input_buffer_lock;
-
-
 	unsigned short hits_read_start_base1[MAX_HIT_NUMBER];
 	unsigned short hits_read_start_base2[MAX_HIT_NUMBER];
 
@@ -218,7 +212,6 @@ typedef struct {
 	unsigned short thread_number;
 	fc_thread_thread_context_t * thread_contexts;
 	int is_all_finished;
-	unsigned int input_buffer_max_size;
 	int sambam_chro_table_items;
 	SamBam_Reference_Info * sambam_chro_table;
 	pthread_spinlock_t sambam_chro_table_lock;
@@ -562,7 +555,7 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 
 		long long BAM_header_size = -1;
 		int file_probe = is_certainly_bam_file(next_fn, NULL, &BAM_header_size);
-		//SUBREADprintf(" >>> %s : header=%lld\n", next_fn,BAM_header_size);
+		//SUBREADprintf(" >>> %s : header=%lld , BSIZE=%lld\n", next_fn,BAM_header_size, global_context -> max_BAM_header_size );
 		if(BAM_header_size>0) global_context -> max_BAM_header_size = max( global_context -> max_BAM_header_size , BAM_header_size + 180000);
 		if(file_probe==-1) nNonExistFiles++;
 		if(file_probe == 1) nBAMfiles++;		
@@ -2855,7 +2848,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	int x1;
 
 	memset(global_context, 0, sizeof(fc_thread_global_context_t));
-	global_context -> input_buffer_max_size = buffer_size;
+	global_context -> max_BAM_header_size = buffer_size;
 	global_context -> all_reads = 0;
 	global_context -> redo = 0;
 	global_context -> SAM_output_fp = NULL;
@@ -2898,6 +2891,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> calculate_overlapping_lengths = (global_context -> fragment_minimum_overlapping > 1) || global_context -> use_overlapping_break_tie;
 	global_context -> debug_command = debug_command;
 	global_context -> max_M = max_M;
+	global_context -> max_BAM_header_size = buffer_size;
 
 	global_context -> read_counters.unassigned_ambiguous=0;
 	global_context -> read_counters.unassigned_nofeatures=0;
@@ -3017,10 +3011,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	for(xk1=0; xk1<global_context -> thread_number; xk1++)
 	{
 	//	printf("CHRR_MALLOC\n");
-		pthread_spin_init(&global_context->thread_contexts[xk1].input_buffer_lock, PTHREAD_PROCESS_PRIVATE);
-		global_context -> thread_contexts[xk1].input_buffer_remainder = 0;
-		global_context -> thread_contexts[xk1].input_buffer_write_ptr = 0;
-		global_context -> thread_contexts[xk1].input_buffer = malloc(global_context -> input_buffer_max_size);
 		global_context -> thread_contexts[xk1].thread_id = xk1;
 		global_context -> thread_contexts[xk1].chunk_read_ptr = 0;
 		global_context -> thread_contexts[xk1].count_table = calloc(sizeof(read_count_type_t), et_exons);
@@ -3091,10 +3081,8 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		if(global_context -> thread_contexts[xk1].read_coverage_bits)
 			free(global_context -> thread_contexts[xk1].read_coverage_bits);	
 		free(global_context -> thread_contexts[xk1].count_table);	
-		free(global_context -> thread_contexts[xk1].input_buffer);
 		free(global_context -> thread_contexts[xk1].chro_name_buff);
 		free(global_context -> thread_contexts[xk1].strm_buffer);
-		pthread_spin_destroy(&global_context -> thread_contexts[xk1].input_buffer_lock);
 		if(global_context -> do_junction_counting){
 			HashTableDestroy(global_context -> thread_contexts[xk1].junction_counting_table);
 			HashTableDestroy(global_context -> thread_contexts[xk1].splicing_point_table);
@@ -4162,10 +4150,8 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	unsigned int buffer_size = (1024*1024*12);
-	global_context.max_BAM_header_size = buffer_size;
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping);
 
-	fc_thread_init_global_context(& global_context, buffer_size, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping);
 
 	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && global_context.use_fraction_multi_mapping)
 	{

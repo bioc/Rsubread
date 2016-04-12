@@ -49,6 +49,8 @@
 #define FILE_TYPE_EMPTY   999990
 #define FILE_TYPE_NONEXIST 999999
 
+#define FEATURECOUNTS_BUFFER_SIZE (1024*1024*12)
+
 
 
 #include <stdlib.h>
