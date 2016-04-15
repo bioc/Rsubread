@@ -1,4 +1,4 @@
-featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,largestOverlap=FALSE,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,maxMOp=10,reportReads=FALSE)
+featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,largestOverlap=FALSE,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,maxMOp=10,reportReads=FALSE)
 {
 	flag <- FALSE
 
@@ -15,6 +15,10 @@ featureCounts <- function(files,annot.inbuilt="mm9",annot.ext=NULL,isGTFAnnotati
 	    hg19={
 	      ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
 	      cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
+	       },
+	    hg38={
+	      ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
+	      cat("NCBI RefSeq annotation for hg38 (build 38.2) is used.\n")
 	       },
 	       {
 		stop("In-built annotation for ", annot.inbuilt, " is not available.\n")

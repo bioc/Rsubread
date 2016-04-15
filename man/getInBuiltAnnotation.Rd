@@ -3,10 +3,10 @@
 \title{Retrieve in-built annotations provided by featureCounts function}
 \description{Retrieve an in-built annotation and save it to a data frame}
 \usage{
-getInBuiltAnnotation(annotation="mm9")
+getInBuiltAnnotation(annotation="mm10")
 }
 \arguments{
-  \item{annotation}{ a character string specifying the in-built annotation to be retrieved. It has three possible values including \code{mm9}, \code{mm10} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm9', `mm10' and `hg19', respectively. \code{mm9} by default.}
+  \item{annotation}{ a character string specifying the in-built annotation to be retrieved. It has four possible values including \code{mm10}, \code{mm9}, \code{hg38} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm10', `mm9', `hg38' and `hg19', respectively. \code{mm10} by default.}
 }
 \details{
 The \code{\link{featureCounts}} read summarization function provides in-built annotations for conveniently summarizing reads to genes or exons, and this function allows users to have access to those in-built annotations.
@@ -24,7 +24,7 @@ A data frame with five columns including \code{GeneID}, \code{Chr}, \code{Start}
 \code{\link{featureCounts}}}
 \examples{
 library(Rsubread)
-x <- getInBuiltAnnotation("hg19")
+x <- getInBuiltAnnotation("hg38")
 x[1:5,]
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
