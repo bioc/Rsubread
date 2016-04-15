@@ -6,7 +6,7 @@
 featureCounts(files,
 
 	# annotation
-	annot.inbuilt="mm9",
+	annot.inbuilt="mm10",
 	annot.ext=NULL,
 	isGTFAnnotationFile=FALSE,
 	GTF.featureType="exon",
@@ -58,7 +58,7 @@ featureCounts(files,
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
-  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has three possible values including \code{mm9}, \code{mm10} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm9', `mm10' and `hg19', respectively. \code{mm9} by default. The in-built annotation has a SAF format (see below).}
+  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has four possible values including \code{mm10}, \code{mm9}, \code{hg38} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm10', `mm9', `hg38' and `hg19', respectively. \code{mm10} by default. The in-built annotation has a SAF format (see below).}
   \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. See below for more details about SAF format annotation. \code{annot.ext} will override \code{annot.inbuilt} if they are both provided.}
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{exon} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
@@ -111,7 +111,7 @@ A read overlaps a meta-feature if it overlaps at least one of the features belon
 
 \code{gene} and \code{exon} are typically used when summarizing RNA-seq read data, which will yield read counts for genes and exons, respectively.
 
-The in-built annotations for human and mouse genomes (\code{hg19}, \code{mm9} and \code{mm10}) provided in this function can be conveniently used for read summarization.
+The in-built annotations for human and mouse genomes (\code{hg38}, \code{hg19}, \code{mm10} and \code{mm9}) provided in this function can be conveniently used for read summarization.
 These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}) and were then postprocessed by removing redundant chromosomal regions within each gene and combining adjacent CDS and UTR sequences. 
 The in-built annotations use the SAF annotation format (see below) and their content can be retrieved using the \code{\link{getInBuiltAnnotation}} function.
 

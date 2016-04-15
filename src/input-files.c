@@ -2695,7 +2695,9 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				unsigned int bam_signature;
 				BAM_next_u32(bam_signature);
 				BAM_next_u32(pairer -> BAM_l_text);
-				char * header_txt = malloc(pairer->BAM_l_text);
+				char * header_txt = NULL;
+
+				if(pairer->BAM_l_text>0) header_txt = malloc(pairer->BAM_l_text);
 
 				//SUBREADprintf("HEAD_TXT=%d\n", pairer -> BAM_l_text);
 				for(x1 = 0 ; x1 < pairer -> BAM_l_text; x1++){
@@ -2723,18 +2725,20 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					memcpy(header_txt + ref_bin_len, &l_ref, 4);
 					ref_bin_len += 4;
 
-					assert(ref_bin_len < pairer -> BAM_l_text);
-					//SUBREADprintf("%d-th ref : %s [len=%u]\n", x1, ref_name, l_ref);
+					if(ref_bin_len >= pairer -> BAM_l_text){
+						SUBREADprintf("%d-th ref : %s [len=%u], bin_len=%d < %d\n", x1, ref_name, l_ref, ref_bin_len,  pairer -> BAM_l_text);
+						assert(ref_bin_len < pairer -> BAM_l_text);
+					}
 				}
 
 				//exit(0);
 				pairer -> output_header(pairer, thread_context -> thread_id, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
 
-				free(header_txt);
+				if(header_txt) free(header_txt);
 
 				pairer -> BAM_header_parsed = 1;
-				if(pairer -> display_progress)
-					SUBREADprintf("\nThe header was parsed: %d reference sequences were found.\nScanning the input file.\n", pairer -> BAM_n_ref);
+				//if(pairer -> display_progress)
+				//	SUBREADprintf("\nThe header was parsed: %d reference sequences were found.\nScanning the input file.\n", pairer -> BAM_n_ref);
 				SAM_pairer_fetch_BAM_block(pairer, thread_context);
 
 				//SUBREADprintf("HEAD_FINISHED, BAD=%d\n", pairer -> is_bad_format);
@@ -4415,8 +4419,12 @@ int SAM_nosort_decompress_next_block(SAM_pairer_context_t * pairer){
 
 #define NOSORT_SAM_next_line {NOSORT_SAM_eof  = fgets(line_ptr, NOSORT_SBAM_BUFF_SIZE, pairer -> input_fp);}
 
-#define NOSORT_REFILL_LOWBAR 6000*1000
-#define NOSORT_REFILL_HIGHBAR 18000*1000
+#if FEATURECOUNTS_BUFFER_SIZE < ( 12*1024*1024 )
+#error "FEATURECOUNTS_BUFFER_SIZE MUST BE GREATER THAN 12MB!!"
+#endif
+
+#define NOSORT_REFILL_LOWBAR ( 3 * 1024 * 1024 ) 
+#define NOSORT_REFILL_HIGHBAR ( 6 * 1024 * 1024  ) 
 
 void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 	int x1;
@@ -4633,7 +4641,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 						}
 
 						record_len = strlen(line_ptr);
-	//					SUBREADprintf("1CHR=%c, ECHR=%d , RL=%d, RINS=%d, USED=%d\n", line_ptr[0], line_ptr[record_len - 1], record_len, this_thread -> reads_in_SBAM, this_thread -> input_buff_SBAM_used);
+					//	SUBREADprintf("1CHR=%c, ECHR=%d , RL=%d, RINS=%d, USED=%d, SIZE=%d\n", line_ptr[0], line_ptr[record_len - 1], record_len, this_thread -> reads_in_SBAM, this_thread -> input_buff_SBAM_used, pairer -> input_buff_SBAM_size);
 						memcpy(this_thread -> input_buff_SBAM + this_thread -> input_buff_SBAM_used , line_ptr, record_len);
 						this_thread -> input_buff_SBAM_used += record_len;
 						this_thread -> reads_in_SBAM ++;

@@ -1,4 +1,4 @@
-getInBuiltAnnotation <- function(annotation="mm9")
+getInBuiltAnnotation <- function(annotation="mm10")
 {
 
 	 switch(tolower(as.character(annotation)),
@@ -13,6 +13,10 @@ getInBuiltAnnotation <- function(annotation="mm9")
 	    hg19={
 	      ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
 	      cat("NCBI RefSeq annotation for hg19 (build 37.2).\n")
+	       },
+	    hg38={
+	      ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
+	      cat("NCBI RefSeq annotation for hg38 (build 38.2).\n")
 	       },
 	       {
 		stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
