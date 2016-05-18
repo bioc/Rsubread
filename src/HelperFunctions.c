@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 
 #ifdef MACOS
@@ -844,6 +845,8 @@ int mac_str(char * str_buff)
         }
     }
 
+    close(sock);
+
     unsigned char mac_address[6];
 
     if (success){
@@ -886,5 +889,91 @@ int mac_or_rand_str(char * str_buff){
 	return mac_str(str_buff) && rand_str(str_buff) && mathrand_str(str_buff);
 }
 
+long double fast_fractorial(unsigned int x, long double * buff, int buflen){
+	if(x<2) return 0;
+	
+	if(buff != NULL && x < buflen && buff[x]!=0){
+		return buff[x];
+	}
+	long double ret;
 
+	if(x<30){
+		int x1;
+		ret =0;
+		for(x1 = 2 ; x1 <= x; x1++) ret += logl(x1);
+	}else{
+		ret = logl(x)*x - x + 0.5 * logl(2*M_PI* x) + 1/(12.*x) - 1./(360.* x*x*x) +  1./(1260.* x*x*x*x*x) -  1./(1680.*x*x*x*x*x*x*x) + (x>60?0:(1./(1188.*x*x*x*x*x*x*x*x*x ) ));
+	}
+	if(buff != NULL && x < buflen) buff[x]=ret;
+	return ret;
+}
+
+
+#define BUFF_4D 36
+
+long double fast_freq( unsigned int tab[2][2] , long double * buff, int buflen){
+	int x0 = -1;
+	if(buff && buflen > BUFF_4D * BUFF_4D * BUFF_4D * BUFF_4D && tab[0][0] < BUFF_4D && tab[0][1] < BUFF_4D && tab[1][0] < BUFF_4D && tab[1][1] < BUFF_4D ){
+		x0 = buflen + tab[0][0]* BUFF_4D * BUFF_4D * BUFF_4D + tab[0][1] * BUFF_4D * BUFF_4D + tab[1][0] * BUFF_4D + tab[1][1];
+		if(buff[x0]!=0) return buff[x0];
+		
+	}
+	long double ret = fast_fractorial(tab[0][0]+tab[0][1],buff,buflen)+fast_fractorial(tab[1][0]+tab[1][1],buff,buflen) + 
+		fast_fractorial(tab[0][0]+tab[1][0],buff,buflen)+fast_fractorial(tab[0][1]+tab[1][1],buff,buflen) -
+		fast_fractorial(tab[0][0],buff,buflen) - fast_fractorial(tab[0][1],buff,buflen) - 
+		fast_fractorial(tab[1][0],buff,buflen) - fast_fractorial(tab[1][1],buff,buflen) - 
+		fast_fractorial(tab[0][0] + tab[0][1] + tab[1][0] + tab[1][1],buff,buflen);
+	if(x0>=0) buff[x0] = ret;
+	return ret;
+}
+
+
+
+double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c, unsigned int d, long double * buff, int buflen){
+	unsigned int tab[2][2];
+	long double P0, P_delta, ret;
+
+	tab[0][0]=a;
+	tab[0][1]=b;
+	tab[1][0]=c;
+	tab[1][1]=d;
+
+	int x_a, y_a, x_min=-1, y_min=-1;
+	unsigned int min_a = 0xffffffff;
+	for(x_a = 0; x_a < 2; x_a++)
+		for(y_a = 0; y_a < 2; y_a++){
+			if(tab[x_a][y_a]<min_a){
+				min_a = tab[x_a][y_a];
+				x_min = x_a;
+				y_min = y_a;
+			}
+		}
+	P_delta = fast_freq(tab, buff, buflen);
+	P0 = ret = exp(P_delta);
+//	printf("P0=%LG\n", P0);
+	if(min_a>0){
+		unsigned int Qa = min_a;
+		unsigned int Qb = tab[x_min][!y_min];
+		unsigned int Qc = tab[!x_min][y_min];
+		unsigned int Qd = tab[!x_min][!y_min];
+		for(; ; ){
+			min_a --;
+			Qb++;Qc++;
+			P_delta -= logl(Qb*Qc);
+			P_delta += logl(Qa*Qd);
+			Qa--;Qd--;
+			ret += expl(P_delta);
+			printf(" %LG %LG ( += %LG )\n", logl(ret), logl(1 - (ret - P0)), P_delta);
+			if(min_a < 1) break;
+		}
+	}
+
+	double ret1 = ret, ret2 = 1 - (ret - P0);
+
+	if(min(ret1, ret2) < 0){
+		return 0.0;
+	}
+	return  min(ret1, ret2) ;
+
+}
 

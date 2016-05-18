@@ -36,6 +36,7 @@
 #define GENE_INPUT_SAM_PAIR_2   95
 
 
+#define MIN_FILE_POINTERS_ALLOWED 240
 
 #define FILE_TYPE_SAM     50
 #define FILE_TYPE_BAM     500
@@ -120,6 +121,8 @@ typedef struct {
 	int is_single_end_mode;
 	int force_do_not_sort;
 	int is_finished;
+	int merge_level_finished;
+	int max_file_open_number;
 	subread_lock_t input_fp_lock;
 	subread_lock_t output_header_lock;
 	subread_lock_t unsorted_notification_lock;

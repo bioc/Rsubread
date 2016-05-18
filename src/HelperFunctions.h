@@ -69,4 +69,6 @@ int strcmp_number(char * s1, char * s2);
 unsigned int reverse_cigar(unsigned int pos, char * cigar, char * new_cigar);
 unsigned int find_left_end_cigar(unsigned int right_pos, char * cigar);
 int mac_or_rand_str(char * char_14);
+
+double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c, unsigned int d, long double * frac_buffer, int buffer_size);
 #endif

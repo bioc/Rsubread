@@ -99,7 +99,7 @@ struct SNP_Calling_Parameters{
 
 #define PRECALCULATE_FACTORIAL 2000000
 
-double * precalculated_factorial;// [PRECALCULATE_FACTORIAL];
+long double * precalculated_factorial;// [PRECALCULATE_FACTORIAL];
 
 double factorial_float_real(int a)
 {
@@ -113,7 +113,6 @@ double factorial_float_real(int a)
 
 double factorial_float(int a)
 {
-
 	if(a<PRECALCULATE_FACTORIAL && (precalculated_factorial[a]!=0.))
 		return precalculated_factorial[a]; 
 	else
@@ -154,25 +153,43 @@ double fisher_exact_test(int a, int b, int c, int d)
 
 	//printf("FET: %d %d %d %d\n", a, b, c, d);
 
-	if (a * d > b * c) {
-            a = a + b; b = a - b; a = a - b; 
-            c = c + d; d = c - d; c = c - d;
-        }
 
-        if (a > d) { a = a + d; d = a - d; a = a - d; }
-        if (b > c) { b = b + c; c = b - c; b = b - c; }
+	if(1){
+		double ret = fast_fisher_test_one_side(a,b,c,d, precalculated_factorial, PRECALCULATE_FACTORIAL);
+	//	SUBREADprintf("FISHER_RES %d %d %d %d %.9f %.9f\n", a,b,c,d, ret, log(ret));
+		return ret;
+	}else{
+		if (a * d > b * c) {
+		    a = a + b; b = a - b; a = a - b; 
+		    c = c + d; d = c - d; c = c - d;
+		}
 
-        double p_sum = 0.0;
+		if (a > d) { a = a + d; d = a - d; a = a - d; }
+		if (b > c) { b = b + c; c = b - c; b = b - c; }
 
-	double p = fisherSub(a, b, c, d);
-	while (a >= 0) {
-	    p_sum += p;
-	    if (a == 0) break;
-	    --a; ++b; ++c; --d;
-	    p = fisherSub(a, b, c, d);
+		double p_sum = 0.0;
+
+		double p = fisherSub(a, b, c, d);
+		while (a >= 0) {
+		    p_sum += p;
+		    if (a == 0) break;
+		    --a; ++b; ++c; --d;
+		    p = fisherSub(a, b, c, d);
+		}
+
+		if(0){
+			// DON'T PUT IT HERE!
+			int AA=a, BB=b, CC=c, DD=d;
+			double r1 = fast_fisher_test_one_side(AA,BB,CC,DD, NULL, PRECALCULATE_FACTORIAL);
+			if(abs(r1-p_sum) / max(r1,p_sum) >= 0.01){
+				printf("BADR: FAST = %.7f != JAVA %.7f,  %d %d %d %d\n", log(r1), log(p_sum),AA,BB,CC,DD);
+			}else{
+				printf("GOODR: FAST = %.7f ~= JAVA %.7f,  %d %d %d %d\n", log(r1), log(p_sum),AA,BB,CC,DD);
+			}
+		}
+
+		return p_sum;
 	}
-
-	return p_sum;
 }
 
 unsigned int fisher_test_size;
@@ -508,7 +525,8 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				}
 
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
-				//SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
+				if(0 && flanking_matched > 10000 && p_middle < 1E-5)
+					SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
 				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
@@ -1296,6 +1314,7 @@ void EXSNP_SIGINT_hook(int param)
 							unlink(del_name);
 						}
 					}
+					closedir(d);
 				}
 			}
 				
@@ -1328,8 +1347,8 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	fisher_test_size = 0;
 
-	precalculated_factorial = (double*)malloc(sizeof(double)*PRECALCULATE_FACTORIAL);
-	for(i=0; i<PRECALCULATE_FACTORIAL; i++)
+	precalculated_factorial = (long double*)malloc(sizeof(long double)*PRECALCULATE_FACTORIAL * 2);
+	for(i=0; i<PRECALCULATE_FACTORIAL * 2; i++)
 		precalculated_factorial[i] = 0.; 
 		
 
@@ -1493,7 +1512,7 @@ void print_usage_snp(char * myname)
 	SUBREADputs("             location must have (ie. the minimum coverage). 1 by default.");
 	SUBREADputs("");
 	SUBREADputs("  -x <int>   Specify the maximum number of mapped reads a SNP-containing");
-	SUBREADputs("             location have have. 3000 by default. Any location having more than");
+	SUBREADputs("             location have have. 1000 by default. Any location having more than");
 	SUBREADputs("             the threshold number of reads will not be considered for SNP");
 	SUBREADputs("             calling. This option is useful for removing PCR artefacts.");
 	SUBREADputs("");
@@ -1567,7 +1586,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	parameters.supporting_read_rate = 0.;
 	parameters.min_supporting_read_number = 1;
 	parameters.min_alternative_read_number = 1;
-	parameters.max_supporting_read_number = 3000;
+	parameters.max_supporting_read_number = 1000;
 	parameters.neighbour_filter_testlen = -1; 
 	parameters.neighbour_filter_rate = 0.000000001;
 	parameters.min_phred_score = 13;

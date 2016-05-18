@@ -109,6 +109,7 @@ void PROPMAPPED_SIGINT_hook(int param)
 						unlink(del_name);
 					}
 				}
+				closedir(d);
 			}
 		}
 			

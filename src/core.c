@@ -1255,14 +1255,27 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 	{
 		int head_cut = 0 , tail_cut = 0;
 
+		if(0 && FIXLENstrcmp("V0112_0155:7:1302:9507:32993", read_name)==0){
+			char posout1[100];
+			absoffset_to_posstr(global_context, r->linear_position, posout1);
+			SUBREADprintf("PERR : CIGAR=%s, READLEN=%d, POS=%s\n", r->cigar , read_len, posout1);
+		}
+
 		if(locate_gene_position_max(r->linear_position,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:current_result->chromosomal_length)) {
 			is_r_OK = 0;
 		} else {
+
+
+		if(0 && FIXLENstrcmp("V0112_0155:7:1302:9507:32993", read_name)==0){
+			char posout1[100];
+			absoffset_to_posstr(global_context, r->linear_position, posout1);
+			SUBREADprintf("CUTT : CIGAR=%s, READLEN=%d, CATS=%d  %d\n", r->cigar , read_len, head_cut, tail_cut);
+		}
+
 			int is_added_OK = 1;
-			//SUBREADprintf("CUT-LEN=%d,%d\n", head_cut, tail_cut);
 			if(head_cut!=0 || tail_cut!=0)
 				is_added_OK = add_head_tail_cut_softclipping(r->cigar , read_len, head_cut, tail_cut);
-			
+
 			if(is_added_OK){
 				r -> offset++;
 				assert(r-> chro);
