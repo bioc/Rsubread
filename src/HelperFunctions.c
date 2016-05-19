@@ -963,7 +963,7 @@ double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c,
 			P_delta += logl(Qa*Qd);
 			Qa--;Qd--;
 			ret += expl(P_delta);
-			printf(" %LG %LG ( += %LG )\n", logl(ret), logl(1 - (ret - P0)), P_delta);
+			//printf(" %LG %LG ( += %LG )\n", logl(ret), logl(1 - (ret - P0)), P_delta);
 			if(min_a < 1) break;
 		}
 	}
