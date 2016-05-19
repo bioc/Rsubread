@@ -2722,10 +2722,10 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				BAM_next_u32(bam_signature);
 				BAM_next_u32(pairer -> BAM_l_text);
 				char * header_txt = NULL;
+				int header_txt_dynamic_length = -1;
 
-				if(pairer->BAM_l_text>0) header_txt = malloc(pairer->BAM_l_text);
+				if(pairer->BAM_l_text>0) header_txt = malloc(max(1000000,pairer->BAM_l_text));
 
-				//SUBREADprintf("HEAD_TXT=%d\n", pairer -> BAM_l_text);
 				for(x1 = 0 ; x1 < pairer -> BAM_l_text; x1++){
 					BAM_next_nch;
 					header_txt [x1] = nch;
@@ -2733,13 +2733,23 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				pairer -> output_header(pairer, thread_context -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
 
 				BAM_next_u32(pairer -> BAM_n_ref);
-				//SUBREADprintf("HEAD_CHRO=%d\n", pairer -> BAM_n_ref);
 				unsigned int ref_bin_len = 0;
 				for(x1 = 0; x1 < pairer -> BAM_n_ref; x1++) {
 					unsigned int l_name, l_ref, x2;
 					char ref_name[MAX_CHROMOSOME_NAME_LEN];
 					BAM_next_u32(l_name);
 					assert(l_name < 256);
+
+					if(header_txt == NULL){
+						header_txt = malloc(3000000);
+						header_txt_dynamic_length = 3000000;
+					}
+
+					if( header_txt_dynamic_length>0 && ref_bin_len > header_txt_dynamic_length - 1000000 ){
+						header_txt_dynamic_length *= 2;
+						header_txt = realloc( header_txt,  header_txt_dynamic_length);
+					}
+
 					memcpy(header_txt + ref_bin_len, &l_name, 4);
 					ref_bin_len += 4;
 					for(x2 = 0; x2 < l_name; x2++){
@@ -2751,10 +2761,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					memcpy(header_txt + ref_bin_len, &l_ref, 4);
 					ref_bin_len += 4;
 
-					if(ref_bin_len >= pairer -> BAM_l_text){
-						SUBREADprintf("%d-th ref : %s [len=%u], bin_len=%d < %d\n", x1, ref_name, l_ref, ref_bin_len,  pairer -> BAM_l_text);
-						assert(ref_bin_len < pairer -> BAM_l_text);
-					}
+					//SUBREADprintf("%d-th ref : %s [len=%u], bin_len=%d < %d\n", x1, ref_name, l_ref, ref_bin_len,  pairer -> BAM_l_text);
 				}
 
 				//exit(0);
