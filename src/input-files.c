@@ -2347,26 +2347,16 @@ void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (*
 }
 
 
-void SAM_pairer_warning_file_open_limit(SAM_pairer_context_t * pairer){
+int SAM_pairer_warning_file_open_limit(){
 
 	struct rlimit limit_st;
 	getrlimit(RLIMIT_NOFILE, & limit_st);
-	pairer -> max_file_open_number = min(limit_st.rlim_cur , limit_st.rlim_max);
 
-	//#warning ">>>>>> COMMENT NEXT BLOCK IN RELEASE! <<<<<"
-	if(0)
-	{
-		SUBREADprintf("OS Fopen Limit=%d\n", pairer -> max_file_open_number );
-		pairer -> max_file_open_number = 87;
+	if(min(limit_st.rlim_cur, limit_st.rlim_max  ) < MIN_FILE_POINTERS_ALLOWED){
+		SUBREADprintf(" ERROR: the maximum file open number (%d) is too low. Please increase this number to a number larger than 50 by using the 'ulimit -n' command. This program has to terminate now.",(int)(min(limit_st.rlim_cur, limit_st.rlim_max)));
+		return 1;
 	}
-
-	if(pairer -> max_file_open_number < MIN_FILE_POINTERS_ALLOWED){
-		print_in_box(80,0,0,"");
-		print_in_box(80,0,PRINT_BOX_NOCOLOR_FOR_COLON,"   WARNING: the maximum file open number (%d) is too low.", pairer -> max_file_open_number);
-		print_in_box(80,0,0,"            Please increase this number by using command 'ulimit -n 512'.");
-		print_in_box(80,0,0,"            Otherwise, the program can run very slow or crash.");
-		print_in_box(80,0,0,"");
-	}
+	return 0;
 }
 
 // Tiny_Mode only write the following information:
@@ -3644,7 +3634,7 @@ int SAM_pairer_is_matched_chunks(char * c1, char * c2){
 
 
 
-void merge_level_fps(SAM_pairer_context_t * pairer, char * fname, FILE ** fps, int fps_no, unsigned long long * rescured){
+void merge_level_fps(SAM_pairer_context_t * pairer, char * fname, FILE ** fps, int fps_no){
 	char * bin_tmp1 , * bin_tmp2;
 	int max_name_len = MAX_READ_NAME_LEN*2 +80, x1;
 
@@ -3713,7 +3703,6 @@ void merge_level_fps(SAM_pairer_context_t * pairer, char * fname, FILE ** fps, i
 						pairer -> is_unsorted_notified = 1;
 					}
 				}
-				(*rescured)++;
 
 				int read_has = SAM_pairer_osr_next_name( fps[min2_name_fileno],  names + max_name_len*min2_name_fileno, -1, -1);
 				if(!read_has) *(names + max_name_len*min2_name_fileno)=0;
@@ -3742,91 +3731,127 @@ void merge_level_fps(SAM_pairer_context_t * pairer, char * fname, FILE ** fps, i
 #define PAIRER_WAIT_TICK_TIME 10000
 
 int SAM_pairer_get_merge_max_fp(SAM_pairer_context_t * pairer){
-	return pairer -> max_file_open_number - 80;
+	return pairer -> max_file_open_number;
 
 }
 
-void * SAM_pairer_rescure_orphants_max_FP(void * params){
+void SAM_pairer_set_merge_max_fp(SAM_pairer_context_t * pairer, int fon){
+	pairer -> max_file_open_number = fon;
+}
 
-	void ** param_ptr = (void **) params;
-	SAM_pairer_context_t * pairer = param_ptr[0];
-	int thread_no = (int)(param_ptr[1]-NULL);
-	free(params);
 
-	unsigned long long rescured=0, died=0;
+void SAM_pairer_probe_maxfp( SAM_pairer_context_t * pairer){
 	int orphant_fp_no=0;
 	int thno, bkno, x1;
+	int thread_fps [ pairer -> total_threads ];
+	char tmp_fname[MAX_FILE_NAME_LENGTH];
 
-	if(0 == thread_no && pairer -> display_progress)
-		SUBREADprintf("Finished scanning the input file. Processing unpaired reads.\n");
-
-
-	// block-level merging
-
+	memset(thread_fps, 0, sizeof(int) * pairer -> total_threads);
 	for( thno = 0 ; thno < pairer -> total_threads ; thno ++ ){
 		for( bkno = 0 ; ; bkno++){
-			char tmp_fname[MAX_FILE_NAME_LENGTH];
 			sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix,  thno, bkno);
-
 			FILE * in_fp = fopen(tmp_fname, "rb");
 			if(NULL == in_fp) break;
+			thread_fps[thno] = bkno;
 			fclose(in_fp);
 			orphant_fp_no ++;
 		}
 	}
 
+	int max_open_fps = 0, has_limit = 0;
+	int orphant_fp_size = 50;
+	FILE ** orphant_fps = malloc(sizeof(FILE *) * orphant_fp_size);
+
+	for( bkno = 0 ; bkno < 5; bkno++){
+		sprintf(tmp_fname, "%s-FTEST-%d.tmp", pairer->tmp_file_prefix, bkno);
+		FILE * tfp = fopen(tmp_fname, "w");
+		if(NULL == tfp){
+			has_limit = 1;
+			break;
+		}
+		orphant_fps[max_open_fps++] = tfp;
+	}
 	//#warning ">>>>>>> COMMENT NEXT LINE <<<<<<<<"
-	//SUBREADprintf("OR_fps= %d\n", orphant_fp_no);
-
-	FILE * level_merge_fps [ SAM_pairer_get_merge_max_fp(pairer) ];
-	int current_opened_fp_no = 0, processed_orphant = 0;
-	if(orphant_fp_no > SAM_pairer_get_merge_max_fp(pairer)){
-		if( thread_no > 0 ){
-			while(!pairer -> merge_level_finished) usleep(PAIRER_WAIT_TICK_TIME);
-		}else{
-			for( thno = 0 ; thno < pairer -> total_threads ; thno ++ ){
-				for( bkno = 0 ; ; bkno++){
-					char tmp_fname[MAX_FILE_NAME_LENGTH];
-					sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix,  thno, bkno);
-
-					FILE * in_fp = fopen(tmp_fname, "rb");
-					if(NULL == in_fp) break;
-
-					//#warning ">>>> COMMENT DEBUG OUTPUT <<<<"
-					//SUBREADprintf("Adding temp file:%s\n", tmp_fname);
-					level_merge_fps[current_opened_fp_no ++] = in_fp;
-					processed_orphant ++;
-					if(current_opened_fp_no >= SAM_pairer_get_merge_max_fp(pairer) || processed_orphant == orphant_fp_no){
-						sprintf(tmp_fname, "%s-LEVELMERGE.tmp", pairer->tmp_file_prefix);
-
-					//	#warning ">>>> COMMENT DEBUG OUTPUT <<<<"
-					//	SUBREADprintf("Merging temp files\n");
-						merge_level_fps(pairer , tmp_fname, level_merge_fps, current_opened_fp_no, &rescured);
-						for(x1 = 0; x1 < current_opened_fp_no; x1++) fclose(level_merge_fps[x1]);
-
-						if(processed_orphant < orphant_fp_no){
-							level_merge_fps[0] = fopen(tmp_fname, "rb");
-							current_opened_fp_no = 1;
-						}
-					}
-				}
+	for( thno = 0 ; thno < pairer -> total_threads ; thno ++ ){
+		if(has_limit) break;
+		for( bkno = 0 ; ; bkno++){
+			sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix,  thno, bkno);
+			FILE * in_fp = fopen(tmp_fname, "rb");
+			if(NULL == in_fp){
+				if( bkno <= thread_fps[thno] ) has_limit = 1;
+				break;
 			}
-			pairer -> merge_level_finished = 1;
+			orphant_fps[max_open_fps++] = in_fp;
+			if(max_open_fps >= orphant_fp_size - 1){
+				orphant_fp_size *= 2;
+				orphant_fps = realloc(orphant_fps, orphant_fp_size * sizeof(FILE *));
+			}
 		}
 	}
 
+	for( bkno = 0 ;bkno < max_open_fps; bkno ++) fclose(orphant_fps[bkno]);
 
+	SAM_pairer_set_merge_max_fp(pairer, max_open_fps - 5);
 
+	//#warning ">>>>>>> COMMENT NEXT LINE <<<<<<<<"
+	//SUBREADprintf("Needed FPS = %d, Ulimit FPS = %d, Has_Limit = %d  \n", orphant_fp_no, max_open_fps, has_limit);
 
+	if( SAM_pairer_get_merge_max_fp(pairer) < orphant_fp_no * pairer -> total_threads){
+		int processed_orphant = 0;
+		int current_opened_fp_no = 0 ;
+		FILE * level_merge_fps [ SAM_pairer_get_merge_max_fp(pairer) ];
+		for( thno = 0 ; thno < pairer -> total_threads ; thno ++ ){
+			for( bkno = 0 ; ; bkno++){
+				char tmp_fname[MAX_FILE_NAME_LENGTH];
+				sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix,  thno, bkno);
 
+				FILE * in_fp = fopen(tmp_fname, "rb");
+				if(NULL == in_fp) break;
+
+	//			#warning ">>>> COMMENT DEBUG OUTPUT <<<<"
+	//			SUBREADprintf("Adding temp file:%s\n", tmp_fname);
+				level_merge_fps[current_opened_fp_no ++] = in_fp;
+				processed_orphant ++;
+				if(current_opened_fp_no >= SAM_pairer_get_merge_max_fp(pairer) || processed_orphant == orphant_fp_no){
+					sprintf(tmp_fname, "%s-LEVELMERGE.tmp", pairer->tmp_file_prefix);
+
+	//				#warning ">>>> COMMENT DEBUG OUTPUT <<<<"
+	//				SUBREADprintf("Merging temp files\n");
+					merge_level_fps(pairer , tmp_fname, level_merge_fps, current_opened_fp_no);
+					for(x1 = 0; x1 < current_opened_fp_no; x1++) fclose(level_merge_fps[x1]);
+
+					if(processed_orphant < orphant_fp_no){
+						level_merge_fps[0] = fopen(tmp_fname, "rb");
+						current_opened_fp_no = 1;
+					}
+				}
+			}
+		}
+		pairer -> merge_level_finished = 1;
+	}
+	free(orphant_fps);
+
+}
+
+void * SAM_pairer_rescure_orphants_max_FP(void * params){
+	void ** param_ptr = (void **) params;
+	SAM_pairer_context_t * pairer = param_ptr[0];
+	int thread_no = (int)(param_ptr[1]-NULL);
+	free(params);
+
+	unsigned long long died=0;
+	int orphant_fp_no=0;
+	int thno, bkno, x1;
+	char tmp_fname[MAX_FILE_NAME_LENGTH];
 
 	int max_name_len = MAX_READ_NAME_LEN*2 +80, orphant_fp_size = 50;
 	FILE ** orphant_fps = malloc(sizeof(FILE *) * orphant_fp_size);
 
-	//#warning ">>>>>>> COMMENT NEXT LINE <<<<<<<<"
+	if(0 == thread_no && pairer -> display_progress)
+		SUBREADprintf("Finished scanning the input file. Processing unpaired reads.\n");
+
 	//SUBREADprintf("merged = %d\n", pairer -> merge_level_finished);
 	if(pairer -> merge_level_finished){
-		char tmp_fname[MAX_FILE_NAME_LENGTH];
 		sprintf(tmp_fname, "%s-LEVELMERGE.tmp", pairer->tmp_file_prefix);
 		FILE * in_fp = fopen(tmp_fname, "rb");
 		orphant_fps[0] = in_fp;
@@ -3835,7 +3860,6 @@ void * SAM_pairer_rescure_orphants_max_FP(void * params){
 		orphant_fp_no = 0;
 		for( thno = 0 ; thno < pairer -> total_threads ; thno ++ ){
 			for( bkno = 0 ; ; bkno++){
-				char tmp_fname[MAX_FILE_NAME_LENGTH];
 				sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix,  thno, bkno);
 
 				FILE * in_fp = fopen(tmp_fname, "rb");
@@ -3848,10 +3872,6 @@ void * SAM_pairer_rescure_orphants_max_FP(void * params){
 			}
 		}
 	}
-
-
-
-
 
 	char * names = malloc( orphant_fp_no * max_name_len );
 	memset(names, 0, orphant_fp_no * max_name_len );
@@ -3916,7 +3936,6 @@ void * SAM_pairer_rescure_orphants_max_FP(void * params){
 
 				int read_has = SAM_pairer_osr_next_name( orphant_fps[min2_name_fileno],  names + max_name_len*min2_name_fileno, thread_no,  pairer-> total_threads);
 				if(!read_has) *(names + max_name_len*min2_name_fileno)=0;
-				rescured++;
 			}else{
 				//#warning ">>>>>>> COMMENT NEXT LINE <<<<<<<<"
 				//SUBREADprintf("FINAL_ORPHAN:%s\n" , names + max_name_len*min_name_fileno);
@@ -3927,7 +3946,6 @@ void * SAM_pairer_rescure_orphants_max_FP(void * params){
 			int read_has = SAM_pairer_osr_next_name( orphant_fps[min_name_fileno],  names + max_name_len*min_name_fileno, thread_no, pairer-> total_threads);
 			//#warning ">>>>>>> COMMENT NEXT BLOCK <<<<<<<<"
 			if(0){
-					if((rescured + died) % 10000 == 0)  SUBREADprintf("%llu FINISHED\n", (rescured + died));
 					if(!read_has) SUBREADprintf("FP %d FINISHED\n", min_name_fileno);
 				}
 			if(!read_has) *(names + max_name_len*min_name_fileno)=0;
@@ -3945,130 +3963,9 @@ void * SAM_pairer_rescure_orphants_max_FP(void * params){
 	free( bin_tmp1 );
 	free( bin_tmp2 );
 	pairer -> total_orphan_reads += died;
-	//SUBREADprintf("RESCURE THREAD %d   Rescured %llu, Died %llu\n", thread_no, rescured, died);
 	return NULL;
 }
 
-
-
-
-
-
-void * SAM_pairer_rescure_orphants_150p2(void * params){
-
-	void ** param_ptr = (void **) params;
-	SAM_pairer_context_t * pairer = param_ptr[0];
-	int thread_no = (int)(param_ptr[1]-NULL);
-	free(params);
-
-	int orphant_fp_size = 50, orphant_fp_no=0;
-	FILE ** orphant_fps = malloc(sizeof(FILE *) * orphant_fp_size);
-	int thno, bkno, x1;
-	char * bin_tmp1 , * bin_tmp2;
-
-	if(0 == thread_no && pairer -> display_progress)
-		SUBREADprintf("Finished scanning the input file. Processing unpaired reads.\n");
-
-	bin_tmp1 = malloc(66000);
-	bin_tmp2 = malloc(66000);
-
-	for( thno = 0 ; thno < pairer -> total_threads ; thno ++ ){
-		for( bkno = 0 ; ; bkno++){
-			char tmp_fname[MAX_FILE_NAME_LENGTH];
-			sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix,  thno, bkno);
-
-			FILE * in_fp = fopen(tmp_fname, "rb");
-			if(NULL == in_fp) break;
-			if(orphant_fp_no >= orphant_fp_size){
-				orphant_fp_size *= 1.5;
-				orphant_fps = realloc(orphant_fps, orphant_fp_size * sizeof(FILE *));
-			}
-			orphant_fps[orphant_fp_no++]=in_fp;
-		}
-	}
-
-	int max_name_len = MAX_READ_NAME_LEN*2 +80;
-	char * names = malloc( orphant_fp_no * max_name_len );
-	memset(names, 0, orphant_fp_no * max_name_len );
-	
-	for(x1 = 0 ; x1 < orphant_fp_no; x1++)
-	{
-		int has = SAM_pairer_osr_next_name( orphant_fps[x1] , names + max_name_len*x1 , thread_no , pairer-> total_threads);
-		if(!has) *(names + max_name_len*x1)=0;
-	}
-
-	unsigned long long rescured=0, died=0;
-
-	while(1){
-		int min_name_fileno = -1;
-		int min2_name_fileno = -1;
-
-		for(x1 = 0 ; x1 < orphant_fp_no; x1++){
-			int has = *(names + max_name_len*x1);
-			if(has){
-				int strcv_12 = 1;
-				if(min_name_fileno >=0) strcv_12 = strcmp(names+(min_name_fileno * max_name_len), names+(x1 * max_name_len));
-				if(strcv_12 > 0){
-					min_name_fileno = x1;
-					min2_name_fileno = -1;
-				}else if( strcv_12 == 0){
-					min2_name_fileno = x1;
-				}
-			}
-
-		}
-
-		if(min_name_fileno >= 0){
-			SAM_pairer_osr_next_bin( orphant_fps[ min_name_fileno ] , bin_tmp1);
-
-			if( min2_name_fileno >=0){
-				SAM_pairer_osr_next_bin( orphant_fps[ min2_name_fileno ] , bin_tmp2);
-				pairer -> output_function(pairer, thread_no,  names + max_name_len*min_name_fileno , (char*) bin_tmp1, (char*)bin_tmp2);
-
-				if(0 == pairer -> is_unsorted_notified){
-					char *name_tmp_1 = malloc(strlen(names+(min_name_fileno * max_name_len))+5), *name_tmp_2 = malloc(strlen(names+(min_name_fileno * max_name_len))+5);
-					char * min1_chunk_info, * min2_chunk_info;
-					sprintf(name_tmp_1, "C:%s:%d", names+(min_name_fileno * max_name_len), 0);
-					sprintf(name_tmp_2, "C:%s:%d", names+(min2_name_fileno * max_name_len), 1);
-					min1_chunk_info = HashTableGet( pairer -> unsorted_notification_table , name_tmp_1);
-					min2_chunk_info = HashTableGet( pairer -> unsorted_notification_table , name_tmp_2);
-					//SUBREADprintf("RESCURE MATCHER:  %s , %s ==  %s , %s, %s\n", name_tmp_1, name_tmp_2, min1_chunk_info, min2_chunk_info,
-					//	SAM_pairer_is_matched_chunks(min1_chunk_info, min2_chunk_info)?"MATCH":"XXXXX");
-					if(min1_chunk_info == NULL || min2_chunk_info == NULL || !SAM_pairer_is_matched_chunks(min1_chunk_info, min2_chunk_info)){
-						sprintf(name_tmp_1, "B:%s:%d", names+(min_name_fileno * max_name_len), 0);
-						if( pairer -> unsorted_notification ){
-							//SUBREADprintf("FINAL STEP\n");
-							pairer -> unsorted_notification(pairer ,  HashTableGet( pairer -> unsorted_notification_table , name_tmp_1), NULL);
-						}
-						pairer -> is_unsorted_notified = 1;
-					}
-				}
-
-				int read_has = SAM_pairer_osr_next_name( orphant_fps[min2_name_fileno],  names + max_name_len*min2_name_fileno, thread_no,  pairer-> total_threads);
-				if(!read_has) *(names + max_name_len*min2_name_fileno)=0;
-				rescured++;
-			}else{
-				//SUBREADprintf("FINAL_ORPHAN:%s\n" , names + max_name_len*min_name_fileno);
-				pairer -> output_function(pairer, thread_no,  names + max_name_len*min_name_fileno, (char*) bin_tmp1, NULL);
-				died++;
-			}
-
-			int read_has = SAM_pairer_osr_next_name( orphant_fps[min_name_fileno],  names + max_name_len*min_name_fileno, thread_no, pairer-> total_threads);
-			if(!read_has) *(names + max_name_len*min_name_fileno)=0;
-		} else break;
-	}
-	free(names);
-
-	for(x1 = 0 ; x1 < orphant_fp_no; x1++)
-	{
-		fclose ( orphant_fps[x1] );
-	}
-	free( bin_tmp1 );
-	free( bin_tmp2 );
-	pairer -> total_orphan_reads += died;
-	//SUBREADprintf("RESCURE THREAD %d   Rescured %llu, Died %llu\n", thread_no, rescured, died);
-	return NULL;
-}
 
 void SAM_pairer_update_orphant_table(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context){
 	unsigned int x2 = 0;
@@ -4287,6 +4184,9 @@ int SAM_pairer_run_once( SAM_pairer_context_t * pairer){
 	}
 
 	if(0 == pairer -> is_bad_format){
+
+		SAM_pairer_probe_maxfp( pairer );
+
 		for(x1 = 0; x1 < pairer -> total_threads ; x1++){
 			// this 16-byte memory block is freed in the thread worker.
 
@@ -4814,7 +4714,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 		unsigned int bam_signature;
 		NOSORT_BAM_next_u32(bam_signature);
 		NOSORT_BAM_next_u32(pairer -> BAM_l_text);
-		char * header_txt = malloc(pairer->BAM_l_text);
+		char * header_txt = malloc(max(1000000,pairer->BAM_l_text));
 
 		for(x1 = 0 ; x1 < pairer -> BAM_l_text; x1++){
 			NOSORT_BAM_next_nch;

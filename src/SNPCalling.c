@@ -156,9 +156,10 @@ double fisher_exact_test(int a, int b, int c, int d)
 
 	if(1){
 		double ret = fast_fisher_test_one_side(a,b,c,d, precalculated_factorial, PRECALCULATE_FACTORIAL);
-	//	SUBREADprintf("FISHER_RES %d %d %d %d %.9f %.9f\n", a,b,c,d, ret, log(ret));
+		//SUBREADprintf("FISHER_RES %d %d %d %d %.9f %.9f\n", a,b,c,d, ret, log(ret));
 		return ret;
 	}else{
+		int AA=a, BB=b, CC=c, DD=d;
 		if (a * d > b * c) {
 		    a = a + b; b = a - b; a = a - b; 
 		    c = c + d; d = c - d; c = c - d;
@@ -177,9 +178,8 @@ double fisher_exact_test(int a, int b, int c, int d)
 		    p = fisherSub(a, b, c, d);
 		}
 
-		if(0){
+		if(1){
 			// DON'T PUT IT HERE!
-			int AA=a, BB=b, CC=c, DD=d;
 			double r1 = fast_fisher_test_one_side(AA,BB,CC,DD, NULL, PRECALCULATE_FACTORIAL);
 			if(abs(r1-p_sum) / max(r1,p_sum) >= 0.01){
 				printf("BADR: FAST = %.7f != JAVA %.7f,  %d %d %d %d\n", log(r1), log(p_sum),AA,BB,CC,DD);

@@ -1221,34 +1221,37 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 		{			
 			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped, r->current_cigar_decompress, r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens);
 
-			int xk1;
-			r->chimeric_sections = chimeric_sections;
-			strcpy(r->out_cigars[0], output_context->out_cigar_buffer[0]);
-			for(xk1=1; xk1<chimeric_sections; xk1++)
-			{
-				int chimeric_pos;
-				char * chimaric_chr;
-				strcpy(r->out_cigars[xk1], output_context->out_cigar_buffer[xk1]);
-				unsigned int vitual_head_pos = r->out_poses[xk1];
-				char strand_xor = (r->out_strands[xk1] == '-') != is_second_read;//!= (r->out_strands[0]=='-') ;
-
-				//if(( r->out_strands[xk1] == '-' ) != (r->out_strands[0]=='-' )) vitual_head_pos = move_to_read_head(vitual_head_pos, r->out_cigars[xk1]);
-
-				if(0==locate_gene_position_max(vitual_head_pos ,& global_context -> chromosome_table, & chimaric_chr, & chimeric_pos, NULL, NULL, 0+r->out_lens[xk1]))
+			if(chimeric_sections > 0){
+				int xk1;
+				r->chimeric_sections = chimeric_sections;
+				strcpy(r->out_cigars[0], output_context->out_cigar_buffer[0]);
+				for(xk1=1; xk1<chimeric_sections; xk1++)
 				{
-					int soft_clipping_movement = 0;
-					soft_clipping_movement = get_soft_clipping_length(r->out_cigars[xk1]);
-					assert(chimaric_chr);
-					sprintf(r->additional_information + strlen(r->additional_information), "\tCG:Z:%s\tCP:i:%u\tCT:Z:%c\tCC:Z:%s", r->out_cigars[xk1] , max(1,chimeric_pos + soft_clipping_movement + 1), strand_xor?'-':'+' , chimaric_chr );
-				}
-				else is_r_OK = 0;
-			}
-			r->linear_position = r->out_poses[0];
-			r->strand = r->out_strands[0]=='-';
+					int chimeric_pos;
+					char * chimaric_chr;
+					strcpy(r->out_cigars[xk1], output_context->out_cigar_buffer[xk1]);
+					unsigned int vitual_head_pos = r->out_poses[xk1];
+					char strand_xor = (r->out_strands[xk1] == '-') != is_second_read;//!= (r->out_strands[0]=='-') ;
 
-			strcpy(r->cigar , r->out_cigars[0]);
+					//if(( r->out_strands[xk1] == '-' ) != (r->out_strands[0]=='-' )) vitual_head_pos = move_to_read_head(vitual_head_pos, r->out_cigars[xk1]);
+
+					if(0==locate_gene_position_max(vitual_head_pos ,& global_context -> chromosome_table, & chimaric_chr, & chimeric_pos, NULL, NULL, 0+r->out_lens[xk1]))
+					{
+						int soft_clipping_movement = 0;
+						soft_clipping_movement = get_soft_clipping_length(r->out_cigars[xk1]);
+						assert(chimaric_chr);
+						sprintf(r->additional_information + strlen(r->additional_information), "\tCG:Z:%s\tCP:i:%u\tCT:Z:%c\tCC:Z:%s", r->out_cigars[xk1] , max(1,chimeric_pos + soft_clipping_movement + 1), strand_xor?'-':'+' , chimaric_chr );
+					}
+					else is_r_OK = 0;
+				}
+				r->linear_position = r->out_poses[0];
+				r->strand = r->out_strands[0]=='-';
+
+				strcpy(r->cigar , r->out_cigars[0]);
+			}else is_r_OK = 0;
 		}
-		r->soft_clipping_movements = get_soft_clipping_length(r->cigar);
+		if(is_r_OK)
+			r->soft_clipping_movements = get_soft_clipping_length(r->cigar);
 	}
 
 	if(is_r_OK)
@@ -4189,6 +4192,14 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				int curr_offset, new_offset;
 				locate_gene_position_max(current_perfect_cursor, &global_context -> chromosome_table, & curr_chr, & curr_offset, NULL, NULL, 1);
 				locate_gene_position_max(jummped_location      , &global_context -> chromosome_table, &  new_chr, &  new_offset, NULL, NULL, 1);
+				if( curr_chr == NULL || new_chr == NULL ){
+					/*
+					char outpos[100];
+					absoffset_to_posstr(global_context, sel_pos + 1, outpos);
+					SUBREADprintf("Wrong CIGAR: mapped to %s, CIGAR=%s\n", outpos , in_cigar);
+					*/
+					return -1;
+				}
 				assert(curr_chr);
 				assert(new_chr);
 				is_chro_jump = (curr_chr != new_chr);

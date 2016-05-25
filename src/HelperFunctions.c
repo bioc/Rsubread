@@ -889,6 +889,8 @@ int mac_or_rand_str(char * str_buff){
 	return mac_str(str_buff) && rand_str(str_buff) && mathrand_str(str_buff);
 }
 
+#define PI_LONG 3.1415926535897932384626434L
+
 long double fast_fractorial(unsigned int x, long double * buff, int buflen){
 	if(x<2) return 0;
 	
@@ -897,12 +899,12 @@ long double fast_fractorial(unsigned int x, long double * buff, int buflen){
 	}
 	long double ret;
 
-	if(x<30){
+	if(x<50){
 		int x1;
-		ret =0;
-		for(x1 = 2 ; x1 <= x; x1++) ret += logl(x1);
+		ret =0.L;
+		for(x1 = 2 ; x1 <= x; x1++) ret += logl((long double)(x1));
 	}else{
-		ret = logl(x)*x - x + 0.5 * logl(2*M_PI* x) + 1/(12.*x) - 1./(360.* x*x*x) +  1./(1260.* x*x*x*x*x) -  1./(1680.*x*x*x*x*x*x*x) + (x>60?0:(1./(1188.*x*x*x*x*x*x*x*x*x ) ));
+		ret = logl(x)*1.0L*x - 1.0L*x + 0.5L * logl(2.0L*PI_LONG* x) + 1.L/(12.L*x) - 1.L/(360.L* x*x*x) +  1.L/(1260.L* x*x*x*x*x) -  1.L/(1680.L*x*x*x*x*x*x*x);
 	}
 	if(buff != NULL && x < buflen) buff[x]=ret;
 	return ret;
@@ -950,7 +952,7 @@ double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c,
 		}
 	P_delta = fast_freq(tab, buff, buflen);
 	P0 = ret = exp(P_delta);
-//	printf("P0=%LG\n", P0);
+	//printf("P0=%LG\n", P0);
 	if(min_a>0){
 		unsigned int Qa = min_a;
 		unsigned int Qb = tab[x_min][!y_min];
@@ -963,7 +965,7 @@ double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c,
 			P_delta += logl(Qa*Qd);
 			Qa--;Qd--;
 			ret += expl(P_delta);
-			//printf(" %LG %LG ( += %LG )\n", logl(ret), logl(1 - (ret - P0)), P_delta);
+		//	printf("%LG %LG %LG\n", ret, 1 - (ret - P0), expl(P_delta));
 			if(min_a < 1) break;
 		}
 	}

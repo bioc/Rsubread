@@ -4145,8 +4145,7 @@ int readSummary(int argc,char *argv[]){
 	else	isRestrictlyNoOvelrapping = 0;
 	
 
-	
-
+	if(SAM_pairer_warning_file_open_limit()) return -1;
 
 	fc_thread_global_context_t global_context;
 
