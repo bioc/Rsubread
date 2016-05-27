@@ -2353,7 +2353,7 @@ int SAM_pairer_warning_file_open_limit(){
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
 	if(min(limit_st.rlim_cur, limit_st.rlim_max  ) < MIN_FILE_POINTERS_ALLOWED){
-		SUBREADprintf(" ERROR: the maximum file open number (%d) is too low. Please increase this number to a number larger than 50 by using the 'ulimit -n' command. This program has to terminate now.",(int)(min(limit_st.rlim_cur, limit_st.rlim_max)));
+		SUBREADprintf(" ERROR: the maximum file open number (%d) is too low. Please increase this number to a number larger than 50 by using the 'ulimit -n' command. This program has to terminate now.\n\n",(int)(min(limit_st.rlim_cur, limit_st.rlim_max)));
 		return 1;
 	}
 	return 0;
