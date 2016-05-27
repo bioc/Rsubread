@@ -1752,7 +1752,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 			{
 				unsigned int head_indel_left_edge = head_indel_pos + current_result->selected_position - 1;
 				//head_indel_left_edge -= max(0, head_indel_movement);
-				if(head_indel_left_edge>=0 && abs(head_indel_movement)<=global_context -> config.max_indel_length)
+				if(abs(head_indel_movement)<=global_context -> config.max_indel_length)
 				{
 					local_add_indel_event(global_context, thread_context, event_table, read_text + head_indel_pos, head_indel_left_edge, head_indel_movement, 1, 1, 0);
 					mark_gapped_read(current_result);
@@ -2126,7 +2126,7 @@ int finalise_db_graph(global_context_t * global_context, reassembly_block_contex
 		else
 		{
 			int test_next;
-			int all_reads;
+			int all_reads = 0;
 			int ignored_moves=0;
 			int max_move_reads=0;
 			unsigned long long int previous_key = current_key<<2;
@@ -3886,6 +3886,7 @@ void COREMAIN_SIGINT_hook(int param)
 						unlink(del_name);
 					}
 				}
+				closedir(d);
 			}
 		}
 			

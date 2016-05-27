@@ -936,14 +936,14 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 			ret_features[xk1].chro_name_pos_delta = chro_name_pos - ret_features[xk1].feature_name_pos;
 			ret_features[xk1].start = atoi( start_ptr );// start 
-			if(ret_features[xk1].start<0 || ret_features[xk1].start>0x7fffffff)
+			if(ret_features[xk1].start>0x7fffffff)
 			{
 				ret_features[xk1].start = 0;
 				print_in_box(80,0,0,"WARNING the %d-th line has a negative chro coordinate.", lineno);
 			}
 
 			ret_features[xk1].end = atoi( end_ptr );//end 
-			if(ret_features[xk1].end<0 || ret_features[xk1].end>0x7fffffff)
+			if(ret_features[xk1].end>0x7fffffff)
 			{
 				ret_features[xk1].end = 0;
 				print_in_box(80,0,0,"WARNING the %d-th line has a negative chro coordinate.", lineno);
@@ -4145,8 +4145,7 @@ int readSummary(int argc,char *argv[]){
 	else	isRestrictlyNoOvelrapping = 0;
 	
 
-	
-
+	if(SAM_pairer_warning_file_open_limit()) return -1;
 
 	fc_thread_global_context_t global_context;
 

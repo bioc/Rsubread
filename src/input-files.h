@@ -36,6 +36,7 @@
 #define GENE_INPUT_SAM_PAIR_2   95
 
 
+#define MIN_FILE_POINTERS_ALLOWED 50
 
 #define FILE_TYPE_SAM     50
 #define FILE_TYPE_BAM     500
@@ -120,6 +121,8 @@ typedef struct {
 	int is_single_end_mode;
 	int force_do_not_sort;
 	int is_finished;
+	int merge_level_finished;
+	int max_file_open_number;
 	subread_lock_t input_fp_lock;
 	subread_lock_t output_header_lock;
 	subread_lock_t unsorted_notification_lock;
@@ -303,4 +306,5 @@ int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);
 void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
+int SAM_pairer_warning_file_open_limit();
 #endif
