@@ -2651,8 +2651,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 					for(read_record_i = 0; read_record_i < current_candidate_locations; read_record_i++){
 						realignment_result_t * current_realignment_result = final_realignments + current_realignment_index[read_record_i];
-						mapping_result_t *current_result = current_realignment_result -> mapping_result; 
-						assert(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED);
+						//mapping_result_t *current_result = current_realignment_result -> mapping_result; 
+						//assert(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED);
 
 						unsigned int this_MATCH = current_MATCH_buffer[read_record_i];
 						unsigned int this_MISMATCH = current_MISMATCH_buffer[read_record_i];
