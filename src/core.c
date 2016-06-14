@@ -2650,7 +2650,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 					unsigned int scores_array [global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR];
 
 					for(read_record_i = 0; read_record_i < current_candidate_locations; read_record_i++){
-						realignment_result_t * current_realignment_result = final_realignments + current_realignment_index[read_record_i];
+						//realignment_result_t * current_realignment_result = final_realignments + current_realignment_index[read_record_i];
 						//mapping_result_t *current_result = current_realignment_result -> mapping_result; 
 						//assert(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED);
 
