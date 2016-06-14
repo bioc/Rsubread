@@ -2371,7 +2371,7 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 	pairer -> input_fp = f_subr_open(in_file, "rb");
 	if(NULL == pairer -> input_fp) return 1;
 
-	SAM_pairer_warning_file_open_limit(pairer);
+	SAM_pairer_warning_file_open_limit();
 
 	pairer -> input_is_BAM = BAM_input;
 	pairer -> tiny_mode = is_Tiny_Mode;

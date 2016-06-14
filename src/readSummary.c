@@ -598,8 +598,11 @@ void print_FC_configuration(fc_thread_global_context_t * global_context, char * 
 	print_in_box(80,0,0,"            Output file : %s", out);
 	print_in_box(80,0,0,"                Summary : %s.summary", out);
 	print_in_box(80,0,0,"             Annotation : %s (%s)", annot, is_GTF?"GTF":"SAF");
-	if(isReadSummaryReport)
+	if(isReadSummaryReport){
 		print_in_box(80,0,0,"     Assignment details : <input_file>.featureCounts");
+		print_in_box(80,0,0,"                     (Note that files are saved to the output directory)");
+		print_in_box(80,0,0,"");
+	}
 	if(global_context -> do_junction_counting)
 		print_in_box(80,0,0,"      Junction Counting : <output_file>.jcounts");
 
@@ -1413,6 +1416,11 @@ int strcmp_slash(char * s1, char * s2)
 }
 
 #define NH_FRACTION_INT 65536
+
+unsigned int calculate_multi_overlap_fraction(fc_thread_global_context_t * global_context, unsigned int fixed_fractional_count, int maximum_total_count){
+	if(global_context -> use_fraction_multi_mapping) return fixed_fractional_count / maximum_total_count;
+	else return fixed_fractional_count;
+}
 
 unsigned int calc_fixed_fraction(int nh){
 	if(nh==1) return NH_FRACTION_INT;
@@ -2671,7 +2679,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 					if( this_decision_score < maximum_decision_score ) continue ; 
 
 					long tmp_voter_id = decision_table_exon_ids[xk1];
-					thread_context->count_table[tmp_voter_id] += fixed_fractional_count;
+					thread_context->count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, maximum_total_count);
 
 					if(global_context -> SAM_output_fp)
 					{
@@ -2838,6 +2846,7 @@ HashTable * load_alias_table(char * fname)
 		HashTablePut(ret, sam_chr_buf, anno_chr_buf);
 	}
 
+	fclose(fp);
 
 	free(fl);
 	return ret;
@@ -3243,21 +3252,22 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 				{
 						int merged_gaps = mergeIntervals(input_start_stop_list, output_start_stop_list, gap_merge_ptr);
 
-						for(xk3=0; xk3<merged_gaps; xk3++)
+						for(xk3=0; xk3<gap_merge_ptr; xk3++)
 						{
 							char numbbuf[12];
 							BUFstrcat(out_chr_list, matched_chr, &tmp_chr_list);
 							BUFstrcat(out_chr_list, ";", &tmp_chr_list);
 
-							sprintf(numbbuf,"%u;", output_start_stop_list[xk3 * 2]);
+							sprintf(numbbuf,"%u;", input_start_stop_list[xk3 * 2]);
 							BUFstrcat(out_start_list, numbbuf, &tmp_start_list);
-							sprintf(numbbuf,"%u;", output_start_stop_list[xk3 * 2 + 1] - 1);
+							sprintf(numbbuf,"%u;", input_start_stop_list[xk3 * 2 + 1] - 1);
 							BUFstrcat(out_end_list, numbbuf, &tmp_end_list);
 							sprintf(numbbuf,"%c;", matched_strand?'-':'+');
 							BUFstrcat(out_strand_list, numbbuf, &tmp_strand_list);
 
-							gene_nonoverlap_len += output_start_stop_list[xk3 * 2 + 1] - output_start_stop_list[xk3 * 2];
 						}
+						for(xk3=0; xk3<merged_gaps; xk3++)
+							gene_nonoverlap_len += output_start_stop_list[xk3 * 2 + 1] - output_start_stop_list[xk3 * 2];
 				}	
 			}
 		}
@@ -3421,8 +3431,8 @@ static struct option long_options[] =
 	{"readExtension3", required_argument, 0, 0},
 	{"read2pos", required_argument, 0, 0},
 	{"minOverlap", required_argument, 0, 0},
-	{"countSplitAlignmentsOnly", no_argument, 0, 0},
-	{"countNonSplitAlignmentsOnly", no_argument, 0, 0},
+	{"splitOnly", no_argument, 0, 0},
+	{"nonSplitOnly", no_argument, 0, 0},
 	{"debugCommand", required_argument, 0, 0},
 	{"ignoreDup", no_argument, 0, 0},
 	{"donotsort", no_argument, 0, 0},
@@ -3442,22 +3452,13 @@ void print_usage()
 	SUBREADputs("Usage: featureCounts [options] -a <annotation_file> -o <output_file> input_file1 [input_file2] ... \n");
 	SUBREADputs("Required arguments:");
 	SUBREADputs("");
+
+
+
+	SUBREADputs("# Annotation");
+	SUBREADputs("");
 	SUBREADputs("  -a <string>         Name of an annotation file. GTF/GFF format by default.");
 	SUBREADputs("                      See -F option for more formats.");
-	SUBREADputs("");
-	SUBREADputs("  -o <string>         Name of the output file including read counts. A separate ");
-	SUBREADputs("                      file including summary statistics of counting results is ");
-	SUBREADputs("                      also included in the output (`<string>.summary')");
-	SUBREADputs("");
-	SUBREADputs("  input_files         List of input files in BAM or SAM format. Users do not ");
-	SUBREADputs("                      need to specify it is BAM or SAM.");
-	SUBREADputs("");
-	SUBREADputs("Optional arguments:"); 
-	SUBREADputs("");
-	SUBREADputs("  -A <string>         Name of a comma delimited file including chromosome alias ");
-	SUBREADputs("                      names used to match chromosome names used in annotation ");
-	SUBREADputs("                      with those used in BAM/SAM input, if they are different. ");
-	SUBREADputs("                      See Users Guide for file format.");
 	SUBREADputs("");
 	SUBREADputs("  -F <string>         Specify format of provided annotation file. Acceptable");
 	SUBREADputs("                      formats include `GTF/GFF' and `SAF'. `GTF/GFF' by default.");
@@ -3471,28 +3472,86 @@ void print_usage()
 	SUBREADputs("                      default. Meta-features used for read counting will be ");
 	SUBREADputs("                      extracted from annotation using the provided value.");
 	SUBREADputs("");
+	SUBREADputs("  -A <string>         Name of a comma delimited file including chromosome alias ");
+	SUBREADputs("                      names used to match chromosome names used in annotation ");
+	SUBREADputs("                      with those used in BAM/SAM input, if they are different. ");
+	SUBREADputs("                      See Users Guide for file format.");
+	SUBREADputs("");
+
+	SUBREADputs("# Level of summarization");
+	SUBREADputs("");
 	SUBREADputs("  -f                  Perform read counting at feature level (eg. counting ");
 	SUBREADputs("                      reads for exons rather than genes).");
+	SUBREADputs("");
+
+	SUBREADputs("# Overlap between reads and features");
 	SUBREADputs("");
 	SUBREADputs("  -O                  Assign reads to all their overlapping meta-features (or ");
 	SUBREADputs("                      features if -f is specified).");
 	SUBREADputs("");
-	SUBREADputs("  -s <int>            Perform strand-specific read counting. Possible values:  ");
-	SUBREADputs("                      0 (unstranded), 1 (stranded) and 2 (reversely stranded). ");
-	SUBREADputs("                      0 by default.");
+	SUBREADputs("  --minOverlap <int>  Specify minimum number of overlapping bases requried ");
+	SUBREADputs("                      between a read and a meta-feature/feature that the read ");
+	SUBREADputs("                      is assigned to. 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("  --largestOverlap    Assign reads to a meta-feature/feature that has the ");
+	SUBREADputs("                      largest number of overlapping bases.");
+	SUBREADputs("");
+    SUBREADputs("  --readExtension5 <int> Reads are extended upstream by <int> bases from their");
+    SUBREADputs("                      5' end.");
+    SUBREADputs("");
+    SUBREADputs("  --readExtension3 <int> Reads are extended upstream by <int> bases from their");
+    SUBREADputs("                      3' end.");
+    SUBREADputs("");
+	SUBREADputs("  --read2pos <5:3>    Reduce reads to their 5' most base or 3' most base. Read");
+	SUBREADputs("                      counting is then performed based on the single base the ");
+	SUBREADputs("                      read is reduced to.");
+	SUBREADputs("");
+
+	SUBREADputs("# Multi-mapping reads");
 	SUBREADputs("");
 	SUBREADputs("  -M                  Multi-mapping reads will also be counted. For a multi-");
 	SUBREADputs("                      mapping read, all its reported alignments will be ");
 	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
 	SUBREADputs("");
+	SUBREADputs("  --fraction          Use a fractional count 1/n, instead of 1 (one) count, for ");
+	SUBREADputs("                      each reported alignment of a multi-mapping read in read ");
+	SUBREADputs("                      counting. n is total number of alignments reported for ");
+	SUBREADputs("                      the multi-mapping read. This option must be used together ");
+	SUBREADputs("                      with '-M' option.");
+	SUBREADputs("");
+
+	SUBREADputs("# Read filtering");
+	SUBREADputs("");
 	SUBREADputs("  -Q <int>            The minimum mapping quality score a read must satisfy in");
 	SUBREADputs("                      order to be counted. For paired-end reads, at least one");
 	SUBREADputs("                      end should satisfy this criteria. 0 by default.");
 	SUBREADputs("");
-	SUBREADputs("  -T <int>            Number of the threads. 1 by default.");
+	SUBREADputs("  --splitOnly         Count split alignments only (ie. alignments with CIGAR");
+	SUBREADputs("                      string containing 'N'). An example of split alignments is");
+	SUBREADputs("                      exon-spanning reads in RNA-seq data.");
 	SUBREADputs("");
-	SUBREADputs("  -v                  Output version of the program.");
+	SUBREADputs("  --nonSplitOnly      If specified, only non-split alignments (CIGAR strings do");
+    SUBREADputs("                      not contain letter 'N') will be counted. All the other");
+    SUBREADputs("                      alignments will be ignored.");
+	SUBREADputs("");
+	SUBREADputs("  --primary           Count primary alignments only. Primary alignments are ");
+	SUBREADputs("                      identified using bit 0x100 in SAM/BAM FLAG field.");
+	SUBREADputs("");
+	SUBREADputs("  --ignoreDup         Ignore duplicate reads in read counting. Duplicate reads ");
+	SUBREADputs("                      are identified using bit Ox400 in BAM/SAM FLAG field. The ");
+	SUBREADputs("                      whole read pair is ignored if one of the reads is a ");
+	SUBREADputs("                      duplicate read for paired end data.");
+	SUBREADputs("");
+
+	SUBREADputs("# Strandness");
+	SUBREADputs("");
+	SUBREADputs("  -s <int>            Perform strand-specific read counting. Possible values:  ");
+	SUBREADputs("                      0 (unstranded), 1 (stranded) and 2 (reversely stranded). ");
+	SUBREADputs("                      0 by default.");
+	SUBREADputs("");
+
+	SUBREADputs("# Exon-exon junctions");
 	SUBREADputs("");
 	SUBREADputs("  -J                  Count number of reads supporting each exon-exon junction.");
 	SUBREADputs("                      Junctions were identified from those exon-spanning reads");
@@ -3503,59 +3562,22 @@ void print_usage()
 	SUBREADputs("                      generating the input SAM or BAM files. This argument is");
 	SUBREADputs("                      only needed when doing junction counting.");
 	SUBREADputs("");
-	SUBREADputs("  -R                  Output detailed assignment result for each read. A text ");
-	SUBREADputs("                      file will be generated for each input file, including ");
-	SUBREADputs("                      names of reads and meta-features/features reads were ");
-	SUBREADputs("                      assigned to. See Users Guide for more details.");
-	SUBREADputs("");
-	SUBREADputs("  --largestOverlap    Assign reads to a meta-feature/feature that has the ");
-	SUBREADputs("                      largest number of overlapping bases.");
-	SUBREADputs("");
-	SUBREADputs("  --minOverlap <int>  Specify minimum number of overlapping bases requried ");
-	SUBREADputs("                      between a read and a meta-feature/feature that the read ");
-	SUBREADputs("                      is assigned to. 1 by default.");
-	SUBREADputs("");
-	SUBREADputs("  --read2pos <5:3>    Reduce reads to their 5' most base or 3' most base. Read");
-	SUBREADputs("                      counting is then performed based on the single base the ");
-	SUBREADputs("                      read is reduced to.");
-	SUBREADputs("");
-        SUBREADputs("  --readExtension5 <int> Reads are extended upstream by <int> bases from their");
-        SUBREADputs("                      5' end.");
-        SUBREADputs("");
-        SUBREADputs("  --readExtension3 <int> Reads are extended upstream by <int> bases from their");
-        SUBREADputs("                      3' end.");
-        SUBREADputs("");
-	SUBREADputs("  --fraction          Use a fractional count 1/n, instead of 1 (one) count, for ");
-	SUBREADputs("                      each reported alignment of a multi-mapping read in read ");
-	SUBREADputs("                      counting. n is total number of alignments reported for ");
-	SUBREADputs("                      the multi-mapping read. This option must be used together ");
-	SUBREADputs("                      with '-M' option.");
-	SUBREADputs("");
-	SUBREADputs("  --primary           Count primary alignments only. Primary alignments are ");
-	SUBREADputs("                      identified using bit 0x100 in SAM/BAM FLAG field.");
-	SUBREADputs("");
-	SUBREADputs("  --ignoreDup         Ignore duplicate reads in read counting. Duplicate reads ");
-	SUBREADputs("                      are identified using bit Ox400 in BAM/SAM FLAG field. The ");
-	SUBREADputs("                      whole read pair is ignored if one of the reads is a ");
-	SUBREADputs("                      duplicate read for paired end data.");
-	SUBREADputs("");
-	SUBREADputs("  --countSplitAlignmentsOnly Count split alignments only (ie. alignments with ");
-	SUBREADputs("                      CIGAR string containing `N'). An example of split ");
-	SUBREADputs("                      alignments is exon-spanning reads in RNA-seq data.");
+
+	SUBREADputs("# Parameters specific to paired end reads");
 	SUBREADputs("");
 	SUBREADputs("  -p                  If specified, fragments (or templates) will be counted");
 	SUBREADputs("                      instead of reads. This option is only applicable for");
 	SUBREADputs("                      paired-end reads.");
 	SUBREADputs("");
+	SUBREADputs("  -B                  Count read pairs that have both ends successfully aligned ");
+	SUBREADputs("                      only.");
+	SUBREADputs("");
 	SUBREADputs("  -P                  Check validity of paired-end distance when counting read ");
 	SUBREADputs("                      pairs. Use -d and -D to set thresholds.");
 	SUBREADputs("");
-        SUBREADputs("  -d <int>            Minimum fragment/template length, 50 by default.");
-        SUBREADputs("");
-        SUBREADputs("  -D <int>            Maximum fragment/template length, 600 by default.");
-	SUBREADputs("");
-	SUBREADputs("  -B                  Count read pairs that have both ends successfully aligned ");
-	SUBREADputs("                      only.");
+    SUBREADputs("  -d <int>            Minimum fragment/template length, 50 by default.");
+    SUBREADputs("");
+    SUBREADputs("  -D <int>            Maximum fragment/template length, 600 by default.");
 	SUBREADputs("");
 	SUBREADputs("  -C                  Do not count read pairs that have their two ends mapping ");
 	SUBREADputs("                      to different chromosomes or mapping to same chromosome ");
@@ -3565,10 +3587,23 @@ void print_usage()
 	SUBREADputs("                      the same pair are required to be located next to each ");
 	SUBREADputs("                      other in the input.");
 	SUBREADputs("");
+
+	SUBREADputs("# Miscellaneous");
+	SUBREADputs("");
+	SUBREADputs("  -T <int>            Number of the threads. 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -R                  Output detailed assignment result for each read. A text ");
+	SUBREADputs("                      file will be generated for each input file, including ");
+	SUBREADputs("                      names of reads and meta-features/features reads were ");
+	SUBREADputs("                      assigned to. See Users Guide for more details.");
+	SUBREADputs("");
 	SUBREADputs("  --maxMOp <int>      Maximum number of 'M' operations allowed in a CIGAR string");
 	SUBREADputs("                      . 10 by default. Both 'X' and '=' are treated as 'M' and");
 	SUBREADputs("                      adjacent 'M' operations are merged in the CIGAR string.");
 	SUBREADputs("");
+	SUBREADputs("  -v                  Output version of the program.");
+	SUBREADputs("");
+
 }
 
 int junckey_sort_compare(void * inptr, int i, int j){
@@ -4152,7 +4187,7 @@ int readSummary(int argc,char *argv[]){
 	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping);
 
 
-	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && global_context.use_fraction_multi_mapping)
+	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && (!isMultiOverlapAllowed) && global_context.use_fraction_multi_mapping)
 	{
 		SUBREADprintf("ERROR: '--fraction' option should be used together with '-M'.\nThis option should not be used when multi-mapping reads are disallowed or the primary mapping is only counted.\n");
 		return -1;
@@ -4163,7 +4198,7 @@ int readSummary(int argc,char *argv[]){
 	//print_in_box(80,0,0,"IG=%d, IS=%d", isGeneLevel, isSplitOrExonicOnly);
 	if(0)if(isSplitOrExonicOnly && ( isGeneLevel || !isMultiOverlapAllowed) )
 	{
-		print_in_box(80,0,0,"NOTICE --countSplitAlignmentsOnly is specified, but '-O' and '-f' are not");
+		print_in_box(80,0,0,"NOTICE --splitOnly is specified, but '-O' and '-f' are not");
 		print_in_box(80,0,0,"       both specified. Please read the manual for details.");
 		print_in_box(80,0,0,"");
 	}
@@ -4821,7 +4856,7 @@ int feature_count_main(int argc, char ** argv)
 					do_not_sort = 1;
 				}
 
-				if(strcmp("countSplitAlignmentsOnly", long_options[option_index].name)==0)
+				if(strcmp("splitOnly", long_options[option_index].name)==0)
 				{
 					is_Split_or_Exonic_Only = 1;
 				}
@@ -4830,7 +4865,7 @@ int feature_count_main(int argc, char ** argv)
 				{
 					is_Restrictedly_No_Overlap = 1;
 				}
-				if(strcmp("countNonSplitAlignmentsOnly", long_options[option_index].name)==0)
+				if(strcmp("nonSplitOnly", long_options[option_index].name)==0)
 				{
 					is_Split_or_Exonic_Only = 2;
 				}

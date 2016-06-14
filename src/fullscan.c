@@ -1,8 +1,6 @@
 /***************************************************************
 
-   The Subread and Rsubread software packages are free
-   software packages:
- 
+   The Subread software package is free software package: 
    you can redistribute it and/or modify it under the terms
    of the GNU General Public License as published by the 
    Free Software Foundation, either version 3 of the License,
@@ -32,38 +30,57 @@
 float MIN_REPORTING_RATIO = 0.8;
 gene_offset_t _global_offsets;
 unsigned int  SCAN_TOTAL_BASES=0;
-int ic = 0;
+char * only_chro = NULL;
 
 
 void fullscan_usage()
 {
-	SUBREADputs("This program is for scanning a particular read in the whole chromosome space by completely scanning the index file.");
-
-	SUBREADputs("Usage: subread-fullscan -i <index_base> -m <report_threshold> <read_string>");
+	SUBREADprintf("\nsubread-fullscan Version %s\n\n", SUBREAD_VERSION);
+	SUBREADputs("  This program scans the entire genome to find all high-similarity locations to");
+	SUBREADputs("a specified read.");
+	SUBREADputs("");
+	SUBREADputs("Usage:");
+	SUBREADputs("");
+	SUBREADputs(" ./subread-fullscan [options] -i <index_name> <read_string>");
+	SUBREADputs("");
+	SUBREADputs("Required arguments:");
+	SUBREADputs("");
+	SUBREADputs("  -i <string>  Base name of the index.");
+	SUBREADputs("");
+	SUBREADputs("  read_string  The read bases.");
+	SUBREADputs("");
+	SUBREADputs("Optional arguments:");
+	SUBREADputs("");
+	SUBREADputs("  -m <float>   The minimum fraction of matched bases in the read, 0.8 by default"); 
+	SUBREADputs("");
+	
 }
 
 void report_pos(unsigned int pos)
 {
 	char * chro_name;
-	unsigned int chro_pos;
+	int chro_pos;
 	locate_gene_position(pos, &_global_offsets, &chro_name, &chro_pos);
 	SUBREADprintf ("%s,%u\n", chro_name,chro_pos);
 }
 
 
-int str_match_count(char * c1, char * c2, int rl)
+int str_match_count(char * c1, char * c2, int rl, int th)
 {
 	int i,ret =0;
 	for (i=0; i<rl;i++)
-		ret += (c1[i]==c2[i]);
-	return ret;
+	{
+		ret += (c1[i]!=c2[i]);
+		if(ret > th) return 0;
+	}
+	return rl-ret;
 }
 
 void scan_test_match(char * read, char * read_rev, char * chro, int rl, unsigned int pos)
 {
-	int m = str_match_count(read, chro, rl);
-	int mr = str_match_count(read_rev, chro, rl);
 	int threshold = (int)(MIN_REPORTING_RATIO * rl - 0.001);
+	int m = str_match_count(read, chro, rl, rl- threshold);
+	int mr = str_match_count(read_rev, chro, rl,rl- threshold);
 	if (m>=threshold)
 	{
 		SUBREADprintf("\nFound on positive strand (%0.2f%%): ", m*100./rl);
@@ -114,6 +131,12 @@ void full_scan_read(char * index_name, char * read_str)
 
 		for(; current_pos + read_len < index.start_point + index.length ; current_pos++)
 		{
+			if(only_chro){
+				char * chro_name;
+				int chro_pos;
+				locate_gene_position(current_pos, &_global_offsets, &chro_name, &chro_pos);
+				if(strcmp(chro_name, only_chro)!=0)continue;
+			}
 			scan_test_match(read_str, read_rev_str, chro_str, read_len, current_pos);
 			char nch = gvindex_get(&index, current_pos + read_len);
 			int i;
@@ -121,7 +144,7 @@ void full_scan_read(char * index_name, char * read_str)
 				chro_str[i]= chro_str[i+1];
 			chro_str[read_len-1] = nch;
 			if (current_pos % 1000000 == 0)
-				print_text_scrolling_bar("Scan:", current_pos*1./SCAN_TOTAL_BASES, 80, &ic);
+				SUBREADprintf("   %u bases finished\n", current_pos);
 		}
 		tabno +=1;
 	}
@@ -139,7 +162,7 @@ int main (int argc , char ** argv)
 
 	index_name[0]=0;
 
-	while ((c = getopt (argc, argv, "i:m:?")) != -1)
+	while ((c = getopt (argc, argv, "i:m:c:?")) != -1)
 		switch(c)
 		{
 			case 'i':
@@ -147,6 +170,9 @@ int main (int argc , char ** argv)
 				break;
 			case 'm':
 				MIN_REPORTING_RATIO = atof(optarg);
+				break;
+			case 'c':
+				only_chro = optarg;
 				break;
 			case '?':
 				return -1 ;
@@ -167,18 +193,19 @@ int main (int argc , char ** argv)
 
 	load_offsets (&_global_offsets, index_name);
 	SUBREADprintf ("Reporting threshold=%0.2f%%\n", MIN_REPORTING_RATIO*100);
-	for(i=0;i<_global_offsets.total_offsets;i++)
+
+	/*
+	for(i=0;i<1000;i++)
 	{
-		if (!_global_offsets.read_offsets[i])break;
-		SCAN_TOTAL_BASES = _global_offsets.read_offsets[i];
-	}
+		if (!_global_offsets.read_offset[i])break;
+		SCAN_TOTAL_BASES = _global_offsets.read_offset[i];
+	}*/
 	SUBREADprintf ("All bases =%u\n", SCAN_TOTAL_BASES);
 	SUBREADprintf ("Scanning the full index for %s...\n\n", read_str);
 
 	full_scan_read(index_name, read_str);
 
 	SUBREADprintf ("\nFinished.\n");
-	destroy_offsets(&_global_offsets);
 
 	return 0;
 }

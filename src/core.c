@@ -1187,10 +1187,6 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 	is_r_OK = (current_result -> mapping_result -> result_flags & CORE_IS_FULLY_EXPLAINED) > 0;
 
-	if(is_r_OK)
-		if((current_result -> mapping_result ->  result_flags & CORE_IS_BREAKEVEN) && !global_context -> config.report_multi_mapping_reads)
-			is_r_OK = 0;
-
 	if(0 && FIXLENstrcmp("V0112_0155:7:1101:5279:29143#ATCACG", read_name) == 0)
 		SUBREADprintf("%s  R_%d CPOINT1 : is_OK=%d\n", read_name , is_second_read + 1 , is_r_OK);
 
@@ -1205,9 +1201,13 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		r->is_first_section_jumpped = is_first_section_jumped;
 		r->linear_position = current_result -> first_base_position;
-		r->mapping_quality = current_result -> final_quality;
-		if(current_result -> mapping_result -> result_flags & CORE_IS_BREAKEVEN)
-			r ->mapping_quality = 0;
+		//r->mapping_quality = current_result -> final_quality;
+		r->mapping_quality = 40;	// changed on 10-JUN-2016
+		if(current_result -> realign_flags & CORE_IS_BREAKEVEN)
+			r -> mapping_quality = 0;
+		else
+			r -> mapping_quality /= current_result->locations_for_second_step;
+		//SUBREADprintf("REP=%d\n", current_result->locations_for_second_step);
 
 		strcpy(r->cigar, r -> current_cigar_decompress);
 		r->strand = (current_result -> mapping_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
@@ -1219,7 +1219,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		if(global_context -> config.do_fusion_detection)
 		{			
-			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped, r->current_cigar_decompress, r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens);
+			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped, r->current_cigar_decompress, r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens, read_name);
 
 			if(chimeric_sections > 0){
 				int xk1;
@@ -2543,6 +2543,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 		//memset(final_MATCH_buffer, 0, sizeof(int) * 2 * global_context -> config.multi_best_reads);
 		//memset(final_MISMATCH_buffer, 0, sizeof(int) * 2 * global_context -> config.multi_best_reads);
 		int r1_candidate_locations = 0, r2_candidate_locations = 0;
+		int r1_step2_locations = 0, r2_step2_locations = 0;
 
 		clear_repeated_buffer(global_context, repeated_buffer_pos, repeated_buffer_cigars, &repeated_count);
 		for (is_second_read = 0; is_second_read < 1 + global_context -> input_reads.is_paired_end_reads; is_second_read ++)
@@ -2593,6 +2594,14 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				}
 
 				current_result -> result_flags &= ~CORE_IS_FULLY_EXPLAINED;
+
+
+				if(is_second_read) r2_step2_locations = best_read_id + 1;
+				else r1_step2_locations = best_read_id + 1;
+
+				if(0 && FIXLENstrcmp("V0112_0155:7:1101:7921:2517#ACTTGA", read_name_1)==0){
+					SUBREADprintf("R1 N2=%d, R2 N2=%d, R%d : pos=%u\n", r1_step2_locations, r2_step2_locations, is_second_read+1, current_result->selected_position);
+				}
 
 				unsigned int final_alignments = explain_read(global_context, thread_context , final_realignments + (is_second_read + 2 * best_read_id) * MAX_ALIGNMENT_PER_ANCHOR,
 							   current_read_number, current_rlen, current_read_name, current_read, current_qual, is_second_read, best_read_id, is_negative_strand);
@@ -2682,6 +2691,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 					}
 
 					if(highest_score_occurence<2 ||  global_context -> config.report_multi_mapping_reads){
+						int is_break_even = 0;
+						if(highest_score_occurence>1)	is_break_even = 1;
 
 						highest_score_occurence = min(highest_score_occurence, global_context -> config.reported_multi_best_reads);
 						for(read_record_i = 0; read_record_i <  current_candidate_locations ; read_record_i++){
@@ -2694,6 +2705,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								strcpy(qual_text_1, raw_qual_text_1);
 								strcpy(qual_text_2, raw_qual_text_2);
 
+								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
+								current_realignment_result -> locations_for_second_step = is_second_read?r2_step2_locations:r1_step2_locations;
 
 								//if(161430 <= current_read_number) SUBREADprintf("ALL_SE=%d, THIS_HIT=%d\n", highest_score_occurence, output_cursor);
 								//if(161436 == current_read_number)SUBREADprintf("DOUBLE_ADD_SE for %d (%p): %u      %d/%d, BEST=%d\n", scores_array[read_record_i] , current_realignment_result, current_read_number, output_cursor , highest_score_occurence, best_score_highest);
@@ -2793,6 +2806,10 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			//SUBREADprintf("Highest score = %llu, Occurance = %d\n", highest_score , highest_score_occurence);
 			// Then, copy the (R1, R2) that have the highest score into the align_res buffer.
 			if(highest_score_occurence <= 1 || global_context -> config.report_multi_mapping_reads){
+
+				int is_break_even = 0;
+				if(highest_score_occurence>1)is_break_even = 1;
+
 				highest_score_occurence = min(highest_score_occurence, global_context -> config.reported_multi_best_reads);
 				for(r1_best_id = 0; r1_best_id < r1_candidate_locations; r1_best_id ++)
 				{
@@ -2814,7 +2831,15 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								strcpy(qual_text_1, raw_qual_text_1);
 								strcpy(qual_text_2, raw_qual_text_2);
 
-								//if(161436 == current_read_number)SUBREADprintf("DOUBLE_ADD_PE: %u      %d/%d\n", current_read_number, output_cursor , highest_score_occurence);
+								if(is_break_even){
+									r1_realign -> realign_flags |= CORE_IS_BREAKEVEN;
+									r2_realign -> realign_flags |= CORE_IS_BREAKEVEN;
+								}
+
+								r1_realign -> locations_for_second_step = r1_step2_locations;
+								r2_realign -> locations_for_second_step = r2_step2_locations;
+
+								//SUBREADprintf("R1R2_Rep = %d,%d\n", r1_step2_locations,r2_step2_locations);
 								write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, r1_realign, r2_realign, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
 								output_cursor ++;
 						}
@@ -3068,7 +3093,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			{
 
 				//SUBREADprintf("P%d %llu %s\n", is_reversed, current_read_number, read_name_1);
-				if(0 && FIXLENstrcmp("R003577537", read_name_1) ==0 ) {
+				if(0 && FIXLENstrcmp("V0112_0155:7:1101:7921:2517#ACTTGA", read_name_1) ==0 ) {
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
@@ -4134,7 +4159,7 @@ void absoffset_to_posstr(global_context_t * global_context, unsigned int pos, ch
 	sprintf(res, "%s:%u", ch, off);
 }
 
-int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * perfect_lens)
+int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos, int is_first_section_negative_strand, int is_first_section_reversed, char * in_cigar, unsigned int * out_poses, char ** out_cigars, char * out_strands, int read_len, short * perfect_lens, char * read_name)
 {
 	unsigned int current_perfect_map_start = sel_pos;
 	int current_perfect_section_no = 0;
@@ -4204,15 +4229,22 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 				assert(new_chr);
 				is_chro_jump = (curr_chr != new_chr);
 
-				long long int dist = current_perfect_cursor;
-				dist -= jummped_location;
+				long long int dist = (long long int)current_perfect_cursor;
+				dist -= (long long int)jummped_location;
 				if(abs(dist) >= global_context -> config.maximum_intron_length)
 					is_long_jump = 1;
+
+			//#warning ">>>>>> COMMENT WHEN RELEASE <<<<<<"
+			if(0 && FIXLENstrcmp("R000000007", read_name)==0)
+				SUBREADprintf("dist=%lld, abs=%lld, %u, %u\n",dist,abs(dist), current_perfect_cursor, jummped_location);
 				// A long jump is the jump longer than 2^27.
 				// Picard does not like it!!
 			}
 
 			// is_long_jump is true only if the two sections are on different chromosomes.
+			//#warning ">>>>>> COMMENT WHEN RELEASE <<<<<<"
+			if(0 && FIXLENstrcmp("R000000007", read_name)==0)
+				SUBREADprintf("CHR_JMP=%d, NCCH=%c, LONG_JMP=%d\n", is_chro_jump, ncch, is_long_jump);
 			if(is_chro_jump || islower(ncch) || ncch == 'B' || is_long_jump)
 			{
 				current_perfect_cursor = jummped_location;
