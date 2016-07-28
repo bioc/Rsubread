@@ -5,7 +5,7 @@
 \description{Subread and Subjunc perform local and global alignments respectively. The seed-and-vote paradigm enables efficient and accurate alignments to be carried out.}
 \usage{
 align(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",
-output_file=paste(readfile1,"subread",output_format,sep="."),nsubreads=10,
+output_file=paste(as.character(readfile1),"subread",output_format,sep="."),nsubreads=10,
 TH1=3,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,
 unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",
 nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,
@@ -13,7 +13,7 @@ DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,
 detectSV=FALSE)
 
 subjunc(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",
-output_file=paste(readfile1,"subjunc",output_format,sep="."),nsubreads=14,
+output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),nsubreads=14,
 TH1=1,TH2=1,maxMismatches=3,nthreads=1,indels=5,complexIndels=FALSE,phredOffset=33,
 unique=TRUE,nBestLocations=1,minFragLength=50,maxFragLength=600,PE_orientation="fr",
 nTrim5=0,nTrim3=0,readGroupID=NULL,readGroup=NULL,color2base=FALSE,

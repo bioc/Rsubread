@@ -1,3 +1,6 @@
+28 July 2016 - 1.22.3
+(1) Coerce 'readfile1','readfile2' and 'output_file' parameters in align and subjunc functions to be of character type.
+
 9 June 2016 - 1.22.2
 (1) Incorporate further changes from Subread 1.5.0-p3.
 
