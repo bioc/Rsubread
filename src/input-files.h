@@ -145,6 +145,7 @@ typedef struct {
 	unsigned int BAM_l_text;
 	unsigned int BAM_n_ref;
 	int is_unsorted_notified;
+	int is_incomplete_BAM;
 
 	void (* reset_output_function) (void * pairer);
 	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
@@ -307,4 +308,5 @@ int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_thre
 void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
 int SAM_pairer_warning_file_open_limit();
+void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 #endif

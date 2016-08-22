@@ -156,7 +156,8 @@ double fisher_exact_test(int a, int b, int c, int d)
 
 	if(1){
 		double ret = fast_fisher_test_one_side(a,b,c,d, precalculated_factorial, PRECALCULATE_FACTORIAL);
-		//SUBREADprintf("FISHER_RES %d %d %d %d %.9f %.9f\n", a,b,c,d, ret, log(ret));
+		//#warning ">>>>>> FOR ACCURACY MEASUREMENT ONLY <<<<<<<<"
+		//SUBREADprintf("FISHER_RES %d %d %d %d %.19G %.19G\n", a,b,c,d, ret, log(ret));
 		return ret;
 	}else{
 		int AA=a, BB=b, CC=c, DD=d;
@@ -1733,6 +1734,11 @@ int main_snp_calling_test(int argc,char ** argv)
 				print_usage_snp(argv[0]);
 				return -1;
 		}
+	}
+
+	if(argc > optind){
+		SUBREADprintf("Invalid parameter '%s'\n", argv[optind]);
+		return -1;
 	}
 
 	if(out_BED_file[0]==0 || in_FASTA_file[0]==0 || (parameters.pile_file_name [0] == 0 && in_SAM_file[0]==0))

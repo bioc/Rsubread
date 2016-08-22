@@ -372,7 +372,7 @@ typedef struct{
 	short realign_flags;
 	short final_quality;
 	short chromosomal_length;
-	short locations_for_second_step;
+	short MAPQ_adjustment;
 } realignment_result_t;
 
 #define BUCKETED_TABLE_INIT_ITEMS 3
@@ -637,5 +637,6 @@ int FIXLENstrcmp(char * fixed_len, char * rname);
 
 int is_valid_digit(char * optarg, char * optname);
 int is_valid_digit_range(char * optarg, char * optname, int min, int max_inc);
+int is_valid_float(char * optarg, char * optname);
 int exec_cmd(char * cmd, char * outstr, int out_limit);
 #endif

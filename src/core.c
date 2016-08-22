@@ -63,6 +63,25 @@ void core_version_number(char * program)
 	SUBREADprintf("\n%s v%s\n\n" , program, SUBREAD_VERSION);
 }
 
+int is_valid_float(char * optarg, char * optname){
+	int xk1=0;
+	while(1){
+		int nch = optarg[xk1++];
+		if(!nch){
+			if(xk1 == 1){
+				SUBREADprintf("Value for argumant %s-%s is missing.\n", optname[1]?"-":"", optname);
+				return 0;
+			}
+			break;
+		}
+		if(( nch!='-' || xk1 > 1 ) && nch != '.' && !isdigit(nch)){
+			SUBREADprintf("Value for argumant %s-%s is not a valid number: '%s'\n", optname[1]?"-":"", optname, optarg);
+			return 0;
+		}
+	}
+	return 1;
+}
+
 int is_valid_digit(char * optarg, char * optname){
 	int xk1=0;
 	while(1){
@@ -1206,8 +1225,8 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 		if(current_result -> realign_flags & CORE_IS_BREAKEVEN)
 			r -> mapping_quality = 0;
 		else
-			r -> mapping_quality /= current_result->locations_for_second_step;
-		//SUBREADprintf("REP=%d\n", current_result->locations_for_second_step);
+			r -> mapping_quality /= current_result->MAPQ_adjustment;
+		//SUBREADprintf("REP=%d\n", current_result->MAPQ_adjustment);
 
 		strcpy(r->cigar, r -> current_cigar_decompress);
 		r->strand = (current_result -> mapping_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
@@ -2706,7 +2725,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								strcpy(qual_text_2, raw_qual_text_2);
 
 								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
-								current_realignment_result -> locations_for_second_step = is_second_read?r2_step2_locations:r1_step2_locations;
+								current_realignment_result -> MAPQ_adjustment = current_MISMATCH_buffer [read_record_i] + ( is_second_read?(r2_step2_locations): (r1_step2_locations));
 
 								//if(161430 <= current_read_number) SUBREADprintf("ALL_SE=%d, THIS_HIT=%d\n", highest_score_occurence, output_cursor);
 								//if(161436 == current_read_number)SUBREADprintf("DOUBLE_ADD_SE for %d (%p): %u      %d/%d, BEST=%d\n", scores_array[read_record_i] , current_realignment_result, current_read_number, output_cursor , highest_score_occurence, best_score_highest);
@@ -2836,8 +2855,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 									r2_realign -> realign_flags |= CORE_IS_BREAKEVEN;
 								}
 
-								r1_realign -> locations_for_second_step = r1_step2_locations;
-								r2_realign -> locations_for_second_step = r2_step2_locations;
+								r1_realign -> MAPQ_adjustment = r1_step2_locations + final_MISMATCH_buffer1[r1_best_id];
+								r2_realign -> MAPQ_adjustment = r2_step2_locations + final_MISMATCH_buffer2[r2_best_id];
 
 								//SUBREADprintf("R1R2_Rep = %d,%d\n", r1_step2_locations,r2_step2_locations);
 								write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, r1_realign, r2_realign, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
@@ -3093,6 +3112,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			{
 
 				//SUBREADprintf("P%d %llu %s\n", is_reversed, current_read_number, read_name_1);
+				//#warning ">>>>>>> DISABLE THE FOLLOING BLOCK <<<<<<"
 				if(0 && FIXLENstrcmp("V0112_0155:7:1101:7921:2517#ACTTGA", read_name_1) ==0 ) {
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
@@ -4163,7 +4183,7 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 {
 	unsigned int current_perfect_map_start = sel_pos;
 	int current_perfect_section_no = 0;
-	int current_perfect_cursor = sel_pos;
+	unsigned int current_perfect_cursor = sel_pos;
 	int is_reversed = is_first_section_reversed;
 	int is_negative = is_first_section_negative_strand;
 	int read_cursor = 0;

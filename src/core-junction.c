@@ -2012,7 +2012,7 @@ int find_donor_receptor(global_context_t * global_context, thread_context_t * th
 		char out1pos[100];
 		absoffset_to_posstr(global_context, search_in_chro_start, out1pos);
 
-		if(1 || FIXLENstrcmp("chr14:105",out1pos)==0){
+		if(0 && FIXLENstrcmp("chr14:105",out1pos)==0){
 			SUBREADprintf("POS=%s\t\tINS=%d\t\t%s\n", out1pos, best_insertion_in_between, rname);
 			SUBREADprintf("R= %s\nS1=%s%s\nS2=%s%s\n   %s|%s|\n\n", rtext, sp1s, chro_bases_startside, sp1s, chro_bases_endside, spE, spBB);
 		}

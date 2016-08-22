@@ -1447,10 +1447,11 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 
 			if(first_correct_base < last_correct_base || first_correct_base > last_correct_base + 3000)
 				SUBREADprintf("WRONG ORDER: F=%u, L=%d\n", first_correct_base , last_correct_base);
-			//int last_second_part_base = find_subread_end(read_len, global_context->config.total_subreads , next_correct_subread_last) ;
-			if(0 && FIXLENstrcmp("DB7DT8Q1:236:C2NGTACXX:2:1213:17842:64278", read_name) == 0)
+
+			//#warning ">>>>>>> COMMENT NEXT BLOCK IN RELEASE <<<<<<<<"
+			if(0 && FIXLENstrcmp("D00491:277:C89FUANXX:7:1110:20418:31541", read_name) == 0)
 			//if(current_result->selected_position > 433897 - 100 && current_result->selected_position < 433897)
-				SUBREADprintf("INDEL_P03: I=%d; INDELS=%d; POS=%u; COVER=%d -- %d\n", i, indels, current_result->selected_position, last_correct_subread, next_correct_subread);
+				SUBREADprintf("INDEL_P03: I=%d; INDELS=%d; POS=%u; COVER=%d -- %d (vote_no : %d - %d)\n", i, indels, current_result->selected_position, last_correct_base, first_correct_base, last_correct_subread, next_correct_subread);
 
 			if(global_context -> config.use_dynamic_programming_indel || read_len > EXON_LONG_READ_LENGTH)
 			{
@@ -1467,7 +1468,8 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 				movement_buffer[dyna_steps]=0;
 
 
-				if(0 && FIXLENstrcmp("DB7DT8Q1:236:C2NGTACXX:2:1213:17842:64278", read_name) == 0)
+				//#warning ">>>>>>> COMMENT NEXT BLOCK IN RELEASE <<<<<<<<"
+				if(0 && FIXLENstrcmp("D00491:277:C89FUANXX:7:1110:20418:31541", read_name) == 0)
 				{
 					SUBREADprintf("IR= %d  %d~%d\n", dyna_steps, last_correct_base, first_correct_base);
 
@@ -1518,20 +1520,26 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 
 								// let's test if it is ambiguous:
 								gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
-								int ambiguous_i, ambiguous_count=0;
-								int best_matched_bases = match_chro(read_text + cursor_on_read - 6, current_value_index, indel_left_boundary - 6, 6, 0, global_context->config.space_type)  +
-											 match_chro(read_text + cursor_on_read - min(current_indel_len,0), current_value_index, indel_left_boundary + max(0, current_indel_len), 6, 0, global_context->config.space_type);
-								for(ambiguous_i=-5; ambiguous_i<=5; ambiguous_i++)
-								{
-									int left_match = match_chro(read_text + cursor_on_read - 6, current_value_index, indel_left_boundary - 6, 6+ambiguous_i, 0, global_context->config.space_type);
-									int right_match = match_chro(read_text + cursor_on_read + ambiguous_i - min(current_indel_len,0), current_value_index, indel_left_boundary + ambiguous_i + max(0, current_indel_len), 6-ambiguous_i, 0,global_context->config.space_type);
-									if(left_match+right_match == best_matched_bases) ambiguous_count ++;
+
+								//#warning ">>>>>>> COMMENT NEXT BLOCK IN RELEASE <<<<<<<<"
+								if(0 && FIXLENstrcmp("D00491:277:C89FUANXX:7:1110:20418:31541",read_name ) == 0){
+									SUBREADprintf("INDEL_DDADD: abs(I=%d); INDELS=%d; PN=%d; LOC=%ul READ_CUR=%d\n",i, current_indel_len, pair_number, indel_left_boundary-1, cursor_on_read);
 								}
 
-								//#warning "=========== COMMENT THIS LINE ==============="
 
-								if(0 && FIXLENstrcmp("DB7DT8Q1:236:C2NGTACXX:2:1213:17842:64278", read_name) == 0)
-									SUBREADprintf("INDEL_DDADD: abs(I=%d); INDELS=%d; PN=%d; LOC=%u\n",i, current_indel_len, pair_number, indel_left_boundary-1);
+								int ambiguous_count=0;
+								//#warning " >>>>>>>> MAKE SURE DISABLING THE NEXT BLOCK IS HARMLESS <<<<<<<<<  "
+								if(0){
+									int ambiguous_i, best_matched_bases = match_chro(read_text + cursor_on_read - 6, current_value_index, indel_left_boundary - 6, 6, 0, global_context->config.space_type)  +
+												 match_chro(read_text + cursor_on_read - min(current_indel_len,0), current_value_index, indel_left_boundary + max(0, current_indel_len), 6, 0, global_context->config.space_type);
+									for(ambiguous_i=-5; ambiguous_i<=5; ambiguous_i++)
+									{
+										int left_match = match_chro(read_text + cursor_on_read - 6, current_value_index, indel_left_boundary - 6, 6+ambiguous_i, 0, global_context->config.space_type);
+										int right_match = match_chro(read_text + cursor_on_read + ambiguous_i - min(current_indel_len,0), current_value_index, indel_left_boundary + ambiguous_i + max(0, current_indel_len), 6-ambiguous_i, 0,global_context->config.space_type);
+										if(left_match+right_match == best_matched_bases) ambiguous_count ++;
+									}
+								}
+
 								if(abs(current_indel_len)<=global_context -> config.max_indel_length)
 								{
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0);

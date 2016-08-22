@@ -888,9 +888,12 @@ int match_chro(char * read, gene_value_index_t * index, unsigned int pos, int te
 					case 'C':
 						ret += tt==2;
 						break;
+					case 0:
+						//SUBREADprintf("NON-ATGC-CHAR:%d\n", tv);
+						//assert(0);
+						break;
 					default:
 						ret += tt==3;
-						break;
 
 				}
 				offset_bit+=2;

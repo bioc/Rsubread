@@ -499,6 +499,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 		}
 	}
 
+	if(argc > optind){
+		SUBREADprintf("Invalid parameter '%s'\n", argv[optind]);
+		return -1;
+	}
+
 	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
 	if(global_context->config.more_accurate_fusions)
 	{

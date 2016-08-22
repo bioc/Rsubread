@@ -61,6 +61,20 @@ void fastq_64_to_33(char * qs)
 		qs[i++] -= 31;
 }
 
+void * delay_run(void * ptr){
+	usleep(100000);
+	free(ptr);
+	return NULL;
+}
+
+void * delay_realloc(void * old_pntr, size_t old_size, size_t new_size){
+	pthread_t thread;
+	void * new_ret = malloc(new_size);
+	memcpy(new_ret, old_pntr, old_size);
+	pthread_create(&thread, NULL, delay_run, old_pntr);
+	return new_ret;
+}
+
 double guess_reads_density(char * fname, int is_sam)
 {
 	return guess_reads_density_format(fname, is_sam, NULL, NULL, NULL);
@@ -1268,7 +1282,7 @@ void fix_cigar_SAM14(char * cig){
 }
 
 //This function returns 0 if the line is a mapped read; -1 if the line is in a wrong format and 1 if the read is unmapped.
-int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, unsigned int * pair_dist, char * sequence , char * quality_string, int * rl, int * repeated)
+int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, unsigned int * pos, char * cigar, int * mapping_quality, unsigned int * pair_dist, char * sequence, char * quality_string, int * rl, int * repeated)
 {
 	char cc;
 	int ci = 0, k=0, field=0, ret_quality = 0, ret_flag = 0, ret_pairdist=0;
@@ -1822,7 +1836,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 
 
 			//SUBREADprintf("ARRI_0=%p ; OFFS=%p ; EVT=%p\n%s\n",array_index, offsets, event_table, line_buffer);
-			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, &pairdist, sequence , quality_string, &rl, &repeated);
+			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, &pairdist, sequence, quality_string, &rl, &repeated);
 			//SUBREADprintf("ARRI_2=%p ; OFFS=%p ; EVT=%p\n",array_index, offsets, event_table);
 
 			if(strlen(quality_string)<2)
@@ -1910,7 +1924,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 								}
 //								printf("INST: RL=%d; INSL=%d; READ_CUR=%d; IGNORE=%d\n", rl, insert_length, read_cursor , base_ignored_head_tail);
 
-								if(need_write && insert_length >= 5)
+								if(need_write && insert_length >= 5 && sequence[0]!='*')
 								{
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
@@ -1947,7 +1961,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 						// the left edge ( last WANTED base ) is chromosome_cursor-1
 						// the indel length is -tmpv;
 						// now we add this into the event table.
-						if(event_table)
+						if(event_table &&  sequence[0]!='*')
 							add_cigar_indel_event(event_table, chro, chromosome_cursor-1, -tmpv, sequence + read_cursor);
 						read_cursor += tmpv;
 						tmpv = 0;
@@ -2161,6 +2175,8 @@ void delete_with_prefix(char * prefix){
 			strcpy(del_suffix , prefix);
 		}
 	
+		//#warning ">>>>>>>> COMMENT THIS OUT <<<<<<<<<<<<<<<<<<<<<"
+		//SUBREADprintf("SCANDEL: %s, PREFIX %s, SUFFIX %s\n", del2, prefix, del_suffix);
 		if(strlen(del_suffix)>8)
 		{
 			DIR           *d;
@@ -2173,11 +2189,13 @@ void delete_with_prefix(char * prefix){
 				{
 					if(strstr(dir->d_name, del_suffix))
 					{
-						//SUBREADprintf("DEL:%s\n", dir->d_name);
 						strcpy(del_name, del2);
 						strcat(del_name, "/");
 						strcat(del_name, dir->d_name);
 						unlink(del_name);
+
+			//			#warning ">>>>>>>> COMMENT THIS OUT <<<<<<<<<<<<<<<<<<<<<"
+			//			SUBREADprintf("DEL: %s\n", del_name);
 						//test fix
 					}
 				}
@@ -2392,11 +2410,11 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 
 	pairer -> appendix1 = appendix1;
 
-	_REPAIRER_delete_temp_prefix = tmp_path;
 	old_sig_TERM = signal (SIGTERM, REPAIR_SIGINT_hook);
 	old_sig_INT = signal (SIGINT, REPAIR_SIGINT_hook);
 	
 	strcpy(pairer -> tmp_file_prefix, tmp_path);
+	_REPAIRER_delete_temp_prefix = pairer -> tmp_file_prefix;
 	pairer -> threads = malloc(all_threads * sizeof(SAM_pairer_thread_t));
 	memset(pairer -> threads, 0, all_threads * sizeof(SAM_pairer_thread_t));
 
@@ -2481,7 +2499,9 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 	unsigned char gz_header_12 [12];
 	//SUBREADprintf("STAT GZ  POS=%llu\n", ftello(fp));
 	int read_len = fread(gz_header_12, 1, 12, fp );
-	if(read_len < 12) return -1;
+	if(read_len < 12){
+		return -1;
+	}
 	if(gz_header_12[0]!=31 || gz_header_12[1]!=139){
 		SUBREADprintf("Unrecognized Gzip headers: %u, %u\nPlease make sure if the input file is in the BAM format.\n", gz_header_12[0], gz_header_12[1]);
 		return -1;
@@ -2569,26 +2589,31 @@ void SAM_pairer_fill_BIN_buff(SAM_pairer_context_t * pairer ,  SAM_pairer_thread
 	// For SAM files: must be the full lines.
 	int current_buffer_used = 0;
 	int current_blocks = 0;
+	int last_read_len = -1, this_size;
 	if(pairer -> input_is_BAM){
 		while(1){
-			if(feof(pairer -> input_fp)){
+			if( feof(pairer -> input_fp)){
 				*is_finished = 1;
 				break;
 			}
 			if(pairer -> input_buff_SBAM_size - current_buffer_used < MIN_BAM_BLOCK_SIZE) {
 				break;
 			}
-			int this_size = 0;
-
 			this_size = SAM_pairer_read_BAM_block( pairer -> input_fp , pairer -> input_buff_SBAM_size - current_buffer_used , thread_context -> input_buff_SBAM + current_buffer_used);
 
 			current_blocks ++;
 			if(this_size >= 0) {
 				current_buffer_used += this_size;
 			} else {
+				if(feof(pairer -> input_fp) && last_read_len != -1 ){
+					pairer -> is_bad_format |= (last_read_len > 2);
+					pairer -> is_incomplete_BAM |= (last_read_len > 2);
+					//SUBREADprintf("BAM-FINISHED, CORRECT=%d (%d)\n", !pairer -> is_bad_format, last_read_len);
+				}
 				*is_finished = 1;
 				break;
 			}
+			last_read_len = this_size;
 		}
 	}else{
 		current_buffer_used = SAM_pairer_read_SAM_MB(pairer -> input_fp , pairer -> input_buff_SBAM_size , thread_context -> input_buff_SBAM);
@@ -2908,8 +2933,9 @@ int online_register_contig(SAM_pairer_context_t * pairer , SAM_pairer_thread_t *
 	if(refId < 0){
 		refId = pairer->sam_contig_number_table->numOfElements;
 		pairer -> output_header(pairer, thread_context -> thread_id, 0, 1 , header_sec , 8+reflen);
-		char * mem_ref = malloc(reflen);
+		char * mem_ref = malloc(reflen+1);
 		memcpy(mem_ref, ref, reflen);
+		mem_ref[reflen]=0;
 		HashTablePut(pairer->sam_contig_number_table, mem_ref, NULL + refId + 1);
 	}
 	subread_lock_release(&pairer -> output_header_lock);
@@ -4932,7 +4958,7 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 
 	}else for(corrected_run = 0; corrected_run < 2  ; corrected_run ++){
 		SAM_pairer_run_once(pairer);
-		if(pairer -> is_bad_format && pairer->input_is_BAM){
+		if(pairer -> is_bad_format && pairer->input_is_BAM && ! pairer -> is_incomplete_BAM){
 			//#warning ">>>>>> REMOVE '+ 1' FROM NEXT LINE IN RELEASE <<<<<<"
 			assert(1 != corrected_run);
 			//#warning ">>>>>> COMMENT NEXT LINE IN RELEASE <<<<<<"
@@ -4946,7 +4972,7 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 		}else break;
 	}
 
-	return 0;
+	return pairer -> is_bad_format;
 }
 
 int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_path)

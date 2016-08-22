@@ -62,26 +62,26 @@ int mergeIntervals(unsigned int * intervals, unsigned int * result_ints, int nin
 	stack_buffer_mem[stock_pointer*2+1] = intervals[1];
 	stock_pointer++;
  
-    for (ii = 1 ; ii < nints; ii++)
-    {
+	for (ii = 1 ; ii < nints; ii++)
+	{
 		//int top_start = stack_buffer_mem[stock_pointer*2-2];
 		int top_stop = stack_buffer_mem[stock_pointer*2-1];
  
-        if (top_stop < intervals[ii*2])
-        {
+		if (top_stop < intervals[ii*2])
+		{
 			stack_buffer_mem[stock_pointer * 2] = intervals[ii*2];
 			stack_buffer_mem[stock_pointer * 2+1] = intervals[ii*2+1];
 			stock_pointer++;
-        }
-        else if (top_stop < intervals[ii*2+1])
-        {
-            top_stop = intervals[ii*2+1];
+		}
+		else if (top_stop < intervals[ii*2+1])
+		{
+			top_stop = intervals[ii*2+1];
 			stack_buffer_mem[stock_pointer*2-1] = top_stop;
-        }
+		}
 		// Otherwise the ii-th interval is useless because it is enclosed in the top item
-    }
+	}
  
-    return stock_pointer;
+	return stock_pointer;
 }
  
 #ifdef MAKE_TEST_INTERVL_MERGE
@@ -126,6 +126,6 @@ int main()
 	gaps = mergeIntervals(inbuff, outbuff, 6);
 	print_gaps(outbuff, gaps);
 
-    return 0;
+	return 0;
 }
 #endif
