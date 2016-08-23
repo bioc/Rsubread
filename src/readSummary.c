@@ -2987,10 +2987,13 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 
 		for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
 
-			//SUBREADprintf("Scoring Overlap %s = %d >=%d\n", read_name, scoring_overlappings[score_x1], applied_fragment_minimum_overlapping);
+			if(0 && FIXLENstrcmp("V0112_0155:7:1101:5387:6362", read_name)==0) SUBREADprintf("Scoring Overlap %s = %d >=%d, score=%d, exonid=%ld\n", read_name, scoring_overlappings[score_x1], applied_fragment_minimum_overlapping, scoring_numbers[score_x1], scoring_exon_ids[score_x1]);
 			//SUBREADprintf("RLTEST: %s %d\n", read_name, scoring_overlappings[score_x1]);
 			if( applied_fragment_minimum_overlapping > 1 )
-				if( applied_fragment_minimum_overlapping > scoring_overlappings[score_x1] ) continue;
+				if( applied_fragment_minimum_overlapping > scoring_overlappings[score_x1] ){
+					scoring_numbers[score_x1] = 0;
+					continue;
+				}
 			
 			if( maximum_score < scoring_numbers[score_x1] ){
 				maximum_total_count = 1;
@@ -3825,15 +3828,19 @@ void print_usage()
 	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
 
 	SUBREADputs("Usage: featureCounts [options] -a <annotation_file> -o <output_file> input_file1 [input_file2] ... \n");
-	SUBREADputs("Required arguments:");
-	SUBREADputs("");
-
-
-
-	SUBREADputs("# Annotation");
+	SUBREADputs("## Required arguments:");
 	SUBREADputs("");
 	SUBREADputs("  -a <string>         Name of an annotation file. GTF/GFF format by default.");
 	SUBREADputs("                      See -F option for more formats.");
+	SUBREADputs("");
+	SUBREADputs("  -o <string>         Name of the output file including read counts. A separate"); 
+	SUBREADputs("                      file including summary statistics of counting results is");
+	SUBREADputs("                      also included in the output (`<string>.summary')");
+	SUBREADputs("");
+	SUBREADputs("  input_file1 [input_file2] ...   A list of SAM or BAM format files.");
+	SUBREADputs("");
+	SUBREADputs("## Options");
+	SUBREADputs("# Annotation");
 	SUBREADputs("");
 	SUBREADputs("  -F <string>         Specify format of provided annotation file. Acceptable");
 	SUBREADputs("                      formats include `GTF/GFF' and `SAF'. `GTF/GFF' by default.");
@@ -3847,10 +3854,13 @@ void print_usage()
 	SUBREADputs("                      default. Meta-features used for read counting will be ");
 	SUBREADputs("                      extracted from annotation using the provided value.");
 	SUBREADputs("");
-	SUBREADputs("  -A <string>         Name of a comma delimited file including chromosome alias ");
-	SUBREADputs("                      names used to match chromosome names used in annotation ");
-	SUBREADputs("                      with those used in BAM/SAM input, if they are different. ");
-	SUBREADputs("                      See Users Guide for file format.");
+	SUBREADputs("  -A <string>         Provide a chromosome name alias file to match chr names in");
+	SUBREADputs("                      annotation with those in the reads. This should be a two-");
+	SUBREADputs("                      column comma-delimited text file. Its first column should");
+	SUBREADputs("                      include chr names in the annotation and its second column");
+	SUBREADputs("                      should include chr names in the reads. Chr names are case");
+	SUBREADputs("                      sensitive. No column header should be included in the");
+	SUBREADputs("                      file.");
 	SUBREADputs("");
 
 	SUBREADputs("# Level of summarization");
@@ -3864,16 +3874,21 @@ void print_usage()
 	SUBREADputs("  -O                  Assign reads to all their overlapping meta-features (or ");
 	SUBREADputs("                      features if -f is specified).");
 	SUBREADputs("");
-	SUBREADputs("  --minOverlap <int>  Specify minimum number of overlapping bases requried ");
-	SUBREADputs("                      between a read and a meta-feature/feature that the read ");
-	SUBREADputs("                      is assigned to. 1 by default.");
+	SUBREADputs("  --minOverlap <int>  Minimum number of overlapping bases in a read that is");
+	SUBREADputs("                      required for read assignment. 1 by default. Number of");
+	SUBREADputs("                      overlapping bases is counted from both reads if paired");
+	SUBREADputs("                      end. If a negative value is provided, then a gap of up");
+	SUBREADputs("                      to specified size will be allowed between read and the");
+	SUBREADputs("                      feature that the read is assigned to.");
+        SUBREADputs("");
+	SUBREADputs("  --fracOverlap <value> Minimum fraction of overlapping bases in a read that is");
+	SUBREADputs("                      required for read assignment. Value should be within range");
+	SUBREADputs("                      [0,1]. 0 by default. Number of overlapping bases is");
+	SUBREADputs("                      counted from both reads if paired end. Both this option");
+	SUBREADputs("                      and '--minOverlap' option need to be satisfied for read");
+	SUBREADputs("                      assignment.");
 	SUBREADputs("");
-	SUBREADputs("  --fracOverlap <value> Specify the minimum fraction of read bases required for");
-	SUBREADputs("                      assigning a read to the feature. Soft-clipped bases are");
-	SUBREADputs("                      counted. Hard-clipped bases are not counted. The value");
-	SUBREADputs("                      should be in the range of (0,1]. The default value is 0");
-	SUBREADputs("                      (note that at least 1 bp overlap will be required for read");
-	SUBREADputs("                      assignment).");
+	SUBREADputs("# Fractional counting");
 	SUBREADputs("");
 	SUBREADputs("  --largestOverlap    Assign reads to a meta-feature/feature that has the ");
 	SUBREADputs("                      largest number of overlapping bases.");
@@ -3896,12 +3911,19 @@ void print_usage()
 	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
 	SUBREADputs("");
-	SUBREADputs("  --fraction          Use a fractional count 1/n, instead of 1 (one) count, for ");
-	SUBREADputs("                      each reported alignment of a multi-mapping read in read ");
-	SUBREADputs("                      counting. n is total number of alignments reported for ");
-	SUBREADputs("                      the multi-mapping read. This option must be used together ");
-	SUBREADputs("                      with '-M' option.");
+	SUBREADputs("  --fraction          Assign fractional counts to features. This option must");
+	SUBREADputs("                      be used together with '-M' or '-O' or both. When '-M' is");
+	SUBREADputs("                      specified, each reported alignment from a multi-mapping");
+	SUBREADputs("                      read (identified via 'NH' tag) will carry a fractional");
+	SUBREADputs("                      count of 1/x, instead of 1 (one), where x is the total");
+	SUBREADputs("                      number of alignments reported for the same read. When '-O'");
+	SUBREADputs("                      is specified, each overlapping feature will receive a");
+	SUBREADputs("                      fractional count of 1/y, where y is the total number of");
+	SUBREADputs("                      features overlapping with the read. When both '-M' and");
+	SUBREADputs("                      '-O' are specified, each alignment will carry a fraction");
+	SUBREADputs("                      count of 1/(x*y).");
 	SUBREADputs("");
+	
 
 	SUBREADputs("# Read filtering");
 	SUBREADputs("");
@@ -3928,8 +3950,8 @@ void print_usage()
 
 	SUBREADputs("# Strandness");
 	SUBREADputs("");
-	SUBREADputs("  -s <int>            Perform strand-specific read counting. Possible values:  ");
-	SUBREADputs("                      0 (unstranded), 1 (stranded) and 2 (reversely stranded). ");
+	SUBREADputs("  -s <int>            Perform strand-specific read counting. Acceptable values:");
+	SUBREADputs("                      0 (unstranded), 1 (stranded) and 2 (reversely stranded).");
 	SUBREADputs("                      0 by default.");
 	SUBREADputs("");
 
@@ -3940,9 +3962,10 @@ void print_usage()
 	SUBREADputs("                      in the input (containing 'N' in CIGAR string). Counting");
 	SUBREADputs("                      results are saved to a file named '<output_file>.jcounts'");
 	SUBREADputs("");
-	SUBREADputs("  -G <string>         The Fasta file containing the reference genome used in");
-	SUBREADputs("                      generating the input SAM or BAM files. This argument is");
-	SUBREADputs("                      only needed when doing junction counting.");
+	SUBREADputs("  -G <string>         Provide the name of a FASTA-format file that contains the");
+	SUBREADputs("                      reference sequences used in read mapping that produced the");
+	SUBREADputs("                      provided SAM/BAM files. This optional argument can be used");
+	SUBREADputs("                      with '-J' option to improve read counting for junctions.");
 	SUBREADputs("");
 
 	SUBREADputs("# Parameters specific to paired end reads");
@@ -3970,9 +3993,11 @@ void print_usage()
 	SUBREADputs("                      other in the input.");
 	SUBREADputs("");
 
-	SUBREADputs("# Miscellaneous");
+	SUBREADputs("# Number of CPU threads");
 	SUBREADputs("");
 	SUBREADputs("  -T <int>            Number of the threads. 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("# Miscellaneous");
 	SUBREADputs("");
 	SUBREADputs("  -R                  Output detailed assignment result for each read. A text ");
 	SUBREADputs("                      file will be generated for each input file, including ");
@@ -3980,11 +4005,13 @@ void print_usage()
 	SUBREADputs("                      assigned to. See Users Guide for more details.");
 	SUBREADputs("");
 	SUBREADputs("  --tmpDir <string>   Directory under which intermediate files are saved (later");
-	SUBREADputs("                      removed).");
+	SUBREADputs("                      removed). By default, intermediate files will be saved to");
+	SUBREADputs("                      the directory specified in '-o' argument.");
 	SUBREADputs("");
-	SUBREADputs("  --maxMOp <int>      Maximum number of 'M' operations allowed in a CIGAR string");
-	SUBREADputs("                      . 10 by default. Both 'X' and '=' are treated as 'M' and");
-	SUBREADputs("                      adjacent 'M' operations are merged in the CIGAR string.");
+	SUBREADputs("  --maxMOp <int>      Maximum number of 'M' operations allowed in a CIGAR");
+	SUBREADputs("                      string. 10 by default. Both 'X' and '=' are treated as 'M'");
+	SUBREADputs("                      and adjacent 'M' operations are merged in the CIGAR");
+	SUBREADputs("                      string.");
 	SUBREADputs("");
 	SUBREADputs("  -v                  Output version of the program.");
 	SUBREADputs("");
@@ -4586,7 +4613,7 @@ int readSummary(int argc,char *argv[]){
 
 	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && (!isMultiOverlapAllowed) && global_context.use_fraction_multi_mapping)
 	{
-		SUBREADprintf("ERROR: '--fraction' option should be used together with '-M'.\nThis option should not be used when multi-mapping reads are disallowed or the primary mapping is only counted.\n");
+		SUBREADprintf("ERROR: '--fraction' option should be used together with '-M' or '-O'. Please change the parameters to allow multi-mapping reads and/or multi-overlapping features.\n");
 		return -1;
 	}
 	if( print_FC_configuration(&global_context, argv[1], argv[2], argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport) )
