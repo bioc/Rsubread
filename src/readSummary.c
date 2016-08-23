@@ -3888,8 +3888,6 @@ void print_usage()
 	SUBREADputs("                      and '--minOverlap' option need to be satisfied for read");
 	SUBREADputs("                      assignment.");
 	SUBREADputs("");
-	SUBREADputs("# Fractional counting");
-	SUBREADputs("");
 	SUBREADputs("  --largestOverlap    Assign reads to a meta-feature/feature that has the ");
 	SUBREADputs("                      largest number of overlapping bases.");
 	SUBREADputs("");
@@ -3910,6 +3908,8 @@ void print_usage()
 	SUBREADputs("                      mapping read, all its reported alignments will be ");
 	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
+	SUBREADputs("");
+	SUBREADputs("# Fractional counting");
 	SUBREADputs("");
 	SUBREADputs("  --fraction          Assign fractional counts to features. This option must");
 	SUBREADputs("                      be used together with '-M' or '-O' or both. When '-M' is");
