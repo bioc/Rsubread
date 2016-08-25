@@ -19,6 +19,7 @@ featureCounts(files,
 	# overlap between reads and features
 	allowMultiOverlap=FALSE,
 	minOverlap=1,
+	fracOverlap=0,
 	largestOverlap=FALSE,
 	readExtension5=0,
 	readExtension3=0,
@@ -26,6 +27,8 @@ featureCounts(files,
 	
 	# multi-mapping reads
 	countMultiMappingReads=FALSE,
+
+	# fractional counting
 	fraction=FALSE,
 
 	# read filtering
@@ -51,10 +54,13 @@ featureCounts(files,
 	countChimericFragments=TRUE,	
 	autosort=TRUE,
 	
-	# miscellaneous
+	# number of CPU threads
 	nthreads=1,
+
+	# miscellaneous
 	maxMOp=10,
-	reportReads=FALSE)
+	reportReads=FALSE,
+	tmpDir=".")
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
@@ -67,6 +73,7 @@ featureCounts(files,
   \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features using their values in the ``GeneID" column in the SAF-format annotation file or using the ``gene_id" attribute in the GTF-format annotation file, and reads will assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), numbers of overlapping bases from each read in the same pair will be summed. If a negative value is provided, the read will be extended from both ends. \code{1} by default.}
+  \item{fracOverlap}{ \code{numeric} giving minimum fraction of overlapping bases in a read that is required for read assignment. Value should be within range [0,1]. \code{0} by default. Number of overlapping bases is counted from both reads if paired end. Both this option and \code{minOverlap} option need to be satisfied for read assignment.}
   \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
   \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
@@ -91,6 +98,7 @@ featureCounts(files,
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{maxMOp}{ \code{integer} giving the maximum number of `M' operations (matches or mis-matches) allowed in a CIGAR string. \code{10} by default. Both `X' and `=' operations are treated as `M' and adjacent `M' operations are merged in the CIGAR string.}
   \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
+  \item{tmpDir}{ a character string specifying the directory under which intermediate files are saved (later removed). By default, current working directory is used.}
   }
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.

@@ -1,4 +1,4 @@
-featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,largestOverlap=FALSE,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,maxMOp=10,reportReads=FALSE)
+featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,largestOverlap=FALSE,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,maxMOp=10,reportReads=FALSE,tmpDir=".")
 {
 	flag <- FALSE
 
@@ -71,7 +71,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 
 	PE_orientation <- "fr"
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,sep=",")
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,as.numeric(reportReads),as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads_C),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 

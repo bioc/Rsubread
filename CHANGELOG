@@ -1,3 +1,8 @@
+24 Aug 2016 - 1.23.4
+(1) Incorporate changes from SF Subread 1.5.1.
+(2) New parameters in featureCounts: fracOverlap, tmpDir
+(3) Fractional counts can be generated for multi-overlapping reads. 
+
 28 July 2016 - 1.23.3
 (1) Coerce file name parameters in align and subjunc to be of character type.
 
