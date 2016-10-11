@@ -64,22 +64,22 @@ featureCounts(files,
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
-  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has four possible values including \code{mm10}, \code{mm9}, \code{hg38} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm10', `mm9', `hg38' and `hg19', respectively. \code{mm10} by default. The in-built annotation has a SAF format (see below).}
+  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has four possible values including \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm10"} by default. The in-built annotation has a SAF format (see below).}
   \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. See below for more details about SAF format annotation. \code{annot.ext} will override \code{annot.inbuilt} if they are both provided.}
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
-  \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{exon} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
-  \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{gene_id} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
-  \item{chrAliases}{ a character string giving the name of a file that contains aliases of chromosome names. The file should be a comma delimited text file that includes two columns. The first column gives the chromosome names used in the annotation and the second column gives the chromosome names used by reads. This file should not contain header lines. Names included in this file are case sensitive.}
-  \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features using their values in the ``GeneID" column in the SAF-format annotation file or using the ``gene_id" attribute in the GTF-format annotation file, and reads will assiged to the meta-features instead of the features. See below for more details.}
+  \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{"exon"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
+  \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{"gene_id"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}.}
+  \item{chrAliases}{ a character string giving the name of a chromosome name alias file. This should be a two-column comma-delimited text file. Chromosome name aliases included in this file are used to match chr names in annotation with those in the reads. First column in the file should include chr names in the annotation and second column should include chr names in the reads. Chr names are case sensitive. No column header should be included in the file.}
+  \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg. genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features, using their values in the \code{GeneID} column in the SAF-format annotation file or using the \code{GTF.attrType} attribute in the GTF-format annotation file, and then reads will be assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
-  \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), numbers of overlapping bases from each read in the same pair will be summed. If a negative value is provided, the read will be extended from both ends. \code{1} by default.}
-  \item{fracOverlap}{ \code{numeric} giving minimum fraction of overlapping bases in a read that is required for read assignment. Value should be within range [0,1]. \code{0} by default. Number of overlapping bases is counted from both reads if paired end. Both this option and \code{minOverlap} option need to be satisfied for read assignment.}
+  \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), number of overlapping bases from each read in the same pair will be summed. If a negative value is provided, then a gap of up to specified size will be allowed between read and the feature that the read is assigned to. \code{1} by default.}
+  \item{fracOverlap}{ \code{numeric} giving minimum fraction of overlapping bases in a read that is required for read assignment. Value should be within range [0,1]. \code{0} by default. Number of overlapping bases is counted from both reads if paired end. Both this option and \code{minOverlap} option need to be satisfied before a read can be assigned.}
   \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
   \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
   \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
   \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
-  \item{fraction}{ logical indicating if fractional counts will be produced for multi-mapping reads. If \code{TRUE}, a fractional count, 1/n, will be generated for each reported alignment of a multi-mapping read, where n is the total number of alignments reported for that read. \code{countMultiMappingReads} must be set to \code{TRUE} when \code{fraction} is \code{TRUE}.}
+  \item{fraction}{ logical indicating if fractional counts are produced for multi-mapping reads and/or multi-overlapping reads. \code{FALSE} by default. See below for more details.}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
   \item{splitOnly}{ logical indicating whether only split alignments (their CIGAR strings contain letter 'N') should be included for summarization. \code{FALSE} by default. Example split alignments are exon-spanning reads from RNA-seq data. \code{useMetaFeatures} should be set to \code{FALSE} and \code{allowMultiOverlap} should be set to \code{TRUE}, if the purpose of summarization is to assign exon-spanning reads to all their overlapping exons.}
   \item{nonSplitOnly}{ logical indicating whether only non-split alignments (their CIGAR strings do not contain letter 'N') should be included for summarization. \code{FALSE} by default.}
@@ -87,7 +87,7 @@ featureCounts(files,
   \item{ignoreDup}{ logical indicating whether reads marked as duplicates should be ignored. \code{FALSE} by default. Read duplicates are identified using bit Ox400 in the FLAG field in SAM/BAM files. The whole fragment (read pair) will be ignored if paired end.}
   \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{juncCounts}{ logical indicating if number of reads supporting each exon-exon junction will be reported. Junctions are identified from those exon-spanning reads in input data. \code{FALSE} by default.}
-  \item{genome}{ a character string giving the name of a FASTA-format file that includes the reference genome sequences. The reference genome provided here should be the same as the one used in read mapping. \code{NULL} by default.}
+  \item{genome}{ a character string giving the name of a FASTA-format file that includes the reference sequences used in read mapping that produced the provided SAM/BAM files. \code{NULL} by default. This argument should only be used when \code{juncCounts} is \code{TRUE}. Note that providing reference sequences is optional when \code{juncCounts} is set to \code{TRUE}.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (templates or read pairs) will be counted instead of individual reads. \code{FALSE} by default.}
   \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   \item{checkFragLength}{ logical indicating if the two ends from the same fragment are required to satisify the fragment length criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. The fragment length criteria are specified via \code{minFragLength} and \code{maxFragLength}.}
@@ -103,28 +103,12 @@ featureCounts(files,
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.
 
-This function takes as input a set of files containing read mapping results output from a read aligner (e.g. \code{\link{align}}), and then assigns mapped reads to genomic features.
+This function takes as input a set of files containing read mapping results output from a read aligner (e.g. \code{\link{align}} or \code{\link{subjunc}}), and then assigns mapped reads to genomic features.
 Both SAM and BAM format input files are accepted.
 
-The argument \code{useMetaFeatures} specifies the read summarization should be performed at the feature level or at the meta-feature level.
-Each entry in the annotation data is a feature, which for example could be an exon.
-When \code{useMetaFeatures} is \code{TRUE}, the \code{featureCounts} function creates meta-features by grouping features using the gene identifiers included in the ``GeneID" column in the annotation data (or in the ``gene_id" attribute in the GTF format annotation file) and then assigns reads to meta-features instead of features.
-The \code{useMetaFeatures} is particularly useful for gene-level expression analysis, because it instructs this function to count reads for genes (meta-features) instead of exons (features).
-Note that when meta-features are used in the read summarization, if a read is found to overlap two or more features belong to the same meta-feature it will be only counted once for that meta-feature.
-
-The argument \code{allowMultiOverlap} specifies how those reads, which are found to overlap with more than one feature (or meta-feature), should be assigned.
-When \code{allowMultiOverlap} is \code{FALSE}, a read overlapping multiple features (or meta-features) will not be assigned to any of them (not counted).
-Otherwise, it will be assigned to all of them.
-A read overlaps a meta-feature if it overlaps at least one of the features belonging to this meta-feature.
-
-\code{gene} and \code{exon} are typically used when summarizing RNA-seq read data, which will yield read counts for genes and exons, respectively.
-
-The in-built annotations for human and mouse genomes (\code{hg38}, \code{hg19}, \code{mm10} and \code{mm9}) provided in this function can be conveniently used for read summarization.
-These annotations were downloaded from the NCBI ftp server (\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/}) and were then postprocessed by removing redundant chromosomal regions within each gene and combining adjacent CDS and UTR sequences. 
-The in-built annotations use the SAF annotation format (see below) and their content can be retrieved using the \code{\link{getInBuiltAnnotation}} function.
-
-Users may also choose to provide their own annotation for summarization.
-If users provide a SAF (Simplified Annotation Format) annotation, the annotation should have the following format:
+\code{featureCounts} accepts two annotation formats: SAF (Simplified Annotation Format) and GTF/GFF formats.
+Specification of GTF/GFF format can be found at \url{https://genome.ucsc.edu/FAQ/FAQformat.html}.
+SAF is a simplified annotation format and below shows an example of this format:
 
 \preformatted{
 GeneID		Chr	Start	End	Strand
@@ -137,19 +121,55 @@ GeneID		Chr	Start	End	Strand
 ...
 }
 
-The SAF annotation format has five required columns, including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Strand}.
-These columns can be in any order.
-More columns can be included in the annotation.
-Columns are tab-delimited.
-Column names are case insensitive.
-\code{GeneID} column may contain integers or character strings.
-Chromosomal names included in the \code{Chr} column must match those used inclued in the mapping results, otherwise reads will fail to be assigned. 
-Users may provide a SAF annotation in the form of a data frame or a file using the \code{annot.ext} argument.\cr\cr
+SAF annotation includes the following five required columns: \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Strand}.
+The \code{GeneID} column includes identifiers of features.
+These identifiers can be integer or character string.
+The \code{Chr} column includes chromosome names of features and these names should match the chromosome names includes in the provided SAM/BAM files.
+The \code{Start} and \code{End} columns include start and end coordinates of features, respectively.
+Both start and end coordinates are inclusive.
+The \code{Strand} column indicates the strand of features (\code{"+"} or \code{"-"}).
+Column names in a SAF annotation should be the same as those shown in the above example (case insensitive).
+Columns can be in any order.
+Extra columns are allowed to be added into the annotation.
 
-Users may also provide a GTF/GFF format annotation via \code{annot.ext} argument.
-But GTF/GFF annotation should only be provided as a file, and \code{isGTFAnnotationFile} should be set to \code{TRUE} when such a annotation is provided.
-\code{featureCounts} function uses the `gene_id' attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level.\cr\cr
- 
+In-built annotations, which were generated based on NCBI RefSeq gene annotations, are provided to faciliate convenient read summarization.
+We provide in-built annotations for the following genomes: \code{"hg38"}, \code{"hg19"}, \code{"mm10"} and \code{"mm9"}.
+The content of in-built annotations can be accessed via the \code{\link{getInBuiltAnnotation}} function.
+These annotations have a SAF format.
+
+The in-built annotations are a modified version of NCBI RefSeq gene annotations.
+We downloaded the RefSeq gene annotations from NCBI ftp server (eg. RefSeq annotation for \code{mm10} was downloaded from \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.38.1/mapview/seq_gene.md.gz}).
+We then used these annotations to create our in-built annotations.
+For each gene, we used its CDS (coding DNA sequence) and UTR (untranslated) regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene.
+Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once (they might be included multiple times in the original CDSs and UTRs).
+Also, exons within the same gene do not overlap with each other.
+
+Users may provide an external annotation for read summarization via the \code{annot.ext} argument.
+If the external annotation is in SAF format, it can be provdied as either a \code{data.frame} or a tab-delimited text file with proper column names included.
+If it is in GTF/GFF format, it should be provided as a file only (and \code{isGTFAnnotationFile} should be set to \code{TRUE}).
+
+\code{featureCounts} function uses the \code{GTF.attrType} attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level.
+
+The argument \code{useMetaFeatures} specifies whether read summarization should be performed at feature level or at meta-feature level.
+A feature represents a continuous genomic region and a meta-feature is a group of features.
+For instance, an exon is a feature and a gene comprising one or more exons is a meta-feature.
+To assign reads to meta-features, \code{featureCounts} firstly groups into meta-features the features that have the same gene identifiers.
+\code{featureCounts} looks for gene identifiers in \code{GeneID} column of a SAF annotation or by using \code{GTF.attrType} attribute in a GTF/GFF annotation.
+Then for each read \code{featureCounts} searches for meta-features that have at least one feature that overlaps with the read.
+A read might be found to overlap with more than one feature within the same meta-feature (eg. an exon-spanning read overlaps with more than one exon from the same gene), however this read will still be counted only once for the meta-feature.
+
+RNA-seq reads are often summarized to meta-features to produce read counts for genes.
+Further downstream analysis can then be carried out to discover differentially expressed genes.
+Feature-level summarization of RNA-seq data often yields exon-level read counts, which is useful for investigating alternative splicing of genes.
+
+\code{featureCounts} provides multiple options to count multi-mapping reads (reads mapping to more than one location in the reference genome).
+Users can choose to ignore such reads by setting \code{countMultiMappingReads} to \code{FALSE}, or fully count every alignment reported for a multi-mapping read by setting \code{countMultiMappingReads} to \code{TRUE} (each alignment carries \code{1} count), or count each alignment fractionally by setting both \code{countMultiMappingReads} and \code{fraction} to \code{TRUE} (each alignment carries \code{1/x} count where \code{x} is the total number of alignments reported for the read).
+
+\code{featureCounts} also provides multiple options to count multi-overlapping reads (reads overlapping with more than one meta-feature when conducting meta-feature-level summarization or overlapping with more than one feature when conducting feature-level summarization).
+Users can choose to ignore such reads by setting \code{allowMultiOverlap} to \code{FALSE}, or fully count them for each overlapping meta-feature/feature by setting \code{allowMultiOverlap} to \code{TRUE} (each overlapping meta-feature/feature receives a count of 1 from a read), or assign a fractional count to each overlapping meta-feature/feature by setting both \code{allowMultiOverlap} and \code{fraction} to \code{TRUE} (each overlapping meta-feature/feature receives a count of \code{1/y} from a read where \code{y} is the total number of meta-features/features overlapping with the read).
+
+If a read is both multi-mapping and multi-overlapping, then each overlapping meta-feature/feature will receive a fractional count of \code{1/(x*y)} if \code{countMultiMappingReads}, \code{allowMultiOverlap} and \code{fraction} are all set to \code{TRUE}.
+
 When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of reads will be counted.
 \code{featureCounts} function checks if reads from the same pair are adjacent to each other (this could happen when reads were for example sorted by their mapping locations), and it automatically reorders those reads that belong to the same pair but are not adjacent to each other in the input read file.
 }

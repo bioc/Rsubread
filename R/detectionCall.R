@@ -1,26 +1,46 @@
 detectionCall <- function(dataset, species="hg", plot=FALSE)
-
 {
 	
 	if (file.exists(dataset) == FALSE) {
-
 		stop("File for the given dataset doesn't exist!\n")
-
 	} 
 	
 	if (species == "mm"){
-		
-		### mouse annotation file not available yet
 		exon_file <- system.file("annot","mm9_NCBI_exon_GC.txt",package="Rsubread")
-		ir_file <- system.file("annot","mm9_NCBI_binned_integenic_region_GC.txt",package="Rsubread") 
-			
+        if(exon_file == ""){
+            ret_df <- download.file("http://bioinf.wehi.edu.au/software/Rsubread/mm9_NCBI_exon_GC.txt",file.path(system.file("annot",package="Rsubread"),"mm9_NCBI_exon_GC.txt"))
+            if(ret_df != 0)
+                stop("Failed to download file http://bioinf.wehi.edu.au/software/Rsubread/mm9_NCBI_exon_GC.txt")
+            exon_file <- system.file("annot","mm9_NCBI_exon_GC.txt",package="Rsubread")
+        }
+        
+		ir_file <- system.file("annot","mm9_NCBI_binned_integenic_region_GC.txt",package="Rsubread")
+        if(ir_file == ""){
+            ret_df <- download.file("http://bioinf.wehi.edu.au/software/Rsubread/mm9_NCBI_binned_integenic_region_GC.txt",file.path(system.file("annot",package="Rsubread"),"mm9_NCBI_binned_integenic_region_GC.txt"))
+            if(ret_df != 0)
+                stop("Failed to download file http://bioinf.wehi.edu.au/software/Rsubread/mm9_NCBI_binned_integenic_region_GC.txt")
+            ir_file <- system.file("annot","mm9_NCBI_binned_integenic_region_GC.txt",package="Rsubread")
+        }
+
 	} 
 	
 	if(species == "hg"){
-			
 		exon_file <- system.file("annot","hg19_NCBI_exon_GC.txt",package="Rsubread")
-		ir_file <- system.file("annot","hg19_NCBI_binned_integenic_region_GC.txt",package="Rsubread") 
-			
+        if(exon_file == ""){
+            ret_df <- download.file("http://bioinf.wehi.edu.au/software/Rsubread/hg19_NCBI_exon_GC.txt",file.path(system.file("annot",package="Rsubread"),"hg19_NCBI_exon_GC.txt"))
+            if(ret_df != 0)
+                stop("Failed to download file http://bioinf.wehi.edu.au/software/Rsubread/hg19_NCBI_exon_GC.txt")
+            exon_file <- system.file("annot","hg19_NCBI_exon_GC.txt",package="Rsubread")
+        }
+        
+		ir_file <- system.file("annot","hg19_NCBI_binned_integenic_region_GC.txt",package="Rsubread")
+        if(ir_file == ""){
+            ret_df <- download.file("http://bioinf.wehi.edu.au/software/Rsubread/hg19_NCBI_binned_integenic_region_GC.txt",file.path(system.file("annot",package="Rsubread"),"hg19_NCBI_binned_integenic_region_GC.txt"))
+            if(ret_df != 0)
+                stop("Failed to download file http://bioinf.wehi.edu.au/software/Rsubread/hg19_NCBI_binned_integenic_region_GC.txt")
+            ir_file <- system.file("annot","hg19_NCBI_binned_integenic_region_GC.txt",package="Rsubread")
+        }
+
 	}
 
 	temp_header <- 	"."
