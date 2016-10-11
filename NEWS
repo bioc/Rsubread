@@ -1,3 +1,24 @@
+CHANGES IN VERSION 1.24.0
+------------------------
+
+NEW FEATURES
+
+o New parameters in featureCounts() function: `fracOverlap' and `tmpDir'.
+
+o FeatureCounts can now perfrom fractional counting for both multi-mapping reads and multi-overlapping reads via its `fraction' parameter.
+
+o Depreciate `PE_orientation' parameter in featureCounts.
+
+o In-built annotation for hg38(GRCh38) is added to the package.
+
+o Improved reporting of mapping quality score (MQS) for align() and subjunc() functions.
+
+o Improved efficiency of exactSNP() function when calling SNPs from data with very high sequencing depth.
+
+o Improved documentation and screen output.
+
+
+
 CHANGES IN VERSION 1.22.0
 ------------------------
 
