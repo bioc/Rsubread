@@ -173,7 +173,7 @@ build_exon_data_structure_map(void){
 void
 build_ir_data_structure_map(void){
 	FILE *fin;
-	int read_start, read_end, read_entrezid, read_n, read_gc, read_at;
+	int read_start, read_end, read_n, read_gc, read_at;
 	char chr_id[STR];
 	node *cnode=NULL;
 	char current_chr_id[STR];
@@ -211,7 +211,7 @@ simplify_SAM_file(void){
 	char * line = NULL;
 	char * read_chr;
 	size_t len = 1000;
-	size_t z;
+//	size_t z;
 	int read_pos;
 	char *readline;
 

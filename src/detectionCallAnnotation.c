@@ -114,7 +114,7 @@ build_exon_data_structure(void){
 void
 build_ir_data_structure(void){
 	FILE *fin;
-	int read_start, read_end, read_length;
+	int read_start, read_end;
 	char chr_id[STR];
 	node *cnode=NULL;
 	char current_chr_id[STR];
@@ -149,7 +149,7 @@ void
 breakIntegenicRegion(){
 	FILE *fin;
 	FILE *fout;
-	int read_entrezid, read_start, read_end, read_length;
+	int read_start, read_end;
 	char chr_id[STR];
 	int binnum = 0;
 	fin = fopen(ir_file, "r");

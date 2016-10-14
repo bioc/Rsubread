@@ -234,7 +234,8 @@ find_chr(int gene_pos, char *chr_id){
 			gene_array[gene_pos].chr_index = gene_array[gene_pos].chr_num - 1;
 			current_chr_index = gene_array[gene_pos].chr_index;
 			gene_array[gene_pos].chr_array[current_chr_index].id = (char *)malloc(STR);
-			char *pt = strcpy(gene_array[gene_pos].chr_array[current_chr_index].id,chr_id);
+//			char *pt = strcpy(gene_array[gene_pos].chr_array[current_chr_index].id,chr_id);
+            strcpy(gene_array[gene_pos].chr_array[current_chr_index].id,chr_id);
 			gene_array[gene_pos].current_chr = gene_array[gene_pos].chr_array[current_chr_index].id;
 			gene_array[gene_pos].chr_array[current_chr_index].exon_list =(exon *)make_empty();
 

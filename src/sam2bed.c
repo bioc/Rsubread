@@ -40,7 +40,7 @@ int sam2bed(int argc,char *argv[]){
   char * tok;
   char strand;
   char * chr;
-  int i, readlen, chr_start, chr_end, flag, mqs;
+  int readlen, chr_start, chr_end, flag, mqs;
 
   int MAX_LINE_LENGTH = 100000;
   

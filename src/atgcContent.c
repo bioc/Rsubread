@@ -64,13 +64,13 @@ void initialise(){
 void retrieve_sequence(char ** input, char ** output_seq){
   
   char * line = NULL;
-  size_t len = 0;
-  ssize_t z;
+//  size_t len = 0;
+//  ssize_t z;
   int i;
-  int readlen;
-  int offset;
+//  int readlen;
+//  int offset;
   int line_num = 0;
-  int data_ready=1;
+//  int data_ready=1;
 
   int MAX_LINE_LENGTH = 100000;
   
@@ -105,8 +105,8 @@ void atgcContent(char ** input, char ** output, int *basewise){
   FILE *fin, *fout;
   
   char * line = NULL;
-  size_t len = 0;
-  ssize_t z;
+//  size_t len = 0;
+//  ssize_t z;
   int i,j;
   int readlen;
   int line_num=0;
