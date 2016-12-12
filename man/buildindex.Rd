@@ -8,7 +8,7 @@ TH_subread=100,colorspace=FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
-  \item{reference}{ charater string giving the name of the file containing all the refernece sequences.}
+  \item{reference}{ charater string giving the name of a FASTA-format file that includes sequences of all chromosomes and contigs.}
   \item{gappedIndex}{ logical. If \code{FALSE}, 16mers (subreads) will be extracted from every chromosomal location of a reference genome and then they will be used to build a hash table index. By default(\code{TRUE}), subreads are extracted in every three bases from the genome.}
   \item{indexSplit}{ logical. If \code{TRUE}, the built index is allowed to be splitted into multiple segments. The number of such segments is determined by \code{memory} value, genome size and permitting of gaps between subreads(\code{gappedIndex}). If \code{indexSplit} is set to \code{FALSE}, a single-segment index (no splitting) will be generated regardless of what value is chosen for \code{memory}.}
   \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 8000 MB by default.}
