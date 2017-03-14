@@ -139,7 +139,11 @@ typedef struct{
 	// input_scheme
 	char first_read_file[MAX_FILE_NAME_LENGTH];
 	char second_read_file[MAX_FILE_NAME_LENGTH];
-	char medium_result_prefix[MAX_FILE_NAME_LENGTH];
+	char exon_annotation_file[MAX_FILE_NAME_LENGTH];
+	char exon_annotation_alias_file[MAX_FILE_NAME_LENGTH];
+	int exon_annotation_file_type;
+	char exon_annotation_gene_id_column[MAX_READ_NAME_LEN];
+	char exon_annotation_feature_name_column[MAX_READ_NAME_LEN];
 
 
 	short read_trim_5;
@@ -266,6 +270,7 @@ typedef struct{
 #define CORE_EXPERIMENT_DNASEQ 1000
 #define CORE_EXPERIMENT_RNASEQ 2000
 
+#define PRINT_BOX_WRAPPED 4
 #define PRINT_BOX_NOCOLOR_FOR_COLON 2
 #define PRINT_BOX_CENTER 1
 
@@ -305,11 +310,10 @@ typedef struct{
 	short junction_flanking_left;
 	short junction_flanking_right;
 
-	unsigned char event_type;
 	char indel_at_junction;
 	char is_negative_strand;	// this only works to junction detection, according to 'GT/AG' or 'CT/AC' donors. This only applys to junctions.
 	char is_strand_jumped;		// "strand jumped" means that the left and right sides are on different strands. This only applys to fusions.
-	char is_donor_found;		// only for junctions: GT/AG is found at the location.
+	char is_donor_found_or_annotation;		// only for junctions: GT/AG is found at the location. 1: found, 0:not found: 64: from annotation (thus unknown)
 						// Also, if "is_strand_jumped" is true, all coordinates (e.g., splicing points, cover_start, cover_end, etc) are on "reversed read" view.
 
 	char small_side_increasing_coordinate;
@@ -325,6 +329,7 @@ typedef struct{
 	unsigned short anti_supporting_reads;
 	unsigned short final_counted_reads;
 	unsigned short final_reads_mismatches;
+	unsigned char event_type;
 	unsigned int global_event_id;
 	float event_quality;
 
@@ -373,6 +378,7 @@ typedef struct{
 	short final_quality;
 	short chromosomal_length;
 	short MAPQ_adjustment;
+	int known_junction_supp;
 } realignment_result_t;
 
 #define BUCKETED_TABLE_INIT_ITEMS 3
@@ -402,6 +408,7 @@ typedef struct {
 	int item_index_j;
 	unsigned int mapping_position;
 	int major_half_votes;
+	unsigned short read_start_base;
 }simple_mapping_t;
 
 typedef struct{
@@ -439,6 +446,7 @@ typedef struct {
 
 
 typedef struct{
+	unsigned long long all_correct_PE_reads;
 	int thread_id;
 	pthread_t thread;
 
@@ -478,6 +486,7 @@ typedef struct{
 	FILE * output_sam_fp;
 	FILE * long_insertion_FASTA_fp;
 	char * output_sam_inner_buffer;
+	int output_sam_is_full;
 
 	// running contexts
 	void * module_contexts[5]; 
@@ -536,7 +545,8 @@ typedef struct{
 
 	// per chunk parameters
 	subread_read_number_t read_block_start;
-
+	char * exonic_region_bitmap;
+	HashTable * sam_chro_to_anno_chr_alias;
 } global_context_t;
 
 
@@ -639,4 +649,6 @@ int is_valid_digit(char * optarg, char * optname);
 int is_valid_digit_range(char * optarg, char * optname, int min, int max_inc);
 int is_valid_float(char * optarg, char * optname);
 int exec_cmd(char * cmd, char * outstr, int out_limit);
+int is_pos_in_annotated_exon_regions(global_context_t * global_context, unsigned int pos);
+char * get_sam_chro_name_from_alias(HashTable * tab, char * anno_chro);
 #endif

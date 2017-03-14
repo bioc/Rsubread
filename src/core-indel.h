@@ -30,8 +30,8 @@
 //#define MAX_EVENT_ENTRIES_PER_SITE 5
 //#define MAX_EVENT_ENTRIES_PER_SITE 12 
 //
-#define EVENT_ENTRIES_INIT_SIZE 9
-#define MAX_EVENT_ENTRIES_PER_SITE 9
+#define EVENT_ENTRIES_INIT_SIZE (9) 
+#define MAX_EVENT_ENTRIES_PER_SITE (9) 
 #define CHRO_EVENT_TYPE_REMOVED 0
 #define CHRO_EVENT_TYPE_INDEL 8
 #define CHRO_EVENT_TYPE_LONG_INDEL 16 
@@ -132,6 +132,8 @@ typedef struct{
 	unsigned int block_start_linear_pos;
 } reassembly_block_context_t;
 
+#define EVENT_BODY_LOCK_BUCKETS 14929
+
 
 typedef struct{
 	HashTable * event_entry_table;
@@ -139,6 +141,7 @@ typedef struct{
 	unsigned int current_max_event_number;
 	chromosome_event_t * event_space_dynamic;
 	HashTable * local_reassembly_pileup_files;
+	subread_lock_t event_body_locks[EVENT_BODY_LOCK_BUCKETS];
 
 	short ** dynamic_align_table;
 	char ** dynamic_align_table_mask;
@@ -159,7 +162,9 @@ typedef struct{
 int init_indel_tables(global_context_t * context);
 int destroy_indel_module(global_context_t * context);
 int init_indel_thread_contexts(global_context_t * global_context, thread_context_t * thread_context, int task);
-int finalise_indel_thread(global_context_t * global_context, thread_context_t * thread_context, int task);
+int sort_global_event_table(global_context_t * global_context);
+int load_known_junctions(global_context_t * global_context);
+int finalise_indel_and_junction_thread(global_context_t * global_context, thread_context_t * thread_contexts, int task);
 int find_new_indels(global_context_t * global_context, thread_context_t * thread_context, int pair_number, char * read_name, char * read_text, char * qual_text, int read_len, int is_second_read, int best_read_id);
 int write_indel_final_results(global_context_t * context);
 int search_event(global_context_t * global_context,HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, char event_type, chromosome_event_t ** return_buffer);
@@ -188,5 +193,11 @@ int anti_supporting_read_scan(global_context_t * global_context);
 
 int core_dynamic_align(global_context_t * global_context, thread_context_t * thread_context, char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, char * read_name);
 
-chromosome_event_t * local_add_indel_event(global_context_t * global_context, thread_context_t * thread_context, HashTable * event_table, char * read_text, unsigned int left_edge, int indels, int score_supporting_read_added, int is_ambiguous, int mismatched_bases);
+void init_core_temp_path(global_context_t * context);
+
+chromosome_event_t * local_add_indel_event(global_context_t * global_context, thread_context_t * thread_context, HashTable * event_table, char * read_text, unsigned int left_edge, int indels, int score_supporting_read_added, int is_ambiguous, int mismatched_bases,int * old_event_id);
+
+void print_indel_table(global_context_t * global_context);
+int sort_junction_entry_table(global_context_t * global_context);
+void mark_event_bitmap(unsigned char * bitmap, unsigned int pos);
 #endif

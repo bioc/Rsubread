@@ -430,7 +430,7 @@ void bktable_append(bucketed_table_t * tab, char * chro, unsigned int pos, void 
 }
 
 
-void bktable_free_ptrs(void * buckv, HashTable * tab){
+void bktable_free_ptrs(void * bukey, void * buckv, HashTable * tab){
 	int x1;
 	bucketed_table_bucket_t * buck = buckv;
 	for(x1 = 0; x1 < buck -> items; x1++)

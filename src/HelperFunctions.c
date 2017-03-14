@@ -44,6 +44,7 @@
 
 
 #include "subread.h"
+#include "input-files.h"
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
@@ -977,5 +978,173 @@ double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c,
 	}
 	return  min(ret1, ret2) ;
 
+}
+
+int load_features_annotation(char * file_name, int file_type, char * gene_id_column, char * feature_name_column,
+ void * context, int do_add_feature(char * gene_name, char * chro_name, unsigned int start, unsigned int end, int is_negative_strand, void * context)  ){
+	char * file_line = malloc(MAX_LINE_LENGTH+1);
+	int lineno = 0, is_GFF_warned = 0, loaded_features = 0;
+	FILE * fp = fopen(file_name, "r");
+
+	if(NULL == fp){
+		SUBREADprintf("Error: unable to open the annotation file : %s\n", file_name);
+		return -1;
+	}
+
+	while(1){
+		int is_gene_id_found = 0, is_negative_strand = -1;
+		char * token_temp = NULL, * feature_name, * chro_name = NULL;
+		char feature_name_tmp[FEATURE_NAME_LENGTH];
+		feature_name = feature_name_tmp;
+		
+		unsigned int start = 0, end = 0;
+		char * getres = fgets(file_line, MAX_LINE_LENGTH, fp);
+		if(getres == NULL) break;
+
+		lineno++;
+		if(is_comment_line(file_line, file_type, lineno-1))continue;
+
+		if(file_type == FILE_TYPE_RSUBREAD)
+		{
+			feature_name = strtok_r(file_line,"\t",&token_temp);
+			int feature_name_len = strlen(feature_name);
+			if(feature_name_len > FEATURE_NAME_LENGTH) feature_name[FEATURE_NAME_LENGTH -1 ] = 0;
+			
+			chro_name = strtok_r(NULL,"\t", &token_temp);
+			int chro_name_len = strlen(chro_name);
+			if(chro_name_len > MAX_CHROMOSOME_NAME_LEN) chro_name[MAX_CHROMOSOME_NAME_LEN -1 ] = 0;
+
+			char * start_ptr = strtok_r(NULL,"\t", &token_temp);
+			char * end_ptr = strtok_r(NULL,"\t", &token_temp);
+
+			if(start_ptr == NULL || end_ptr == NULL){
+				SUBREADprintf("\nWarning: the format on the %d-th line is wrong.\n", lineno);
+			}
+			long long int tv1 = atoll(start_ptr);
+			long long int tv2 = atoll(end_ptr);
+
+			if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
+				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
+					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+					return -2;
+				}
+			}else{
+				SUBREADprintf("\nError: Line %d contains a format error. The expected annotation format is SAF.\n", lineno);
+				return -2;
+			}
+			
+			start = atoi(start_ptr);// start
+			end = atoi(end_ptr);//end
+			
+			char * strand_str = strtok_r(NULL,"\t", &token_temp);
+			if(strand_str == NULL)
+				is_negative_strand = 0;
+			else
+				is_negative_strand = ('-' ==strand_str[0]);
+				
+			is_gene_id_found = 1;
+			
+		} else if(file_type == FILE_TYPE_GTF) {
+			chro_name = strtok_r(file_line,"\t",&token_temp);
+			strtok_r(NULL,"\t", &token_temp);// source
+			char * feature_type = strtok_r(NULL,"\t", &token_temp);// feature_type
+			
+			if(strcmp(feature_type, feature_name_column)==0){
+				char * start_ptr = strtok_r(NULL,"\t", &token_temp);
+				char * end_ptr = strtok_r(NULL,"\t", &token_temp);
+				
+
+				if(start_ptr == NULL || end_ptr == NULL){
+					SUBREADprintf("\nWarning: the format on the %d-th line is wrong.\n", lineno);
+				}
+				long long int tv1 = atoll(start_ptr);
+				long long int tv2 = atoll(end_ptr);
+				
+				
+				if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
+					if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
+						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+						return -2;
+					}
+				}else{
+					SUBREADprintf("\nError: Line %d contains a format error. The expected annotation format is GTF/GFF.\n", lineno);
+					return -2;
+				}
+				start = atoi(start_ptr);// start
+				end = atoi(end_ptr);//end
+
+				if(start < 1 || end<1 ||  start > 0x7fffffff || end > 0x7fffffff || start > end)
+					SUBREADprintf("\nWarning: the feature on the %d-th line has zero coordinate or zero lengths\n\n", lineno);
+
+					
+				strtok_r(NULL,"\t", &token_temp);// score
+				is_negative_strand = ('-' == (strtok_r(NULL,"\t", &token_temp)[0]));//strand
+				strtok_r(NULL,"\t",&token_temp);	// "frame"
+				char * extra_attrs = strtok_r(NULL,"\t",&token_temp);   // name_1 "val1"; name_2 "val2"; ...
+				if(extra_attrs && (strlen(extra_attrs)>2)){
+					int attr_val_len = GTF_extra_column_value(extra_attrs , gene_id_column , feature_name_tmp, FEATURE_NAME_LENGTH);
+					if(attr_val_len>0) is_gene_id_found=1;
+				}
+
+				if(!is_gene_id_found){
+					if(!is_GFF_warned)
+					{
+						int ext_att_len = strlen(extra_attrs);
+						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
+						SUBREADprintf("\nWarning: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n",  gene_id_column, extra_attrs);
+					}
+					is_GFF_warned++;
+				}
+					
+			}
+		}
+		
+		if(is_gene_id_found){
+			do_add_feature(feature_name, chro_name, start, end, is_negative_strand, context);
+			loaded_features++;
+		}
+		
+	}
+	fclose(fp);
+	free(file_line);		
+	return loaded_features;
+}
+
+HashTable * load_alias_table(char * fname) {
+	FILE * fp = f_subr_open(fname, "r");
+	if(!fp)
+	{
+		print_in_box(80,0,0,"WARNING unable to open alias file '%s'", fname);
+		return NULL;
+	}
+
+	char * fl = malloc(2000);
+
+	HashTable * ret = HashTableCreate(1013);
+	HashTableSetDeallocationFunctions(ret, free, free);
+	HashTableSetKeyComparisonFunction(ret, fc_strcmp_chro);
+	HashTableSetHashFunction(ret, fc_chro_hash);
+	
+	while (1)
+	{
+		char *ret_fl = fgets(fl, 1999, fp);
+		if(!ret_fl) break;
+		if(fl[0]=='#') continue;
+		char * sam_chr = NULL;
+		char * anno_chr = strtok_r(fl, ",", &sam_chr);
+		if((!sam_chr)||(!anno_chr)) continue;
+
+		sam_chr[strlen(sam_chr)-1]=0;
+		char * anno_chr_buf = malloc(strlen(anno_chr)+1);
+		strcpy(anno_chr_buf, anno_chr);
+		char * sam_chr_buf = malloc(strlen(sam_chr)+1);
+		strcpy(sam_chr_buf, sam_chr);
+		HashTablePut(ret, sam_chr_buf, anno_chr_buf);
+	}
+
+	fclose(fp);
+
+	free(fl);
+	return ret;
 }
 

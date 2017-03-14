@@ -4,7 +4,6 @@
 #include <getopt.h>
 #include <unistd.h>
 
-
 #include "subread.h"
 #include "input-files.h"
 #include "core.h"
@@ -36,6 +35,9 @@ static struct option long_options[] =
 	{"quality",  no_argument, 0, 'Q'},
 	{"trim5", required_argument, 0, '5'},
 	{"trim3", required_argument, 0, '3'},
+	{"exonAnnotation", required_argument, 0, 'a'},
+	{"exonAlias", required_argument, 0, 'A'},
+	{"exonFormat", required_argument, 0, 'F'},
 	{"memoryMultiplex",  required_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
 	{"gzFASTQinput",  no_argument, 0, 0},
@@ -66,65 +68,80 @@ void print_usage_core_aligner()
 	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs(" ./subread-align [options] -i <index_name> -r <input> -o <output> -t <type>");
+	SUBREADputs("./subread-align [options] -i <index_name> -r <input>  -t <type> -o <output>");
 	SUBREADputs("");
-	SUBREADputs("Required arguments:");
+	SUBREADputs("## Mandatory arguments:");
 	SUBREADputs("    ");
 	SUBREADputs("  -i <string>       Base name of the index.");
 	SUBREADputs("");
-	SUBREADputs("  -r <string>       Name of the input file. Input formats including gzipped");
-	SUBREADputs("                    fastq, fastq, and fasta can be automatically detected. If");
-	SUBREADputs("                    paired-end, this should give the name of file including");
-	SUBREADputs("                    first reads.");
+	SUBREADputs("  -r <string>       Name of an input read file. If paired-end, this should be");
+	SUBREADputs("                    the first read file (typically containing ‘R1’ in the file");
+	SUBREADputs("                    name) and the second should be provided via ‘-R’.");
+	SUBREADputs("                    Acceptable formats include gzipped FASTQ, FASTQ and FASTA.");
+	SUBREADputs("                    These formats are identified automatically.");
 	SUBREADputs("    ");
 	SUBREADputs("  -t <int>          Type of input sequencing data. Its values include");
 	SUBREADputs("                      0: RNA-seq data");
 	SUBREADputs("                      1: genomic DNA-seq data.");
 	SUBREADputs("    ");
-	SUBREADputs("Optional arguments:");
+	SUBREADputs("## Optional arguments:");
+	SUBREADputs("# input reads and output");
 	SUBREADputs("    ");
-	SUBREADputs("  -o <string>       Name of the output file. By default, the output is in BAM");
-	SUBREADputs("                    format.");
+	SUBREADputs("  -o <string>       Name of an output file. By default, the output is in BAM");
+	SUBREADputs("                    format. Omitting this option makes the output be written to");
+	SUBREADputs("                    STDOUT.");
 	SUBREADputs("");
-	SUBREADputs("  -n <int>          Number of selected subreads, 10 by default.");
-	SUBREADputs("");
-	SUBREADputs("  -m <int>          Consensus threshold for reporting a hit (minimal number of");
-	SUBREADputs("                    subreads that map in consensus) . If paired-end, this gives");
-	SUBREADputs("                    the consensus threshold for the anchor read. 3 by default");
-	SUBREADputs("");
-	SUBREADputs("  -M <int>          Specify the maximum number of mis-matched bases allowed in");
-	SUBREADputs("                    the alignment. 3 by default. Mis-matches found in soft-");
-	SUBREADputs("                    clipped bases are not counted.");
-	SUBREADputs("");
-	SUBREADputs("  -T <int>          Number of CPU threads used, 1 by default.");
-	SUBREADputs("");
-	SUBREADputs("  -I <int>          Maximum length (in bp) of indels that can be detected. 5 by");
-	SUBREADputs("                    default. The program can detect indels of up to 200bp long.");
-	SUBREADputs("");
-	SUBREADputs("  -B <int>          Maximal number of equally-best mapping locations to be");
-	SUBREADputs("                    reported. 1 by default. Note that -u option takes precedence");
-	SUBREADputs("                    over -B.");
-	SUBREADputs("");
-	SUBREADputs("  -P <3:6>          Format of Phred scores in input files, '3' for phred+33 and");
-	SUBREADputs("                    '6' for phred+64. '3' by default.");
-	SUBREADputs("");
-	SUBREADputs("  -u                Report uniquely mapped reads only. Number of matched bases (");
-	SUBREADputs("                    for RNA-seq) or mis-matched bases(for genomic DNA-seq) is");
-	SUBREADputs("                    used to break the tie.");
-	SUBREADputs("");
-	SUBREADputs("  -b                Convert color-space read bases to base-space read bases in");
-	SUBREADputs("                    the mapping output. Note that read mapping is performed at");
-	SUBREADputs("                    color-space.");
-	SUBREADputs("");
-	SUBREADputs("  --sv              Detect structural variants (eg. long indel, inversion,");
-	SUBREADputs("                    duplication and translocation) and report breakpoints. Refer");
-	SUBREADputs("                    to Users Guide for breakpoint reporting.");
+	SUBREADputs("  -R <string>       Name of the second read file in paired-end data (typically");
+	SUBREADputs("                    containing ‘R2’ in the file name).");
 	SUBREADputs("");
 	SUBREADputs("  --SAMinput        Input reads are in SAM format.");
 	SUBREADputs("");
 	SUBREADputs("  --BAMinput        Input reads are in BAM format.");
 	SUBREADputs("");
-	SUBREADputs("  --SAMoutput       Save mapping result in SAM format.");
+	SUBREADputs("  --SAMoutput        Save mapping results in SAM format.");
+	SUBREADputs("");
+	SUBREADputs("# offset value added to Phred quality scores of read bases");
+	SUBREADputs("");
+	SUBREADputs("  -P <3:6>          Offset value added to the Phred quality score of each read");
+	SUBREADputs("                    base. '3' for phred+33 and '6' for phred+64. '3' by default.");
+	SUBREADputs("");
+	SUBREADputs("# thresholds for mapping");
+	SUBREADputs("");
+	SUBREADputs("  -n <int>          Number of selected subreads, 10 by default.");
+	SUBREADputs("");
+	SUBREADputs("  -m <int>          Consensus threshold for reporting a hit (minimal number of");
+	SUBREADputs("                    subreads that map in consensus) . If paired-end, this gives");
+	SUBREADputs("                    the consensus threshold for the anchor read (anchor read");
+	SUBREADputs("                    receives more votes than the other read in the same pair).");
+	SUBREADputs("                    3 by default");
+	SUBREADputs("");
+	SUBREADputs("  -p <int>          Consensus threshold for the non- anchor read in a pair. 1 by");
+	SUBREADputs("                    default.");
+	SUBREADputs("");
+	SUBREADputs("  -M <int>          Maximum number of mis-matched bases allowed in each reported");
+	SUBREADputs("                    alignment. 3 by default. Mis-matched bases found in soft-");
+	SUBREADputs("                    clipped bases are not counted.");
+	SUBREADputs("");
+	SUBREADputs("# unique mapping and multi-mapping");
+	SUBREADputs("");
+	SUBREADputs("  -u                Report uniquely mapped reads only. Number of matched bases (");
+	SUBREADputs("                    for RNA-seq) or mis-matched bases(for genomic DNA-seq) is");
+	SUBREADputs("                    used to break the tie when multiple mapping locations are");
+	SUBREADputs("                    found.");
+	SUBREADputs("");
+	SUBREADputs("  -B <int>          Maximal number of equally-best mapping locations to be");
+	SUBREADputs("                    reported. 1 by default. Note that -u option takes precedence");
+	SUBREADputs("                    over -B.");
+	SUBREADputs("");
+	SUBREADputs("# indel detection");
+	SUBREADputs("");
+	SUBREADputs("  -I <int>          Maximum length (in bp) of indels that can be detected. 5 by");
+	SUBREADputs("                    default. Indels of up to 200bp long can be detected.");
+	SUBREADputs("");
+	SUBREADputs("  --complexIndels   Detect multiple short indels that are in close proximity");
+	SUBREADputs("                    (they can be as close as 1bp apart from each other).");
+	SUBREADputs("");
+	SUBREADputs("# read trimming");
 	SUBREADputs("");
 	SUBREADputs("  --trim5 <int>     Trim off <int> number of bases from 5' end of each read. 0");
 	SUBREADputs("                    by default.");
@@ -132,9 +149,32 @@ void print_usage_core_aligner()
 	SUBREADputs("  --trim3 <int>     Trim off <int> number of bases from 3' end of each read. 0");
 	SUBREADputs("                    by default.");
 	SUBREADputs("");
+	SUBREADputs("# distance and orientation of paired end reads");
+	SUBREADputs("");
+	SUBREADputs("  -d <int>          Minimum fragment/insert length, 50bp by default.");
+	SUBREADputs("");
+	SUBREADputs("  -D <int>          Maximum fragment/insert length, 600bp by default.");
+	SUBREADputs("");
+	SUBREADputs("  -S <ff:fr:rf>     Orientation of first and second reads, 'fr' by default (");
+	SUBREADputs("                    forward/reverse).");
+	SUBREADputs("");
+	SUBREADputs("# number of CPU threads");
+	SUBREADputs("");
+	SUBREADputs("  -T <int>          Number of CPU threads used, 1 by default.");
+	SUBREADputs("");
+	SUBREADputs("# read group");
+	SUBREADputs("");
 	SUBREADputs("  --rg-id <string>  Add read group ID to the output.");
 	SUBREADputs("");
 	SUBREADputs("  --rg <string>     Add <tag:value> to the read group (RG) header in the output.");
+	SUBREADputs("");
+	SUBREADputs("# color space reads");
+	SUBREADputs("");
+	SUBREADputs("  -b                Convert color-space read bases to base-space read bases in");
+	SUBREADputs("                    the mapping output. Note that read mapping is performed at");
+	SUBREADputs("                    color-space.");
+	SUBREADputs("");
+	SUBREADputs("# dynamic programming");
 	SUBREADputs("");
 	SUBREADputs("  --DPGapOpen <int> Penalty for gap opening in short indel detection. -1 by");
 	SUBREADputs("                    default.");
@@ -148,30 +188,44 @@ void print_usage_core_aligner()
 	SUBREADputs("  --DPMatch <int>   Score for matched bases in short indel detection. 2 by");
 	SUBREADputs("                    default.");
 	SUBREADputs("");
-	SUBREADputs("  --complexIndels   Detect multiple short indels that occur concurrently in a");
-	SUBREADputs("                    small genomic region (these indels could be as close as 1bp");
-	SUBREADputs("                    apart).");
+	SUBREADputs("# detect structural variants");
+	SUBREADputs("");
+	SUBREADputs("  --sv              Detect structural variants (eg. long indel, inversion,");
+	SUBREADputs("                    duplication and translocation) and report breakpoints. Refer");
+	SUBREADputs("                    to Users Guide for breakpoint reporting.");
+	SUBREADputs("");
+	SUBREADputs("# gene annotation");
+	SUBREADputs("");
+	SUBREADputs("  -a                Name of an annotation file. GTF/GFF format by default. See");
+	SUBREADputs("                    -F option for more format information.");
+	SUBREADputs("");
+	SUBREADputs("  -F                Specify format of the provided annotation file. Acceptable");
+	SUBREADputs("                    formats include 'GTF' (or compatible GFF format) and");
+	SUBREADputs("                    'SAF'. 'GTF' by default. For SAF format, please refer to");
+	SUBREADputs("                    Users Guide.");
+	SUBREADputs("");
+	SUBREADputs("  -A                Provide a chromosome name alias file to match chr names in");
+	SUBREADputs("                    annotation with those in the reads. This should be a two-");
+	SUBREADputs("                    column comma-delimited text file. Its first column should");
+	SUBREADputs("                    include chr names in the annotation and its second column");
+	SUBREADputs("                    should include chr names in the index. Chr names are case");
+	SUBREADputs("                    sensitive. No column header should be included in the");
+	SUBREADputs("                    file.");
+	SUBREADputs("");
+	SUBREADputs("  --gtfFeature <string>  Specify feature type in GTF annotation. 'exon'");
+	SUBREADputs("                    by default. Features used for read counting will be ");
+	SUBREADputs("                    extracted from annotation using the provided value.");
+	SUBREADputs("");
+	SUBREADputs("  --gtfAttr <string>     Specify attribute type in GTF annotation. 'gene_id'");
+	SUBREADputs("                    by default. Meta-features used for read counting will be ");
+	SUBREADputs("                    extracted from annotation using the provided value.");
+	SUBREADputs("");
+	SUBREADputs("# others");
 	SUBREADputs("");
 	SUBREADputs("  -v                Output version of the program.");
 	SUBREADputs("");
-	SUBREADputs("Optional arguments for paired-end reads:");
-	SUBREADputs("");
-	SUBREADputs("  -R <string>       Name of the file including second reads.");
-	SUBREADputs("");
-	SUBREADputs("  -p <int>          Consensus threshold for the non-anchor read (receiving less");
-	SUBREADputs("                    votes than the anchor read from the same pair). 1 by");
-	SUBREADputs("                    default.");
-	SUBREADputs("");
-	SUBREADputs("  -d <int>          Minimum fragment/insert length, 50bp by default.");
-	SUBREADputs("");
-	SUBREADputs("  -D <int>          Maximum fragment/insert length, 600bp by default.");
-	SUBREADputs("");
-	SUBREADputs("  -S <ff:fr:rf>     Orientation of first and second reads, 'fr' by default (");
-	SUBREADputs("                    forward/reverse).");
-	SUBREADputs("");
 	SUBREADputs("Refer to Users Manual for detailed description to the arguments. ");
 	SUBREADputs("");
-
 }
 
 
@@ -211,7 +265,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 
 */
 
-	while ((c = getopt_long (argc, argv, "xsvJS:L:AHd:D:n:m:p:G:E:X:Y:P:R:r:i:l:o:T:I:t:B:bFcuUfM:Q1:2:3:5:?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "xsvJS:L:A:a:Hd:D:n:m:p:G:E:X:Y:P:R:r:i:l:o:T:I:t:B:bF:cuUfM:Q1:2:3:5:?", long_options, &option_index)) != -1)
 	{
 		switch(c)
 		{
@@ -270,8 +324,21 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 's':
 				global_context->config.downscale_mapping_quality = 1;
 				break;
+			case 'a':
+				strncpy(global_context->config.exon_annotation_file,  optarg, MAX_FILE_NAME_LENGTH-1);
+				break;
 			case 'A':
-				global_context->config.report_sam_file = 0;
+				strncpy(global_context->config.exon_annotation_alias_file, optarg, MAX_FILE_NAME_LENGTH-1);
+				break;
+			case 'F':
+				if(strcmp(optarg,"GTF")==0){
+					global_context->config.exon_annotation_file_type = FILE_TYPE_GTF;
+				} else if(strcmp(optarg,"SAF")==0){
+					global_context->config.exon_annotation_file_type = FILE_TYPE_RSUBREAD;
+				} else {
+					SUBREADprintf("Unknown annotation file format: %s.\nThe accepted formats are GTF and SAF only.\n", optarg);
+					STANDALONE_exit(-1);
+				}
 				break;
 			case 'S':
 				global_context->config.is_first_read_reversed = optarg[0]=='r'?1:0;
@@ -391,10 +458,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				}
 
 				break;
-			case 'F':
-				global_context->config.is_second_iteration_running = 0;
-				global_context->config.report_sam_file = 0;
-				break;
 			case 'c':
 				global_context->config.space_type = GENE_SPACE_COLOR; 
 				break;
@@ -469,6 +532,14 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context -> config.do_structural_variance_detection = 1;
 					global_context -> config.use_memory_buffer = 1;
 					global_context -> config.reads_per_chunk = 600llu*1024*1024;
+				}
+				else if(strcmp("gtfFeature", long_options[option_index].name) == 0)
+				{
+					strncpy(global_context->config.exon_annotation_feature_name_column, optarg, MAX_READ_NAME_LEN - 1);
+				}
+				else if(strcmp("gtfAttr", long_options[option_index].name) == 0)
+				{
+					strncpy(global_context->config.exon_annotation_gene_id_column, optarg, MAX_READ_NAME_LEN - 1);
 				}
 				else if(strcmp("maxRealignLocations", long_options[option_index].name)==0)
 				{

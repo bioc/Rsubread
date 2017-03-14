@@ -71,4 +71,8 @@ unsigned int find_left_end_cigar(unsigned int right_pos, char * cigar);
 int mac_or_rand_str(char * char_14);
 
 double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c, unsigned int d, long double * frac_buffer, int buffer_size);
+int load_features_annotation(char * file_name, int file_type, char * gene_id_column, char * feature_name_column,
+ void * context, int do_add_feature(char * gene_name, char * chro_name, unsigned int start, unsigned int end, int is_negative_strand, void * context)  );
+
+HashTable * load_alias_table(char * fname) ;
 #endif

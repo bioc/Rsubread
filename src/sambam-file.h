@@ -38,7 +38,7 @@ typedef unsigned int BS_uint_32;
 #define BAM_FILE_STAGE_ALIGNMENT 20
 
 
-#define SAMBAM_COMPRESS_LEVEL 5
+#define SAMBAM_COMPRESS_LEVEL Z_BEST_SPEED
 #define SAMBAM_GZIP_WINDOW_BITS -15
 #define SAMBAM_INPUT_STREAM_SIZE 140000
 
@@ -72,7 +72,7 @@ typedef struct
 } SamBam_Alignment;
 
 
-#define SB_FETCH(a)  if((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < 3000){SamBam_fetch_next_chunk(a);}
+#define SB_FETCH(a)  if((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < 3000){int test_rlen_2 = SamBam_fetch_next_chunk(a); if(test_rlen_2 == -2){(a)->is_bam_broken = 1;}}
 #define SB_EOF(a)  ((a)-> is_eof && (  (a) -> input_binary_stream_write_ptr <= (a) -> input_binary_stream_read_ptr ))
 #define SB_READ(a)  ((a) -> input_binary_stream_buffer + (a) -> input_binary_stream_read_ptr - (a) -> input_binary_stream_buffer_start_ptr)
 #define SB_RINC(a, len)   ((a) -> input_binary_stream_read_ptr) += len
@@ -97,6 +97,7 @@ typedef struct
 	char * input_binary_stream_buffer;
 	int is_eof;
 	int is_paired_end;
+	int is_bam_broken;
 } SamBam_FILE;
 
 
@@ -111,6 +112,7 @@ typedef struct
 	int header_plain_text_buffer_max;
 	int chunk_buffer_used;
 	int writer_state;
+	int is_internal_error;
 	unsigned int crc0;
 	
 	HashTable * chromosome_name_table;

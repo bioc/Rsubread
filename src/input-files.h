@@ -36,6 +36,7 @@
 #define GENE_INPUT_SAM_PAIR_2   95
 
 
+#define MAX_LINE_LENGTH 3000
 #define MIN_FILE_POINTERS_ALLOWED 50
 
 #define FILE_TYPE_SAM     50
@@ -49,6 +50,8 @@
 #define FILE_TYPE_UNKNOWN 999
 #define FILE_TYPE_EMPTY   999990
 #define FILE_TYPE_NONEXIST 999999
+#define FILE_TYPE_RSUBREAD 10
+#define FILE_TYPE_GTF 100
 
 #define FEATURECOUNTS_BUFFER_SIZE (1024*1024*12)
 
@@ -138,7 +141,8 @@ typedef struct {
 	int input_chunk_no;
 	int input_buff_SBAM_size;
 	int input_buff_BIN_size;
-	char tmp_file_prefix[MAX_FILE_NAME_LENGTH];
+	char tmp_file_prefix[MAX_FILE_NAME_LENGTH+1];
+	char in_file_name[MAX_FILE_NAME_LENGTH+1];
 
 	SAM_pairer_thread_t * threads;
 	int BAM_header_parsed;
@@ -146,6 +150,7 @@ typedef struct {
 	unsigned int BAM_n_ref;
 	int is_unsorted_notified;
 	int is_incomplete_BAM;
+	int is_internal_error;
 
 	void (* reset_output_function) (void * pairer);
 	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
@@ -263,7 +268,7 @@ double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int
 
 FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * close_immediately);
 
-void write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len);
+int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len);
 
 int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromosome_t *known_chromosomes, unsigned int * max_base_position);
 int my_strcmp(const void * s1, const void * s2);
@@ -273,7 +278,7 @@ void destroy_cigar_event_table(HashTable * event_table);
 
 int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, unsigned long long int read_no);
 int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len);
-void sort_SAM_finalise(SAM_sort_writer * writer);
+int sort_SAM_finalise(SAM_sort_writer * writer);
 int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_path);
 void colorread2base(char * read_buffer, int read_len);
 
@@ -309,4 +314,5 @@ void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
 int SAM_pairer_warning_file_open_limit();
 void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
+int is_comment_line(const char * l, int file_type, unsigned int lineno);
 #endif

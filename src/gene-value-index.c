@@ -127,19 +127,25 @@ void gvindex_set(gene_value_index_t * index, gehash_data_t offset, gehash_key_t 
 	index -> length = offset + 16 - index -> start_point + padding;
 }
 
-void gvindex_dump(gene_value_index_t * index, const char filename [])
+int gvindex_dump(gene_value_index_t * index, const char filename [])
 {
 	FILE * fp = f_subr_open(filename, "wb");
+	int is_full = 0;
+	int write_len = fwrite(&index->start_point,4,1, fp);
 
-	fwrite(&index->start_point,4,1, fp);
-	fwrite(&index->length, 4, 1, fp);
+	write_len += fwrite(&index->length, 4, 1, fp);
+	if(write_len < 2){
+		is_full = 1;
+	}
 
 	unsigned int useful_bytes, useful_bits;
 	gvindex_baseno2offset (index -> length+ index -> start_point, index,&useful_bytes,&useful_bits);
 
-	fwrite(index->values, 1, useful_bytes+1, fp);
-
+	write_len = fwrite(index->values, 1, useful_bytes+1, fp);
+	if(write_len <= useful_bytes) is_full = 1;
 	fclose(fp);
+	if(is_full) SUBREADprintf("ERROR: unable to writeinto the output file. Please check the disk space in the output directory.\n");
+	return is_full;
 }
 
 
@@ -148,10 +154,15 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	FILE * fp = f_subr_open(filename, "rb");
 	int read_length;
 	read_length = fread(&index->start_point,4,1, fp);
-	assert(read_length>0);
+	if(read_length<1){
+		SUBREADprintf("ERROR: the array index is incomplete : %d", read_length );
+		return 1;
+	}
 	read_length = fread(&index->length,4,1, fp);
-	assert(read_length>0);
-
+	if(read_length<1){
+		SUBREADputs("ERROR: the index is incomplete.");
+		return 1;
+	}
 	//SUBREADprintf ("\nBINDEX %s : %u ~ +%u\n",filename, index->start_point, index->length );
 
 	unsigned int useful_bytes, useful_bits;
@@ -167,7 +178,10 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	
 
 	read_length =fread(index->values, 1, useful_bytes+1, fp);
-	assert(read_length>0);
+	if(read_length < useful_bytes){
+		SUBREADprintf("ERROR: the array index is incomplete : %d < %d.", read_length, useful_bytes+1 );
+		return 1;
+	}
 
 	fclose(fp);
 	return 0;

@@ -36,7 +36,7 @@ void bktable_init(bucketed_table_t * tab, unsigned int maximum_interval_length, 
 
 void bktable_destroy(bucketed_table_t * tab);
 
-void bktable_free_ptrs(void * buckv, HashTable * tab);
+void bktable_free_ptrs(void * bkey, void * buckv, HashTable * tab);
 
 void fraglist_init(fragment_list_t * list);
 

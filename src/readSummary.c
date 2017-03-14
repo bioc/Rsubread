@@ -22,10 +22,12 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+
 
 
 #ifndef MAKE_STANDALONE
@@ -52,11 +54,7 @@
 /********************************************************************/
 /********************************************************************/
 /********************************************************************/
-#define FEATURE_NAME_LENGTH  256 
 #define CHROMOSOME_NAME_LENGTH 256 
-#define MAX_LINE_LENGTH 3000
-#define FILE_TYPE_RSUBREAD 10
-#define FILE_TYPE_GTF 100
 
 #define ALLOW_ALL_MULTI_MAPPING 1
 #define ALLOW_PRIMARY_MAPPING 2
@@ -191,6 +189,8 @@ typedef struct {
 	int is_duplicate_ignored;
 	int is_first_read_reversed;
 	int is_second_read_straight;
+	int use_stdin_file;
+	int disk_is_full;
 	int do_not_sort;
 	int reduce_5_3_ends_to_one;
 	int isCVersion;
@@ -545,8 +545,10 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 {
 	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+300), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
 	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
+	char MAC_or_random[13];
+	mac_or_rand_str(MAC_or_random);
 
-	sprintf(sam_used, "%s/featureCounts_test_file_writable.tmp", global_context -> temp_file_dir);
+	sprintf(sam_used, "%s/featureCounts_test_file_writable-%06d-%s.tmp", global_context -> temp_file_dir, getpid(), MAC_or_random);
 	FILE * fp = fopen(sam_used,"w");
 	if(fp){
 		fclose(fp);
@@ -570,7 +572,11 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		if(BAM_header_size>0) global_context -> max_BAM_header_size = max( global_context -> max_BAM_header_size , BAM_header_size + 180000);
 		if(file_probe==-1){
 			nNonExistFiles++;
-			SUBREADprintf("\nERROR: invalid parameter: '%s'\n\n", next_fn);
+			if(global_context -> use_stdin_file){
+				SUBREADprintf("\nERROR: no valid SAM or BAM file is received from <STDIN>\n\n");
+			}else{
+				SUBREADprintf("\nERROR: invalid parameter: '%s'\n\n", next_fn);
+			}
 			return 1;
 		}
 		if(file_probe == 1) nBAMfiles++;		
@@ -610,12 +616,14 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		else if(is_first_read_PE == 1) file_chr = 'P';
 		//file_chr = 'o';
 
-		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, next_fn,CHAR_ESC);
+		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":next_fn,CHAR_ESC);
 		nfiles++;
 	}
 
 	(*n_input_files) = nfiles;
 	print_in_box(80,0,0,"");
+
+	#ifdef MAKE_STANDALONE	
 	print_in_box(80,0,0,"            Output file : %s", out);
 	print_in_box(80,0,0,"                Summary : %s.summary", out);
 	print_in_box(80,0,0,"             Annotation : %s (%s)", annot, is_GTF?"GTF":"SAF");
@@ -624,8 +632,10 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		print_in_box(80,0,0,"                     (Note that files are saved to the output directory)");
 		print_in_box(80,0,0,"");
 	}
+
 	if(global_context -> do_junction_counting)
 		print_in_box(80,0,0,"      Junction Counting : <output_file>.jcounts");
+	#endif
 
 	if(global_context -> alias_file_name[0])
 		print_in_box(80,0,0,"  Chromosome alias file : %s", global_context -> alias_file_name);
@@ -646,16 +656,15 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	if(global_context->is_multi_mapping_allowed == ALLOW_PRIMARY_MAPPING)
 		multi_mapping_allow_mode = "primary only";
 	else if(global_context->is_multi_mapping_allowed == ALLOW_ALL_MULTI_MAPPING)
-		multi_mapping_allow_mode = global_context -> use_fraction_multi_mapping?"counted (as fractions)": "counted (as integer)";
+		multi_mapping_allow_mode = global_context -> use_fraction_multi_mapping?"counted": "counted";
 
 	print_in_box(80,0,0,"     Multimapping reads : %s", multi_mapping_allow_mode);
 	print_in_box(80,0,0,"Multi-overlapping reads : %s", global_context->is_multi_overlap_allowed?"counted":"not counted");
 	if(global_context -> is_split_or_exonic_only)
 		print_in_box(80,0,0,"       Split alignments : %s", (1 == global_context -> is_split_or_exonic_only)?"only split alignments":"only exonic alignments");
-	if(global_context -> fragment_minimum_overlapping !=1)
-		print_in_box(80,0,0,"      Overlapping bases : %d", global_context -> fragment_minimum_overlapping);
-	if(global_context -> fractional_minimum_overlapping !=1)
-		print_in_box(81,0,0,"      Overlapping bases : %0.1f%%%%", global_context -> fractional_minimum_overlapping*100);
+	print_in_box(80,0,0,"  Min overlapping bases : %d", global_context -> fragment_minimum_overlapping);
+	if(global_context -> fractional_minimum_overlapping > 0.000001)
+		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%%", global_context -> fractional_minimum_overlapping*100);
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
 		print_in_box(80,0,0,"        Read extensions : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
 	if(global_context -> reduce_5_3_ends_to_one)
@@ -688,10 +697,14 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	return 0;
 }
 
-void print_FC_results(fc_thread_global_context_t * global_context)
+void print_FC_results(fc_thread_global_context_t * global_context, char * out)
 {
 	print_in_box(89,0,1,"%c[36mRead assignment finished.%c[0m", CHAR_ESC, CHAR_ESC);
 	print_in_box(80,0,0,"");
+	#ifdef MAKE_STANDALONE
+	print_in_box(80,0,PRINT_BOX_WRAPPED,"Summary of counting results can be found in file \"%s\"", out);
+	print_in_box(80,0,0,"");
+	#endif
 	print_in_box(80,2,1,"http://subread.sourceforge.net/");
 	SUBREADputs("");
 	return;
@@ -725,28 +738,6 @@ void print_FC_results(fc_thread_global_context_t * global_context)
 int fc_strcmp(const void * s1, const void * s2)
 {
 	return strcmp((char*)s1, (char*)s2);
-}
-
-
-int is_comment_line(const char * l, int file_type, unsigned int lineno)
-{
-	int tabs = 0, xk1 = 0;
-	if(l[0]=='#') return 1;
-
-	if(isalpha(l[0]) && file_type == FILE_TYPE_RSUBREAD)
-	{
-		char target_chr[16];
-		memcpy(target_chr, l, 16);
-		for(xk1=0; xk1<16; xk1++)
-			target_chr[xk1] = tolower(target_chr[xk1]);
-
-		if(memcmp(target_chr, "geneid\tchr\tstart",16)==0) return 1;
-	}
-
-	xk1=0;
-	while(l[xk1]) tabs += (l[xk1++] == '\t');
-
-	return tabs < ((file_type == FILE_TYPE_GTF)?8:4);
 }
 
 void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * chro, unsigned int start, unsigned int stop){
@@ -862,7 +853,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	while(1)
 	{
 		char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
-		char * token_temp, *chro_name;
+		char * token_temp = NULL, *chro_name;
 		fc_chromosome_index_info * chro_stab;
 		unsigned int feature_pos = 0;
 		if(!fgets_ret) break;
@@ -926,7 +917,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 		int is_gene_id_found = 0;
 		fgets(file_line, MAX_LINE_LENGTH, fp);
 		lineno++;
-		char * token_temp;
+		char * token_temp = NULL;
 		if(is_comment_line(file_line, file_type, lineno-1))continue;
 
 		if(file_type == FILE_TYPE_RSUBREAD)
@@ -2199,10 +2190,10 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 
 /*
 typedef struct {
-        char chromosome_name_left[CHROMOSOME_NAME_LENGTH + 1];
-        char chromosome_name_right[CHROMOSOME_NAME_LENGTH + 1];
-        unsigned int last_exon_base_left;
-        unsigned int first_exon_base_right;
+	char chromosome_name_left[CHROMOSOME_NAME_LENGTH + 1];
+	char chromosome_name_right[CHROMOSOME_NAME_LENGTH + 1];
+	unsigned int last_exon_base_left;
+	unsigned int first_exon_base_right;
 } fc_junction_info_t;
 
 */
@@ -2283,6 +2274,19 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			char ** hits_chro1, char ** hits_chro2, unsigned int * hits_start_pos1, unsigned int * hits_start_pos2, unsigned short * hits_length1, unsigned short * hits_length2,
 			int fixed_fractional_count, char * read_name);
 
+int writesize_fprint(fc_thread_global_context_t * global_context, FILE * fp, const char * pattern, ...){
+	int ret;
+	va_list args;
+	va_start(args , pattern);
+	assert(fp);
+
+	ret = vfprintf(fp, pattern , args);
+	va_end(args);
+	if(ret < 1) global_context -> disk_is_full = 1;
+	return ret;
+
+}
+
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2)
 {
 
@@ -2340,7 +2344,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				thread_context->read_counters.unassigned_unmapped ++;
 
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped\t*\t*\n", read_name);
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_Unmapped\t*\t*\n", read_name);
 
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
@@ -2363,7 +2367,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(global_context -> SAM_output_fp)
 				{
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MappingQuality\t*\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_MappingQuality\t*\tMapping_Quality=%d,%d\n", read_name, first_read_quality_score, mapping_qual);
 				}
 				return;
 			}
@@ -2393,7 +2397,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						thread_context->read_counters.unassigned_fragmentlength ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_FragmentLength\t*\tLength=%ld\n", read_name, fragment_length);
+							writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_FragmentLength\t*\tLength=%ld\n", read_name, fragment_length);
 						return;
 					}
 				} else {
@@ -2401,7 +2405,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 						thread_context->read_counters.unassigned_chimericreads ++;
 
 						if(global_context -> SAM_output_fp)
-							fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Chimera\t*\t*\n", read_name);
+							writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_Chimera\t*\t*\n", read_name);
 						return;
 					}
 				}
@@ -2416,7 +2420,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			{
 				thread_context->read_counters.unassigned_duplicate ++;
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Duplicate\t*\t*\n", read_name);
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_Duplicate\t*\t*\n", read_name);
 
 				return;
 			}
@@ -2433,7 +2437,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				thread_context->read_counters.unassigned_multimapping ++;
 
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\t*\t*\n", read_name);
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_MultiMapping\t*\t*\n", read_name);
 
 				return;
 			}
@@ -2447,7 +2451,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			thread_context->read_counters.unassigned_secondary ++;
 
 			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\t*\t*\n", read_name);
+				writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_Secondary\t*\t*\n", read_name);
 			return;
 		}
 
@@ -2476,7 +2480,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			if(skipped_for_exonic == 1 + global_context -> is_paired_end_mode_assign){
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_%s\t*\t*\n", read_name, (global_context->is_split_or_exonic_only == 2)?"Hasjunction":"Nonjunction");
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_%s\t*\t*\n", read_name, (global_context->is_split_or_exonic_only == 2)?"Hasjunction":"Nonjunction");
 
 				thread_context->read_counters.unassigned_junction_condition ++;
 				return;
@@ -2486,7 +2490,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(global_context->is_split_or_exonic_only == 2 && is_junction_read) {
 			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_%s\t*\t*\n", read_name, (global_context->is_split_or_exonic_only == 2)?"Hasjunction":"Nonjunction");
+				writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_%s\t*\t*\n", read_name, (global_context->is_split_or_exonic_only == 2)?"Hasjunction":"Nonjunction");
 			thread_context->read_counters.unassigned_junction_condition ++;
 			return;
 		}
@@ -2817,7 +2821,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1\n", read_name, final_feture_name);
+			writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1\n", read_name, final_feture_name);
 		}
 		thread_context->read_counters.assigned_reads ++;
 	} else if(global_context -> need_calculate_overlap_len == 0 && nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0]) {
@@ -2828,7 +2832,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
 			unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-			fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1\n", read_name, final_feture_name);
+			writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1\n", read_name, final_feture_name);
 		}
 		thread_context->read_counters.assigned_reads ++;
 	} else {
@@ -2951,7 +2955,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							score_x1_key = global_context -> exontable_geneid[ scoring_exon_ids[score_x1] ];
 						else	score_x1_key = scoring_exon_ids[score_x1] ;
 
-						//fprintf(stderr, "Q222KEY: exon=%ld, gene=%ld\n", scoring_exon_ids[score_x1] , score_x1_key  );
+						//writesize_fprint(global_context,stderr, "Q222KEY: exon=%ld, gene=%ld\n", scoring_exon_ids[score_x1] , score_x1_key  );
 						if( score_x1_key == score_merge_key ){
 							if((scoring_flags[score_x1] & ( ends?2:1 )) == 0) {
 								scoring_flags[score_x1] |= (ends?2:1);
@@ -2979,6 +2983,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		int maximum_total_count = 0;
 		int maximum_score_x1 = 0;
 		int applied_fragment_minimum_overlapping = 1;
+		int overlapping_total_count = 0;
 
 		if( global_context -> fragment_minimum_overlapping > 1 ||  global_context -> need_calculate_fragment_len){
 			applied_fragment_minimum_overlapping = max( global_context -> fragment_minimum_overlapping, global_context -> fractional_minimum_overlapping * ( total_frag_len) );
@@ -3001,11 +3006,12 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 				maximum_score_x1 = score_x1;
 			}else if( maximum_score == scoring_numbers[score_x1] )
 				maximum_total_count++;
+			overlapping_total_count ++;
 		}
 
 		if(maximum_total_count == 0){
 			if(global_context -> SAM_output_fp)
-				fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\t*\t*\n", read_name);
+				writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_NoFeatures\t*\t*\n", read_name);
 
 			thread_context->read_counters.unassigned_nofeatures ++;
 		}else{
@@ -3021,9 +3027,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 					int final_gene_number = global_context -> exontable_geneid[max_exon_id];
 					unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
 					if(scoring_count>1)
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1;%s/Targets=%d/%d\n", read_name, final_feture_name, global_context -> use_overlapping_break_tie? "MaximumOverlapping":"Votes", maximum_score, scoring_count);
+						writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1;%s/Targets=%d/%d\n", read_name, final_feture_name, global_context -> use_overlapping_break_tie? "MaximumOverlapping":"Votes", maximum_score, scoring_count);
 					else
-						fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1\n", read_name, final_feture_name);
+						writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=1\n", read_name, final_feture_name);
 				}
 				thread_context->read_counters.assigned_reads ++;
 			}else if(global_context -> is_multi_overlap_allowed) {
@@ -3034,10 +3040,14 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 				{
 
 					// This change was made on 31/MAR/2016
-					if( scoring_numbers[xk1] < maximum_score ) continue ; 
+					if( scoring_numbers[xk1] < 1 ) continue ;
+					if( scoring_numbers[xk1] < maximum_score && global_context -> use_overlapping_break_tie ) continue ; 
 
 					long tmp_voter_id = scoring_exon_ids[xk1];
-					thread_context->count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, maximum_total_count);
+					//if(1 && FIXLENstrcmp( read_name , "V0112_0155:7:1101:5467:23779#ATCACG" )==0)
+					//	SUBREADprintf("CountsFrac = %d ; add=%d\n", overlapping_total_count, calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count) );
+
+					thread_context->count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count);
 
 					if(global_context -> SAM_output_fp)
 					{
@@ -3058,12 +3068,12 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 					int ffnn = strlen(final_feture_names);
 					if(ffnn>0) final_feture_names[ffnn-1]=0;
 					// overlapped but still assigned 
-					fprintf(global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=%d\n", read_name, final_feture_names, assigned_no);
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tAssigned\t%s\tTotal=%d\n", read_name, final_feture_names, assigned_no);
 				}
 				thread_context->read_counters.assigned_reads ++;
 			} else {
 				if(global_context -> SAM_output_fp)
-					fprintf(global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguity\t*\tNumber_Of_Overlapped_Genes=%d\n", read_name, maximum_total_count);
+					writesize_fprint(global_context,global_context -> SAM_output_fp,"%s\tUnassigned_Ambiguity\t*\tNumber_Of_Overlapped_Genes=%d\n", read_name, maximum_total_count);
 
 				thread_context->read_counters.unassigned_ambiguous ++;
 			}
@@ -3169,47 +3179,6 @@ void fc_thread_merge_results(fc_thread_global_context_t * global_context, read_c
 	print_in_box(80,0,0,"");
 }
 
-HashTable * load_alias_table(char * fname)
-{
-	FILE * fp = f_subr_open(fname, "r");
-	if(!fp)
-	{
-		print_in_box(80,0,0,"WARNING unable to open alias file '%s'", fname);
-		return NULL;
-	}
-
-	char * fl = malloc(2000);
-
-	HashTable * ret = HashTableCreate(1013);
-	HashTableSetDeallocationFunctions(ret, free, free);
-	HashTableSetKeyComparisonFunction(ret, fc_strcmp);
-	HashTableSetHashFunction(ret, fc_chro_hash);
-	
-	while (1)
-	{
-		char *ret_fl = fgets(fl, 1999, fp);
-		if(!ret_fl) break;
-		if(fl[0]=='#') continue;
-		char * sam_chr = NULL;
-		char * anno_chr = strtok_r(fl, ",", &sam_chr);
-		if((!sam_chr)||(!anno_chr)) continue;
-
-		sam_chr[strlen(sam_chr)-1]=0;
-		char * anno_chr_buf = malloc(strlen(anno_chr)+1);
-		strcpy(anno_chr_buf, anno_chr);
-		char * sam_chr_buf = malloc(strlen(sam_chr)+1);
-		strcpy(sam_chr_buf, sam_chr);
-		
-		//printf("ALIAS: %s -> %s\n", sam_chr, anno_chr);
-		HashTablePut(ret, sam_chr_buf, anno_chr_buf);
-	}
-
-	fclose(fp);
-
-	free(fl);
-	return ret;
-}
-
 void get_temp_dir_from_out(char * tmp, char * out){
 	char * slash = strrchr(out,'/');
 	if(NULL == slash){
@@ -3220,7 +3189,37 @@ void get_temp_dir_from_out(char * tmp, char * out){
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir)
+void fc_thread_init_input_files(fc_thread_global_context_t * global_context, char * in_fnames, char ** out_ptr ){
+	if(global_context -> use_stdin_file){
+		#ifdef MAKE_STANDALONE
+
+		char MAC_or_random[13];
+
+		(*out_ptr) = malloc(300);
+		mac_or_rand_str(MAC_or_random);
+		sprintf(*out_ptr, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
+
+		SUBREADprintf("\nReading data from <STDIN> for featureCounts ...\n\n");
+		
+		FILE * ifp = fopen(*out_ptr,"w");
+		while(1){
+			char nchar[100];
+			int rlen = fread(nchar, 1, 100, stdin);
+			if(rlen > 0) fwrite(nchar, 1, rlen, ifp);
+			else break;
+			//if(rlen < 100)break;
+		}
+		fclose(ifp);
+
+		#endif
+	}else{
+		(*out_ptr) = malloc(strlen(in_fnames)+1);
+		strcpy((*out_ptr), in_fnames);
+	}
+
+}
+
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file)
 {
 	int x1;
 
@@ -3243,6 +3242,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_multi_mapping_allowed = is_multi_mapping_allowed;
 	global_context -> is_split_or_exonic_only = is_split_or_exonic_only;
 	global_context -> is_duplicate_ignored = is_duplicate_ignored;
+	global_context -> use_stdin_file = use_stdin_file;
 	//global_context -> is_first_read_reversed = (pair_orientations[0]=='r');
 	//global_context -> is_second_read_straight = (pair_orientations[1]=='f');
 
@@ -3434,13 +3434,16 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		thread_args[1] = & global_context -> thread_contexts[xk1];
 	}
 
-	char rand_prefix[500];
+	char rand_prefix[300];
+	char new_fn[300];
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 	sprintf(rand_prefix, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
+	if(global_context -> use_stdin_file) sprintf(new_fn, "<%s",  global_context -> input_file_name );
+	else sprintf(new_fn, "%s",  global_context -> input_file_name );
 
 	//#warning "REMOVE ' * 2 ' FROM NEXT LINE !!!!!!"
-	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, 1, !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, global_context -> input_file_name, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context);
+	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, 1, !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context);
 	SAM_pairer_set_unsorted_notification(&global_context -> read_pairer, pairer_unsorted_notification);
 
 	return 0;
@@ -3518,7 +3521,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		if(!next_fn||strlen(next_fn)<1) break;
 		if(column_numbers[i_files])
 		{
-			fprintf(fp_out,"\t%s", next_fn);
+			fprintf(fp_out,"\t%s", global_context -> use_stdin_file?"STDIN":next_fn);
 			non_empty_files ++;
 		}
 		next_fn = strtok_r(NULL, ";", &tmp_ptr);
@@ -3578,6 +3581,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	char *is_occupied = malloc(longest_gene_exons);
 	unsigned int * input_start_stop_list = malloc(longest_gene_exons * sizeof(int) * 2);
 	unsigned int * output_start_stop_list = malloc(longest_gene_exons * sizeof(int) * 2);
+	int disk_is_full = 0;
 
 	char * out_chr_list = malloc(longest_gene_exons * (1+global_context -> longest_chro_name) + 1), * tmp_chr_list = NULL;
 	char * out_start_list = malloc(11 * longest_gene_exons + 1), * tmp_start_list = NULL;
@@ -3655,7 +3659,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		_cut_tail(out_end_list);
 		_cut_tail(out_strand_list);
 
-		fprintf(fp_out, "%s\t%s\t%s\t%s\t%s\t%d"    , gene_symbol, out_chr_list, out_start_list, out_end_list, out_strand_list, gene_nonoverlap_len);
+		int wlen = fprintf(fp_out, "%s\t%s\t%s\t%s\t%s\t%d"    , gene_symbol, out_chr_list, out_start_list, out_end_list, out_strand_list, gene_nonoverlap_len);
 
 		// all exons: gene_exons_number[xk1] : gene_exons_pointer[xk1]
 		int non_empty_file_index = 0;
@@ -3675,7 +3679,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 			}
 		}
 		fprintf(fp_out,"\n");
-
+		if(wlen < 6)disk_is_full = 1;
 	}
 	free(is_occupied);
 	free(input_start_stop_list);
@@ -3693,12 +3697,17 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	free(gene_exons_end);
 	free(gene_exons_strand);
 	fclose(fp_out);
+
+	if(disk_is_full){
+		SUBREADprintf("ERROR: disk is full; the count file cannot be generated.\n");
+		unlink(out_file);
+	}
 }
 
 void fc_write_final_counts(fc_thread_global_context_t * global_context, const char * out_file, int nfiles, char * file_list, read_count_type_t ** column_numbers, fc_read_counters *read_counters, int isCVersion)
 {
 	char fname[300];
-	int i_files, xk1;
+	int i_files, xk1, disk_is_full = 0;
 
 	sprintf(fname, "%s.summary", out_file);
 	FILE * fp_out = f_subr_open(fname,"w");
@@ -3715,7 +3724,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	{
 		if(!next_fn||strlen(next_fn)<1) break;
 		if(column_numbers[i_files])
-			fprintf(fp_out,"\t%s", next_fn);
+			fprintf(fp_out,"\t%s", global_context -> use_stdin_file?"STDIN":next_fn);
 
 		next_fn += strlen(next_fn)+1;
 	}
@@ -3733,17 +3742,24 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 			if(column_numbers[i_files])
 				fprintf(fp_out,"\t%llu", *cntr);
 		}
-		fprintf(fp_out,"\n");
+		int wlen = fprintf(fp_out,"\n");
+		if(wlen < 1)disk_is_full = 1;
 	}
 
 
 	fclose(fp_out);
+
+	if(disk_is_full){
+		SUBREADprintf("ERROR: disk is full; the count file cannot be generated.\n");
+		unlink(out_file);
+	}
+
 }
 void fc_write_final_results(fc_thread_global_context_t * global_context, const char * out_file, int features, read_count_type_t ** column_numbers, char * file_list, int n_input_files, fc_feature_info_t * loaded_features, int header_out)
 {
 	/* save the results */
 	FILE * fp_out;
-	int i, i_files = 0;
+	int i, i_files = 0, disk_is_full =0;
 	fp_out = f_subr_open(out_file,"w");
 	if(!fp_out){
 		SUBREADprintf("Failed to create file %s\n", out_file);
@@ -3766,7 +3782,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 	while(1){
 		if(!next_fn||strlen(next_fn)<1) break;
 		if(column_numbers[i_files])
-			fprintf(fp_out,"\t%s", next_fn);
+			fprintf(fp_out,"\t%s", global_context -> use_stdin_file?"STDIN":next_fn);
 		next_fn = strtok_r(NULL, ";", &tmp_ptr);
 		i_files++;
 	}
@@ -3794,10 +3810,15 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 
 			}
 		}
-		fprintf(fp_out,"\n");
+		int wlen = fprintf(fp_out,"\n");
+		if(wlen < 1)disk_is_full = 1;
 	}
 
 	fclose(fp_out);
+	if(disk_is_full){
+		SUBREADprintf("ERROR: disk is full; unable to write into the output file.\n");
+		unlink(out_file);
+	}
 }
 
 static struct option long_options[] =
@@ -3828,29 +3849,35 @@ void print_usage()
 	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
 
 	SUBREADputs("Usage: featureCounts [options] -a <annotation_file> -o <output_file> input_file1 [input_file2] ... \n");
-	SUBREADputs("## Required arguments:");
+	SUBREADputs("## Mandatory arguments:");
 	SUBREADputs("");
 	SUBREADputs("  -a <string>         Name of an annotation file. GTF/GFF format by default.");
-	SUBREADputs("                      See -F option for more formats.");
+	SUBREADputs("                      See -F option for more format information. Inbuilt");
+	SUBREADputs("                      annotations (SAF format) is available in 'annotation'");
+	SUBREADputs("                      directory of the package.");
 	SUBREADputs("");
 	SUBREADputs("  -o <string>         Name of the output file including read counts. A separate"); 
 	SUBREADputs("                      file including summary statistics of counting results is");
-	SUBREADputs("                      also included in the output (`<string>.summary')");
+	SUBREADputs("                      also included in the output ('<string>.summary')");
 	SUBREADputs("");
-	SUBREADputs("  input_file1 [input_file2] ...   A list of SAM or BAM format files.");
+	SUBREADputs("  input_file1 [input_file2] ...   A list of SAM or BAM format files. They can be");
+	SUBREADputs("                      either name or location sorted. If not files provided,");
+	SUBREADputs("                      <stdin> input is expected.");
 	SUBREADputs("");
-	SUBREADputs("## Options");
+	
+	SUBREADputs("## Optional arguments:");
 	SUBREADputs("# Annotation");
 	SUBREADputs("");
-	SUBREADputs("  -F <string>         Specify format of provided annotation file. Acceptable");
-	SUBREADputs("                      formats include `GTF/GFF' and `SAF'. `GTF/GFF' by default.");
-	SUBREADputs("                      See Users Guide for description of SAF format.");
+	SUBREADputs("  -F <string>         Specify format of the provided annotation file. Acceptable");
+	SUBREADputs("                      formats include 'GTF' (or compatible GFF format) and");
+	SUBREADputs("                      'SAF'. 'GTF' by default.  For SAF format, please refer to");
+	SUBREADputs("                      Users Guide.");
 	SUBREADputs("");
-	SUBREADputs("  -t <string>         Specify feature type in GTF annotation. `exon' by ");
+	SUBREADputs("  -t <string>         Specify feature type in GTF annotation. 'exon' by ");
 	SUBREADputs("                      default. Features used for read counting will be ");
 	SUBREADputs("                      extracted from annotation using the provided value.");
 	SUBREADputs("");
-	SUBREADputs("  -g <string>         Specify attribute type in GTF annotation. `gene_id' by ");
+	SUBREADputs("  -g <string>         Specify attribute type in GTF annotation. 'gene_id' by ");
 	SUBREADputs("                      default. Meta-features used for read counting will be ");
 	SUBREADputs("                      extracted from annotation using the provided value.");
 	SUBREADputs("");
@@ -3880,8 +3907,8 @@ void print_usage()
 	SUBREADputs("                      end. If a negative value is provided, then a gap of up");
 	SUBREADputs("                      to specified size will be allowed between read and the");
 	SUBREADputs("                      feature that the read is assigned to.");
-        SUBREADputs("");
-	SUBREADputs("  --fracOverlap <value> Minimum fraction of overlapping bases in a read that is");
+	SUBREADputs("");
+	SUBREADputs("  --fracOverlap <float> Minimum fraction of overlapping bases in a read that is");
 	SUBREADputs("                      required for read assignment. Value should be within range");
 	SUBREADputs("                      [0,1]. 0 by default. Number of overlapping bases is");
 	SUBREADputs("                      counted from both reads if paired end. Both this option");
@@ -3906,7 +3933,7 @@ void print_usage()
 	SUBREADputs("");
 	SUBREADputs("  -M                  Multi-mapping reads will also be counted. For a multi-");
 	SUBREADputs("                      mapping read, all its reported alignments will be ");
-	SUBREADputs("                      counted. The `NH' tag in BAM/SAM input is used to detect ");
+	SUBREADputs("                      counted. The 'NH' tag in BAM/SAM input is used to detect ");
 	SUBREADputs("                      multi-mapping reads.");
 	SUBREADputs("");
 	SUBREADputs("# Fractional counting");
@@ -3920,7 +3947,7 @@ void print_usage()
 	SUBREADputs("                      is specified, each overlapping feature will receive a");
 	SUBREADputs("                      fractional count of 1/y, where y is the total number of");
 	SUBREADputs("                      features overlapping with the read. When both '-M' and");
-	SUBREADputs("                      '-O' are specified, each alignment will carry a fraction");
+	SUBREADputs("                      '-O' are specified, each alignment will carry a fractional");
 	SUBREADputs("                      count of 1/(x*y).");
 	SUBREADputs("");
 	
@@ -3974,8 +4001,7 @@ void print_usage()
 	SUBREADputs("                      instead of reads. This option is only applicable for");
 	SUBREADputs("                      paired-end reads.");
 	SUBREADputs("");
-	SUBREADputs("  -B                  Count read pairs that have both ends successfully aligned ");
-	SUBREADputs("                      only.");
+	SUBREADputs("  -B                  Only count read pairs that have both ends aligned.");
 	SUBREADputs("");
 	SUBREADputs("  -P                  Check validity of paired-end distance when counting read ");
 	SUBREADputs("                      pairs. Use -d and -D to set thresholds.");
@@ -4120,7 +4146,7 @@ int junccmp(fc_junction_gene_t * j1, fc_junction_gene_t * j2){
 
 
 void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char * output_file_name,  read_count_type_t ** table_columns, char * input_file_names, int n_input_files, HashTable ** junction_global_table_list, HashTable ** splicing_global_table_list){
-	int infile_i;
+	int infile_i, disk_is_full = 0;
 
 	HashTable * merged_junction_table = HashTableCreate(156679);
 
@@ -4210,7 +4236,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	{
 		if(!next_fn||strlen(next_fn)<1) break;
 		if(table_columns[infile_i])
-			fprintf(ofp,"\t%s", next_fn);
+			fprintf(ofp,"\t%s", global_context -> use_stdin_file?"STDIN":next_fn);
 
 		next_fn += strlen(next_fn)+1;
 	}
@@ -4243,7 +4269,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 				else if(donor[0]=='C' && donor[1]=='T' && receptor[0]=='A' && receptor[1]=='C') strand = "-";
 			}else if(!global_context ->is_junction_no_chro_shown){
 				global_context ->is_junction_no_chro_shown = 1;
-				print_in_box(80,0,0, "   WARNING contig `%s' is not found in the", chro_small);
+				print_in_box(80,0,0, "   WARNING contig '%s' is not found in the", chro_small);
 				print_in_box(80,0,0, "   provided genome file!");
 				print_in_box(80,0,0,"");
 
@@ -4341,7 +4367,8 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			unsigned long count = HashTableGet(junction_global_table_list[infile_i]  , key_list[ky_i]) - NULL;
 			fprintf(ofp,"\t%lu", count);
 		}
-		fprintf(ofp, "\n");
+		int wlen = fprintf(ofp, "\n");
+		if(wlen < 1) disk_is_full = 1;
 	}
 	fclose(ofp);
 	free(junction_key_list);
@@ -4357,6 +4384,10 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	HashTableDestroy(merged_junction_table);
 	HashTableDestroy(merged_splicing_table);
+	if(disk_is_full){
+		unlink(outfname);
+		SUBREADprintf("ERROR: disk is full; no junction counting table is generated.\n");
+	}
 }
 
 char * get_short_fname(char * lname){
@@ -4424,15 +4455,16 @@ int readSummary(int argc,char *argv[]){
 	39: as.numeric(is_Restrictly_No_Overlapping) # when "1", disable the voting-based tie breaking (e.g., when the reads are paired-end and one gene receives two votes but the other gene only has one.). "0" by default.
 	40: as.numeric(min_Fractional_Overlap) # A fractioal number.  0.00 : at least 1 bp overlapping
 	41: temp_directory # the directory to put temp files. "<use output directory>" by default, namely find it from the output file dir.
+	42: as.numeric(use_stdin_stdout) # only for CfeatureCounts. When use_stdin_stdout & 0x01 > 0, the input file is from stdin (stored in a temporary file); when use_stdin_stdout & 0x02 > 0, the output should be written to STDOUT instead of a file.
 	 */
 
-	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one;
+	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile;
 	float fracOverlap;
 	char **chr;
 	long *start, *stop;
 	int *geneid;
 
-	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir;
+	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr ;
 	long nexons;
 
 
@@ -4603,20 +4635,25 @@ int readSummary(int argc,char *argv[]){
 	}
 	else	temp_dir = NULL;//	get_temp_dir_from_out(temp_dir, (char *)argv[3]);
 
+	if(argc>42){
+		useStdinFile = (atoi(argv[42]) & 1)!=0;
+	}else	useStdinFile = 0;
+
 
 	if(SAM_pairer_warning_file_open_limit()) return -1;
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile);
 
+	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
 	if( global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && (!isMultiOverlapAllowed) && global_context.use_fraction_multi_mapping)
 	{
 		SUBREADprintf("ERROR: '--fraction' option should be used together with '-M' or '-O'. Please change the parameters to allow multi-mapping reads and/or multi-overlapping features.\n");
 		return -1;
 	}
-	if( print_FC_configuration(&global_context, argv[1], argv[2], argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport) )
+	if( print_FC_configuration(&global_context, argv[1], file_name_ptr, argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport) )
 		return -1;
 
 
@@ -4671,15 +4708,15 @@ int readSummary(int argc,char *argv[]){
 
 
 	char * tmp_pntr = NULL;
-	char * file_list_used = malloc(strlen(argv[2])+1);
-	char * file_list_used2 = malloc(strlen(argv[2])+1);
-	char * is_unique = malloc(strlen(argv[2])+1);
-	strcpy(file_list_used, argv[2]);
+	char * file_list_used = malloc(strlen(file_name_ptr)+1);
+	char * file_list_used2 = malloc(strlen(file_name_ptr)+1);
+	char * is_unique = malloc(strlen(file_name_ptr)+1);
+	strcpy(file_list_used, file_name_ptr);
 	for(x1 = 0;;x1++){
 		char * test_fn = strtok_r(x1?NULL:file_list_used,";", &tmp_pntr);
 		if(NULL == test_fn) break; 
 		char * short_fname = get_short_fname(test_fn);
-		strcpy(file_list_used2, argv[2]);
+		strcpy(file_list_used2, file_name_ptr);
 
 		is_unique[x1]=1;
 		char * loop_ptr = NULL;
@@ -4700,7 +4737,7 @@ int readSummary(int argc,char *argv[]){
 	free(file_list_used2);
 
 	tmp_pntr = NULL;
-	strcpy(file_list_used, argv[2]);
+	strcpy(file_list_used, file_name_ptr);
 	char * next_fn = strtok_r(file_list_used,";", &tmp_pntr);
 	read_count_type_t ** table_columns = calloc( n_input_files , sizeof(read_count_type_t *)), i_files=0;
 	fc_read_counters * read_counters = calloc(n_input_files , sizeof(fc_read_counters)); 
@@ -4714,7 +4751,7 @@ int readSummary(int argc,char *argv[]){
 
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
-		if(next_fn==NULL || strlen(next_fn)<1) break;
+		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
 
 		read_count_type_t * column_numbers = calloc(nexons, sizeof(read_count_type_t));
 		HashTable * junction_global_table = NULL;
@@ -4745,6 +4782,9 @@ int readSummary(int argc,char *argv[]){
 		memset(my_read_counter, 0, sizeof(fc_read_counters));
 
 		int ret_int = readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end, my_read_counter, junction_global_table, splicing_global_table);
+		if(global_context.disk_is_full){
+			SUBREADprintf("ERROR: disk is full. Please check the free space in the output directory.\n");
+		}
 		if(ret_int!=0){
 			// give up this file.
 
@@ -4771,17 +4811,18 @@ int readSummary(int argc,char *argv[]){
 	free(file_list_used);
 
 	if(global_context.is_input_bad_format){
-		SUBREADprintf("\nFATAL Error: an input file has wrong format! The program has to terminate and no counting file is generated.\n\n");
-	}else{
+		SUBREADprintf("\nFATAL Error: The program has to terminate and no counting file is generated.\n\n");
+	}else if(!global_context.disk_is_full){
 		if(isGeneLevel)
-			fc_write_final_gene_results(&global_context, geneid, chr, start, stop, sorted_strand, argv[3], nexons,  table_columns, argv[2], n_input_files , loaded_features, isCVersion);
+			fc_write_final_gene_results(&global_context, geneid, chr, start, stop, sorted_strand, argv[3], nexons,  table_columns, file_name_ptr, n_input_files , loaded_features, isCVersion);
 		else
-			fc_write_final_results(&global_context, argv[3], nexons, table_columns, argv[2], n_input_files ,loaded_features, isCVersion);
+			fc_write_final_results(&global_context, argv[3], nexons, table_columns, file_name_ptr, n_input_files ,loaded_features, isCVersion);
 	}
-	if(global_context.do_junction_counting)
-		fc_write_final_junctions(&global_context, argv[3], table_columns, argv[2], n_input_files , junction_global_table_list, splicing_global_table_list);
+	if(global_context.do_junction_counting && !global_context.disk_is_full)
+		fc_write_final_junctions(&global_context, argv[3], table_columns, file_name_ptr, n_input_files , junction_global_table_list, splicing_global_table_list);
 
-	fc_write_final_counts(&global_context, argv[3], n_input_files, argv[2], table_columns, read_counters, isCVersion);
+	if(!global_context.disk_is_full)
+		fc_write_final_counts(&global_context, argv[3], n_input_files, file_name_ptr, table_columns, read_counters, isCVersion);
 
 	int total_written_coulmns = 0;
 	for(i_files=0; i_files<n_input_files; i_files++)
@@ -4796,9 +4837,10 @@ int readSummary(int argc,char *argv[]){
 
 		}
 	free(table_columns);
+	free(file_name_ptr);
 
 
-	if(global_context.is_input_bad_format == 0) print_FC_results(&global_context);
+	if(global_context.is_input_bad_format == 0) print_FC_results(&global_context, (char *)argv[3]/*out file name*/);
 	KeyValuePair * cursor;
 	int bucket;
 	for(bucket=0; bucket < global_context.exontable_chro_table  -> numOfBuckets; bucket++)
@@ -4908,14 +4950,11 @@ void sort_bucket_table(fc_thread_global_context_t * global_context){
 
 int readSummary_single_file(fc_thread_global_context_t * global_context, read_count_type_t * column_numbers, int nexons,  int * geneid, char ** chr, long * start, long * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, long * anno_chr_head, long * block_end_index, long * block_min_start , long * block_max_end, fc_read_counters * my_read_counter, HashTable * junction_global_table, HashTable * splicing_global_table)
 {
-	FILE *fp_in = NULL;
 	int read_length = 0;
 	int is_first_read_PE=0;
 	char * line = (char*)calloc(MAX_LINE_LENGTH, 1);
 	char * file_str = "";
 
-	if(strcmp( global_context->input_file_name,"STDIN")!=0)
-	{
 		int file_probe = is_certainly_bam_file(global_context->input_file_name, &is_first_read_PE, NULL);
 		
 		global_context -> is_paired_end_input_file = is_first_read_PE;
@@ -4935,17 +4974,13 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 
 		if(!global_context->redo)
 		{
-			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context->input_file_name);
+			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context -> use_stdin_file? "<STDIN>":global_context->input_file_name);
 			if(is_first_read_PE)
 				print_in_box(80,0,0,"   Paired-end reads are included.");
 			else
 				print_in_box(80,0,0,"   Single-end reads are included.");
 		}
 		
-	}
-
-	if(strcmp( global_context->input_file_name,"STDIN")!=0)
-	{
 		FILE * exist_fp = f_subr_open( global_context->input_file_name,"r");
 		if(!exist_fp)
 		{
@@ -4955,25 +4990,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 			return -1;
 		}
 		fclose(exist_fp);
-	}
-
-	/*
-	if(strcmp(global_context->input_file_name,"STDIN")!=0)
-		if(warning_file_type(global_context->input_file_name, global_context->is_SAM_file?FILE_TYPE_SAM:FILE_TYPE_BAM))
-			global_context->is_unpaired_warning_shown=1;
-	*/
 	// Open the SAM/BAM file
 	// Nothing is done if the file does not exist.
-
-	#ifdef MAKE_STANDALONE
-	if(strcmp("STDIN",global_context->input_file_name)==0)
-		fp_in = stdin;
-	else
-		fp_in = f_subr_open(global_context->input_file_name,"r");
-	#else
-		fp_in = f_subr_open(global_context->input_file_name,"r");
-	#endif
-
 
 	// begin to load-in the data.
 	if(!global_context->redo)
@@ -4996,13 +5014,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon, my_read_counter, junction_global_table, splicing_global_table);
 	fc_thread_destroy_thread_context(global_context);
 
-	//global_context .read_counters.assigned_reads = nreads_mapped_to_exon;
-
-	#ifdef MAKE_STANDALONE
-	if(strcmp("STDIN",global_context->input_file_name)!=0)
-	#endif
-		fclose(fp_in);
-
 	if(global_context -> sambam_chro_table) free(global_context -> sambam_chro_table);
 	global_context -> sambam_chro_table = NULL;
 
@@ -5018,7 +5029,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[42];
+	char * Rargv[43];
 	char annot_name[300];
 	char temp_dir[300];
 	char * out_name = malloc(300);
@@ -5068,7 +5079,8 @@ int feature_count_main(int argc, char ** argv)
 	int very_long_file_names_size = 200;
 	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
 	float fracOverlap = 0.0;
-	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20];
+	int std_input_output_mode = 0;
+	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[11];
 	very_long_file_names = malloc(very_long_file_names_size);
 	very_long_file_names [0] = 0;
 	fasta_contigs_name[0]=0;
@@ -5321,7 +5333,7 @@ int feature_count_main(int argc, char ** argv)
 		minFragmentOverlap = 1;
 	}
 
-	if(out_name[0]==0 || annot_name[0]==0||argc == optind)
+	if(out_name[0]==0 || annot_name[0]==0)
 	{
 		print_usage();
 		return -1;
@@ -5342,6 +5354,7 @@ int feature_count_main(int argc, char ** argv)
 	}
 
 	very_long_file_names[strlen(very_long_file_names)-1]=0;
+	std_input_output_mode = (strcmp(very_long_file_names, "") == 0?1:0);
 
 	sprintf(strFiveEndExtension, "%d", fiveEndExtension);
 	sprintf(strThreeEndExtension, "%d", threeEndExtension);
@@ -5353,6 +5366,8 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(feature_block_size_str,"%d", feature_block_size);
 	sprintf(Strand_Sensitive_Str,"%d", Strand_Sensitive_Mode);
 	sprintf(fracOverlapStr, "%g", fracOverlap);
+	sprintf(std_input_output_mode_str,"%d",std_input_output_mode);
+
 	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
 	Rargv[2] = very_long_file_names;
@@ -5395,7 +5410,11 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[39] = is_Restrictedly_No_Overlap?"1":"0"; 
 	Rargv[40] = fracOverlapStr;
 	Rargv[41] = temp_dir;
-	int retvalue = readSummary(42, Rargv);
+	Rargv[42] = std_input_output_mode_str;
+
+	int retvalue = -1;
+	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
+	else retvalue = readSummary(43, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
