@@ -4298,6 +4298,8 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 					junction_support_list[ ky_i2 ] ++;
 					junction_source_list[ky_i2] |= ( (ky_i1 < found_features_small)? 1 : 2 );
 					is_duplicate = 1;
+
+					max_supp = max(junction_support_list[ky_i2], max_supp);
 					break;
 				}
 			}
@@ -4333,7 +4335,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		
 		for(ky_i2 = 0; ky_i2 < unique_junctions; ky_i2 ++){
 			fc_junction_gene_t * tested_key = junction_key_list[ky_i2];
-			if(tested_key != NULL && tested_key -> pos_first_base < smallest_coordinate_gene){
+			if(tested_key != NULL && junction_support_list[ky_i2] == max_supp && tested_key -> pos_first_base < smallest_coordinate_gene){
 				primary_gene = tested_key;
 				smallest_coordinate_gene = tested_key -> pos_first_base;
 			}
