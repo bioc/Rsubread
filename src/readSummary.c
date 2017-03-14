@@ -639,9 +639,12 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 
 	if(global_context -> alias_file_name[0])
 		print_in_box(80,0,0,"  Chromosome alias file : %s", global_context -> alias_file_name);
+
 	print_in_box(80,0,0,"     Dir for temp files : %s", global_context->temp_file_dir);
 
+	#ifdef MAKE_STANDALONE	
 	print_in_box(80,0,0,"");
+	#endif
 	print_in_box(80,0,0,"                Threads : %d", global_context->thread_number);
 	print_in_box(80,0,0,"                  Level : %s level", global_context->is_gene_level?"meta-feature":"feature");
 	print_in_box(80,0,0,"             Paired-end : %s", global_context->is_paired_end_mode_assign?"yes":"no");
