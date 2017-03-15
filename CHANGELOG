@@ -1,3 +1,7 @@
+15 March 2017 1.25.2
+(1) Incorporate SF Subread 1.5.2.
+(2) Update users guide.
+
 9 March 2017
 (1) Align and subjunc function can take user provided annotation for exon-exon junction detection.
 (2) Dynamic programming parameters added to subjunc.
