@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.7 2015/01/25 21:32:56 cvs Exp $
+ * $Id: hashtable.h,v 9999.9 2017/03/10 00:01:40 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -40,7 +40,22 @@ typedef struct {
     long long int counter3;
 } HashTable;
 
-void HashTableIteration(HashTable * tab, void process_item(void * hashed_obj, HashTable * tab) );
+
+
+typedef struct {
+	void ** elementList;
+	long numOfElements;
+	long capacityOfElements;
+	void (*elemDeallocator)(void *elem);
+} ArrayList;
+
+ArrayList * ArrayListCreate(int init_capacity);
+void ArrayListDestroy(ArrayList * list);
+void * ArrayListGet(ArrayList * list, long n);
+int ArrayListPush(ArrayList * list, void * new_elem);
+void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
+
+void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
 
 /*--------------------------------------------------------------------------*\
  *  NAME:

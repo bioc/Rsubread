@@ -79,6 +79,7 @@ struct SNP_Calling_Parameters{
 
 	char pile_file_name[300];
 	int delete_piles;
+	int disk_is_full;
 
 	char background_input_file[300];
 	char subread_index[300];
@@ -294,7 +295,11 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 			fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
 			fread(&read_len, sizeof(short), 1, tmp_fp);
 			fread(read, sizeof(char), read_len, tmp_fp);
-			fread(qual, sizeof(char), read_len, tmp_fp);
+			int rlen = fread(qual, sizeof(char), read_len, tmp_fp);
+			if(rlen < read_len){
+				SUBREADputs("ERROR: the temporary file is broken.");
+				return -1;
+			} 
 			first_base_pos = read_rec.pos - block_no * BASE_BLOCK_LENGTH;
 			parameters->is_paired_end_data = read_rec.flags & 1;
 
@@ -581,7 +586,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 
 int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference_len, char * referenced_genome, char * chro_name , char * temp_prefix, struct SNP_Calling_Parameters * parameters)
 {
-	int block_no = (offset -1) / BASE_BLOCK_LENGTH, i;
+	int block_no = (offset -1) / BASE_BLOCK_LENGTH, i, disk_is_full = 0;
 	char temp_file_name[300];
 	FILE *tmp_fp;
 	unsigned int * snp_voting_piles, *snp_BGC_piles = NULL;	// offset * 4 + "A/C/G/T"[0,1,2,3]
@@ -632,7 +637,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		pcutoff_list[i]=-1.;
 	}
 
-	read_tmp_block(parameters, tmp_fp,&SNP_bitmap_recorder,snp_voting_piles,block_no, reference_len, referenced_genome);
+	int read_is_error = read_tmp_block(parameters, tmp_fp,&SNP_bitmap_recorder,snp_voting_piles,block_no, reference_len, referenced_genome);
 
 	fclose(tmp_fp);
 	if (parameters -> delete_piles)
@@ -891,7 +896,12 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					snprintf(sprint_line,999, "%s\t%u\t.\t%c\t%s\t%.4f\t.\tDP=%d;MM=%s;BGTOTAL=%d;BGMM=%d%s\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, Qvalue, all_reads, supporting_list , snp_filter_background_matched[i]+snp_filter_background_unmatched[i], snp_filter_background_unmatched[i], BGC_Qvalue_str);
 					if(parameters->output_fp_lock)
 						subread_lock_occupy(parameters->output_fp_lock);
-					fwrite(sprint_line, 1, strlen(sprint_line),out_fp);
+					int sprint_line_len = strlen(sprint_line);
+					int wlen = fwrite(sprint_line, 1, sprint_line_len,out_fp);
+					if(wlen < sprint_line_len){
+						disk_is_full=1;
+						break;
+					}
 					parameters->reported_SNPs++;
 					if(parameters->output_fp_lock)
 						subread_lock_release(parameters->output_fp_lock);
@@ -932,8 +942,12 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 					fwrite(referenced_genome + i, 1, 1, out_fp);
 				fwrite(referenced_genome + 1 + i + max(0,indels), 1, 1, out_fp);
 				unsigned short * indel_sups = parameters -> cigar_event_table-> appendix2;
-				fprintf(out_fp, "\t1.0\t.\tINDEL;DP=%d;SR=%d\n",all_reads,indel_sups[event_id]);
+				int wlen = fprintf(out_fp, "\t1.0\t.\tINDEL;DP=%d;SR=%d\n",all_reads,indel_sups[event_id]);
 
+				if(wlen < 10){
+					disk_is_full=1;
+					break;
+				}
 				parameters->reported_indels++;
 				if(parameters->output_fp_lock)
 					subread_lock_release(parameters->output_fp_lock);
@@ -956,7 +970,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 	free(pcutoff_list);
 	free(sprint_line);
 	//SUBREADprintf("OVERLAPPED=%llu; MISMA=%llu; ALL_BASES=%llu\n",OVERLAPPED_BASES, OVER_MISMA_BASES, ALL_BASES);
-	return 0;
+	return read_is_error || disk_is_full;
 }
 
 
@@ -1033,9 +1047,10 @@ int run_chromosome_search(FILE *in_fp, FILE * out_fp, char * chro_name , char * 
 					//#warning "=== ONLY TEST ONE BLOCK   , USE 'if(1)' IN RELEASE          ==="
 					//if(strcmp(chro_name,"chr7")==0 && all_offset == 60000000){
 					if(1){
-						process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
+						parameters -> disk_is_full |= process_snp_votes(out_fp, all_offset, offset, referenced_base, chro_name , temp_prefix, parameters);
 						print_in_box(89,0,0,"processed block %c[36m%s@%d%c[0m by thread %d/%d [block number=%d/%d]", CHAR_ESC, chro_name, all_offset, CHAR_ESC , thread_no+1, all_threads, 1+(*task_no)-parameters->empty_blocks, parameters->all_blocks);
 					}
+					if(parameters -> disk_is_full)break;
 				}
 				else if((*task_no) % all_threads == thread_no)
 				{
@@ -1204,6 +1219,11 @@ int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, ch
 	}
 	//fprintf(out_fp, "## Fisher_Test_Size=%u\n",fisher_test_size);
 	fclose(out_fp);
+	if(parameters -> disk_is_full){
+		unlink(out_BED_file);
+		SUBREADputs("ERROR: cannot write into the output VCF file. Please check the disk space in the output directory.");
+		ret = 1;
+	}
 	return ret;
 
 }
@@ -1405,14 +1425,11 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		HashTableSetKeyComparisonFunction(parameters-> cigar_event_table, my_strcmp);
 
 		memcpy(rand48_seed, &start_time, 6);
-		if(temp_location)
-			strcpy(temp_file_prefix, temp_location);
-		else{
-			char mac_rand[13];
-			mac_or_rand_str(mac_rand);
+		char mac_rand[13];
+		mac_or_rand_str(mac_rand);
 
-			sprintf(temp_file_prefix, "./temp-snps-%06u-%s-", getpid(), mac_rand);
-		}
+		sprintf(temp_file_prefix, "%s/temp-snps-%06u-%s-", temp_location, getpid(), mac_rand);
+
 		_EXSNP_SNP_delete_temp_prefix = temp_file_prefix;
 
 		print_in_box(89,0,0,"Split %s file into %c[36m%s*%c[0m ..." , parameters -> is_BAM_file_input?"BAM":"SAM" , CHAR_ESC, temp_file_prefix, CHAR_ESC);
@@ -1578,7 +1595,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	optopt = 63;
 
 
-
+	memset(&parameters, 0, sizeof(struct SNP_Calling_Parameters));
 	parameters.start_time = miltime();
 	parameters.empty_blocks = 0;
 	parameters.reported_SNPs = 0;
@@ -1686,10 +1703,6 @@ int main_snp_calling_test(int argc,char ** argv)
 
 			case 'o':
 				strncpy(out_BED_file, optarg,299);
-				break;
-
-			case '9':	// UNUSED
-				strncpy(temp_path,  optarg,299);
 				break;
 
 			case 'T':
@@ -1814,7 +1827,16 @@ int main_snp_calling_test(int argc,char ** argv)
 	warning_file_type(in_SAM_file, parameters.is_BAM_file_input?FILE_TYPE_BAM:FILE_TYPE_SAM);
 	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
 	warning_file_limit();
-	ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path[0]?temp_path:NULL, read_count, threads, &parameters);
+	int x1;
+	for(x1 = strlen(out_BED_file); x1 >= 0; x1--){
+		if(out_BED_file[x1]=='/'){
+			memcpy(temp_path, out_BED_file, x1);
+			temp_path[x1]=0;
+			break;
+		}
+	}
+	if(temp_path[0]==0)strcpy(temp_path, "./");
+	ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path, read_count, threads, &parameters);
 	if(ret != -1)
 	{
 		print_in_box(80,0,1,"");

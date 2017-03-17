@@ -1296,7 +1296,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	FILE * fp = f_subr_open(fname, "rb");
 	if (!fp)
 	{
-		SUBREADprintf ("Table file `%s' is not found.\n", fname);
+		SUBREADprintf ("Table file '%s' is not found.\n", fname);
 		return 1;
 	}
 
@@ -1341,6 +1341,10 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			the_table -> index_gap = 3;
 
 		the_table -> current_items = load_int64(fp);
+		if(the_table -> current_items < 1 || the_table -> current_items > 0xffffffffllu){
+			SUBREADputs("ERROR: the index format is unrecognizable.");
+			return 1;
+		}
 		the_table -> buckets_number = load_int32(fp);
 		the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
 		if(!the_table -> buckets)
@@ -1368,9 +1372,15 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			if(current_bucket -> current_items > 0)
 			{
 				read_length = fread(current_bucket -> new_item_keys, sizeof(short), current_bucket -> current_items, fp);
-				assert(read_length>0);
+				if(read_length < current_bucket -> current_items){
+					SUBREADprintf("ERROR: the index is incomplete : %d < %u.\n",read_length, current_bucket -> current_items);
+					return 1;
+				}
 				read_length = fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
-				assert(read_length>0);
+				if(read_length < current_bucket -> current_items){
+					SUBREADprintf("ERROR: the index value is incomplete : %d < %u.\n",read_length, current_bucket -> current_items);
+					return 1;
+				}
 			}
 
 		}
@@ -1415,9 +1425,15 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			if(current_bucket -> current_items > 0)
 			{
 				read_length = fread(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
-				assert(read_length>0);
+				if(read_length < current_bucket -> current_items){
+					SUBREADprintf("ERROR: the index is incomplete.\n");
+					return 1;
+				}
 				read_length = fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
-				assert(read_length>0);
+				if(read_length < current_bucket -> current_items){
+					SUBREADprintf("ERROR: the index is incomplete.\n");
+					return 1;
+				}
 			}
 
 		}
@@ -1499,7 +1515,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	int maximum_bucket_size = 0;
 	if (!fp)
 	{
-		SUBREADprintf ("Table file `%s' is not able to open.\n", fname);
+		SUBREADprintf ("Table file '%s' is not able to open.\n", fname);
 		return -1;
 	}
 
@@ -1648,13 +1664,25 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 			}
 		}
 
-		fwrite(& (current_bucket -> current_items), sizeof(int), 1, fp);
-		fwrite(& (current_bucket -> space_size), sizeof(int), 1, fp);
+		int is_full = 0;
+		int write_len = fwrite(& (current_bucket -> current_items), sizeof(int), 1, fp);
+		if(write_len<1) is_full = 1;
+		write_len = fwrite(& (current_bucket -> space_size), sizeof(int), 1, fp);
+		if(write_len<1) is_full = 1;
+
 		if(the_table->version_number == SUBINDEX_VER0)
 			fwrite(current_bucket -> item_keys, sizeof(gehash_key_t), current_bucket -> current_items, fp);
-		else
-			fwrite(current_bucket -> new_item_keys, sizeof(short), current_bucket -> current_items, fp);
-		fwrite(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
+		else{
+			write_len = fwrite(current_bucket -> new_item_keys, sizeof(short), current_bucket -> current_items, fp);
+			if(write_len < current_bucket -> current_items) is_full = 1;
+		}
+		write_len = fwrite(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
+		if(write_len < current_bucket -> current_items) is_full = 1;
+		if(is_full){
+			fclose(fp);
+			SUBREADprintf("ERROR: Unable to write into the output file. Please check the disk space in the output directory.\n");
+			return 1;
+		}
 	}
 
 	if(the_table->version_number > SUBINDEX_VER0)
@@ -1667,8 +1695,13 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 	}
 
 
-	fwrite(&(the_table -> is_small_table), sizeof(char), 1, fp);
+	int write_len = fwrite(&(the_table -> is_small_table), sizeof(char), 1, fp);
 	fclose(fp);
+
+	if(write_len < 1){
+		SUBREADprintf("ERROR: Unable to write into the output file. Please check the disk space in the output directory.\n");
+		return 1;
+	}
 	print_in_box(80,0,0,"");
 	return 0;
 }

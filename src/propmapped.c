@@ -248,7 +248,7 @@ FILE * get_FP_by_read_name(propMapped_context * context, char * read_name)
 	
 }
 
-void add_read_flags(propMapped_context * context, FILE * fp, char * read_name, unsigned short flags)
+int add_read_flags(propMapped_context * context, FILE * fp, char * read_name, unsigned short flags)
 {
 	int x1;
 	int rname_len = strlen(read_name);
@@ -269,13 +269,17 @@ void add_read_flags(propMapped_context * context, FILE * fp, char * read_name, u
 
 	rname_len = strlen(read_name);
 	if(rname_len>250)
-		return;
+		return -1;
 
 
 	unsigned char rname_len_char = (unsigned char)rname_len;
-	fwrite(&rname_len_char,1,1,fp);
-	fwrite(read_name,rname_len,1,fp);
-	fwrite(&flags, 1,sizeof(short), fp);
+	int wlen = fwrite(&rname_len_char,1,1,fp);
+	if(wlen < 1) return -1;
+	wlen = fwrite(read_name,rname_len,1,fp);
+	if(wlen < 1) return -1;
+	wlen = fwrite(&flags, sizeof(short), 1, fp);
+	if(wlen < 1) return -1;
+	return 0;
 }
 
 int init_PE_sambam(propMapped_context * context)
@@ -283,7 +287,19 @@ int init_PE_sambam(propMapped_context * context)
 	char mac_rand[13];
 	mac_or_rand_str(mac_rand);
 	srand(time(NULL));
-	sprintf(context->temp_file_prefix, "prpm-temp-sum-%06u-%s", getpid(), mac_rand);
+
+	int x1;
+	context->temp_file_prefix[0]=0;
+	for(x1 = strlen(context->output_file_name) ; x1 >=0; x1--){
+		if(context->output_file_name[x1]=='/'){
+			memcpy(context->temp_file_prefix, context->output_file_name, x1);
+			context->temp_file_prefix[x1] = 0;
+		}
+	}
+
+	if(context->temp_file_prefix[0]==0) strcpy(context->temp_file_prefix, "./");
+
+	sprintf(context->temp_file_prefix+strlen(context->temp_file_prefix), "/prpm-temp-sum-%06u-%s", getpid(), mac_rand);
 
 	_PROPMAPPED_delete_tmp_prefix = context -> temp_file_prefix;
 	signal (SIGTERM, PROPMAPPED_SIGINT_hook);
@@ -302,6 +318,7 @@ int split_PE_sambam(propMapped_context * context)
 	}
 
 	char * line_buffer = malloc(3000);
+	int is_error = 0;
 
 	while(1)
 	{
@@ -315,7 +332,8 @@ int split_PE_sambam(propMapped_context * context)
 		unsigned flags = atoi(flags_str);
 		
 		FILE * fp = get_FP_by_read_name(context , read_name);
-		add_read_flags(context, fp, read_name, flags);
+		is_error = add_read_flags(context, fp, read_name, flags);
+		if(is_error) break;
 		context -> all_records++;
 	}
 
@@ -323,7 +341,8 @@ int split_PE_sambam(propMapped_context * context)
 	free(line_buffer);
 	SamBam_fclose(in_fp);
 
-	return 0;
+	if(is_error) SUBREADprintf("ERROR: Unable to write into the temporary file. Please check the disk space in the output directory.");
+	return is_error;
 }
 
 int prop_PE(propMapped_context * context)

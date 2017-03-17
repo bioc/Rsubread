@@ -37,7 +37,7 @@ The Subread aligner (\R{align} function) is a highly efficient and accurate alig
 It adopts a novel mapping paradigm called ``seed-and-vote".
 Under this paradigm, a number of 16mers (called seeds or subreads) are extracted from each read and they were mapped to the reference genome to vote for the mapping location of the read.
 Read mapping performed under this paradigm has been found to be more efficient and accurate than that carried out under the conventional ``seed-and-extend" paradigm (Liao et al. 2013).
-This package also includes a program for detecting exon-exon junctions, \R{subjunc}, that makes use of the powerful ``seed-and-vote" paradigm too.
+This package also includes a program for detecting exon-exon junctions, \R{subjunc}, that makes use of the ``seed-and-vote" paradigm as well.
 
 An important step in processing next-gen sequencing data is to assign mapped reads to genomic features such as genes, exons, and promoters.
 This package includes a general-purpose read summarization function \R{featureCounts} that takes mapped reads as input and assigns them to genomic features.

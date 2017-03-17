@@ -58,6 +58,10 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 			ret = PBam_get_next_zchunk(fp -> os_file, in_buff, 65536, & real_len);
 			if(ret > 0)
 				nchunk = SamBam_unzip(fp -> input_binary_stream_buffer + fp->input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr + have , in_buff , ret);
+			else if(ret == -2){
+				SUBREADputs("ERROR: BAM format is broken!");
+				return -2;
+			}
 
 			//printf("RET=%d; CHK=%d\n", ret, nchunk);
 
@@ -345,7 +349,7 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 {
 	unsigned char ID1, ID2, CM, FLG;
 	unsigned short XLEN;
-	int BSIZE=-1;
+	int BSIZE=-1, rlen, is_file_broken = 0;
 
 	if(feof(bam_fp)) return -1;
 
@@ -371,7 +375,8 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 		
 		fread(&SI1, 1, 1, bam_fp);
 		fread(&SI2, 1, 1, bam_fp);
-		fread(&SLEN, 1, 2, bam_fp);
+		rlen = fread(&SLEN, 2, 1, bam_fp);
+		if(rlen < 1) is_file_broken = 1;
 
 		if(SI1==66 && SI2== 67 && SLEN == 2)
 		{
@@ -391,10 +396,14 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 		if(CDATA_READING<CDATA_LEN)
 			fseeko(bam_fp, CDATA_LEN-CDATA_READING, SEEK_CUR);
 		fseeko(bam_fp, 4, SEEK_CUR);
-		fread(&real_len, 4, 1, bam_fp);
+		rlen = fread(&real_len, 4, 1, bam_fp);
+		if(rlen < 1) is_file_broken = 1;
 
 	//	SUBREADprintf("read_data=%u\n", CDATA_LEN);
-		return CDATA_READING;
+		if(is_file_broken){
+			SUBREADputs("ERROR: the input BAM file is broken.");
+		}
+		return is_file_broken?-2:CDATA_READING;
 	}
 	else
 		return -1;
@@ -748,13 +757,22 @@ int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab, char * rem
 	char * CDATA = malloc(80010);
 	char * PDATA = malloc(1000000);
 
-	int chro_tab_size = 0, chro_tab_items = 0, chro_tab_state = 0, header_remainder = 0, remainder_byte_len = 0; 
+	int chro_tab_size = 0, chro_tab_items = 0, chro_tab_state = 0, header_remainder = 0, remainder_byte_len = 0, bam_is_broken = 0; 
 	z_stream strm;
 	while(1)
 	{
 		unsigned int real_len = 0;
 		int rlen = PBam_get_next_zchunk(bam_fp,CDATA,80000, & real_len);
-		if(rlen<0) break;
+		if(rlen<0){
+			bam_is_broken = (rlen == -2);
+			if(bam_is_broken){
+				SUBREADprintf("BAM file format error!\n");
+				free(CDATA);
+				free(PDATA);
+				return -1;
+			}
+			break;
+		}
 
 		strm.zalloc = Z_NULL;
 		strm.zfree = Z_NULL;
@@ -980,15 +998,21 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer)
 	compressed_size = 70000 - writer -> output_stream.avail_out;
 	//printf("ADDED BLOCK=%d; LEN=%d; S=%s\n", compressed_size, writer ->chunk_buffer_used,  writer ->chunk_buffer);
 	SamBam_writer_chunk_header(writer, compressed_size);
-	fwrite(writer -> compressed_chunk_buffer, 1, compressed_size, writer -> bam_fp);
+	int chunk_write_size = fwrite(writer -> compressed_chunk_buffer, 1, compressed_size, writer -> bam_fp);
 
 	fwrite(&CRC32 , 4, 1, writer -> bam_fp);
 	fwrite(&writer ->chunk_buffer_used , 4, 1, writer -> bam_fp);
+	if(chunk_write_size < compressed_size){
+		if(!writer -> is_internal_error)SUBREADputs("ERROR: no space left in the output directory.");
+		writer -> is_internal_error = 1;
+	}
 
 	writer ->chunk_buffer_used = 0;
 
 
 }
+
+double sambam_t1 = 0;
 
 void SamBam_writer_write_header(SamBam_Writer * writer)
 {
@@ -1391,7 +1415,16 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 
 	if(writer -> chunk_buffer_used>55000)
 	{
+		//	double t0 = miltime();
 		SamBam_writer_add_chunk(writer);
+		//	double t1 = miltime();
+		//	if(sambam_t1 > 100)
+		//		SUBREADprintf("Running = %.6f , Compress Time = %.6f\n", t0 - sambam_t1, t1 - t0);
+		//	sambam_t1 = t1;
+	
+
+
+
 		writer -> chunk_buffer_used = 0;
 	}	
 	return 0;

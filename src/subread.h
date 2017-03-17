@@ -33,9 +33,6 @@
 
 #include "hashtable.h" 
 
-#define INPUT_BUFFER_SIZE (8*1024*1024) 
-#define OUTPUT_BUFFER_SIZE (32*1024*1024) 
-
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -64,11 +61,12 @@
 #define MAX_READ_NAME_LEN 100 
 #define MAX_CHROMOSOME_NAME_LEN 100 
 #define MAX_FILE_NAME_LENGTH 300
+#define FEATURE_NAME_LENGTH  256 
 
-#define MULTI_THREAD_OUTPUT_ITEMS  4096 
+//#warning "============== REMOVE '*1.2' FROM THE NEXT LINE ================"
+#define MULTI_THREAD_OUTPUT_ITEMS  (4096 * 3/5 *3)
 
-//#warning "============ CHANGE THE NEXT LINE TO 120 ========"
-#define EXON_LONG_READ_LENGTH 120
+#define EXON_LONG_READ_LENGTH 160 
 #define EXON_MAX_CIGAR_LEN 256 
 #define FC_CIGAR_PARSER_ITEMS 11 
 

@@ -422,11 +422,11 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 
 
 	n = HashTableGet(offsets -> read_name_to_index, chro_name)-NULL;
-	//printf("NAME INDEL : %ld  ; n=%d\n", offsets -> read_name_to_index -> numOfElements, n );
+	//printf("09NOV: GET '%s' = %d\n", chro_name, n);
 	if(n<1) return 0xffffffff;
-
 	if(n>1)
 		ret = offsets->read_offsets[n-2];
+	ret += offsets -> padding ;
 
 	return ret + chro_pos;
 }
@@ -487,10 +487,13 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 			*chro_name = (char *)offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
 
+			//#warning ">>>>>>>>>>>>>>NOT <<<<<<<<<<<<<<<<<"
+			//printf("OCT27-NULL_LOCATION: %u > %u; N=%d\n", linear, offsets->read_offsets[n-1], n);
+
 			return 0;
 		}
 	}
-	return 1;
+	return -1;
 }
 
 
@@ -1477,7 +1480,9 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	int n=0;
 	int padding = 0;
 
-	gehash_load_option(index_prefix, SUBREAD_INDEX_OPTION_INDEX_PADDING , &padding);
+	int is_V3_index = gehash_load_option(index_prefix, SUBREAD_INDEX_OPTION_INDEX_PADDING , &padding);
+	if(!is_V3_index) return 1;
+	
 	memset(offsets, 0, sizeof( gene_offset_t));
 	sprintf(fn, "%s.reads", index_prefix);
 
@@ -1529,10 +1534,8 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 		char * read_name_mem = malloc(MAX_CHROMOSOME_NAME_LEN);
 		strcpy(read_name_mem, offsets->read_names + n*MAX_CHROMOSOME_NAME_LEN);
 
-
-		//printf("PUT OFFSET: %s,%u\n", read_name_mem , n);
+		//printf("09NOV: add_annotation_to_junctions: '%s',%u\n", read_name_mem , n);
 		HashTablePut(offsets->read_name_to_index, read_name_mem , NULL + 1 + n);
-	
 
 		n++;
 		if(n >= current_max_n)

@@ -6,14 +6,53 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.11 2015/01/25 21:32:56 cvs Exp $
+ * $Id: hashtable.c,v 9999.14 2017/03/10 00:01:40 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <pthread.h>
 #include "hashtable.h"
+
+
+
+ArrayList * ArrayListCreate(int init_capacity){
+	ArrayList * ret = malloc(sizeof(ArrayList));
+	memset(ret,0,sizeof(ArrayList));
+	ret -> capacityOfElements = init_capacity;
+	ret -> elementList = malloc(sizeof(void *)*init_capacity);
+	return ret;
+}
+
+void ArrayListDestroy(ArrayList * list){
+	long x1;
+	if(list -> elemDeallocator)
+		for(x1 = 0;x1 < list->numOfElements; x1++)
+			list -> elemDeallocator(list -> elementList[x1]);
+		
+	free(list -> elementList);
+	free(list);
+}
+
+void * ArrayListGet(ArrayList * list, long n){
+	if(n<0 || n >= list->numOfElements)return NULL;
+	return list -> elementList[n];
+}
+
+int ArrayListPush(ArrayList * list, void * new_elem){
+	if(list -> capacityOfElements <= list->numOfElements){
+		list -> capacityOfElements *=1.3;
+		list -> elementList=realloc(list -> elementList, list -> capacityOfElements);
+	}
+	list->elementList[list->numOfElements++] = new_elem;
+	return list->numOfElements;
+}
+void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem)){
+	list -> elemDeallocator = elem_deallocator;
+}
+
 
 static int pointercmp(const void *pointer1, const void *pointer2);
 static unsigned long pointerHashFunction(const void *pointer);
@@ -743,13 +782,13 @@ void free_values_destroy(HashTable * tab)
 	HashTableDestroy(tab);
 }
 
-void HashTableIteration(HashTable * tab, void process_item(void * hashed_obj, HashTable * tab) )
+void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) )
 {
     int i;
     for (i=0; i< tab ->numOfBuckets; i++) {
         KeyValuePair *pair = tab ->bucketArray[i];
         while (pair != NULL) {
-            process_item(pair -> value, tab);
+            process_item(( void * )pair -> key, pair -> value, tab);
             KeyValuePair *nextPair = pair->next;
             pair = nextPair;
         }

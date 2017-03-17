@@ -86,7 +86,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 	double local_begin_ftime = 0.;
 
-	int chro_table_maxsize=100;
+	int chro_table_maxsize=100, dump_res = 0;
 	unsigned int * read_offsets = malloc(sizeof(unsigned int) * chro_table_maxsize);
 	char * read_names = malloc(MAX_READ_NAME_LEN * chro_table_maxsize);
 	gehash_t table;
@@ -163,16 +163,14 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
 					SUBREADfflush(stdout);
 
-					gehash_dump(&table, fn);
+					if(!dump_res)dump_res |= gehash_dump(&table, fn);
 
 					if(VALUE_ARRAY_INDEX)
 					{
 						sprintf (fn, "%s.%02d.%c.array", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-						gvindex_dump(&value_array_index, fn);
+						if(!dump_res)dump_res |= gvindex_dump(&value_array_index, fn);
 						gvindex_destory(&value_array_index) ;
 					}
-
-
 
 					gehash_destory(&table);
 
@@ -280,11 +278,11 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				sprintf(fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
 				SUBREADfflush(stdout);
 
-				gehash_dump(&table, fn);
+				if(!dump_res)dump_res |= gehash_dump(&table, fn);
 				if(VALUE_ARRAY_INDEX)
 				{
 					sprintf(fn, "%s.%02d.%c.array", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-					gvindex_dump(&value_array_index, fn);
+					if(!dump_res)dump_res |= gvindex_dump(&value_array_index, fn);
 				}
 
 				table_no ++;
@@ -420,9 +418,27 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 		}
 	}
-	free(fn);
 	free(read_names);
 	free(read_offsets);
+	if(dump_res){
+		SUBREADprintf("No index was built.\n");
+		sprintf(fn, "%s.files", index_prefix);
+		unlink(fn);
+		sprintf(fn, "%s.reads", index_prefix);
+		unlink(fn);
+		int index_i;
+		for(index_i = 0; index_i <= 99; index_i++){
+			sprintf(fn, "%s.%02d.b.tab", index_prefix, index_i);
+			unlink(fn);
+			sprintf(fn, "%s.%02d.c.tab", index_prefix, index_i);
+			unlink(fn);
+			sprintf(fn, "%s.%02d.b.array", index_prefix, index_i);
+			unlink(fn);
+			sprintf(fn, "%s.%02d.c.array", index_prefix, index_i);
+			unlink(fn);
+		}
+	}
+	free(fn);
 	return 0;
 }
 
@@ -778,7 +794,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	char * line_buf = malloc(MAX_READ_LENGTH);
 	char * read_head_buf = malloc(MAX_READ_LENGTH * 3);
 	unsigned int inp_file_no, line_no;
-	int written_chrs = 0;
+	int written_chrs = 0, is_disk_full = 0;
 	int chrom_lens_max_len = 100;
 	int chrom_lens_len = 0;
 	ERROR_FOUND_IN_FASTA = 0;
@@ -786,7 +802,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 	if(!out_fp)
 	{
-		SUBREADprintf("ERROR: The current directory is not writable, but the index builder needs to create temporary files in the current directory. Please change the working directory and rerun the index builder.\n");
+		SUBREADprintf("ERROR: the output directory is not writable, but the index builder needs to create temporary files in the current directory. Please change the working directory and rerun the index builder.\n");
 		return -1;
 	}
 
@@ -921,7 +937,13 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 				if(is_head_written)
 				{
-					fprintf(out_fp,"%s\n", line_buf);
+					int line_buf_len = strlen(line_buf);
+					int writen_len = fprintf(out_fp,"%s\n", line_buf);
+					if(writen_len < line_buf_len){
+						SUBREADprintf("ERROR: unable to write into the temporary file. Please check the free space of the output directory.\n");
+						is_disk_full = 1;
+						break;
+					}
 					(*chrom_lens)[chrom_lens_len-1] = read_len;
 					(*chrom_lens)[chrom_lens_len] = 0;
 				}
@@ -935,6 +957,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 		}
 
 		fclose(in_fp);
+		if(is_disk_full) break;
 	}
 
 
@@ -948,7 +971,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 		return 1;
 	}
 
-	if(is_repeated_chro)
+	if(is_repeated_chro|| is_disk_full)
 		return 1;
 
 	if(ERROR_FOUND_IN_FASTA)
@@ -1174,8 +1197,16 @@ int main_buildindex(int argc,char ** argv)
 
 	begin_ftime = miltime();
 
+	for(x1 = strlen(output_file); x1 >=0; x1--){
+		if(output_file[x1]=='/'){
+			memcpy(tmp_fa_file, output_file, x1);
+			tmp_fa_file[x1]=0;
+			break;
+		}
+	}
+	if(tmp_fa_file[0]==0)strcpy(tmp_fa_file, "./");
 
-	sprintf(tmp_fa_file, "./subread-index-sam-%06u-XXXXXX", getpid());
+	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-XXXXXX", getpid());
 	mkstemp(tmp_fa_file);
 
 	sprintf(log_file_name, "%s.log", output_file);

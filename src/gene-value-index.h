@@ -28,7 +28,7 @@ int gvindex_init(gene_value_index_t * index, unsigned int start_point);
 
 void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_value, int padding);
 
-void gvindex_dump(gene_value_index_t * index, const char filename []);
+int gvindex_dump(gene_value_index_t * index, const char filename []);
 
 int gvindex_load(gene_value_index_t * index, const char filename []);
 
