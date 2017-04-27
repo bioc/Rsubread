@@ -1,10 +1,10 @@
 Package: Rsubread
-Version: 1.27.0
-Date: 2017-04-24
+Version: 1.27.1
+Date: 2017-04-27
 Title: Subread sequence alignment for R
 Author: Wei Shi and Yang Liao with contributions from Gordon Smyth, Jenny Dai
         and Timothy Triche, Jr.
-Maintainer: Wei Shi <shi@wehi.edu.au>
+Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.EDU.AU>
 Description: Provides powerful and easy-to-use tools for
         analyzing next-gen sequencing read data.
         Includes quality assessment of sequence reads, read
