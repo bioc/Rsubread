@@ -187,6 +187,9 @@ typedef struct {
 
 void fastq_64_to_33(char * qs);
 
+// the caller is in charge of deallocation
+char * memstrcpy(char * in);
+
 int chars2color(char c1, char c2);
 
 int genekey2color(char last_base,char * key);
@@ -312,7 +315,9 @@ int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);
 void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
+int SAM_pairer_iterate_tags(unsigned char * bin, int bin_len, char * tag_name, char * data_type, char ** saved_value);
 int SAM_pairer_warning_file_open_limit();
 void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
+void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
 #endif

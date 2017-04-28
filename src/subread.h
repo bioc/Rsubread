@@ -188,7 +188,7 @@ typedef short gene_vote_number_t;
 #define MAX_EXONS_PER_GENE 400 
 #define MAX_EXON_CONNECTIONS 10
 
-#define MAX_GENE_NAME_LEN 12
+#define MAX_GENE_NAME_LEN 128
 #define MAX_INDEL_TOLERANCE 7
 
 #define SUBINDEX_VER0 100

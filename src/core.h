@@ -459,8 +459,17 @@ typedef struct{
 	int output_buffer_item;
 	int output_buffer_pointer;
 	int is_finished;
-	unsigned int all_mapped_reads;
 	subread_lock_t output_lock;
+
+	unsigned int all_mapped_reads;
+	unsigned int not_properly_pairs_wrong_arrangement;
+	unsigned int not_properly_pairs_different_chro;
+	unsigned int not_properly_different_strands;
+	unsigned int not_properly_pairs_TLEN_wrong;
+	unsigned int all_unmapped_reads;
+	unsigned int not_properly_pairs_only_one_end_mapped;
+	unsigned int all_multimapping_reads;
+	unsigned int all_uniquely_mapped_reads;
 } thread_context_t;
 
 
@@ -516,11 +525,20 @@ typedef struct{
 	double timecost_for_realign;
 
 	unsigned long long all_processed_reads;
-	unsigned long long all_mapped_reads;
 	unsigned long long all_correct_PE_reads;
 	unsigned int all_junctions;
 	unsigned int all_fusions;
 	unsigned int all_indels;
+
+	unsigned int all_mapped_reads;
+	unsigned int not_properly_pairs_wrong_arrangement;
+	unsigned int not_properly_pairs_different_chro;
+	unsigned int not_properly_different_strands;
+	unsigned int not_properly_pairs_TLEN_wrong;
+	unsigned int all_unmapped_reads;
+	unsigned int not_properly_pairs_only_one_end_mapped;
+	unsigned int all_multimapping_reads;
+	unsigned int all_uniquely_mapped_reads;
 
 	unsigned long long current_circle_start_abs_offset_file1;
 	gene_inputfile_position_t current_circle_start_position_file1;
@@ -547,6 +565,7 @@ typedef struct{
 	subread_read_number_t read_block_start;
 	char * exonic_region_bitmap;
 	HashTable * sam_chro_to_anno_chr_alias;
+	HashTable * annotation_chro_table;
 } global_context_t;
 
 

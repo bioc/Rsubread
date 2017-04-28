@@ -980,10 +980,10 @@ double fast_fisher_test_one_side(unsigned int a, unsigned int b, unsigned int c,
 
 }
 
-int load_features_annotation(char * file_name, int file_type, char * gene_id_column, char * feature_name_column,
- void * context, int do_add_feature(char * gene_name, char * chro_name, unsigned int start, unsigned int end, int is_negative_strand, void * context)  ){
+int load_features_annotation(char * file_name, int file_type, char * gene_id_column, char * transcript_id_column, char * used_feature_type,
+ void * context, int do_add_feature(char * gene_name, char * transcript_name, char * chro_name, unsigned int start, unsigned int end, int is_negative_strand, void * context)  ){
 	char * file_line = malloc(MAX_LINE_LENGTH+1);
-	int lineno = 0, is_GFF_warned = 0, loaded_features = 0;
+	int lineno = 0, is_GFF_txid_warned = 0, is_GFF_geneid_warned = 0, loaded_features = 0;
 	FILE * fp = fopen(file_name, "r");
 
 	if(NULL == fp){
@@ -992,9 +992,9 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 	}
 
 	while(1){
-		int is_gene_id_found = 0, is_negative_strand = -1;
-		char * token_temp = NULL, * feature_name, * chro_name = NULL;
-		char feature_name_tmp[FEATURE_NAME_LENGTH];
+		int is_tx_id_found = 0, is_gene_id_found = 0, is_negative_strand = -1;
+		char * token_temp = NULL, * feature_name, *transcript_id = NULL, * chro_name = NULL;
+		char feature_name_tmp[FEATURE_NAME_LENGTH], txid_tmp[FEATURE_NAME_LENGTH];
 		feature_name = feature_name_tmp;
 		
 		unsigned int start = 0, end = 0;
@@ -1049,7 +1049,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 			strtok_r(NULL,"\t", &token_temp);// source
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);// feature_type
 			
-			if(strcmp(feature_type, feature_name_column)==0){
+			if(strcmp(feature_type, used_feature_type)==0){
 				char * start_ptr = strtok_r(NULL,"\t", &token_temp);
 				char * end_ptr = strtok_r(NULL,"\t", &token_temp);
 				
@@ -1084,23 +1084,37 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 				if(extra_attrs && (strlen(extra_attrs)>2)){
 					int attr_val_len = GTF_extra_column_value(extra_attrs , gene_id_column , feature_name_tmp, FEATURE_NAME_LENGTH);
 					if(attr_val_len>0) is_gene_id_found=1;
+
+					if(transcript_id_column){
+							transcript_id = txid_tmp;
+							attr_val_len = GTF_extra_column_value(extra_attrs , transcript_id_column , txid_tmp, FEATURE_NAME_LENGTH);
+							if(attr_val_len>0) is_tx_id_found=1;
+							else transcript_id = NULL;
+					}
 				}
 
 				if(!is_gene_id_found){
-					if(!is_GFF_warned)
-					{
+					if(!is_GFF_geneid_warned){
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
 						SUBREADprintf("\nWarning: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n",  gene_id_column, extra_attrs);
 					}
-					is_GFF_warned++;
+					is_GFF_geneid_warned++;
 				}
 					
+				if(transcript_id_column && !is_tx_id_found){
+					if(!is_GFF_txid_warned){
+						int ext_att_len = strlen(extra_attrs);
+						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
+						SUBREADprintf("\nWarning: failed to find the transcript identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n", transcript_id_column, extra_attrs);
+					}
+					is_GFF_txid_warned++;
+				}
 			}
 		}
 		
 		if(is_gene_id_found){
-			do_add_feature(feature_name, chro_name, start, end, is_negative_strand, context);
+			do_add_feature(feature_name, transcript_id, chro_name, start, end, is_negative_strand, context);
 			loaded_features++;
 		}
 		

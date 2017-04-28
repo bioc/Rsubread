@@ -59,6 +59,7 @@ static struct option long_options[] =
 	{"complexIndels", no_argument, 0, 0},
 	{"minVoteCutoff",  required_argument, 0, 0},
 	{"maxRealignLocations",  required_argument, 0, 0},
+	{"multiMapping", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -68,15 +69,15 @@ void print_usage_core_aligner()
 	SUBREADprintf("\nVersion %s\n\n", SUBREAD_VERSION);
 	SUBREADputs("Usage:");
 	SUBREADputs("");
-	SUBREADputs("./subread-align [options] -i <index_name> -r <input>  -t <type> -o <output>");
+	SUBREADputs("./subread-align [options] -i <index_name> -r <input> -t <type> -o <output>");
 	SUBREADputs("");
 	SUBREADputs("## Mandatory arguments:");
 	SUBREADputs("    ");
 	SUBREADputs("  -i <string>       Base name of the index.");
 	SUBREADputs("");
 	SUBREADputs("  -r <string>       Name of an input read file. If paired-end, this should be");
-	SUBREADputs("                    the first read file (typically containing ‘R1’ in the file");
-	SUBREADputs("                    name) and the second should be provided via ‘-R’.");
+	SUBREADputs("                    the first read file (typically containing \"R1\"in the file");
+	SUBREADputs("                    name) and the second should be provided via \"-R\".");
 	SUBREADputs("                    Acceptable formats include gzipped FASTQ, FASTQ and FASTA.");
 	SUBREADputs("                    These formats are identified automatically.");
 	SUBREADputs("    ");
@@ -92,15 +93,15 @@ void print_usage_core_aligner()
 	SUBREADputs("                    STDOUT.");
 	SUBREADputs("");
 	SUBREADputs("  -R <string>       Name of the second read file in paired-end data (typically");
-	SUBREADputs("                    containing ‘R2’ in the file name).");
+	SUBREADputs("                    containing \"R2\" the file name).");
 	SUBREADputs("");
 	SUBREADputs("  --SAMinput        Input reads are in SAM format.");
 	SUBREADputs("");
 	SUBREADputs("  --BAMinput        Input reads are in BAM format.");
 	SUBREADputs("");
-	SUBREADputs("  --SAMoutput        Save mapping results in SAM format.");
+	SUBREADputs("  --SAMoutput       Save mapping results in SAM format.");
 	SUBREADputs("");
-	SUBREADputs("# offset value added to Phred quality scores of read bases");
+	SUBREADputs("# Phred offset");
 	SUBREADputs("");
 	SUBREADputs("  -P <3:6>          Offset value added to the Phred quality score of each read");
 	SUBREADputs("                    base. '3' for phred+33 and '6' for phred+64. '3' by default.");
@@ -124,14 +125,13 @@ void print_usage_core_aligner()
 	SUBREADputs("");
 	SUBREADputs("# unique mapping and multi-mapping");
 	SUBREADputs("");
-	SUBREADputs("  -u                Report uniquely mapped reads only. Number of matched bases (");
-	SUBREADputs("                    for RNA-seq) or mis-matched bases(for genomic DNA-seq) is");
-	SUBREADputs("                    used to break the tie when multiple mapping locations are");
-	SUBREADputs("                    found.");
+	SUBREADputs("  --multiMapping    Report multi-mapping reads in addition to uniquely mapped");
+	SUBREADputs("                    reads. Use \"-B\" to set the maximum number of equally-best");
+	SUBREADputs("                    alignments to be reported.");
 	SUBREADputs("");
-	SUBREADputs("  -B <int>          Maximal number of equally-best mapping locations to be");
-	SUBREADputs("                    reported. 1 by default. Note that -u option takes precedence");
-	SUBREADputs("                    over -B.");
+	SUBREADputs("  -B <int>          Maximum number of equally-best alignments to be reported for");
+	SUBREADputs("                    a multi-mapping read. Equally-best alignments have the same");
+	SUBREADputs("                    number of mis-matched bases. 1 by default.");
 	SUBREADputs("");
 	SUBREADputs("# indel detection");
 	SUBREADputs("");
@@ -347,10 +347,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 			case 'U':
 				global_context->config.report_no_unpaired_reads = 1;
 				break;
-			case 'u':
-				global_context->config.report_multi_mapping_reads = 0;
-				global_context->config.use_hamming_distance_break_ties = 1;
-				break;
 			case 'b':
 				global_context->config.convert_color_to_base = 1;
 				break;
@@ -466,7 +462,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				break;
 				
 			case 0:
-				if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
+				if(strcmp("multiMapping", long_options[option_index].name)==0)
+				{
+					global_context->config.report_multi_mapping_reads = 1;
+				}
+				else if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
 				{
 					global_context->config.memory_use_multiplex = atof(optarg);
 				}

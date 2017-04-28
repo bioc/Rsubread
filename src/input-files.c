@@ -75,6 +75,15 @@ void * delay_realloc(void * old_pntr, size_t old_size, size_t new_size){
 	return new_ret;
 }
 
+// the caller is in charge of deallocation
+char * memstrcpy(char * in){
+	int ilen = strlen(in);
+	char * ret = malloc(ilen+1);
+	memcpy(ret, in, ilen);
+	ret[ilen]=0;
+	return ret;
+}
+
 double guess_reads_density(char * fname, int is_sam)
 {
 	return guess_reads_density_format(fname, is_sam, NULL, NULL, NULL);
@@ -2250,7 +2259,7 @@ int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_thre
 		bam_main -> threads[x1].strm.next_in = Z_NULL;
 
 		deflateInit2(&bam_main -> threads[x1].strm, bam_main -> compression_level, Z_DEFLATED,
-                PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+		PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 	}
 	return 0;
 }
@@ -2763,7 +2772,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					BAM_next_nch;
 					header_txt [x1] = nch;
 				}
-				pairer -> output_header(pairer, thread_context -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
+				int is_OK = pairer -> output_header(pairer, thread_context -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
 
 				BAM_next_u32(pairer -> BAM_n_ref);
 				unsigned int ref_bin_len = 0;
@@ -2797,10 +2806,13 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					//SUBREADprintf("%d-th ref : %s [len=%u], bin_len=%d < %d\n", x1, ref_name, l_ref, ref_bin_len,  pairer -> BAM_l_text);
 				}
 
-				//exit(0);
-				pairer -> output_header(pairer, thread_context -> thread_id, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
+				is_OK = is_OK || pairer -> output_header(pairer, thread_context -> thread_id, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
 
 				if(header_txt) free(header_txt);
+				if(is_OK){
+					pairer -> is_incomplete_BAM = 1;
+					return 0;
+				}
 
 				pairer -> BAM_header_parsed = 1;
 				//if(pairer -> display_progress)
@@ -2870,7 +2882,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				}
 			}
 
-			pairer -> output_header(pairer, thread_context -> thread_id, 1, header_len , header_start , header_len);
+			int is_OK = pairer -> output_header(pairer, thread_context -> thread_id, 1, header_len , header_start , header_len);
 			thread_context -> input_buff_SBAM_ptr = 0;
 			int header_bin_ptr = 0, header_contigs = 0;
 			while(1){
@@ -2919,8 +2931,12 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				}
 			}
 
-			pairer -> output_header(pairer, thread_context -> thread_id, 0, header_contigs , header_start , header_bin_ptr);
+			is_OK = is_OK || pairer -> output_header(pairer, thread_context -> thread_id, 0, header_contigs , header_start , header_bin_ptr);
 			pairer -> BAM_header_parsed = 1;
+			if(is_OK){
+				pairer -> is_incomplete_BAM = 1;
+				return 0;
+			}
 		}
 
 		if(passed_read_SBAM_ptr >=0)
@@ -3151,7 +3167,7 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 	return bin_ptr;
 }
 
-int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value){
+int SAM_pairer_iterate_tags(unsigned char * bin, int bin_len, char * tag_name, char * data_type, char ** saved_value){
 	int found = 0;
 	int bin_cursor = 0;
 	while(bin_cursor < bin_len){
@@ -3164,58 +3180,69 @@ int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_nam
 			SUBREADprintf("TAG=%s, TYP=%c %d %c\n", outc, bin[bin_cursor+2],  bin[bin_cursor+3],  bin[bin_cursor+4]);
 		}
 
-                if(bin[bin_cursor] == tag_name[0] && bin[bin_cursor+1] == tag_name[1]){
-                        int tag_int_val = 0;
-                        if(bin[bin_cursor+2]=='i' || bin[bin_cursor+2]=='I'){
-                                memcpy(&tag_int_val, bin+bin_cursor+3, 4);
-                                found = 1;
-                        } else if(bin[bin_cursor+2]=='s' || bin[bin_cursor+2]=='S'){
-                                memcpy(&tag_int_val, bin+bin_cursor+3, 2);
-                                found = 1;
-                        } else if(bin[bin_cursor+2]=='c' || bin[bin_cursor+2]=='C'){
-                                memcpy(&tag_int_val, bin+bin_cursor+3, 1);
-                                found = 1;
-                        }
-                        if(found){
-                                (* saved_value) = tag_int_val;
-                                break;
-                        }
-                }
-                int skip_content = 0;
+		if(bin[bin_cursor] == tag_name[0] && bin[bin_cursor+1] == tag_name[1]){
+			(* data_type) = bin[bin_cursor+2];
+			(* saved_value) = (char *)bin+bin_cursor+3;
+			found = 1;
+			break;
+		}
+		int skip_content = 0;
 		//SUBREADprintf("NextTag=%c; ", bin[bin_cursor+2]);
-                if(bin[bin_cursor+2]=='i' || bin[bin_cursor+2]=='I' || bin[bin_cursor+2]=='f')
-                        skip_content = 4;
-                else if(bin[bin_cursor+2]=='s' || bin[bin_cursor+2]=='S')
-                        skip_content = 2;
-                else if(bin[bin_cursor+2]=='c' || bin[bin_cursor+2]=='C' ||  bin[bin_cursor+2]=='A')
-                        skip_content = 1;
+		if(bin[bin_cursor+2]=='i' || bin[bin_cursor+2]=='I' || bin[bin_cursor+2]=='f')
+			skip_content = 4;
+		else if(bin[bin_cursor+2]=='s' || bin[bin_cursor+2]=='S')
+			skip_content = 2;
+		else if(bin[bin_cursor+2]=='c' || bin[bin_cursor+2]=='C' ||  bin[bin_cursor+2]=='A')
+			skip_content = 1;
 		else if(bin[bin_cursor+2]=='Z' || bin[bin_cursor+2]=='H'){
-                        while(bin[bin_cursor+skip_content + 3]){
+			while(bin[bin_cursor+skip_content + 3]){
 				//SUBREADprintf("ACHAR=%c\n", (bin[skip_content + 3]));
 				skip_content++;
 			}
 			skip_content ++;
-                } else if(bin[bin_cursor+2]=='B'){
-                        char cell_type = tolower(bin[bin_cursor+3]);
+		} else if(bin[bin_cursor+2]=='B'){
+			char cell_type = tolower(bin[bin_cursor+3]);
 			
-                        memcpy(&skip_content, bin + bin_cursor + 4, 4);
+			memcpy(&skip_content, bin + bin_cursor + 4, 4);
 		//	SUBREADprintf("Array Type=%c, cells=%d\n", cell_type, skip_content);
-                        if(cell_type == 's')skip_content *=2;
-                        else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
+			if(cell_type == 's')skip_content *=2;
+			else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
 			skip_content += 4 + 1;
-                }else{
+		}else{
 			SUBREADprintf("UnknownTag=%c\n", bin[bin_cursor+2]);
 			assert(0);
 		}
 		//SUBREADprintf("SKIP=%d\n", skip_content);
-                bin_cursor += skip_content + 3;
-        }
-        return found;
+		bin_cursor += skip_content + 3;
+	}
+	return found;
 }
 
+int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value){
+	char * data_ptr = NULL;
+	char data_type = 0;
+
+	(*saved_value) = 0;
+	int ret = SAM_pairer_iterate_tags(bin, bin_len, tag_name, &data_type, &data_ptr);
+	//SUBREADprintf(" NEED %s , FOUND %d, TYPE %c\n", tag_name, ret, data_type);
+	if(ret){
+		if(data_type == 'i' || data_type == 'I')
+			memcpy(saved_value, data_ptr, 4);
+		else if(data_type == 's' || data_type == 'S')
+			memcpy(saved_value, data_ptr, 2);
+		else if(data_type == 'c' || data_type == 'C')
+			memcpy(saved_value, data_ptr, 1);
+		else return 0;
+	}
+
+	return ret;
+}
+
+
+
 int SAM_pairer_get_read_full_name( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , unsigned char * bin, int bin_len , char * full_name, int * this_flag){
-        full_name[0]=0;
-        int rlen = 0;
+	full_name[0]=0;
+	int rlen = 0;
 	unsigned int l_read_name = 0;
 	unsigned int refID = 0;
 	unsigned int next_refID = 0;
@@ -4429,7 +4456,7 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	out_strm.next_in = Z_NULL;
 	
 	deflateInit2(&out_strm, Z_NO_COMPRESSION, Z_DEFLATED,
-                PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+		PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 
 	int disk_is_full = 0;
 	int in_bin_ptr = 0;
@@ -4811,7 +4838,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 			header_txt [x1] = nch;
 		}
 
-		pairer -> output_header(pairer, 0, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
+		int is_OK = pairer -> output_header(pairer, 0, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
 		NOSORT_BAM_next_u32(pairer -> BAM_n_ref);
 		unsigned int ref_bin_len = 0;
 		for(x1 = 0; x1 < pairer -> BAM_n_ref; x1++) {
@@ -4833,8 +4860,13 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 			assert(ref_bin_len < pairer -> BAM_l_text);
 		}
 
-		pairer -> output_header(pairer, 0, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
+		is_OK = is_OK || pairer -> output_header(pairer, 0, 0, pairer -> BAM_n_ref , header_txt , ref_bin_len );
 		free(header_txt);
+
+		if(is_OK){
+			pairer -> is_incomplete_BAM = 1;
+			return;
+		}
 
 		while(1){
 			if(pairer -> is_finished) break;
@@ -4956,8 +4988,15 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 		}
 
 		pairer -> BAM_header_parsed = 1;
-		pairer -> output_header(pairer, 0, 0, header_contigs , header_bin , header_bin_ptr);
+		int is_OK = pairer -> output_header(pairer, 0, 0, header_contigs , header_bin , header_bin_ptr);
 		free(header_bin);
+
+		if(is_OK){
+			pairer -> is_incomplete_BAM = 1;
+			return;
+		}
+
+
 
 		fseek(pairer -> input_fp, passed_read_SBAM_ptr, SEEK_SET);
 
@@ -5025,10 +5064,11 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 		if(pairer -> is_bad_format && pairer->input_is_BAM && ( ! pairer -> is_internal_error )  && ( ! pairer -> is_incomplete_BAM )){
 			//#warning ">>>>>> REMOVE '+ 1' FROM NEXT LINE IN RELEASE <<<<<<"
 			assert(1 != corrected_run);
-			//#warning ">>>>>> COMMENT NEXT LINE IN RELEASE <<<<<<"
-			//SUBREADprintf("Retrying with the corrected format...\n");
 			delete_with_prefix(pairer -> tmp_file_prefix);
 			pairer -> is_internal_error |= SAM_pairer_fix_format(pairer);
+			//#warning ">>>>>> COMMENT NEXT LINE IN RELEASE <<<<<<"
+			//SUBREADprintf("Retrying with the corrected format... (%d)\n", pairer -> is_bad_format);
+
 			if(pairer -> is_bad_format || pairer -> is_internal_error)
 				return -1;
 			SAM_pairer_reset(pairer);
@@ -5036,7 +5076,7 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 		}else break;
 	}
 
-	return pairer -> is_bad_format || pairer -> is_internal_error;
+	return pairer -> is_bad_format || pairer -> is_internal_error || pairer -> is_incomplete_BAM;
 }
 
 int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_path)
@@ -6026,6 +6066,35 @@ int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_
 	//if(is_first_read_PE)assert(0);
 	return ret;
 }
+
+void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg){
+	int buck_i, shown = 0;
+	for(buck_i = 0; buck_i < t1 -> numOfBuckets; buck_i++){
+		KeyValuePair * cursor = t1 -> bucketArray[buck_i];
+		while(cursor){
+			char * t1chro = (char *) cursor -> key;
+			int found = HashTableGet(t2, t1chro) != NULL;
+			if(!found) if(strlen(t1chro)>3 &&  t1chro[0]=='c'&&t1chro[1]=='h'&&t1chro[2]=='r' ) found = HashTableGet(t2, t1chro+3) != NULL;
+			if(!found) {
+				char tmp_t1chro [MAX_CHROMOSOME_NAME_LEN+1];
+				sprintf(tmp_t1chro, "chr%s", t1chro);
+				found = HashTableGet(t2, tmp_t1chro) != NULL;
+			}
+
+			if(!found){
+				if(!shown){
+					print_in_box(80,0,0,"");
+					print_in_box(80,0,0,msg);
+					shown = 1;
+				}
+				print_in_box(80,0,0,"   %s", t1chro);
+			}
+			cursor = cursor -> next;
+		}
+	}
+	if(shown) print_in_box(80,0,0,"");
+}
+
 
 #ifdef MAKE_INPUTTEST
 int main(int argc, char ** argv)

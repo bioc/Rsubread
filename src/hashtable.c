@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.14 2017/03/10 00:01:40 cvs Exp $
+ * $Id: hashtable.c,v 9999.17 2017/04/28 06:30:27 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -15,7 +15,12 @@
 #include <assert.h>
 #include <pthread.h>
 #include "hashtable.h"
+#include "core.h"
 
+static int pointercmp(const void *pointer1, const void *pointer2);
+static unsigned long pointerHashFunction(const void *pointer);
+static int isProbablePrime(long number);
+static long calculateIdealNumOfBuckets(HashTable *hashTable);
 
 
 ArrayList * ArrayListCreate(int init_capacity){
@@ -43,8 +48,12 @@ void * ArrayListGet(ArrayList * list, long n){
 
 int ArrayListPush(ArrayList * list, void * new_elem){
 	if(list -> capacityOfElements <= list->numOfElements){
-		list -> capacityOfElements *=1.3;
-		list -> elementList=realloc(list -> elementList, list -> capacityOfElements);
+		if(list -> capacityOfElements *1.3 > list -> capacityOfElements + 10)
+				list -> capacityOfElements = list -> capacityOfElements *1.3;
+		else	list -> capacityOfElements = list -> capacityOfElements + 10;
+
+		list -> elementList=realloc(list -> elementList, sizeof(void *) * list -> capacityOfElements);
+		assert(list -> elementList);
 	}
 	list->elementList[list->numOfElements++] = new_elem;
 	return list->numOfElements;
@@ -53,12 +62,53 @@ void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator
 	list -> elemDeallocator = elem_deallocator;
 }
 
+int ArrayListSort_compare(void * sortdata0, int L, int R){
+	void ** sortdata = sortdata0;
+	ArrayList * list = sortdata[0];
+	int (*comp_elems)(void * L_elem, void * R_elem) = sortdata[1];
 
-static int pointercmp(const void *pointer1, const void *pointer2);
-static unsigned long pointerHashFunction(const void *pointer);
-static int isProbablePrime(long number);
-static long calculateIdealNumOfBuckets(HashTable *hashTable);
+	void * L_elem = list -> elementList[L];
+	void * R_elem = list -> elementList[R];
+	return comp_elems(L_elem, R_elem);
+}
 
+void ArrayListSort_exchange(void * sortdata0, int L, int R){
+	void ** sortdata = sortdata0;
+	ArrayList * list = sortdata[0];
+
+	void * tmpp = list -> elementList[L];
+	list -> elementList[L] = list -> elementList[R];
+	list -> elementList[R] = tmpp;
+}
+
+void ArrayListSort_merge(void * sortdata0, int start, int items, int items2){
+	void ** sortdata = sortdata0;
+	ArrayList * list = sortdata[0];
+	int (*comp_elems)(void * L_elem, void * R_elem) = sortdata[1];
+
+	void ** merged = malloc(sizeof(void *)*(items + items2));
+	int write_cursor, read1=start, read2=start+items;
+
+	for(write_cursor = 0; write_cursor < items + items2; write_cursor++){
+		void * Elm1 = list -> elementList[read1];
+		void * Elm2 = list -> elementList[read2];
+
+		int select_1 = (read1 == start + items)?0:( read2 == start + items + items2 || comp_elems(Elm1, Elm2) < 0 );
+		if(select_1) merged[write_cursor] = list -> elementList[read1++];
+		else merged[write_cursor] = list -> elementList[read2++];
+	}
+
+	memcpy(list -> elementList + start, merged, sizeof(void *) * (items + items2));
+	free(merged);
+}
+
+void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem)){
+	void * sortdata[2];	
+	sortdata[0] = list;
+	sortdata[1] = compare_L_minus_R;
+
+	merge_sort(sortdata, list -> numOfElements, ArrayListSort_compare, ArrayListSort_exchange, ArrayListSort_merge);
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -157,8 +207,10 @@ void HashTableDestroy(HashTable *hashTable) {
 
             if (hashTable->keyDeallocator != NULL)
                 hashTable->keyDeallocator((void *) pair->key);
-            if (hashTable->valueDeallocator != NULL)
-                hashTable->valueDeallocator(pair->value);
+            if (hashTable->valueDeallocator != NULL){
+//			fprintf(stderr,"FREE %p\n", pair->value);
+			hashTable->valueDeallocator(pair->value);
+		}
             free(pair);
             pair = nextPair;
         }
