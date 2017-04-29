@@ -235,6 +235,8 @@ void txunique_process_gene_chro(txunique_context_t * context, char * chro, int s
 					struct _txunique_tmp_edges *edge = ArrayListGet(combined_edge_list, ex_i);
 
 					//SUBREADprintf("  TXN %s, Edge: %u (%s), Exon [%d]: %u ~ %u, %s, depth=%d, uniq_base=%u, all_base=%u\n", try_tx->transcript_id, edge -> base_open_end, edge -> is_exon_start?"START":"END  ", txex_i, txex?txex->exon_start:0, txex?txex->exon_stop:0 , is_on?"ON":"OFF", overlapping_count, unique_bases, total_bases);
+					if(total_start<1) assert(!is_on);
+					if(!is_on) assert(total_start < 1);
 					if(edge -> is_exon_start){
 						overlapping_count += edge -> nsupp;
 
@@ -247,7 +249,7 @@ void txunique_process_gene_chro(txunique_context_t * context, char * chro, int s
 							assert(overlapping_count > 1);
 						}else if(overlapping_count == 1&& is_on) unique_start = edge -> base_open_end;
 
-						if(total_start<1)total_start = edge -> base_open_end;
+						if(total_start<1 && is_on)total_start = edge -> base_open_end;
 					}
 
 					if(is_on) assert(overlapping_count>0);
@@ -262,13 +264,15 @@ void txunique_process_gene_chro(txunique_context_t * context, char * chro, int s
 							assert(overlapping_count ==0);
 						} else if(overlapping_count == 1 && is_on) unique_start = edge -> base_open_end;
 
-						if(total_start && overlapping_count <1){
+						if(total_start && !is_on){
 							total_bases += edge -> base_open_end - total_start;
 							total_start = 0;
 						}
 					}
 
 					if(overlapping_count<1) assert(!is_on);
+					if(!is_on) assert(total_start < 1);
+					if(total_start<1) assert(!is_on);
 
 					if(txex && edge-> is_exon_start==0){
 							if(edge-> base_open_end > txex -> exon_stop) txex_i++;

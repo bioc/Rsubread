@@ -61,7 +61,7 @@
 #define MAX_READ_NAME_LEN 100 
 #define MAX_CHROMOSOME_NAME_LEN 100 
 #define MAX_FILE_NAME_LENGTH 300
-#define FEATURE_NAME_LENGTH  256 
+#define FEATURE_NAME_LENGTH 256 
 
 //#warning "============== REMOVE '*1.2' FROM THE NEXT LINE ================"
 #define MULTI_THREAD_OUTPUT_ITEMS  (4096 * 3/5 *3)
