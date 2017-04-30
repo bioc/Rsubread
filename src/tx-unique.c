@@ -81,6 +81,7 @@ int txunique_do_add_exon(char * gene_name, char * transcript_id, char * chrome_n
 
 int txunique_load_annotation(txunique_context_t * context){
 	int loaded_features = load_features_annotation(context -> input_GTF_file_name, FILE_TYPE_GTF, context -> gene_name_column_name, context -> transcript_id_column_name, context -> used_feature_type, context, txunique_do_add_exon);
+	if(loaded_features<1) return -1;
 	return 0;
 }
 
@@ -437,7 +438,6 @@ int TxUniqueMain(int argc, char ** argv){
 		ret = ret || txunique_find_unique_bases(&context);
 		ret = ret || txunique_write_output_file(&context);
 		ret = ret || txunique_destroy_context(&context);
-
-		SUBREADputs("All finished.");
+		if(!ret) SUBREADputs("All finished.");
 		return ret;
 }

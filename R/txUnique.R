@@ -8,8 +8,13 @@ txUnique <- function(GTF_Annotation_File, Feature_Type = "exon", Gene_ID_Attribu
 	cmd <- paste("txUnique",opt,sep="\t")
 	n <- length(unlist(strsplit(cmd,"\t")))
 	C_args <- .C("R_txUnique_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
-	z <- read.delim(fout)
-	z <- z[ order(z[,'Gene_ID'], z[,'Transcript_ID']) ,]
-	file.remove(fout)
-	z
+	if(file.exists(fout)){
+		z <- read.delim(fout)
+		z <- z[ order(z[,'Gene_ID'], z[,'Transcript_ID']) ,]
+		file.remove(fout)
+		z
+	}else{
+		print("No output was generated.")
+		NA
+	}
 }
