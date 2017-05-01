@@ -57,6 +57,9 @@ featureCounts(files,
 	# number of CPU threads
 	nthreads=1,
 
+    # read group
+    byReadGroup=FALSE,
+
 	# miscellaneous
 	maxMOp=10,
 	reportReads=FALSE,
@@ -96,6 +99,7 @@ featureCounts(files,
   \item{countChimericFragments}{ logical indicating whether a chimeric fragment, which has its two reads mapped to different chromosomes, should be counted or not. \code{TRUE} by default.}
   \item{autosort}{ logical specifying if the automatic read sorting is enabled. This option is only applicable for paired-end reads. If \code{TRUE}, reads will be automatically sorted by their names if reads from the same pair are found not to be located next to each other in the input. No read sorting will be performed if there are no such reads found.}
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
+  \item{byReadGroup}{ logical indicating if read counting will be performed for each individual read group. \code{FALSE} by default.}
   \item{maxMOp}{ \code{integer} giving the maximum number of `M' operations (matches or mis-matches) allowed in a CIGAR string. \code{10} by default. Both `X' and `=' operations are treated as `M' and adjacent `M' operations are merged in the CIGAR string.}
   \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
   \item{tmpDir}{ a character string specifying the directory under which intermediate files are saved (later removed). By default, current working directory is used.}

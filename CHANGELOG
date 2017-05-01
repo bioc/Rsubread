@@ -1,3 +1,9 @@
+1 May 2017 - 1.27.2
+(1) Added txUnique() function.
+(2) C code in align() and subjunc() has -u option removed.
+(3) New option in featureCounts to allow counting of reads in each read group individually.
+(4) Align() and subjunc() report percentage of uniquely mapped reads, multi-mapping reads and unmapped reads.
+
 27 April 2017 - 1.27.1
 (1) Added promoterRegions() function.
 (2) Modified getInBuiltAnnotation() function.

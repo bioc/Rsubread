@@ -50,8 +50,8 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 	if(complexIndels)
 		opt <- paste(opt,"--complexIndels",sep=",")
 
-	if(unique)
-		opt <- paste(opt,"-u",sep=",")
+	if(!unique)
+		opt <- paste(opt,"--multiMapping",sep=",")
 
 	opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")
 

@@ -23,9 +23,6 @@ A data matrix, where each row corresponds to a transcript in the GTP annotation 
 %\note{}
 %\seealso{}
 \examples{
-library(Rsubread)
-base_counts <- txUnique("hg19-Ensembl.GTF")
-base_counts[1:10,]
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
