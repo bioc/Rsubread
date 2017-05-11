@@ -185,4 +185,6 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp);
 int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage, int max_secs);
 char cigar_op_char(int ch);
 void SamBam_read2bin(char * read_txt, char * read_bin);
+
+int convert_BAM_binary_to_SAM(SamBam_Reference_Info * chro_table, char * bam_bin, char * sam_txt);
 #endif

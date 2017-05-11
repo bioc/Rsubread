@@ -3090,24 +3090,25 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 
 			int is_important_tag =  (in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'H') ||
 						(in_str[in_ptr+0] == 'H' && in_str[in_ptr+1] == 'I') ||
+						(in_str[in_ptr+0] == 'R' && in_str[in_ptr+1] == 'G') ||
 						(in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'M') ;
 			int xxnch;
-			if(in_str[in_ptr + 3] == 'Z'){
-				if(!pairer -> tiny_mode){
+			if(in_str[in_ptr + 3] == 'Z' || in_str[in_ptr + 3] == 'H'){
+				if(is_important_tag||!pairer -> tiny_mode){
 					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
 					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
-					bin_tmp[bin_ptr+2] = 'Z';
+					bin_tmp[bin_ptr+2] = in_str[in_ptr + 3];
 					bin_ptr += 3;
 				}
 				in_ptr += 5;
 				while(1){
 					xxnch = *(in_str + in_ptr);
-					if(xxnch == '\n' || xxnch == '\t') break;
-					if(!pairer -> tiny_mode)
+					if(xxnch == '\n' || xxnch == '\t' || xxnch == 0) break;
+					if(is_important_tag||!pairer -> tiny_mode)
 						*(bin_tmp + (bin_ptr++)) = xxnch;
 					in_ptr ++;
 				}
-				if(!pairer -> tiny_mode)
+				if(is_important_tag||!pairer -> tiny_mode)
 					*(bin_tmp + (bin_ptr++)) = 0;
 			}else if(in_str[in_ptr + 3] == 'i'){
 				int tmpi = 0, tmpi_sign = 1;
@@ -3122,7 +3123,7 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 
 				while(1){
 					xxnch = *(in_str + in_ptr);
-					if(xxnch == '\n' || xxnch == '\t') break;
+					if(xxnch == '\n' || xxnch == '\t' || xxnch == 0) break;
 					else if(xxnch == '-') tmpi_sign = -1;
 					else tmpi = tmpi * 10 + xxnch - '0';
 					in_ptr ++;
@@ -3132,6 +3133,64 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 					set_memory_int(bin_tmp+bin_ptr, tmpi);
 					bin_ptr += 4;
 				}
+			}else if(in_str[in_ptr + 3] == 'f'){
+				char ftxt[30];
+				int fi=0;
+				while(1){
+					xxnch = *(in_str + in_ptr + 5 + fi);
+					if(xxnch== '\n' || xxnch == '\t'|| xxnch == 0) break;
+					ftxt[fi++]=xxnch;
+					ftxt[fi]=0;
+				}
+				if(!pairer -> tiny_mode){
+					float fv = atof(ftxt);
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'f';
+					memcpy( bin_tmp + bin_ptr + 3, &fv, 4);
+					bin_ptr += 7;
+				}
+				in_ptr += 5 + fi;
+			}else if(in_str[in_ptr + 3] == 'B'){
+				char elemtype = in_str[in_ptr + 5];
+				int txi=0, eles=0;
+				char ttxt[30], *elen_ptr = NULL;;
+				if(!pairer -> tiny_mode){
+					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
+					bin_tmp[bin_ptr+1] = in_str[in_ptr+1];
+					bin_tmp[bin_ptr+2] = 'B';
+					bin_tmp[bin_ptr+3] = elemtype;
+					elen_ptr = bin_tmp+4 + bin_ptr;
+					bin_ptr += 8;
+				}
+				in_ptr += 6;
+				while(1){
+					xxnch = *(in_str + in_ptr);
+					if((!pairer -> tiny_mode)){
+						if((xxnch ==',' || xxnch =='\n' || xxnch == '\t' || xxnch == 0) && txi > 0){
+							//SUBREADprintf("ADD VAL : `%s`\n", ttxt);
+							if(elemtype == 'f'){
+								float fv = atof(ttxt);
+								memcpy( bin_tmp + bin_ptr, &fv, 4);
+							}else{
+								int iv = atoi(ttxt);
+								memcpy( bin_tmp + bin_ptr, &iv, 4);
+							}
+							bin_ptr+=4;
+							txi=0;
+							eles++;
+						}else{
+							if(xxnch!=','){
+								ttxt[txi++] = xxnch;
+								ttxt[txi] = 0;
+							}
+						}
+					}
+					if(xxnch =='\n' || xxnch == '\t' || xxnch == 0)break;
+					in_ptr ++;
+				}
+				if((!pairer -> tiny_mode)) memcpy(elen_ptr, & eles, 4);
+
 			}else if(in_str[in_ptr + 3] == 'A'){
 				if(!pairer -> tiny_mode){
 					bin_tmp[bin_ptr+0] = in_str[in_ptr+0];
@@ -3145,7 +3204,7 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 				in_ptr += 5;
 				while(1){
 					xxnch = *(in_str + in_ptr);
-					if(xxnch == '\n' || xxnch == '\t') break;
+					if(xxnch == '\n' || xxnch == '\t' || xxnch == 0) break;
 					in_ptr++;
 				}
 			}
@@ -3296,7 +3355,8 @@ int SAM_pairer_get_read_full_name( SAM_pairer_context_t * pairer , SAM_pairer_th
 	unsigned int tags_len = bin_len - tags_start;
 
 	if(tags_len > 2){
-		SAM_pairer_iterate_int_tags(bin + tags_start, tags_len, "HI", &HItag);
+		int found = SAM_pairer_iterate_int_tags(bin + tags_start, tags_len, "HI", &HItag);
+		if(!found) HItag = -1;
 	}
 
 	int slash_pos = 0;
@@ -3497,6 +3557,7 @@ int SAM_pairer_multi_thread_output(void * pairer_vp, int thread_no, char * rname
 }
 
 void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , int read_name_len, char * read_full_name, int bin_len, char * bin , int flags){
+
 	unsigned char * mate_bin = HashTableGet(thread_context -> orphant_table, read_full_name);
 	if(mate_bin){
 		if(pairer -> output_function)
@@ -3549,7 +3610,6 @@ int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t
 		int name_len = SAM_pairer_get_read_full_name(pairer, thread_context, bin, bin_len, read_full_name, & this_flags);
 
 		if(pairer -> is_single_end_mode == 0 && ( this_flags & 1 ) == 1){ // if the reads are PE
-
 			if(strcmp(read_full_name , thread_context -> immediate_last_read_full_name) == 0){
 				if(pairer -> output_function)
 					pairer -> output_function(pairer, thread_context -> thread_id, read_full_name, (char*) bin, (char*)thread_context -> immediate_last_read_bin);
@@ -4224,6 +4284,7 @@ void * SAM_pairer_thread_run( void * params ){
 		if(pairer -> is_bad_format) break;
 
 		if(thread_context -> immediate_last_read_full_name[0]){
+
 			SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name, thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_bin_len ,  thread_context -> immediate_last_read_flags);
 			SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
 			thread_context -> immediate_last_read_full_name[0] = 0;

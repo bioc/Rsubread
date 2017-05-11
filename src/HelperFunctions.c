@@ -36,10 +36,12 @@
 
 #else
 
+#ifndef __MINGW32__
 #include <sys/ioctl.h>
-#include <net/if.h>
-#include <unistd.h>
 #include <netinet/in.h>
+#include <net/if.h>
+#endif
+#include <unistd.h>
 #endif
 
 
@@ -768,7 +770,7 @@ int strcmp_number(char * s1, char * s2)
 
 int mac_str(char * str_buff)
 {
-#ifdef FREEBSD
+#if defined(FREEBSD) || defined(__MINGW32__)
 	return 1;
 #else
 #ifdef MACOS

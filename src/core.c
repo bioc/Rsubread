@@ -4061,6 +4061,10 @@ int load_global_context(global_context_t * context)
 	int min_phred_score = -1 , max_phred_score = -1;
 	context -> is_phred_warning = 0; 
 	
+	if(context->config.multi_best_reads>1 && ! context->config.report_multi_mapping_reads){
+		print_in_box(80,0,0,"WARNING: Multi-mapping reads are reported.");
+		context->config.report_multi_mapping_reads = 1;
+	}
 
 	subread_init_lock(&context->input_reads.input_lock);
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1))
