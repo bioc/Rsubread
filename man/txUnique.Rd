@@ -1,7 +1,7 @@
 \name{txUnique}
 \alias{txUnique}
-\title{txUnique: counting unique bases of transcripts}
-\description{This function counts the unique bases and total bases of transcripts in a GTF annotation file
+\title{Count number of bases unique to each transcript}
+\description{For each transcript, number of unique bases and total number of bases will be reported.
 }
 \usage{
 txUnique(GTF_Annotation_File, Feature_Type = "exon", Gene_ID_Attribute = "gene_id", Transcript_ID_Attribute = "transcript_id")
@@ -13,10 +13,10 @@ txUnique(GTF_Annotation_File, Feature_Type = "exon", Gene_ID_Attribute = "gene_i
   \item{Transcript_ID_Attribute}{ character string specifying the attribute name in the 9-th column in the GTF file for the transcript identifier. \code{transcript_id} by default.}
 }
 \details{
-txUnique calculates the total number of bases in each transcript, as well as the number of bases that are only in this transcript, but not included in other transcript(s) belonging to the same gene. The repeated or overlapping exons within each transcript are merged before counting the numbers of unique and total bases.
+This function compares the transcripts belonging to the same gene and then counts the number of bases unique to each transcript. It also reports the total number of bases for each transcript. When a transcript is found to contain overlapping exons, the overlapping exons will be merged and each overlapping base will be counted only once.
 }
 \value{
-A data matrix, where each row corresponds to a transcript in the GTP annotation file. There are four columns for each transcript: the identifier of the gene, the identifier of the transcript, the numbers of unique bases and total bases in the transcript.
+A data matrix in which each row represents a transcript. The matrix includes four columns: gene identifier, transcript identifier, number of bases unique to each transcript and total number of bases each transcript has.
 }
 %\references{}
 \author{Yang Liao and Wei Shi}

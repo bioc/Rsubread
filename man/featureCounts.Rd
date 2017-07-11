@@ -31,6 +31,9 @@ featureCounts(files,
 	# fractional counting
 	fraction=FALSE,
 
+	# long reads
+	isLongRead=FALSE,
+
 	# read filtering
 	minMQS=0,
 	splitOnly=FALSE,
@@ -57,13 +60,14 @@ featureCounts(files,
 	# number of CPU threads
 	nthreads=1,
 
-    # read group
-    byReadGroup=FALSE,
+	# read group
+	byReadGroup=FALSE,
 
 	# miscellaneous
 	maxMOp=10,
-	reportReads=FALSE,
-	tmpDir=".")
+	reportReads=NULL,
+	tmpDir=".",
+	verbose=FALSE)
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
@@ -83,6 +87,7 @@ featureCounts(files,
   \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
   \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
   \item{fraction}{ logical indicating if fractional counts are produced for multi-mapping reads and/or multi-overlapping reads. \code{FALSE} by default. See below for more details.}
+  \item{isLongRead}{ logical indicating if input data contain long reads. This option should be set to \code{TRUE} if counting Nanopore or PacBio long reads.}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}
   \item{splitOnly}{ logical indicating whether only split alignments (their CIGAR strings contain letter 'N') should be included for summarization. \code{FALSE} by default. Example split alignments are exon-spanning reads from RNA-seq data. \code{useMetaFeatures} should be set to \code{FALSE} and \code{allowMultiOverlap} should be set to \code{TRUE}, if the purpose of summarization is to assign exon-spanning reads to all their overlapping exons.}
   \item{nonSplitOnly}{ logical indicating whether only non-split alignments (their CIGAR strings do not contain letter 'N') should be included for summarization. \code{FALSE} by default.}
@@ -101,8 +106,9 @@ featureCounts(files,
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{byReadGroup}{ logical indicating if read counting will be performed for each individual read group. \code{FALSE} by default.}
   \item{maxMOp}{ \code{integer} giving the maximum number of `M' operations (matches or mis-matches) allowed in a CIGAR string. \code{10} by default. Both `X' and `=' operations are treated as `M' and adjacent `M' operations are merged in the CIGAR string.}
-  \item{reportReads}{ logical indicating if read counting result for each read/fragment is saved to a file. If \code{TRUE}, read counting results for reads/fragments will be saved to a tab-delimited file that contains four columns including name of read/fragment, status(assigned or the reason if not assigned), name of target feature/meta-feature and number of hits if the read/fragment is counted multiple times. Name of the file is the same as name of the input read file except a suffix `.featureCounts' is added. Multiple files will be generated if there is more than one input read file.}
+  \item{reportReads}{ output detailed read assignment results for each read (or fragment if paired end). The detailed assignment results can be saved in three different formats including \code{CORE}, \code{SAM} and \code{BAM} (note that these values are case sensitive). Default value of this option is \code{NULL}, indicating not to report assignment results for reads. \code{CORE} format represents a tab-delimited text file that contains four columns including read name, status (assigned or the reason if not assigned), number of targets and target list. A target is a feature or a meta-feature. Items in the target lists is separated by comma. If a read is not assigned, its number of targets will be set as -1. For each input file, a text file is generated and its name is the input file name added with `.featureCounts'. When \code{SAM} or \code{BAM} format is specified, the detailed assignment results will be saved to SAM and BAM format files. Names of generated files are the input file names added with `.featureCounts.sam' or `.featureCounts.bam'. Three tags are used to describe read assignment results: XS, XN and XT. Tag XS gives the assignment status. Tag XN gives number of targets. Tag XT gives comma separated target list.}
   \item{tmpDir}{ a character string specifying the directory under which intermediate files are saved (later removed). By default, current working directory is used.}
+  \item{verbose}{ logical indicating if verbose information for debugging will be generated. This may include information such as unmatched chromosomes/contigs between reads and annotation.}
   }
 \details{
 \code{featureCounts} is a general-purpose read summarization function, which assigns to the genomic features (or meta-features) the mapped reads that were generated from genomic DNA and RNA sequencing.
@@ -195,8 +201,8 @@ Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpo
 \examples{\dontrun{
 library(Rsubread)
 
-# Summarize SAM format single-end reads using built-in RefSeq annotation for mouse genome mm9:
-featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm9")
+# Summarize SAM format single-end reads using built-in RefSeq annotation for mouse genome mm10:
+featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm10")
 
 # Summarize single-end reads using a user-provided GTF annotation file:
 featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",

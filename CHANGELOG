@@ -1,3 +1,10 @@
+11 July 2017 - 1.27.3
+(1) Count long reads in featureCounts.
+(2) Add ‘verbose’ option to featureCounts.
+(3) Detailed assignment results can be saved to text file or SAM/BAM file by featureCounts.
+(4) Filters included in featureCounts counting summary are ordered by their order being applied in counting.
+(5) Update users guide.
+
 1 May 2017 - 1.27.2
 (1) Added txUnique() function.
 (2) C code in align() and subjunc() has -u option removed.
