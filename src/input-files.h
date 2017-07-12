@@ -105,7 +105,7 @@ typedef struct {
 	unsigned long long orphant_space;
 	z_stream strm;
 
-	char immediate_last_read_bin[66000];
+	char immediate_last_read_bin[FC_LONG_READ_RECORD_HARDLIMIT];
 	char immediate_last_read_full_name[MAX_READ_NAME_LEN*2 +80 ];
 	int immediate_last_read_flags;
 	int immediate_last_read_bin_len;
@@ -123,6 +123,8 @@ typedef struct {
 	int is_bad_format;
 	int is_single_end_mode;
 	int force_do_not_sort;
+	int long_cigar_mode;
+	int long_read_minimum_length;
 	int is_finished;
 	int merge_level_finished;
 	int max_file_open_number;
@@ -153,7 +155,7 @@ typedef struct {
 	int is_internal_error;
 
 	void (* reset_output_function) (void * pairer);
-	int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2); 
+	int (* output_function) (void * pairer, int thread_no, char * bin1, char * bin2); 
 	int (* output_header) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len); 
 	void (* unsorted_notification) (void * pairer, char * bin1, char * bin2); // it is called only once
 	// reserved for the application passing its own data to the output function.
@@ -303,13 +305,13 @@ unsigned long long geinput_file_offset( gene_input_t * input);
 int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_header_length);
 
 
-int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * rname, char * bin1, char * bin2), char * tmp_path, void * appendix1) ;
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * bin1, char * bin2), char * tmp_path, void * appendix1, int long_read_minimum_length) ;
 int SAM_pairer_run( SAM_pairer_context_t * pairer);
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
 void SAM_pairer_writer_reset(void * pairer);
 void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (* unsorted_notification) (void * pairer, char * bin1, char * bin2));
 
-int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * rname, char * bin1, char * bin2 );
+int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * bin1, char * bin2 );
 int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len);
 
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);

@@ -27,7 +27,7 @@ typedef unsigned short BS_uint_16;
 typedef unsigned int BS_uint_32;
 
 #define BAM_MAX_CHROMOSOME_NAME_LEN 100 
-#define BAM_MAX_CIGAR_LEN 256
+#define BAM_MAX_CIGAR_LEN (30000)
 #define BAM_MAX_READ_NAME_LEN 256
 #define BAM_MAX_READ_LEN 3000
 

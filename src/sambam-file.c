@@ -781,6 +781,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 
 	char extra_tags [CORE_ADDITIONAL_INFO_LENGTH];
 	extra_tags[0]=0;
+	int extra_len = 0;
 	while( (*chunk_ptr) < next_start)
 	{
 		char extag[2];
@@ -827,14 +828,23 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 			if(extype == 'c' || extype=='C' || extype == 'i' || extype=='I' || extype == 's' || extype=='S'){
 				int tmpi = 0;
 				memcpy(&tmpi, chunk+(*chunk_ptr),delta);
-				if(tmpi >= 0)
-					sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
+				if(tmpi >= 0 && extra_len < CORE_ADDITIONAL_INFO_LENGTH - 18){
+					int sret = sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
+					extra_len += sret;
+				}
 			}else if(extype == 'Z'){
-				sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
-				*(extra_tags + strlen(extra_tags)+delta-1) = 0;
-				memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
+				if(extra_len < CORE_ADDITIONAL_INFO_LENGTH - 7 - delta){
+					sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
+					extra_len += 6;
+					*(extra_tags + strlen(extra_tags)+delta-1) = 0;
+					memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
+					extra_len += delta - 1;
+				}
 			}else if(extype == 'A'){
-				sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
+				if(extra_len < CORE_ADDITIONAL_INFO_LENGTH - 8){
+					int sret = sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
+					extra_len += sret;
+				}
 			}
 		}
 
@@ -1357,6 +1367,7 @@ int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage, int
 			for(; int_opt<8; int_opt++) if("MIDNSHP=X"[int_opt] == nch)break;
 			cigar_int[num_opt ++] = (tmp_int << 4) | int_opt; 
 			tmp_int = 0;
+			//SUBREADprintf("CIGARCOM: %d-th is %c\n", num_opt, nch);
 			if(num_opt>=max_secs)break;
 		}
 	}

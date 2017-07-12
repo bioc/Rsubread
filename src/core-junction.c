@@ -202,7 +202,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 				SUBREADprintf("F_JUMP?  match=%d / tested=%d\n", matched_bases_to_site , tested_read_pos);
 
 			//#warning "========= remove - 2000 from next line ============="
-			if(tested_read_pos >0 && ( matched_bases_to_site*10000/tested_read_pos > 9000 - 2000 || global_context->config.maximise_sensitivity_indel) )
+			if(explain_context -> total_tries < REALIGN_TOTAL_TRIES && tested_read_pos >0 && ( matched_bases_to_site*10000/tested_read_pos > 9000 - 2000 || global_context->config.maximise_sensitivity_indel) )
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
@@ -275,16 +275,10 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_sections ++;
 
 
-			if(0 && FIXLENstrcmp("R000404427", explain_context -> read_name) == 0)
-				SUBREADprintf("FRONT_ADD_EVENT : %s , %u ~ %u , INDELLEN=%d, TEST_READ_POS=%u, RPED=%u, ABSSTART=%u\n", explain_context -> read_name, tested_event -> event_small_side, tested_event -> event_large_side, tested_event -> indel_length, tested_read_pos, explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end, new_read_head_abs_offset);
+						if(0 && FIXLENstrcmp("R000404427", explain_context -> read_name) == 0)
+							SUBREADprintf("FRONT_ADD_EVENT : %s , %u ~ %u , INDELLEN=%d, TEST_READ_POS=%u, RPED=%u, ABSSTART=%u\n", explain_context -> read_name, tested_event -> event_small_side, tested_event -> event_large_side, tested_event -> indel_length, tested_read_pos, explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end, new_read_head_abs_offset);
 
-						//if(explain_context -> pair_number == 23){
-						//printf("JUMP_IN: %u ; STRAND=%c ; REMENDER=%d ; 0=%d 0=%d\n", new_read_head_abs_offset, tested_event -> is_strand_jumped?'X':'=', new_remainder_len, tested_event -> indel_length,  tested_event -> indel_at_junction);
-						//}
-
-		//			#warning "SUBREAD_151 REMOVE THIS ASSERTION! "
-		//			assert(new_remainder_len < 102);
-						//printf("SUGGEST_NEXT = %d (! %d)\n", tested_event -> connected_next_event_distance,  tested_event -> connected_previous_event_distance);
+						explain_context -> total_tries ++;
 						search_events_to_front(global_context, thread_context, explain_context, read_text + tested_event -> indel_at_junction + tested_read_pos -  min(0, tested_event->indel_length), qual_text + tested_read_pos -  min(0, tested_event->indel_length), new_read_head_abs_offset, new_remainder_len, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_next_event_distance, 0);
 						explain_context -> tmp_search_sections --;
 
@@ -536,7 +530,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 			//#warning ">>>>>>>>>>>>>>>> REMOVE IT <<<<<<<<<<<<<<<<<<<<<<"
 			//printf("OCT27-STEPSB-JB-%s: test %u = %d events; TEST=%d > 7000 : MA=%d; %s ; %u = %u - (%d - %d) ; LEV=%d\n", explain_context -> read_name, potential_event_pos, site_events_no, (read_tail_pos<=tested_read_pos)?(-1234):( matched_bases_to_site*10000/(read_tail_pos - tested_read_pos)) , matched_bases_to_site, read_text + tested_read_pos, potential_event_pos, read_tail_abs_offset, read_tail_pos, tested_read_pos, explain_context -> tmp_search_sections);
 			//#warning "========= remove - 2000 from next line ============="
-			if((read_tail_pos>tested_read_pos) && ( matched_bases_to_site*10000/(read_tail_pos - tested_read_pos) > 9000 - 2000 || global_context->config.maximise_sensitivity_indel) )
+			if(explain_context -> total_tries < REALIGN_TOTAL_TRIES && (read_tail_pos>tested_read_pos) && ( matched_bases_to_site*10000/(read_tail_pos - tested_read_pos) > 9000 - 2000 || global_context->config.maximise_sensitivity_indel) )
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
@@ -617,6 +611,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						//#warning ">>>>>>>>>>>>>>>> REMOVE IT <<<<<<<<<<<<<<<<<<<<<<"
 						//printf("OCT27-STEPSB-JB-%s: %u IN -> %u; NEW_TAIL=%d; ENV_CONN=%d; LEV=%d\n", explain_context -> read_name, potential_event_pos, new_read_tail_abs_offset, new_read_tail_pos, tested_event -> connected_previous_event_distance, explain_context -> tmp_search_sections);
 					
+						explain_context -> total_tries ++;
 						search_events_to_back(global_context, thread_context, explain_context, read_text , qual_text, new_read_tail_abs_offset , new_read_tail_pos, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_previous_event_distance, 0);
 						//#warning ">>>>>>>>>>>>>>>> REMOVE IT <<<<<<<<<<<<<<<<<<<<<<"
 						//printf("OCT27-STEPSB-JB-%s: %u OUT <- %u; LEN=%d\n", explain_context -> read_name, potential_event_pos, new_read_tail_abs_offset, explain_context -> tmp_search_sections);
@@ -2542,6 +2537,7 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	explain_context.pair_number = pair_number;
 	explain_context.is_second_read = is_second_read ;
 	explain_context.best_read_id = best_read_id;
+	explain_context.total_tries = 0;
 
 	unsigned int back_search_tail_position,front_search_start_position; 
 	unsigned short back_search_read_tail, front_search_read_start;
@@ -2582,9 +2578,11 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 		front_search_start_position = current_result -> selected_position + front_search_read_start;
 	}
 
-	if(0 && FIXLENstrcmp( explain_context.read_name, "R000002689")==0)
-	{
-		SUBREADprintf("EXPLAIN_READ_%d %s [%d]: POS=%u ;; BACK SEARCH TAILPOS=%u, READTAIL=%d ; INDEL_IN_CONF=%d ; READ_COV=%d~%d\n", 1+is_second_read, explain_context.read_name, best_read_id, current_result -> selected_position, back_search_tail_position, back_search_read_tail, current_result -> indels_in_confident_coverage, front_search_read_start, back_search_read_tail);
+	if(0 && FIXLENstrcmp("SRR3439488.572382", explain_context.read_name)==0) {
+		char * q_res_chro=NULL;
+		int q_res_offset=0;
+		locate_gene_position(current_result -> selected_position,&global_context -> chromosome_table, &q_res_chro, &q_res_offset);
+		SUBREADprintf("EXPLAIN_READ_%d %s [%d]: POS=%u (%s:%d);; BACK SEARCH TAILPOS=%u, READTAIL=%d ; INDEL_IN_CONF=%d ; READ_COV=%d~%d\n", 1+is_second_read, explain_context.read_name, best_read_id, current_result -> selected_position,q_res_chro,q_res_offset, back_search_tail_position, back_search_read_tail, current_result -> indels_in_confident_coverage, front_search_read_start, back_search_read_tail);
 	}
 
 	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 0, 1);
@@ -2682,6 +2680,9 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	// calc
 	else*/
 	int realignment_number = finalise_explain_CIGAR(global_context, thread_context, &explain_context, final_realignments);
+
+	if(0 && FIXLENstrcmp("SRR3439488.572382", explain_context.read_name)==0) 
+		SUBREADprintf("TRYING_REALIGN:%s:%u\n", explain_context.read_name, explain_context.total_tries);
 
 	return realignment_number;
 }

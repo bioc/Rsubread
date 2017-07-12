@@ -392,7 +392,7 @@ int show_summary(global_context_t * global_context)
 	if(global_context -> is_phred_warning)
 	{
 		print_in_box(80, 0,1,"");
-		print_in_box(80,0,0, "           WARNING : Phred offset (%d) incorrect?", global_context->config.phred_score_format == FASTQ_PHRED33?33:64);
+		print_in_box(80,0,0, "            WARNING : Phred offset (%d) incorrect?", global_context->config.phred_score_format == FASTQ_PHRED33?33:64);
 	}
 	print_in_box(80, 0,1,"");
 	print_in_box(80, 0,0,"       Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);

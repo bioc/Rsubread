@@ -69,6 +69,18 @@ typedef struct{
 } fc_junction_gene_t;
 
 
+#define MAXIMUM_INSERTION_IN_SECTION 8
+
+typedef struct {
+	char * chro;
+	unsigned int start_pos;
+	unsigned int chromosomal_length;
+	short insertions;
+	unsigned int insertion_start_pos[ MAXIMUM_INSERTION_IN_SECTION ];
+	unsigned short insertion_lengths[ MAXIMUM_INSERTION_IN_SECTION ];
+} CIGAR_interval_t;
+
+
 
 typedef struct {
 	int space;
@@ -135,6 +147,13 @@ typedef struct {
 	long hits_indices1 [MAX_HIT_NUMBER];
 	long hits_indices2 [MAX_HIT_NUMBER];
 
+	unsigned int proc_Starting_Chro_Points[65536];
+	unsigned short proc_Starting_Read_Points[65536];
+	unsigned short proc_Section_Read_Lengths[65536];
+	char * proc_ChroNames[65536];
+	char proc_Event_After_Section[65536];
+	CIGAR_interval_t proc_CIGAR_intervals_R1[65536], proc_CIGAR_intervals_R2[65536];
+
 	char ** scoring_buff_gap_chros;
 	unsigned int * scoring_buff_gap_starts;
 	unsigned short * scoring_buff_gap_lengths;
@@ -191,10 +210,13 @@ typedef struct {
 	int is_SEPEmix_warning_shown;
 	int is_unpaired_warning_shown;
 	int is_stake_warning_shown;
+	int is_read_too_long_to_SAM_BAM_shown;
 	int is_split_or_exonic_only;
 	int is_duplicate_ignored;
 	int is_first_read_reversed;
 	int is_second_read_straight;
+	int is_verbose;
+	int long_read_minimum_length;
 	int assign_reads_to_RG;
 	int use_stdin_file;
 	int disk_is_full;
@@ -682,6 +704,8 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		print_in_box(80,0,0,"      Read reduction to : %d' end" , global_context -> reduce_5_3_ends_to_one == REDUCE_TO_5_PRIME_END ?5:3);
 	if(global_context -> is_duplicate_ignored)
 		print_in_box(80,0,0,"       Duplicated Reads : ignored");
+	if(global_context -> long_read_minimum_length < 5000)
+		print_in_box(80,0,0,"         Long read mode : yes");
 	//print_in_box(80,0,0,"      Read orientations : %c%c", global_context->is_first_read_reversed?'r':'f', global_context->is_second_read_straight?'f':'r' );
 
 	if(global_context->is_paired_end_mode_assign)
@@ -1732,18 +1756,6 @@ int reverse_flag(int mf){
 	return ret;
 }
 
-#define MAXIMUM_INSERTION_IN_SECTION 8
-
-typedef struct {
-	char * chro;
-	unsigned int start_pos;
-	unsigned int chromosomal_length;
-	short insertions;
-	unsigned int insertion_start_pos[ MAXIMUM_INSERTION_IN_SECTION ];
-	unsigned short insertion_lengths[ MAXIMUM_INSERTION_IN_SECTION ];
-} CIGAR_interval_t;
-
-
 int calc_total_frag_one_len(CIGAR_interval_t * intvs, int intvn){
 	int ret = 0, x1;
 	for(x1 = 0; x1 < intvn; x1++){
@@ -1772,6 +1784,13 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 		// two reads are from different chromosomes
 		return calc_total_frag_one_len( CIGAR_intervals_R2,CIGAR_intervals_R2_sections ) + calc_total_frag_one_len( CIGAR_intervals_R1,CIGAR_intervals_R1_sections );
 
+    if(0&& FIXLENstrcmp("V0112_0155:7:1101:11874:24723", read_name)==0){
+		int xx;
+		for(xx = 0; xx < CIGAR_intervals_R1_sections; xx++)
+				SUBREADprintf("R1 SEC %d: %u + %d\n", xx, CIGAR_intervals_R1[xx].start_pos,  CIGAR_intervals_R1[xx].chromosomal_length );
+		for(xx = 0; xx < CIGAR_intervals_R2_sections; xx++)
+				SUBREADprintf("R2 SEC %d: %u + %d\n", xx, CIGAR_intervals_R2[xx].start_pos,  CIGAR_intervals_R2[xx].chromosomal_length );
+	}
 	
 	unsigned int merged_section_count = 0;
 	unsigned int merged_section_start_positions[ MAXIMUM_INSERTION_IN_SECTION * 3 ];
@@ -2280,11 +2299,23 @@ void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thr
 	return ret;
 }
 
-int process_pairer_output(void * pairer_vp, int thread_no, char * rname, char * bin1, char * bin2){
+int process_pairer_output(void * pairer_vp, int thread_no, char * bin1, char * bin2){
 	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
 	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
 	fc_thread_thread_context_t * thread_context = global_context -> thread_contexts + thread_no;
 
+
+	if(pairer -> long_cigar_mode){
+		if(global_context -> max_M < 65536){
+			//SUBREADprintf("SWITCHED INTO LONG-READ MODE\n");
+			global_context -> max_M = 65536;
+		}
+		if(!global_context->is_read_too_long_to_SAM_BAM_shown &&(global_context -> is_read_details_out == FILE_TYPE_SAM || global_context -> is_read_details_out == FILE_TYPE_BAM)){
+			global_context -> is_read_details_out = 0;
+			SUBREADprintf("ERROR: The read is too long to the SAM or BAM output.\nPlease use the 'CORE' mode for the assignment detail output.\n");
+			global_context->is_read_too_long_to_SAM_BAM_shown = 1;
+		}
+	}
 	//#warning "++++++ REMOVE THIS RETURN ++++++"
 	//return 0;
 
@@ -2429,7 +2460,8 @@ void write_read_detailed_remainder(fc_thread_global_context_t * global_context, 
 		memcpy(&tmplen, thread_context -> read_details_buff + write_bin_ptr, 4);
 		if(tmplen < 9 || tmplen > 3*MAX_FC_READ_LENGTH){
 			SUBREADprintf("ERROR: Format error : len = %d\n", tmplen);
-			exit(-1);
+			//oexit(-1);
+			return ;
 		}
 		tmplen +=4;
 		write_bin_ptr += tmplen;
@@ -2451,7 +2483,10 @@ int add_read_detail_bin_buff(fc_thread_global_context_t * global_context, fc_thr
 	memcpy(&binlen, bin, 4);
 	binlen += 4;
 	if(binlen > MAX_FC_READ_LENGTH * 3){
-		SUBREADprintf("ERROR: The read is too long to the BAM output.\n");
+		if(!global_context->is_read_too_long_to_SAM_BAM_shown){
+				SUBREADprintf("ERROR: The read is too long to the SAM or BAM output.\nPlease use the 'CORE' mode for the assignment detail output.\n");
+				global_context->is_read_too_long_to_SAM_BAM_shown = 1;
+		}
 		return -1;
 	}
 
@@ -2471,7 +2506,7 @@ int write_read_details_FP(fc_thread_global_context_t * global_context, fc_thread
 	
 	if(global_context -> is_read_details_out == FILE_TYPE_RSUBREAD){
 		get_readname_from_bin(bin1?bin1:bin2, &read_name);
-		fprintf(global_context -> read_details_out_FP, "%s\t%s\t%d\t%s\n", read_name, status, feature_count, features);
+		fprintf(global_context -> read_details_out_FP, "%s\t%s\t%d\t%s\n", read_name, status, feature_count, features?features:"NA");
 	}else{
 		char * out_bin1 = NULL, *out_bin2 = NULL;
 		char * tags[4];
@@ -2527,9 +2562,12 @@ void warning_anno_BAM_chromosomes(fc_thread_global_context_t * global_context){
 	for(x1 = 0 ; x1 < global_context -> exontable_exons ; x1++)
 		HashTablePut(ANNO_chro_tab, global_context -> exontable_chr[x1], NULL+1);
 
-	warning_hash_hash(ANNO_chro_tab, BAM_chro_tab, "Chromosomes/contigs in annotation but not in input file");
-	warning_hash_hash(BAM_chro_tab, ANNO_chro_tab, "Chromosomes/contigs in annotation but not in input file");
+	if(global_context -> is_verbose){
+		warning_hash_hash(ANNO_chro_tab, BAM_chro_tab, "Chromosomes/contigs in annotation but not in input file");
+		warning_hash_hash(BAM_chro_tab, ANNO_chro_tab, "Chromosomes/contigs in input file but not in annotation");
+	}
 	HashTableDestroy(BAM_chro_tab);
+	HashTableDestroy(ANNO_chro_tab);
 }
 
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2)
@@ -2546,11 +2584,14 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	unsigned int  total_frag_len =0;
 
 	int cigar_sections, is_junction_read;
-	unsigned int Starting_Chro_Points[global_context -> max_M];
-	unsigned short Starting_Read_Points[global_context -> max_M];
-	unsigned short Section_Read_Lengths[global_context -> max_M];
-	char * ChroNames[global_context -> max_M];
-	char Event_After_Section[global_context -> max_M];
+    unsigned int * Starting_Chro_Points = thread_context -> proc_Starting_Chro_Points;
+    unsigned short * Starting_Read_Points = thread_context -> proc_Starting_Read_Points;
+    unsigned short * Section_Read_Lengths = thread_context -> proc_Section_Read_Lengths;
+    char ** ChroNames = thread_context -> proc_ChroNames;
+    char * Event_After_Section = thread_context -> proc_Event_After_Section;
+
+	CIGAR_interval_t * CIGAR_intervals_R1 = thread_context -> proc_CIGAR_intervals_R1;
+    CIGAR_interval_t * CIGAR_intervals_R2 = thread_context -> proc_CIGAR_intervals_R2;
 
 	int is_second_read;
 	int maximum_NH_value = 1, NH_value;
@@ -2560,9 +2601,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	if(thread_context -> thread_id == 0 && thread_context -> all_reads < 1){
 		warning_anno_BAM_chromosomes(global_context);
 	}
-
-	CIGAR_interval_t CIGAR_intervals_R1 [ global_context -> max_M ];
-	CIGAR_interval_t CIGAR_intervals_R2 [ global_context -> max_M ];
 
 	if(global_context -> need_calculate_overlap_len ){
 		memset( CIGAR_intervals_R1, 0, sizeof(CIGAR_interval_t) *  global_context -> max_M  );
@@ -2580,6 +2618,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		RG_ptr = NULL;
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr);
+
+		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 	//	SUBREADprintf("  RNAME=%s\n", read_name);
 
 		//#warning "==================== REMOVE WHEN RELEASE ========================"
@@ -2958,7 +2998,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	if(global_context -> need_calculate_fragment_len )
 		total_frag_len = calc_total_frag_len( global_context, thread_context, CIGAR_intervals_R1, CIGAR_intervals_R1_sections, CIGAR_intervals_R2, CIGAR_intervals_R2_sections , read_name);
 
-	//SUBREADprintf("FRAGLEN: %s %d\n", read_name, total_frag_len);
+	//SUBREADprintf("FRAGLEN: %s %d; CIGARS=%d,%d\n", read_name, total_frag_len, CIGAR_intervals_R1_sections,CIGAR_intervals_R2_sections);
 
 	int fixed_fractional_count = global_context -> use_fraction_multi_mapping ?calc_fixed_fraction(maximum_NH_value): NH_FRACTION_INT;
 
@@ -3125,9 +3165,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			count_table[hit_exon_id] += fixed_fractional_count;				
 		}else{
 			thread_context->count_table[hit_exon_id] += fixed_fractional_count;
-			thread_context->nreads_mapped_to_exon++;
 			thread_context->read_counters.assigned_reads ++;
 		}
+		thread_context->nreads_mapped_to_exon++;
 		if(global_context -> read_details_out_FP)
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
@@ -3146,9 +3186,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			count_table[hit_exon_id] += fixed_fractional_count;	
 		}else{
 			thread_context->count_table[hit_exon_id] += fixed_fractional_count;
-			thread_context->nreads_mapped_to_exon++;
 			thread_context->read_counters.assigned_reads ++;
 		}
+		thread_context->nreads_mapped_to_exon++;
 		if(global_context -> read_details_out_FP)
 		{
 			int final_gene_number = global_context -> exontable_geneid[hit_exon_id];
@@ -3361,9 +3401,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							count_table[max_exon_id] += fixed_fractional_count;
 						}else{
 							thread_context->count_table[max_exon_id] += fixed_fractional_count;
-							thread_context->nreads_mapped_to_exon++;
 							thread_context->read_counters.assigned_reads ++;
 						}
+						thread_context->nreads_mapped_to_exon++;
 						if(global_context -> read_details_out_FP)
 						{
 							int final_gene_number = global_context -> exontable_geneid[max_exon_id];
@@ -3412,8 +3452,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							sumtab -> assigned_reads++;
 						}else{
 							thread_context->read_counters.assigned_reads ++;
-							thread_context->nreads_mapped_to_exon++;
 						}
+						thread_context->nreads_mapped_to_exon++;
 						
 						if(global_context -> read_details_out_FP)
 						{
@@ -3619,18 +3659,35 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		}
 	}
 
-	char pct_str[10];
-	if(total_input_reads>0)
-		sprintf(pct_str,"(%.1f%%%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
-	else	pct_str[0]=0;
 
-	if(unpaired_fragment_no){
-		print_in_box(80,0,0,"   Not properly paired fragments : %llu", unpaired_fragment_no);
+
+	if(0 == global_context -> is_input_bad_format){
+		char pct_str[10];
+		if(total_input_reads>0)
+			sprintf(pct_str,"(%.1f%%%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
+		else	pct_str[0]=0;
+	
+	
+		if(unpaired_fragment_no){
+			print_in_box(80,0,0,"   Not properly paired fragments : %llu", unpaired_fragment_no);
+		}
+
+		int show_summary = 1;
+		if(global_context -> assign_reads_to_RG){
+			if(RGmerged_table -> numOfElements)
+				print_in_box(80,0,0,"   Total read groups : %ld", RGmerged_table -> numOfElements);
+			else{
+				print_in_box(80,0,0,"   No read groups are found; no output is generated.");
+				show_summary = 0;
+			}
+		}
+		if(show_summary){
+			print_in_box(80,0,0,"   Total %s : %llu", global_context -> is_paired_end_mode_assign?"fragments":"reads", total_input_reads); 
+			print_in_box(pct_str[0]?81:80,0,0,"   Successfully assigned %s : %llu %s", global_context -> is_paired_end_mode_assign?"fragments":"reads", *nreads_mapped_to_exon,pct_str); 
+		}
+		print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
+		print_in_box(80,0,0,"");
 	}
-	print_in_box(80,0,0,"   Total %s : %llu", global_context -> is_paired_end_mode_assign?"fragments":"reads", total_input_reads); 
-	print_in_box(pct_str[0]?81:80,0,0,"   Successfully assigned %s : %llu %s", global_context -> is_paired_end_mode_assign?"fragments":"reads", *nreads_mapped_to_exon,pct_str); 
-	print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
-	print_in_box(80,0,0,"");
 	return ret;
 }
 
@@ -3674,7 +3731,7 @@ void fc_thread_init_input_files(fc_thread_global_context_t * global_context, cha
 
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose)
 {
 	int x1;
 
@@ -3699,6 +3756,8 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_duplicate_ignored = is_duplicate_ignored;
 	global_context -> use_stdin_file = use_stdin_file;
 	global_context -> assign_reads_to_RG = assign_reads_to_RG;
+	global_context -> long_read_minimum_length = long_read_minimum_length;
+	global_context -> is_verbose = is_verbose;
 	//global_context -> is_first_read_reversed = (pair_orientations[0]=='r');
 	//global_context -> is_second_read_straight = (pair_orientations[1]=='f');
 
@@ -3792,6 +3851,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	global_context -> read_length = read_length;
 	global_context -> is_unpaired_warning_shown = 0;
 	global_context -> is_stake_warning_shown = 0;
+	global_context -> is_read_too_long_to_SAM_BAM_shown = 0;
 
 	if(global_context -> is_read_details_out)
 	{
@@ -3901,9 +3961,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		}
 
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
-		void ** thread_args = malloc(sizeof(void *)*2);
-		thread_args[0] = global_context;
-		thread_args[1] = & global_context -> thread_contexts[xk1];
 	}
 
 	char rand_prefix[300];
@@ -3914,8 +3971,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	if(global_context -> use_stdin_file) sprintf(new_fn, "<%s",  global_context -> input_file_name );
 	else sprintf(new_fn, "%s",  global_context -> input_file_name );
 
-	//#warning "REMOVE ' * 2 ' FROM NEXT LINE !!!!!!"
-	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, !( global_context -> is_read_details_out == FILE_TYPE_BAM ||global_context -> is_read_details_out == FILE_TYPE_SAM ) , !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context);
+	//#warning " ===================== REMOVE ' 0 && ' FROM NEXT LINE !!!!!! =================="
+	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, !( global_context -> is_read_details_out == FILE_TYPE_BAM ||global_context -> is_read_details_out == FILE_TYPE_SAM ) , !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context,  global_context -> long_read_minimum_length);
 	SAM_pairer_set_unsorted_notification(&global_context -> read_pairer, pairer_unsorted_notification);
 
 	return 0;
@@ -3967,7 +4024,12 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 }
 void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 {
-	global_context -> is_input_bad_format |= SAM_pairer_run(&global_context -> read_pairer); 
+	int assign_ret = SAM_pairer_run(&global_context -> read_pairer);
+	if(assign_ret){
+		print_in_box(80,0,0,"");
+		print_in_box(80,0,0,"   format error found in this file!");
+	}
+	global_context -> is_input_bad_format |= assign_ret;
 }
 
 void BUFstrcat(char * targ, char * src, char ** buf){
@@ -4305,6 +4367,7 @@ static struct option long_options[] =
 	{"tmpDir", required_argument, 0, 0},
 	{"largestOverlap", no_argument, 0,0},
 	{"byReadGroup", no_argument, 0,0},
+	{"verbose", no_argument, 0,0},
 	{0, 0, 0, 0}
 };
 
@@ -4495,10 +4558,21 @@ void print_usage()
 	SUBREADputs("                      in the input SAM or BAM file");
 	SUBREADputs("");
 
+	SUBREADputs("# Long reads");
+	SUBREADputs("");
+	SUBREADputs("  -L <int>            Input dataset will be treated as long reads. Long-read");
+	SUBREADputs("                      counting can only run in one thread and only reads (not");
+	SUBREADputs("                      read-pairs) can be counted. There is no limitation on the");
+	SUBREADputs("                      number of 'M' operations allowed in a CIGAR string in long");
+	SUBREADputs("                      read counting.");
+	SUBREADputs("");
+
 	SUBREADputs("# Miscellaneous");
 	SUBREADputs("");
-	SUBREADputs("  -R <format>         Output detailed assignment result for each read or read-");
-	SUBREADputs("                      pair. Accepted formats include SAM, BAM and CORE. ");
+	SUBREADputs("  -R <format>         Output detailed assignment results for each read or read-");
+	SUBREADputs("                      pair. Results are saved to a file that is in one of the");
+	SUBREADputs("                      following formats: CORE, SAM and BAM. See Users Guide for");
+	SUBREADputs("                      more info about these formats.");
 	SUBREADputs("");
 	SUBREADputs("  --tmpDir <string>   Directory under which intermediate files are saved (later");
 	SUBREADputs("                      removed). By default, intermediate files will be saved to");
@@ -4508,6 +4582,9 @@ void print_usage()
 	SUBREADputs("                      string. 10 by default. Both 'X' and '=' are treated as 'M'");
 	SUBREADputs("                      and adjacent 'M' operations are merged in the CIGAR");
 	SUBREADputs("                      string.");
+	SUBREADputs("");
+	SUBREADputs("  --verbose           Output verbose information for debugging, such as un-");
+	SUBREADputs("                      matched chromosome/contig names.");
 	SUBREADputs("");
 	SUBREADputs("  -v                  Output version of the program.");
 	SUBREADputs("");
@@ -4925,9 +5002,11 @@ int readSummary(int argc,char *argv[]){
 	41: temp_directory # the directory to put temp files. "<use output directory>" by default, namely find it from the output file dir.
 	42: as.numeric(use_stdin_stdout) # only for CfeatureCounts. When use_stdin_stdout & 0x01 > 0, the input file is from stdin (stored in a temporary file); when use_stdin_stdout & 0x02 > 0, the output should be written to STDOUT instead of a file.
 	43: as.numeric(assign_reads_to_RG) # 1: reads with "RG" tags will be assigned to read groups' 0: default setting
+	44: as.numeric(long_read_minimum_length) # Reads longer than this will be assigned as long reads (no multi-threading)
+	45: as.numeric(is_verbose) # 1: show the mismatched chromosome names on screet; 0: don't do so
 	 */
 
-	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG;
+	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose;
 	float fracOverlap;
 	char **chr;
 	long *start, *stop;
@@ -5112,12 +5191,19 @@ int readSummary(int argc,char *argv[]){
 		assignReadsToRG = (argv[43][0]=='1');
 	else  assignReadsToRG = 0;
 
+	if(argc>44)
+		long_read_minimum_length = atoi(argv[44])?1:1999999999;
+	else  long_read_minimum_length = 1999999999;
+
+	if(argc>45)
+		is_verbose = (argv[45][0]=='1'); 
+	else  is_verbose = 0;
 
 	if(SAM_pairer_warning_file_open_limit()) return -1;
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -5229,6 +5315,8 @@ int readSummary(int argc,char *argv[]){
 		ArrayListSetDeallocationFunction(splicing_global_table_list, (void (*)(void *))HashTableDestroy);
 	}
 
+	int ret_int = 0;
+
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
 		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
@@ -5267,8 +5355,10 @@ int readSummary(int argc,char *argv[]){
 		}
 		
 		fc_read_counters * my_read_counter = calloc(1, sizeof(fc_read_counters));
+		global_context.is_read_details_out = isReadSummaryReport;
+		global_context.max_M = max_M;
 
-		int ret_int = readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end, my_read_counter, junction_global_table, splicing_global_table, merged_RG_table);
+		ret_int = ret_int || readSummary_single_file(& global_context, column_numbers, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start, block_max_end, my_read_counter, junction_global_table, splicing_global_table, merged_RG_table);
 		if(global_context.disk_is_full){
 			SUBREADprintf("ERROR: disk is full. Please check the free space in the output directory.\n");
 		}
@@ -5281,15 +5371,18 @@ int readSummary(int argc,char *argv[]){
 			free(column_numbers);
 		} else {
 			// finished
-			ArrayListPush(table_columns, column_numbers);
+
 			char * mem_file_name = memstrcpy(next_fn);
-			ArrayListPush(table_column_names, mem_file_name);
-			ArrayListPush(read_counters, my_read_counter);
-			
-			if(global_context.do_junction_counting){
-				ArrayListPush(junction_global_table_list,junction_global_table);
-				ArrayListPush(splicing_global_table_list,splicing_global_table);
+			if(!global_context.assign_reads_to_RG){
+				ArrayListPush(table_columns, column_numbers);
+				ArrayListPush(table_column_names, mem_file_name);
+				ArrayListPush(read_counters, my_read_counter);
+				if(global_context.do_junction_counting){
+					ArrayListPush(junction_global_table_list,junction_global_table);
+					ArrayListPush(splicing_global_table_list,splicing_global_table);
+				}
 			}
+			
 			if(global_context.assign_reads_to_RG){
 				int buck_i;
 				for(buck_i = 0; buck_i < merged_RG_table -> numOfBuckets; buck_i++){
@@ -5315,7 +5408,8 @@ int readSummary(int argc,char *argv[]){
 					}
 				}
 				
-			}			
+				free(mem_file_name);
+			}
 			total_written_coulmns ++;
 		}
 		global_context.is_paired_end_mode_assign = orininal_isPE;
@@ -5324,6 +5418,7 @@ int readSummary(int argc,char *argv[]){
 	}
 
 	free(file_list_used);
+	free(is_unique);
 
 	if(global_context.is_input_bad_format){
 		SUBREADprintf("\nFATAL Error: The program has to terminate and no counting file is generated.\n\n");
@@ -5536,7 +5631,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[44];
+	char * Rargv[46];
 	char annot_name[300];
 	char temp_dir[300];
 	char * out_name = malloc(300);
@@ -5587,8 +5682,8 @@ int feature_count_main(int argc, char ** argv)
 	int very_long_file_names_size = 200;
 	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
 	float fracOverlap = 0.0;
-	int std_input_output_mode = 0;
-	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[11];
+	int std_input_output_mode = 0, long_read_mode = 0, is_verbose = 0;
+	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[11], long_read_mode_str[11];
 	very_long_file_names = malloc(very_long_file_names_size);
 	very_long_file_names [0] = 0;
 	fasta_contigs_name[0]=0;
@@ -5619,7 +5714,7 @@ int feature_count_main(int argc, char ** argv)
 	strcpy(max_M_str, "10");
 	strcpy(Pair_Orientations,"fr");
 
-	while ((c = getopt_long (argc, argv, "G:A:g:t:T:o:a:d:D:L:Q:pbF:fs:S:CBJPMOR:v?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "G:A:g:t:T:o:a:d:D:LQ:pbF:fs:S:CBJPMOR:v?", long_options, &option_index)) != -1)
 		switch(c)
 		{
 			case 'S':
@@ -5737,7 +5832,7 @@ int feature_count_main(int argc, char ** argv)
 				term_strncpy(annot_name, optarg,299);
 				break;
 			case 'L':
-				feature_block_size = atoi(optarg);
+				long_read_mode = 1;
 				break;
 			case 0 :	// long options
 
@@ -5795,7 +5890,7 @@ int feature_count_main(int argc, char ** argv)
 					strcpy(temp_dir, optarg);
 				}
 				if(strcmp("maxMOp", long_options[option_index].name)==0){
-					if(!is_valid_digit_range(optarg, "maxMOp", 1 , 64))
+					if(!is_valid_digit_range(optarg, "maxMOp", 1 , 65555))
 						STANDALONE_exit(-1);
 					strcpy(max_M_str, optarg);
 				}
@@ -5835,6 +5930,10 @@ int feature_count_main(int argc, char ** argv)
 					is_Split_or_Exonic_Only = 2;
 				}
 				
+				if(strcmp("verbose", long_options[option_index].name)==0){
+					is_verbose = 1;
+				}
+
 				if(strcmp("byReadGroup", long_options[option_index].name)==0){
 					assign_reads_to_RG = 1;
 				}
@@ -5888,6 +5987,7 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(Strand_Sensitive_Str,"%d", Strand_Sensitive_Mode);
 	sprintf(fracOverlapStr, "%g", fracOverlap);
 	sprintf(std_input_output_mode_str,"%d",std_input_output_mode);
+	sprintf(long_read_mode_str, "%d", long_read_mode);
 
 	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
@@ -5933,10 +6033,12 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[41] = temp_dir;
 	Rargv[42] = std_input_output_mode_str;
 	Rargv[43] = assign_reads_to_RG?"1":"0"; 
+	Rargv[44] = long_read_mode_str;
+	Rargv[45] = is_verbose?"1":"0";
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(44, Rargv);
+	else retvalue = readSummary(46, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);

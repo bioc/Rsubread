@@ -317,6 +317,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 
 				global_context->config.max_vote_combinations = max(global_context->config.max_vote_combinations, global_context->config.reported_multi_best_reads + 1);
 				global_context->config.max_vote_simples = max(global_context->config.max_vote_simples, global_context->config.reported_multi_best_reads + 1);
+				global_context->config.report_multi_mapping_reads = 1;
 				break;
 			case 'H':
 				global_context->config.use_hamming_distance_break_ties = 1;
