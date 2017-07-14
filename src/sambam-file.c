@@ -529,6 +529,167 @@ int PBam_chunk_headers(char * chunk, int *chunk_ptr, int chunk_len, SamBam_Refer
 	return -1;
 }
 
+int convert_BAM_binary_to_SAM( SamBam_Reference_Info * chro_table, char * bam_bin, char * sam_txt ){
+	int bin_len = 0;
+	memcpy(&bin_len, bam_bin, 4);
+	bin_len += 4;
+
+	int sam_ptr = 0, tmpint = 0;
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%s\t", bam_bin+36);
+
+	memcpy(&tmpint, bam_bin + 16 ,4);
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%d\t", (tmpint >> 16) & 0xffff);
+	int cigar_opts = tmpint & 0xffff;
+
+	memcpy(&tmpint, bam_bin + 4  ,4);
+	int r1chro = tmpint;
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%s\t", tmpint<0?"*":chro_table[tmpint].chro_name);
+	memcpy(&tmpint, bam_bin + 8  ,4);
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%d\t", tmpint+1);
+	memcpy(&tmpint, bam_bin + 12 ,4);
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%d\t", (tmpint >> 8) & 0xff);
+	int name_len = tmpint & 0xff;
+	int cigar_i;
+	for(cigar_i = 0; cigar_i < cigar_opts; cigar_i ++){
+		unsigned int cigarint=0;
+		memcpy(&cigarint, bam_bin + name_len + 36 + cigar_i * 4,4);
+		sam_ptr += sprintf(sam_txt + sam_ptr, "%u%c", cigarint >> 4, "MIDNSHP=X"[cigarint&0xf]);
+	}
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%s\t", cigar_i<1?"*":"");
+	
+	memcpy(&tmpint, bam_bin + 24, 4);
+	//SUBREADprintf("CHRO_IDX=%d\n", tmpint);
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%s\t", tmpint<0?"*":((tmpint == r1chro)?"=":chro_table[tmpint].chro_name));
+	
+	memcpy(&tmpint, bam_bin + 28, 4);
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%d\t", tmpint+1);
+
+	memcpy(&tmpint, bam_bin + 32, 4);
+	sam_ptr += sprintf(sam_txt + sam_ptr, "%d\t", tmpint);
+
+	int seq_len;
+	memcpy(&seq_len, bam_bin + 20,4);
+	int seqi, flex_ptr=name_len + 36 +  cigar_opts * 4;
+	for(seqi=0; seqi<seq_len; seqi++){
+		sam_txt[sam_ptr++]="=ACMGRSVTWYHKDBN"[ (bam_bin[flex_ptr] >> ( 4*!(seqi %2) )) & 15 ];
+		if(seqi %2) flex_ptr++;
+	}
+	sam_txt[sam_ptr++]='\t';
+	if(seqi %2) flex_ptr++;
+	for(seqi=0; seqi<seq_len; seqi++){
+		unsigned char nch = (unsigned char) bam_bin[flex_ptr++];
+		if(nch!=0xff||seqi == 0)
+				sam_txt[sam_ptr++]=nch==0xff?'*':(nch+33);
+	}
+	sam_txt[sam_ptr++]='\t';
+
+	while(flex_ptr < bin_len){
+		sam_txt[sam_ptr++]=bam_bin[flex_ptr++];
+		sam_txt[sam_ptr++]=bam_bin[flex_ptr++];
+		sam_txt[sam_ptr++]=':';
+		char tagtype = bam_bin[flex_ptr++];
+
+		if(tagtype == 'B'){
+			char elemtype = bam_bin[flex_ptr++];
+			int elem_no=0, is_int_type = 0, type_bytes = 0, is_signed = 0;
+			memcpy(&elem_no, bam_bin + flex_ptr, 4);
+			flex_ptr += 4;
+			sam_txt[sam_ptr++]='B';
+			sam_txt[sam_ptr++]=':';
+			sam_txt[sam_ptr++]=elemtype;
+			sam_txt[sam_ptr++]=',';
+
+			if(elemtype == 'i' || elemtype == 'I'){
+				is_int_type = 1;
+				type_bytes = 4;
+				is_signed = elemtype == 'i' ;
+			}else if(elemtype == 's' || elemtype == 'S'){
+				is_int_type = 1;
+				type_bytes = 2;
+				is_signed = elemtype == 's' ;
+			}else if(elemtype == 'c' || elemtype == 'C'){
+				is_int_type = 1;
+				type_bytes = 1;
+				is_signed = elemtype == 's' ;
+			}else if(elemtype == 'f'){
+				type_bytes = 4;
+			}
+
+			int elemi;
+			for(elemi =0; elemi < elem_no; elemi++){
+				if(is_int_type){
+					int tagval = 0;
+					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);
+					long long printv = is_signed?tagval:( (unsigned int) tagval );
+					sam_ptr += sprintf(sam_txt + sam_ptr, "%lld,", printv);
+				}else{
+					float tagval = 0;
+					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);
+					sam_ptr += sprintf(sam_txt + sam_ptr, "%f,", tagval);
+				}
+				flex_ptr += type_bytes;
+			}
+
+			sam_txt[sam_ptr-1] = '\t';
+			sam_txt[sam_ptr] = 0;
+		}else{
+				int is_int_type = 0, is_float_type = 0, type_bytes = 0, is_string_type = 0, is_char_type = 0, is_signed = 0;
+				if(tagtype == 'i' || tagtype == 'I'){
+					is_int_type = 1;
+					type_bytes = 4;
+					is_signed = tagtype == 'i' ;
+				}else if(tagtype == 's' || tagtype == 'S'){
+					is_int_type = 1;
+					type_bytes = 2;
+					is_signed = tagtype == 's' ;
+				}else if(tagtype == 'c' || tagtype == 'C'){
+					is_int_type = 1;
+					type_bytes = 1;
+					is_signed = tagtype == 's' ;
+				}else if(tagtype == 'f'){
+					is_float_type = 1;
+					type_bytes = 4;
+				}else if(tagtype == 'Z' || tagtype == 'H'){
+					is_string_type = 1;
+					while(bam_bin[flex_ptr+(type_bytes ++)]);
+				}else if(tagtype == 'A'){
+					is_char_type = 1;
+					type_bytes = 1;
+				}
+
+
+				sam_txt[sam_ptr++]=is_int_type?'i':tagtype;
+				sam_txt[sam_ptr++]=':';
+
+				if(is_int_type){
+					int tagval = 0;
+					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);
+					long long printv = is_signed?tagval:( (unsigned int) tagval );
+					sam_ptr += sprintf(sam_txt + sam_ptr, "%lld\t", printv);
+				}else if(is_string_type){
+					// type_bytes includes \0
+					memcpy(sam_txt + sam_ptr, bam_bin + flex_ptr, type_bytes -1);
+					sam_txt[ sam_ptr + type_bytes -1 ] = '\t';
+
+					//sam_txt[ sam_ptr + type_bytes +1]=0;
+					//SUBREADprintf("STR_LEN=%d\tSTR=%s\n", type_bytes-1, sam_txt + sam_ptr);
+					sam_ptr += type_bytes;
+				}else if(is_float_type){
+					float tagval = 0;
+					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);
+					sam_ptr += sprintf(sam_txt + sam_ptr, "%f\t", tagval);
+				}else if(is_char_type){
+					sam_txt[ sam_ptr++ ] = bam_bin[flex_ptr];
+					sam_txt[ sam_ptr++ ] = '\t';
+				}
+				flex_ptr += type_bytes;
+		}
+	}
+
+	sam_txt[sam_ptr-1]=0; //last '\t' 
+	return sam_ptr-1;
+}
+
 int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Reference_Info * bam_chro_table, char * buff , int buff_len, SamBam_Alignment*aln, int seq_needed)
 {
 	int xk1;
@@ -620,6 +781,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 
 	char extra_tags [CORE_ADDITIONAL_INFO_LENGTH];
 	extra_tags[0]=0;
+	int extra_len = 0;
 	while( (*chunk_ptr) < next_start)
 	{
 		char extag[2];
@@ -666,14 +828,23 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 			if(extype == 'c' || extype=='C' || extype == 'i' || extype=='I' || extype == 's' || extype=='S'){
 				int tmpi = 0;
 				memcpy(&tmpi, chunk+(*chunk_ptr),delta);
-				if(tmpi >= 0)
-					sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
+				if(tmpi >= 0 && extra_len < CORE_ADDITIONAL_INFO_LENGTH - 18){
+					int sret = sprintf(extra_tags + strlen(extra_tags), "\t%c%c:i:%d", extag[0], extag[1], tmpi);
+					extra_len += sret;
+				}
 			}else if(extype == 'Z'){
-				sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
-				*(extra_tags + strlen(extra_tags)+delta-1) = 0;
-				memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
+				if(extra_len < CORE_ADDITIONAL_INFO_LENGTH - 7 - delta){
+					sprintf(extra_tags + strlen(extra_tags), "\t%c%c:Z:", extag[0], extag[1]);
+					extra_len += 6;
+					*(extra_tags + strlen(extra_tags)+delta-1) = 0;
+					memcpy(extra_tags + strlen(extra_tags), chunk + (*chunk_ptr), delta - 1);
+					extra_len += delta - 1;
+				}
 			}else if(extype == 'A'){
-				sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
+				if(extra_len < CORE_ADDITIONAL_INFO_LENGTH - 8){
+					int sret = sprintf(extra_tags + strlen(extra_tags), "\t%c%c:A:%c", extag[0], extag[1], *(chunk + *chunk_ptr) );
+					extra_len += sret;
+				}
 			}
 		}
 
@@ -1196,6 +1367,7 @@ int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage, int
 			for(; int_opt<8; int_opt++) if("MIDNSHP=X"[int_opt] == nch)break;
 			cigar_int[num_opt ++] = (tmp_int << 4) | int_opt; 
 			tmp_int = 0;
+			//SUBREADprintf("CIGARCOM: %d-th is %c\n", num_opt, nch);
 			if(num_opt>=max_secs)break;
 		}
 	}

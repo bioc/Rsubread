@@ -120,7 +120,7 @@ int main_read_repair(int argc, char ** argv)
 		SUBREADprintf("Unable to open the output file. Program terminated.\n");
 		return -1;
 	}else{
-		ret = SAM_pairer_create(&pairer, threads, memory, is_BAM, tiny_mode,0,0 , 1, in_BAM_file, SAM_pairer_writer_reset, SAM_pairer_multi_thread_header, SAM_pairer_multi_thread_output, rand_prefix, &writer_main);
+		ret = SAM_pairer_create(&pairer, threads, memory, is_BAM, tiny_mode,0,0 , 1, in_BAM_file, SAM_pairer_writer_reset, SAM_pairer_multi_thread_header, SAM_pairer_multi_thread_output, rand_prefix, &writer_main, 99999999);
 		if(ret){
 			SUBREADprintf("Unable to open the input file. Program terminated.\n");
 			return -1;
@@ -139,3 +139,4 @@ int main_read_repair(int argc, char ** argv)
 		}
 	}
 }
+

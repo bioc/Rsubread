@@ -27,7 +27,7 @@ typedef unsigned short BS_uint_16;
 typedef unsigned int BS_uint_32;
 
 #define BAM_MAX_CHROMOSOME_NAME_LEN 100 
-#define BAM_MAX_CIGAR_LEN 256
+#define BAM_MAX_CIGAR_LEN (30000)
 #define BAM_MAX_READ_NAME_LEN 256
 #define BAM_MAX_READ_LEN 3000
 
@@ -185,4 +185,6 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp);
 int SamBam_compress_cigar(char * cigar, int * cigar_int, int * ret_coverage, int max_secs);
 char cigar_op_char(int ch);
 void SamBam_read2bin(char * read_txt, char * read_bin);
+
+int convert_BAM_binary_to_SAM(SamBam_Reference_Info * chro_table, char * bam_bin, char * sam_txt);
 #endif

@@ -39,6 +39,26 @@ int main_repeated_test(int argc, char *argv[]);
 int main_read_repair(int argc,char *argv[]);
 int main_qualityScores(int argc, char *argv[]);
 int findCommonVariants(int argc, char *argv[]);
+int TxUniqueMain(int argc, char *argv[]);
+
+void R_txUnique_wrapper(int * nargs, char ** argv){
+	char * r_argv, ** c_argv;
+	int i,n;
+
+	n = *nargs;
+	r_argv = (char *)calloc(15000, sizeof(char));
+	strcpy(r_argv,*argv);
+
+	c_argv = (char **) calloc(n+1,sizeof(char *));
+	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],"R_txUnique");
+	strcpy(c_argv[1],strtok(r_argv,"\t"));
+	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,"\t"));
+	TxUniqueMain(n+1, c_argv);
+	free(r_argv);
+	for(i=0;i<n+1;i++) free(c_argv[i]);
+	free(c_argv);
+}
 
 void R_mergeVCF(int * nargs, char ** argv)
 {

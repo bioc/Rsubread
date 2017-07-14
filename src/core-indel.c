@@ -1117,13 +1117,6 @@ int finalise_indel_and_junction_thread(global_context_t * global_context, thread
 			prev_env = this_event;
 		}
 
-		if(0){
-			for(xk1 = 0; xk1 < merge_target_items; xk1++){
-				chromosome_event_t * pev = merge_target + xk1;
-				printf("OCT27-MERGERES: %u~%u, indel=%d, nsup=%d, TYPE=%d\n",pev->event_small_side, pev->event_large_side, pev->indel_length, pev->supporting_reads, pev->event_type);
-			}
-		}
-
 		free(records);
 
 		if(thread_contexts)
@@ -1238,7 +1231,7 @@ typedef struct {
 	HashTable * feature_sorting_table;
 } do_load_juncs_context_t;
 
-int do_juncs_add_feature(char * gene_name, char * chro_name, unsigned int feature_start, unsigned int feature_end, int is_negative_strand, void * context){
+int do_juncs_add_feature(char * gene_name, char * transcript_id, char * chro_name, unsigned int feature_start, unsigned int feature_end, int is_negative_strand, void * context){
 	//#warning ">>>>>>> COMMENt NEXT <<<<<<<<<<<<<<"
 	//SUBREADprintf("INJ LOCS: %s : %u, %u\n", chro_name, feature_start, feature_end);
 	do_load_juncs_context_t * do_load_juncs_context = context;
@@ -1336,8 +1329,7 @@ int load_known_junctions(global_context_t * global_context){
 	do_load_juncs_context.global_context = global_context;
 	do_load_juncs_context.feature_sorting_table = feature_sorting_table;
 
-	int features = load_features_annotation(global_context->config.exon_annotation_file , global_context->config.exon_annotation_file_type, global_context->config.exon_annotation_gene_id_column, global_context->config.exon_annotation_feature_name_column, 
-           &do_load_juncs_context, do_juncs_add_feature);
+	int features = load_features_annotation(global_context->config.exon_annotation_file , global_context->config.exon_annotation_file_type, global_context->config.exon_annotation_gene_id_column, NULL, global_context->config.exon_annotation_feature_name_column, &do_load_juncs_context, do_juncs_add_feature);
 
 	feature_sorting_table -> appendix1 = global_context;
 	HashTableIteration(feature_sorting_table, add_annotation_to_junctions);
@@ -1476,22 +1468,9 @@ int search_event(global_context_t * global_context, HashTable * event_table, chr
 		}
 		
 		//#warning ">>>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-		if(0){
-			indel_context_t * indel_context = (indel_context_t *) global_context -> module_contexts[MODULE_INDEL_ID];
-			chromosome_event_t * est = indel_context -> event_space_dynamic;
-			if(est == event_space)
-				printf("OCT27-STEPRS-EVENT_HIT= %u ; HIT=%d\n", pos, xk2);
-		
-		}
 	}else{
 		//#warning ">>>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-		if(0){
-			indel_context_t * indel_context = (indel_context_t *) global_context -> module_contexts[MODULE_INDEL_ID];
-			chromosome_event_t * est = indel_context -> event_space_dynamic;
-			if(est == event_space)
-				printf("OCT27-STEPRS-EVENT_HIT= %u ; HIT=0000\n", pos);
-		
-		}
+
 	}
 
 	return ret;
@@ -2275,7 +2254,7 @@ void print_indel_table(global_context_t * global_context){
 	for(xk1 = 0; xk1 <  indel_context -> total_events ; xk1++){
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 		
-		printf("OCT27-STEP-INTAB-TYPE-%d POS %u~%u GID=%u PV %d %d  SUP %d / %d\n", event_body -> event_type, event_body -> event_small_side, event_body -> event_large_side, event_body -> global_event_id, event_body -> connected_next_event_distance, event_body -> connected_previous_event_distance , event_body -> supporting_reads , event_body -> anti_supporting_reads);
+		//printf("OCT27-STEP-INTAB-TYPE-%d POS %u~%u GID=%u PV %d %d  SUP %d / %d\n", event_body -> event_type, event_body -> event_small_side, event_body -> event_large_side, event_body -> global_event_id, event_body -> connected_next_event_distance, event_body -> connected_previous_event_distance , event_body -> supporting_reads , event_body -> anti_supporting_reads);
 	}
 
 	int bucket;
@@ -2288,7 +2267,7 @@ void print_indel_table(global_context_t * global_context){
 			int env_i;
 			for(env_i = 1; env_array[env_i]; env_i++){
 				chromosome_event_t * event_body = indel_context -> event_space_dynamic + (env_array[env_i]-1);
-				printf("OCT27-STEPQ-ENTAB-%u [%d] to %u ~ %u len=%d VAL=%d  PTR=%p\n",entry_pos, env_i, event_body -> event_small_side,  event_body -> event_large_side, event_body -> indel_length, env_array[env_i], env_array);
+		//		printf("OCT27-STEPQ-ENTAB-%u [%d] to %u ~ %u len=%d VAL=%d  PTR=%p\n",entry_pos, env_i, event_body -> event_small_side,  event_body -> event_large_side, event_body -> indel_length, env_array[env_i], env_array);
 			}
 
 			cursor = cursor->next;
@@ -2327,8 +2306,8 @@ int write_indel_final_results(global_context_t * global_context)
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 
 
-		 //#warning " ================= REMOVE '- 1' from the next LINE!!! ========================="
-		if((event_body -> event_type != CHRO_EVENT_TYPE_INDEL && event_body->event_type != CHRO_EVENT_TYPE_LONG_INDEL  && event_body -> event_type != CHRO_EVENT_TYPE_POTENTIAL_INDEL)|| (event_body -> final_counted_reads < 1 && event_body -> event_type == CHRO_EVENT_TYPE_INDEL) )
+		//#warning " ================= REMOVE '- 1' from the next LINE!!! ========================="
+		if((event_body -> event_type != CHRO_EVENT_TYPE_INDEL && event_body->event_type != CHRO_EVENT_TYPE_LONG_INDEL  && event_body -> event_type != CHRO_EVENT_TYPE_POTENTIAL_INDEL)|| (event_body -> final_counted_reads < 1  && event_body -> event_type == CHRO_EVENT_TYPE_INDEL) )
 			continue;
 
 		//assert((-event_body -> indel_length) < MAX_INSERTION_LENGTH);
@@ -4451,6 +4430,7 @@ void init_global_context(global_context_t * context)
 	context->config.do_fusion_detection = 0;
 	context->config.do_structural_variance_detection = 0;
 	context->config.more_accurate_fusions = 1;
+	context->config.report_multi_mapping_reads = 0;
 
 	//#warning "============= best values for the SVs application: 8; 5; 32 ==============="
 	context->config.top_scores = 8 - 5;
@@ -4471,7 +4451,6 @@ void init_global_context(global_context_t * context)
 	context->will_remove_input_file = 0;
 	context->config.ignore_unmapped_reads = 0;
 	context->config.report_unmapped_using_mate_pos = 1;
-	context->config.report_multi_mapping_reads = 1;
 	context->config.downscale_mapping_quality=0;
 	context->config.ambiguous_mapping_tolerance = 39;
 	context->config.use_hamming_distance_break_ties = 0;

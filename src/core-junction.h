@@ -23,6 +23,8 @@
 #include "hashtable.h"
 #include "core.h"
 
+#define REALIGN_TOTAL_TRIES 50
+
 #define FUNKY_FRAGMENT_A	1	// same strand and gapped (0<gap<tra_len)
 #define FUNKY_FRAGMENT_BC	2	// very far far away (>=tra_len) or chimeric.
 #define FUNKY_FRAGMENT_DE	4	// tlen < tra_len and strand jumpped
@@ -67,6 +69,7 @@ typedef struct{
 	int all_back_alignments;
 	int all_front_alignments;
 	int known_junctions;
+	unsigned int total_tries;
 
 //	unsigned int tmp_jump_length;
 //	unsigned int best_jump_length;
