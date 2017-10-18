@@ -51,6 +51,7 @@ typedef struct {
 	int is_fragments_counted;
 	int is_proppair_needed;
 	int sort_buckets;
+	int verbose;
 
 	HashTable * split_fp_table;
 
@@ -167,7 +168,7 @@ int write_result(propMapped_context * context)
 		fclose(outfp);
 	}
 	char * objname = context -> is_fragments_counted? "fragment":"read";
-	SUBREADprintf("Finished. All records: %llu; all %ss: %llu; mapped %ss: %llu; the mappability is %.2f%%\n", context->all_records, objname, context -> all_reads, objname, context -> mapped_reads, context -> mapped_reads*100./context -> all_reads);
+	if(context -> verbose) SUBREADprintf("Finished. All records: %llu; all %ss: %llu; mapped %ss: %llu; the mappability is %.2f%%\n", context->all_records, objname, context -> all_reads, objname, context -> mapped_reads, context -> mapped_reads*100./context -> all_reads);
 
 	return 0;
 }
@@ -431,8 +432,7 @@ void ppm_warning_file_limit()
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
 	{
-		if(min(limit_st.rlim_cur , limit_st.rlim_max) < 400)
-		{
+		if(min(limit_st.rlim_cur , limit_st.rlim_max) < 400) {
 			SUBREADprintf("Your operation system does not allow a single process to open more then 400 files. You may need to change this setting by using a 'ulimit -n 500' command, or the program may crash.\n");
 		}
 	}
@@ -461,7 +461,7 @@ int propmapped(int argc, char ** argv)
 	context -> sort_buckets = 253;
 
 
-	while((c = getopt_long (argc, argv, "i:o:bfph", propm_long_options, &option_index)) != -1)
+	while((c = getopt_long (argc, argv, "Vi:o:bfph", propm_long_options, &option_index)) != -1)
 	{
 		switch(c){
 			case 'i':
@@ -473,6 +473,8 @@ int propmapped(int argc, char ** argv)
 			case 'f':
 				context -> is_fragments_counted = 1;
 				break;
+			case 'V':
+				context -> verbose = 1;
 			case 'p':
 				context -> is_proppair_needed = 1;
 				break;

@@ -314,10 +314,8 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.multi_best_reads=1;
 
 				global_context->config.reported_multi_best_reads = global_context->config.multi_best_reads;
-
 				global_context->config.max_vote_combinations = max(global_context->config.max_vote_combinations, global_context->config.reported_multi_best_reads + 1);
 				global_context->config.max_vote_simples = max(global_context->config.max_vote_simples, global_context->config.reported_multi_best_reads + 1);
-				global_context->config.report_multi_mapping_reads = 1;
 				break;
 			case 'H':
 				global_context->config.use_hamming_distance_break_ties = 1;
@@ -575,6 +573,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 		SUBREADprintf("Invalid parameter '%s'\n", argv[optind]);
 		return -1;
 	}
+
+	if(global_context->config.reported_multi_best_reads > 1 && ! global_context->config.report_multi_mapping_reads)
+		SUBREADprintf("WARNING: You required multi best alignments, but disallowed multi-mapping reads. You need to turn on the multi-mapping option.\n");
 
 	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
 	if(global_context->config.more_accurate_fusions)

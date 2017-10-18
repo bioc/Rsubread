@@ -1191,11 +1191,13 @@ unsigned int move_to_read_head(unsigned int tailpos, char * cigar){
 
 // This function returns 1 if the cut was added.
 // It returns 0 if the head or tail cut is not able to be added (e.g., the cigar ends up like "50M4I10S" or "10S30N90M") 
-int add_head_tail_cut_softclipping(char * cigar, int rlen, int head_cut, int tail_cut){
+int add_head_tail_cut_softclipping(global_context_t * global_context, unsigned int linear, char * cigar, int rlen, int head_cut, int tail_cut){
+	//SUBREADprintf("ADD_SOFT: %s , %d, %d\n", cigar,head_cut,tail_cut);
 
 	char cigar_added [CORE_MAX_CIGAR_STR_LEN];
 	int cigar_cursor = 0, read_cursor = 0, next_read_cursor = 0;
 	int tmpi = 0, nch, has_M = 0;
+	unsigned int linear_cursor = linear;
 
 	cigar_added[0]=0;
 
@@ -1208,6 +1210,13 @@ int add_head_tail_cut_softclipping(char * cigar, int rlen, int head_cut, int tai
 		}else{
 			if('M' == nch || 'S' == nch || 'I' == nch)
 				next_read_cursor = read_cursor + tmpi;
+
+			if('M' == nch || 'D' == nch || 'S' == nch || 'N' == nch){
+				int is_start_in_chro, is_end_in_chro;
+				is_start_in_chro = get_offset_maximum_chro_pos(global_context,linear_cursor);
+				is_end_in_chro = get_offset_maximum_chro_pos(global_context,linear_cursor + tmpi);
+				linear_cursor += tmpi;
+			}
 
 			int head_S = 0, tail_S =0, remainder_tmpi = tmpi, is_skip = 0;
 			
@@ -1322,26 +1331,12 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 	{
 		int head_cut = 0 , tail_cut = 0;
 
-		if(0 && FIXLENstrcmp("V0112_0155:7:1302:9507:32993", read_name)==0){
-			char posout1[100];
-			absoffset_to_posstr(global_context, r->linear_position, posout1);
-			SUBREADprintf("PERR : CIGAR=%s, READLEN=%d, POS=%s\n", r->cigar , read_len, posout1);
-		}
-
-		if(locate_gene_position_max(r->linear_position,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:current_result->chromosomal_length)) {
+		if(locate_gene_position_max(r->linear_position + r->soft_clipping_movements,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:(current_result->chromosomal_length - r->soft_clipping_movements))) {
 			is_r_OK = 0;
 		} else {
-
-
-		if(0 && FIXLENstrcmp("V0112_0155:7:1302:9507:32993", read_name)==0){
-			char posout1[100];
-			absoffset_to_posstr(global_context, r->linear_position, posout1);
-			SUBREADprintf("CUTT : CIGAR=%s, READLEN=%d, CATS=%d  %d\n", r->cigar , read_len, head_cut, tail_cut);
-		}
-
 			int is_added_OK = 1;
 			if(head_cut!=0 || tail_cut!=0)
-				is_added_OK = add_head_tail_cut_softclipping(r->cigar , read_len, head_cut, tail_cut);
+				is_added_OK = add_head_tail_cut_softclipping(global_context, r->linear_position, r->cigar , read_len, head_cut, tail_cut);
 
 			if(is_added_OK){
 				r -> offset++;
@@ -1922,13 +1917,13 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 		if(1)if(is_funky & FUNKY_FRAGMENT_BC){
 			//#warning "LOGIC WRONG: R1 AND R2 SHOULD BE DECIDED BY THEIR MAPPING POSITIONS"
-			bktable_append(&global_context -> funky_table_BC, rec1 -> chro, rec1 -> offset + rec1 -> soft_clipping_movements, NULL + (2*pair_number));
-			bktable_append(&global_context -> funky_table_BC, rec2 -> chro, rec2 -> offset + rec2 -> soft_clipping_movements, NULL + (2*pair_number+1));
+			bktable_append(&global_context -> funky_table_BC, rec1 -> chro, rec1 -> offset , NULL + (2*pair_number));
+			bktable_append(&global_context -> funky_table_BC, rec2 -> chro, rec2 -> offset , NULL + (2*pair_number+1));
 		}
 		if(1)if(is_funky & FUNKY_FRAGMENT_DE){
 			fraglist_append(&global_context -> funky_list_DE, pair_number);
-			bktable_append(&global_context -> funky_table_DE, rec1 -> chro, rec1 -> offset + rec1 -> soft_clipping_movements, NULL + (2*pair_number + (rec1 -> offset > rec2 -> offset ? 1:0)));
-			bktable_append(&global_context -> funky_table_DE, rec2 -> chro, rec2 -> offset + rec2 -> soft_clipping_movements, NULL + (2*pair_number + (rec1 -> offset < rec2 -> offset ? 1:0)));
+			bktable_append(&global_context -> funky_table_DE, rec1 -> chro, rec1 -> offset , NULL + (2*pair_number + (rec1 -> offset > rec2 -> offset ? 1:0)));
+			bktable_append(&global_context -> funky_table_DE, rec2 -> chro, rec2 -> offset , NULL + (2*pair_number + (rec1 -> offset < rec2 -> offset ? 1:0)));
 		}
 	}
 
@@ -2120,7 +2115,11 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	if(is_R1_OK && is_R2_OK)
 	{
 		if( rec1->offset >  rec2->offset) out_tlen1 = - out_tlen1;
-		else	out_tlen2 = -out_tlen2;
+		else if(rec2->offset > rec1->offset) out_tlen2 = -out_tlen2;
+		else{
+			if( rec1 -> strand )  out_tlen1 = - out_tlen1;
+			else out_tlen2 = -out_tlen2;
+		}
 	}
 
 	if(0==current_location)
@@ -2144,11 +2143,11 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 	if(is_R1_OK){
-		out_offset1 = max(1, rec1->offset + rec1 -> soft_clipping_movements);
+		out_offset1 = max(1, rec1->offset);
 		out_mapping_quality1 = rec1->mapping_quality;
 	}
 	if(is_R2_OK){
-		out_offset2 = max(1, rec2->offset + rec2 -> soft_clipping_movements);
+		out_offset2 = max(1, rec2->offset);
 		out_mapping_quality2 = rec2->mapping_quality;
 	}
 
@@ -3506,6 +3505,11 @@ int run_maybe_threads(global_context_t *global_context, int task)
 	void * thr_parameters [5];
 	int ret_value =0;
 
+	if(task == STEP_ITERATION_TWO){
+		global_context -> last_written_fragment_number = 0;
+	}
+
+
 	if(global_context->config.all_threads<2) {
 		thr_parameters[0] = global_context;
 		thr_parameters[1] = NULL;
@@ -3528,8 +3532,6 @@ int run_maybe_threads(global_context_t *global_context, int task)
 
 		memset(thread_contexts, 0, sizeof(thread_context_t)*64);
 		global_context -> all_thread_contexts = thread_contexts;
-		if(task == STEP_ITERATION_TWO)
-			global_context -> last_written_fragment_number = 0;
 
 		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++)
 		{
@@ -3563,11 +3565,11 @@ int run_maybe_threads(global_context_t *global_context, int task)
 				global_context -> not_properly_pairs_only_one_end_mapped += thread_contexts[current_thread_no].not_properly_pairs_only_one_end_mapped;
 				global_context -> all_multimapping_reads += thread_contexts[current_thread_no].all_multimapping_reads;
 				global_context -> all_uniquely_mapped_reads += thread_contexts[current_thread_no].all_uniquely_mapped_reads;
+
 			}
 			ret_value += *(ret_values + current_thread_no);
 			if(ret_value)break;
 		}
-
 		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++){
 			if(thread_contexts[current_thread_no].output_buffer_item > 0)
 				SUBREADprintf("ERROR: UNFINISHED OUTPUT!\n");
@@ -3684,7 +3686,6 @@ int read_chunk_circles(global_context_t *global_context)
 			period_load_index = miltime() - time_load_index;
 			global_context -> timecost_load_index += period_load_index;
 			global_context -> current_value_index = global_context -> all_value_indexes + global_context->current_index_block_number;
-
 
 			if(global_context->current_index_block_number ==0 && global_context -> all_processed_reads==0)
 				global_context->align_start_time = miltime();

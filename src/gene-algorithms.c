@@ -444,13 +444,13 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 	int total_offsets = offsets -> total_offsets;
 
-	int GENE_LOCATE_JUMP = total_offsets/4;
+	int GENE_LOCATE_JUMP = total_offsets/3;
 
-	while (GENE_LOCATE_JUMP > 5)
+	while (GENE_LOCATE_JUMP >3)
 	{
 		while(n+GENE_LOCATE_JUMP < total_offsets &&  offsets->read_offsets[n+GENE_LOCATE_JUMP] <= linear)
 			n+=GENE_LOCATE_JUMP;
-		GENE_LOCATE_JUMP /=4;
+		GENE_LOCATE_JUMP /=3;
 	}
 
 	for (; offsets->read_offsets[n]; n++)
@@ -462,17 +462,28 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 			//SUBREADprintf("max=%u <= lim=%u : ACCEPTED.\n", rl + linear , offsets->read_offsets[n] + 16);
 
 			// the end of the read should not excess the end of the chromosome
-			if(tail_cut_length == NULL){ 
-				if(rl + linear > offsets->read_offsets[n] + 15 - offsets -> padding) return 1;
-			} else {
-				(*tail_cut_length) = linear + rl - ( offsets->read_offsets[n] + 15 - offsets -> padding);
-				if( (*tail_cut_length) >= rl )return 1;
-			}
 
 			if (n==0)
 				*pos = linear;
 			else
 				*pos = linear - offsets->read_offsets[n-1];
+
+
+			if(tail_cut_length == NULL){ 
+				if(rl + linear > offsets->read_offsets[n] + 15 - offsets -> padding) return 1;
+			} else {
+				unsigned int posn1 = 0;
+				if(n>0) posn1 = offsets->read_offsets[n-1];
+				long long int tct =  ( linear + rl - posn1 - offsets -> padding );
+				if(tct < rl)tct = rl;
+				long long int chro_leng = (offsets->read_offsets[n] - posn1 - 2*offsets -> padding + 16);
+
+				//SUBREADprintf("CHRO_LEN : %lld, READ_TAIL %lld , RL=%d\n", chro_leng, tct, rl);
+				tct -= chro_leng;
+				if( tct >= rl )return 1;
+				if( tct <0    )tct=0;
+				(*tail_cut_length) = tct;
+			}
 
 			if( (*pos) < offsets -> padding ) {
 				if(head_cut_length == NULL || (*pos) + rl <= offsets -> padding){

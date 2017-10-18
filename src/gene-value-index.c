@@ -53,17 +53,56 @@ void gvindex_baseno2offset(unsigned int base_number, gene_value_index_t * index,
 	* offset_bit = base_number % 4 * 2;
 }
 
+int is_offset_in_chro(gene_value_index_t * offsets, gehash_data_t linear){
+	int ret = 1;
+	if(offsets -> appendix1 && offsets -> appendix2){
+		gene_offset_t * chros = offsets -> appendix1;
+		int padding = offsets -> appendix2 - NULL;
+	//	SUBREADprintf( "OFFSETS:%d, PADD:%d\n", chros -> total_offsets, padding );
+	
+		int n = 0;
+		int total_offsets = chros -> total_offsets;
+
+		int LL = 0, RR = total_offsets-1;
+
+		while(1){
+			if(LL >= RR-1) break;
+			int MM = (LL+RR)/2;
+			if( linear > chros->read_offsets[MM]) LL = MM;
+			else if(linear < chros->read_offsets[MM]) RR = MM;
+			else break;
+		}
+
+		n = max(0, LL - 2);
+
+		for (; n < chros -> total_offsets; n++) {
+			if (chros->read_offsets[n] > linear) {
+				unsigned int pos;
+	
+				if (n==0)
+					pos = linear;
+				else
+					pos = linear - chros->read_offsets[n-1];
+	
+				if( pos < chros -> padding  || pos >= ( chros->read_offsets[n] - chros->read_offsets[n-1] - chros -> padding ))
+					ret = 0;
+					SUBREADprintf("INCHRO:%d ; POS:%d\n", ret, pos);
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
 // return 'A', 'G', 'T' and 'C'
 int gvindex_get(gene_value_index_t * index, gehash_data_t offset)
 {
 	unsigned int offset_byte, offset_bit;
+	//if(!is_offset_in_chro( index, offset ))return -1;
+
 	gvindex_baseno2offset_m(offset, index , offset_byte, offset_bit);
-
 	if(offset_byte >= index-> values_bytes -1)return 'N';
-
 	unsigned int one_base_value = (index->values [offset_byte]) >> (offset_bit);
-
-
 	//SUBREADprintf("RECV_BASE=%d (%d -  %d)\n",one_base_value & 3, offset_byte , offset_bit);
 
 	return int2base(one_base_value & 3);
@@ -151,6 +190,7 @@ int gvindex_dump(gene_value_index_t * index, const char filename [])
 
 int gvindex_load(gene_value_index_t * index, const char filename [])
 {
+	memset(index,0, sizeof(gene_value_index_t));
 	FILE * fp = f_subr_open(filename, "rb");
 	int read_length;
 	read_length = fread(&index->start_point,4,1, fp);

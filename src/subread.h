@@ -54,6 +54,7 @@
 
 
 #define MAX_THREADS 40
+#define FC_MAX_THREADS 64
 #define MAX_EVENTS_IN_READ 8
 
 //#warning "============== REMOVE '* 15' FROM THE NEXT LINE ================"
@@ -243,16 +244,6 @@ typedef struct {
 } gene_t;
 
 
-typedef struct{
-	unsigned int memory_block_size;
-	unsigned int start_base_offset;
-	unsigned int start_point;
-	unsigned int length;
-	unsigned char * values;
-	unsigned int values_bytes;
-} gene_value_index_t;
-
-
 
 struct gehash_bucket {
 	int current_items;
@@ -274,6 +265,18 @@ typedef struct {
 	int index_gap;
 	int padding;
 } gehash_t;
+
+
+typedef struct{
+	unsigned int memory_block_size;
+	unsigned int start_base_offset;
+	unsigned int start_point;
+	unsigned int length;
+	unsigned char * values;
+	unsigned int values_bytes;
+	void * appendix1;
+	void * appendix2;
+} gene_value_index_t;
 
 
 typedef struct {

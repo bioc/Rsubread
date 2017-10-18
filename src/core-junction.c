@@ -110,6 +110,41 @@ void debug_show_event(global_context_t* global_context, chromosome_event_t * eve
 	SUBREADprintf("Event between %s and %s\n", outpos1, outpos2);
 }
 
+int get_offset_maximum_chro_pos(global_context_t * global_context, thread_context_t * thread_context, unsigned int linear){
+	gene_offset_t * chros =& global_context -> chromosome_table;
+	int n = 0;
+	int total_offsets = chros -> total_offsets;
+
+	int LL = 0, RR = total_offsets-1;
+
+	while(1){
+		if(LL >= RR-1) break;
+		int MM = (LL+RR)/2;
+		if( linear > chros->read_offsets[MM]) LL = MM;
+		else if(linear < chros->read_offsets[MM]) RR = MM;
+		else break;
+	}
+
+	n = max(0, LL - 2);
+
+	for (; n < chros -> total_offsets; n++) {
+		if (chros->read_offsets[n] > linear) {
+			int ret;
+			unsigned int last_linear = 0;
+			if(n==0)
+				ret = chros->read_offsets[0] - chros -> padding  *2 +16;
+			else{
+				ret = ( chros->read_offsets[n] - chros->read_offsets[n-1]  ) - chros -> padding  *2 +16;
+				last_linear =  chros->read_offsets[n-1];
+			}
+			linear -= last_linear;
+			if(linear < chros -> padding || linear >= chros -> padding + ret) return -1;
+			return ret;
+		}
+	}
+	return -2;
+}
+
 
 // read_head_abs_pos is the offset of the FIRST WANTED base.
 void search_events_to_front(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_head_abs_offset, short remainder_len, short sofar_matched, int suggested_movement, int do_not_jump)
@@ -2547,7 +2582,7 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	back_search_tail_position = current_result -> selected_position + back_search_read_tail +  current_result -> indels_in_confident_coverage;
 
 	//if( back_search_read_tail > 102)
-	//	SUBREADprintf("MAX back_search_read_tail : MIN %d , %d\n", explain_context.full_read_len , current_result -> confident_coverage_end);
+	//SUBREADprintf("MAX back_search_read_tail : MIN %d , %d\n", explain_context.full_read_len , current_result -> confident_coverage_end);
 
 	explain_context.tmp_search_junctions[0].read_pos_end = back_search_read_tail;
 	explain_context.tmp_search_junctions[0].abs_offset_for_start = back_search_tail_position;
@@ -2762,8 +2797,11 @@ int find_soft_clipping(global_context_t * global_context,  thread_context_t * th
 		// add the new base
 		char reference_base = gvindex_get(current_value_index, added_base_index + mapped_pos);
 
-
-		//SUBREADprintf("CHMAT [%s] ref:read = %c:%c\n", search_to_tail?"T":"H", reference_base,  read_text[added_base_index]);
+		if(0){
+			char outpos1[100];
+			absoffset_to_posstr(global_context, added_base_index + mapped_pos, outpos1);
+			SUBREADprintf("CHMAT [%s] %s (%u) ref:read = %c:%c\n", search_to_tail?"T":"H" ,outpos1,  added_base_index + mapped_pos, reference_base,  read_text[added_base_index]);
+		}
 		int added_is_matched = (reference_base == read_text[added_base_index]);
 		matched_in_window += added_is_matched;
 		if(added_is_matched)
@@ -2820,6 +2858,13 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 
 	//SUBREADprintf("Coverage : %d ~ %d\n", covered_start, covered_end);
 
+	if(0){
+		char posout1[100];
+		int chro_max = get_offset_maximum_chro_pos(global_context,thread_context,read_head_abs_offset);
+		absoffset_to_posstr(global_context, read_head_abs_offset, posout1);
+		SUBREADprintf("READ %s : mapped to %s ; max_pos=%d\n", read_name,  posout1, chro_max);
+	}
+
 	while(1)
 	{
 		char nch = cigar_string[cigar_cursor++];
@@ -2841,6 +2886,18 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 				int has_clipping_this_section_head = 0, has_clipping_this_section_tail = 0;
 				char * reversed_first_section_text = NULL;
 
+				if(0){
+					int is_head_in_chro = get_offset_maximum_chro_pos(global_context,thread_context, current_perfect_section_abs );
+					int is_end_in_chro = get_offset_maximum_chro_pos(global_context,thread_context, current_perfect_section_abs + tmp_int );
+					char posout1[100];
+					char posout2[100];
+					int chro_max = get_offset_maximum_chro_pos(global_context,thread_context, current_perfect_section_abs );
+					absoffset_to_posstr(global_context, current_perfect_section_abs, posout1);
+					absoffset_to_posstr(global_context, current_perfect_section_abs + tmp_int, posout2);
+					SUBREADprintf("  %dM SECTION : mapped to %s ~ %s ; max_pos=%d ; Hin=%d, Ein=%d\n", tmp_int,  posout1, posout2, chro_max, is_head_in_chro, is_end_in_chro);
+					SUBREADprintf("  %dM SECTION : Hin=%d, Ein=%d\n", tmp_int, is_head_in_chro, is_end_in_chro);
+				}
+
 				// find "J" sections if it is the first M
 				if(is_First_M && global_context -> config.show_soft_cliping)
 				{
@@ -2859,6 +2916,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 					}
 					else
 						head_soft_clipped = find_soft_clipping(global_context, thread_context, current_value_index, read_text, current_perfect_section_abs, tmp_int, 0, adj_coverage_start);
+					//SUBREADprintf("SSHEAD:%d\n", head_soft_clipped);
 
 					if(head_soft_clipped == tmp_int){
 						(*full_section_clipped) = 1;
@@ -2890,6 +2948,8 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 					}
 					else
 						tail_soft_clipped = find_soft_clipping(global_context, thread_context, current_value_index, read_text + read_cursor, current_perfect_section_abs, tmp_int, 1, adj_coverage_end);
+
+					//SUBREADprintf("SSTAIL:%d\n", tail_soft_clipped);
 
 					if(tail_soft_clipped == tmp_int){
 						tail_soft_clipped = 0;

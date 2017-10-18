@@ -465,7 +465,6 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 
 				global_context->config.max_vote_combinations = max(global_context->config.max_vote_combinations, global_context->config.reported_multi_best_reads + 1);
 				global_context->config.max_vote_simples = max(global_context->config.max_vote_simples, global_context->config.reported_multi_best_reads + 1);
-
 				break;
 			case 'c':
 				global_context->config.space_type = GENE_SPACE_COLOR; 
@@ -618,6 +617,8 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 		return -1;
 	}
 
+	if(global_context->config.reported_multi_best_reads > 1 && ! global_context->config.report_multi_mapping_reads)
+		SUBREADprintf("WARNING: You required multi best alignments, but disallowed multi-mapping reads. You need to turn on the multi-mapping option.\n");
 
 	if(global_context->config.is_SAM_file_input) global_context->config.phred_score_format = FASTQ_PHRED33;
 	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;

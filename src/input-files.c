@@ -2838,6 +2838,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 
 			if(record_len < 32 || record_len > min(MAX_BIN_RECORD_LENGTH,60000) || seq_len >= pairer -> long_read_minimum_length || thread_context -> input_buff_BIN_used < thread_context -> input_buff_BIN_ptr + record_len ){
 				if(seq_len >= pairer -> long_read_minimum_length) pairer -> is_single_end_mode = 1;
+				//SUBREADprintf("BADFMT: rlen %d; seqlen %d; room %d < %d\n",  record_len, seq_len,  thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr , record_len);
 				pairer -> is_bad_format = 1;
 				return 0;
 			}
@@ -3404,47 +3405,70 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 	char * tmptr = NULL;
 
 	//SUBREADprintf("S=%s  ", rname);
-	char * realname = strtok_r(rname, "\027", &tmptr);
+	char * realname = bin1 + 36;
+	int block1len =-1;
 	int len_name = strlen(realname);
-	int r1_chro = atoi(strtok_r(NULL, "\027", &tmptr));
-	int r1_pos = atoi(strtok_r(NULL, "\027", &tmptr));
-	int r2_chro = atoi(strtok_r(NULL, "\027", &tmptr));
-	int r2_pos = atoi(strtok_r(NULL, "\027", &tmptr));
-	int HItag = atoi(strtok_r(NULL, "\027", &tmptr));
-	int mate_FLAG = 0;
-	memcpy(&mate_FLAG, bin1 + 16, 4);
-	mate_FLAG = 0xffff&(mate_FLAG >>16);
+	int r1_chro =-1;
+	int r1_pos =-1;
+	int r2_chro =-1;
+	int r2_pos =-1;
+
+	memcpy(&block1len, bin1, 4);
+	memcpy(&r1_chro, bin1 + 4, 4);
+	memcpy(&r1_pos, bin1 + 8, 4);
+
+	memcpy(&r2_chro, bin1 + 24, 4);
+	memcpy(&r2_pos, bin1 + 28, 4);
+
+	int HItag =-1;
+	int NHtag =-1;
+
+	int seq_len = -1;
+	int cigar_opts = -1;
+	memcpy(&seq_len, bin1+20,4);
+	int r1_FLAG = -1;
+	memcpy(&r1_FLAG, bin1 + 16, 4);
+	cigar_opts = r1_FLAG & 0xffff;
+
+	int bin1ptr = 36 + len_name +1 + seq_len + (seq_len+1)/2 + 4 * cigar_opts;
+	//SUBREADprintf("MAKE_DUMMY: %s\n", realname);
+	if( block1len + 4 > bin1ptr + 3 ){
+		SAM_pairer_iterate_int_tags(bin1+bin1ptr,block1len + 4 - bin1ptr, "NH", &NHtag); 
+		SAM_pairer_iterate_int_tags(bin1+bin1ptr,block1len + 4 - bin1ptr, "HI", &HItag); 
+	}
+
+	r1_FLAG = 0xffff&(r1_FLAG >>16);
 	int mate_tlen = 0;
 	memcpy(&mate_tlen, bin1 + 32, 4);
 
 	if(r1_chro<0) r1_pos=-1;
 	if(r2_chro<0) r2_pos=-1;
 
-	int my_chro = (mate_FLAG&0x40)? r2_chro : r1_chro;
-	int my_pos = (mate_FLAG&0x40)? r2_pos : r1_pos;
-	int mate_chro = (mate_FLAG&0x40)? r1_chro : r2_chro;
-	int mate_pos = (mate_FLAG&0x40)? r1_pos : r2_pos;
+	int my_chro = (r1_FLAG&0x40)? r2_chro : r1_chro;
+	int my_pos = (r1_FLAG&0x40)? r2_pos : r1_pos;
+	int mate_chro = (r1_FLAG&0x40)? r1_chro : r2_chro;
+	int mate_pos = (r1_FLAG&0x40)? r1_pos : r2_pos;
 
 	int bin_mq_nl = (len_name+1);
-	int my_flag = (mate_FLAG&0x40)? 0x80:0x40;
-	my_flag |= 1;
+	int r2_FLAG = (r1_FLAG&0x40)? 0x80:0x40;
+	r2_FLAG |= 1;
 
 	// Dummy reads should always be unmapped!
-	//if(mate_FLAG & 8)my_flag |=4;
+	//if(r1_FLAG & 8)r2_FLAG |=4;
 
-	if(mate_FLAG & 4)my_flag |=8;
-	if(mate_FLAG & 8)my_flag |=4;
-	if(mate_FLAG & 0x10) my_flag |= 0x20;
-	if(mate_FLAG & 0x20) my_flag |= 0x10;
-	my_flag = my_flag << 16;
+	if(r1_FLAG & 4)r2_FLAG |=8;
+	if(r1_FLAG & 8)r2_FLAG |=4;
+	if(r1_FLAG & 0x10) r2_FLAG |= 0x20;
+	if(r1_FLAG & 0x20) r2_FLAG |= 0x10;
+	r2_FLAG = r2_FLAG << 16;
 
 	memcpy(out_bin2+4, &my_chro,4);
 	memcpy(out_bin2+8, &my_pos,4);
 	memcpy(out_bin2+12, &bin_mq_nl, 4);
-	memcpy(out_bin2+16, &my_flag, 4);
+	memcpy(out_bin2+16, &r2_FLAG, 4);
 
-	my_flag = 1;
-	memcpy(out_bin2+20, &my_flag, 4);
+	r2_FLAG = 1;
+	memcpy(out_bin2+20, &r2_FLAG, 4);
 	memcpy(out_bin2+24, &mate_chro, 4); 
 	memcpy(out_bin2+28, &mate_pos, 4); 
 
@@ -3455,24 +3479,43 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 	out_bin2[36 + len_name+2] = 0x20;
 
 	int all_len = 36 + len_name + 3 - 4;
+	int tag_ptr = 36 + len_name + 3;
 	//SUBREADprintf("HI=%d\n", HItag);
-	if(HItag>=0){
-		out_bin2[36 + len_name+3]='H';
-		out_bin2[36 + len_name+4]='I';
+	if(HItag>0){
+		out_bin2[tag_ptr++]='H';
+		out_bin2[tag_ptr++]='I';
 		if(HItag<128){
-			out_bin2[36 + len_name+5]='C';
-			memcpy(out_bin2 + 36 + len_name+6, &HItag, 1);
+			out_bin2[tag_ptr++]='C';
+			memcpy(out_bin2 + (tag_ptr++), &HItag, 1);
 			all_len += 4;
 		}else if(HItag<32767){
-			out_bin2[36 + len_name+5]='S';
+			out_bin2[(tag_ptr+=2)]='S';
 			memcpy(out_bin2 + 36 + len_name+6, &HItag, 2);
 			all_len += 5;
 		}else {
-			out_bin2[36 + len_name+5]='I';
+			out_bin2[(tag_ptr+=4)]='I';
 			memcpy(out_bin2 + 36 + len_name+6, &HItag, 4);
 			all_len += 7;
 		}
 	}
+	if(NHtag>0){
+		out_bin2[tag_ptr++]='N';
+		out_bin2[tag_ptr++]='H';
+		if(NHtag<128){
+			out_bin2[tag_ptr++]='C';
+			memcpy(out_bin2 + (tag_ptr++), &NHtag, 1);
+			all_len += 4;
+		}else if(NHtag<32767){
+			out_bin2[(tag_ptr+=2)]='S';
+			memcpy(out_bin2 + 36 + len_name+6, &NHtag, 2);
+			all_len += 5;
+		}else {
+			out_bin2[(tag_ptr+=4)]='I';
+			memcpy(out_bin2 + 36 + len_name+6, &NHtag, 4);
+			all_len += 7;
+		}
+	}
+
 	memcpy(out_bin2,&all_len,4);
 }
 
@@ -3609,9 +3652,11 @@ int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t
 
 	int has_next_read = SAM_pairer_get_next_read_BIN(pairer, thread_context, &bin, &bin_len);
 	//#warning "============COMMENT NEXT =================="
-	//SUBREADprintf("GOT READ: BINLEN=%d\n", bin_len);
+	//SUBREADprintf("TRYING READ: BINLEN=%d ; HASNEXT=%d\n", bin_len, has_next_read);
 	if(has_next_read){
 		int name_len = SAM_pairer_get_read_full_name(pairer, thread_context, bin, bin_len, read_full_name, & this_flags);
+
+		//SUBREADprintf("GOT READ %s, : BINLEN=%d\n", read_full_name , bin_len);
 
 		if(pairer -> is_single_end_mode == 0 && ( this_flags & 1 ) == 1){ // if the reads are PE
 			if(strcmp(read_full_name , thread_context -> immediate_last_read_full_name) == 0){
@@ -4668,8 +4713,9 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 
 						if((( etag_name0 == 'H' && etag_name1 == 'I' ) ||
 						    ( etag_name0 == 'N' && etag_name1 == 'H' ) ||
+						    ( etag_name0 == 'R' && etag_name1 == 'G' ) ||
 						    ( etag_name0 == 'N' && etag_name1 == 'M' )
-						    ) && ( etag_type == 'c' || etag_type == 'C'||etag_type == 's'||etag_type == 'S'||etag_type == 'i'||etag_type == 'I') 
+						    ) && ( etag_type == 'c' || etag_type=='Z' || etag_type == 'C'||etag_type == 's'||etag_type == 'S'||etag_type == 'i'||etag_type == 'I') 
 						  ){
 							FIX_APPEND_READ(&etag_name0,1);
 							FIX_APPEND_READ(&etag_name1,1);
@@ -4678,10 +4724,16 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 						//	SUBREADprintf("ADDED INTO BAM\n");
 						}
 						if(etag_type == 'Z'||etag_type =='H'){
+							if(this_tag_output) extag_new_len +=3;
 							while(1){
 								FIX_GET_NEXT_NCH;
 								if(nch < 0) return -1;
+								if(this_tag_output){
+									FIX_APPEND_READ(&nch, 1);
+									extag_new_len++;
+								}
 								x1++;
+								assert(x1 < 20000);
 								if(nch == 0)break;
 							}
 						}else if(etag_type == 'A'){
