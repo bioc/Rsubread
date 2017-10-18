@@ -3,12 +3,13 @@
 \title{Calculate the proportion of mapped reads/fragments in SAM/BAM files}
 \description{Number of mapped reads/fragments will be counted and fraction of such reads/fragments will be calculated.}
 \usage{
-propmapped(files,countFragments=TRUE,properlyPaired=FALSE)
+propmapped(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
 }
 \arguments{
   \item{files}{ a character vector giving the names of SAM/BAM format files. Format of input files is automatically determined by the function.}
   \item{countFragments}{ logical, indicating whether reads or fragments (read pairs) should be counted. If \code{TRUE}, fragments will be counted when paired-end read data are provided. This function automatically detects if the data are single end or paired end. For single end data, each read is treated as a fragment and therefore the value of this parameter should be set to \code{TRUE}.}
   \item{properlyPaired}{ logical, indicating if only properly paired reads will be counted. This is only applicable for paired end data. \code{FALSE} by default.}
+  \item{verbose}{ display verbose information.}
 }
 \details{
 This function uses the \code{FLAG} field in the SAM/BAM to look for mapped reads and count them.

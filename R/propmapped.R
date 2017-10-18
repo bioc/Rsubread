@@ -1,4 +1,4 @@
-propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE)
+propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
 {
     fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
@@ -9,7 +9,10 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE)
 		opt <- paste(opt,"-f",sep=",")
 	  if(properlyPaired)
 	    opt <- paste(opt,"-p",sep=",")
-	  
+
+      if(verbose)
+        opt <- paste(opt,"-V",sep=",")
+
 	  opt <- paste(opt,"-o",fout,sep=",")
 	  cmd <- paste("propmapped",opt,sep=",")
 	  n <- length(unlist(strsplit(cmd,",")))
