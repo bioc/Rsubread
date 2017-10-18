@@ -1,3 +1,22 @@
+CHANGES IN VERSION 1.28.0
+------------------------
+
+NEW FEATURES
+
+o New functions: promoterRegions() and txUnique().
+
+o New parameter in featureCounts() for counting long reads - 'isLongRead'.
+
+o New parameter in featureCounts() for counting reads by read groups - 'byReadGroup'.
+
+o New parameter in featureCounts() for requiring minimum fraction of overlapping bases in each feature - 'fracOverlapFeature'.
+
+o Assignment results for each read can be added to the provided SAM/BAM files by featureCounts ('reportReads' option).
+
+o Align() and subjunc() produce a mapping summary including percentages of uniquely mapped reads, multi-mapping reads and unmapped reads.
+
+
+
 CHANGES IN VERSION 1.26.0
 ------------------------
 

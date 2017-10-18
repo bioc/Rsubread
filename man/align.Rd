@@ -26,7 +26,7 @@ TH2=1,
 maxMismatches=3,
 
 # unique mapping and multi-mapping
-unique=TRUE,
+unique=FALSE,
 nBestLocations=1,
 
 # indel detection
@@ -91,7 +91,7 @@ TH2=1,
 maxMismatches=3,
 
 # unique mapping and multi-mapping
-unique=TRUE,
+unique=FALSE,
 nBestLocations=1,
 
 # indel detection
@@ -148,8 +148,8 @@ chrAliases=NULL)
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This is the threshold for the first reads if paired-end read data are provided.}
   \item{TH2}{ numeric value giving the consensus threhold for the second reads in paired-end data.}
   \item{maxMismatches}{ numeric value giving the maximum number of mis-matched bases allowed in the alignment. \code{3} by default. Mis-matches found in soft-clipped bases are not counted.}
-  \item{unique}{ logical indicating if only uniquely mapped reads should be reported (multi-mapping reads will not be reported). \code{TRUE} by default. A uniquely mapped read must have one single mapping location that has less mis-matched bases than any other candidate locations.}
-  \item{nBestLocations}{ numeric value giving the maximal number of equally-best mapping locations allowed to be reported for the read. 1 by default. The allowed value is between 1 to 16 (inclusive). In the mapping output, `NH' tag is used to indicate how many alignments are reported for the read and `HI' tag is used for numbering the alignments reported for the same read. This argument is only applicable when \code{unique} option is set to \code{FALSE}.}
+  \item{unique}{ logical indicating if only uniquely mapped reads should be reported. A uniquely mapped read has one single mapping location that has less mis-matched bases than any other candidate locations. By default, multi-mapping reads will be reported in addition to uniquely mapped reads. Number of alignments reported for each multi-mapping read is determined by the \code{nBestLocations} parameter.}
+  \item{nBestLocations}{ numeric value specifying the maximal number of equally-best mapping locations that will be reported for a multi-mapping read. 1 by default. The allowed value is between 1 to 16 (inclusive). In the mapping output, `NH' tag is used to indicate how many alignments are reported for the read and `HI' tag is used for numbering the alignments reported for the same read. This argument is only applicable when \code{unique} option is set to \code{FALSE}.}
   \item{indels}{ numeric value giving the maximum number of insertions/deletions allowed during the mapping. \code{5} by default.}
   \item{complexIndels}{ logical indicating if complex indels will be detected. If \code{TRUE}, the program will try to detect multiple short indels that occurs concurrently in a small genomic region (indels could be as close as 1bp apart).}
   \item{nTrim5}{ numeric value giving the number of bases trimmed off from 5' end of each read. \code{0} by default.}

@@ -20,6 +20,7 @@ featureCounts(files,
 	allowMultiOverlap=FALSE,
 	minOverlap=1,
 	fracOverlap=0,
+	fracOverlapFeature=0,
 	largestOverlap=FALSE,
 	readExtension5=0,
 	readExtension3=0,
@@ -81,6 +82,7 @@ featureCounts(files,
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
   \item{minOverlap}{ \code{integer} giving the minimum number of overlapped bases required for assigning a read to a feature (or a meta-feature). For assignment of read pairs (fragments), number of overlapping bases from each read in the same pair will be summed. If a negative value is provided, then a gap of up to specified size will be allowed between read and the feature that the read is assigned to. \code{1} by default.}
   \item{fracOverlap}{ \code{numeric} giving minimum fraction of overlapping bases in a read that is required for read assignment. Value should be within range [0,1]. \code{0} by default. Number of overlapping bases is counted from both reads if paired end. Both this option and \code{minOverlap} option need to be satisfied before a read can be assigned.}
+  \item{fracOverlapFeature}{ \code{numeric} giving minimum fraction of bases included in a feature that is required for overlapping with a read or a read pair. Value should be within range [0,1]. \code{0} by default.}
   \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
   \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
