@@ -163,7 +163,7 @@ typedef struct {
 
 	unsigned int scoring_buff_numbers[MAX_HIT_NUMBER * 2];
 	unsigned int scoring_buff_flags[MAX_HIT_NUMBER * 2];
-	unsigned short scoring_buff_overlappings[MAX_HIT_NUMBER * 2];
+	unsigned int scoring_buff_overlappings[MAX_HIT_NUMBER * 2];
 	long scoring_buff_exon_ids[MAX_HIT_NUMBER * 2];
 
 	char * chro_name_buff;
@@ -241,6 +241,7 @@ typedef struct {
 	int three_end_extension;
 	int fragment_minimum_overlapping;
 	float fractional_minimum_overlapping; 
+	float fractional_minimum_feature_overlapping;
 	int use_overlapping_break_tie;
 
 	unsigned long long int all_reads;
@@ -697,7 +698,9 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		print_in_box(80,0,0,"       Split alignments : %s", (1 == global_context -> is_split_or_exonic_only)?"only split alignments":"only exonic alignments");
 	print_in_box(80,0,0,"  Min overlapping bases : %d", global_context -> fragment_minimum_overlapping);
 	if(global_context -> fractional_minimum_overlapping > 0.000001)
-		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%%", global_context -> fractional_minimum_overlapping*100);
+		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%% to reads", global_context -> fractional_minimum_overlapping*100);
+	if(global_context -> fractional_minimum_feature_overlapping > 0.000001)
+		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%% to features", global_context -> fractional_minimum_feature_overlapping*100);
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
 		print_in_box(80,0,0,"        Read extensions : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
 	if(global_context -> reduce_5_3_ends_to_one)
@@ -2171,6 +2174,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 		if(assign_reads_to_RG){
 			char RG_type = 0;
 			SAM_pairer_iterate_tags((unsigned char *)bin+bin_ptr, block_len + 4 - bin_ptr, "RG", &RG_type, RG_ptr);
+		//SUBREADprintf("RG_TEST: PTR=%p, VAL=`%s`, TY=%c\n", *RG_ptr, *RG_ptr, RG_type);
 			if(RG_type != 'Z') (*RG_ptr) = NULL;
 		}
 		//SUBREADprintf("FOUND=%d, NH=%d, TAG=%.*s\n", found_NH, *(NH_value), 3 , bin+bin_ptr);
@@ -2620,11 +2624,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr);
 
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
-	//	SUBREADprintf("  RNAME=%s\n", read_name);
+		//SUBREADprintf("TEST_RG: '%s'\n", RG_ptr);
 
-		//#warning "==================== REMOVE WHEN RELEASE ========================"
-		//if(global_context -> read_details_out_FP)
-		//	fprintf(global_context -> read_details_out_FP, "SAMDEBUG: %s\t\t%s, %ld\n", read_name, read_chr, read_pos);
 		if(is_second_read == 0)
 		{
 			//skip the read if unmapped (its mate will be skipped as well if paired-end)
@@ -3114,7 +3115,7 @@ void overlap_exchange(void * arr, int L, int R){
 	pos[R*2+1] = tt;
 }
 
-unsigned short calc_score_overlaps(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char ** chros, unsigned int * start_poses, unsigned short * lens, int sections){
+unsigned int calc_score_overlaps(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char ** chros, unsigned int * start_poses, unsigned short * lens, int sections){
 	unsigned int in_intervals[ 2*sections ];
 	unsigned int out_intervals[ 2*sections ], x1;
 	char used_interval[ sections ];
@@ -3155,6 +3156,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			char ** hits_chro1, char ** hits_chro2, unsigned int * hits_start_pos1, unsigned int * hits_start_pos2, unsigned short * hits_length1, unsigned short * hits_length2, int fixed_fractional_count, char * read_name, char * RG_name, char * bin1, char * bin2){
 	if(global_context -> need_calculate_overlap_len == 0 && nhits2+nhits1==1) {
 		long hit_exon_id = nhits2?hits_indices2[0]:hits_indices1[0];
+
+		//SUBREADprintf("V_AND_A: '%p'\n", RG_name);
 
 		if(RG_name){
 			void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
@@ -3216,20 +3219,88 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		
 		unsigned int * scoring_numbers = thread_context -> scoring_buff_numbers;	// size is : MAX_HIT_NUMBER *2
 		unsigned int * scoring_flags = thread_context -> scoring_buff_flags;		// size is : MAX_HIT_NUMBER *2
-		unsigned short * scoring_overlappings = thread_context -> scoring_buff_overlappings;		// size is : MAX_HIT_NUMBER *2
+		unsigned int * scoring_overlappings = thread_context -> scoring_buff_overlappings;		// size is : MAX_HIT_NUMBER *2
 		long * scoring_exon_ids = thread_context -> scoring_buff_exon_ids;		// size is : MAX_HIT_NUMBER *2
 		int scoring_count = 0,  score_x1;
 
 
 		if( global_context -> need_calculate_overlap_len ){
-
+			int end1, end2, hit_x1, hit_x2;
 			char ** scoring_gap_chros = thread_context -> scoring_buff_gap_chros;
 			unsigned int * scoring_gap_starts = thread_context -> scoring_buff_gap_starts; // size is : MAX_HIT_NUMBER *2;
 			unsigned short * scoring_gap_lengths = thread_context -> scoring_buff_gap_lengths; 	// size is : MAX_HIT_NUMBER *2*  global_context -> max_M*2
 
-			int end1, end2, hit_x1, hit_x2;
 			char used_hit1 [nhits1];
 			char used_hit2 [nhits2];
+
+			if( global_context ->  fractional_minimum_feature_overlapping > 1E-10 ){
+				memset(used_hit1 , 0 , nhits1);
+				memset(used_hit2 , 0 , nhits2);
+				for(end1 = 0; end1 < global_context -> is_paired_end_mode_assign + 1 ; end1++){
+					int allhits = end1?nhits2:nhits1;
+					long * hits_indices_X1 = end1?hits_indices2:hits_indices1;
+					char * used_hit_X1 = end1?used_hit2:used_hit1;
+
+					//#warning "DEBUG OUT 0"
+					if(0 && FIXLENstrcmp("V0112_0155:7:1102:12486:34235", read_name) == 0)
+						SUBREADprintf("OVERLAP START %d hits\n", allhits);
+					for(hit_x1 = 0; hit_x1 < allhits; hit_x1++){
+						if(used_hit_X1[hit_x1])continue;
+
+						long tested_exon_id = hits_indices_X1[hit_x1];
+						long exon_span = global_context -> exontable_stop[tested_exon_id] +1;
+						exon_span -= global_context -> exontable_start[tested_exon_id];
+
+						long applied_overlapping_threshold = (int)(exon_span * global_context ->  fractional_minimum_feature_overlapping+0.5);
+
+						scoring_gap_chros[0 ] = (end1?hits_chro2:hits_chro1)[hit_x1];
+						scoring_gap_starts[0 ] = (end1?hits_start_pos2:hits_start_pos1)[hit_x1];
+						scoring_gap_lengths[0 ] = (end1?hits_length2:hits_length1)[hit_x1];
+						int gaps=1;
+
+						for(end2 = 0; end2 < global_context -> is_paired_end_mode_assign + 1 ; end2++){
+							int allhits2 = end2?nhits2:nhits1;
+							char * used_hit_X2 = end2?used_hit2:used_hit1;
+							long * hits_indices_X2 = end2?hits_indices2:hits_indices1;
+
+
+							for(hit_x2 = 0; hit_x2 < allhits2; hit_x2++){
+								if(used_hit_X2[hit_x2]) continue;
+								long other_exon_id =  hits_indices_X2[hit_x2];
+								if(other_exon_id == tested_exon_id){
+									used_hit_X2[ hit_x2 ]=1;
+									scoring_gap_chros[ gaps ] = (end2?hits_chro2:hits_chro1)[hit_x2];
+									scoring_gap_starts[ gaps ] = (end2?hits_start_pos2:hits_start_pos1)[hit_x2];
+									scoring_gap_lengths[ gaps ] = (end2?hits_length2:hits_length1)[hit_x2];
+									gaps ++;
+								}
+							}
+						}
+
+
+						unsigned int tested_exon_overlap_any_read = calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps);
+						if(applied_overlapping_threshold > tested_exon_overlap_any_read){
+							// remove this exon from lists
+
+							for(end2 = 0; end2 < global_context -> is_paired_end_mode_assign + 1 ; end2++){
+								int allhits2 = end2?nhits2:nhits1;
+								long * hits_indices_X2 = end2?hits_indices2:hits_indices1;
+
+								for(hit_x2 = 0; hit_x2 < allhits2; hit_x2++){
+									long other_exon_id =  hits_indices_X2[hit_x2];
+									if(other_exon_id == tested_exon_id){
+										hits_indices_X2[hit_x2] = -1;
+									}
+								}
+							}
+						}
+						//#warning "DEBUG OUT 1"
+						if(0 && FIXLENstrcmp("V0112_0155:7:1102:12486:34235", read_name) == 0)
+							SUBREADprintf("OVERLAP TO %ld : %u >= %u ; EXON_SPAN=%ld ( %ld ~ %ld)\n", tested_exon_id, tested_exon_overlap_any_read, applied_overlapping_threshold, exon_span, global_context -> exontable_start[tested_exon_id], global_context -> exontable_stop[tested_exon_id]);
+					}
+				}
+			}
+
 			memset(used_hit1 , 0 , nhits1);
 			memset(used_hit2 , 0 , nhits2);
 
@@ -3243,6 +3314,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 
 					int gaps = 0;
 					long tmp_exon_id = hits_indices_X1[hit_x1];
+					if(tmp_exon_id < 0) continue;
 					long score_merge_key;
 					if (global_context -> is_gene_level )
 						score_merge_key = global_context -> exontable_geneid[tmp_exon_id];
@@ -3268,6 +3340,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 
 						for( hit_x2 = 0 ; hit_x2 < nhit_X2; hit_x2 ++ ){
 							if(used_hit_X2[hit_x2])continue;
+							if(hits_indices_X2[hit_x2] < 0) continue;
 
 							long X2_merge_key;
 							if (global_context -> is_gene_level )
@@ -3359,7 +3432,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			}else thread_context->read_counters.unassigned_nofeatures ++;
 		}else{
 				for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
-					if(0 && FIXLENstrcmp("V0112_0155:7:1101:5387:6362", read_name)==0) SUBREADprintf("Scoring Overlap %s = %d >=%d, score=%d, exonid=%ld\n", read_name, scoring_overlappings[score_x1], applied_fragment_minimum_overlapping, scoring_numbers[score_x1], scoring_exon_ids[score_x1]);
+					//#warning "DEBUG OUT 2"
+					if(0 && FIXLENstrcmp("V0112_0155:7:1102:12486:34235", read_name)==0) SUBREADprintf("Scoring Overlap %s = %d >=%d, score=%d, exonid=%ld\n", read_name, scoring_overlappings[score_x1], applied_fragment_minimum_overlapping, scoring_numbers[score_x1], scoring_exon_ids[score_x1]);
 					//SUBREADprintf("RLTEST: %s %d\n", read_name, scoring_overlappings[score_x1]);
 					if( applied_fragment_minimum_overlapping > 1 )
 						if( applied_fragment_minimum_overlapping > scoring_overlappings[score_x1] ){
@@ -3731,7 +3805,7 @@ void fc_thread_init_input_files(fc_thread_global_context_t * global_context, cha
 
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose)
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap)
 {
 	int x1;
 
@@ -3779,9 +3853,10 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> three_end_extension = threeEndExtension;
 	global_context -> fragment_minimum_overlapping = minFragmentOverlap;
 	global_context -> fractional_minimum_overlapping = fracOverlap;
+	global_context -> fractional_minimum_feature_overlapping = frac_feature_overlap;
 	global_context -> use_overlapping_break_tie = useOverlappingBreakTie;
-	global_context -> need_calculate_fragment_len = ( global_context -> fractional_minimum_overlapping > 1E-10 );
-	global_context -> need_calculate_overlap_len = global_context -> fractional_minimum_overlapping > 1E-10 || (global_context -> fragment_minimum_overlapping > 1) || global_context -> use_overlapping_break_tie;
+	global_context -> need_calculate_fragment_len = ( global_context -> fractional_minimum_overlapping > 1E-10 ) || (global_context -> fractional_minimum_feature_overlapping > 1E-10);
+	global_context -> need_calculate_overlap_len = (global_context -> fractional_minimum_overlapping > 1E-10) || (global_context -> fragment_minimum_overlapping > 1) || global_context -> use_overlapping_break_tie || (global_context -> fractional_minimum_feature_overlapping > 1E-10);
 	global_context -> debug_command = debug_command;
 	global_context -> max_M = max_M;
 	global_context -> max_BAM_header_size = buffer_size;
@@ -4354,6 +4429,7 @@ static struct option long_options[] =
 	{"read2pos", required_argument, 0, 0},
 	{"minOverlap", required_argument, 0, 0},
 	{"fracOverlap", required_argument, 0, 0},
+	{"fracOverlapFeature", required_argument, 0, 0},
 	{"splitOnly", no_argument, 0, 0},
 	{"nonSplitOnly", no_argument, 0, 0},
 	{"debugCommand", required_argument, 0, 0},
@@ -4442,6 +4518,10 @@ void print_usage()
 	SUBREADputs("                      counted from both reads if paired end. Both this option");
 	SUBREADputs("                      and '--minOverlap' option need to be satisfied for read");
 	SUBREADputs("                      assignment.");
+	SUBREADputs("");
+	SUBREADputs("  --fracOverlapFeature <float> Minimum fraction of bases included in a feature");
+	SUBREADputs("                      that is required for overlapping with a read or a read-");
+	SUBREADputs("                      pair. Value should be within range [0,1]. 0 by default.");
 	SUBREADputs("");
 	SUBREADputs("  --largestOverlap    Assign reads to a meta-feature/feature that has the ");
 	SUBREADputs("                      largest number of overlapping bases.");
@@ -4554,17 +4634,18 @@ void print_usage()
 
 	SUBREADputs("# Read groups");
 	SUBREADputs("");
-	SUBREADputs("  --byReadGroup       Assign reads by their read groups if the \"RG\" tag is found");
-	SUBREADputs("                      in the input SAM or BAM file");
+	SUBREADputs("  --byReadGroup       Assign reads by read group. \"RG\" tag is required to be");
+	SUBREADputs("                      present in the input BAM/SAM files.");
+	SUBREADputs("                      ");
 	SUBREADputs("");
 
 	SUBREADputs("# Long reads");
 	SUBREADputs("");
-	SUBREADputs("  -L <int>            Input dataset will be treated as long reads. Long-read");
-	SUBREADputs("                      counting can only run in one thread and only reads (not");
-	SUBREADputs("                      read-pairs) can be counted. There is no limitation on the");
-	SUBREADputs("                      number of 'M' operations allowed in a CIGAR string in long");
-	SUBREADputs("                      read counting.");
+	SUBREADputs("  -L                  Count long reads such as Nanopore and PacBio reads. Long");
+	SUBREADputs("                      read counting can only run in one thread and only reads");
+	SUBREADputs("                      (not read-pairs) can be counted. There is no limitation on");
+	SUBREADputs("                      the number of 'M' operations allowed in a CIGAR string in");
+	SUBREADputs("                      long read counting.");
 	SUBREADputs("");
 
 	SUBREADputs("# Miscellaneous");
@@ -5004,10 +5085,11 @@ int readSummary(int argc,char *argv[]){
 	43: as.numeric(assign_reads_to_RG) # 1: reads with "RG" tags will be assigned to read groups' 0: default setting
 	44: as.numeric(long_read_minimum_length) # Reads longer than this will be assigned as long reads (no multi-threading)
 	45: as.numeric(is_verbose) # 1: show the mismatched chromosome names on screet; 0: don't do so
+	46: as.numeric(frac_feature_overlap) # fraction of the feature to be overlapped with a read
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose;
-	float fracOverlap;
+	float fracOverlap, fracOverlapFeature;
 	char **chr;
 	long *start, *stop;
 	int *geneid;
@@ -5093,7 +5175,7 @@ int readSummary(int argc,char *argv[]){
 		isInputFileResortNeeded = atoi(argv[23]);
 	else	isInputFileResortNeeded = 0;
 	if(thread_number<1) thread_number=1;
-	if(thread_number>16)thread_number=16;
+	if(thread_number>FC_MAX_THREADS)thread_number=FC_MAX_THREADS;
 
 	int Param_fiveEndExtension, Param_threeEndExtension;
 	if(argc>25)
@@ -5199,11 +5281,15 @@ int readSummary(int argc,char *argv[]){
 		is_verbose = (argv[45][0]=='1'); 
 	else  is_verbose = 0;
 
+	if(argc>46)
+		fracOverlapFeature = atof(argv[46]);
+	else	fracOverlapFeature = 0.0;
+
 	if(SAM_pairer_warning_file_open_limit()) return -1;
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -5631,7 +5717,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[46];
+	char * Rargv[47];
 	char annot_name[300];
 	char temp_dir[300];
 	char * out_name = malloc(300);
@@ -5651,6 +5737,7 @@ int feature_count_main(int argc, char ** argv)
 	char min_qual_score_str[11];
 	char feature_block_size_str[11];
 	char Strand_Sensitive_Str[11];
+	char strFeatureFracOverlap[11];
 	char Pair_Orientations[3];
 	char * very_long_file_names;
 	int is_Input_Need_Reorder = 0;
@@ -5681,7 +5768,7 @@ int feature_count_main(int argc, char ** argv)
 	int c;
 	int very_long_file_names_size = 200;
 	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
-	float fracOverlap = 0.0;
+	float fracOverlap = 0.0, fracOverlapFeature = 0.0;
 	int std_input_output_mode = 0, long_read_mode = 0, is_verbose = 0;
 	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[11], long_read_mode_str[11];
 	very_long_file_names = malloc(very_long_file_names_size);
@@ -5761,7 +5848,7 @@ int feature_count_main(int argc, char ** argv)
 				strcpy(nameGeneIDColumn, optarg);
 				break;
 			case 'T':
-				if(!is_valid_digit_range(optarg, "T", 1, 64))
+				if(!is_valid_digit_range(optarg, "T", 1, FC_MAX_THREADS))
 					STANDALONE_exit(-1);
 
 				threads = atoi(optarg);
@@ -5863,6 +5950,15 @@ int feature_count_main(int argc, char ** argv)
 						STANDALONE_exit(-1);
 					fracOverlap = atof(optarg);
 				}
+
+
+				if(strcmp("fracOverlapFeature", long_options[option_index].name)==0)
+				{
+					if(!is_valid_float(optarg, "fracOverlapFeature"))
+						STANDALONE_exit(-1);
+					fracOverlapFeature = atof(optarg);
+				}
+
 
 				if(strcmp("minOverlap", long_options[option_index].name)==0)
 				{
@@ -5988,6 +6084,7 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(fracOverlapStr, "%g", fracOverlap);
 	sprintf(std_input_output_mode_str,"%d",std_input_output_mode);
 	sprintf(long_read_mode_str, "%d", long_read_mode);
+	sprintf(strFeatureFracOverlap, "%g", fracOverlapFeature);
 
 	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
@@ -6035,10 +6132,11 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[43] = assign_reads_to_RG?"1":"0"; 
 	Rargv[44] = long_read_mode_str;
 	Rargv[45] = is_verbose?"1":"0";
+	Rargv[46] = strFeatureFracOverlap;
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(46, Rargv);
+	else retvalue = readSummary(47, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
