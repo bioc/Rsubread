@@ -503,8 +503,7 @@ int propmapped(int argc, char ** argv)
 		ret = -1;
 		SUBREADprintf("Unable to open input file '%s' or the input file is empty!\n", context -> input_file_name);
 	}
-
-	SUBREADprintf("The input file is opened as a %cAM file.\nThe %ss in the input file are being counted.\n", context -> is_BAM_input?'B':'S', context -> is_fragments_counted?"fragment":"read");
+	if(context -> verbose) SUBREADprintf("The input file is opened as a %cAM file.\nThe %ss in the input file are being counted.\n", context -> is_BAM_input?'B':'S', context -> is_fragments_counted?"fragment":"read");
 
 	ppm_warning_file_limit ();
 	ret = ret || init_PE_sambam(context);
