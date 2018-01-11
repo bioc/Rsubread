@@ -3,6 +3,7 @@
 #cp src/Makevars.in src/Makevars
 
 UNAME=`uname`
+IS_CYG=`uname |grep -i cygwin |wc -l`
 
 echo @@@@@ The operating system is $UNAME.
 
@@ -10,7 +11,10 @@ version_no=`cat DESCRIPTION |grep Version|cut -f2 -d' '`
 
 echo SUBREAD_VER = \"\\\"Rsubread $version_no\\\"\" > src/Makevars
 
-if test  $UNAME = "Linux" 
+if test  $IS_CYG = 1 
+then
+	cat src/Makevars.Linux >> src/Makevars
+elif test  $UNAME = "Linux" 
 then
 	# This is a Linux machine! 
 	cat src/Makevars.Linux >> src/Makevars
