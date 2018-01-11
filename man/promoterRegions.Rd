@@ -3,7 +3,7 @@
 \title{Generate annotation for promoter region of genes}
 \description{Create a SAF data.frame of genewise promoter regions}
 \usage{
-promoterRegions <- function(annotation="mm10", upstream=3000L, downstream=2000L)
+promoterRegions(annotation="mm10", upstream=3000L, downstream=2000L)
 }
 \arguments{
 \item{annotation}{ a character string giving the name of a genome with built-in annotation or a SAF format gene annotation. If using built-in annotation, the character string should be one of the following: \code{mm10}, \code{mm9}, \code{hg38} or \code{hg19}. They correspond to the NCBI RefSeq annotations for genomes `mm10', `mm9', `hg38' and `hg19', respectively. \code{mm10} by default.}

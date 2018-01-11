@@ -1,3 +1,12 @@
+25 Oct 2017 - 1.27.9
+(1) Update help page for featureCounts.
+
+20 Oct 2017 - 1.27.8
+(1) updated users guide.
+
+19 Oct 2017 - 1.27.7
+(1) C code update from Yang.
+
 18 Oct 2017 - 1.27.6
 (1) Add ‘verbose’ option to propmapped().
 (2) Add ‘fracOverlapFeature’ to featureCounts().
