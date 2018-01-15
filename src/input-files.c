@@ -2831,23 +2831,24 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					return 0;
 			}
 
-			unsigned int record_len = 0, seq_len = 0;
-			memcpy(&record_len, thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr, 4);
-			memcpy(&seq_len, thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr + 20, 4);
-			thread_context -> input_buff_BIN_ptr += 4;
-
-			if(record_len < 32 || record_len > min(MAX_BIN_RECORD_LENGTH,60000) || seq_len >= pairer -> long_read_minimum_length || thread_context -> input_buff_BIN_used < thread_context -> input_buff_BIN_ptr + record_len ){
-				if(seq_len >= pairer -> long_read_minimum_length) pairer -> is_single_end_mode = 1;
-				//SUBREADprintf("BADFMT: rlen %d; seqlen %d; room %d < %d\n",  record_len, seq_len,  thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr , record_len);
-				pairer -> is_bad_format = 1;
-				return 0;
+			if(!pairer -> is_bad_format){
+				unsigned int record_len = 0, seq_len = 0;
+				memcpy(&record_len, thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr, 4);
+				memcpy(&seq_len, thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr + 20, 4);
+				thread_context -> input_buff_BIN_ptr += 4;
+	
+				if(record_len < 32 || record_len > min(MAX_BIN_RECORD_LENGTH,60000) || seq_len >= pairer -> long_read_minimum_length || thread_context -> input_buff_BIN_used < thread_context -> input_buff_BIN_ptr + record_len ){
+					if(seq_len >= pairer -> long_read_minimum_length) pairer -> is_single_end_mode = 1;
+					pairer -> is_bad_format = 1;
+					return 0;
+				}
+	
+				(* bin_where) = thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr - 4;
+				(* bin_len) = record_len + 4;
+				thread_context -> input_buff_BIN_ptr += record_len;
+	
+				if( pairer -> tiny_mode)SAM_pairer_reduce_BAM_bin(pairer, thread_context, *bin_where, bin_len);
 			}
-
-			(* bin_where) = thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr - 4;
-			(* bin_len) = record_len + 4;
-			thread_context -> input_buff_BIN_ptr += record_len;
-
-			if( pairer -> tiny_mode )SAM_pairer_reduce_BAM_bin(pairer, thread_context, *bin_where, bin_len);
 
 			return 1;
 		}
@@ -3408,27 +3409,27 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 	char * realname = bin1 + 36;
 	int block1len =-1;
 	int len_name = strlen(realname);
-	int r1_chro =-1;
-	int r1_pos =-1;
-	int r2_chro =-1;
-	int r2_pos =-1;
+	int old_read_chro =-1;
+	int old_read_pos =-1;
+	int new_dummy_chro =-1;
+	int new_dummy_pos =-1;
 
 	memcpy(&block1len, bin1, 4);
-	memcpy(&r1_chro, bin1 + 4, 4);
-	memcpy(&r1_pos, bin1 + 8, 4);
+	memcpy(&old_read_chro, bin1 + 4, 4);
+	memcpy(&old_read_pos, bin1 + 8, 4);
 
-	memcpy(&r2_chro, bin1 + 24, 4);
-	memcpy(&r2_pos, bin1 + 28, 4);
+	memcpy(&new_dummy_chro, bin1 + 24, 4);
+	memcpy(&new_dummy_pos, bin1 + 28, 4);
 
 	int HItag =-1;
 	int NHtag =-1;
 
 	int seq_len = -1;
 	int cigar_opts = -1;
-	memcpy(&seq_len, bin1+20,4);
-	int r1_FLAG = -1;
-	memcpy(&r1_FLAG, bin1 + 16, 4);
-	cigar_opts = r1_FLAG & 0xffff;
+	memcpy(&seq_len, bin1 + 20,4);
+	int old_read_FLAG = -1;
+	memcpy(&old_read_FLAG, bin1 + 16, 4);
+	cigar_opts = old_read_FLAG & 0xffff;
 
 	int bin1ptr = 36 + len_name +1 + seq_len + (seq_len+1)/2 + 4 * cigar_opts;
 	//SUBREADprintf("MAKE_DUMMY: %s\n", realname);
@@ -3437,40 +3438,36 @@ void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2){
 		SAM_pairer_iterate_int_tags(bin1+bin1ptr,block1len + 4 - bin1ptr, "HI", &HItag); 
 	}
 
-	r1_FLAG = 0xffff&(r1_FLAG >>16);
+	old_read_FLAG = 0xffff&(old_read_FLAG >>16);
 	int mate_tlen = 0;
 	memcpy(&mate_tlen, bin1 + 32, 4);
 
-	if(r1_chro<0) r1_pos=-1;
-	if(r2_chro<0) r2_pos=-1;
+	if(old_read_chro<0) old_read_pos=-1;
+	if(new_dummy_chro<0) new_dummy_pos=-1;
 
-	int my_chro = (r1_FLAG&0x40)? r2_chro : r1_chro;
-	int my_pos = (r1_FLAG&0x40)? r2_pos : r1_pos;
-	int mate_chro = (r1_FLAG&0x40)? r1_chro : r2_chro;
-	int mate_pos = (r1_FLAG&0x40)? r1_pos : r2_pos;
 
 	int bin_mq_nl = (len_name+1);
-	int r2_FLAG = (r1_FLAG&0x40)? 0x80:0x40;
-	r2_FLAG |= 1;
+	int new_dummy_FLAG = (old_read_FLAG&0x40)? 0x80:0x40;
+	new_dummy_FLAG |= 1;
 
 	// Dummy reads should always be unmapped!
-	//if(r1_FLAG & 8)r2_FLAG |=4;
+	//if(old_read_FLAG & 8)new_dummy_FLAG |=4;
 
-	if(r1_FLAG & 4)r2_FLAG |=8;
-	if(r1_FLAG & 8)r2_FLAG |=4;
-	if(r1_FLAG & 0x10) r2_FLAG |= 0x20;
-	if(r1_FLAG & 0x20) r2_FLAG |= 0x10;
-	r2_FLAG = r2_FLAG << 16;
+	if(old_read_FLAG & 4)new_dummy_FLAG |=8;
+	if(old_read_FLAG & 8)new_dummy_FLAG |=4;
+	if(old_read_FLAG & 0x10) new_dummy_FLAG |= 0x20;
+	if(old_read_FLAG & 0x20) new_dummy_FLAG |= 0x10;
+	new_dummy_FLAG = new_dummy_FLAG << 16;
 
-	memcpy(out_bin2+4, &my_chro,4);
-	memcpy(out_bin2+8, &my_pos,4);
+	memcpy(out_bin2+4, &new_dummy_chro,4);
+	memcpy(out_bin2+8, &new_dummy_pos,4);
 	memcpy(out_bin2+12, &bin_mq_nl, 4);
-	memcpy(out_bin2+16, &r2_FLAG, 4);
+	memcpy(out_bin2+16, &new_dummy_FLAG, 4);
 
-	r2_FLAG = 1;
-	memcpy(out_bin2+20, &r2_FLAG, 4);
-	memcpy(out_bin2+24, &mate_chro, 4); 
-	memcpy(out_bin2+28, &mate_pos, 4); 
+	new_dummy_FLAG = 1;
+	memcpy(out_bin2+20, &new_dummy_FLAG, 4);
+	memcpy(out_bin2+24, &old_read_chro, 4); 
+	memcpy(out_bin2+28, &old_read_pos, 4); 
 
 	mate_tlen = -mate_tlen;
 	memcpy(out_bin2+32, &mate_tlen, 4);
@@ -3653,7 +3650,7 @@ int SAM_pairer_do_next_read( SAM_pairer_context_t * pairer , SAM_pairer_thread_t
 	int has_next_read = SAM_pairer_get_next_read_BIN(pairer, thread_context, &bin, &bin_len);
 	//#warning "============COMMENT NEXT =================="
 	//SUBREADprintf("TRYING READ: BINLEN=%d ; HASNEXT=%d\n", bin_len, has_next_read);
-	if(has_next_read){
+	if(has_next_read && !pairer -> is_bad_format){
 		int name_len = SAM_pairer_get_read_full_name(pairer, thread_context, bin, bin_len, read_full_name, & this_flags);
 
 		//SUBREADprintf("GOT READ %s, : BINLEN=%d\n", read_full_name , bin_len);
