@@ -585,6 +585,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 
+	/*
 	if(global_context -> max_missing_bases_in_read >= 0 && global_context -> fractional_minimum_overlapping > 0.000001){
 		SUBREADprintf("\nERROR: multiple filtering conditions on overlapping bases in reads\n");
 		return 1;
@@ -593,7 +594,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	if(global_context -> max_missing_bases_in_feature >= 0 && global_context -> fractional_minimum_feature_overlapping > 0.000001){
 		SUBREADprintf("\nERROR: multiple filtering conditions on overlapping bases in features\n");
 		return 1;
-	}
+	}*/
 
 	sprintf(sam_used, "%s/featureCounts_test_file_writable-%06d-%s.tmp", global_context -> temp_file_dir, getpid(), MAC_or_random);
 	FILE * fp = fopen(sam_used,"w");
@@ -716,9 +717,9 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		print_in_box(80,0,0,"       Split alignments : %s", (1 == global_context -> is_split_or_exonic_only)?"only split alignments":"only exonic alignments");
 	print_in_box(80,0,0,"  Min overlapping bases : %d", global_context -> fragment_minimum_overlapping);
 	if(global_context -> max_missing_bases_in_read >= 0)
-		print_in_box(81,0,0,"  Min overlapping bases : %d in reads", global_context -> max_missing_bases_in_read);
+		print_in_box(80,0,0,"      Max missing bases : %d in reads", global_context -> max_missing_bases_in_read);
 	if(global_context -> max_missing_bases_in_feature >= 0)
-		print_in_box(81,0,0,"  Min overlapping bases : %d in features", global_context -> max_missing_bases_in_feature);
+		print_in_box(80,0,0,"      Max missing bases : %d in features", global_context -> max_missing_bases_in_feature);
 	if(global_context -> fractional_minimum_overlapping > 0.000001)
 		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%% to reads", global_context -> fractional_minimum_overlapping*100);
 	if(global_context -> fractional_minimum_feature_overlapping > 0.000001)
