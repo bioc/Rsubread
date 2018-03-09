@@ -22,8 +22,8 @@ A data matrix in which each row represents a transcript. The matrix includes fou
 \author{Yang Liao and Wei Shi}
 %\note{}
 %\seealso{}
-\examples{
-}
+%\examples{
+%}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
 %\keyword{}
