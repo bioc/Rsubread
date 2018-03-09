@@ -56,6 +56,7 @@ int DTCdo_add_feature(char * gene_name, char * transcript_name, char * chro_name
 	new_exon -> is_negative_strand = is_negative_strand;
 
 	ArrayListPush(context -> exon_table , new_exon);
+	return 0;
 }
 
 int DTCcompare_merge_genes(void * L_elem, void * R_elem){
@@ -152,6 +153,7 @@ int DTCwrite_annotations(char * gene_name, char * transcript_name, char * chro_n
 	unsigned int * gc_2int = HashTableGet(context ->gene_to_GC_TOTAL_table, gene_name);
 	if(!gc_2int) gc_2int = (unsigned int[]){0,0,0};
 	DTCadd_annotation(context, gene_name, chro_name, start, end, is_negative_strand, gc_2int[0], gc_2int[1], 0);
+	return 0;
 }
 
 void DTCprint_lentab_items(void * key, void * hashed_obj, HashTable * tab){
