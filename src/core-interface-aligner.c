@@ -48,6 +48,7 @@ static struct option long_options[] =
 	{"SAMinput", no_argument, 0, 0},
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"sv", no_argument, 0, 0},
+	{"longDel", no_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
@@ -484,6 +485,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("BAMinput", long_options[option_index].name)==0) 
 				{
+					if(global_context->config.is_SAM_file_input && global_context->config.is_BAM_input == 0){
+						SUBREADprintf("ERROR: you cannot specify both SAMinput and BAMinput\n");
+						return -1;
+					}
+
 					global_context->config.is_BAM_input = 1;
 					global_context->config.is_SAM_file_input = 1;
 				}
@@ -493,6 +499,11 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("SAMinput", long_options[option_index].name)==0) 
 				{
+					if(global_context->config.is_SAM_file_input && global_context->config.is_BAM_input == 1){
+						SUBREADprintf("ERROR: you cannot specify both SAMinput and BAMinput\n");
+						return -1;
+					}
+
 					global_context->config.is_BAM_input = 0;
 					global_context->config.is_SAM_file_input = 1;
 				}
@@ -514,6 +525,12 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.do_fusion_detection = 1;
 					global_context->config.prefer_donor_receptor_junctions = 0;
 					//global_context->config.do_big_margin_filtering_for_reads = 1;
+				}
+				else if(strcmp("longDel", long_options[option_index].name)==0) 
+				{
+					global_context->config.do_breakpoint_detection = 1;
+					global_context->config.do_long_del_detection = 1;
+					global_context->config.prefer_donor_receptor_junctions = 0;
 				}
 				else if(strcmp("minMappedLength", long_options[option_index].name)==0) 
 				{
@@ -553,7 +570,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.maximise_sensitivity_indel = 1;
 					global_context->config.realignment_minimum_variant_distance = 1;
-					global_context->config.max_indel_length = 16;
+				//	global_context->config.max_indel_length = max(16, global_context->config.max_indel_length);
 				}
 				else if(strcmp("minVoteCutoff", long_options[option_index].name)==0)
 				{
@@ -577,7 +594,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	if(global_context->config.reported_multi_best_reads > 1 && ! global_context->config.report_multi_mapping_reads)
 		SUBREADprintf("WARNING: You required multi best alignments, but disallowed multi-mapping reads. You need to turn on the multi-mapping option.\n");
 
-	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && global_context->config.do_fusion_detection;
+	global_context->config.more_accurate_fusions = global_context->config.more_accurate_fusions && (global_context->config.do_fusion_detection || global_context->config.do_long_del_detection);
 	if(global_context->config.more_accurate_fusions)
 	{
 		global_context->config.high_quality_base_threshold = 999999;

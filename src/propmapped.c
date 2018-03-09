@@ -287,7 +287,9 @@ int init_PE_sambam(propMapped_context * context)
 {
 	char mac_rand[13];
 	mac_or_rand_str(mac_rand);
+	#ifdef MAKE_STANDALONE
 	srand(time(NULL));
+	#endif
 
 	int x1;
 	context->temp_file_prefix[0]=0;
@@ -327,6 +329,7 @@ int split_PE_sambam(propMapped_context * context)
 		if(!is_ret) break;
 		if(line_buffer[0]=='@') continue;
 
+		//SUBREADprintf("TELLO: %ld\n", ftello(in_fp -> os_file));
 		char * tok_tmp;
 		char * read_name = strtok_r (line_buffer,"\t", &tok_tmp);	// read name
 		char * flags_str = strtok_r (NULL ,"\t", &tok_tmp);
@@ -372,7 +375,7 @@ int prop_PE(propMapped_context * context)
 					fread(read_name,read_len,1,fp);
 					read_name[read_len]=0;
 					//assert(read_len == strlen(read_name));
-					//printf("RNAME=%s;\n", read_name);
+				//	SUBREADprintf("RNAME %s\n", read_name);
 					fread(&flags,1, sizeof(short), fp);
 
 					int new_OK; 
@@ -421,6 +424,7 @@ int prop_PE(propMapped_context * context)
 					}
 				}
 		}
+		//SUBREADprintf("BIN %d  ALLR %llu  MAPPED %llu  ELES=%ld\n", bini, context -> all_reads, context -> mapped_reads, rname_table -> numOfElements);
 		HashTableDestroy(rname_table);
 	}
 	return 0;

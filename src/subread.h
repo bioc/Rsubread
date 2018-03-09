@@ -486,6 +486,8 @@ struct explorer_record_t
 };
 
 FILE * f_subr_open(const char * fname, const char * mode);
+void myrand_srand(unsigned long long seed);
+int myrand_rand();
 #define abs(a) 	  ((a)>=0?(a):-(a))
 #define max(a,b)  ((a)<(b)?(b):(a))
 #define min(a,b)  ((a)>(b)?(b):(a))

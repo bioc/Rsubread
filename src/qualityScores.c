@@ -46,7 +46,7 @@ typedef struct {
 	FILE * result_fp;
 	union{
 		SamBam_FILE * sambam_reader;
-		gzFile * gzfq_reader;
+		gzFile gzfq_reader;
 		FILE * fq_reader; 
 	};
 

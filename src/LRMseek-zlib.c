@@ -1,23 +1,23 @@
 #include <assert.h> 
-#include "core.h"
-#include "seek-zlib.h"
+#include "LRMconfig.h"
+#include "LRMseek-zlib.h"
 
 #define SEEKGZ_INIT_TEXT_SIZE (1024*1024)
 #define SEEKGZ_BINBUFF_SIZE (1*1024*1024)
 
-unsigned long long seekgz_ftello(seekable_zfile_t * fp){
+unsigned long long LRMseekgz_ftello(seekable_zfile_t * fp){
 	unsigned long long ret = ftello(fp -> gz_fp);
 	ret -= fp -> stem.avail_in;
 	return ret;
 }
 
-unsigned int crc_pos(char * bin, int len){
+unsigned int LRMcrc_pos(char * bin, int len){
 	unsigned int crc0 = crc32(0, NULL, 0);
 	unsigned int CRC32 = crc32(crc0, (unsigned char *) bin, len);
 	return CRC32;
 }
 
-void seekgz_binreadmore(seekable_zfile_t * fp){
+void LRMseekgz_binreadmore(seekable_zfile_t * fp){
 	if(feof(fp->gz_fp))return;
 
 	assert(fp -> stem.avail_in >= 0);
@@ -34,12 +34,12 @@ void seekgz_binreadmore(seekable_zfile_t * fp){
 		if(readlen>0)
 			fp -> stem.avail_in += readlen;
 		fp -> stem.next_in = (unsigned char *)fp -> current_chunk_bin;
-		//SUBREADprintf("READIN: %d,  POS: %llu,  CRC:%u\n", fp -> stem.avail_in , ftello(fp -> gz_fp) , crc_pos(fp -> current_chunk_bin , fp -> stem.avail_in));
+		//SEEKZLIBprintf("READIN: %d,  POS: %llu,  CRC:%u\n", fp -> stem.avail_in , ftello(fp -> gz_fp) , crc_pos(fp -> current_chunk_bin , fp -> stem.avail_in));
 	}
 }
 
-int seekgz_bingetc(seekable_zfile_t * fp){
-	seekgz_binreadmore(fp);	
+int LRMseekgz_bingetc(seekable_zfile_t * fp){
+	LRMseekgz_binreadmore(fp);	
 	int ret = -1;
 
 	if(fp -> stem.avail_in > 0)
@@ -53,54 +53,54 @@ int seekgz_bingetc(seekable_zfile_t * fp){
 	
 }
 
-int seekgz_skip_header(seekable_zfile_t * fp, int tail_size){
+int LRMseekgz_skip_header(seekable_zfile_t * fp, int tail_size){
 	int id1, id2;
 
 	if(tail_size){
 		for(id1=0; id1<tail_size; id1++)
-			seekgz_bingetc(fp);
+			LRMseekgz_bingetc(fp);
 	}
-	id1 = seekgz_bingetc(fp);
-	id2 = seekgz_bingetc(fp);
+	id1 = LRMseekgz_bingetc(fp);
+	id2 = LRMseekgz_bingetc(fp);
 
 	if(id1 != 31 || id2 != 139){
-		//SUBREADprintf("header:%d,%d\n", id1, id2);
+		//SEEKZLIBprintf("header:%d,%d\n", id1, id2);
 		return 1;
 	}
 
-	 seekgz_bingetc(fp); // CM
-	int FLG= seekgz_bingetc(fp); // FLG 
-	seekgz_bingetc(fp);
-	seekgz_bingetc(fp);
-	seekgz_bingetc(fp);
-	seekgz_bingetc(fp);
-	seekgz_bingetc(fp); // XFL
-	seekgz_bingetc(fp); // OS
+	 LRMseekgz_bingetc(fp); // CM
+	int FLG= LRMseekgz_bingetc(fp); // FLG 
+	LRMseekgz_bingetc(fp);
+	LRMseekgz_bingetc(fp);
+	LRMseekgz_bingetc(fp);
+	LRMseekgz_bingetc(fp);
+	LRMseekgz_bingetc(fp); // XFL
+	LRMseekgz_bingetc(fp); // OS
 
 	//fprintf(stderr, "FLG=%d, XFL=%d\n" , FLG, XFL);
 
 	if(FLG & (1<<2)){	// FEXT
 		unsigned short XLEN=0;
-		XLEN = seekgz_bingetc(fp);
-		XLEN += seekgz_bingetc(fp)*256;
+		XLEN = LRMseekgz_bingetc(fp);
+		XLEN += LRMseekgz_bingetc(fp)*256;
 		for(; XLEN>0; XLEN--)
-			seekgz_bingetc(fp);
+			LRMseekgz_bingetc(fp);
 	}
 
 	for(id1 = 3; id1 <=4; id1++){
 		if(FLG & (1<<id1)){	// FNAME or FCOMMENT
 			while(1){
-				int namec = seekgz_bingetc(fp);
+				int namec = LRMseekgz_bingetc(fp);
 				if(0==namec) break;
 			}
 		}
 	}
 	if(FLG & (1<<1)){	// FCRC
-		seekgz_bingetc(fp);
-		seekgz_bingetc(fp);
+		LRMseekgz_bingetc(fp);
+		LRMseekgz_bingetc(fp);
 	}
 
-	fp -> next_block_file_offset = seekgz_ftello(fp);
+	fp -> next_block_file_offset = LRMseekgz_ftello(fp);
 	if(fp -> block_start_in_file_offset<1)
 		fp -> block_start_in_file_offset = fp -> next_block_file_offset;
 	fp -> next_block_file_bits = 0; 
@@ -111,10 +111,10 @@ int seekgz_skip_header(seekable_zfile_t * fp, int tail_size){
 	return 0;
 }
 
-int seekgz_decompress_next_chunk(seekable_zfile_t * fp);
-int seekgz_open(const char * fname, seekable_zfile_t * fp){
+int LRMseekgz_decompress_next_chunk(seekable_zfile_t * fp);
+int LRMseekgz_open(const char * fname, seekable_zfile_t * fp){
 	memset(fp, 0, sizeof(seekable_zfile_t));
-	fp -> gz_fp = f_subr_open(fname, "rb");
+	fp -> gz_fp = fopen(fname, "rb");
 	if(NULL==fp -> gz_fp)return -1;
 	fp -> current_chunk_bin = malloc(SEEKGZ_BINBUFF_SIZE);
 	fp -> current_chunk_txt = malloc(SEEKGZ_INIT_TEXT_SIZE);
@@ -127,14 +127,14 @@ int seekgz_open(const char * fname, seekable_zfile_t * fp){
 	fp -> stem.avail_in = 0;
 	fp -> stem.next_in = Z_NULL;
 	
-	int ret = seekgz_skip_header(fp,0);
+	int ret = LRMseekgz_skip_header(fp,0);
 	if(ret) return 1;
 	ret = inflateInit2(&(fp -> stem), -15);
 	if(ret) return 1;
 	return 0;
 }
 
-void seekgz_tell(seekable_zfile_t * fp, seekable_position_t * pos){
+void LRMseekgz_tell(seekable_zfile_t * fp, seekable_position_t * pos){
 	pos -> block_gzfile_offset = fp -> block_start_in_file_offset;
 	pos -> block_gzfile_bits = fp -> block_start_in_file_bits;
 	memcpy(pos -> dict_window, fp -> block_dict_window, fp -> block_dict_window_size); 
@@ -142,13 +142,13 @@ void seekgz_tell(seekable_zfile_t * fp, seekable_position_t * pos){
 	pos -> in_block_text_offset = fp -> in_block_offset;
 }
 
-void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
+void LRMseekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 	//#warning "COMMENT THIS LINE !!!!!"
 	//fprintf(stderr, "SEEK => %llu[%d] + %u ; WIN=%d CRC=%u\n", pos -> block_gzfile_offset, pos -> block_gzfile_bits, pos -> in_block_text_offset, pos -> block_dict_window_size, crc_pos( pos -> dict_window, pos -> block_dict_window_size));
 	fseeko(fp->gz_fp, pos -> block_gzfile_offset - (pos -> block_gzfile_bits?1:0), SEEK_SET);
 
 	if(Z_OK!=inflateReset(&fp->stem))
-		SUBREADprintf("FATAL: UNABLE TO INIT STREAM!\n\n\n");
+		SEEKZLIBprintf("FATAL: UNABLE TO INIT STREAM!\n\n\n");
 	if(pos -> block_dict_window_size>0){
 		if(pos -> block_gzfile_bits){
 			char nch = fgetc(fp->gz_fp);
@@ -156,7 +156,7 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 			inflatePrime(&fp->stem, pos -> block_gzfile_bits, nch>>(8-pos -> block_gzfile_bits));
 		}
 		if(Z_OK != inflateSetDictionary(&fp->stem, (unsigned char *)pos -> dict_window, pos -> block_dict_window_size))
-			SUBREADprintf("FATAL: UNABLE TO RESET STREAM!\n\n\n");
+			SEEKZLIBprintf("FATAL: UNABLE TO RESET STREAM!\n\n\n");
 	}
 
 	fp -> stem.avail_in = 0;
@@ -173,7 +173,7 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 
 	unsigned int chunk_end_block_offset=0;
 	while(1){
-		seekgz_decompress_next_chunk(fp);
+		LRMseekgz_decompress_next_chunk(fp);
 		if(fp -> internal_error) break;
 		chunk_end_block_offset += fp -> txt_buffer_used;
 
@@ -189,15 +189,15 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 
 
 
-int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
+int LRMseekgz_decompress_next_chunk(seekable_zfile_t * fp){
 	unsigned int this_chunk_size = 0;
 	int loaded_blocks = 0;
 	while(1){
-		seekgz_binreadmore(fp);
+		LRMseekgz_binreadmore(fp);
 		if(loaded_blocks > 0)
-			//SUBREADprintf("LOADED BLOCKS=%d\n", loaded_blocks);
+			//SEEKZLIBprintf("LOADED BLOCKS=%d\n", loaded_blocks);
 		if(fp -> txt_buffer_used >=  fp -> current_chunk_txt_size * 7 / 8){
-			//SUBREADprintf("TRE ALLOC CHUNK_TXT: %d -> %d\n", fp -> current_chunk_txt_size, (int)(fp -> current_chunk_txt_size*1.5));
+			//SEEKZLIBprintf("TRE ALLOC CHUNK_TXT: %d -> %d\n", fp -> current_chunk_txt_size, (int)(fp -> current_chunk_txt_size*1.5));
 			fp -> current_chunk_txt_size *= 1.5;
 			assert(fp -> current_chunk_txt_size < 3*512*1024*1024);
 			fp -> current_chunk_txt = realloc(fp -> current_chunk_txt, fp -> current_chunk_txt_size );
@@ -215,9 +215,9 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 		int is_chunk_end = 0;
 
 		//#warning "COMMENT NEXT LINE!!!!!!"
-		//fprintf(stderr,"INFLATING: INLEN=%d , OLEN=%d, POS=%lld, RET=%d, TOOL=%s\n", inlen , have, seekgz_ftello(fp), ret, zlibVersion());
+		//fprintf(stderr,"INFLATING: INLEN=%d , OLEN=%d, POS=%lld, RET=%d, TOOL=%s\n", inlen , have, LRMseekgz_ftello(fp), ret, zlibVersion());
 		if(ret != Z_OK && ret != Z_STREAM_END){ //any error
-			SUBREADprintf("FATAL: INFLATE-ERROR=%d   POS=%lld\n", ret, seekgz_ftello(fp));
+			SEEKZLIBprintf("FATAL: INFLATE-ERROR=%d   POS=%lld\n", ret, LRMseekgz_ftello(fp));
 			fp -> internal_error = 1;
 			return -1;
 		}
@@ -257,12 +257,12 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 			//fprintf(stderr,"CPY: %d -> %d [%d] ; PNTR=%d, NEWPNTR=%d, have=%d\n", two_src_start, two_dst_start, two_length, fp -> dict_window_pointer, new_pntr, have);
 			memcpy(fp -> dict_window + two_dst_start, fp -> current_chunk_txt + two_src_start, two_length);
 			fp -> dict_window_pointer = new_pntr;
-			fp -> dict_window_used = min(fp -> dict_window_used + have, SEEKGZ_ZLIB_WINDOW_SIZE);
+			fp -> dict_window_used = SEEKZLIBmin(fp -> dict_window_used + have, SEEKGZ_ZLIB_WINDOW_SIZE);
 
 			is_chunk_end = (fp -> stem.data_type & 128) && !(fp -> stem.data_type & 64);
 			if(is_chunk_end){
 				fp -> is_the_last_chunk = 1;
-				unsigned long long file_pos_after_avail = seekgz_ftello(fp);
+				unsigned long long file_pos_after_avail = LRMseekgz_ftello(fp);
 				fp -> next_block_file_offset = file_pos_after_avail;
 				fp -> next_block_file_bits = fp->stem.data_type & 7;
 			}
@@ -274,7 +274,7 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 
 		if(Z_STREAM_END == ret || ((is_chunk_end || 0 == fp -> stem.avail_in) && fp -> txt_buffer_used >=10)){
 			if(Z_STREAM_END == ret){
-				seekgz_skip_header(fp, 8); 
+				LRMseekgz_skip_header(fp, 8); 
 				inflateReset(&fp->stem);
 			}
 			break;
@@ -283,7 +283,7 @@ int seekgz_decompress_next_chunk(seekable_zfile_t * fp){
 	return 0;
 }
 
-int seekgz_next_char(seekable_zfile_t * fp){
+int LRMseekgz_next_char(seekable_zfile_t * fp){
 	if(fp -> internal_error) return -1;
 	while(fp -> in_chunk_offset >= fp -> txt_buffer_used){
 		if(feof(fp -> gz_fp) && fp -> stem.avail_in < 10 )
@@ -291,7 +291,7 @@ int seekgz_next_char(seekable_zfile_t * fp){
 		else {
 			fp -> txt_buffer_used = 0;
 			fp -> in_chunk_offset = 0;
-			int decompress_ret = seekgz_decompress_next_chunk(fp);
+			int decompress_ret = LRMseekgz_decompress_next_chunk(fp);
 			if(decompress_ret) return -1;
 		}
 	}
@@ -321,7 +321,7 @@ int seekgz_next_char(seekable_zfile_t * fp){
 	return retc;
 }
 
-int seekgz_gets(seekable_zfile_t * fp, char * buf, int buf_size){
+int LRMseekgz_gets(seekable_zfile_t * fp, char * buf, int buf_size){
 	int i=0;
 	buf[0]=0;
 	while(1){
@@ -329,7 +329,7 @@ int seekgz_gets(seekable_zfile_t * fp, char * buf, int buf_size){
 			buf[i]=0;
 			return i;
 		}
-		int nch = seekgz_next_char(fp);
+		int nch = LRMseekgz_next_char(fp);
 		if(nch<0 || nch == '\n'){
 			if(i<1 && nch <0) return 0;
 			buf[i] = '\n';
@@ -339,60 +339,8 @@ int seekgz_gets(seekable_zfile_t * fp, char * buf, int buf_size){
 	}
 }
 
-void seekgz_close(seekable_zfile_t * fp){
+void LRMseekgz_close(seekable_zfile_t * fp){
 	fclose(fp -> gz_fp);
 	free(fp -> current_chunk_txt);
 	free(fp -> current_chunk_bin);
-}
-
-int autozip_open(const char * fname, autozip_fp * fp){
-	int ret = -1;
-	memset(fp, 0, sizeof(autozip_fp));
-	strcpy(fp -> filename, fname);
-
-	FILE * tstfp = fopen(fname,"r");
-	if(!tstfp) return ret;
-
-	int cc1, cc2;
-	cc1 = fgetc(tstfp);
-	cc2 = fgetc(tstfp);
-
-	if(cc2 == 0x8b && cc1 == 0x1f){
-		fclose(tstfp);
-		fp -> is_plain = 0;
-		int iret = seekgz_open(fname, &fp -> gz_fp);
-		if(iret >= 0) ret = 1;
-		else ret = -1;
-	}else{
-		fseek(tstfp, 0, 0);
-		fp -> plain_fp = tstfp;
-		fp -> is_plain = 1;
-		ret = 0;
-	}
-	return ret;
-}
-
-void autozip_close(autozip_fp * fp){
-	if(fp -> is_plain) fclose(fp -> plain_fp);
-	else seekgz_close(&fp -> gz_fp);
-} 
-
-int autozip_gets(autozip_fp * fp, char * buf, int buf_size){
-	int ret = 0;
-	if(fp -> is_plain) {
-		char * retc = fgets(buf, buf_size, fp -> plain_fp);
-		if(retc == NULL) ret = 0;
-		else ret = strlen(buf);
-	}else{
-		ret = seekgz_gets(&fp -> gz_fp, buf, buf_size);
-	}
-	return ret;
-}
-
-void autozip_rewind(autozip_fp * fp){
-	char fname [MAX_FILE_NAME_LENGTH+1];
-	strcpy(fname, fp -> filename);
-
-	autozip_close(fp);
-	autozip_open(fname, fp);
 }

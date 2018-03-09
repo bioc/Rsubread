@@ -215,6 +215,7 @@ typedef struct{
 
 	// subfusion
 	int do_fusion_detection;
+	int do_long_del_detection;
 	int do_structural_variance_detection;
 	int prefer_donor_receptor_junctions;
 	int more_accurate_fusions;

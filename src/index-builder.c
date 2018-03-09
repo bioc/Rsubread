@@ -1047,7 +1047,6 @@ int main_buildindex(int argc,char ** argv)
 				IS_COLOR_SPACE = 1;
 				break;
 			case 'M':
-				IS_FORCED_ONE_BLOCK = 0;
 				memory_limit = atoi(optarg);
 				break;
 			case 'f':

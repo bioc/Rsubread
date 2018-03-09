@@ -178,8 +178,8 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 		current_bucket->space_size = new_bucket_length;
 	}
 	return 0;
-
 }
+
 int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_small_table)
 {
 	int new_bucket_length;
@@ -190,11 +190,12 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 
 	if (current_bucket->space_size<1)
 	{
+		int randv = myrand_rand();
 		if(is_small_table)
 			//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.5+3.*pow((rand()*1./RAND_MAX),30)));
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.5+3.*pow(randv * 1./RAND_MAX,30)));
 		else
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.+3.*pow((rand()*1./RAND_MAX),30)));
+			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1. +3.*pow(randv * 1./RAND_MAX,30)));
 
 
 	//	printf("NS1=%d\nNS2=%d\n", new_bucket_length, new_bucket_length);
@@ -233,7 +234,7 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 	}
 	else
 	{
-		int test_start = rand() % the_table-> buckets_number;
+		int test_start = myrand_rand() % the_table-> buckets_number;
 		int i;
 		int need_allowc = 1;
 		for (i =test_start; i<test_start+10000; i++)
@@ -241,7 +242,7 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 			if (i==bucket_no)continue;
 			if (i>=the_table-> buckets_number)
 			{
-				test_start = rand() % the_table-> buckets_number;
+				test_start = myrand_rand() % the_table-> buckets_number;
 				i = test_start;
 				continue;
 			} 
@@ -442,9 +443,9 @@ int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 	if(occurance >= limit) 
 	{
 
-		if(rand()%32768 < replace_prob)
+		if(myrand_rand()%32768 < replace_prob)
 			return 1;
-		int replacement_id = rand()%occurance;
+		int replacement_id = myrand_rand()%occurance;
 		occurance = 0;
 		for(xk1=0; xk1<current_bucket->current_items ; xk1++)
 			if(current_bucket->item_keys[xk1]==key)
@@ -707,7 +708,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 						test_max += 1;
 						vote->votes[offsetX][i] = test_max;
-						vote->quality[offsetX][i] += quality;
 						if (offset_from_5 <  vote->coverage_start [offsetX][i])
 							vote->coverage_start [offsetX][i] = offset_from_5;
 						if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
@@ -730,7 +730,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 					vote -> items[offsetX] ++;
 					dat[i] = kv;
 					vote->votes[offsetX][i]=1;
-					vote->quality[offsetX][i]=quality;
 					vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
 					vote->coverage_start [offsetX][i] = offset_from_5;
 					vote->coverage_end [offsetX][i] = offset_from_5+16;
@@ -762,56 +761,68 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 					for (i=0;i<datalen;i++)
 					{
-
-						if((!WITHOUT_CLUSTER_ORDERING ) && subread_number + 1 <= vote -> last_subread_cluster[offsetX][i])
-							continue;
-
 						int di = dat[i];
 						int dist0 = kv-di;
-						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
-						{
-							if(is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND)))
-							{
-								gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-								test_max += 1;
-								vote -> votes[offsetX][i] = test_max;
-								vote -> quality[offsetX][i] += quality;
-
-
-								/*
-								if (offset_from_5 <  vote->coverage_start [offsetX][i])
-								{
-									vote->coverage_start [offsetX][i] = offset_from_5;
-								}*/
-								if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
-								{
-									vote->coverage_end [offsetX][i] = offset_from_5+16;
-								}
-
-								int toli =  vote -> toli[offsetX][i];
-
-								if (dist0 !=  vote->current_indel_cursor[offsetX][i])
-								{
-									toli +=3;
-									if (toli < indel_tolerance*3)
-									{
-										vote -> toli[offsetX][i] = toli;
-										vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-										vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-										vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-											
-										if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-									}
-									vote->current_indel_cursor [offsetX][i] = (char)dist0;
-								}
-								else
-									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-
-								vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
-
-								vote->max_vote = max(vote->max_vote , test_max);
-								i = 9999999;
+						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance && is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND))) {
+							int toli =  vote -> toli[offsetX][i];
+	
+							if(di >= 46494104 && di <= 46496104 ){
+								SUBREADprintf("VOTES: at %u, subread_no = %d , last_cluster = %d , toli = %d\n", di, subread_number , vote -> last_subread_cluster[offsetX][i] , toli);
 							}
+
+							if( toli > 0 && subread_number + 1 == vote -> last_subread_cluster[offsetX][i] ){
+								int move_dist = 0;
+								if( toli >=3 ) move_dist = vote -> indel_recorder[offsetX][i][toli-3+2];
+								int new_dist = move_dist;
+								move_dist -= vote -> indel_recorder[offsetX][i][toli+2];
+								new_dist -= dist0;
+								if(abs(move_dist) > abs(new_dist)){
+									toli -= 3;
+									vote -> toli[offsetX][i] = toli;
+									vote -> last_subread_cluster[offsetX][i]--;
+									vote -> votes[offsetX][i] --;
+								}
+							}
+							if((!WITHOUT_CLUSTER_ORDERING ) && subread_number + 1 <= vote -> last_subread_cluster[offsetX][i])
+								continue;
+
+
+							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+							test_max += 1;
+							vote -> votes[offsetX][i] = test_max;
+
+							/*
+							if (offset_from_5 <  vote->coverage_start [offsetX][i])
+							{
+								vote->coverage_start [offsetX][i] = offset_from_5;
+							}*/
+							if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
+							{
+								vote->coverage_end [offsetX][i] = offset_from_5+16;
+							}
+
+
+							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
+							{
+								toli +=3;
+								if (toli < indel_tolerance*3)
+								{
+									vote -> toli[offsetX][i] = toli;
+									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
+									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
+										
+									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+								}
+								vote->current_indel_cursor [offsetX][i] = (char)dist0;
+							}
+							else
+								vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
+
+							vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
+
+							vote->max_vote = max(vote->max_vote , test_max);
+							i = 9999999;
 						}
 					}
 					if (i>=9999999){
@@ -833,7 +844,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						vote -> items[offsetX2] ++;
 						dat2[datalen2] = kv;
 						vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
-						vote -> quality[offsetX2][datalen2]=quality;
 						vote -> votes[offsetX2][datalen2]=1;
 						vote -> toli[offsetX2][datalen2]=0;
 						vote -> last_subread_cluster[offsetX2][datalen2] = subread_number + 1;
@@ -941,24 +951,44 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 					for (i=0;i<datalen;i++)
 					{
-						if((!WITHOUT_CLUSTER_ORDERING ) &&  subread_number + 1 <= vote -> last_subread_cluster[offsetX][i]) continue;
 						int di = dat[i];
 						int dist0 = kv-di;
-						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance )
+
+	
+						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance && is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND)) )
 						{
+
+//							if(di >= 46494104 && di <= 46496104 ){
+//								SUBREADprintf("VOTES: at %u, subread_no = %d , last_cluster = %d , toli = %d\n", di, subread_number , vote -> last_subread_cluster[offsetX][i] , toli);
+//							}
+
+							int toli =  vote -> toli[offsetX][i];
+							if( toli > 0 && subread_number + 1 == vote -> last_subread_cluster[offsetX][i] ){
+								int move_dist = 0;
+								if( toli >=3 ) move_dist = vote -> indel_recorder[offsetX][i][toli-3+2];
+								int new_dist = move_dist;
+								move_dist -= vote -> indel_recorder[offsetX][i][toli+2];
+								new_dist -= dist0;
+								if(abs(move_dist) > abs(new_dist)){
+									toli -= 3;
+									vote -> toli[offsetX][i] = toli;
+									vote -> last_subread_cluster[offsetX][i]--;
+									vote -> votes[offsetX][i] --;
+								}
+							}
+
+							if((!WITHOUT_CLUSTER_ORDERING ) &&  subread_number + 1 <= vote -> last_subread_cluster[offsetX][i]) continue;
+
 							//SUBREADprintf("IIX = %d, BASE=%u, change_dist=%d, subread=#%d\n", iix, dat[i], dist0, subread_number);
-							if(is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND)))
-							{
+							if(1){
 
 								gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 								test_max += 1;
 								vote -> votes[offsetX][i] = test_max;
-								vote -> quality[offsetX][i] += quality;
 
 								if (offset +16 > vote->coverage_end [offsetX][i])
 									vote->coverage_end [offsetX][i] = offset+16;
 
-								int toli =  vote -> toli[offsetX][i];
 
 								if (dist0 !=  vote->current_indel_cursor[offsetX][i])
 								{
@@ -999,7 +1029,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						vote -> items[offsetX2] ++;
 						dat2[datalen2] = kv;
 						vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
-						vote -> quality[offsetX2][datalen2]=quality;
 						vote -> votes[offsetX2][datalen2]=1;
 						vote -> toli[offsetX2][datalen2]=0;
 
@@ -1035,7 +1064,6 @@ void select_best_vote(gene_vote_t * vote)
 			if(vote -> votes[i][j] == vote->max_vote)
 			{
 				vote -> max_position = vote -> pos[i][j];
-				vote -> max_quality = vote -> quality[i][j];
 				vote -> max_mask = vote -> masks[i][j];
 				vote -> max_coverage_start = vote->coverage_start[i][j];
 				vote -> max_coverage_end = vote->coverage_end[i][j];

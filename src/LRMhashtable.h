@@ -6,11 +6,11 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.13 2018/03/09 00:13:00 cvs Exp $
+ * $Id: LRMhashtable.h,v 1.1 2018/03/08 04:32:16 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
-#ifndef _HASHTABLE_H
-#define _HASHTABLE_H
+#ifndef _HASHTABLE_H_LRM
+#define _HASHTABLE_H_LRM
 
 /* These structs should not be accessed directly from user code.
  * All access should be via the public functions declared below. */
@@ -48,241 +48,239 @@ typedef struct {
 	void (*elemDeallocator)(void *elem);
 } ArrayList;
 
-ArrayList * ArrayListCreate(int init_capacity);
-void ArrayListDestroy(ArrayList * list);
-void * ArrayListGet(ArrayList * list, long n);
-int ArrayListPush(ArrayList * list, void * new_elem);
-int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
-void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
-void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem));
+ArrayList * LRMArrayListCreate(int init_capacity);
+void LRMArrayListDestroy(ArrayList * list);
+void * LRMArrayListGet(ArrayList * list, long n);
+int LRMArrayListPush(ArrayList * list, void * new_elem);
+void LRMArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
 
 
-void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
+void LRMHashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableCreate() - creates a new HashTable
+ *      LRMHashTableCreate() - creates a new LRMHashTable
  *  DESCRIPTION:
- *      Creates a new HashTable.  When finished with this HashTable, it
- *      should be explicitly destroyed by calling the HashTableDestroy()
+ *      Creates a new LRMHashTable.  When finished with this LRMHashTable, it
+ *      should be explicitly destroyed by calling the LRMHashTableDestroy()
  *      function.
  *  EFFICIENCY:
  *      O(1)
  *  ARGUMENTS:
- *      numOfBuckets - the number of buckets to start the HashTable out with.
+ *      numOfBuckets - the number of buckets to start the LRMHashTable out with.
  *                     Must be greater than zero, and should be prime.
  *                     Ideally, the number of buckets should between 1/5
  *                     and 1 times the expected number of elements in the
- *                     HashTable.  Values much more or less than this will
+ *                     LRMHashTable.  Values much more or less than this will
  *                     result in wasted memory or decreased performance
- *                     respectively.  The number of buckets in a HashTable
+ *                     respectively.  The number of buckets in a LRMHashTable
  *                     can be re-calculated to an appropriate number by
- *                     calling the HashTableRehash() function once the
- *                     HashTable has been populated.  The number of buckets
- *                     in a HashTable may also be re-calculated
+ *                     calling the LRMHashTableRehash() function once the
+ *                     LRMHashTable has been populated.  The number of buckets
+ *                     in a LRMHashTable may also be re-calculated
  *                     automatically if the ratio of elements to buckets
- *                     passes the thresholds set by HashTableSetIdealRatio().
+ *                     passes the thresholds set by LRMHashTableSetIdealRatio().
  *  RETURNS:
- *      HashTable    - a new Hashtable, or NULL on error
+ *      LRMHashTable    - a new LRMHashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
-HashTable *HashTableCreate(long numOfBuckets);
+HashTable *LRMHashTableCreate(long numOfBuckets);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableDestroy() - destroys an existing HashTable
+ *      LRMHashTableDestroy() - destroys an existing LRMHashTable
  *  DESCRIPTION:
- *      Destroys an existing HashTable.
+ *      Destroys an existing LRMHashTable.
  *  EFFICIENCY:
  *      O(n)
  *  ARGUMENTS:
- *      hashTable    - the HashTable to destroy
+ *      hashTable    - the LRMHashTable to destroy
  *  RETURNS:
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableDestroy(HashTable *hashTable);
+void LRMHashTableDestroy(HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableContainsKey() - checks the existence of a key in a HashTable
+ *      LRMHashTableContainsKey() - checks the existence of a key in a LRMHashTable
  *  DESCRIPTION:
- *      Determines whether or not the specified HashTable contains the
+ *      Determines whether or not the specified LRMHashTable contains the
  *      specified key.  Uses the comparison function specified by
- *      HashTableSetKeyComparisonFunction().
+ *      LRMHashTableSetKeyComparisonFunction().
  *  EFFICIENCY:
  *      O(1), assuming a good hash function and element-to-bucket ratio
  *  ARGUMENTS:
- *      hashTable    - the HashTable to search
+ *      hashTable    - the LRMHashTable to search
  *      key          - the key to search for
  *  RETURNS:
- *      bool         - whether or not the specified HashTable contains the
+ *      bool         - whether or not the specified LRMHashTable contains the
  *                     specified key.
 \*--------------------------------------------------------------------------*/
 
-int HashTableContainsKey(const HashTable *hashTable, const void *key);
+int LRMHashTableContainsKey(const HashTable *hashTable, const void *key);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableContainsValue()
- *                         - checks the existence of a value in a HashTable
+ *      LRMHashTableContainsValue()
+ *                         - checks the existence of a value in a LRMHashTable
  *  DESCRIPTION:
- *      Determines whether or not the specified HashTable contains the
- *      specified value.  Unlike HashTableContainsKey(), this function is
+ *      Determines whether or not the specified LRMHashTable contains the
+ *      specified value.  Unlike LRMHashTableContainsKey(), this function is
  *      not very efficient, since it has to scan linearly looking for a
  *      match.  Uses the comparison function specified by
- *      HashTableSetValueComparisonFunction().
+ *      LRMHashTableSetValueComparisonFunction().
  *  EFFICIENCY:
  *      O(n)
  *  ARGUMENTS:
- *      hashTable    - the HashTable to search
+ *      hashTable    - the LRMHashTable to search
  *      value        - the value to search for
  *  RETURNS:
- *      bool         - whether or not the specified HashTable contains the
+ *      bool         - whether or not the specified LRMHashTable contains the
  *                     specified value.
 \*--------------------------------------------------------------------------*/
 
-int HashTableContainsValue(const HashTable *hashTable, const void *value);
+int LRMHashTableContainsValue(const HashTable *hashTable, const void *value);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTablePut() - adds a key/value pair to a HashTable
+ *      LRMHashTablePut() - adds a key/value pair to a LRMHashTable
  *  DESCRIPTION:
- *      Adds the specified key/value pair to the specified HashTable.  If
- *      the key already exists in the HashTable (determined by the comparison
- *      function specified by HashTableSetKeyComparisonFunction()), its value
+ *      Adds the specified key/value pair to the specified LRMHashTable.  If
+ *      the key already exists in the LRMHashTable (determined by the comparison
+ *      function specified by LRMHashTableSetKeyComparisonFunction()), its value
  *      is replaced by the new value.  May trigger an auto-rehash (see
- *      HashTableSetIdealRatio()).  It is illegal to specify NULL as the
+ *      LRMHashTableSetIdealRatio()).  It is illegal to specify NULL as the
  *      key or value.
  *  EFFICIENCY:
  *      O(1), assuming a good hash function and element-to-bucket ratio
  *  ARGUMENTS:
- *      hashTable    - the HashTable to add to
+ *      hashTable    - the LRMHashTable to add to
  *      key          - the key to add or whose value to replace
  *      value        - the value associated with the key
  *  RETURNS:
  *      err          - 0 if successful, -1 if an error was encountered
 \*--------------------------------------------------------------------------*/
 
-int HashTablePut(HashTable *hashTable, const void *key, void *value);
-int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key);
+int LRMHashTablePut(HashTable *hashTable, const void *key, void *value);
+int LRMHashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableGet() - retrieves the value of a key in a HashTable
+ *      LRMHashTableGet() - retrieves the value of a key in a LRMHashTable
  *  DESCRIPTION:
- *      Retrieves the value of the specified key in the specified HashTable.
+ *      Retrieves the value of the specified key in the specified LRMHashTable.
  *      Uses the comparison function specified by
- *      HashTableSetKeyComparisonFunction().
+ *      LRMHashTableSetKeyComparisonFunction().
  *  EFFICIENCY:
  *      O(1), assuming a good hash function and element-to-bucket ratio
  *  ARGUMENTS:
- *      hashTable    - the HashTable to search
+ *      hashTable    - the LRMHashTable to search
  *      key          - the key whose value is desired
  *  RETURNS:
  *      void *       - the value of the specified key, or NULL if the key
- *                     doesn't exist in the HashTable
+ *                     doesn't exist in the LRMHashTable
 \*--------------------------------------------------------------------------*/
 
-void *HashTableGet(const HashTable *hashTable, const void *key);
+void * LRMHashTableGet(const HashTable *hashTable, const void *key);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableRemove() - removes a key/value pair from a HashTable
+ *      LRMHashTableRemove() - removes a key/value pair from a LRMHashTable
  *  DESCRIPTION:
  *      Removes the key/value pair identified by the specified key from the
- *      specified HashTable if the key exists in the HashTable.  May trigger
- *      an auto-rehash (see HashTableSetIdealRatio()).
+ *      specified LRMHashTable if the key exists in the LRMHashTable.  May trigger
+ *      an auto-rehash (see LRMHashTableSetIdealRatio()).
  *  EFFICIENCY:
  *      O(1), assuming a good hash function and element-to-bucket ratio
  *  ARGUMENTS:
- *      hashTable    - the HashTable to remove the key/value pair from
+ *      hashTable    - the LRMHashTable to remove the key/value pair from
  *      key          - the key specifying the key/value pair to be removed
  *  RETURNS:
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRemove(HashTable *hashTable, const void *key);
+void LRMHashTableRemove(HashTable *hashTable, const void *key);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableRemoveAll() - removes all key/value pairs from a HashTable
+ *      LRMHashTableRemoveAll() - removes all key/value pairs from a LRMHashTable
  *  DESCRIPTION:
- *      Removes all key/value pairs from the specified HashTable.  May trigger
- *      an auto-rehash (see HashTableSetIdealRatio()).
+ *      Removes all key/value pairs from the specified LRMHashTable.  May trigger
+ *      an auto-rehash (see LRMHashTableSetIdealRatio()).
  *  EFFICIENCY:
  *      O(n)
  *  ARGUMENTS:
- *      hashTable    - the HashTable to remove all key/value pairs from
+ *      hashTable    - the LRMHashTable to remove all key/value pairs from
  *  RETURNS:
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRemoveAll(HashTable *hashTable);
+void LRMHashTableRemoveAll(HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableIsEmpty() - determines if a HashTable is empty
+ *      LRMHashTableIsEmpty() - determines if a LRMHashTable is empty
  *  DESCRIPTION:
- *      Determines whether or not the specified HashTable contains any
+ *      Determines whether or not the specified LRMHashTable contains any
  *      key/value pairs.
  *  EFFICIENCY:
  *      O(1)
  *  ARGUMENTS:
- *      hashTable    - the HashTable to check
+ *      hashTable    - the LRMHashTable to check
  *  RETURNS:
- *      bool         - whether or not the specified HashTable contains any
+ *      bool         - whether or not the specified LRMHashTable contains any
  *                     key/value pairs
 \*--------------------------------------------------------------------------*/
 
-int HashTableIsEmpty(const HashTable *hashTable);
+int LRMHashTableIsEmpty(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableSize() - returns the number of elements in a HashTable
+ *      LRMHashTableSize() - returns the number of elements in a LRMHashTable
  *  DESCRIPTION:
  *      Returns the number of key/value pairs that are present in the
- *      specified HashTable.
+ *      specified LRMHashTable.
  *  EFFICIENCY:
  *      O(1)
  *  ARGUMENTS:
- *      hashTable    - the HashTable whose size is requested
+ *      hashTable    - the LRMHashTable whose size is requested
  *  RETURNS:
  *      long         - the number of key/value pairs that are present in
- *                     the specified HashTable
+ *                     the specified LRMHashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableSize(const HashTable *hashTable);
+long LRMHashTableSize(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableGetNumBuckets() - returns the number of buckets in a HashTable
+ *      LRMHashTableGetNumBuckets() - returns the number of buckets in a LRMHashTable
  *  DESCRIPTION:
- *      Returns the number of buckets that are in the specified HashTable.
- *      This may change dynamically throughout the life of a HashTable if
+ *      Returns the number of buckets that are in the specified LRMHashTable.
+ *      This may change dynamically throughout the life of a LRMHashTable if
  *      automatic or manual rehashing is performed.
  *  EFFICIENCY:
  *      O(1)
  *  ARGUMENTS:
- *      hashTable    - the HashTable whose number of buckets is requested
+ *      hashTable    - the LRMHashTable whose number of buckets is requested
  *  RETURNS:
  *      long         - the number of buckets that are in the specified
- *                     HashTable
+ *                     LRMHashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableGetNumBuckets(const HashTable *hashTable);
+long LRMHashTableGetNumBuckets(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableSetKeyComparisonFunction()
- *              - specifies the function used to compare keys in a HashTable
+ *      LRMHashTableSetKeyComparisonFunction()
+ *              - specifies the function used to compare keys in a LRMHashTable
  *  DESCRIPTION:
  *      Specifies the function used to compare keys in the specified
- *      HashTable.  The specified function should return zero if the two
+ *      LRMHashTable.  The specified function should return zero if the two
  *      keys are considered equal, and non-zero otherwise.  The default
  *      function is one that simply compares pointers.
  *  ARGUMENTS:
- *      hashTable    - the HashTable whose key comparison function is being
+ *      hashTable    - the LRMHashTable whose key comparison function is being
  *                     specified
  *      keycmp       - a function which returns zero if the two arguments
  *                     passed to it are considered "equal" keys and non-zero
@@ -291,20 +289,20 @@ long HashTableGetNumBuckets(const HashTable *hashTable);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetKeyComparisonFunction(HashTable *hashTable,
+void LRMHashTableSetKeyComparisonFunction(HashTable *hashTable,
                              int (*keycmp)(const void *key1, const void *key2));
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableSetValueComparisonFunction()
- *              - specifies the function used to compare values in a HashTable
+ *      LRMHashTableSetValueComparisonFunction()
+ *              - specifies the function used to compare values in a LRMHashTable
  *  DESCRIPTION:
  *      Specifies the function used to compare values in the specified
- *      HashTable.  The specified function should return zero if the two
+ *      LRMHashTable.  The specified function should return zero if the two
  *      values are considered equal, and non-zero otherwise.  The default
  *      function is one that simply compares pointers.
  *  ARGUMENTS:
- *      hashTable    - the HashTable whose value comparison function is being
+ *      hashTable    - the LRMHashTable whose value comparison function is being
  *                     specified
  *      valuecmp     - a function which returns zero if the two arguments
  *                     passed to it are considered "equal" values and non-zero
@@ -313,51 +311,51 @@ void HashTableSetKeyComparisonFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetValueComparisonFunction(HashTable *hashTable,
+void LRMHashTableSetValueComparisonFunction(HashTable *hashTable,
                        int (*valuecmp)(const void *value1, const void *value2));
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableSetHashFunction()
- *              - specifies the hash function used by a HashTable
+ *      LRMHashTableSetHashFunction()
+ *              - specifies the hash function used by a LRMHashTable
  *  DESCRIPTION:
  *      Specifies the function used to determine the hash value for a key
- *      in the specified HashTable (before modulation).  An ideal hash
+ *      in the specified LRMHashTable (before modulation).  An ideal hash
  *      function is one which is easy to compute and approximates a
  *      "random" function.  The default function is one that works
- *      relatively well for pointers.  If the HashTable keys are to be
+ *      relatively well for pointers.  If the LRMHashTable keys are to be
  *      strings (which is probably the case), then this default function
  *      will not suffice, in which case consider using the provided
- *      HashTableStringHashFunction() function.
+ *      LRMHashTableStringHashFunction() function.
  *  ARGUMENTS:
- *      hashTable    - the HashTable whose hash function is being specified
+ *      hashTable    - the LRMHashTable whose hash function is being specified
  *      hashFunction - a function which returns an appropriate hash code
  *                     for a given key
  *  RETURNS:
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetHashFunction(HashTable *hashTable,
+void LRMHashTableSetHashFunction(HashTable *hashTable,
                               unsigned long (*hashFunction)(const void *key));
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableRehash() - reorganizes a HashTable to be more efficient
+ *      LRMHashTableRehash() - reorganizes a LRMHashTable to be more efficient
  *  DESCRIPTION:
- *      Reorganizes a HashTable to be more efficient.  If a number of
- *      buckets is specified, the HashTable is rehashed to that number of
- *      buckets.  If 0 is specified, the HashTable is rehashed to a number
+ *      Reorganizes a LRMHashTable to be more efficient.  If a number of
+ *      buckets is specified, the LRMHashTable is rehashed to that number of
+ *      buckets.  If 0 is specified, the LRMHashTable is rehashed to a number
  *      of buckets which is automatically calculated to be a prime number
  *      that achieves (as closely as possible) the ideal element-to-bucket 
- *      ratio specified by the HashTableSetIdealRatio() function.
+ *      ratio specified by the LRMHashTableSetIdealRatio() function.
  *  EFFICIENCY:
  *      O(n)
  *  ARGUMENTS:
- *      hashTable    - the HashTable to be reorganized
- *      numOfBuckets - the number of buckets to rehash the HashTable to.
+ *      hashTable    - the LRMHashTable to be reorganized
+ *      numOfBuckets - the number of buckets to rehash the LRMHashTable to.
  *                     Should be prime.  Ideally, the number of buckets
  *                     should be between 1/5 and 1 times the expected
- *                     number of elements in the HashTable.  Values much
+ *                     number of elements in the LRMHashTable.  Values much
  *                     more or less than this will result in wasted memory
  *                     or decreased performance respectively.  If 0 is
  *                     specified, an appropriate number of buckets is
@@ -366,27 +364,27 @@ void HashTableSetHashFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRehash(HashTable *hashTable, long numOfBuckets);
+void LRMHashTableRehash(HashTable *hashTable, long numOfBuckets);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableSetIdealRatio()
- *              - sets the ideal element-to-bucket ratio of a HashTable
+ *      LRMHashTableSetIdealRatio()
+ *              - sets the ideal element-to-bucket ratio of a LRMHashTable
  *  DESCRIPTION:
  *      Sets the ideal element-to-bucket ratio, as well as the lower and
- *      upper auto-rehash thresholds, of the specified HashTable.  Note
+ *      upper auto-rehash thresholds, of the specified LRMHashTable.  Note
  *      that this function doesn't actually perform a rehash.
  *
  *      The default values for these properties are 3.0, 0.0 and 15.0
  *      respectively.  This is likely fine for most situations, so there
  *      is probably no need to call this function.
  *  ARGUMENTS:
- *      hashTable    - a HashTable
+ *      hashTable    - a LRMHashTable
  *      idealRatio   - the ideal element-to-bucket ratio.  When a rehash
  *                     occurs (either manually via a call to the
- *                     HashTableRehash() function or automatically due the
+ *                     LRMHashTableRehash() function or automatically due the
  *                     the triggering of one of the thresholds below), the
- *                     number of buckets in the HashTable will be
+ *                     number of buckets in the LRMHashTable will be
  *                     recalculated to be a prime number that achieves (as
  *                     closely as possible) this ideal ratio.  Must be a
  *                     positive number.
@@ -410,60 +408,58 @@ void HashTableRehash(HashTable *hashTable, long numOfBuckets);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetIdealRatio(HashTable *hashTable, float idealRatio,
+void LRMHashTableSetIdealRatio(HashTable *hashTable, float idealRatio,
                             float lowerRehashThreshold,
                             float upperRehashThreshold);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableSetDeallocationFunctions()
- *              - sets the key and value deallocation functions of a HashTable
+ *      LRMHashTableSetDeallocationFunctions()
+ *              - sets the key and value deallocation functions of a LRMHashTable
  *  DESCRIPTION:
  *      Sets the key and value deallocation functions of the specified
- *      HashTable.  This determines what happens to a key or a value when it
- *      is removed from the HashTable.  If the deallocation function is NULL
+ *      LRMHashTable.  This determines what happens to a key or a value when it
+ *      is removed from the LRMHashTable.  If the deallocation function is NULL
  *      (the default if this function is never called), its reference is
  *      simply dropped and it is up to the calling program to perform the
  *      proper memory management.  If the deallocation function is non-NULL,
  *      it is called to free the memory used by the object.  E.g., for simple
  *      objects, an appropriate deallocation function may be free().
  *
- *      This affects the behaviour of the HashTableDestroy(), HashTablePut(),
- *      HashTableRemove() and HashTableRemoveAll() functions.
+ *      This affects the behaviour of the LRMHashTableDestroy(), LRMHashTablePut(),
+ *      LRMHashTableRemove() and LRMHashTableRemoveAll() functions.
  *  ARGUMENTS:
- *      hashTable    - a HashTable
+ *      hashTable    - a LRMHashTable
  *      keyDeallocator
  *                   - if non-NULL, the function to be called when a key is
- *                     removed from the HashTable.
+ *                     removed from the LRMHashTable.
  *      valueDeallocator
  *                   - if non-NULL, the function to be called when a value is
- *                     removed from the HashTable.
+ *                     removed from the LRMHashTable.
  *  RETURNS:
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetDeallocationFunctions(HashTable *hashTable,
+void LRMHashTableSetDeallocationFunctions(HashTable *hashTable,
                                        void (*keyDeallocator)(void *key),
                                        void (*valueDeallocator)(void *value));
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
- *      HashTableStringHashFunction() - a good hash function for strings
+ *      LRMHashTableStringHashFunction() - a good hash function for strings
  *  DESCRIPTION:
  *      A hash function that is appropriate for hashing strings.  Note that
  *      this is not the default hash function.  To make it the default hash
- *      function, call HashTableSetHashFunction(HashTableStringHashFunction).
+ *      function, call LRMHashTableSetHashFunction(HashTableStringHashFunction).
  *  ARGUMENTS:
  *      key    - the key to be hashed
  *  RETURNS:
  *      long   - the unmodulated hash value of the key
 \*--------------------------------------------------------------------------*/
 
-unsigned long HashTableStringHashFunction(const void *key);
+unsigned long LRMHashTableStringHashFunction(const void *key);
 
-void free_values_destroy(HashTable * tab);
-int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, int replace_key, int dealloc_key, int dealloc_value);
-
+void LRMfree_values_destroy(HashTable * tab);
 #endif /* _HASHTABLE_H */
 
 

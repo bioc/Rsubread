@@ -108,6 +108,11 @@ int main_read_repair(int argc, char ** argv)
 		STANDALONE_exit(-1);
 	}
 
+	if(!is_paired_end_BAM(in_BAM_file)){
+		SUBREADprintf("Error: the input file contains single-end reads. Repair can only process paired-end reads.\n");
+		STANDALONE_exit(-1);
+	}
+
 	char mac_rand[13];
 	mac_or_rand_str(mac_rand);
 

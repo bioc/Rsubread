@@ -406,7 +406,7 @@ void remove_sorted_neighbours(global_context_t * global_context)
 
 	merge_sort(sort_data, indel_context->total_events, event_neighbour_sort_compare, event_neighbour_sort_exchange, event_neighbour_sort_merge);
 
-	int xk2, position_delta, maxinum_removed_events = global_context-> config.do_fusion_detection? 9999999:1999999;
+	int xk2, position_delta, maxinum_removed_events =(global_context->  config.do_fusion_detection || global_context->  config.do_long_del_detection)? 9999999:1999999;
 
 	position_delta = 10;
 	int * to_be_removed_ids = malloc(sizeof(int) * (1+maxinum_removed_events)), to_be_removed_number=0;
@@ -477,7 +477,7 @@ void remove_neighbour(global_context_t * global_context)
 	int xk1;
 	int * to_be_removed_ids;
 	int to_be_removed_number = 0, all_junctions = 0;
-	int maxinum_removed_events = global_context-> config.do_fusion_detection? 9999999:1999999;
+	int maxinum_removed_events =(global_context->  config.do_fusion_detection || global_context->  config.do_long_del_detection)? 9999999:1999999;
 
 
 	to_be_removed_ids = malloc(sizeof(int) * (1+maxinum_removed_events));
@@ -564,7 +564,7 @@ void remove_neighbour(global_context_t * global_context)
 						}
 					}
 
-				if(1 && global_context->config.do_fusion_detection && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
+				if((1 && global_context-> config.do_fusion_detection || 1 && global_context-> config.do_long_del_detection) && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
 				{
 					for(xk2=-10 ; xk2 < 10 ; xk2++)
 					{
@@ -1913,9 +1913,11 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 
 				dyna_steps = core_dynamic_align(global_context, thread_context, read_text + last_correct_base, first_correct_base - last_correct_base, voting_position + last_correct_base + last_indel, movement_buffer, indels, read_name);
 
-
 				movement_buffer[dyna_steps]=0;
 
+				if(0 && FIXLENstrcmp("simulated.2467286", read_name) == 0){
+					SUBREADprintf("DYNAMIC: indels=%d, %s\n", indels, movement_buffer);
+				}
 
 				//#warning ">>>>>>> COMMENT NEXT BLOCK IN RELEASE <<<<<<<<"
 				if(0) {
@@ -1943,7 +1945,6 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 					int mv=movement_buffer[x1];
 					if(mv==3) total_mismatch++;
 				}
-//	if(pair_number==4)printf("XK3==%d\n", total_mismatch);
 
 				if(total_mismatch<=2 || (global_context->config.maximise_sensitivity_indel && total_mismatch <= 2 ))
 					for(x1=0; x1<dyna_steps;x1++)
@@ -1960,24 +1961,9 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 							}
 							else if ( is_in_indel && (mv == 0 || mv == 3)  )
 							{
-								//if(pair_number == 17296)
-								//printf("R%d : NEW INDEL: %u; len = %d\n", is_second_read, indel_left_boundary - 1 , current_indel_len);
-								//#ifdef indel_debug
-								//#warning "=========== COMMENT THIS LINE ==============="
-								//printf("NEW INDEL: %u; len = %d\n", indel_left_boundary - 1 , current_indel_len);
-								//#endif
-
-								// let's test if it is ambiguous:
 								gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
 
-								//#warning ">>>>>>> COMMENT NEXT BLOCK IN RELEASE <<<<<<<<"
-								if(0 && FIXLENstrcmp("D00491:277:C89FUANXX:7:1110:20418:31541",read_name ) == 0){
-									SUBREADprintf("INDEL_DDADD: abs(I=%d); INDELS=%d; PN=%d; LOC=%ul READ_CUR=%d\n",i, current_indel_len, pair_number, indel_left_boundary-1, cursor_on_read);
-								}
-
-
 								int ambiguous_count=0;
-								//#warning " >>>>>>>> MAKE SURE DISABLING THE NEXT BLOCK IS HARMLESS <<<<<<<<<  "
 								if(0){
 									int ambiguous_i, best_matched_bases = match_chro(read_text + cursor_on_read - 6, current_value_index, indel_left_boundary - 6, 6, 0, global_context->config.space_type)  +
 												 match_chro(read_text + cursor_on_read - min(current_indel_len,0), current_value_index, indel_left_boundary + max(0, current_indel_len), 6, 0, global_context->config.space_type);
@@ -1993,6 +1979,9 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								{
 									int  old_event_id = -1;
 
+									if(0)if(indel_left_boundary >= 44438630 + 1210 - 200 && indel_left_boundary  <= 44438630 + 1210 + 200 && current_indel_len == 6){
+										SUBREADprintf("ADD AN INDEL: %s : %u ; len = %u\n", read_name, indel_left_boundary, current_indel_len);
+									}
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0, &old_event_id);
 									mark_gapped_read(current_result);
 
@@ -2285,7 +2274,7 @@ int write_indel_final_results(global_context_t * global_context)
 	FILE * ofp = NULL;
 
 	fn2 = malloc(MAX_FILE_NAME_LENGTH);
-	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.indel", global_context->config.output_prefix);
+	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.indel.vcf", global_context->config.output_prefix);
 
 	ofp = f_subr_open(fn2, "wb");
 
@@ -4418,8 +4407,6 @@ int finalise_long_insertions(global_context_t * global_context)
 
 void init_global_context(global_context_t * context)
 {
-	srand(time(NULL));
-
 	memset(context->module_contexts, 0, 5*sizeof(void *));
 	memset(&context->config, 0, sizeof(configuration_t));
 
@@ -4428,6 +4415,7 @@ void init_global_context(global_context_t * context)
 	context->config.report_sam_file = 1;
 	context->config.do_breakpoint_detection = 0;
 	context->config.do_fusion_detection = 0;
+	context->config.do_long_del_detection = 0;
 	context->config.do_structural_variance_detection = 0;
 	context->config.more_accurate_fusions = 1;
 	context->config.report_multi_mapping_reads = 0;
@@ -4542,7 +4530,7 @@ void init_global_context(global_context_t * context)
 	int seed_rand[2];
 	double double_time = miltime();
 	memcpy(seed_rand, &double_time, 2*sizeof(int));
-	srand(seed_rand[0]^seed_rand[1]);
+	myrand_srand(seed_rand[0]^seed_rand[1]);
 
 	context->config.max_indel_length = 5;
 	context->config.phred_score_format = FASTQ_PHRED33;

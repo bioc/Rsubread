@@ -159,4 +159,5 @@ void finalise_structural_variances(global_context_t * global_context);
 
 void debug_show_event(global_context_t* global_context, chromosome_event_t * event);
 void get_event_two_coordinates(global_context_t * global_context, unsigned int event_no, char ** small_chro, int * small_pos, unsigned int * small_abs, char ** large_chro,  int * large_pos, unsigned int * large_abs);
+int get_offset_maximum_chro_pos(global_context_t * global_context, thread_context_t * thread_context, unsigned int linear);
 #endif

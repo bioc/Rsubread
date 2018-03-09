@@ -187,4 +187,5 @@ char cigar_op_char(int ch);
 void SamBam_read2bin(char * read_txt, char * read_bin);
 
 int convert_BAM_binary_to_SAM(SamBam_Reference_Info * chro_table, char * bam_bin, char * sam_txt);
+int is_paired_end_BAM(char * fn);
 #endif

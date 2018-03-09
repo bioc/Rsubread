@@ -498,11 +498,19 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("BAMinput", long_options[option_index].name)==0) 
 				{
+					if(global_context->config.is_SAM_file_input && global_context->config.is_BAM_input == 0){
+						SUBREADprintf("Error: you cannot specify both SAMinput and BAMinput\n");
+						return -1;
+					}
 					global_context->config.is_BAM_input = 1;
 					global_context->config.is_SAM_file_input = 1;
 				}
 				else if(strcmp("SAMinput", long_options[option_index].name)==0) 
 				{
+					if(global_context->config.is_SAM_file_input && global_context->config.is_BAM_input == 1){
+						SUBREADprintf("Error: you cannot specify both SAMinput and BAMinput\n");
+						return -1;
+					}
 					global_context->config.is_BAM_input = 0;
 					global_context->config.is_SAM_file_input = 1;
 				}
@@ -583,7 +591,7 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.maximise_sensitivity_indel = 1;
 					global_context->config.realignment_minimum_variant_distance = 1;
-					global_context->config.max_indel_length = 16;
+				//	global_context->config.max_indel_length = 16;
 				}
 				else if(strcmp("disableBigMargin", long_options[option_index].name)==0)
 				{

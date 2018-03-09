@@ -81,6 +81,28 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 
 }
 
+int is_paired_end_BAM(char * fn){
+	FILE * fp = fopen(fn, "rb");
+	if(!fp) return 0;
+	unsigned char h2[2];
+	fread(h2, 1,2,fp);
+	int is_bam = (h2[0]==31) && (h2[1]==139);
+	fclose(fp);
+
+	SamBam_FILE * sambam_reader;
+	char fline[3000];
+	sambam_reader = SamBam_fopen(fn, is_bam?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM);
+	while(1){
+		char * is_ret = SamBam_fgets(sambam_reader, fline, 2999, 1);
+		if(!is_ret) return 0;
+		if(fline[0]!='@') break;
+	}
+	char * tok = NULL;
+	strtok_r(fline, "\t", &tok);
+	int flags = atoi(strtok_r(NULL, "\t", &tok));
+	SamBam_fclose(sambam_reader);
+	return flags & 1;
+}
 SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 {
 	SamBam_FILE * ret = (SamBam_FILE *)malloc(sizeof(SamBam_FILE));

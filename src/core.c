@@ -381,9 +381,9 @@ int show_summary(global_context_t * global_context)
 
 	if(global_context->config.output_prefix[0])
 	{
-	        if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !global_context -> config.do_fusion_detection))
+	        if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !(global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)))
 	                print_in_box(80, 0,0,"          Junctions : %'u", global_context -> all_junctions);
-	        if(global_context->config.do_fusion_detection)
+	        if((global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 	                print_in_box(80, 0,0,"            Fusions : %'u", global_context -> all_fusions);
 	        print_in_box(80, 0,0,"             Indels : %'u", global_context -> all_indels);
 	}
@@ -648,7 +648,8 @@ int parse_opts_core(int argc , char ** argv, global_context_t * global_context)
 				global_context->config.minimum_subread_for_second_read = atoi(optarg);
 				break;
 			case 't':
-				sprintf(global_context->config.temp_file_prefix, "%s/core-temp-sum-%06u-%05u", optarg, getpid(), rand());
+				sprintf(global_context->config.temp_file_prefix, "%s/core-temp-sum-%06u-%05u", optarg, getpid(), myrand_rand()
+				);
 				break;
 			case 'F':
 				global_context->config.is_second_iteration_running = 0;
@@ -719,11 +720,36 @@ int check_configuration(global_context_t * global_context)
 
 }
 
+unsigned long long myrand_seed = 0;
+
+void myrand_srand(unsigned long long seed){
+	struct timeval xtime;
+	gettimeofday(&xtime,NULL);
+
+	unsigned long long tv = xtime.tv_usec ^ (xtime.tv_sec * 81811);
+	myrand_seed ^= tv;
+	tv = xtime.tv_sec ^ (xtime.tv_usec << 23);
+	myrand_seed ^= tv;
+
+	myrand_rand();
+	myrand_seed ^= seed;
+	myrand_rand();
+}
+
+int myrand_rand(){
+	if(myrand_seed % 3133LLU == 0) myrand_srand(0);
+
+	myrand_seed ^= (myrand_seed % 131317);
+	myrand_seed ^= myrand_seed << 13;
+	return (int)(myrand_seed % (1LLU+RAND_MAX));
+}
+
+
 int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_context_t * )))
 {
 	struct timeval xtime; 
 	gettimeofday(&xtime,NULL);
-	srand(time(NULL)^xtime.tv_usec);
+	myrand_srand(time(NULL)^xtime.tv_usec);
 
 	global_context_t * global_context;
 	global_context = (global_context_t*)malloc(sizeof(global_context_t));
@@ -895,7 +921,7 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 	int is_OK = 0;
 	char temp_file_name[200];
 	char * linebuff=malloc(3001);
-	gzFile * rawfp = gzopen(fname, "r");
+	gzFile rawfp = gzopen(fname, "r");
 	
 	if(rawfp)
 	{
@@ -1039,17 +1065,17 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 int write_final_results(global_context_t * context)
 {
 
-	if(context -> config.do_fusion_detection && context -> config.do_structural_variance_detection)
+	if((context ->  config.do_fusion_detection || context ->  config.do_long_del_detection) && context -> config.do_structural_variance_detection)
 		finalise_structural_variances(context);
 
 	if(context -> config.output_prefix[0])
 	{
 		write_indel_final_results(context);
 
-		if(context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && (context -> config.prefer_donor_receptor_junctions||!context -> config.do_fusion_detection))
+		if(context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && (context -> config.prefer_donor_receptor_junctions||!(context ->  config.do_fusion_detection || context ->  config.do_long_del_detection)))
 			write_junction_final_results(context);
 
-		if(context -> config.do_fusion_detection)
+		if((context ->  config.do_fusion_detection || context ->  config.do_long_del_detection))
 			write_fusion_final_results(context);
 	}
 	
@@ -1213,8 +1239,8 @@ int add_head_tail_cut_softclipping(global_context_t * global_context, unsigned i
 
 			if('M' == nch || 'D' == nch || 'S' == nch || 'N' == nch){
 				int is_start_in_chro, is_end_in_chro;
-				is_start_in_chro = get_offset_maximum_chro_pos(global_context,linear_cursor);
-				is_end_in_chro = get_offset_maximum_chro_pos(global_context,linear_cursor + tmpi);
+				is_start_in_chro = get_offset_maximum_chro_pos(global_context,NULL,linear_cursor);
+				is_end_in_chro = get_offset_maximum_chro_pos(global_context,NULL,linear_cursor + tmpi);
 				linear_cursor += tmpi;
 			}
 
@@ -1267,7 +1293,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		int current_strand = (current_result -> mapping_result -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
 		int is_first_section_jumped = current_result -> first_base_is_jumpped;
-		if(is_first_section_jumped) assert(global_context -> config.do_fusion_detection);
+		if(is_first_section_jumped) assert((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection));
 		strcpy(r-> current_cigar_decompress, current_result -> cigar_string);
 
 		int chimeric_sections = 0;
@@ -1290,7 +1316,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 		//printf("SM='%s'\n", r->additional_information);
 
-		if(global_context -> config.do_fusion_detection)
+		if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection))
 		{			
 			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped, r->current_cigar_decompress, r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens, read_name);
 
@@ -1331,7 +1357,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 	{
 		int head_cut = 0 , tail_cut = 0;
 
-		if(locate_gene_position_max(r->linear_position + r->soft_clipping_movements,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut, global_context->config.do_fusion_detection?read_len:(current_result->chromosomal_length - r->soft_clipping_movements))) {
+		if(locate_gene_position_max(r->linear_position + r->soft_clipping_movements,& global_context -> chromosome_table, &r-> chro , &r -> offset, &head_cut, &tail_cut,(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)?read_len:(current_result->chromosomal_length - r->soft_clipping_movements))){
 			is_r_OK = 0;
 		} else {
 			int is_added_OK = 1;
@@ -1906,7 +1932,7 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 
 	//#warning "SUBREAD_151 ============= REMOVE '+1' when not doing structure variance detection for the proposal  =========="
 	if(0)
-	if(global_context -> config.do_fusion_detection && rec1 && rec2 && current_location == 0 && rec1 -> chimeric_sections == 1 && rec2 -> chimeric_sections == 1){
+	if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection) && rec1 && rec2 && current_location == 0 && rec1 -> chimeric_sections == 1 && rec2 -> chimeric_sections == 1){
 		// when current_location == 0, both r1 and r2 were on the same strand.
 		int is_funky = is_funky_fragment(global_context, read_name_1, rec1 -> chro, rec1 -> offset, read_len_1, rec1 -> strand, rec1 -> out_cigars[0], read_text_1, read_name_2, rec2 -> chro, rec2 -> offset, read_len_2, rec2 -> strand, rec2 -> out_cigars[0] , read_text_2, tlen);
 		if (0 &&is_funky)
@@ -2278,13 +2304,13 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 	char qual_text_1[MAX_READ_LENGTH+1], qual_text_2[MAX_READ_LENGTH+1];
 	char read_name_1[MAX_READ_NAME_LEN+1], read_name_2[MAX_READ_NAME_LEN+1];
 	int read_len_1, read_len_2=0;
-	int need_junction_step = global_context -> config.do_breakpoint_detection || global_context -> config.do_fusion_detection;
+	int need_junction_step = global_context -> config.do_breakpoint_detection || global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection;
 	int sqr_interval, sqr_read_number = 0;
 
 	init_chunk_scanning_parameters(global_context,thread_context, & ginp1, & ginp2);
 	sqr_interval = max(5000,global_context -> processed_reads_in_chunk/10/ global_context -> config.all_threads);
 
-	while(1)
+	if(0) while(1)
 	{
 		int is_second_read;
 
@@ -2323,6 +2349,7 @@ int do_iteration_one(global_context_t * global_context, thread_context_t * threa
 					continue;
 				}
 
+				// DISABLED
 				find_new_indels(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
 				if(need_junction_step)
 					find_new_junctions(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
@@ -3139,6 +3166,20 @@ int core_get_subread_quality(global_context_t * global_context, thread_context_t
 	return  ret;
 }
 
+int has_better_mapping(global_context_t * global_context, thread_context_t * thread_context, subread_read_number_t current_read_number, int is_second_read, int this_aln_id){
+	int better_read_id;
+
+	mapping_result_t * this_r = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, this_aln_id);
+	for(better_read_id = 0; better_read_id < this_aln_id; better_read_id++){
+		mapping_result_t * better_r = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, better_read_id);
+		if( this_r -> selected_position >= better_r -> selected_position - global_context -> config.max_indel_length - 1 
+		 && this_r -> selected_position <=  better_r -> selected_position +  global_context -> config.max_indel_length +1 )
+		if( this_r -> confident_coverage_start >= better_r -> confident_coverage_start
+		 && this_r -> confident_coverage_end <= better_r -> confident_coverage_end) return 1;
+	}
+	return 0;
+}
+
 int do_voting(global_context_t * global_context, thread_context_t * thread_context)
 {
 	int ret, xk1;
@@ -3174,13 +3215,12 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	unsigned int low_index_border = global_context -> current_value_index -> start_base_offset;
 	unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length; 
 	int has_second_read = 1 + global_context -> input_reads.is_paired_end_reads;
-	//int need_junction_step = global_context -> config.do_breakpoint_detection || global_context -> config.do_fusion_detection;
 
 	if(thread_context)
 		thread_context -> current_value_index = global_context -> current_value_index;
 
 	int GENE_SLIDING_STEP = global_context -> current_index -> index_gap;
-	int need_junction_step = global_context -> config.do_breakpoint_detection || global_context -> config.do_fusion_detection;
+	int need_junction_step = global_context -> config.do_breakpoint_detection || global_context ->  config.do_fusion_detection ||global_context ->  config.do_long_del_detection;
 
 	while(1)
 	{
@@ -3206,7 +3246,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		for(is_reversed = 0; is_reversed<2; is_reversed++)
 		{
 			//printf("MAP_REA = %s / %s\n", read_text_1, read_text_2);
-			if(is_reversed==0 || !global_context->config.do_fusion_detection)
+			if(is_reversed==0 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
 				init_gene_vote(vote_1);
 				if(global_context -> input_reads.is_paired_end_reads) init_gene_vote(vote_2);
@@ -3271,17 +3311,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						char * subread_string = current_read + subread_offset;
 
 						gehash_key_t subread_integer = genekey2int(subread_string, global_context->config.space_type);
-						//SUBREADprintf("The %d-th subread=%s\n", subread_no, subread_string);
 
-
-						if(global_context -> config.use_quality_score_break_ties)
-						{
-							char * quality_string_subr = current_qual + subread_offset;
-							subread_quality = core_get_subread_quality(global_context, thread_context, quality_string_subr, 16);
-						}
-
-
-						//SUBREADprintf("%d=%u     %s\n", subread_offset, subread_integer, subread_string);
 						if(global_context->config.is_methylation_reads)
 							gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, subread_quality, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
 						else
@@ -3321,34 +3351,14 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 
 
-			if(is_reversed==1 || !global_context->config.do_fusion_detection)
+			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
-
-				//SUBREADprintf("P%d %llu %s\n", is_reversed, current_read_number, read_name_1);
-				//#warning ">>>>>>> DISABLE THE FOLLOING BLOCK <<<<<<"
-				if(0) { int dx1, vtab_items1=0, vtab_items2=0;
-					for(dx1 = 0; dx1 < GENE_VOTE_TABLE_SIZE; dx1++) vtab_items1+=vote_1->items[dx1];
-					for(dx1 = 0; dx1 < GENE_VOTE_TABLE_SIZE; dx1++) vtab_items2+=vote_2->items[dx1];
-					printf("OCT27-STEPA-%s-P%d, V1 %d, V2 %d\n", read_name_1, is_reversed, vtab_items1, vtab_items2);
-				}
-				//#warning ">>>>>>> DISABLE THE FOLLOING BLOCK <<<<<<"
-				if(0 && FIXLENstrcmp("R010442852", read_name_1) ==0 ) {
+				if(0)if(1||FIXLENstrcmp("simulated.603514/", read_name_1) ==0 || FIXLENstrcmp("simulated.1613132", read_name_1) ==0 ) {
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
 					print_votes(vote_2, global_context -> config.index_prefix);
 				}
-				//finalise_vote(vote_1);
- 
-				/*
-				if(407229 == current_read_number){
-					fprintf(stderr, "TABLE_ITEMS=%llu\n", global_context->current_index->current_items);
-					//print_votes(vote_1, global_context -> config.index_prefix);
-					//print_votes(vote_2, global_context -> config.index_prefix);
-				}*/
-				//if(global_context -> input_reads.is_paired_end_reads) finalise_vote(vote_2);
-
-				//SUBREADprintf("NON-INFORMARTIVE=%d, %d\n", vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 
 				if(global_context -> input_reads.is_paired_end_reads)
 					process_voting_junction(global_context, thread_context, current_read_number, vote_1, vote_2, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_reversed, v1_all_subreads, v2_all_subreads);
@@ -3365,10 +3375,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						_global_retrieve_alignment_ptr(global_context, current_read_number, 0,0)->noninformative_subreads_in_vote = max(_global_retrieve_alignment_ptr(global_context, current_read_number, 0,0)->noninformative_subreads_in_vote, vote_1 -> noninformative_subreads);
 					}
 				}
-
-
-				//if(current_read_number == 0) print_votes(vote_1, global_context -> config.index_prefix);
-				//if(current_read_number == 0) printf("V0=%d; %d\n", _global_retrieve_alignment_ptr(global_context, current_read_number, 0,0)->selected_votes, _global_retrieve_alignment_ptr(global_context, current_read_number, 1,0)->selected_votes);
 			}
 		
 			if(is_reversed == 0)
@@ -3427,9 +3433,15 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 					locate_current_value_index(global_context, thread_context, current_r, current_rlen);
 
 					//#warning "==== UNCOMMENT THE NEXT THREE LINES ===="
-					find_new_indels(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
+
+					if(0 && FIXLENstrcmp("simulated.2467286/2", current_read_name)==0) SUBREADprintf("TEST_BETTER: better_id = %d, votes = %d, has=%d\n", best_read_id, current_r -> selected_votes, has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id));
+					if(!has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id))
+						find_new_indels(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
 					if(need_junction_step)
 						find_new_junctions(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
+
+					if(0 && FIXLENstrcmp("simulated.2467286/2", current_read_name)==0) SUBREADprintf("TEST_BETTER_END: better_id = %d, votes = %d, has=%d\n", best_read_id, current_r -> selected_votes, has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id));
+
 					if(thread_context) thread_context -> current_value_index = curr_val_index;
 					else global_context -> current_value_index = curr_val_index;
 				}
@@ -3537,7 +3549,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 		{
 			thread_contexts[current_thread_no].thread_id = current_thread_no;
 			init_indel_thread_contexts(global_context, thread_contexts+current_thread_no, task);
-			if(global_context->config.do_breakpoint_detection || global_context->config.do_fusion_detection)
+			if((global_context->config.do_breakpoint_detection || global_context-> config.do_fusion_detection || global_context->config.do_breakpoint_detection || global_context-> config.do_long_del_detection))
 				init_junction_thread_contexts(global_context, thread_contexts+current_thread_no, task);
 
 			subread_lock_occupy(&global_context -> thread_initial_lock);
@@ -3815,12 +3827,12 @@ int print_configuration(global_context_t * context)
 
 	if(context->config.do_breakpoint_detection)
 	{
-	        if(context->config.do_fusion_detection)
-	        {
-		print_in_box(80, 0, 0, "Function      : Read alignment + Junction/Fusion detection%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
-	        }
-	        else
-		print_in_box(80, 0, 0, "Function      : Read alignment + Junction detection (%s)", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?"DNA-Seq":"RNA-Seq");
+        if(context-> config.do_fusion_detection)
+			print_in_box(80, 0, 0, "Function      : Read alignment + Junction/Fusion detection%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
+        else if(context-> config.do_long_del_detection)
+			print_in_box(80, 0, 0, "Function      : Read alignment + Long Deletion detection%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
+		else
+			print_in_box(80, 0, 0, "Function      : Read alignment + Junction detection (%s)", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?"DNA-Seq":"RNA-Seq");
 	}
 	else
 	        print_in_box(80, 0, 0, "Function      : Read alignment%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
@@ -4254,7 +4266,7 @@ int init_modules(global_context_t * context)
 {
 	sublog_printf(SUBLOG_STAGE_DEV1, SUBLOG_LEVEL_DEBUG, "init_modules: begin");
 	int ret = init_indel_tables(context);
-	if(context->config.do_breakpoint_detection || context->config.do_fusion_detection)
+	if((context->config.do_breakpoint_detection || context-> config.do_fusion_detection || context->config.do_breakpoint_detection || context-> config.do_long_del_detection))
 		ret = ret || init_junction_tables(context);
 
 	sublog_printf(SUBLOG_STAGE_DEV1, SUBLOG_LEVEL_DEBUG, "init_modules: finished: %d",ret);
@@ -4264,7 +4276,7 @@ int init_modules(global_context_t * context)
 int destroy_modules(global_context_t * context)
 {
 	destroy_indel_module(context);
-	if(context->config.do_breakpoint_detection || context->config.do_fusion_detection)
+	if((context->config.do_breakpoint_detection || context-> config.do_fusion_detection || context->config.do_breakpoint_detection || context-> config.do_long_del_detection))
 		destroy_junction_tables(context);
 	return 0;
 }

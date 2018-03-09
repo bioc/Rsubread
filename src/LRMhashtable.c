@@ -6,58 +6,59 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.13 2018/03/09 00:13:00 cvs Exp $
+ * $Id: LRMhashtable.c,v 1.2 2018/03/08 04:51:07 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
-#ifndef _HASHTABLE_H
-#define _HASHTABLE_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <pthread.h>
+#include "LRMconfig.h"
+#include "LRMhashtable.h"
 
-/* These structs should not be accessed directly from user code.
- * All access should be via the public functions declared below. */
-
-typedef struct KeyValuePair_struct {
-    const void *key;
-    void *value;
-    struct KeyValuePair_struct *next;
-} KeyValuePair;
-
-typedef struct {
-    long numOfBuckets;
-    long numOfElements;
-    KeyValuePair **bucketArray;
-    float idealRatio, lowerRehashThreshold, upperRehashThreshold;
-    int (*keycmp)(const void *key1, const void *key2);
-    int (*valuecmp)(const void *value1, const void *value2);
-    unsigned long (*hashFunction)(const void *key);
-    void (*keyDeallocator)(void *key);
-    void (*valueDeallocator)(void *value);
-
-    void * appendix1;
-    void * appendix2;
-    void * appendix3;
-    long long int counter1;
-    long long int counter2;
-    long long int counter3;
-} HashTable;
+static int LRMpointercmp(const void *pointer1, const void *pointer2);
+static unsigned long LRMpointerHashFunction(const void *pointer);
+static int LRMisProbablePrime(long number);
+static long LRMcalculateIdealNumOfBuckets(HashTable *hashTable);
 
 
-typedef struct {
-	void ** elementList;
-	long numOfElements;
-	long capacityOfElements;
-	void (*elemDeallocator)(void *elem);
-} ArrayList;
+ArrayList * LRMArrayListCreate(int init_capacity){
+	ArrayList * ret = malloc(sizeof(ArrayList));
+	memset(ret,0,sizeof(ArrayList));
+	ret -> capacityOfElements = init_capacity;
+	ret -> elementList = malloc(sizeof(void *)*init_capacity);
+	return ret;
+}
 
-ArrayList * ArrayListCreate(int init_capacity);
-void ArrayListDestroy(ArrayList * list);
-void * ArrayListGet(ArrayList * list, long n);
-int ArrayListPush(ArrayList * list, void * new_elem);
-int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
-void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
-void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem));
+void LRMArrayListDestroy(ArrayList * list){
+	long x1;
+	if(list -> elemDeallocator)
+		for(x1 = 0;x1 < list->numOfElements; x1++)
+			list -> elemDeallocator(list -> elementList[x1]);
+		
+	free(list -> elementList);
+	free(list);
+}
+
+void * LRMArrayListGet(ArrayList * list, long n){
+	if(n<0 || n >= list->numOfElements)return NULL;
+	return list -> elementList[n];
+}
+
+int LRMArrayListPush(ArrayList * list, void * new_elem){
+	if(list -> capacityOfElements <= list->numOfElements){
+		list -> capacityOfElements *=1.3;
+		list -> elementList=realloc(list -> elementList, sizeof(void *)*list -> capacityOfElements);
+	}
+	list->elementList[list->numOfElements++] = new_elem;
+	return list->numOfElements;
+}
+void LRMArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem)){
+	list -> elemDeallocator = elem_deallocator;
+}
 
 
-void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -86,7 +87,52 @@ void HashTableIteration(HashTable * tab, void process_item(void * key, void * ha
  *      HashTable    - a new Hashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
-HashTable *HashTableCreate(long numOfBuckets);
+
+HashTable *LRMHashTableCreate(long numOfBuckets) {
+    HashTable *hashTable;
+    int i;
+
+
+    assert(numOfBuckets > 0);
+
+    hashTable = (HashTable *) malloc(sizeof(HashTable));
+    if (hashTable == NULL)
+        return NULL;
+
+    hashTable->appendix1=NULL;
+    hashTable->appendix2=NULL;
+    hashTable->appendix3=NULL;
+
+    hashTable->counter1=0;
+    hashTable->counter2=0;
+    hashTable->counter3=0;
+
+    hashTable->bucketArray = (KeyValuePair **)
+                        malloc(numOfBuckets * sizeof(KeyValuePair *));
+    if (hashTable->bucketArray == NULL) {
+        free(hashTable);
+        return NULL;
+    }
+    
+    hashTable->numOfBuckets = numOfBuckets;
+    hashTable->numOfElements = 0;
+
+    for (i=0; i<numOfBuckets; i++)
+        hashTable->bucketArray[i] = NULL;
+
+    hashTable->idealRatio = 3.0;
+    hashTable->lowerRehashThreshold = 0.0;
+    hashTable->upperRehashThreshold = 15.0;
+
+    hashTable->keycmp = LRMpointercmp;
+    hashTable->valuecmp = LRMpointercmp;
+    hashTable->hashFunction = LRMpointerHashFunction;
+    hashTable->keyDeallocator = NULL;
+    hashTable->valueDeallocator = NULL;
+
+    return hashTable;
+}
+
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -101,7 +147,28 @@ HashTable *HashTableCreate(long numOfBuckets);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableDestroy(HashTable *hashTable);
+void LRMHashTableDestroy(HashTable *hashTable) {
+    int i;
+
+    for (i=0; i<hashTable->numOfBuckets; i++) {
+        KeyValuePair *pair = hashTable->bucketArray[i];
+        while (pair != NULL) {
+            KeyValuePair *nextPair = pair->next;
+
+            if (hashTable->keyDeallocator != NULL)
+                hashTable->keyDeallocator((void *) pair->key);
+            if (hashTable->valueDeallocator != NULL){
+//			fprintf(stderr,"FREE %p\n", pair->value);
+			hashTable->valueDeallocator(pair->value);
+		}
+            free(pair);
+            pair = nextPair;
+        }
+    }
+
+    free(hashTable->bucketArray);
+    free(hashTable);
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -120,7 +187,9 @@ void HashTableDestroy(HashTable *hashTable);
  *                     specified key.
 \*--------------------------------------------------------------------------*/
 
-int HashTableContainsKey(const HashTable *hashTable, const void *key);
+int LRMHashTableContainsKey(const HashTable *hashTable, const void *key) {
+    return (LRMHashTableGet(hashTable, key) != NULL);
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -142,7 +211,20 @@ int HashTableContainsKey(const HashTable *hashTable, const void *key);
  *                     specified value.
 \*--------------------------------------------------------------------------*/
 
-int HashTableContainsValue(const HashTable *hashTable, const void *value);
+int LRMHashTableContainsValue(const HashTable *hashTable, const void *value) {
+    int i;
+
+    for (i=0; i<hashTable->numOfBuckets; i++) {
+        KeyValuePair *pair = hashTable->bucketArray[i];
+        while (pair != NULL) {
+            if (hashTable->valuecmp(value, pair->value) == 0)
+                return 1;
+            pair = pair->next;
+        }
+    }
+
+    return 0;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -164,8 +246,61 @@ int HashTableContainsValue(const HashTable *hashTable, const void *value);
  *      err          - 0 if successful, -1 if an error was encountered
 \*--------------------------------------------------------------------------*/
 
-int HashTablePut(HashTable *hashTable, const void *key, void *value);
-int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key);
+int LRMHashTablePut(HashTable *hashTable, const void *key, void *value) {
+	return LRMHashTablePutReplace(hashTable, key, value, 1);
+}
+int LRMHashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key) {
+    long hashValue;
+    KeyValuePair *pair;
+
+    assert(key != NULL);
+    assert(value != NULL);
+
+    hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
+    pair = hashTable->bucketArray[hashValue];
+
+    while (pair != NULL && hashTable->keycmp(key, pair->key) != 0)
+        pair = pair->next;
+
+    if (pair) {
+        if (pair->key != key) {
+            if(replace_key)
+	    {
+		if(hashTable->keyDeallocator)
+			hashTable->keyDeallocator((void *) pair->key);
+                pair->key = key;
+	    }
+        }
+        if (pair->value != value) {
+            if (hashTable->valueDeallocator != NULL)
+                hashTable->valueDeallocator(pair->value);
+            pair->value = value;
+        }
+    }
+    else {
+        KeyValuePair *newPair = (KeyValuePair *) malloc(sizeof(KeyValuePair));
+        if (newPair == NULL) {
+		return -1;
+        }
+        else {
+            newPair->key = key;
+            newPair->value = value;
+            newPair->next = hashTable->bucketArray[hashValue];
+            hashTable->bucketArray[hashValue] = newPair;
+            hashTable->numOfElements++;
+
+            if (hashTable->upperRehashThreshold > hashTable->idealRatio) {
+                float elementToBucketRatio = (float) hashTable->numOfElements /
+                                             (float) hashTable->numOfBuckets;
+                if (elementToBucketRatio > hashTable->upperRehashThreshold)
+                    LRMHashTableRehash(hashTable, 0);
+            }
+        }
+    }
+
+    return 0;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -184,7 +319,16 @@ int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int 
  *                     doesn't exist in the HashTable
 \*--------------------------------------------------------------------------*/
 
-void *HashTableGet(const HashTable *hashTable, const void *key);
+void *LRMHashTableGet(const HashTable *hashTable, const void *key) {
+    long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
+    KeyValuePair *pair = hashTable->bucketArray[hashValue];
+
+    while (pair != NULL && hashTable->keycmp(key, pair->key) != 0)
+        pair = pair->next;
+
+    return (pair == NULL)? NULL : pair->value;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -202,7 +346,40 @@ void *HashTableGet(const HashTable *hashTable, const void *key);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRemove(HashTable *hashTable, const void *key);
+void LRMHashTableRemove(HashTable *hashTable, const void *key) {
+    long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
+
+    KeyValuePair *pair = hashTable->bucketArray[hashValue];
+    KeyValuePair *previousPair = NULL;
+
+    while (pair != NULL && hashTable->keycmp(key, pair->key) != 0) {
+        previousPair = pair;
+        pair = pair->next;
+    }
+
+    if (pair != NULL) {
+        if (hashTable->keyDeallocator != NULL)
+            hashTable->keyDeallocator((void *) pair->key);
+        if (hashTable->valueDeallocator != NULL)
+            hashTable->valueDeallocator(pair->value);
+        if (previousPair != NULL)
+            previousPair->next = pair->next;
+        else
+            hashTable->bucketArray[hashValue] = pair->next;
+        free(pair);
+        hashTable->numOfElements--;
+
+        if (hashTable->lowerRehashThreshold > 0.0) {
+            float elementToBucketRatio = (float) hashTable->numOfElements /
+                                         (float) hashTable->numOfBuckets;
+            if (elementToBucketRatio < hashTable->lowerRehashThreshold)
+                LRMHashTableRehash(hashTable, 0);
+        }
+    }
+
+
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -218,7 +395,26 @@ void HashTableRemove(HashTable *hashTable, const void *key);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRemoveAll(HashTable *hashTable);
+void LRMHashTableRemoveAll(HashTable *hashTable) {
+    int i;
+
+    for (i=0; i<hashTable->numOfBuckets; i++) {
+        KeyValuePair *pair = hashTable->bucketArray[i];
+        while (pair != NULL) {
+            KeyValuePair *nextPair = pair->next;
+            if (hashTable->keyDeallocator != NULL)
+                hashTable->keyDeallocator((void *) pair->key);
+            if (hashTable->valueDeallocator != NULL)
+                hashTable->valueDeallocator(pair->value);
+            free(pair);
+            pair = nextPair;
+        }
+        hashTable->bucketArray[i] = NULL;
+    }
+
+    hashTable->numOfElements = 0;
+    LRMHashTableRehash(hashTable, 5);
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -235,7 +431,9 @@ void HashTableRemoveAll(HashTable *hashTable);
  *                     key/value pairs
 \*--------------------------------------------------------------------------*/
 
-int HashTableIsEmpty(const HashTable *hashTable);
+int LRMHashTableIsEmpty(const HashTable *hashTable) {
+    return (hashTable->numOfElements == 0);
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -252,7 +450,9 @@ int HashTableIsEmpty(const HashTable *hashTable);
  *                     the specified HashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableSize(const HashTable *hashTable);
+long LRMHashTableSize(const HashTable *hashTable) {
+    return hashTable->numOfElements;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -270,7 +470,9 @@ long HashTableSize(const HashTable *hashTable);
  *                     HashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableGetNumBuckets(const HashTable *hashTable);
+long LRMHashTableGetNumBuckets(const HashTable *hashTable) {
+    return hashTable->numOfBuckets;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -291,8 +493,11 @@ long HashTableGetNumBuckets(const HashTable *hashTable);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetKeyComparisonFunction(HashTable *hashTable,
-                             int (*keycmp)(const void *key1, const void *key2));
+void LRMHashTableSetKeyComparisonFunction(HashTable *hashTable,
+        int (*keycmp)(const void *key1, const void *key2)) {
+    assert(keycmp != NULL);
+    hashTable->keycmp = keycmp;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -313,8 +518,11 @@ void HashTableSetKeyComparisonFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetValueComparisonFunction(HashTable *hashTable,
-                       int (*valuecmp)(const void *value1, const void *value2));
+void LRMHashTableSetValueComparisonFunction(HashTable *hashTable,
+        int (*valuecmp)(const void *value1, const void *value2)) {
+    assert(valuecmp != NULL);
+    hashTable->valuecmp = valuecmp;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -337,8 +545,12 @@ void HashTableSetValueComparisonFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetHashFunction(HashTable *hashTable,
-                              unsigned long (*hashFunction)(const void *key));
+void LRMHashTableSetHashFunction(HashTable *hashTable,
+        unsigned long (*hashFunction)(const void *key))
+{
+    assert(hashFunction != NULL);
+    hashTable->hashFunction = hashFunction;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -366,7 +578,43 @@ void HashTableSetHashFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRehash(HashTable *hashTable, long numOfBuckets);
+void LRMHashTableRehash(HashTable *hashTable, long numOfBuckets) {
+    KeyValuePair **newBucketArray;
+    int i;
+
+    assert(numOfBuckets >= 0);
+    if (numOfBuckets == 0)
+        numOfBuckets = LRMcalculateIdealNumOfBuckets(hashTable);
+
+    if (numOfBuckets == hashTable->numOfBuckets)
+        return; /* already the right size! */
+
+    newBucketArray = (KeyValuePair **)
+                                malloc(numOfBuckets * sizeof(KeyValuePair *));
+    if (newBucketArray == NULL) {
+        /* Couldn't allocate memory for the new array.  This isn't a fatal
+         * error; we just can't perform the rehash. */
+        return;
+    }
+
+    for (i=0; i<numOfBuckets; i++)
+        newBucketArray[i] = NULL;
+
+    for (i=0; i<hashTable->numOfBuckets; i++) {
+        KeyValuePair *pair = hashTable->bucketArray[i];
+        while (pair != NULL) {
+            KeyValuePair *nextPair = pair->next;
+            long hashValue = hashTable->hashFunction(pair->key) % numOfBuckets;
+            pair->next = newBucketArray[hashValue];
+            newBucketArray[hashValue] = pair;
+            pair = nextPair;
+        }
+    }
+
+    free(hashTable->bucketArray);
+    hashTable->bucketArray = newBucketArray;
+    hashTable->numOfBuckets = numOfBuckets;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -410,9 +658,16 @@ void HashTableRehash(HashTable *hashTable, long numOfBuckets);
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetIdealRatio(HashTable *hashTable, float idealRatio,
-                            float lowerRehashThreshold,
-                            float upperRehashThreshold);
+void LRMHashTableSetIdealRatio(HashTable *hashTable, float idealRatio,
+        float lowerRehashThreshold, float upperRehashThreshold) {
+    assert(idealRatio > 0.0);
+    assert(lowerRehashThreshold < idealRatio);
+    assert(upperRehashThreshold == 0.0 || upperRehashThreshold > idealRatio);
+
+    hashTable->idealRatio = idealRatio;
+    hashTable->lowerRehashThreshold = lowerRehashThreshold;
+    hashTable->upperRehashThreshold = upperRehashThreshold;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -442,9 +697,12 @@ void HashTableSetIdealRatio(HashTable *hashTable, float idealRatio,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableSetDeallocationFunctions(HashTable *hashTable,
-                                       void (*keyDeallocator)(void *key),
-                                       void (*valueDeallocator)(void *value));
+void LRMHashTableSetDeallocationFunctions(HashTable *hashTable,
+        void (*keyDeallocator)(void *key),
+        void (*valueDeallocator)(void *value)) {
+    hashTable->keyDeallocator = keyDeallocator;
+    hashTable->valueDeallocator = valueDeallocator;
+}
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -452,18 +710,88 @@ void HashTableSetDeallocationFunctions(HashTable *hashTable,
  *  DESCRIPTION:
  *      A hash function that is appropriate for hashing strings.  Note that
  *      this is not the default hash function.  To make it the default hash
- *      function, call HashTableSetHashFunction(HashTableStringHashFunction).
+ *      function, call HashTableSetHashFunction(hashTable,
+ *      HashTableStringHashFunction).
  *  ARGUMENTS:
  *      key    - the key to be hashed
  *  RETURNS:
- *      long   - the unmodulated hash value of the key
+ *      unsigned long - the unmodulated hash value of the key
 \*--------------------------------------------------------------------------*/
 
-unsigned long HashTableStringHashFunction(const void *key);
+unsigned long LRMHashTableStringHashFunction(const void *key) {
+    const unsigned char *str = (const unsigned char *) key;
+    unsigned long hashValue = 0;
+    int i;
 
-void free_values_destroy(HashTable * tab);
-int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, int replace_key, int dealloc_key, int dealloc_value);
+    for (i=0; str[i] != '\0'; i++)
+        hashValue = hashValue * 37 + str[i];
 
-#endif /* _HASHTABLE_H */
+    return hashValue;
+}
+
+static int LRMpointercmp(const void *pointer1, const void *pointer2) {
+    return (pointer1 != pointer2);
+}
+
+static unsigned long LRMpointerHashFunction(const void *pointer) {
+    return ((unsigned long) pointer) ;
+}
+
+static int LRMisProbablePrime(long oddNumber) {
+    long i;
+
+    for (i=3; i<51; i+=2)
+        if (oddNumber == i)
+            return 1;
+        else if (oddNumber%i == 0)
+            return 0;
+
+    return 1; /* maybe */
+}
+
+static long LRMcalculateIdealNumOfBuckets(HashTable *hashTable) {
+    long idealNumOfBuckets = hashTable->numOfElements / hashTable->idealRatio;
+    if (idealNumOfBuckets < 5)
+        idealNumOfBuckets = 5;
+    else
+        idealNumOfBuckets |= 0x01; /* make it an odd number */
+    while (!LRMisProbablePrime(idealNumOfBuckets))
+        idealNumOfBuckets += 2;
+
+    return idealNumOfBuckets;
+}
 
 
+void LRMfree_values_destroy(HashTable * tab)
+{
+
+	KeyValuePair * cursor;
+	int bucket;
+	
+	for(bucket=0; bucket< tab -> numOfBuckets; bucket++)
+	{
+		cursor = tab -> bucketArray[bucket];
+		while (1)
+		{
+			if(!cursor) break;
+			char * read_txt = (char *) cursor ->value;
+			free(read_txt);
+			cursor = cursor->next;
+		}
+	}
+
+	LRMHashTableDestroy(tab);
+}
+
+void LRMHashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) )
+{
+    int i;
+    for (i=0; i< tab ->numOfBuckets; i++) {
+        KeyValuePair *pair = tab ->bucketArray[i];
+        while (pair != NULL) {
+            process_item(( void * )pair -> key, pair -> value, tab);
+            KeyValuePair *nextPair = pair->next;
+            pair = nextPair;
+        }
+    }
+}

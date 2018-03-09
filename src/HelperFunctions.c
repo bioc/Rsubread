@@ -47,6 +47,7 @@
 
 #include "subread.h"
 #include "input-files.h"
+#include "seek-zlib.h"
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
@@ -351,7 +352,7 @@ int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char
 	int cigar_cursor=0;
 	unsigned short current_section_chro_len=0, current_section_start_read_pos = 0, read_cursor = 0;
 	unsigned int chromosome_cursor=first_pos;
-	int ret=0;
+	int ret=0, is_first_S = 1;
 
 	for(cigar_cursor=0; ; cigar_cursor++)
 	{
@@ -363,8 +364,10 @@ int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char
 		}
 		else
 		{
-			if(ch == 'S')
+			if(ch == 'S'){
+				if(is_first_S) current_section_start_read_pos = tmp_int;
 				read_cursor += tmp_int;
+			}
 			else if(ch == 'M' || ch == 'X' || ch == '=') {
 				read_cursor += tmp_int;
 				current_section_chro_len += tmp_int;
@@ -391,6 +394,7 @@ int RSubread_parse_CIGAR_string(char * chro , unsigned int first_pos, const char
 			}
 			//printf("C=%c, TV=%d, CC=%d, RC=%d\n", ch, tmp_int, chromosome_cursor, current_section_chro_len);
 			tmp_int = 0;
+			is_first_S = 0;
 		}
 		if(cigar_cursor>100) return -1;
 	}
@@ -880,10 +884,10 @@ int rand_str(char * str_buff){
 }
 
 int mathrand_str(char * str_buff){
-	srand((int)(miltime()*100));
+	myrand_srand((int)(miltime()*100));
 	int x1;
 	for(x1 = 0; x1 < 6; x1++){
-		sprintf(str_buff+2*x1, "%02X", rand() & 0xff );
+		sprintf(str_buff+2*x1, "%02X", myrand_rand() & 0xff );
 	}
 	return 0;
 }
@@ -986,9 +990,10 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
  void * context, int do_add_feature(char * gene_name, char * transcript_name, char * chro_name, unsigned int start, unsigned int end, int is_negative_strand, void * context)  ){
 	char * file_line = malloc(MAX_LINE_LENGTH+1);
 	int lineno = 0, is_GFF_txid_warned = 0, is_GFF_geneid_warned = 0, loaded_features = 0;
-	FILE * fp = fopen(file_name, "r");
+	autozip_fp afp;
+	int aret = autozip_open(file_name, &afp);
 
-	if(NULL == fp){
+	if(aret < 0){
 		SUBREADprintf("Error: unable to open the annotation file : %s\n", file_name);
 		return -1;
 	}
@@ -1000,8 +1005,8 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 		feature_name = feature_name_tmp;
 		
 		unsigned int start = 0, end = 0;
-		char * getres = fgets(file_line, MAX_LINE_LENGTH, fp);
-		if(getres == NULL) break;
+		aret = autozip_gets(&afp, file_line, MAX_LINE_LENGTH);
+		if(aret < 1) break;
 
 		lineno++;
 		if(is_comment_line(file_line, file_type, lineno-1))continue;
@@ -1121,7 +1126,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 		}
 		
 	}
-	fclose(fp);
+	autozip_close(&afp);
 	free(file_line);		
 	return loaded_features;
 }

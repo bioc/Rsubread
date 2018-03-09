@@ -2515,6 +2515,14 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 			int toli = vote->toli [i][j];
 			int last_offset = vote -> indel_recorder[i][j][toli+2];
 			SUBREADprintf("  %s\tVote = %d , Position is %s,%d (+%u) Coverage is (%d, %d) Indel %d %s\n", vote->votes[i][j] == vote->max_vote?"***":"   ", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j],last_offset, (vote -> masks[i][j] & IS_NEGATIVE_STRAND)?"NEG":"POS");
+
+			if(1){
+				int k;
+				for(k=0; k<=toli; k+=3){
+					SUBREADprintf("    %d - %d : D=%d    ",  vote -> indel_recorder[i][j][k], vote -> indel_recorder[i][j][k+1], vote -> indel_recorder[i][j][k+2]);
+				}
+				SUBREADputs("");
+			}
 		}
 	
 
