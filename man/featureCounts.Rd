@@ -22,6 +22,8 @@ featureCounts(files,
 	fracOverlap=0,
 	fracOverlapFeature=0,
 	largestOverlap=FALSE,
+	nonOverlap=NULL,
+	nonOverlapFeature=NULL,
 	readExtension5=0,
 	readExtension3=0,
 	read2pos=NULL,
@@ -84,6 +86,8 @@ featureCounts(files,
   \item{fracOverlap}{ \code{numeric} giving minimum fraction of overlapping bases in a read that is required for read assignment. Value should be within range [0,1]. \code{0} by default. Number of overlapping bases is counted from both reads if paired end. Both this option and \code{minOverlap} option need to be satisfied before a read can be assigned.}
   \item{fracOverlapFeature}{ \code{numeric} giving minimum fraction of bases included in a feature that is required for overlapping with a read or a read pair. Value should be within range [0,1]. \code{0} by default.}
   \item{largestOverlap}{ If \code{TRUE}, a read (or read pair) will be assigned to the feature (or meta-feature) that has the largest number of overlapping bases, if the read (or read pair) overlaps with multiple features (or meta-features).}
+  \item{nonOverlap}{ \code{nonOverlap} giving the maximum number of bases in a read/read-pair that do not overlap with a feature. The read can ba assigned to the feature only if the number of the non-overlapping bases in the read does not excess this limit. The default value is \code{NULL} (ie no limit is set).}
+  \item{nonOverlapFeature}{ \code{nonOverlapFeature} giving the maximum number of non-overlapping bases in a feature that is allowed for assigning a read or a read-pair to the feature. The default value is \code{NULL} (ie no limit is set).}
   \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
   \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
