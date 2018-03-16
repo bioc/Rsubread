@@ -815,16 +815,17 @@ int test_small_minor_votes(global_context_t * global_context, int minor_i, int m
 int test_junction_minor(global_context_t * global_context, thread_context_t * thread_context, gene_vote_t * votes, int vote_i, int vote_j, int i, int j, long long int dist)
 {
 	if(abs(dist)> global_context->config.maximum_intron_length) return 1; 
-	if(votes -> coverage_start[vote_i][vote_j] == votes -> coverage_start[i][j])return 1;
-	if(votes -> coverage_end[vote_i][vote_j]   == votes -> coverage_end[i][j])return 1;
+	if(votes -> coverage_start[vote_i][vote_j] == votes -> coverage_start[i][j])return 2;
+	if(votes -> coverage_end[vote_i][vote_j]   == votes -> coverage_end[i][j])return 3;
 
+	//SUBREADprintf( " COV_IN_READ: %d ~ %d         CHRO_POS: %u ~ %u \n", votes -> coverage_start[vote_i][vote_j] , votes -> coverage_start[i][j] , votes -> pos[vote_i][vote_j] ,  votes -> pos[i][j] );
 	if(votes -> coverage_start[vote_i][vote_j] > votes -> coverage_start[i][j])
 	{
-		if(votes -> pos[vote_i][vote_j] < votes -> pos[i][j])return 1;
+		if(votes -> pos[vote_i][vote_j] < votes -> pos[i][j])return 4;
 	}
 	else
 	{
-		if(votes -> pos[vote_i][vote_j] > votes -> pos[i][j])return 1;
+		if(votes -> pos[vote_i][vote_j] > votes -> pos[i][j])return 5;
 	}
 
 	return 0;
@@ -1036,7 +1037,8 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 					// for example, if the distance is too far, if the coverered region overlapped or 
 					// if the covered region has a wrong arrangement to their relative positions.
 					int test_minor_res = test_junction_minor(global_context, thread_context, current_vote, vote_i, vote_j, i, j, dist);
-					if(0 && FIXLENstrcmp("R002403247", read_name) == 0) {
+//#warning " ============ DEBUG 1 ==================== "
+					if(0 &&  FIXLENstrcmp("R002403247", read_name) == 0) {
 						char posout2[100];
 						char posout1[100];
 						absoffset_to_posstr(global_context, current_vote -> pos[vote_i][vote_j], posout1);
@@ -2030,8 +2032,8 @@ int find_donor_receptor(global_context_t * global_context, thread_context_t * th
 			if(start_last_exon_base >= 2 && start_last_exon_base < search_in_read_end - search_in_read_start -insertion_in_between_i -2){
 
 
-			//	if(FIXLENstrcmp("V0112_0155:7:1101:12618:2466#ACTTGA", rname) == 0)
-			//		SUBREADprintf("split=%d, ins=%d, MM=%d+%d \n", start_last_exon_base, insertion_in_between_i, start_site_mismatches, end_site_mismatches);
+			if(0&& FIXLENstrcmp("V0112_0155:7:1101:12618:2466#ACTTGA", rname) == 0)
+				SUBREADprintf("split=%d, ins=%d, MM=%d+%d \n", start_last_exon_base, insertion_in_between_i, start_site_mismatches, end_site_mismatches);
 
 
 				if( (end_site_mismatches + start_site_mismatches) * 500 + insertion_in_between_i < best_testing_score ){
@@ -3723,7 +3725,7 @@ int donor_score(global_context_t * global_context, thread_context_t * thread_con
 					{
 
 						right_should_match = match_chro(read_text + real_split_point + inserted_bases, value_index, right_virtualHead_abs_offset + real_split_point + right_indel_offset + inserted_bases, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
-						//printf("INS=%d; LM=%d; RM=%d\t\tLOL=%u, LOR=%u, SP=%d\n", inserted_bases, left_should_match, right_should_match, left_virtualHead_abs_offset, right_virtualHead_abs_offset, real_split_point);
+					//	printf("INS=%d; LM=%d; RM=%d\t\tLOL=%u, LOR=%u, SP=%d\n", inserted_bases, left_should_match, right_should_match, left_virtualHead_abs_offset, right_virtualHead_abs_offset, real_split_point);
 						if(right_should_match >= 2*JUNCTION_CONFIRM_WINDOW - left_should_match - mismatch_in_between_allowd)
 						{
 							left_should_not_match = match_chro(read_text + real_split_point + inserted_bases, value_index, left_virtualHead_abs_offset + real_split_point + left_indel_offset, JUNCTION_CONFIRM_WINDOW , 0, global_context -> config.space_type);	
@@ -4310,7 +4312,7 @@ int write_junction_final_results(global_context_t * global_context)
 			continue;
 
 		//#warning "  ================================== remove '- 1' from the next line!!! ================================="
-		if(event_body->final_counted_reads <  1 || ( event_body->critical_supporting_reads < 1&& event_body->indel_at_junction))
+		if(event_body->final_counted_reads <  1 || ( event_body->critical_supporting_reads < 1 - 1&& event_body->indel_at_junction))
 		{
 			no_sup_juncs++;
 			continue;
@@ -4332,12 +4334,13 @@ int write_junction_final_results(global_context_t * global_context)
 
 		all_junctions ++;
 
+		indel_sect[0]=0;
 		if(event_body->indel_at_junction)
 			sprintf(indel_sect,"INS%d", event_body->indel_at_junction);
-		if(event_body-> is_donor_found_or_annotation &64)strcpy(indel_sect,"ANNO");
+		if(event_body-> is_donor_found_or_annotation &64)strcat(indel_sect,"ANNO");
 		//else if(event_body->critical_supporting_reads < 1)
 		//	strcpy(indel_sect, "NOCRT");
-		else	indel_sect[0]=0;
+
 
 		int wlen = fprintf(ofp,"%s\t%u\t%u\tJUNC%08u%s\t%d\t%c\t%u\t%u\t%d,%d,%d\t2\t%d,%d\t0,%u\n", chro_name_left, feature_start,  feature_end,
 												all_junctions, indel_sect,  event_body -> final_counted_reads, event_body->is_negative_strand?'-':'+',

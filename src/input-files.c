@@ -3184,6 +3184,9 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 					bin_ptr += 8;
 				}
 				in_ptr += 6;
+				int elembytes_no = 4;
+				if(elemtype == 'C' || elemtype == 'c') elembytes_no = 1;
+				if(elemtype == 'S' || elemtype == 's') elembytes_no = 2;
 				while(1){
 					xxnch = *(in_str + in_ptr);
 					if((!pairer -> tiny_mode)){
@@ -3194,9 +3197,9 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 								memcpy( bin_tmp + bin_ptr, &fv, 4);
 							}else{
 								int iv = atoi(ttxt);
-								memcpy( bin_tmp + bin_ptr, &iv, 4);
+								memcpy( bin_tmp + bin_ptr, &iv, elembytes_no);
 							}
-							bin_ptr+=4;
+							bin_ptr+=elembytes_no;
 							txi=0;
 							eles++;
 						}else{

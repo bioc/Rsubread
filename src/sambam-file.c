@@ -643,7 +643,14 @@ int convert_BAM_binary_to_SAM( SamBam_Reference_Info * chro_table, char * bam_bi
 					int tagval = 0;
 					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);
 					long long printv = is_signed?tagval:( (unsigned int) tagval );
-					sam_ptr += sprintf(sam_txt + sam_ptr, "%lld,", printv);
+					if(elemtype == 'i') sam_ptr += sprintf(sam_txt + sam_ptr, "%d,", (int)printv);
+					if(elemtype == 'I') sam_ptr += sprintf(sam_txt + sam_ptr, "%u,", (unsigned int)printv);
+
+					if(elemtype == 's') sam_ptr += sprintf(sam_txt + sam_ptr, "%d,", (short)printv);
+					if(elemtype == 'S') sam_ptr += sprintf(sam_txt + sam_ptr, "%u,", (unsigned short)printv);
+
+					if(elemtype == 'c') sam_ptr += sprintf(sam_txt + sam_ptr, "%d,", (char)printv);
+					if(elemtype == 'C') sam_ptr += sprintf(sam_txt + sam_ptr, "%u,", (unsigned char)printv);
 				}else{
 					float tagval = 0;
 					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);

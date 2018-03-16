@@ -338,7 +338,7 @@ int LRMwrite_chunk_compress_bam_block(LRMcontext_t * context,  LRMthread_context
 	//LRMprintf("COMPRESS: %d -> %d\n", bin_len, compressed_size);
 	
 	bam_buf[0]=31;
-	bam_buf[1]=139;
+	bam_buf[1]=(char)139;
 	bam_buf[2]=8;
 	bam_buf[3]=4;
 	memset(bam_buf+4, 0, 5);
