@@ -14,11 +14,11 @@ sublong(
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \arguments{
-	\item{index}{ a character vector giving the basename of index file. Index files should be located in the current directory. Using a full index that has no gaps between subreads is suggested. The index must be built in one block. See the manual for the options of \code{buildindex}. }
-	\item{readFiles}{ a character vector giving the name of the input file(s) that contains reads to be aligned. Both FASTQ and gzipped FASTQ formats are acceptable. The quality score format must be Phred+33.}
-	\item{outputFiles}{ a character vector specifying the name of the output file(s). }
-	\item{outputFormat}{ a character vector specifying the format of the output file. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}. }
-	\item{nthreads}{ a numeric value giving the number of threads used for mapping. \code{1} by default. If the number of threads is greater than 1, the reads in the output file are not guaranteed to have the same order as the reads in the input file.}
+	\item{index}{ a character vector giving the basename of index file. Index files should be located in the current directory. Using a full index that has no gaps between subreads is suggested. The index must be built in one block. See the manual for the options of \code{buildindex()}. }
+	\item{readFiles}{ a character vector giving the name(s) of the input file(s) that contain reads to be aligned. Both FASTQ and gzipped FASTQ formats are acceptable. The quality score format must be Phred+33.}
+	\item{outputFiles}{ a character vector specifying the name(s) of the output file(s). }
+	\item{outputFormat}{ a string specifying the format of the output file(s). \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}. }
+	\item{nthreads}{ a numeric value giving the number of threads used for mapping. \code{1} by default. If the number of threads is greater than 1, the reads in each output file are not guaranteed to have the same order as the reads in the corresponding input file.}
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \details{
