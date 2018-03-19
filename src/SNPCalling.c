@@ -1509,9 +1509,10 @@ void print_usage_snp(char * myname)
 	SUBREADputs("Optional arguments:");
 	SUBREADputs("");
 	SUBREADputs("  -a <file>  Provide a set of annotated SNPs (e.g. SNPs included in the dbSNP");
-	SUBREADputs("             database). The supplied file should be in VCF format. Providing");
-	SUBREADputs("             known SNPs to the program should improve its SNP calling");
-	SUBREADputs("             performance. Note that the provided SNPs may or may not be called.");
+	SUBREADputs("             database). The supplied file should be in VCF format (gzipped file");
+	SUBREADputs("             is accepted). Providing known SNPs to the program should improve");
+	SUBREADputs("             its SNP calling performance. Note that the provided SNPs may or");
+	SUBREADputs("             may not be called.");
 	SUBREADputs("");
 	SUBREADputs("  -b         Indicate the input file provided via -i is in BAM format.");
 	SUBREADputs("");
@@ -1529,10 +1530,9 @@ void print_usage_snp(char * myname)
 	SUBREADputs("  -r <int>   Specify the minimum number of mapped reads a SNP-containing");
 	SUBREADputs("             location must have (ie. the minimum coverage). 1 by default.");
 	SUBREADputs("");
-	SUBREADputs("  -x <int>   Specify the maximum number of mapped reads a SNP-containing");
-	SUBREADputs("             location have have. 1000 by default. Any location having more than");
-	SUBREADputs("             the threshold number of reads will not be considered for SNP");
-	SUBREADputs("             calling. This option is useful for removing PCR artefacts.");
+	SUBREADputs("  -x <int>   Specify the maximum depth a SNP location is allowed to have.");
+	SUBREADputs("             1,000,000 reads by default. This option is useful for removing PCR");
+	SUBREADputs("             artefacts.");
 	SUBREADputs("");
 	SUBREADputs("  -s <int>   Specify the minimum base quality scores (Phred scores) read bases");
 	SUBREADputs("             must satisfy to be used for SNP calling. 13 by default. Read bases");

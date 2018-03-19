@@ -22,7 +22,7 @@ sublong(
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \details{
-\code{Sublong} was specifically designed for ultra-long DNA-seq read mapping. Unlike \code{align} or \code{subjunc}, \code{sublong} does not build the indel table or junction table, but directly find the full alignments of reads by using a bounded dynamic programming algorithm after the seed-and-vote step. This makes \code{sublong} able to map reads that are as long as millions of bases and also contain very many (teens of thousands of) artifitial indels introduced in sequencing. This is particularly important for mapping Nanopore sequencing reads.
+\code{Sublong} was specifically designed for ultra-long DNA-seq read mapping. Unlike \code{align} or \code{subjunc}, \code{sublong} does not build the indel table or junction table, but directly finds the full alignments of reads by using a bounded dynamic programming algorithm after the seed-and-vote step. This makes \code{sublong} able to map reads that are as long as millions of bases and also contain very many (teens of thousands of) artifitial indels introduced in sequencing. This is particularly important for mapping Nanopore sequencing reads.
 
 Speed and accuracy were both prioritized in the development of \code{sublong}. This makes \code{sublong} fast enough to finish a data set containing one hundred thousands of Nanopore sequencing reads with a maximum read length of one million bases in teen minutes (running on 24 Xeon cores). Supreme accuracy of the mapping results was also observed in our simulations, comparing to other widely-used ultra-long read aligner.
 

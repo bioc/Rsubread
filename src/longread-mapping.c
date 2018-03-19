@@ -83,14 +83,13 @@ void LRMprint_usage(){
 	LRMputs("");
 	LRMputs("## Mandatory arguments:");
 	LRMputs("");
-	LRMputs(" -i <string>   Base name of the index. The index must be built as a full index,");
-	LRMputs("               and must be one block.");
+	LRMputs(" -i <string>   Base name of the index. The index must be built as a full index");
+	LRMputs("               and has only one block.");
 	LRMputs("");
 	LRMputs(" -r <string>   Name of an input read file. Acceptable formats include gzipped");
-    LRMputs("               FASTQ and FASTQ (automatically identified). The quality scores");
-	LRMputs("               should be in the Phred 33 format.");
+    LRMputs("               FASTQ and FASTQ (automatically identified).");
 	LRMputs("");
-	LRMputs(" -o <string>   Name of an output file. By default, the output is in BAM format.");
+	LRMputs(" -o <string>   Name of an output file in BAM format.");
 	LRMputs("");
 	LRMputs("## Optional arguments:");
 	LRMputs("# input reads and output");

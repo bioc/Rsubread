@@ -199,8 +199,9 @@ void print_usage_core_subjunc()
 	SUBREADputs("");
 	SUBREADputs("# gene annotation");
 	SUBREADputs("");
-	SUBREADputs("  -a                Name of an annotation file. GTF/GFF format by default. See");
-	SUBREADputs("                    -F option for more format information.");
+	SUBREADputs("  -a                Name of an annotation file (gzipped file is accepted).");
+	SUBREADputs("                    GTF/GFF format by default. See -F option for more format");
+	SUBREADputs("                    information.");
 	SUBREADputs("");
 	SUBREADputs("  -F                Specify format of the provided annotation file. Acceptable");
 	SUBREADputs("                    formats include 'GTF' (or compatible GFF format) and");
