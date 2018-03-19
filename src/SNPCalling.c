@@ -1604,7 +1604,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	parameters.supporting_read_rate = 0.;
 	parameters.min_supporting_read_number = 1;
 	parameters.min_alternative_read_number = 1;
-	parameters.max_supporting_read_number = 1000;
+	parameters.max_supporting_read_number = 1000000;
 	parameters.neighbour_filter_testlen = -1; 
 	parameters.neighbour_filter_rate = 0.000000001;
 	parameters.min_phred_score = 13;
