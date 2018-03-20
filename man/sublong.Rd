@@ -6,8 +6,8 @@
 \usage{
 sublong(
   index,
-  readFile,
-  outputFile,
+  readFiles,
+  outputFiles,
   outputFormat="BAM",
   nthreads=1
 )
@@ -35,6 +35,6 @@ Due to the limit of the BAM format, the CIGAR string for each alignment in a BAM
 library(Rsubread)
 ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./full_index",reference=ref,gappedIndex=FALSE, indexSplit=FALSE)
-reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
+reads <- system.file("extdata","longreads.txt.gz",package="Rsubread")
 sublong("./full_index",reads,"./Long_alignment.BAM",nthreads=4)
 }
