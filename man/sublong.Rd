@@ -15,7 +15,7 @@ sublong(
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \arguments{
 	\item{index}{ a character vector giving the basename of index files. Index files should be located in the current directory. The provided index should be a full index and also it should have only one block. See \code{buildindex} for index building options.}
-	\item{readFiles}{ a character vector giving the names of input files that contain long sequence reads. FASTQ and gzipped FASTQ formats can both be accepted.}
+	\item{readFiles}{ a character vector giving the names of input files that contain long sequence reads. FASTQ and gzipped FASTQ formats are both accepted.}
 	\item{outputFiles}{ a character vector specifying the names of output files that contain read mapping results.}
 	\item{outputFormat}{ a character string specifying the format of output files. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}. }
 	\item{nthreads}{ an integer giving the number of threads used for mapping. \code{1} by default. Note that when more than one thread is used, the order of reads might be changed in the output.}
