@@ -96,6 +96,7 @@ struct SNP_Calling_Parameters{
 	unsigned int real_read_count;
 	unsigned int reported_SNPs;
 	unsigned int reported_indels;
+	int supporting_read_excessed_reported;
 };
 
 #define PRECALCULATE_FACTORIAL 2000000
@@ -212,17 +213,16 @@ int is_snp_bitmap(char * bm, unsigned int pos)
 	return bm [bytes] & (1 << bits);
 
 }
-void put_hash_to_pile(HashTable * merge_table, unsigned int* snp_voting_piles, struct SNP_Calling_Parameters * parameters)
+void put_hash_to_pile(HashTable * merge_table, unsigned int* snp_voting_piles, struct SNP_Calling_Parameters * parameters, char * chro, int block_start )
 {
 
 	int bucket;
 	KeyValuePair * cursor;
 
-	for(bucket=0; bucket< merge_table -> numOfBuckets; bucket++)
-	{
+	for(bucket=0; bucket< merge_table -> numOfBuckets; bucket++) {
 		cursor = merge_table -> bucketArray[bucket];
-		while (1)
-		{
+
+		while (1) {
 			if (!cursor) break;
 			int base_N_qual = cursor->value - NULL;
 			int POI_pos = cursor->key - NULL - 100;
@@ -232,20 +232,20 @@ void put_hash_to_pile(HashTable * merge_table, unsigned int* snp_voting_piles, s
 			int j;
 			unsigned int supporting_bases = 0;
 
-			for(j=0; j<4; j++)
-			{
+			for(j=0; j<4; j++) {
 				supporting_bases += snp_voting_piles[POI_pos*4+j];
 			}
 
-			if(supporting_bases < parameters->max_supporting_read_number)
-			{
-				if(qual1 <  (parameters -> is_phred_64?'@':'!')+parameters->min_phred_score) 	// low quality bases
-				{
+			if(supporting_bases < parameters->max_supporting_read_number) {
+				if(qual1 <  (parameters -> is_phred_64?'@':'!')+parameters->min_phred_score){	// low quality bases
 					// the low-seq-quality bases are not inclued in voting.
-				}
-				else
-				{
-					snp_voting_piles[POI_pos*4+base1]+=1;
+				} else snp_voting_piles[POI_pos*4+base1]+=1;
+			}else{
+				if(parameters -> supporting_read_excessed_reported < 100){
+					parameters -> supporting_read_excessed_reported++;
+					SUBREADprintf("Warning: the depth exceeded the limit of %d at %s : %d\n", parameters->max_supporting_read_number, chro ,  block_start + POI_pos);
+					if(parameters -> supporting_read_excessed_reported == 100)
+						SUBREADprintf("Too many warnings.\nNo more warning messages are reported.\n");
 				}
 			}
 
@@ -254,7 +254,7 @@ void put_hash_to_pile(HashTable * merge_table, unsigned int* snp_voting_piles, s
 	}
 }
 
-int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, char ** SNP_bitmap_recorder, unsigned int * snp_voting_piles, int block_no, unsigned int reference_len, char * referenced_genome)
+int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, char ** SNP_bitmap_recorder, unsigned int * snp_voting_piles, int block_no, unsigned int reference_len, char * referenced_genome, char * chro_name, unsigned int offset)
 {
 	int last_read_id=-1,i;
 	HashTable * merge_table = HashTableCreate(1000);
@@ -314,7 +314,7 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 			if(parameters->is_paired_end_data){
 				if( (last_read_id >>1) != (read_rec.read_number>>1) && last_read_id>=0 && merge_table -> numOfElements > 0)
 				{
-					put_hash_to_pile(merge_table, snp_voting_piles, parameters);
+					put_hash_to_pile(merge_table, snp_voting_piles, parameters,chro_name, offset);
 					HashTableDestroy(merge_table);
 					merge_table = HashTableCreate(1000);
 				}
@@ -403,6 +403,13 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 						{
 							snp_voting_piles[(first_base_pos+i-1)*4+base_int]+=1;
 						}
+					}else{
+						if(parameters -> supporting_read_excessed_reported < 100){
+							parameters -> supporting_read_excessed_reported++;
+							SUBREADprintf("Warning: the depth exceeded the limit of %d at %s : %d\n", parameters->max_supporting_read_number, chro_name ,  offset + first_base_pos+i);
+							if(parameters -> supporting_read_excessed_reported == 100)
+								SUBREADprintf("Too many warnings.\nNo more warning messages are reported.\n");
+						}
 					}
 				}
 			}
@@ -411,7 +418,7 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 	}
 
 	if(parameters->is_paired_end_data && merge_table -> numOfElements > 0)
-		put_hash_to_pile(merge_table, snp_voting_piles, parameters);
+		put_hash_to_pile(merge_table, snp_voting_piles, parameters, chro_name, offset);
 	
 	HashTableDestroy(merge_table);
 
@@ -637,7 +644,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		pcutoff_list[i]=-1.;
 	}
 
-	int read_is_error = read_tmp_block(parameters, tmp_fp,&SNP_bitmap_recorder,snp_voting_piles,block_no, reference_len, referenced_genome);
+	int read_is_error = read_tmp_block(parameters, tmp_fp,&SNP_bitmap_recorder,snp_voting_piles,block_no, reference_len, referenced_genome, chro_name, offset);
 
 	fclose(tmp_fp);
 	if (parameters -> delete_piles)
@@ -659,7 +666,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		{
 			int min_phred_score_raw = parameters -> min_phred_score;
 			parameters -> min_phred_score -= 3;
-			read_tmp_block(parameters, tmp_fp,NULL , snp_BGC_piles,block_no, reference_len, referenced_genome);
+			read_tmp_block(parameters, tmp_fp,NULL , snp_BGC_piles,block_no, reference_len, referenced_genome, chro_name, offset);
 			parameters -> min_phred_score  = min_phred_score_raw;
 		}
 		fclose(tmp_fp);

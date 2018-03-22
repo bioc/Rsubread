@@ -566,7 +566,7 @@ void LRMprint_longvote( LRMcontext_t * context, LRMthread_context_t * thread_con
 	for(ii = 0; ii< iteration_context -> sorting_total_votes; ii++){
 		char postxt[55];
 		LRMgene_vote_t * vtab = &(iteration_context->vote_table);
-		if( iteration_context -> sorting_subread_votes[ii] >4){
+		if( iteration_context -> sorting_subread_votes[ii] >0){
 			int bb = iteration_context -> sorting_subread_nos[ii] >> 16;
 			int tt = iteration_context -> sorting_subread_nos[ii] & 0xffff;
 			LRMpos2txt(context,  iteration_context -> sorting_vote_locations[ii], postxt);
@@ -640,6 +640,9 @@ void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_c
 			if( iteration_context -> sorting_is_negative_strand[ii] != is_reversed )
 				continue;
 
+
+			if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0)
+					LRMprintf("    PASSING %d += %d : Vote in win = %d\n", ii, iteration_context -> sorting_subread_votes[ii], votes_in_win);
 			votes_in_win += iteration_context -> sorting_subread_votes[ii];
 
 			while(1){
@@ -648,6 +651,9 @@ void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_c
 					win_start_ii ++;
 				}
 				if(iteration_context -> sorting_vote_locations[ii] - iteration_context -> sorting_vote_locations[win_start_ii] < testing_window_width)break;
+
+			if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0)
+					LRMprintf("    PASSINGSUB  %d -= %d : Vote in win = %d\n", win_start_ii, iteration_context -> sorting_subread_votes[win_start_ii], votes_in_win);
 				votes_in_win -= iteration_context -> sorting_subread_votes[win_start_ii];
 				win_start_ii ++;
 				while(iteration_context -> sorting_is_negative_strand[win_start_ii] != is_reversed){
@@ -655,7 +661,13 @@ void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_c
 					win_start_ii ++;
 				}
 			}
+
+			if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0)
+					LRMprintf("    PASSING2 %d += %d : Vote in win = %d\n", ii, iteration_context -> sorting_subread_votes[ii], votes_in_win);
 	
+			if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0 && votes_in_win > 8200){
+				LRMprintf("    EXCHANGE: %d > %d ; window = %d ~ %d\n=================================\n", votes_in_win , iteration_context -> sorted_window_total_votes[max_window_no-1], win_start_ii, ii);
+			}
 			if(votes_in_win > iteration_context -> sorted_window_total_votes[max_window_no-1]){
 				int tins = -1;
 				int tt;
@@ -1190,7 +1202,10 @@ void LRMdo_dynamic_programming_read( LRMcontext_t * context, LRMthread_context_t
 //	}
 	if(iteration_context -> sorted_window_total_votes [ww] >0){
 		LRMbuild_chains(context, thread_context, iteration_context, ww);
-	//	LRMprint_longvote(context, thread_context, iteration_context);
+
+		if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0 )
+			LRMprint_longvote(context, thread_context, iteration_context);
+
 		LRMfill_gaps(context, thread_context, iteration_context, ww);
 	}else iteration_context -> chain_total_items = iteration_context -> chain_tosmall_items = iteration_context -> chain_tolarge_items = 0;
 	LRMsave_mapping_result(context, thread_context, iteration_context, ww);
