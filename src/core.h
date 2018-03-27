@@ -172,6 +172,7 @@ typedef struct{
 	int downscale_mapping_quality;
 	int is_BAM_input;
 	int is_BAM_output;
+	int is_input_read_order_required;
 	int convert_color_to_base;
 	int SAM_extra_columns;
 	int report_multiple_best_in_pairs;
@@ -456,12 +457,7 @@ typedef struct{
 	void * module_thread_contexts[5];
 	gene_value_index_t * current_value_index;
 
-	output_fragment_buffer_t * output_buffer;
-	int output_buffer_item;
-	int output_buffer_pointer;
-	int is_finished;
 	subread_lock_t output_lock;
-
 	unsigned int all_mapped_reads;
 	unsigned int not_properly_pairs_wrong_arrangement;
 	unsigned int not_properly_pairs_different_chro;

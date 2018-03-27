@@ -1803,9 +1803,9 @@ int main_snp_calling_test(int argc,char ** argv)
 
 	print_in_box(80,1,1,"exactSNP setting");
 	print_in_box(80,0,1,"");
-	print_in_box(80,0,0,"                  Input file : %s (%s)", in_SAM_file, parameters.is_BAM_file_input?"BAM":"SAM");
-	print_in_box(80,0,0,"                 Output file : %s", out_BED_file);
-	print_in_box(80,0,0,"            Reference genome : %s", in_FASTA_file);
+	print_in_box(80,0,0,"                  Input file : %s (%s)", get_short_fname(in_SAM_file), parameters.is_BAM_file_input?"BAM":"SAM");
+	print_in_box(80,0,0,"                 Output file : %s", get_short_fname(out_BED_file));
+	print_in_box(80,0,0,"            Reference genome : %s", get_short_fname(in_FASTA_file));
 	print_in_box(80,0,1,"");
 	print_in_box(80,0,0,"                     Threads : %d", threads);
 	print_in_box(80,0,0,"        Min supporting reads : %d", parameters.min_supporting_read_number);
@@ -1817,7 +1817,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	print_in_box(80,0,0,"         P value upper bound : %.5f", parameters.cutoff_upper_bound);
 	print_in_box(80,0,0,"       Flanking windows size : %d", parameters.fisher_exact_testlen);
 	if(parameters.known_SNP_vcf[0])
-		print_in_box(80,0,0,"       Known SNP annotations : %s", parameters.known_SNP_vcf);
+		print_in_box(80,0,0,"       Known SNP annotations : %s", get_short_fname(parameters.known_SNP_vcf));
 	
 	print_in_box(80,0,1,"");
 	print_in_box(80,2,1,"http://subread.sourceforge.net/");

@@ -1,5 +1,8 @@
 repair <- function(inFiles,inFormat="BAM",outFiles=paste(inFiles,"repair",sep="."),addDummy=TRUE,fullData=TRUE,compress=FALSE,nthreads=8)
 {
+	inFiles <- normalizePath(inFiles, mustWork=T)
+	outFiles <- normalizePath(outFiles, mustWork=F)
+
 	if(length(inFiles) != length(outFiles))
 		stop("Number of input files is different from number of output files.")
 

@@ -887,7 +887,8 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 		
 		if(!items) return 0;
 
-		int imin=0, imax=items;
+#warning "======== MAKE SURE THAT '-1' IS CORRECT ============"
+		int imin=0, imax=items - 1;
 		int last_accepted_index;
 
 		while(1)

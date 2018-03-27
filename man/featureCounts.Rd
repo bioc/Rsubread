@@ -66,9 +66,12 @@ featureCounts(files,
 	# read group
 	byReadGroup=FALSE,
 
+	# assignment results for each read
+	reportReads=NULL,
+	reportReadsPath=NULL,
+
 	# miscellaneous
 	maxMOp=10,
-	reportReads=NULL,
 	tmpDir=".",
 	verbose=FALSE)
 }

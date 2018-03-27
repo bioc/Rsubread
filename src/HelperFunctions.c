@@ -52,6 +52,20 @@
 #include "HelperFunctions.h"
 
 
+char * get_short_fname(char * lname){
+	char * ret = lname;
+
+	int x1;
+	for(x1 = strlen(lname)-1; x1>=0; x1--){
+		if(lname [x1] == '/'){
+			ret = lname + x1 + 1;
+			break;
+		}
+	}
+	return ret;
+}
+
+
 
 // This assumes the first part of Cigar has differet strandness to the main part of the cigar.
 // Pos is the LAST WANTED BASE location before the first strand jump (split by 'b' or 'n').

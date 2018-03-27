@@ -1,10 +1,10 @@
 detectionCall <- function(dataset, species="hg", plot=FALSE)
 {
 	
+	dataset <- normalizePath(dataset, mustWork=T)
 	if (file.exists(dataset) == FALSE) {
 		stop("File for the given dataset doesn't exist!\n")
 	} 
-	
 	if (species == "mm"){
 		exon_file <- system.file("annot","mm9_NCBI_exon_GC.txt",package="Rsubread")
         if(exon_file == ""){

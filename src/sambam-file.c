@@ -1101,7 +1101,7 @@ int test_bamview(int argc, char ** argv)
 	return 0;
 }
 
-int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname)
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads)
 {
 	memset(writer, 0, sizeof(SamBam_Writer));
 
@@ -1114,8 +1114,24 @@ int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname)
 	else
 		writer -> bam_fp = stdout;
 	#endif
-	writer -> chunk_buffer = malloc(70000); 
+
+	writer -> threads = threads;
 	writer -> compressed_chunk_buffer = malloc(70000); 
+	writer -> chunk_buffer = malloc(70000); 
+
+	if(threads>= 2){
+		int x1;
+		writer -> threads_chunk_buffer = malloc(sizeof(char *) * threads) ;
+		writer -> threads_chunk_buffer_compressed = malloc(sizeof(char *) * threads) ;
+		writer -> threads_chunk_buffer_used = malloc(sizeof(int) * threads);
+		writer -> threads_output_stream = malloc(sizeof(z_stream) * threads);
+		memset(writer -> threads_chunk_buffer_used, 0, sizeof(int) * threads);
+		for(x1 = 0; x1 < threads ; x1++){
+			writer -> threads_chunk_buffer [x1] = malloc(70000);
+			writer -> threads_chunk_buffer_compressed [x1] = malloc(70000);
+		}
+		subread_init_lock(&writer -> thread_bam_lock);
+	}
 	writer -> chromosome_name_table = HashTableCreate(1603);
 	writer -> chromosome_id_table = HashTableCreate(1603);
 	writer -> chromosome_len_table = HashTableCreate(1603);
@@ -1169,47 +1185,51 @@ unsigned int SamBam_CRC32(char * dat, int len)
 	return ret;
 }
 
-void SamBam_writer_add_chunk(SamBam_Writer * writer)
+void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 {
 	int compressed_size ; 
 	unsigned int CRC32;
-	writer -> output_stream.avail_out = 70000;
-	writer -> output_stream.avail_in = writer ->chunk_buffer_used;
-	CRC32 = SamBam_CRC32(writer -> chunk_buffer , writer ->chunk_buffer_used);
+	z_stream * this_stream = thread_no < 0 ? &writer ->output_stream:writer -> threads_output_stream + thread_no;
+	int * this_buffer_used = thread_no < 0 ? &writer ->chunk_buffer_used : writer -> threads_chunk_buffer_used + thread_no;
+	char * this_buffer = thread_no < 0 ? writer ->chunk_buffer: writer -> threads_chunk_buffer[thread_no];
+	char * this_compressed_chunk_buffer = thread_no < 0 ? writer ->compressed_chunk_buffer : writer -> threads_chunk_buffer_compressed[thread_no];
 
-	//FILE * dfp = f_subr_open("my.xbin","ab");
-	//fwrite( writer ->chunk_buffer,  writer ->chunk_buffer_used, 1, dfp);
-	//fclose(dfp);
+	//if(thread_no>=0)SUBREADprintf("MTBAM : WRITE THR_%d ; LEN=%d\n", thread_no, *this_buffer_used);
 
- 	int Z_DEFAULT_MEM_LEVEL = 8;
-	writer -> output_stream.zalloc = Z_NULL;
-	writer -> output_stream.zfree = Z_NULL;
-	writer -> output_stream.opaque = Z_NULL;
+	this_stream -> avail_out = 70000;
+	this_stream -> avail_in = (* this_buffer_used);
+	CRC32 = SamBam_CRC32(this_buffer , * this_buffer_used);
 
-	deflateInit2(&writer -> output_stream, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
+	int Z_DEFAULT_MEM_LEVEL = 8;
+	this_stream -> zalloc = Z_NULL;
+	this_stream -> zfree = Z_NULL;
+	this_stream -> opaque = Z_NULL;
+
+	deflateInit2(this_stream, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
 		SAMBAM_GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 	
-	writer -> output_stream.next_in = (unsigned char *)writer -> chunk_buffer;
-	writer -> output_stream.next_out = (unsigned char *)writer -> compressed_chunk_buffer;
+	this_stream -> next_in = (unsigned char *)this_buffer;
+	this_stream -> next_out = (unsigned char *)this_compressed_chunk_buffer;
 
-	deflate(&writer -> output_stream, Z_FINISH);
-	deflateEnd(&writer -> output_stream);
+	deflate(this_stream, Z_FINISH);
+	deflateEnd(this_stream);
 
-	compressed_size = 70000 - writer -> output_stream.avail_out;
+	compressed_size = 70000 - this_stream -> avail_out;
 	//printf("ADDED BLOCK=%d; LEN=%d; S=%s\n", compressed_size, writer ->chunk_buffer_used,  writer ->chunk_buffer);
-	SamBam_writer_chunk_header(writer, compressed_size);
-	int chunk_write_size = fwrite(writer -> compressed_chunk_buffer, 1, compressed_size, writer -> bam_fp);
 
+	subread_lock_occupy(&writer -> thread_bam_lock);
+	SamBam_writer_chunk_header(writer, compressed_size);
+	int chunk_write_size = fwrite(this_compressed_chunk_buffer, 1, compressed_size, writer -> bam_fp);
 	fwrite(&CRC32 , 4, 1, writer -> bam_fp);
-	fwrite(&writer ->chunk_buffer_used , 4, 1, writer -> bam_fp);
+	fwrite(this_buffer_used , 4, 1, writer -> bam_fp);
+	subread_lock_release(&writer -> thread_bam_lock);
+
 	if(chunk_write_size < compressed_size){
 		if(!writer -> is_internal_error)SUBREADputs("ERROR: no space left in the output directory.");
 		writer -> is_internal_error = 1;
 	}
 
-	writer ->chunk_buffer_used = 0;
-
-
+	(* this_buffer_used) = 0;
 }
 
 double sambam_t1 = 0;
@@ -1233,7 +1253,7 @@ void SamBam_writer_write_header(SamBam_Writer * writer)
 
 			memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , writer -> header_plain_text_buffer + header_block_start, header_ptr - header_block_start+1);
 			writer -> chunk_buffer_used +=  header_ptr - header_block_start + 1;
-			SamBam_writer_add_chunk(writer);
+			SamBam_writer_add_chunk(writer, -1);
 			header_block_start = header_ptr + 1;
 		}
 		header_ptr ++;
@@ -1266,11 +1286,26 @@ void SamBam_writer_write_header(SamBam_Writer * writer)
 
 		if(header_ptr ==  writer -> chromosome_name_table -> numOfElements - 1 || writer -> chunk_buffer_used > 55000)
 		{
-			SamBam_writer_add_chunk(writer);
+			SamBam_writer_add_chunk(writer, -1);
 			writer -> chunk_buffer_used = 0;
 		}
 	}
 
+}
+
+
+void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id){
+	if(writer -> threads_chunk_buffer_used[thread_id]) SamBam_writer_add_chunk(writer, thread_id);
+}
+
+void SamBam_writer_finalise_one_thread(SamBam_Writer * writer){
+	if(writer -> threads < 2){
+		if(writer -> chunk_buffer_used)
+			SamBam_writer_add_chunk(writer, -1);
+	}else{
+		// if it is multi-threaded, each thread MUST write the last block itself!
+	}
+	
 }
 
 int SamBam_writer_close(SamBam_Writer * writer)
@@ -1279,12 +1314,10 @@ int SamBam_writer_close(SamBam_Writer * writer)
 	{
 		if(writer -> header_plain_text_buffer)
 			SamBam_writer_write_header(writer);
-	}
-	else if(writer -> chunk_buffer_used)
-		SamBam_writer_add_chunk(writer);
+	} else SamBam_writer_finalise_one_thread(writer);
 	
 	writer -> chunk_buffer_used = 0;
-	SamBam_writer_add_chunk(writer);
+	SamBam_writer_add_chunk(writer, -1);
 //	fputc(0, writer -> bam_fp);
 
 	writer -> output_stream.next_in= NULL;
@@ -1294,6 +1327,17 @@ int SamBam_writer_close(SamBam_Writer * writer)
 
 	free(writer -> chunk_buffer);
 	free(writer -> compressed_chunk_buffer);
+	if(writer -> threads >=2){
+		int x1;
+		for(x1 = 0 ; x1 < writer -> threads; x1 ++){
+			free(writer -> threads_chunk_buffer[x1]);
+			free(writer -> threads_chunk_buffer_compressed[x1]);
+		}
+		free(writer -> threads_output_stream);
+		free(writer -> threads_chunk_buffer);
+		free(writer -> threads_chunk_buffer_compressed);
+		free(writer -> threads_chunk_buffer_used);
+	}
 	HashTableDestroy(writer -> chromosome_name_table);
 	HashTableDestroy(writer -> chromosome_id_table);
 	HashTableDestroy(writer -> chromosome_len_table);
@@ -1462,7 +1506,7 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 				{
 					bin[bin_cursor + str_len] = additional_columns[str_len+col_cursor];
 					str_len++;
-					if(bin_cursor + str_len > 280) break;
+					if(bin_cursor + str_len > 780) break;
 				}
 
 				bin[bin_cursor + str_len] =0;
@@ -1503,7 +1547,7 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 							int intv = 0; float fltv = 0;
 							if(celltype == 'i')intv = atoi(cell_buff);							
 							else fltv = atof(cell_buff);
-							if(bin_cursor < 280){
+							if(bin_cursor < 780){
 								memcpy(bin + bin_cursor, (celltype == 'i')?(void *)&intv:(void *)&fltv, 4);
 								bin_cursor += 4;
 								(*items) ++;
@@ -1520,7 +1564,7 @@ int SamBam_compress_additional(char * additional_columns, char * bin)
 				
 			}
 
-			if(bin_cursor>250) break;
+			if(bin_cursor>750) break;
 			continue;
 		}
 		
@@ -1540,32 +1584,46 @@ int SamBam_reg2bin(int beg, int end)
 	return 0;
 }
 
+void SamBam_writer_finish_header( SamBam_Writer * writer ){
+	if(writer -> writer_state == 0){
+		if(writer -> header_plain_text_buffer)
+		SamBam_writer_write_header(writer);
+		writer -> writer_state = 10;
+	}
+}
+
 #define FC_MAX_CIGAR_SECTIONS 96
 
-int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_position, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns)
+int SamBam_writer_add_read(SamBam_Writer * writer, int thread_no, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_position, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns, int committable)
 {
-	if(writer -> writer_state == 0)	// no reads were added
-	{
-		if(writer -> header_plain_text_buffer)
-			SamBam_writer_write_header(writer);
-	}
-
+	assert(writer -> writer_state!=0);
 	if(!qual_text || !read_text)	
 	{
 		SUBREADprintf("ERROR: sam file is incomplete.\n");
 		return 1;
 	}
 
-	writer -> writer_state = 10;
-	char additional_bin[300];
+	char additional_bin[1000];
 	int cigar_opts[FC_MAX_CIGAR_SECTIONS], xk1, cover_length = 0;
 	int cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, FC_MAX_CIGAR_SECTIONS);
 	int read_name_len = 1+strlen(read_name) ;
 	int additional_bin_len = SamBam_compress_additional(additional_columns, additional_bin);
 	int record_length = 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len + additional_bin_len;
 
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & record_length , 4);
-	writer -> chunk_buffer_used += 4;
+
+	char * this_chunk_buffer;
+	int * this_chunk_buffer_used;
+
+	if(thread_no >= 0){
+		this_chunk_buffer = writer -> threads_chunk_buffer[ thread_no ];
+		this_chunk_buffer_used = writer -> threads_chunk_buffer_used + thread_no;
+	}else{
+		this_chunk_buffer = writer -> chunk_buffer;
+		this_chunk_buffer_used = &writer -> chunk_buffer_used;
+	}
+
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & record_length , 4);
+	(*this_chunk_buffer_used) += 4;
 
 	int bin = SamBam_reg2bin(chro_position -1, chro_position-1+cover_length);
 
@@ -1583,50 +1641,47 @@ int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned in
 	chro_position--;
 	next_chro_position--;
 
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & refID , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & chro_position , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & bin_mq_nl , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & fag_nc , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & read_len , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & nextRefID , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & next_chro_position , 4);
-	writer -> chunk_buffer_used += 4;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , & temp_len , 4);
-	writer -> chunk_buffer_used += 4;
-	strcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , read_name);
-	writer -> chunk_buffer_used += read_name_len;
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used , cigar_opts, 4*cigar_opt_len);
-	writer -> chunk_buffer_used += 4*cigar_opt_len;
-	SamBam_read2bin(read_text  , writer -> chunk_buffer + writer -> chunk_buffer_used);
-	writer -> chunk_buffer_used += (read_len + 1) /2; 
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used, qual_text, read_len);
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & refID , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & chro_position , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & bin_mq_nl , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & fag_nc , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & read_len , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & nextRefID , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & next_chro_position , 4);
+	(*this_chunk_buffer_used) += 4;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , & temp_len , 4);
+	(*this_chunk_buffer_used) += 4;
+	strcpy(this_chunk_buffer + (*this_chunk_buffer_used) , read_name);
+	(*this_chunk_buffer_used) += read_name_len;
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used) , cigar_opts, 4*cigar_opt_len);
+	(*this_chunk_buffer_used) += 4*cigar_opt_len;
+	SamBam_read2bin(read_text  , this_chunk_buffer + (*this_chunk_buffer_used));
+	(*this_chunk_buffer_used) += (read_len + 1) /2; 
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used), qual_text, read_len);
 	for(xk1=0; xk1<read_len; xk1++)
-		writer -> chunk_buffer[writer -> chunk_buffer_used+xk1] -= 33;
+		this_chunk_buffer[(*this_chunk_buffer_used)+xk1] -= 33;
 	
-	writer -> chunk_buffer_used += read_len; 
-	memcpy(writer -> chunk_buffer + writer -> chunk_buffer_used, additional_bin, additional_bin_len);
-	writer -> chunk_buffer_used += additional_bin_len;
+	(*this_chunk_buffer_used) += read_len; 
+	memcpy(this_chunk_buffer + (*this_chunk_buffer_used), additional_bin, additional_bin_len);
+	(*this_chunk_buffer_used) += additional_bin_len;
 
 
-	if(writer -> chunk_buffer_used>55000)
+	if((*this_chunk_buffer_used)>55000 && committable)
 	{
 		//	double t0 = miltime();
-		SamBam_writer_add_chunk(writer);
+		SamBam_writer_add_chunk(writer, thread_no);
 		//	double t1 = miltime();
 		//	if(sambam_t1 > 100)
 		//		SUBREADprintf("Running = %.6f , Compress Time = %.6f\n", t0 - sambam_t1, t1 - t0);
 		//	sambam_t1 = t1;
-	
 
-
-
-		writer -> chunk_buffer_used = 0;
+		(*this_chunk_buffer_used) = 0;
 	}	
 	return 0;
 }
@@ -1965,8 +2020,8 @@ void test_bam_compress()
 	SamBam_writer_add_chromosome(&writer, "chr1", 123123, 1);
 	SamBam_writer_add_chromosome(&writer, "chr2", 223123, 1);
 	SamBam_writer_add_header(&writer, "@PG	ID:subread	VN:1.4.0b2", 0);
-	SamBam_writer_add_read(& writer, "Read1", 0, "chr1", 100000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "XG:Z:OX	NM:i:2	RG:Z:MyGroup1");
-	SamBam_writer_add_read(& writer, "Read2", 16, "chr2", 200000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "NM:i:1	XX:i:8172736	RG:Z:nxnmn	XY:i:33999	XZ:Z:Zuzuzu");
+	SamBam_writer_add_read(& writer, -1, "Read1", 0, "chr1", 100000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "XG:Z:OX	NM:i:2	RG:Z:MyGroup1");
+	SamBam_writer_add_read(& writer, -1, "Read2", 16, "chr2", 200000, 200, "50M", "*", 0, 0, 50, "ATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGAATCGA", "AAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBBAAAAABBBBB", "NM:i:1	XX:i:8172736	RG:Z:nxnmn	XY:i:33999	XZ:Z:Zuzuzu");
 	SamBam_writer_close(&writer);
 }
 

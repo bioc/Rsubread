@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include "hashtable.h"
 #include "gene-value-index.h"
+#include "HelperFunctions.h"
 #include "gene-algorithms.h"
 #include "sorted-hashtable.h"
 #include "input-files.h"
@@ -1140,7 +1141,7 @@ int main_buildindex(int argc,char ** argv)
 	SUBREADputs("");
 	print_in_box(80, 1, 1, "indexBuilder setting");
 	print_in_box(80, 0, 1, "");
-	print_in_box(80, 0, 0, "               Index name : %s", output_file);
+	print_in_box(80, 0, 0, "               Index name : %s", get_short_fname(output_file));
 	print_in_box(80, 0, 0, "              Index space : %s", IS_COLOR_SPACE?"color-space":"base-space");
 
 	if(IS_FORCED_ONE_BLOCK)
@@ -1171,7 +1172,7 @@ int main_buildindex(int argc,char ** argv)
 		if(f_type != FILE_TYPE_FASTA){
 			o_char = '?';
 		}
-		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  fasta_fn , CHAR_ESC);
+		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  get_short_fname(fasta_fn) , CHAR_ESC);
 	}
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 2, 1, "http://subread.sourceforge.net/");

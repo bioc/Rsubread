@@ -1,6 +1,6 @@
 sublong <- function(index, readFiles, outputFiles, outputFormat="BAM" , nthreads=1) {
-	readFiles <- as.character(readFiles)
-	outputFiles <- as.character(outputFiles)
+	readFiles <- normalizePath(as.character(readFiles), mustWork=T)
+	outputFiles <- normalizePath(as.character(outputFiles), mustWork=F)
 
 	if(length(readFiles) != length(outputFiles))
 		stop("The number of input file names is different from the number of output file names.")

@@ -72,7 +72,7 @@ int LRMprint_mapping_summary(LRMcontext_t * context){
 
 
 void LRMprint_version(){
-	LRMprintf("\nVersion %s\n", SUBREAD_VERSION);
+	LRMprintf("\nSublong v%s\n", SUBREAD_VERSION);
 	LRMputs("");
 }
 void LRMprint_usage(){

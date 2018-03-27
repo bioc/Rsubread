@@ -75,4 +75,6 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
  void * context, int do_add_feature(char * gene_name, char * transcript_id, char * chrome_name, unsigned int start, unsigned int end, int is_negative_strand, void * context)  );
 
 HashTable * load_alias_table(char * fname) ;
+
+char * get_short_fname(char * lname);
 #endif

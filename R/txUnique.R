@@ -1,4 +1,6 @@
 txUnique <- function(GTF_Annotation_File, Feature_Type = "exon", Gene_ID_Attribute = "gene_id", Transcript_ID_Attribute = "transcript_id"){
+	GTF_Annotation_File <- normalizePath(GTF_Annotation_File, mustWork=T)
+
 	fout <- file.path(".",paste(".Rsubread_txUnique_pid",Sys.getpid(),sep=""))
 	opt <- paste("-a",GTF_Annotation_File,sep="\t")
 	opt <- paste(opt,"-o",fout,sep="\t")

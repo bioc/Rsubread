@@ -281,6 +281,7 @@ typedef struct {
 	char output_file_name[300];
 	char output_file_path[300];
 	char temp_file_dir[300];
+	char read_details_path[300];
 	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
 	int input_file_unique;
 
@@ -314,7 +315,6 @@ typedef struct {
 } fc_thread_global_context_t;
 
 unsigned int tick_time = 1000;
-
 
 int fetch_boundaries(char * chroname,char * cigar, unsigned int pos, char strand, int *has_left, unsigned short *left_on_read, unsigned int *left_pos, int *has_right, unsigned short *right_on_read, unsigned int *right_pos, fc_junction_info_t *  result_junctions, int junction_space){
 
@@ -664,29 +664,32 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		else if(is_first_read_PE == 1) file_chr = 'P';
 		//file_chr = 'o';
 
-		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":next_fn,CHAR_ESC);
+		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
 		nfiles++;
 	}
 
 	(*n_input_files) = nfiles;
 	print_in_box(80,0,0,"");
 
-	#ifdef MAKE_STANDALONE	
-	print_in_box(80,0,0,"            Output file : %s", out);
-	print_in_box(80,0,0,"                Summary : %s.summary", out);
-	print_in_box(80,0,0,"             Annotation : %s (%s)", annot, is_GTF?"GTF":"SAF");
+	print_in_box(80,0,0,"            Output file : %s", get_short_fname(out));
+	print_in_box(80,0,0,"                Summary : %s.summary", get_short_fname(out));
+	print_in_box(80,0,0,"             Annotation : %s (%s)", get_short_fname(annot), is_GTF?"GTF":"SAF");
 	if(isReadSummaryReport){
 		print_in_box(80,0,0,"     Assignment details : <input_file>.featureCounts%s", isReadSummaryReport == FILE_TYPE_BAM?".bam":(isReadSummaryReport == FILE_TYPE_SAM?".sam":""));
-		print_in_box(80,0,0,"                     (Note that files are saved to the output directory)");
+		if(global_context -> read_details_path[0])
+			print_in_box(80,0,0,"    Details output path : %s", global_context ->read_details_path);
+		else
+			print_in_box(80,0,0,"                     (Note that files are saved to the output directory)");
 		print_in_box(80,0,0,"");
 	}
 
 	if(global_context -> do_junction_counting)
 		print_in_box(80,0,0,"      Junction Counting : <output_file>.jcounts");
+	#ifdef MAKE_STANDALONE	
 	#endif
 
 	if(global_context -> alias_file_name[0])
-		print_in_box(80,0,0,"  Chromosome alias file : %s", global_context -> alias_file_name);
+		print_in_box(80,0,0,"  Chromosome alias file : %s", get_short_fname(global_context -> alias_file_name));
 
 	print_in_box(80,0,0,"     Dir for temp files : %s", global_context->temp_file_dir);
 
@@ -696,8 +699,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	print_in_box(80,0,0,"                Threads : %d", global_context->thread_number);
 	print_in_box(80,0,0,"                  Level : %s level", global_context->is_gene_level?"meta-feature":"feature");
 	print_in_box(80,0,0,"             Paired-end : %s", global_context->is_paired_end_mode_assign?"yes":"no");
-	if(global_context -> do_not_sort && global_context->is_paired_end_mode_assign)
-	{
+	if(global_context -> do_not_sort && global_context->is_paired_end_mode_assign) {
 		print_in_box(80,0,0,"       Sorting PE Reads : never");
 		print_in_box(80,0,0,"");
 	}
@@ -3966,7 +3968,7 @@ void fc_thread_init_input_files(fc_thread_global_context_t * global_context, cha
 
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only )
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, int is_strand_checked, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath )
 {
 	int x1;
 
@@ -4052,6 +4054,9 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	}
 	else	global_context -> alias_file_name[0]=0;
 
+	global_context -> read_details_path[0]=0;
+	if(Rpath)strcpy(global_context -> read_details_path, Rpath);
+
 	strcpy(global_context -> feature_name_column,feature_name_column);
 	strcpy(global_context -> gene_id_column,gene_id_column);
 	strcpy(global_context -> output_file_name, output_fname);
@@ -4103,8 +4108,11 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	{
 		char tmp_fname[350], *modified_fname;
 		int i=0;
+		char * applied_detail_path = global_context -> output_file_path;
+		if(global_context -> read_details_path[0]) applied_detail_path = global_context -> read_details_path;
+
 		if( global_context -> input_file_unique ){
-			sprintf(tmp_fname, "%s/%s.featureCounts%s", global_context -> output_file_path, global_context -> input_file_short_name, global_context -> is_read_details_out == FILE_TYPE_BAM?".bam":(global_context -> is_read_details_out == FILE_TYPE_SAM?".sam":""));
+			sprintf(tmp_fname, "%s/%s.featureCounts%s", applied_detail_path, global_context -> input_file_short_name, global_context -> is_read_details_out == FILE_TYPE_BAM?".bam":(global_context -> is_read_details_out == FILE_TYPE_SAM?".sam":""));
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname);
 		} else {
@@ -4118,7 +4126,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 				i++;
 			}
 			char tmp_fname2[350];
-			sprintf(tmp_fname2, "%s/%s",  global_context -> output_file_path, modified_fname);
+			sprintf(tmp_fname2, "%s/%s", applied_detail_path, modified_fname);
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname2, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname2);
 		}
@@ -4654,6 +4662,7 @@ static struct option long_options[] =
 	{"byReadGroup", no_argument, 0,0},
 	{"verbose", no_argument, 0,0},
 	{"detectionCall", no_argument, 0,0},
+	{"Rpath", required_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -4866,12 +4875,19 @@ void print_usage()
 	SUBREADputs("                      long read counting.");
 	SUBREADputs("");
 
-	SUBREADputs("# Miscellaneous");
+	SUBREADputs("# Assignment results for each read");
 	SUBREADputs("");
 	SUBREADputs("  -R <format>         Output detailed assignment results for each read or read-");
 	SUBREADputs("                      pair. Results are saved to a file that is in one of the");
 	SUBREADputs("                      following formats: CORE, SAM and BAM. See Users Guide for");
 	SUBREADputs("                      more info about these formats.");
+	SUBREADputs("");
+	SUBREADputs("  --Rpath <string>    The path to store the detailed assignment result files.");
+	SUBREADputs("                      The detailed assignment result filess are created in the");
+	SUBREADputs("                      same directory of the output count file by default.");
+	SUBREADputs("");
+
+	SUBREADputs("# Miscellaneous");
 	SUBREADputs("");
 	SUBREADputs("  --tmpDir <string>   Directory under which intermediate files are saved (later");
 	SUBREADputs("                      removed). By default, intermediate files will be saved to");
@@ -5234,19 +5250,6 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	}
 }
 
-char * get_short_fname(char * lname){
-	char * ret = lname;
-
-	int x1;
-	for(x1 = strlen(lname)-1; x1>=0; x1--){
-		if(lname [x1] == '/'){
-			ret = lname + x1 + 1;
-			break;
-		}
-	}
-	return ret;
-}
-
 int readSummary_single_file(fc_thread_global_context_t * global_context, read_count_type_t * column_numbers, int nexons,  int * geneid, char ** chr, long * start, long * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, long * anno_chr_head, long * block_end_index, long * block_min_start , long * block_max_end, fc_read_counters * my_read_counter, HashTable * junc_glob_tab, HashTable * splicing_glob_tab, HashTable * merged_RG_table);
 
 int readSummary(int argc,char *argv[]){
@@ -5308,6 +5311,7 @@ int readSummary(int argc,char *argv[]){
 	48: as.numeric(max_missing_bases_in_read) # maximum # of bases in a read or fragment not overlapping with an exon ; efault value: "-1" means no limit
 	49: as.numeric(max_missing_bases_in_feature) # maximum # of bases in an exon not overlapping with a read or fragment ; default value: "-1" means no limit
 	50: as.numeric(is_Primary_Alignment_only) # "1" : only count the primary alignment (FLAG doesn't have 0x100 bit); "0" : count alignments no metter the 0x100 bit (by default)
+	51: Rpath : the path where the assignment details per read are stored.
 	 */
 
 	int isStrandChecked, isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, do_detectionCall, max_missing_bases_in_feature, max_missing_bases_in_read, is_Primary_Alignment_only;
@@ -5332,7 +5336,7 @@ int readSummary(int argc,char *argv[]){
 	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
 
 	int  isGTF, n_input_files=0;
-	char *  alias_file_name = NULL, * cmd_rebuilt = NULL;
+	char *  alias_file_name = NULL, * cmd_rebuilt = NULL, * Rpath = NULL;
 
 	int isMultiOverlapAllowed, isGeneLevel;
 
@@ -5520,11 +5524,14 @@ int readSummary(int argc,char *argv[]){
 	if(argc>50) is_Primary_Alignment_only = atoi(argv[50]);
 	else is_Primary_Alignment_only = 0;
 
+	if(argc>51) Rpath = argv[51];
+	else Rpath = NULL;
+
 	if(SAM_pairer_warning_file_open_limit()) return -1;
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, isStrandChecked, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -5547,7 +5554,7 @@ int readSummary(int argc,char *argv[]){
 	// Loading the annotations.
 	// Nothing is done if the annotation does not exist.
 	fc_feature_info_t * loaded_features;
-	print_in_box(84,0,0,"Load annotation file %s %c[0m...", argv[1], CHAR_ESC);
+	print_in_box(84,0,0,"Load annotation file %s %c[0m...", get_short_fname(argv[1]), CHAR_ESC);
 	nexons = load_feature_info(&global_context,argv[1], isGTF?FILE_TYPE_GTF:FILE_TYPE_RSUBREAD, &loaded_features);
 	if(nexons<1){
 		if(nexons >= -1) SUBREADprintf("Failed to open the annotation file %s, or its format is incorrect, or it contains no '%s' features.\n",argv[1], nameFeatureTypeColumn);
@@ -5900,7 +5907,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 
 		if(!global_context->redo)
 		{
-			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context -> use_stdin_file? "<STDIN>":global_context->input_file_name);
+			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context -> use_stdin_file? "<STDIN>":get_short_fname(global_context->input_file_name));
 			if(is_first_read_PE)
 				print_in_box(80,0,0,"   Paired-end reads are included.");
 			else
@@ -5955,12 +5962,13 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[51];
+	char * Rargv[52];
 	char annot_name[300];
 	char temp_dir[300];
 	char * out_name = malloc(300);
 	char * fasta_contigs_name = malloc(300);
 	char * alias_file_name = malloc(300);
+	char * Rpath = malloc(300);
 	int cmd_rebuilt_size = 200;
 	char * cmd_rebuilt = malloc(cmd_rebuilt_size);
 	char max_M_str[8];
@@ -6214,6 +6222,11 @@ int feature_count_main(int argc, char ** argv)
 					max_missing_bases_in_read = atoi(optarg);
 				}
 
+				if(strcmp("Rpath", long_options[option_index].name)==0)
+				{
+					strcpy(Rpath, optarg);
+				}
+
 				if(strcmp("minOverlap", long_options[option_index].name)==0)
 				{
 					if(!is_valid_digit(optarg, "minOverlap"))
@@ -6406,16 +6419,18 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[48] = max_missing_bases_in_read_str;
 	Rargv[49] = max_missing_bases_in_feature_str;
 	Rargv[50] = is_primary_alignment_only?"1":"0";
+	Rargv[51] = Rpath;
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(51, Rargv);
+	else retvalue = readSummary(52, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
 	free(alias_file_name);
 	free(fasta_contigs_name);
 	free(cmd_rebuilt);
+	free(Rpath);
 
 	return retvalue;
 

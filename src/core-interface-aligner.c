@@ -61,6 +61,7 @@ static struct option long_options[] =
 	{"minVoteCutoff",  required_argument, 0, 0},
 	{"maxRealignLocations",  required_argument, 0, 0},
 	{"multiMapping", no_argument, 0, 0},
+	{"keepReadOrder", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -101,6 +102,10 @@ void print_usage_core_aligner()
 	SUBREADputs("  --BAMinput        Input reads are in BAM format.");
 	SUBREADputs("");
 	SUBREADputs("  --SAMoutput       Save mapping results in SAM format.");
+	SUBREADputs("");
+	SUBREADputs("  --keepReadOrder   Keep order of reads in BAM output the same as that in the");
+	SUBREADputs("                    input file. Reads from the same pair are always placed next");
+	SUBREADputs("                    to each other no matter this option is specified or not.");
 	SUBREADputs("");
 	SUBREADputs("# Phred offset");
 	SUBREADputs("");
@@ -467,6 +472,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.report_multi_mapping_reads = 1;
 				}
+				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
+				{
+					global_context->config.ignore_unmapped_reads = 1;
+				}
 				else if(strcmp("memoryMultiplex", long_options[option_index].name)==0) 
 				{
 					global_context->config.memory_use_multiplex = atof(optarg);
@@ -494,6 +503,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.is_BAM_input = 1;
 					global_context->config.is_SAM_file_input = 1;
 				}
+				else if(strcmp("keepReadOrder", long_options[option_index].name)==0) 
+				{
+					global_context->config.is_input_read_order_required=1;
+				}
 				else if(strcmp("extraColumns", long_options[option_index].name)==0) 
 				{
 					global_context->config.SAM_extra_columns=1;
@@ -515,10 +528,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("fast", long_options[option_index].name)==0) 
 				{
 					global_context -> config.fast_run = 1;
-				}
-				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
-				{
-					global_context->config.ignore_unmapped_reads = 1;
 				}
 				else if(strcmp("sv", long_options[option_index].name)==0) 
 				{

@@ -1722,127 +1722,11 @@ void remove_nm_i(char * st)
 	}
 }
 
-void write_buffered_output_file(global_context_t *global_context,  output_fragment_buffer_t * rec){
-	
-	if(global_context -> config.is_BAM_output){
-		SamBam_writer_add_read(global_context -> output_bam_writer, rec->r1.read_name, rec->r1.flags, rec->r1.chro_name , rec->r1.location  , rec->r1.map_quality, rec->r1.cigar, rec->r1.other_chro_name , rec->r1.other_location, rec->r1.tlen, rec->r1.rlen, rec->r1.read_text, rec->r1.qual_text, rec->r1.additional_columns);
-
-		if(global_context->input_reads.is_paired_end_reads)
-			SamBam_writer_add_read(global_context -> output_bam_writer, rec->r2.read_name, rec->r2.flags, rec->r2.chro_name , rec->r2.location  , rec->r2.map_quality, rec->r2.cigar, rec->r2.other_chro_name , rec->r2.other_location, rec->r2.tlen, rec->r2.rlen, rec->r2.read_text, rec->r2.qual_text, rec->r2.additional_columns);
-	}
-	else
-	{
-		int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", rec->r1.read_name, rec->r1.flags, rec->r1.chro_name, rec->r1.location, rec->r1.map_quality, rec->r1.cigar, rec->r1.other_chro_name, rec->r1.other_location,  rec->r1.tlen, rec->r1.read_text, rec->r1.qual_text, rec->r1.additional_columns[0]?"\t":"", rec->r1.additional_columns);
-		if(global_context->input_reads.is_paired_end_reads)
-			write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", rec->r2.read_name, rec->r2.flags, rec->r2.chro_name, rec->r2.location, rec->r2.map_quality, rec->r2.cigar, rec->r2.other_chro_name, rec->r2.other_location,  rec->r2.tlen, rec->r2.read_text, rec->r2.qual_text, rec->r2.additional_columns[0]?"\t":"", rec->r2.additional_columns);
-
-		if( write_len < 10 || write_len_2 < 10 ){
-			global_context -> output_sam_is_full = 1;
-		}
-	}
-}
-
 double last_t1 = 0;
-
-void merge_buffered_output_file(global_context_t *global_context, int need_lock, int my_thread_no, int * all_threads_finished){
-
-	thread_context_t * thread_contexts = global_context -> all_thread_contexts;
-	//SUBREADprintf("merge_start: lock=%d, thread=%d, remain_item=%d\n", need_lock, my_thread_no, thread_contexts[my_thread_no].output_buffer_item);
-	int current_thread_no;
-	unsigned int all_reads=0;
-
-	//double tb = miltime();
-
-	if(need_lock){
-		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++){
-			thread_context_t * current_thread = thread_contexts + current_thread_no;
-			//SUBREADprintf("   THREAD %d : %d / %d used\n", current_thread_no, current_thread -> output_buffer_item,  MULTI_THREAD_OUTPUT_ITEMS* global_context -> config.reported_multi_best_reads);
-			all_reads += current_thread -> output_buffer_item;
-
-			if(my_thread_no != current_thread_no) 
-				subread_lock_occupy(&current_thread -> output_lock);
-		}
-	}
-
-	//double t0 = miltime();
-
-	while(1){
-		int has_found = 0;
-
-		(*all_threads_finished) = 1;
-		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++){
-			thread_context_t * current_thread = thread_contexts + current_thread_no;
-			if(current_thread_no>0 && !current_thread->is_finished)
-				(*all_threads_finished) = 0;
-
-			if( current_thread -> output_buffer_item > 0 ){
-				int earliest_frag_index = current_thread -> output_buffer_pointer - current_thread -> output_buffer_item;
-				if(earliest_frag_index < 0) earliest_frag_index += MULTI_THREAD_OUTPUT_ITEMS * global_context -> config.reported_multi_best_reads;
-
-				output_fragment_buffer_t * src = current_thread -> output_buffer + earliest_frag_index;
-				subread_read_number_t earliest_frag_number = src -> fragment_number_in_chunk;
-
-				//if(161430 <= earliest_frag_number) SUBREADprintf("The %d-th thread has earlist = %u ; want %u\n", current_thread_no, earliest_frag_number ,  global_context -> last_written_fragment_number);
-
-				//SUBREADprintf("30NOV2016-EARLIST %d <= %d\n", earliest_frag_number , global_context -> last_written_fragment_number);
-				if(earliest_frag_number <= global_context -> last_written_fragment_number){
-					int need_more = max(1, src -> multi_mapping_locations);
-					need_more -= src -> this_mapping_location;
-				
-					//#warning ">>>>> THE NEXT BLOCK SHOULD BE COMMENTED OUT <<<<<<"
-					if(0 && src -> this_mapping_location < src -> multi_mapping_locations)
-					{
-						int next_frag_index = (earliest_frag_index ==  MULTI_THREAD_OUTPUT_ITEMS * global_context -> config.reported_multi_best_reads - 1)?0:earliest_frag_index + 1;
-						output_fragment_buffer_t * nextsrc = current_thread -> output_buffer + next_frag_index;
-						if(nextsrc -> fragment_number_in_chunk != src -> fragment_number_in_chunk){
-							output_fragment_buffer_t * prevsrc = current_thread -> output_buffer + earliest_frag_index - 1;
-							SUBREADprintf("RN=%s , %s, THIS: %d/%d, R-1=%u R1=%u, R2=%u, REMAIN=%d, THIS_IDX=%d\n", src -> r1.read_name, nextsrc -> r1.read_name, src -> this_mapping_location , src -> multi_mapping_locations, prevsrc-> fragment_number_in_chunk, src -> fragment_number_in_chunk, nextsrc -> fragment_number_in_chunk, current_thread -> output_buffer_item, earliest_frag_index);
-						}
-						assert(nextsrc -> fragment_number_in_chunk == src -> fragment_number_in_chunk);
-					}
-					//if(161430 <= earliest_frag_number) SUBREADprintf("WRITTEN [%u]? %d/%d MORE=%d\n", earliest_frag_number, src -> this_mapping_location , src -> multi_mapping_locations,need_more);
-					//SUBREADprintf("30NOV2016-NEED-MORE  %d >= %d BY THRE %d\n", current_thread -> output_buffer_item , need_more, current_thread_no);
-					if(current_thread -> output_buffer_item >= need_more){
-						//SUBREADprintf("merge: %d >= 1 ?  this=%d, all=%d  \n", src -> this_mapping_location, need_more, src -> this_mapping_location , src -> multi_mapping_locations);
-						if(need_more <= 1)
-							global_context -> last_written_fragment_number = earliest_frag_number + 1;
-
-						write_buffered_output_file(global_context, src);
-						current_thread -> output_buffer_item --;
-						has_found = 1;
-					}
-				}
-			}
-		}
-		if(0==has_found)
-			break;
-	}
-
-	//double t1 = miltime();
-
-	//if(last_t1 > 100)
-	//	SUBREADprintf("WRITE RATE: RUNNING=%.6f, TB->T0=%.6f, T0->T1=%.6f %.12f sec / read\n", tb - last_t1 , t0-tb, t1-t0 , (t1 - t0) / all_reads );
-
-	if(need_lock){
-		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++){
-			if(my_thread_no != current_thread_no) {
-				thread_context_t * current_thread = thread_contexts + current_thread_no;
-				subread_lock_release(&current_thread -> output_lock);
-			}
-		}
-	}
-	global_context -> need_merge_buffer_now = 0;
-
-	//last_t1 = t1;
-
-	//SUBREADprintf("merge_finished: lock=%d, thread=%d, remain_item=%d, last_id=%u\n", need_lock, my_thread_no, thread_contexts[my_thread_no].output_buffer_item, global_context -> last_written_fragment_number);
-}
-
 int for_other_thread = 0;
 int for_one_threads = 0;
 
 
-#define BUFFER_TICK_SLEEP_TIME 1000
 void add_buffered_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_read_number_t pair_number ,
     char * read_name1, unsigned int flags1, char * chro_name1, unsigned int chro_position1, int mapping_quality1, char * cigar1,
     char * next_chro_name1, unsigned int next_chro_pos1, int temp_len1, int read_len1,
@@ -1853,69 +1737,34 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
     int all_locations, int this_location
     ){
 
-	while(1){
-		int done = 0, all_finished=0;
-		//SUBREADprintf("30NOV2016-ADDBUFF-LOCK BY THRE %d\n", thread_context -> thread_id);
-		subread_lock_occupy(&thread_context -> output_lock);
-		if(thread_context -> thread_id == 0 && ( thread_context -> output_buffer_item > MULTI_THREAD_OUTPUT_ITEMS* global_context -> config.reported_multi_best_reads *1/4 || global_context -> need_merge_buffer_now)){
-			if(global_context -> need_merge_buffer_now)
-				for_other_thread ++;
-			else
-				for_one_threads ++;
-			//SUBREADprintf("ADD BLOCK: FOR ONE:%d , FOR OTHER:%d\n", for_one_threads, for_other_thread);
-			merge_buffered_output_file(global_context, 1, thread_context -> thread_id, &all_finished);
-		}
-		//SUBREADprintf("30NOV2016-TRY-WRITE MY ITEMS=%d < %d BY THRE %d\n", thread_context -> output_buffer_item , MULTI_THREAD_OUTPUT_ITEMS * global_context -> config.reported_multi_best_reads , thread_context -> thread_id );
+	assert(global_context -> config.all_threads > 1);
 
-		if(thread_context -> output_buffer_item < MULTI_THREAD_OUTPUT_ITEMS * global_context -> config.reported_multi_best_reads) {
-			output_fragment_buffer_t * target = thread_context -> output_buffer+thread_context -> output_buffer_pointer;
-			target -> multi_mapping_locations = all_locations;
-			target -> this_mapping_location = this_location;
-			target -> fragment_number_in_chunk = pair_number;
-			strcpy(target -> r1.read_name, read_name1);
-			target -> r1.flags = flags1;
-			strcpy(target -> r1.chro_name, chro_name1);
-			target -> r1.location = chro_position1;
-			target -> r1.map_quality = mapping_quality1;
-			strcpy(target -> r1.cigar, cigar1);
-			strcpy(target -> r1.other_chro_name, next_chro_name1);
-			target -> r1.other_location = next_chro_pos1;
-			target -> r1.tlen = temp_len1;
-			target -> r1.rlen = read_len1;
-			strcpy(target -> r1.read_text, read_text1);
-			strcpy(target -> r1.qual_text, qual_text1);
-			strcpy(target -> r1.additional_columns, additional_columns1);
+	if( global_context -> config.is_BAM_output  && !global_context -> config.is_input_read_order_required){
+		//SUBREADprintf("MTBAM : THR_%d CORE: %s\n", thread_context -> thread_id, read_name1);
+		SamBam_writer_add_read(global_context -> output_bam_writer, thread_context -> thread_id, read_name1, flags1, chro_name1, chro_position1, mapping_quality1, cigar1, next_chro_name1, next_chro_pos1, temp_len1, read_len1, read_text1, qual_text1, additional_columns1, !global_context->input_reads.is_paired_end_reads);
+		if(global_context->input_reads.is_paired_end_reads)
+			SamBam_writer_add_read(global_context -> output_bam_writer, thread_context -> thread_id, read_name2, flags2, chro_name2, chro_position2, mapping_quality2, cigar2, next_chro_name2, next_chro_pos2, temp_len2, read_len2, read_text2, qual_text2, additional_columns2, 1);
+	}else{
+		subread_lock_occupy(&global_context -> output_lock);
 
-			if(global_context->input_reads.is_paired_end_reads){
-				strcpy(target -> r2.read_name, read_name2);
-				target -> r2.flags = flags2;
-				strcpy(target -> r2.chro_name, chro_name2);
-				target -> r2.location = chro_position2;
-				target -> r2.map_quality = mapping_quality2;
-				strcpy(target -> r2.cigar, cigar2);
-				strcpy(target -> r2.other_chro_name, next_chro_name2);
-				target -> r2.other_location = next_chro_pos2;
-				target -> r2.tlen = temp_len2;
-				target -> r2.rlen = read_len2;
-				strcpy(target -> r2.read_text, read_text2);
-				strcpy(target -> r2.qual_text, qual_text2);
-				strcpy(target -> r2.additional_columns, additional_columns2);
+		if(global_context -> config.is_BAM_output){
+			SamBam_writer_add_read(global_context -> output_bam_writer, -1, read_name1, flags1,  chro_name1 , chro_position1, mapping_quality1, cigar1, next_chro_name1 , next_chro_pos1, temp_len1, read_len1, read_text1, qual_text1, additional_columns1, !global_context->input_reads.is_paired_end_reads);
+
+			if(global_context->input_reads.is_paired_end_reads)
+				SamBam_writer_add_read(global_context -> output_bam_writer, -2, read_name2, flags2,  chro_name2 , chro_position2, mapping_quality2, cigar2, next_chro_name2 , next_chro_pos2, temp_len2, read_len2, read_text2, qual_text2, additional_columns2, 1);
+
+		}else{
+			int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name1, flags1, chro_name1, chro_position1, mapping_quality1, cigar1, next_chro_name1, next_chro_pos1,  temp_len1, read_text1, qual_text1, additional_columns1[0]?"\t":"", additional_columns1);
+			if(global_context->input_reads.is_paired_end_reads)
+				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name2, flags2, chro_name2, chro_position2, mapping_quality2, cigar2, next_chro_name2, next_chro_pos2,  temp_len2, read_text2, qual_text2, additional_columns2[0]?"\t":"", additional_columns2);
+	
+			if( write_len < 10 || write_len_2 < 10 ){
+				global_context -> output_sam_is_full = 1;
 			}
-			thread_context -> output_buffer_pointer ++;
-			if(thread_context -> output_buffer_pointer >= MULTI_THREAD_OUTPUT_ITEMS * global_context -> config.reported_multi_best_reads) 
-				thread_context -> output_buffer_pointer =0;
-			thread_context -> output_buffer_item ++;
-			done = 1;
-			if(thread_context -> thread_id > 0 && thread_context -> output_buffer_item > MULTI_THREAD_OUTPUT_ITEMS*global_context -> config.reported_multi_best_reads * 3 / 5)
-				global_context -> need_merge_buffer_now = 1;
 		}
 
-		subread_lock_release(&thread_context -> output_lock);
-		//SUBREADprintf("30NOV2016-ADDBUFF-FREE BY THRE %d\n", thread_context -> thread_id);
-		if(done)break;
-		usleep(BUFFER_TICK_SLEEP_TIME);
+		subread_lock_release(&global_context -> output_lock);
 	}
-
 }
 
 #define write_chunk_results_145 write_chunk_results
@@ -2197,10 +2046,10 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	else{
 		//subread_lock_occupy(&global_context -> output_lock);
 		if(global_context -> config.is_BAM_output){
-			SamBam_writer_add_read(global_context -> output_bam_writer, read_name_1, flag1,  out_chro1 , out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1 , out_offset2, out_tlen1, read_len_1, read_text_1 + display_offset1, qual_text_1, extra_additional_1);
+			SamBam_writer_add_read(global_context -> output_bam_writer, -1, read_name_1, flag1,  out_chro1 , out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1 , out_offset2, out_tlen1, read_len_1, read_text_1 + display_offset1, qual_text_1, extra_additional_1, !global_context->input_reads.is_paired_end_reads);
 
 			if(global_context->input_reads.is_paired_end_reads)
-				SamBam_writer_add_read(global_context -> output_bam_writer, read_name_2, flag2,  out_chro2 , out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2 , out_offset1, out_tlen2, read_len_2, read_text_2 + display_offset2, qual_text_2, extra_additional_2);
+				SamBam_writer_add_read(global_context -> output_bam_writer, -1, read_name_2, flag2,  out_chro2 , out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2 , out_offset1, out_tlen2, read_len_2, read_text_2 + display_offset2, qual_text_2, extra_additional_2, 1);
 		}
 		else
 		{
@@ -3137,16 +2986,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	}
 
 	destroy_output_context(global_context, &out_context);	
-
-	if(thread_context && 0 == thread_context -> thread_id){
-		while(1){
-			int all_finished = 0;
-			merge_buffered_output_file(global_context, 1, 0, &all_finished);
-			if(all_finished) break;
-			usleep(100);
-		}
-	}
-
+	if(global_context ->config.all_threads >1 && global_context ->config.is_BAM_output && !global_context ->config.is_input_read_order_required)SamBam_writer_finalise_thread(global_context -> output_bam_writer, thread_context -> thread_id);
 	//SUBREADprintf("29NOV2016-QUIT TH-%d\n", thread_context->thread_id );
 	return 0;
 }
@@ -3505,10 +3345,6 @@ void * run_in_thread(void * pthread_param)
 	}
 
 	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_DETAILS, "finished running %d", task);
-
-	if(thread_context)
-		thread_context -> is_finished = 1;
-
 	return NULL;
 }
 
@@ -3545,8 +3381,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 		memset(thread_contexts, 0, sizeof(thread_context_t)*64);
 		global_context -> all_thread_contexts = thread_contexts;
 
-		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++)
-		{
+		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++) {
 			thread_contexts[current_thread_no].thread_id = current_thread_no;
 			init_indel_thread_contexts(global_context, thread_contexts+current_thread_no, task);
 			if((global_context->config.do_breakpoint_detection || global_context-> config.do_fusion_detection || global_context->config.do_breakpoint_detection || global_context-> config.do_long_del_detection))
@@ -3562,8 +3397,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 			pthread_create(&thread_contexts[current_thread_no].thread, NULL,  run_in_thread, &thr_parameters);
 		}
 
-		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++)
-		{
+		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++) {
 			pthread_join(thread_contexts[current_thread_no].thread, NULL);
 			
 			if(STEP_ITERATION_TWO == task){
@@ -3582,17 +3416,12 @@ int run_maybe_threads(global_context_t *global_context, int task)
 			ret_value += *(ret_values + current_thread_no);
 			if(ret_value)break;
 		}
-		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++){
-			if(thread_contexts[current_thread_no].output_buffer_item > 0)
-				SUBREADprintf("ERROR: UNFINISHED OUTPUT!\n");
-		}
 
 		// sort and merge events from all threads and the global event space.
 		finalise_indel_and_junction_thread(global_context, thread_contexts, task);
-		if(STEP_VOTING == task){
+		if(STEP_VOTING == task)
 			// sort the event entry table at each location.
 			sort_junction_entry_table(global_context);
-		}
 	}
 
 	if(CORE_SOFT_BR_CHAR == '\r')
@@ -3838,20 +3667,20 @@ int print_configuration(global_context_t * context)
 	        print_in_box(80, 0, 0, "Function      : Read alignment%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
 	if( context->config.second_read_file[0])
 	{
-	        print_in_box(80, 0, 0, "Input file 1  : %s", context->config.first_read_file);
-	        print_in_box(80, 0, 0, "Input file 2  : %s", context->config.second_read_file);
+	        print_in_box(80, 0, 0, "Input file 1  : %s", get_short_fname(context->config.first_read_file));
+	        print_in_box(80, 0, 0, "Input file 2  : %s", get_short_fname(context->config.second_read_file));
 	}
 	else
-	        print_in_box(80, 0, 0, "Input file    : %s%s", context->config.first_read_file, context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):"");
+	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):"");
 
 	if(context->config.output_prefix [0])
-	        print_in_box(80, 0, 0, "Output file   : %s (%s)", context->config.output_prefix, context->config.is_BAM_output?"BAM":"SAM");
+	        print_in_box(80, 0, 0, "Output file   : %s (%s)%s", get_short_fname(context->config.output_prefix), context->config.is_BAM_output?"BAM":"SAM", context->config.is_input_read_order_required?", Keep Order":"");
 	else
 	        print_in_box(80, 0, 0, "Output method : STDOUT (%s)" , context->config.is_BAM_output?"BAM":"SAM");
 
-	print_in_box(80, 0, 0,         "Index name    : %s", context->config.index_prefix);
+	print_in_box(80, 0, 0,         "Index name    : %s", get_short_fname(context->config.index_prefix));
 	if(context->config.exon_annotation_file[0])
-		print_in_box(80, 0, 0,         "Annotations   : %s (%s)", context->config.exon_annotation_file, context->config.exon_annotation_file_type==FILE_TYPE_GTF?"GTF":"SAF");
+		print_in_box(80, 0, 0,         "Annotations   : %s (%s)",get_short_fname( context->config.exon_annotation_file), context->config.exon_annotation_file_type==FILE_TYPE_GTF?"GTF":"SAF");
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 0, 1, "------------------------------------");
 	print_in_box(80, 0, 0, "");
@@ -3959,6 +3788,7 @@ void write_sam_headers(global_context_t * context)
 		}
 		snprintf(obuf,299, "@PG\tID:subread\tPN:subread\tVN:%s", SUBREAD_VERSION);
 		SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
+		SamBam_writer_finish_header(context -> output_bam_writer);
 	}
 	else
 	{
@@ -4168,7 +3998,7 @@ int load_global_context(global_context_t * context)
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
-			SamBam_writer_create(context -> output_bam_writer , tmp_fname);
+			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads);
 			context -> output_sam_fp = NULL;
 		}
 		else
@@ -4189,7 +4019,7 @@ int load_global_context(global_context_t * context)
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
-			SamBam_writer_create(context -> output_bam_writer ,NULL);
+			SamBam_writer_create(context -> output_bam_writer ,NULL, context -> config.all_threads);
 		}
 		context->output_sam_fp = NULL;
 	}

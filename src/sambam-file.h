@@ -114,10 +114,18 @@ typedef struct
 	int writer_state;
 	int is_internal_error;
 	unsigned int crc0;
+
+	int threads;
+	z_stream * threads_output_stream;
+	char ** threads_chunk_buffer;
+	char ** threads_chunk_buffer_compressed;
+	int * threads_chunk_buffer_used;
 	
 	HashTable * chromosome_name_table;
 	HashTable * chromosome_id_table;
 	HashTable * chromosome_len_table;
+
+	subread_lock_t thread_bam_lock;
 } SamBam_Writer;
 
 // This function reads the next BAM section from the bam_fp. The buffer has a variable length but should be at least 64K bytes.
@@ -166,7 +174,7 @@ int SamBam_feof(SamBam_FILE * fp);
  */
 char * SamBam_fgets(SamBam_FILE * fp , char * buff , int buff_len , int seq_needed);
 
-int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname);
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads);
 
 int SamBam_writer_close(SamBam_Writer * writer);
 
@@ -174,7 +182,7 @@ int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text, int add
 
 int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length, int add_header_too);
 
-int SamBam_writer_add_read(SamBam_Writer * writer, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns);
+int SamBam_writer_add_read(SamBam_Writer * writer, int threadno, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns, int can_submit);
 
 int is_badBAM(char * fn);
 
@@ -188,4 +196,6 @@ void SamBam_read2bin(char * read_txt, char * read_bin);
 
 int convert_BAM_binary_to_SAM(SamBam_Reference_Info * chro_table, char * bam_bin, char * sam_txt);
 int is_paired_end_BAM(char * fn);
+void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id);
+void SamBam_writer_finish_header( SamBam_Writer * writer );
 #endif

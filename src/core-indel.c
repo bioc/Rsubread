@@ -736,10 +736,6 @@ int init_indel_thread_contexts(global_context_t * global_context, thread_context
 		memset(indel_thread_context -> final_reads_mismatches_array , 0, sizeof(unsigned short)*indel_context -> total_events);
 		memset(indel_thread_context -> final_counted_reads_array , 0, sizeof(unsigned short)*indel_context -> total_events);
 
-		thread_context -> output_buffer = malloc(sizeof(output_fragment_buffer_t) * global_context -> config.reported_multi_best_reads * MULTI_THREAD_OUTPUT_ITEMS);
-		thread_context -> output_buffer_item = 0;
-		thread_context -> output_buffer_pointer = 0;
-
 		subread_init_lock(&thread_context -> output_lock);
 
 	}
@@ -1160,7 +1156,6 @@ int finalise_indel_and_junction_thread(global_context_t * global_context, thread
 				}
 				free(indel_thread_context -> final_counted_reads_array);
 				free(indel_thread_context -> final_reads_mismatches_array);
-				free(thread_context -> output_buffer);
 				free(indel_thread_context);
 			}
 	}
@@ -4457,6 +4452,7 @@ void init_global_context(global_context_t * context)
 
 	context->config.is_BAM_output = 1;
 	context->config.is_BAM_input = 0;
+	context->config.is_input_read_order_required = 0;
 	context->config.read_trim_5 = 0;
 	context->config.read_trim_3 = 0;
 	context->config.minimum_exonic_subread_fraction = -1.0;

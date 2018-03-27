@@ -1,13 +1,16 @@
 align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subread",output_format,sep="."),phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
-    readfile1 <- as.character(readfile1)
-    output_file <- as.character(output_file)
+    readfile1 <- normalizePath(as.character(readfile1), mustWork=T)
+    output_file <- normalizePath(as.character(output_file), mustWork=F)
+	index <- normalizePath(index, mustWork=F)
+    if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = normalizePath(annot.ext, mustWork=T)
+	if(!is.null(chrAliases)) chrAliases = normalizePath(chrAliases, mustWork=T)
     
 	if(length(readfile1) != length(output_file))
 		stop("The number of input file names is different from the number of output file names.")
 
 	if(!is.null(readfile2)){
-        readfile2 <- as.character(readfile2)
+        readfile2 <- normalizePath(as.character(readfile2), mustWork=T)
 		if(length(readfile1) != length(readfile2))
 			stop("The number of file names for the first reads is different from the number of file names for the second reads.")
 	}
