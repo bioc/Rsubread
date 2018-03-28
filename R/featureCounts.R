@@ -4,7 +4,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	files <- normalizePath(files, mustWork=T)
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- normalizePath(annot.ext, mustWork=T)
 	if(!is.null(chrAliases))chrAliases <- normalizePath(chrAliases, mustWork=T)
-	if(!is.null(genome)) genome <- -normalizePath(genome, mustWork=T)
+	if(!is.null(genome)) genome <- normalizePath(genome, mustWork=T)
 	if(!is.null(reportReadsPath))reportReadsPath <- normalizePath(reportReadsPath, mustWork=T)
 
 	if(is.null(annot.ext)){
