@@ -4882,9 +4882,10 @@ void print_usage()
 	SUBREADputs("                      following formats: CORE, SAM and BAM. See Users Guide for");
 	SUBREADputs("                      more info about these formats.");
 	SUBREADputs("");
-	SUBREADputs("  --Rpath <string>    The path to store the detailed assignment result files.");
-	SUBREADputs("                      The detailed assignment result filess are created in the");
-	SUBREADputs("                      same directory of the output count file by default.");
+	SUBREADputs("  --Rpath <string>    Directory under which the detailed assignment result files");
+	SUBREADputs("                      are created. The detailed assignment result files are");
+	SUBREADputs("                      created in the same directory of the counting result file");
+	SUBREADputs("                      by default.");
 	SUBREADputs("");
 
 	SUBREADputs("# Miscellaneous");

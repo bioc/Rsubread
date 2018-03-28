@@ -15,6 +15,7 @@ type="rna",
 input_format="gzFASTQ",
 output_format="BAM",
 output_file=paste(as.character(readfile1),"subread",output_format,sep="."),
+keepReadOrder=FALSE,
 
 # offset value added to Phred quality scores of read bases
 phredOffset=33,
@@ -80,6 +81,7 @@ readfile2=NULL,
 input_format="gzFASTQ",
 output_format="BAM",
 output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),
+keepReadOrder=FALSE,
 
 # offset value added to Phred quality scores of read bases
 phredOffset=33,

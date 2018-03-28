@@ -3101,11 +3101,13 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 	if(column_no == 11)	// has extra tags
 	{
 		while(in_str[in_ptr] == '\t'){
-			if((!isalpha(in_str[in_ptr+1])) || (!isalpha(in_str[in_ptr+2])) || (!isalpha(in_str[in_ptr+4]))){
+			if((!isalpha(in_str[in_ptr+1])) || (!isalpha(in_str[in_ptr+4]))){
 				while(in_str[in_ptr] !='\n')in_ptr++;
 				break;
 			}
 			in_ptr ++;
+
+			//SUBREADprintf("EXTRA_TAGS : %c%c : %c\n",in_str[in_ptr+0], in_str[in_ptr+1], in_str[in_ptr+3]);
 
 			int is_important_tag =  (in_str[in_ptr+0] == 'N' && in_str[in_ptr+1] == 'H') ||
 						(in_str[in_ptr+0] == 'H' && in_str[in_ptr+1] == 'I') ||

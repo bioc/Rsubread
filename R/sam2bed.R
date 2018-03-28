@@ -1,7 +1,7 @@
 sam2bed <- function(samfile,bedfile,readlen)
 {
-	samfile <- normalizePaths(samfile, mustWork=T)
-	bedfile <- normalizePaths(bedfile, mustWork=F)
+	samfile <- normalizePath(samfile, mustWork=T)
+	bedfile <- normalizePath(bedfile, mustWork=F)
 	opt <- paste("-n",readlen,samfile,bedfile,sep=",")
 	cmd <- paste("sam2bed",opt,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
