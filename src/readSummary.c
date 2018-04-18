@@ -4882,10 +4882,9 @@ void print_usage()
 	SUBREADputs("                      following formats: CORE, SAM and BAM. See Users Guide for");
 	SUBREADputs("                      more info about these formats.");
 	SUBREADputs("");
-	SUBREADputs("  --Rpath <string>    Directory under which the detailed assignment result files");
-	SUBREADputs("                      are created. The detailed assignment result files are");
-	SUBREADputs("                      created in the same directory of the counting result file");
-	SUBREADputs("                      by default.");
+	SUBREADputs("  --Rpath <string>    Specify a directory to save the detailed assignment");
+	SUBREADputs("                      results. If unspecified, the directory where counting");
+	SUBREADputs("                      results are saved is used.");
 	SUBREADputs("");
 
 	SUBREADputs("# Miscellaneous");
@@ -5504,6 +5503,11 @@ int readSummary(int argc,char *argv[]){
 		long_read_minimum_length = atoi(argv[44])?1:1999999999;
 	else  long_read_minimum_length = 1999999999;
 
+	if(long_read_minimum_length < 2 && isPE){
+		SUBREADputs("ERROR: long read assignment can only be done on single-end mode");
+		return -1;
+	}
+
 	if(argc>45)
 		is_verbose = (argv[45][0]=='1'); 
 	else  is_verbose = 0;
@@ -6034,7 +6038,7 @@ int feature_count_main(int argc, char ** argv)
 	strcpy(nameFeatureTypeColumn,"exon");
 	strcpy(nameGeneIDColumn,"gene_id");
 	strcpy(temp_dir, "<use output directory>");
-	annot_name[0]=0;out_name[0]=0;
+	annot_name[0]=0;out_name[0]=0;Rpath[0]=0;
 	
 
 	cmd_rebuilt[0]=0;

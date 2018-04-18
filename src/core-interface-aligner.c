@@ -103,10 +103,6 @@ void print_usage_core_aligner()
 	SUBREADputs("");
 	SUBREADputs("  --SAMoutput       Save mapping results in SAM format.");
 	SUBREADputs("");
-	SUBREADputs("  --keepReadOrder   Keep order of reads in BAM output the same as that in the");
-	SUBREADputs("                    input file. Reads from the same pair are always placed next");
-	SUBREADputs("                    to each other no matter this option is specified or not.");
-	SUBREADputs("");
 	SUBREADputs("# Phred offset");
 	SUBREADputs("");
 	SUBREADputs("  -P <3:6>          Offset value added to the Phred quality score of each read");
@@ -173,6 +169,12 @@ void print_usage_core_aligner()
 	SUBREADputs("  --rg-id <string>  Add read group ID to the output.");
 	SUBREADputs("");
 	SUBREADputs("  --rg <string>     Add <tag:value> to the read group (RG) header in the output.");
+	SUBREADputs("");
+	SUBREADputs("# read order");
+	SUBREADputs("");
+	SUBREADputs("  --keepReadOrder   Keep order of reads in BAM output the same as that in the");
+	SUBREADputs("                    input file. Reads from the same pair are always placed next");
+	SUBREADputs("                    to each other no matter this option is specified or not.");
 	SUBREADputs("");
 	SUBREADputs("# color space reads");
 	SUBREADputs("");

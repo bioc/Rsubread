@@ -15,7 +15,6 @@ type="rna",
 input_format="gzFASTQ",
 output_format="BAM",
 output_file=paste(as.character(readfile1),"subread",output_format,sep="."),
-keepReadOrder=FALSE,
 
 # offset value added to Phred quality scores of read bases
 phredOffset=33,
@@ -50,6 +49,9 @@ nthreads=1,
 readGroupID=NULL,
 readGroup=NULL,
 
+# read order
+keepReadOrder=FALSE,
+
 # color space reads
 color2base=FALSE,
 
@@ -81,7 +83,6 @@ readfile2=NULL,
 input_format="gzFASTQ",
 output_format="BAM",
 output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),
-keepReadOrder=FALSE,
 
 # offset value added to Phred quality scores of read bases
 phredOffset=33,
@@ -116,6 +117,9 @@ nthreads=1,
 readGroupID=NULL,
 readGroup=NULL,
 
+# read order
+keepReadOrder=FALSE,
+
 # color space reads
 color2base=FALSE,
 
@@ -145,7 +149,6 @@ chrAliases=NULL)
   \item{input_format}{ character string specifying format of read input files. \code{gzFASTQ} by default (this also includes FASTQ, FASTA and gzipped FASTA formats). Other supported formats include \code{SAM} and \code{BAM}. Character values are case insensitive.}
   \item{output_format}{ character string specifying format of output file. \code{BAM} by default. Acceptable formats include \code{SAM} and \code{BAM}.}
   \item{output_file}{ a character vector specifying names of output files. By default, names of output files are set as the file names provided in \code{readfile1} added with an suffix string.}
-  \item{keepReadOrder}{ logical indicating if the order of reads in the BAM output is kept the same as that in the input file. Reads from the same pair are always placed next to each other no matter this option is specified or not.}
   \item{phredOffset}{ numeric value added to base-calling Phred scores to make quality scores (represented as ASCII letters). Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
   \item{nsubreads}{ numeric value giving the number of subreads extracted from each read.}
   \item{TH1}{ numeric value giving the consensus threshold for reporting a hit. This is the threshold for the first reads if paired-end read data are provided.}
@@ -163,6 +166,7 @@ chrAliases=NULL)
   \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.}
   \item{readGroupID}{ a character string giving the read group ID. The specified string is added to the read group header field and also be added to each read in the mapping output. \code{NULL} by default.}
   \item{readGroup}{ a character string in the format of \code{tag:value}. This string will be added to the read group (RG) header in the mapping output. \code{NULL} by default.}
+  \item{keepReadOrder}{ logical indicating if the order of reads in the BAM output is kept the same as that in the input file. Reads from the same pair are always placed next to each other no matter this option is specified or not.}
   \item{color2base}{ logical. If \code{TRUE}, color-space read bases will be converted to base-space bases in the mapping output. Note that the mapping itself will still be performed at color-space. \code{FALSE} by default.}
   \item{DP_GapOpenPenalty}{ a numeric value giving the penalty for opening a gap when using the Smith-Waterman dynamic programming algorithm to detect insertions and deletions. The Smith-Waterman algorithm is only applied for those reads which are found to contain insertions or deletions. \code{-1} by default.}
   \item{DP_GapExtPenalty}{ a numeric value giving the penalty for extending the gap, used by the Smith-Waterman algorithm. \code{0} by default.}

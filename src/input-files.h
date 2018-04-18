@@ -129,7 +129,7 @@ typedef struct {
 	int merge_level_finished;
 	int max_file_open_number;
 	subread_lock_t input_fp_lock;
-	subread_lock_t output_header_lock;
+	subread_lock_t SAM_BAM_table_lock;
 	subread_lock_t unsorted_notification_lock;
 
 	unsigned long long total_input_reads;

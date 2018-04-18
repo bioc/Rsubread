@@ -342,6 +342,145 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 {
 	int is_better_result = 0, is_same_best = 0;
 
+
+	if(explain_context -> best_matching_bases < explain_context-> tmp_total_matched_bases)
+	{
+		is_better_result = 1;
+		explain_context -> best_is_complex = explain_context -> tmp_search_sections ;
+		explain_context -> is_currently_tie = 0;
+		explain_context -> best_support_as_simple = explain_context -> tmp_support_as_simple;
+		explain_context -> best_min_unsupport_as_simple = explain_context -> tmp_min_unsupport;
+		explain_context -> best_min_support_as_complex = explain_context -> tmp_min_support_as_complex;
+		explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
+		explain_context -> second_best_matching_bases = max(explain_context -> second_best_matching_bases, explain_context -> best_matching_bases); 
+		explain_context -> best_matching_bases = explain_context-> tmp_total_matched_bases ;
+
+	}
+	else if(explain_context -> best_matching_bases == explain_context-> tmp_total_matched_bases)
+	{
+		// only gapped explainations are complex counted.
+		explain_context -> best_is_complex +=  explain_context -> tmp_search_sections;
+		explain_context -> second_best_matching_bases = explain_context -> best_matching_bases;
+
+		if(0 && FIXLENstrcmp("R010442852", explain_context -> read_name) == 0){
+			SUBREADprintf("complexity: curr=%d, new=%d   ;   sections=%d\n", explain_context->best_min_support_as_complex, explain_context -> tmp_min_support_as_complex, explain_context -> tmp_search_sections );
+		}
+		if(explain_context -> best_is_complex > 1)
+		{
+			// is complex now!
+			if(explain_context -> tmp_search_sections == 0)
+			{
+				if(explain_context -> tmp_min_unsupport >explain_context->best_min_support_as_complex){
+					is_better_result = 1;
+					explain_context->best_min_support_as_complex =explain_context -> tmp_min_unsupport;
+					explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
+					explain_context -> is_currently_tie = 0;
+				}
+				else if(explain_context -> tmp_min_unsupport == explain_context->best_min_support_as_complex)
+				{
+					explain_context -> is_currently_tie = 1;
+					is_same_best = 1;
+				}
+			}
+			else{
+				if(explain_context -> tmp_min_support_as_complex  >explain_context->best_min_support_as_complex){
+					is_better_result = 1;
+					explain_context -> best_min_support_as_complex =explain_context -> tmp_min_support_as_complex;
+					explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
+					explain_context -> is_currently_tie = 0;
+				}
+				else if(explain_context -> tmp_min_support_as_complex  == explain_context->best_min_support_as_complex){
+					explain_context -> is_currently_tie = 1;
+					is_same_best = 1;
+				}
+			}
+
+		}
+		else
+		{
+			// this branch is reached ONLY if the last best is ONE-gapped (50M3D50M) and the current best is ungapped (100M)!
+			if(explain_context -> best_is_pure_donor_found_explain)
+			{
+				if(explain_context -> best_min_unsupport_as_simple >= explain_context -> best_support_as_simple+2)
+				{
+					is_better_result = 1;
+					explain_context -> best_min_support_as_complex = explain_context -> best_min_unsupport_as_simple;
+					explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
+					explain_context -> is_currently_tie = 0;
+				}
+			}
+	//#warning "======= MAKE if(0) IS CORRECT BEFORE RELEASE ======"
+			else if(0)
+				if(explain_context -> best_min_unsupport_as_simple >= explain_context -> best_support_as_simple)
+				{
+					is_better_result = 1;
+					explain_context -> best_min_support_as_complex = explain_context -> best_min_unsupport_as_simple;
+					explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
+					explain_context -> is_currently_tie = 0;
+				}
+		}
+	}
+	else return;
+
+	if(is_better_result || is_same_best){
+		if(search_to_back){
+			explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_start =  0;
+		}else{
+			explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_end = explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_start + remainder_len;
+			explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].event_after_section = NULL;
+		}
+	}
+
+	if(0 && FIXLENstrcmp("R010442852", explain_context -> read_name) == 0){
+		SUBREADprintf("TRY_REPLACE_DESICION TO %s: BETTER=%d, SAME=%d ; CURRENT : %d secs ; NEWBEST : %d secs\n", search_to_back?"BACK":"FRONT", is_better_result, is_same_best, search_to_back? explain_context -> result_back_junction_numbers[0]:explain_context -> result_front_junction_numbers[0] ,explain_context -> tmp_search_sections);
+		int xx1;
+		for(xx1 = 0; xx1 < explain_context -> tmp_search_sections;xx1++){
+			SUBREADprintf("  Event : %d ~ %d in read\n", explain_context -> tmp_search_junctions[xx1].read_pos_start, explain_context -> tmp_search_junctions[xx1].read_pos_end);
+			if(explain_context -> tmp_search_junctions[xx1].event_after_section){
+				SUBREADprintf("    ");
+				debug_show_event(global_context, explain_context -> tmp_search_junctions[xx1].event_after_section);
+			}
+		}
+	}
+
+	if(is_better_result)
+	{
+		if(search_to_back){
+			explain_context -> all_back_alignments = 1;
+			explain_context -> result_back_junction_numbers[0] = explain_context -> tmp_search_sections +1;
+			// checked: memory boundary
+			memcpy(explain_context -> result_back_junctions[0], explain_context -> tmp_search_junctions , sizeof(perfect_section_in_read_t) * (explain_context -> tmp_search_sections +1)); 
+	
+		}else{
+			explain_context -> all_front_alignments = 1;
+			explain_context -> result_front_junction_numbers[0] = explain_context -> tmp_search_sections +1;
+			// checked: memory boundary
+			memcpy(explain_context -> result_front_junctions[0], explain_context -> tmp_search_junctions , sizeof(perfect_section_in_read_t) * (explain_context -> tmp_search_sections +1)); 
+		}
+
+	}else if(is_same_best){
+		if(search_to_back && explain_context -> all_back_alignments < MAX_ALIGNMENT_PER_ANCHOR){
+			explain_context -> result_back_junction_numbers[explain_context -> all_back_alignments] = explain_context -> tmp_search_sections +1;
+
+			// checked: memory boundary
+			memcpy(explain_context -> result_back_junctions[explain_context -> all_back_alignments], explain_context -> tmp_search_junctions , sizeof(perfect_section_in_read_t) * (explain_context -> tmp_search_sections +1)); 
+			explain_context -> all_back_alignments ++;
+		}else if((!search_to_back) && explain_context -> all_front_alignments < MAX_ALIGNMENT_PER_ANCHOR){
+			explain_context -> result_front_junction_numbers[explain_context -> all_front_alignments] = explain_context -> tmp_search_sections +1;
+
+			// checked: memory boundary
+			memcpy(explain_context -> result_front_junctions[explain_context -> all_front_alignments], explain_context -> tmp_search_junctions , sizeof(perfect_section_in_read_t) * (explain_context -> tmp_search_sections +1)); 
+			explain_context -> all_front_alignments ++;
+		}
+	}
+}
+
+
+
+void new_explain_try_replace_xe(global_context_t* global_context, thread_context_t * thread_context, explain_context_t * explain_context, int remainder_len, int search_to_back)
+{
+	int is_better_result = 0, is_same_best = 0;
+
 	//SUBREADprintf("TRYING SET %s %s : Matched_bases : %d -> %d ; SECS : %d -> %d\n", explain_context -> read_name, search_to_back?"BACK":"FRONT", explain_context -> best_matching_bases, explain_context-> tmp_total_matched_bases, search_to_back? explain_context -> result_back_junction_numbers[0]:explain_context -> result_front_junction_numbers[0] ,explain_context -> tmp_search_sections );
 
 	if(explain_context -> best_matching_bases < explain_context-> tmp_total_matched_bases)

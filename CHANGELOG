@@ -1,3 +1,6 @@
+10 Apr 2018 - 1.29.3
+(1) Largedly improved the speed of featureCounts on the BAM files that have reads overhanging two gzipped blocks. This includes BAM files from STAR and Picard.
+
 28 Mar 2018 - 1.29.2
 (1) Added 'reportReadsPath' option to featureCounts().
 (2) Allowed tilde (~) in input or output file names for all the functions.
