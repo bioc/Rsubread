@@ -2932,7 +2932,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					memcpy(&Treclen, *bin_where, 4);
 					memcpy(&Tseqlen, (*bin_where)+20, 4);
 					assert(record_len == Treclen);
-					int is_bin_start = is_read_bin(*bin_where, thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr +4 , pairer -> BAM_n_ref, NULL);
+					int is_bin_start = is_read_bin(*bin_where, thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr +4 , pairer -> BAM_n_ref);
 					SUBREADprintf("TREC TH_%d: reclen=%u, seqlen=%u, IS_BIN=%d\n", thread_context -> thread_id, Treclen, Tseqlen, is_bin_start);
 					assert(is_bin_start == 1);
 				}
