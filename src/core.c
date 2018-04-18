@@ -1745,25 +1745,33 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 		if(global_context->input_reads.is_paired_end_reads)
 			SamBam_writer_add_read(global_context -> output_bam_writer, thread_context -> thread_id, read_name2, flags2, chro_name2, chro_position2, mapping_quality2, cigar2, next_chro_name2, next_chro_pos2, temp_len2, read_len2, read_text2, qual_text2, additional_columns2, 1);
 	}else{
-		subread_lock_occupy(&global_context -> output_lock);
+		while(1){
+			int is_fin = 0;
+			subread_lock_occupy(&global_context -> output_lock);
+			//SUBREADprintf("THWT : TH_%d IS AFTER %lld ; LAST=%lld\n", thread_context -> thread_id, pair_number -1, global_context -> last_written_fragment_number);
+			if(global_context -> last_written_fragment_number == pair_number-1){
+				if(global_context -> config.is_BAM_output){
+					SamBam_writer_add_read(global_context -> output_bam_writer, -1, read_name1, flags1,  chro_name1 , chro_position1, mapping_quality1, cigar1, next_chro_name1 , next_chro_pos1, temp_len1, read_len1, read_text1, qual_text1, additional_columns1, !global_context->input_reads.is_paired_end_reads);
 
-		if(global_context -> config.is_BAM_output){
-			SamBam_writer_add_read(global_context -> output_bam_writer, -1, read_name1, flags1,  chro_name1 , chro_position1, mapping_quality1, cigar1, next_chro_name1 , next_chro_pos1, temp_len1, read_len1, read_text1, qual_text1, additional_columns1, !global_context->input_reads.is_paired_end_reads);
+					if(global_context->input_reads.is_paired_end_reads)
+						SamBam_writer_add_read(global_context -> output_bam_writer, -2, read_name2, flags2,  chro_name2 , chro_position2, mapping_quality2, cigar2, next_chro_name2 , next_chro_pos2, temp_len2, read_len2, read_text2, qual_text2, additional_columns2, 1);
 
-			if(global_context->input_reads.is_paired_end_reads)
-				SamBam_writer_add_read(global_context -> output_bam_writer, -2, read_name2, flags2,  chro_name2 , chro_position2, mapping_quality2, cigar2, next_chro_name2 , next_chro_pos2, temp_len2, read_len2, read_text2, qual_text2, additional_columns2, 1);
-
-		}else{
-			int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name1, flags1, chro_name1, chro_position1, mapping_quality1, cigar1, next_chro_name1, next_chro_pos1,  temp_len1, read_text1, qual_text1, additional_columns1[0]?"\t":"", additional_columns1);
-			if(global_context->input_reads.is_paired_end_reads)
-				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name2, flags2, chro_name2, chro_position2, mapping_quality2, cigar2, next_chro_name2, next_chro_pos2,  temp_len2, read_text2, qual_text2, additional_columns2[0]?"\t":"", additional_columns2);
-	
-			if( write_len < 10 || write_len_2 < 10 ){
-				global_context -> output_sam_is_full = 1;
+				}else{
+					int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name1, flags1, chro_name1, chro_position1, mapping_quality1, cigar1, next_chro_name1, next_chro_pos1,  temp_len1, read_text1, qual_text1, additional_columns1[0]?"\t":"", additional_columns1);
+					if(global_context->input_reads.is_paired_end_reads)
+						write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name2, flags2, chro_name2, chro_position2, mapping_quality2, cigar2, next_chro_name2, next_chro_pos2,  temp_len2, read_text2, qual_text2, additional_columns2[0]?"\t":"", additional_columns2);
+			
+					if( write_len < 10 || write_len_2 < 10 ){
+						global_context -> output_sam_is_full = 1;
+					}
+				}
+				global_context -> last_written_fragment_number = pair_number;
+				is_fin = 1;
 			}
+			subread_lock_release(&global_context -> output_lock);
+			if(is_fin)break;
+			usleep(2);
 		}
-
-		subread_lock_release(&global_context -> output_lock);
 	}
 }
 
@@ -3354,7 +3362,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 	int ret_value =0;
 
 	if(task == STEP_ITERATION_TWO){
-		global_context -> last_written_fragment_number = 0;
+		global_context -> last_written_fragment_number = -1;
 	}
 
 

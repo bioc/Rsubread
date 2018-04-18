@@ -497,7 +497,7 @@ typedef struct{
 	// running contexts
 	void * module_contexts[5]; 
 	thread_context_t * all_thread_contexts;
-	int last_written_fragment_number;
+	subread_read_number_t last_written_fragment_number;
 	int need_merge_buffer_now;
 	read_input_t input_reads;
 	bigtable_t bigtable;
