@@ -2778,6 +2778,7 @@ void SAM_pairer_reduce_BAM_bin(SAM_pairer_context_t * pairer, SAM_pairer_thread_
 
 #define MAX_BIN_RECORD_LENGTH ( 24*1024)
 int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context, int include_sequence);
+int is_read_bin(char * bin, int bin_len, int max_refID);
 
 int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , unsigned char ** bin_where, int * bin_len ) {
 	if( pairer -> input_is_BAM ){
