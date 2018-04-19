@@ -1,3 +1,6 @@
+19 April 2018 - 1.29.4
+(1) Update NEWS file.
+
 10 Apr 2018 - 1.29.3
 (1) Largedly improved the speed of featureCounts on the BAM files that have reads overhanging two gzipped blocks. This includes BAM files from STAR and Picard.
 
