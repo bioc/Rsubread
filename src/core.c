@@ -1765,7 +1765,7 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 						global_context -> output_sam_is_full = 1;
 					}
 				}
-				global_context -> last_written_fragment_number = pair_number;
+				if(all_locations == this_location +1)global_context -> last_written_fragment_number = pair_number;
 				is_fin = 1;
 			}
 			subread_lock_release(&global_context -> output_lock);
