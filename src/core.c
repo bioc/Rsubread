@@ -1748,7 +1748,7 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 		while(1){
 			int is_fin = 0;
 			subread_lock_occupy(&global_context -> output_lock);
-			//SUBREADprintf("THWT : TH_%d IS AFTER %lld ; LAST=%lld\n", thread_context -> thread_id, pair_number -1, global_context -> last_written_fragment_number);
+			//SUBREADprintf("THWT : TH_%d IS AFTER %lld ; LAST=%lld (%d/%d)\n", thread_context -> thread_id, pair_number -1, global_context -> last_written_fragment_number, this_location, all_locations);
 			if(global_context -> last_written_fragment_number == pair_number-1){
 				if(global_context -> config.is_BAM_output){
 					SamBam_writer_add_read(global_context -> output_bam_writer, -1, read_name1, flags1,  chro_name1 , chro_position1, mapping_quality1, cigar1, next_chro_name1 , next_chro_pos1, temp_len1, read_len1, read_text1, qual_text1, additional_columns1, !global_context->input_reads.is_paired_end_reads);
@@ -1765,7 +1765,7 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 						global_context -> output_sam_is_full = 1;
 					}
 				}
-				if(all_locations == this_location +1)global_context -> last_written_fragment_number = pair_number;
+				if(all_locations <= this_location +1)global_context -> last_written_fragment_number = pair_number;
 				is_fin = 1;
 			}
 			subread_lock_release(&global_context -> output_lock);
