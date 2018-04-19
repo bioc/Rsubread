@@ -7,7 +7,7 @@ exactSNP <- function(readFile,isBAM=FALSE,refGenomeFile,SNPAnnotationFile=NULL,o
   readFile <- normalizePath(readFile, mustWork=T)
   refGenomeFile <- normalizePath(refGenomeFile, mustWork=T);
   outputFile <- normalizePath(outputFile, mustWork=F)
-  SNPAnnotationFile <- normalizePath(SNPAnnotationFile, mustWork=T)
+  if(!is.null(SNPAnnotationFile))SNPAnnotationFile <- normalizePath(SNPAnnotationFile, mustWork=T)
 
   opt <- paste("-i",readFile,sep=",")
   
