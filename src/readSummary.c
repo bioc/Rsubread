@@ -4116,7 +4116,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname);
 		} else {
-			sprintf(tmp_fname, "%s.%s.featureCounts%s", global_context -> raw_input_file_name, global_context -> input_file_short_name, global_context -> is_read_details_out == FILE_TYPE_BAM?".bam":(global_context -> is_read_details_out == FILE_TYPE_SAM?".sam":""));
+			sprintf(tmp_fname, "%s.featureCounts%s", global_context -> raw_input_file_name, global_context -> is_read_details_out == FILE_TYPE_BAM?".bam":(global_context -> is_read_details_out == FILE_TYPE_SAM?".sam":""));
 			modified_fname = tmp_fname;
 			while(modified_fname[0]=='/' || modified_fname[0]=='.' || modified_fname[0]=='\\'){
 				modified_fname ++;

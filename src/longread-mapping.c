@@ -314,7 +314,7 @@ int LRMinput_has_finished( LRMcontext_t * context ){
 
 int LRMload_index(LRMcontext_t * context){
 	int retv = 0;
-	char indextab_fname[LRMMAX_FILENAME_LENGTH];
+	char indextab_fname[LRMMAX_FILENAME_LENGTH + 20];
 
 	sprintf(indextab_fname, "%s.00.b.tab", context -> index_prefix);
 	retv = retv || LRMgehash_load(&(context -> current_index), indextab_fname);

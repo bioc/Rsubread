@@ -2932,7 +2932,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					memcpy(&Treclen, *bin_where, 4);
 					memcpy(&Tseqlen, (*bin_where)+20, 4);
 					assert(record_len == Treclen);
-					int is_bin_start = is_read_bin(*bin_where, thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr +4 , pairer -> BAM_n_ref);
+					int is_bin_start = is_read_bin(*bin_where, thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_used +4 , pairer -> BAM_n_ref);
 					SUBREADprintf("TREC TH_%d: reclen=%u, seqlen=%u, IS_BIN=%d\n", thread_context -> thread_id, Treclen, Tseqlen, is_bin_start);
 					assert(is_bin_start == 1);
 				}
@@ -4395,7 +4395,7 @@ int SAM_pairer_find_start(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * 
 	thread_context -> need_find_start = 0;
 	int start_pos = 0;
 	for(start_pos = 0; start_pos < min(MAX_BIN_RECORD_LENGTH, thread_context -> input_buff_BIN_used); start_pos++){
-		if(1==is_read_bin((char *)thread_context -> input_buff_BIN + start_pos, thread_context -> input_buff_SBAM_used - start_pos , pairer -> BAM_n_ref)){
+		if(1==is_read_bin((char *)thread_context -> input_buff_BIN + start_pos, thread_context -> input_buff_BIN_used - start_pos , pairer -> BAM_n_ref)){
 			//if(1) SUBREADprintf("STFIND # %d : start = %d\n", ++tfinds, start_pos);
 			if(start_pos>0){
 				char * margin_key = malloc(22);

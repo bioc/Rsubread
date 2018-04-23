@@ -1113,16 +1113,7 @@ int test_fully_covered(global_context_t * global_context, gene_vote_t *  vote, i
 }
 
 int is_long_del_high_quality(global_context_t * global_context, thread_context_t * thread_context, int p1_start, int p1_end, int p2_start, int p2_end, int read_len, int p1_votes, int p2_votes){
-	//SUBREADprintf("FULL COV: P1: %d - %d v=%d ; P2: %d - %d v=%d ; len : %d\n", p1_start, p1_end, p1_votes, p2_start, p2_end, p2_votes, read_len);
-	int mid_gap;
-	if( p1_start < p2_start ){
-		mid_gap = max(0, p2_start - p1_end);
-	}else{
-		mid_gap = max(0, p2_end - p1_start);
-	}
-
 	if(p1_votes < 3 || p2_votes < 3) return 0;
-	int total_gap = mid_gap + min( p1_start, p2_start ) + ( read_len - max(p1_end, p2_end) );
 	if( min( p1_start, p2_start ) > 10 ) return 0;
 	if( read_len - max(p1_end, p2_end)  > 10 ) return 0;
 	return 1;
@@ -1145,7 +1136,7 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 
 	if(global_context -> config.do_breakpoint_detection)
 	{
-		int i,j, current_piece_minor_score = 0;
+		int i,j;
 
 		// iterate all the anchors we have found in step 1:
 		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
@@ -1353,8 +1344,6 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 				}
 
 				if(replace_minor){// && (replace_minor > current_piece_minor_score)){
-					current_piece_minor_score = replace_minor;
-
 					junc_res -> minor_position = current_vote -> pos[i][j];
 					junc_res -> minor_votes = current_vote -> votes[i][j];
 
@@ -2201,21 +2190,13 @@ int find_donor_receptor(global_context_t * global_context, thread_context_t * th
 		for(x1 =0; x1<200; x1++) sp1s[x1]=' ';
 		sp1s[search_in_read_start] =0;
 
-		char sp2s[200];
-		for(x1 =0; x1<200; x1++) sp2s[x1]=' ';
-		sp2s[search_in_read_start + best_insertion_in_between] =0;
-
-
-
 		char spE[200];
 		for(x1 =0; x1<200; x1++) spE[x1]=' ';
 		spE[search_in_read_start + best_last_exon_base_in_start] =0;
 
-
 		char spBB[200];
 		for(x1 =0; x1<200; x1++) spBB[x1]=' ';
 		spBB[ best_insertion_in_between] =0;
-
 
 		char out1pos[100];
 		absoffset_to_posstr(global_context, search_in_chro_start, out1pos);
@@ -3060,15 +3041,12 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 				if(is_First_M && global_context -> config.show_soft_cliping)
 				{
 					int adj_coverage_start = covered_start - read_cursor;
-					char * debug_ptr = read_text;
-
 
 					if(current_reversed)
 					{
 						reversed_first_section_text = malloc(MAX_READ_LENGTH);
 						memcpy(reversed_first_section_text, read_text, tmp_int);
 						reverse_read(reversed_first_section_text, tmp_int,  global_context->config.space_type);
-						debug_ptr = reversed_first_section_text;
 
 						head_soft_clipped = find_soft_clipping(global_context, thread_context, current_value_index, reversed_first_section_text, current_perfect_section_abs, tmp_int, 1, 0);
 					}
@@ -3093,7 +3071,6 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 				if(is_Last_M && global_context -> config.show_soft_cliping)
 				{
 					int adj_coverage_end = covered_end - read_cursor;
-					char * debug_ptr = read_text + read_cursor;
 
 					if(current_reversed)
 					{
@@ -3101,7 +3078,6 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 						// checked: boundary
 						memcpy(reversed_first_section_text, read_text + read_cursor, tmp_int);
 						reverse_read(reversed_first_section_text, tmp_int,  global_context->config.space_type);
-						debug_ptr = reversed_first_section_text;
 						tail_soft_clipped = find_soft_clipping(global_context, thread_context, current_value_index, reversed_first_section_text, current_perfect_section_abs, tmp_int, 0, tmp_int);
 					}
 					else
@@ -3265,7 +3241,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_context_t * thread_context, explain_context_t * explain_context, realignment_result_t * final_realignments)
 {
 	int xk1, front_i, back_i;
-	char tmp_cigar[120], tmp_cigar_exonic[120];
+	char tmp_cigar[120];
 	chromosome_event_t * to_be_supported [20];
 	short flanking_size_left[20], flanking_size_right[20];
 	int to_be_supported_count = 0;
@@ -3329,7 +3305,6 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 			to_be_supported_count = 0;
 			tmp_cigar[0]=0;
-			tmp_cigar_exonic[0]=0;
 			int known_junction_supp = 0;
 
 			for(xk1 = 0; xk1 < explain_context -> result_back_junction_numbers[back_i] + explain_context -> result_front_junction_numbers[front_i] -1; xk1++)
@@ -3427,7 +3402,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 				}
 			}
 
-			int mismatch_bases = 0, isCigarOK = 0;
+			int mismatch_bases = 0;
 
 			//#warning ">>>>>>>>>>>>>>>> COMMENT NEXT LINE <<<<<<<<<<<<<<<<<<<<<<<"
 			//SUBREADprintf("ReadDebug:%s\t%s\n", explain_context -> read_name , tmp_cigar);
@@ -3449,11 +3424,10 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 
 
-			int final_qual = 0, applied_mismatch = 0, non_clipped_length = 0, total_indel_length = 0, total_coverage_length = 0, final_MATCH = 0, chromosomal_length = 0, full_section_clipped = 0;
+			int final_qual = 0, applied_mismatch = 0, non_clipped_length = 0, total_indel_length = 0, final_MATCH = 0, chromosomal_length = 0, full_section_clipped = 0;
 
 			if(is_exonic_read_fraction_OK)
 			{
-				total_coverage_length =  result -> confident_coverage_end - result -> confident_coverage_start;
 				final_qual  = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases, result -> confident_coverage_start, result -> confident_coverage_end,  explain_context -> read_name, &non_clipped_length, &total_indel_length, & final_MATCH, & chromosomal_length, & full_section_clipped);
 				//#warning ">>>>>>> COMMENT THIS <<<<<<<"
 				//printf("OCT27-STEP2-%s:%d-POS%u-VOT%d-CIG-%s [ %d ]-INDELs=%llu; M/MM=%d,%d\n", explain_context -> read_name, explain_context  -> is_second_read + 1,  result -> selected_position, result -> selected_votes, tmp_cigar, is_cigar_overflow, ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_entry_table -> numOfElements, final_MATCH, mismatch_bases);
@@ -3537,8 +3511,6 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 						if(is_RNA_from_positive)
 							realign_res -> realign_flags |= CORE_IS_GT_AG_DONORS;
 					}
-
-					isCigarOK=1;
 				}
 
 				realign_res -> first_base_position = final_position;
@@ -4170,7 +4142,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 			new_event -> event_large_side = right_edge_wanted + subjunc_result->indel_at_junction;
 			new_event -> critical_read_id = 2llu * pair_number + is_second_read;
 
-			int new_event_type = ((global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_fusion_detection || global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_long_del_detection) && !global_context -> config.prefer_donor_receptor_junctions)?CHRO_EVENT_TYPE_FUSION:CHRO_EVENT_TYPE_JUNCTION;
+			int new_event_type =(((global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_fusion_detection)||(global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_long_del_detection))&& !global_context -> config.prefer_donor_receptor_junctions)?CHRO_EVENT_TYPE_FUSION:CHRO_EVENT_TYPE_JUNCTION;
 
 			if(is_strand_jumped) new_event_type = CHRO_EVENT_TYPE_FUSION;
 			if((subjunc_result->minor_coverage_start > result->confident_coverage_start) + (subjunc_result -> minor_position >  result -> selected_position) ==1)
@@ -4285,9 +4257,9 @@ void write_inversion_results_final(void * key, void * buckv, HashTable * tab);
 int write_fusion_final_results(global_context_t * global_context)
 {
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
-	char fn2 [MAX_FILE_NAME_LENGTH];
+	char fn2 [MAX_FILE_NAME_LENGTH+30];
 
-	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.breakpoints.vcf", global_context->config.output_prefix);
+	sprintf(fn2,"%s.breakpoints.vcf", global_context->config.output_prefix);
 	FILE * ofp = f_subr_open(fn2, "wb");
 	fprintf(ofp,"##fileformat=VCFv4.1\n");
 	fprintf(ofp,"##INFO=<ID=SVTYPE,Number=1,Type=String,Description=\"Type of structural variant\">\n");
@@ -4432,9 +4404,9 @@ int write_junction_final_results(global_context_t * global_context)
 	int no_sup_juncs = 0, disk_is_full = 0;
 
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
-	char fn2 [MAX_FILE_NAME_LENGTH];
+	char fn2 [MAX_FILE_NAME_LENGTH+30];
 
-	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.junction.bed", global_context->config.output_prefix);
+	sprintf(fn2,"%s.junction.bed", global_context->config.output_prefix);
 	FILE * ofp = f_subr_open(fn2, "wb");
 
 	fprintf(ofp, "#Chr, StartLeftBlock, EndRightBlock, Junction_Name, nSupport, Strand, StartLeftBlock, EndRightBlock, Color, nBlocks, BlockSizes, BlockStarts\n");
@@ -5863,7 +5835,6 @@ int find_translocation_brk_PQR(global_context_t * global_context, mapping_result
 	int candA1i, found_PQR = 0;
 	int candA1Number = bktable_lookup(&global_context -> breakpoint_table_P, chroA, posA1, global_context -> config.maximum_pair_distance , event_pos_list_A1, event_ptr_list_A1, _PQR_LIST_SIZE);
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
-	chromosome_event_t * candBrkPlist [_PQR_LIST_SIZE];
 	int candBrkPi , candBrkPNumber=0;
 
 	//SUBREADprintf("A FOUND %d P ", candA1Number);
@@ -5875,9 +5846,6 @@ int find_translocation_brk_PQR(global_context_t * global_context, mapping_result
 		long long small_dist = event_body -> event_small_side, large_dist = event_body -> event_large_side;
 		small_dist -= resA1 -> selected_position;
 		large_dist -= resA2 -> selected_position;
-
-		if(small_dist > 0 && small_dist < global_context -> config.maximum_pair_distance && large_dist < 0 && large_dist > -1ll * global_context -> config.maximum_pair_distance && event_body -> small_side_increasing_coordinate == 0)
-			candBrkPlist[candBrkPNumber++] = event_body;
 	}
 
 	//SUBREADprintf(", (%d may be used)\n", candBrkPNumber);

@@ -388,7 +388,7 @@ int LRMreadline(FILE * fp, char * buf, int buflen){
 }
 
 int LRMload_offsets(LRMcontext_t * context){
-	char fn[LRMMAX_FILENAME_LENGTH];
+	char fn[LRMMAX_FILENAME_LENGTH+20];
 	FILE * fp;
 	int padding = 0;
 	unsigned int last_end = 0;
@@ -465,7 +465,7 @@ void LRMsambam_write_header(LRMcontext_t * context, LRMthread_context_t * thread
 	}
 	
 	for(chro_no = -1; chro_no < context -> sam_bam_chromosome_list->numOfElements + 2; chro_no++){
-		char * header_line = malloc(10000);		
+		char * header_line = malloc(10100);	
 		int wrlen = 0;
 		if(chro_no >=0 && chro_no < context -> sam_bam_chromosome_list->numOfElements){
 			char * chro_name = LRMArrayListGet(context -> sam_bam_chromosome_list, chro_no);
