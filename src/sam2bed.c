@@ -37,7 +37,6 @@ int sam2bed(int argc,char *argv[]){
   fp_out=fopen(argv[4],"w");
 
   char * line = NULL;
-  char * tok;
   char strand;
   char * chr;
   int readlen, chr_start, chr_end, flag, mqs;
@@ -52,9 +51,7 @@ int sam2bed(int argc,char *argv[]){
     if(line[0] == '@')
       continue;
 
-    tok = strtok(line,"\t");
 	flag = atoi(strtok(NULL,"\t"));
-		
 	chr = strtok(NULL,"\t");
     if(chr[0] != '*'){
        chr_start = atoi(strtok(NULL,"\t")) - 1; 

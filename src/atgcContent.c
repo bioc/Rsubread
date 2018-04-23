@@ -108,7 +108,7 @@ void atgcContent(char ** input, char ** output, int *basewise){
 //  size_t len = 0;
 //  ssize_t z;
   int i,j;
-  int readlen;
+  int readlen=1;
   int line_num=0;
   int index;
   double freq[5];

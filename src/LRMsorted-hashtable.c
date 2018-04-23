@@ -241,7 +241,7 @@ unsigned int LRMload_int32(FILE * fp)
 	int ret;
 	int read_length;
 	read_length = fread(&ret, sizeof(int), 1, fp);
-	assert(read_length>0);
+	if(read_length<=0)assert(0);
 	return ret;
 }
 
@@ -250,7 +250,7 @@ long long int LRMload_int64(FILE * fp)
 	long long int ret;
 	int read_length;
 	read_length = fread(&ret, sizeof(long long int), 1, fp);
-	assert(read_length>0);
+	if(read_length<=0)assert(0);
 	return ret;
 }
 
