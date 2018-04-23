@@ -24,6 +24,8 @@ featureCounts(files,
 	largestOverlap=FALSE,
 	nonOverlap=NULL,
 	nonOverlapFeature=NULL,
+
+	# Read extension and reduction
 	readExtension5=0,
 	readExtension3=0,
 	read2pos=NULL,
@@ -66,7 +68,7 @@ featureCounts(files,
 	# read group
 	byReadGroup=FALSE,
 
-	# assignment results for each read
+	# report assignment result for each read
 	reportReads=NULL,
 	reportReadsPath=NULL,
 
@@ -115,7 +117,7 @@ featureCounts(files,
   \item{nthreads}{ \code{integer} giving the number of threads used for running this function. \code{1} by default.}
   \item{byReadGroup}{ logical indicating if read counting will be performed for each individual read group. \code{FALSE} by default.}
   \item{reportReads}{ output detailed read assignment results for each read (or fragment if paired end). The detailed assignment results can be saved in three different formats including \code{CORE}, \code{SAM} and \code{BAM} (note that these values are case sensitive). Default value of this option is \code{NULL}, indicating not to report assignment results for reads. \code{CORE} format represents a tab-delimited text file that contains four columns including read name, status (assigned or the reason if not assigned), number of targets and target list. A target is a feature or a meta-feature. Items in the target lists is separated by comma. If a read is not assigned, its number of targets will be set as -1. For each input file, a text file is generated and its name is the input file name added with `.featureCounts'. When \code{SAM} or \code{BAM} format is specified, the detailed assignment results will be saved to SAM and BAM format files. Names of generated files are the input file names added with `.featureCounts.sam' or `.featureCounts.bam'. Three tags are used to describe read assignment results: XS, XN and XT. Tag XS gives the assignment status. Tag XN gives number of targets. Tag XT gives comma separated target list.}
-  \item{reportReadsPath}{ specify a directory to save the detailed assignment results. If unspecified, the directory where counting results are saved is used.}
+  \item{reportReadsPath}{ a character string specifying the directory where files including detailed assignment results are saved. If \code{NULL}, the results will be saved to the current working directory.}
   \item{maxMOp}{ \code{integer} giving the maximum number of `M' operations (matches or mis-matches) allowed in a CIGAR string. \code{10} by default. Both `X' and `=' operations are treated as `M' and adjacent `M' operations are merged in the CIGAR string.}
   \item{tmpDir}{ a character string specifying the directory under which intermediate files are saved (later removed). By default, current working directory is used.}
   \item{verbose}{ logical indicating if verbose information for debugging will be generated. This may include information such as unmatched chromosomes/contigs between reads and annotation.}
