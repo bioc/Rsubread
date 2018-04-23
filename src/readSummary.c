@@ -2502,7 +2502,7 @@ int compress_read_detail_BAM(fc_thread_global_context_t * global_context, fc_thr
 			compressed_size = 66600 -thread_context -> bam_file_output_stream.avail_out;
 					
 			bam_buf[0]=31;
-			bam_buf[1]=139;
+			bam_buf[1]=-117;
 			bam_buf[2]=8;
 			bam_buf[3]=4;
 			memset(bam_buf+4, 0, 5);

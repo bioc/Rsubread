@@ -1420,7 +1420,7 @@ void put_new_event(HashTable * event_table, chromosome_event_t * new_event , int
 		mark_event_bitmap(event_table->appendix2, sides[1]);
 	}
 }
-int search_event(global_context_t * global_context, HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, char event_type, chromosome_event_t ** return_buffer)
+int search_event(global_context_t * global_context, HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, unsigned char event_type, chromosome_event_t ** return_buffer)
 {
 	int ret = 0;
 

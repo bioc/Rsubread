@@ -167,7 +167,7 @@ int load_known_junctions(global_context_t * global_context);
 int finalise_indel_and_junction_thread(global_context_t * global_context, thread_context_t * thread_contexts, int task);
 int find_new_indels(global_context_t * global_context, thread_context_t * thread_context, int pair_number, char * read_name, char * read_text, char * qual_text, int read_len, int is_second_read, int best_read_id);
 int write_indel_final_results(global_context_t * context);
-int search_event(global_context_t * global_context,HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, char event_type, chromosome_event_t ** return_buffer);
+int search_event(global_context_t * global_context,HashTable * event_table, chromosome_event_t * event_space, unsigned int pos, int search_type, unsigned char event_type, chromosome_event_t ** return_buffer);
 
 void set_alignment_result(global_context_t * global_context, int pair_number, int is_second_read, int best_read_id, unsigned int position, int votes, gene_vote_number_t * indel_record, short best_cover_start, short best_cover_end, int is_negative_strand, int is_PE, unsigned int minor_position, unsigned int minor_votes, unsigned int minor_coverage_start, unsigned int minor_coverage_end, unsigned int split_point, int inserted_bases, int is_strand_jumped, int is_GT_AG_donors, int used_subreads_in_vote, int noninformative_subreads_in_vote, int major_indel_offset, int minor_indel_offset, int main_hamming, int minor_hamming, int main_quality, int minor_quality);
 
