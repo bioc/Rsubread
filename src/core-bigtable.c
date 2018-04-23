@@ -123,7 +123,7 @@ int init_bigtable_results(global_context_t * global_context, int is_rewinding)
 	if(global_context -> config.use_memory_buffer)
 			global_context -> bigtable_cache_file_fp = NULL;
 	else {
-			char tmpfname[MAX_FILE_NAME_LENGTH];
+			char tmpfname[MAX_FILE_NAME_LENGTH+33];
 			sprintf(tmpfname, "%s-%02d-align.bin", global_context -> config.temp_file_prefix, 0);
 
 			//if(is_rewinding) unlink(tmpfname);
@@ -313,7 +313,7 @@ int finalise_bigtable_results(global_context_t * global_context){
 	if(global_context -> bigtable_cache_file_fp){
 			fclose(global_context -> bigtable_cache_file_fp);
 
-			char tmpfname[MAX_FILE_NAME_LENGTH];
+			char tmpfname[MAX_FILE_NAME_LENGTH+33];
 			sprintf(tmpfname, "%s-%02d-align.bin", global_context -> config.temp_file_prefix, 0);
 			unlink(tmpfname);
 	}

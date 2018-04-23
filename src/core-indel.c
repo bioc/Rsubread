@@ -564,7 +564,7 @@ void remove_neighbour(global_context_t * global_context)
 						}
 					}
 
-				if((1 && global_context-> config.do_fusion_detection || 1 && global_context-> config.do_long_del_detection) && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
+				if((global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection) && event_body -> event_type == CHRO_EVENT_TYPE_FUSION)
 				{
 					for(xk2=-10 ; xk2 < 10 ; xk2++)
 					{
@@ -2032,7 +2032,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 			{
 				if(first_correct_base - last_correct_base  < -min(0,indels)) continue;
 
-				int best_j=0, best_score=-99999, is_ambiguous_indel= 0;
+				int best_score=-99999, is_ambiguous_indel= 0;
 				unsigned int best_pos = 0;
 				int cutoff = first_correct_base-last_correct_base  + min(0, indels) - global_context -> config.flanking_subread_indel_mismatch;
 				int mid_j = (first_correct_base-last_correct_base )/2, min_j=99990;
@@ -2059,7 +2059,6 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								{
 									mismatched_bases = first_correct_base-last_correct_base  + min(0, indels) - score;
 									best_score = score;
-									best_j = j;
 									// best_pos here is the absolute offset of the FIRST UNWANTED BASE.
 									best_pos = voting_position  + last_correct_base + j + last_indel;
 									min_j = abs(mid_j-j);
@@ -2231,32 +2230,6 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 }
 
 void print_indel_table(global_context_t * global_context){
-
-	int xk1;
-	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID];
-	HashTable * entry_table = indel_context -> event_entry_table;
-	for(xk1 = 0; xk1 <  indel_context -> total_events ; xk1++){
-		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
-		
-		//printf("OCT27-STEP-INTAB-TYPE-%d POS %u~%u GID=%u PV %d %d  SUP %d / %d\n", event_body -> event_type, event_body -> event_small_side, event_body -> event_large_side, event_body -> global_event_id, event_body -> connected_next_event_distance, event_body -> connected_previous_event_distance , event_body -> supporting_reads , event_body -> anti_supporting_reads);
-	}
-
-	int bucket;
-	KeyValuePair * cursor;
-	for(bucket=0; bucket< entry_table -> numOfBuckets; bucket++){
-		cursor = entry_table -> bucketArray[bucket];
-		while(cursor){
-			unsigned int entry_pos = cursor->key - NULL;
-			int * env_array = cursor->value;
-			int env_i;
-			for(env_i = 1; env_array[env_i]; env_i++){
-				chromosome_event_t * event_body = indel_context -> event_space_dynamic + (env_array[env_i]-1);
-		//		printf("OCT27-STEPQ-ENTAB-%u [%d] to %u ~ %u len=%d VAL=%d  PTR=%p\n",entry_pos, env_i, event_body -> event_small_side,  event_body -> event_large_side, event_body -> indel_length, env_array[env_i], env_array);
-			}
-
-			cursor = cursor->next;
-		}
-	}
 }
 
 int write_indel_final_results(global_context_t * global_context)
@@ -2268,8 +2241,8 @@ int write_indel_final_results(global_context_t * global_context)
 	char * fn2, *ref_bases, *alt_bases;
 	FILE * ofp = NULL;
 
-	fn2 = malloc(MAX_FILE_NAME_LENGTH);
-	snprintf(fn2, MAX_FILE_NAME_LENGTH, "%s.indel.vcf", global_context->config.output_prefix);
+	fn2 = malloc(MAX_FILE_NAME_LENGTH+30);
+	sprintf(fn2, "%s.indel.vcf", global_context->config.output_prefix);
 
 	ofp = f_subr_open(fn2, "wb");
 
@@ -2476,7 +2449,7 @@ int write_local_reassembly(global_context_t *global_context, HashTable *pileup_f
 
 	if(0 == locate_gene_position_max(anchor_pos, &global_context -> chromosome_table, &chro_name, &chro_offset, NULL, NULL, read_len))
 	{
-		char temp_file_name[MAX_FILE_NAME_LENGTH];
+		char temp_file_name[MAX_FILE_NAME_LENGTH+40];
 		int close_now = 0;
 
 		sprintf(temp_file_name,"%s@%s-%04u.bin", global_context -> config.temp_file_prefix, chro_name , chro_offset / BASE_BLOCK_LENGTH );
@@ -3417,7 +3390,7 @@ int full_indel_alignment(global_context_t * global_context, reassembly_by_voting
 		{
 			// indels_in_section = -5: 5 insertion; indels_in_section = 3: 3 deletion
 			// find the edge.
-			int best_edge_score = -1, best_left, best_right;
+			int best_edge_score = -1;
 			unsigned int section_best_edge = 0;
 
 			// the smallest possible location of the second half is the location if the first half + deletion length
@@ -3433,8 +3406,6 @@ int full_indel_alignment(global_context_t * global_context, reassembly_by_voting
 				{
 					best_edge_score = left_matched+right_matched;
 					section_best_edge = xk2;
-					best_left = left_matched;
-					best_right = right_matched;
 				}
 			}
 
@@ -3516,7 +3487,7 @@ int find_potential_ultralong_indels(global_context_t * global_context , reassemb
 	unsigned int xk1, is_1_left;
 	for(is_1_left = 0; is_1_left < 2; is_1_left ++)
 	{
-		int best_match = -1, best_c2_location = -1;
+		int best_match = -1;
 
 		char * test_key = is_1_left?contig_2:contig_1;
 		char * testee = is_1_left?contig_1:contig_2;
@@ -3527,10 +3498,7 @@ int find_potential_ultralong_indels(global_context_t * global_context , reassemb
 		{
 			int test_match = match_str(test_key, testee + xk1, global_context -> config.reassembly_key_length);
 			if(test_match > best_match)
-			{
 				best_match = test_match;
-				best_c2_location = xk1;
-			}
 		}
 
 		if(best_match >= global_context -> config.reassembly_key_length-1)
@@ -4270,7 +4238,7 @@ int finalise_long_insertions_by_hashtable(global_context_t * global_context)
 	int chro_i;
 	assert(global_context -> index_block_number == 1);
 	unsigned int chro_start_pos = 0;
-	char tmp_fname[300];
+	char tmp_fname[350];
 
 	sprintf(tmp_fname,"%s.reassembly.fa", global_context->config.output_prefix);
 	global_context->long_insertion_FASTA_fp = f_subr_open(tmp_fname ,"wb");
@@ -4281,7 +4249,7 @@ int finalise_long_insertions_by_hashtable(global_context_t * global_context)
 		unsigned int chro_current_pos = 0;
 		for(chro_current_pos = 0; chro_current_pos < chro_length ; chro_current_pos += BASE_BLOCK_LENGTH)
 		{
-			char temp_file_name[MAX_FILE_NAME_LENGTH];
+			char temp_file_name[MAX_FILE_NAME_LENGTH + 50];
 			int block_no = chro_current_pos / BASE_BLOCK_LENGTH;
 
 			sprintf(temp_file_name,"%s@%s-%04u.bin", global_context -> config.temp_file_prefix, global_context -> chromosome_table.read_names+chro_i*MAX_CHROMOSOME_NAME_LEN , block_no );

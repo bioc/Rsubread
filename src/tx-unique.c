@@ -388,7 +388,6 @@ int txunique_parse_options(txunique_context_t * context, int argc, char ** argv)
 	opterr = 1;
 	optopt = 63;
 
-	int sort_needed = 0;
 	while ((c = getopt (argc, argv, "a:o:g:t:f:h"))!=-1){
 		switch(c){
 			case 'a':

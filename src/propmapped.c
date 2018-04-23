@@ -239,7 +239,7 @@ FILE * get_FP_by_read_name(propMapped_context * context, char * read_name)
 	FILE * ret = HashTableGet(context -> split_fp_table, NULL+1+(int)(hash_key));
 	if(!ret)
 	{
-		char fname [300];
+		char fname [340];
 		sprintf(fname, "%s-%llu.bin", context->temp_file_prefix, hash_key);
 		ret = f_subr_open(fname, "wb");
 		HashTablePut(context -> split_fp_table, NULL+1+(int)(hash_key), ret);
@@ -354,7 +354,7 @@ int prop_PE(propMapped_context * context)
 	int bini;
 	for(bini = 0; bini < context -> sort_buckets; bini++)
 	{
-		char fname[300];
+		char fname[360];
 		HashTable * rname_table = HashTableCreate(100000);
 		HashTableSetKeyComparisonFunction(rname_table , fc_strcmp_chro);
 		HashTableSetHashFunction(rname_table, fc_chro_hash);

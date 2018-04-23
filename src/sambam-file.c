@@ -1026,59 +1026,6 @@ int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab, char * rem
 	return 0;
 }
 
-
-int test_pbam(char * fname)
-{
-	FILE * bam_fp = f_subr_open(fname, "rb");
-	char * CDATA = malloc(80010);
-	char * PDATA = malloc(1000000);
-
-	z_stream strm;
-	SamBam_Reference_Info * chro_tab;
-
-	PBum_load_header(bam_fp, & chro_tab, NULL, NULL);
-
-	while(1)
-	{
-		unsigned int real_len = 0;
-		int rlen = PBam_get_next_zchunk(bam_fp,CDATA,80000, & real_len);
-		if(rlen<0) break;
-
-		strm.zalloc = Z_NULL;
-		strm.zfree = Z_NULL;
-		strm.opaque = Z_NULL;
-		strm.avail_in = 0;
-		strm.next_in = Z_NULL;
-		int ret = inflateInit2(&strm, SAMBAM_GZIP_WINDOW_BITS);
-		if (ret != Z_OK)SUBREADprintf("Ohh!\n");
-
-		strm.avail_in = (unsigned int)rlen;
-		strm.next_in = (unsigned char *)CDATA;
-
-
-		strm.avail_out = 1000000;
-		strm.next_out = (unsigned char *)PDATA;
-		ret = inflate(&strm, Z_FINISH);
-		int have = 1000000 - strm.avail_out;
-		inflateEnd(&strm);
-
-		int PDATA_ptr=0;
-
-		while(PDATA_ptr < have)
-		{
-			char * read_line = malloc(3000);
-			SamBam_Alignment  aln;
-			PBam_chunk_gets(PDATA, &PDATA_ptr, have, chro_tab, read_line , 2999, &aln, 0);
-			SUBREADprintf("%s", read_line);
-			free(read_line);
-		}
-	}
-	free(CDATA);
-	free(PDATA);
-	fclose(bam_fp);
-
-	return 0;
-}
 int test_bamview(int argc, char ** argv)
 {
 	if(argc>1)

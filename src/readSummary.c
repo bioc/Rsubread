@@ -381,7 +381,6 @@ int calc_junctions_from_cigar(fc_thread_global_context_t * global_context, int f
 
 	int cigar_cursor = 0, nch, ret = 0, read_len = 0, x1, x2;
 	unsigned int chro_cursor = pos, tmpi = 0;
-	unsigned int right_boundary = 0;
 	unsigned short left_clipped = 0;
 	unsigned short right_clipped = 0;
 
@@ -396,7 +395,6 @@ int calc_junctions_from_cigar(fc_thread_global_context_t * global_context, int f
 				if(nch == 'M')read_len += tmpi;
 
 				chro_cursor += tmpi;
-				right_boundary = chro_cursor -1;
 			} else if(nch == 'N'){
 				unsigned int last_exon_last_base = chro_cursor - 1;
 				unsigned int next_exon_first_base = chro_cursor + tmpi;
@@ -1713,7 +1711,7 @@ int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigne
 			for(;rcursor<bin_len; rcursor++){
 				assert(bin[rcursor] == '@'&& bin[rcursor+3] == '\t');
 				if(bin[rcursor+1]=='R' && bin[rcursor+2]=='G'){
-					int id_start = -1, id_end;
+					int id_start = -1, id_end = -1;
 					for(; rcursor < bin_len; rcursor++){
 						if(bin[rcursor]=='I' && bin[rcursor+1]=='D'){
 							id_start = rcursor + 3;
@@ -1899,12 +1897,8 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 	}
 	
 	unsigned int merged_section_count = 0;
-	unsigned int merged_section_start_positions[ MAXIMUM_INSERTION_IN_SECTION * 3 ];
 	unsigned short merged_section_lengths[ MAXIMUM_INSERTION_IN_SECTION * 3 ];
-	unsigned char merged_section_belong_R1[ MAXIMUM_INSERTION_IN_SECTION * 3 ];
-	unsigned char merged_section_belong_R2[ MAXIMUM_INSERTION_IN_SECTION * 3 ];
 	unsigned int merged_section_indel_counts[ MAXIMUM_INSERTION_IN_SECTION * 3 ];
-	unsigned int merged_section_indel_positions[ MAXIMUM_INSERTION_IN_SECTION * 3 ][ MAXIMUM_INSERTION_IN_SECTION ];
 	unsigned short merged_section_indel_lengths[ MAXIMUM_INSERTION_IN_SECTION * 3 ][ MAXIMUM_INSERTION_IN_SECTION ];
 
 	int R1_i = 0 , R2_i = 0;
@@ -1929,10 +1923,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 			if( is_r1r2_overlap ){
 				if (CIGAR_intervals_R1[R1_i].start_pos > CIGAR_intervals_R2[R2_i].start_pos ){
 					//first half_R2 add special
-					merged_section_start_positions[merged_section_count] = CIGAR_intervals_R2[R2_i].start_pos;
 					merged_section_lengths[merged_section_count] = overlapping_start - CIGAR_intervals_R2[R2_i].start_pos;
-					merged_section_belong_R1[merged_section_count]=0;
-					merged_section_belong_R2[merged_section_count]=1;
 
 					int indel_i;
 					for(indel_i = 0; indel_i < CIGAR_intervals_R2[R2_i].insertions; indel_i++){
@@ -1940,6 +1931,8 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 							if(indel_i>0){
 								int insmov_i, ins_dist_i = 0;
 								for(insmov_i = indel_i ; insmov_i < CIGAR_intervals_R2[R2_i].insertions; insmov_i++){
+									assert(MAXIMUM_INSERTION_IN_SECTION > ins_dist_i);
+									assert(MAXIMUM_INSERTION_IN_SECTION > insmov_i);
 									CIGAR_intervals_R2[R2_i].insertion_start_pos[ins_dist_i] = CIGAR_intervals_R2[R2_i].insertion_start_pos[insmov_i];
 									CIGAR_intervals_R2[R2_i].insertion_lengths[ins_dist_i] = CIGAR_intervals_R2[R2_i].insertion_lengths[insmov_i];
 									ins_dist_i++;
@@ -1948,7 +1941,6 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 							}
 							break;
 						}
-						merged_section_indel_positions[merged_section_count][indel_i] = CIGAR_intervals_R2[R2_i].insertion_start_pos[indel_i];
 						merged_section_indel_lengths[merged_section_count][indel_i] = CIGAR_intervals_R2[R2_i].insertion_lengths[indel_i];
 					}
 					merged_section_indel_counts[merged_section_count] = indel_i;
@@ -1957,10 +1949,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 	
 				}else if( CIGAR_intervals_R1[R1_i].start_pos < CIGAR_intervals_R2[R2_i].start_pos ){
 					//first half_R1 add special
-					merged_section_start_positions[merged_section_count] = CIGAR_intervals_R1[R1_i].start_pos;
 					merged_section_lengths[merged_section_count] = overlapping_start - CIGAR_intervals_R1[R1_i].start_pos;
-					merged_section_belong_R1[merged_section_count]=1;
-					merged_section_belong_R2[merged_section_count]=0;
 
 					int indel_i;
 					for(indel_i = 0; indel_i < CIGAR_intervals_R1[R1_i].insertions; indel_i++){
@@ -1968,6 +1957,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 							if(indel_i>0){
 								int insmov_i, ins_dist_i = 0;
 								for(insmov_i = indel_i ; insmov_i < CIGAR_intervals_R1[R1_i].insertions; insmov_i++){
+									assert(MAXIMUM_INSERTION_IN_SECTION > insmov_i);
 									CIGAR_intervals_R1[R1_i].insertion_start_pos[ins_dist_i] = CIGAR_intervals_R1[R1_i].insertion_start_pos[insmov_i];
 									CIGAR_intervals_R1[R1_i].insertion_lengths[ins_dist_i] = CIGAR_intervals_R1[R1_i].insertion_lengths[insmov_i];
 									ins_dist_i++;
@@ -1977,7 +1967,6 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 							break;
 						}
 
-						merged_section_indel_positions[merged_section_count][indel_i] = CIGAR_intervals_R1[R1_i].insertion_start_pos[indel_i];
 						merged_section_indel_lengths[merged_section_count][indel_i] = CIGAR_intervals_R1[R1_i].insertion_lengths[indel_i];
 					}
 					merged_section_indel_counts[merged_section_count] = indel_i;
@@ -1985,10 +1974,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 					merged_section_count ++;
 				}
 
-				merged_section_start_positions[merged_section_count] = overlapping_start;
 				merged_section_lengths[merged_section_count] = overlapping_end - overlapping_start;
-				merged_section_belong_R1[merged_section_count]=1;
-				merged_section_belong_R2[merged_section_count]=1;
 				merged_section_indel_counts[merged_section_count] = 0;
 
 
@@ -2000,6 +1986,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 						if(indel_i_R1 > 0){
 							int insmov_i, ins_dist_i = 0;
 							for(insmov_i = indel_i_R1 ; insmov_i < CIGAR_intervals_R1[R1_i].insertions; insmov_i++){
+								assert(MAXIMUM_INSERTION_IN_SECTION > insmov_i);
 								CIGAR_intervals_R1[R1_i].insertion_start_pos[ins_dist_i] = CIGAR_intervals_R1[R1_i].insertion_start_pos[insmov_i];
 								CIGAR_intervals_R1[R1_i].insertion_lengths[ins_dist_i] = CIGAR_intervals_R1[R1_i].insertion_lengths[insmov_i];
 								ins_dist_i++;
@@ -2009,6 +1996,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 						if(indel_i_R2 > 0){
 							int insmov_i, ins_dist_i = 0;
 							for(insmov_i = indel_i_R2 ; insmov_i < CIGAR_intervals_R2[R2_i].insertions; insmov_i++){
+								assert(MAXIMUM_INSERTION_IN_SECTION > insmov_i);
 								CIGAR_intervals_R2[R2_i].insertion_start_pos[ins_dist_i] = CIGAR_intervals_R2[R2_i].insertion_start_pos[insmov_i];
 								CIGAR_intervals_R2[R2_i].insertion_lengths[ins_dist_i] = CIGAR_intervals_R2[R2_i].insertion_lengths[insmov_i];
 								ins_dist_i++;
@@ -2022,7 +2010,6 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 					else if( CIGAR_intervals_R1[R1_i].insertion_start_pos[indel_i_R1] < CIGAR_intervals_R2[R2_i].insertion_start_pos[indel_i_R2]  ) indel_i_R1 ++;
 					else{
 						if( CIGAR_intervals_R1[R1_i].insertion_lengths[ indel_i_R1 ] == CIGAR_intervals_R2[R2_i].insertion_lengths[ indel_i_R2 ] ){
-							merged_section_indel_positions[merged_section_count][ merged_section_indel_counts[merged_section_count] ] = CIGAR_intervals_R1[R1_i].insertion_start_pos[indel_i_R1];
 							merged_section_indel_lengths[merged_section_count][ merged_section_indel_counts[merged_section_count] ] = CIGAR_intervals_R1[R1_i].insertion_lengths[indel_i_R1];
 							merged_section_indel_counts[merged_section_count] ++;
 						}
@@ -2049,14 +2036,10 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 				}
 
 			}else if(CIGAR_intervals_R1[R1_i].start_pos >  CIGAR_intervals_R2[R2_i].start_pos){
-				merged_section_start_positions[merged_section_count] = CIGAR_intervals_R2[R2_i].start_pos;
 				merged_section_lengths[merged_section_count] = CIGAR_intervals_R2[R2_i].chromosomal_length;
-				merged_section_belong_R1[merged_section_count]=0;
-				merged_section_belong_R2[merged_section_count]=1;
 
 				int indel_i;
 				for(indel_i = 0; indel_i < CIGAR_intervals_R2[R2_i].insertions; indel_i++){
-					merged_section_indel_positions[merged_section_count][indel_i] = CIGAR_intervals_R2[R2_i].insertion_start_pos[indel_i];
 					merged_section_indel_lengths[merged_section_count][indel_i] = CIGAR_intervals_R2[R2_i].insertion_lengths[indel_i];
 				}
 				merged_section_indel_counts[merged_section_count] = CIGAR_intervals_R2[R2_i].insertions;
@@ -2064,14 +2047,10 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 				merged_section_count ++;
 				R2_i ++;
 			}else{
-				merged_section_start_positions[merged_section_count] = CIGAR_intervals_R1[R1_i].start_pos;
 				merged_section_lengths[merged_section_count] = CIGAR_intervals_R1[R1_i].chromosomal_length;
-				merged_section_belong_R1[merged_section_count]=1;
-				merged_section_belong_R2[merged_section_count]=0;
 
 				int indel_i;
 				for(indel_i = 0; indel_i < CIGAR_intervals_R1[R1_i].insertions; indel_i++){
-					merged_section_indel_positions[merged_section_count][indel_i] = CIGAR_intervals_R1[R1_i].insertion_start_pos[indel_i];
 					merged_section_indel_lengths[merged_section_count][indel_i] = CIGAR_intervals_R1[R1_i].insertion_lengths[indel_i];
 				}
 				merged_section_indel_counts[merged_section_count] = CIGAR_intervals_R1[R1_i].insertions;
@@ -2082,14 +2061,10 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 		}else if(R1_i < CIGAR_intervals_R1_sections){ 
 			// add R1 section to specific section
 			// R1_i ++
-			merged_section_start_positions[merged_section_count] = CIGAR_intervals_R1[R1_i].start_pos;
 			merged_section_lengths[merged_section_count] = CIGAR_intervals_R1[R1_i].chromosomal_length;
-			merged_section_belong_R1[merged_section_count]=1;
-			merged_section_belong_R2[merged_section_count]=0;
 
 			int indel_i;
 			for(indel_i = 0; indel_i < CIGAR_intervals_R1[R1_i].insertions; indel_i++){
-				merged_section_indel_positions[merged_section_count][indel_i] = CIGAR_intervals_R1[R1_i].insertion_start_pos[indel_i];
 				merged_section_indel_lengths[merged_section_count][indel_i] = CIGAR_intervals_R1[R1_i].insertion_lengths[indel_i];
 			}
 			merged_section_indel_counts[merged_section_count] = CIGAR_intervals_R1[R1_i].insertions;
@@ -2097,14 +2072,10 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 			merged_section_count ++;
 			R1_i ++;
 		}else if(R2_i < CIGAR_intervals_R2_sections){
-			merged_section_start_positions[merged_section_count] = CIGAR_intervals_R2[R2_i].start_pos;
 			merged_section_lengths[merged_section_count] = CIGAR_intervals_R2[R2_i].chromosomal_length;
-			merged_section_belong_R1[merged_section_count]=0;
-			merged_section_belong_R2[merged_section_count]=1;
 
 			int indel_i;
 			for(indel_i = 0; indel_i < CIGAR_intervals_R2[R2_i].insertions; indel_i++){
-				merged_section_indel_positions[merged_section_count][indel_i] = CIGAR_intervals_R2[R2_i].insertion_start_pos[indel_i];
 				merged_section_indel_lengths[merged_section_count][indel_i] = CIGAR_intervals_R2[R2_i].insertion_lengths[indel_i];
 			}
 			merged_section_indel_counts[merged_section_count] = CIGAR_intervals_R2[R2_i].insertions;
@@ -2505,7 +2476,7 @@ int compress_read_detail_BAM(fc_thread_global_context_t * global_context, fc_thr
 
 	}else{
 		// there may be multiple reads in the buffer.
-			int write_ptr, bin_len = write_end - write_start;
+			int bin_len = write_end - write_start;
 			char * compressed_buff = bam_buf + 18;
 					
 			int compressed_size ; 
@@ -3384,9 +3355,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 					long * hits_indices_X1 = end1?hits_indices2:hits_indices1;
 					char * used_hit_X1 = end1?used_hit2:used_hit1;
 
-					//#warning "DEBUG OUT 0"
-					if(0 && FIXLENstrcmp("V0112_0155:7:1102:12486:34235", read_name) == 0)
-						SUBREADprintf("OVERLAP START %d hits\n", allhits);
 					for(hit_x1 = 0; hit_x1 < allhits; hit_x1++){
 						if(used_hit_X1[hit_x1])continue;
 
@@ -3593,7 +3561,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		}else{
 				for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
 					//#warning "DEBUG OUT 2"
-					if(0 && FIXLENstrcmp("V0112_0155:7:1102:12486:34235", read_name)==0) SUBREADprintf("Scoring Overlap %s = %d >=%d, score=%d, exonid=%ld ; TOTAL_FRAG_LEN=%d\n", read_name, scoring_overlappings[score_x1], applied_fragment_minimum_overlapping, scoring_numbers[score_x1], scoring_exon_ids[score_x1], total_frag_len);
 					//SUBREADprintf("RLTEST: %s %d\n", read_name, scoring_overlappings[score_x1]);
 					if( applied_fragment_minimum_overlapping > 1 )
 						if( applied_fragment_minimum_overlapping > 10000L*scoring_overlappings[score_x1] ){
@@ -4232,8 +4199,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 	}
 
-	char rand_prefix[300];
-	char new_fn[300];
+	char rand_prefix[360];
+	char new_fn[350];
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 	sprintf(rand_prefix, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
@@ -5326,12 +5293,8 @@ int readSummary(int argc,char *argv[]){
 
 	long * anno_chr_head, * block_min_start, *block_max_end, *block_end_index;
 	char ** anno_chrs, * anno_chr_2ch;
-	long curchr, curpos;
-	char * curchr_name, * fasta_contigs_fname;
+	char * fasta_contigs_fname;
 	unsigned char * sorted_strand;
-	curchr = 0;
-	curpos = 0;
-	curchr_name = "";
 
 	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
 
@@ -5982,15 +5945,15 @@ int feature_count_main(int argc, char ** argv)
 	int min_qual_score = 0;
 	int min_dist = 50;
 	int max_dist = 600;
-	char debug_command[10];
-	char max_missing_bases_in_read_str[11];
-	char max_missing_bases_in_feature_str[11];
-	char min_dist_str[11];
-	char max_dist_str[11];
-	char min_qual_score_str[11];
-	char feature_block_size_str[11];
-	char Strand_Sensitive_Str[11];
-	char strFeatureFracOverlap[11];
+	char debug_command[15];
+	char max_missing_bases_in_read_str[15];
+	char max_missing_bases_in_feature_str[15];
+	char min_dist_str[15];
+	char max_dist_str[15];
+	char min_qual_score_str[15];
+	char feature_block_size_str[15];
+	char Strand_Sensitive_Str[15];
+	char strFeatureFracOverlap[15];
 	char Pair_Orientations[3];
 	char * very_long_file_names;
 	int is_Input_Need_Reorder = 0;
@@ -6027,7 +5990,7 @@ int feature_count_main(int argc, char ** argv)
 	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
 	float fracOverlap = 0.0, fracOverlapFeature = 0.0;
 	int std_input_output_mode = 0, long_read_mode = 0, is_verbose = 0;
-	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[11], long_read_mode_str[11];
+	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[16], long_read_mode_str[16];
 	very_long_file_names = malloc(very_long_file_names_size);
 	very_long_file_names [0] = 0;
 	fasta_contigs_name[0]=0;

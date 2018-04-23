@@ -57,8 +57,6 @@ int is_offset_in_chro(gene_value_index_t * offsets, gehash_data_t linear){
 	int ret = 1;
 	if(offsets -> appendix1 && offsets -> appendix2){
 		gene_offset_t * chros = offsets -> appendix1;
-		int padding = offsets -> appendix2 - NULL;
-	//	SUBREADprintf( "OFFSETS:%d, PADD:%d\n", chros -> total_offsets, padding );
 	
 		int n = 0;
 		int total_offsets = chros -> total_offsets;

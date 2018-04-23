@@ -157,7 +157,7 @@ int DTCwrite_annotations(char * gene_name, char * transcript_name, char * chro_n
 }
 
 void DTCprint_lentab_items(void * key, void * hashed_obj, HashTable * tab){
-	SUBREADprintf("%s => %ld\n", key, hashed_obj - NULL);
+	SUBREADprintf("%s => %ld\n", (char*)key, hashed_obj - NULL);
 }
 
 // start and end are 1-based
@@ -319,11 +319,11 @@ int DTCparse_GTF_and_Genome(DTCcontext_t * context){
 			}
 		}
 
-		for(ii = 0; ii < in_chro_exons -> numOfElements; ii++){
+		/*for(ii = 0; ii < in_chro_exons -> numOfElements; ii++){
 			DTCexon_t * tmpexon = ArrayListGet(in_chro_exons , ii);
 			unsigned int * tmp_gene_info = HashTableGet(genename_to_3int_table , tmpexon -> gene_name);
-			//DTCadd_annotation(context, tmpexon -> gene_name, current_chro, tmpexon -> start, tmpexon -> end, tmpexon -> is_negative_strand, tmp_gene_info[3], tmp_gene_info[4]);	
-		}
+			DTCadd_annotation(context, tmpexon -> gene_name, current_chro, tmpexon -> start, tmpexon -> end, tmpexon -> is_negative_strand, tmp_gene_info[3], tmp_gene_info[4]);	
+		}*/
 
 		if(context -> use_intron_bins){
 			DTCexon_t * tmpexon = ArrayListGet(in_chro_exons , 0);
@@ -393,7 +393,7 @@ int DTCparse_GTF_and_Genome(DTCcontext_t * context){
 			HashTableIteration(genename_to_3int_table ,DTCprocess_gene_tab);
 			ArrayListSort(merged_gene_list, DTCcompare_merge_genes);
 
-			SUBREADprintf("%s has %d merged genes from %ld item hashtable\n", current_chro, merged_gene_list -> numOfElements, genename_to_3int_table -> numOfElements);
+			SUBREADprintf("%s has %ld merged genes from %ld item hashtable\n", current_chro, merged_gene_list -> numOfElements, genename_to_3int_table -> numOfElements);
 			assert(merged_gene_list -> numOfElements>0);
 
 			unsigned int * geneints = ArrayListGet(merged_gene_list, 0);
@@ -493,7 +493,7 @@ int DTCinit_context(DTCcontext_t ** context, int argc, char ** argv){
 	else ret -> sam_chro_to_anno_chr_alias = NULL;
 	
 	ret -> out_FP_genes = fopen(ret -> out_file_name,"w");
-	char binfn[MAX_FILE_NAME_LENGTH];
+	char binfn[MAX_FILE_NAME_LENGTH+12];
 	sprintf(binfn,"%s-bins", ret -> out_file_name);
 	ret -> out_FP_bins = fopen(binfn,"w");
 

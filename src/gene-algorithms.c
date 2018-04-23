@@ -781,8 +781,8 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 // adjust_len <0: "I" in read; adjust_len>0: "D" in read
 void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel_tolerance, int total_subreads, char *read, int * pos_offset, int * adjust_len)
 {
-	int i, is_error = 0;
-	int last_end=0, last_offset = 0, cursor = 0;
+	int i;
+	int last_offset = 0, cursor = 0;
 
 	if(info[0]==-1){
 		sprintf(buf, "%dM", len);
@@ -800,7 +800,6 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 	}
 	else if(info[0]==-3){
 		info ++;
-		is_error = 1;
 	}
 
 	for(i=0; i<indel_tolerance*3; i+=3)
@@ -810,7 +809,6 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		//int subread_start = info[i]-1;
 		int subread_end = info[i+1]-1;
 
-		//int base_start = (last_end==0)?0:(find_subread_end(len, TOTAL_SUBREADS, subread_start)-16);
 		int base_end = (i < indel_tolerance*3-3 && info[i+3])?find_subread_end(len, total_subreads, subread_end):len;
 
 //			SUBREADprintf("BE=%d ; II+3=%d ; len=%d\n", base_end, info[i+3], len);
@@ -832,15 +830,9 @@ void show_cigar(char * info, int len, int is_reversed_map, char * buf, int indel
 		else
 			sprintf(buf+strlen(buf), "%dM", base_end);
 		last_offset = dist;
-		last_end = base_end;
 		cursor = base_end;
-		//if (dist >0)cursor += dist;
 	}
 	compress_cigar(buf, len, read, pos_offset, adjust_len);
-//	if(cursor < len)
-//		sprintf(buf+strlen(buf), "%dM", len-cursor);
-//	if(is_error)
-//		strcat(buf, "XX");
 }
 
 void add_allvote_q(gene_allvote_t* allvote,int qid , int pos, gene_vote_number_t votes, gene_quality_score_t quality, int is_counterpart, short mask, char * max_indel_recorder, gene_value_index_t * array_index, char * read_txt, int read_len, int max_indel, int total_subreads, int space_type, int report_junction, int is_head_high_quality, char * qual_txt, int phred_version, char span_coverage, short **dynamic_programming_short ,  char ** dynamic_programming_char)
@@ -1194,7 +1186,7 @@ int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, 
 
 	int ret = 0;
 	int tali = 0;
-	int last_section_end = 0, last_section_indels=0;
+	int last_section_end = 0;
 
 	for(tali = 0; indel_recorder[tali*3] && tali<MAX_INDEL_TOLERANCE; tali++)
 	{
@@ -1209,11 +1201,8 @@ int match_chro_indel(char * read, gene_value_index_t * index, unsigned int pos, 
 		ret += match_chro(read + last_section_end - min(0, section_offset), index, pos + last_section_end + max(0, section_offset), this_section_end - last_section_end + min(0, section_offset), is_negative_strand * 0, space_type);
 
 		last_section_end = this_section_end;
-		last_section_indels = section_offset;
 	}
 
-	//ret = match_chro(read , index, pos , test_len, is_negative_strand, space_type);
-	//printf("\nRET=%d\n",ret);
 	return ret;
 
 }
@@ -1743,11 +1732,10 @@ int search_DP_branch(char * read, int read_len, gene_value_index_t * index, unsi
 
 	int found = 0;
 	int table_mask_j_1 = 0, table_mask_i_1 = 0;
-	int table_mask2_j_1 = 0, table_mask2_i_1 = 0;
+	int table_mask2_i_1 = 0;
 	if(path_j >0 && path_i >=0)
 	{
 		table_mask_j_1 = left_score + (table_mask[path_i][path_j-1]? DPALIGN_EXTENDGAP_PENALTY: DPALIGN_CREATEGAP_PENALTY) == current_score;
-		table_mask2_j_1 = left_score + (table_mask[path_i][path_j-1]? DPALIGN_EXTENDGAP_PENALTY: DPALIGN_CREATEGAP_PENALTY) < 0;
 	}
 	if(path_i >0 && path_j >=0)
 	{
@@ -2384,7 +2372,6 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 		}
 		
 		int window_matched = 0;
-		int is_match_begin = 0;
 		int last_confirmed_read_pos = 99999;
 		int REFINE_WINDOW_SIZE = 10;
 		for(read_cursor = - REFINE_WINDOW_SIZE; read_cursor < rl - REFINE_WINDOW_SIZE; read_cursor++)
@@ -2403,7 +2390,6 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 
 
 		window_matched = 0;
-		is_match_begin = 0;
 		int first_confirmed_read_pos = 99999;
 		for(read_cursor = rl -1 ; read_cursor >=0 ; read_cursor--)
 		{

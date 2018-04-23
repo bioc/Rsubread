@@ -472,7 +472,7 @@ int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** hu
 
 int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, gehash_t *huge_table)
 {
-	int file_number, table_no, i ,j;
+	int file_number, i ,j;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
 	double local_begin_ftime = miltime();
@@ -521,7 +521,6 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	file_number = 0;
 	offset = 0;
-	table_no = 0;
 	read_no = 0;
 
 	char * fn = malloc(3100);
