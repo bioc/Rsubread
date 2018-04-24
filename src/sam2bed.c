@@ -52,7 +52,8 @@ int sam2bed(int argc,char *argv[]){
       continue;
 
 	tok = strtok(line,"\t");
-	if(top == NULL) assert(0);
+	if(tok == NULL) continue;
+ 
 	flag = atoi(strtok(NULL,"\t"));
 	chr = strtok(NULL,"\t");
     if(chr[0] != '*'){
