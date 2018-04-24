@@ -38,7 +38,7 @@ int sam2bed(int argc,char *argv[]){
 
   char * line = NULL;
   char strand;
-  char * chr;
+  char * chr, *tok;
   int readlen, chr_start, chr_end, flag, mqs;
 
   int MAX_LINE_LENGTH = 100000;
@@ -51,6 +51,8 @@ int sam2bed(int argc,char *argv[]){
     if(line[0] == '@')
       continue;
 
+	tok = strtok(line,"\t");
+	if(top == NULL) assert(0);
 	flag = atoi(strtok(NULL,"\t"));
 	chr = strtok(NULL,"\t");
     if(chr[0] != '*'){
