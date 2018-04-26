@@ -477,6 +477,7 @@ int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 
 size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, int subread_len, unsigned int low_border, unsigned int high_border)
 {
+	assert(max_error_bases < 5);
 	char error_pos_stack[10];	// max error bases = 10;
 
 	gehash_key_t mutation_key;
@@ -542,6 +543,7 @@ size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset,
 
 size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, unsigned int low_border, unsigned int high_border)
 {
+	assert(max_error_bases < 5);
 	int error_pos_stack[10];	// max error bases = 10;
 	int C_poses[16];
 	int  availableC=0;
@@ -564,6 +566,7 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 
 	for (error_bases= min(availableC,max_error_bases); error_bases <= min(availableC,max_error_bases); error_bases++)
 	{
+		assert(error_bases < 5);
 		int j;
 		for(i=0; i<error_bases; i++)
 		{
@@ -572,7 +575,6 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 
 		while (1)
 		{
-
 			char mutation_stack[10];
 			memset(mutation_stack, 0 , error_bases);
 			while(1)

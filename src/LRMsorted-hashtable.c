@@ -526,6 +526,7 @@ size_t LRMgehash_go_tolerance(LRMcontext_t * context, LRMthread_context_t * thre
 	int error_bases ;
 	for (error_bases=1; error_bases <= max_MM; error_bases++)
 	{
+		assert(error_bases<5);
 		int i, j;
 		char error_pos_stack[10];	// max error bases = 10;
 		LRMgehash_key_t mutation_key;
