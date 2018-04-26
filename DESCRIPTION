@@ -1,6 +1,6 @@
 Package: Rsubread
-Version: 1.29.5
-Date: 2018-04-23
+Version: 1.29.6
+Date: 2018-04-27
 Title: Subread sequence alignment for R
 Author: Wei Shi and Yang Liao with contributions from Gordon Smyth, Jenny Dai
         and Timothy Triche, Jr.
