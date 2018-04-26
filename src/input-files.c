@@ -3854,7 +3854,7 @@ int SAM_pairer_osr_next_name(FILE * fp , char * name, int thread_no, int all_thr
 		if(feof(fp)) return 0;
 		int rlen =0;
 		int retv = fread(&rlen, 1, 2, fp);
-		if(retv < 2) return -1;
+		if(retv < 2) return 0;
 		if(rlen < 1) return 0;
 		assert(rlen < 1024);
 
@@ -3882,10 +3882,10 @@ void SAM_pairer_osr_next_bin(FILE * fp, char * bin){
 	assert(rlen < 1024);
 	fseek(fp, rlen, SEEK_CUR);
 	rlen =0;
-	fread(&rlen, 1, 4, fp);
+	retv = fread(&rlen, 1, 4, fp);
 	if(retv <4) *((int*)bin)=0;
 	rlen +=4;
-	fread(bin, 1, rlen, fp);
+	retv = fread(bin, 1, rlen, fp);
 	if(retv <rlen) *((int*)bin)=0;
 }
 
