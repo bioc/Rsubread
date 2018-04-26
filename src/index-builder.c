@@ -1206,7 +1206,11 @@ int main_buildindex(int argc,char ** argv)
 	if(tmp_fa_file[0]==0)strcpy(tmp_fa_file, "./");
 
 	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-XXXXXX", getpid());
-	mkstemp(tmp_fa_file);
+	int tmpfdd = mkstemp(tmp_fa_file);
+	if(tmpfdd == -1){
+		SUBREADprintf("ERROR: cannot create temp file\n");
+		return -1;
+	}
 
 	sprintf(log_file_name, "%s.log", output_file);
 	FILE * log_fp = f_subr_open(log_file_name,"w");

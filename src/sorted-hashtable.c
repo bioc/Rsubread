@@ -1282,7 +1282,7 @@ long long int load_int64(FILE * fp)
 int gehash_load_option(const char fname [], int option_no, int * result){
 	char tabname[MAX_FILE_NAME_LENGTH];
 	char magic_chars[8];
-	int found = 0;
+	int found = 0, rrtv;
 	sprintf(tabname, "%s.00.b.tab", fname);
 	FILE * fp = f_subr_open(tabname, "rb");
 	if(fp == NULL){
@@ -1290,19 +1290,23 @@ int gehash_load_option(const char fname [], int option_no, int * result){
 		fp = f_subr_open(tabname, "rb");
 	}
 	if(fp){	
-		fread(magic_chars,1,8,fp);
+		rrtv = fread(magic_chars,1,8,fp);
+		if(rrtv < 8) return -1;
 		if(memcmp(magic_chars, "2subindx",7)==0) {
 			while(1) {
 				short option_key, option_length;
 
-				fread(&option_key, 2, 1, fp);
+				rrtv = fread(&option_key, 2, 1, fp);
+				if(rrtv < 1) return -1;
 				if(!option_key) break;
 
-				fread(&option_length, 2, 1, fp);
+				rrtv = fread(&option_length, 2, 1, fp);
+				if(rrtv < 1) return -1;
 
 				if(option_key == option_no){
 					*result = 0;
-					fread(result ,option_length,1,fp);
+					rrtv = fread(result ,option_length,1,fp);
+					if(rrtv < 1) return -1;
 					found = 1;
 				}
 				else
@@ -1316,7 +1320,7 @@ int gehash_load_option(const char fname [], int option_no, int * result){
 
 int gehash_load(gehash_t * the_table, const char fname [])
 {
-	int i, read_length;
+	int i, read_length, rrtv;
 	char magic_chars[8];
 	magic_chars[7]=0;
 
@@ -1329,7 +1333,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		return 1;
 	}
 
-	fread(magic_chars,1,8,fp);
+	rrtv = fread(magic_chars,1,8,fp);
+	if(rrtv < 8) return -1;
 
 	if(memcmp(magic_chars, "2subindx",8)!=0)
 	{
@@ -1352,17 +1357,20 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			{
 				short option_key, option_length;
 
-				fread(&option_key, 2, 1, fp);
+				rrtv = fread(&option_key, 2, 1, fp);
+				if(rrtv < 1) return -1;
 				if(!option_key) break;
 
-				fread(&option_length, 2, 1, fp);
-
+				rrtv = fread(&option_length, 2, 1, fp);
+				if(rrtv < 1) return -1;
+				rrtv = 999;
 				if(option_key == SUBREAD_INDEX_OPTION_INDEX_GAP)
-					fread(&(the_table -> index_gap),2,1,fp);
+					rrtv = fread(&(the_table -> index_gap),2,1,fp);
 				else if (option_key ==SUBREAD_INDEX_OPTION_INDEX_PADDING)
-					fread(&(the_table -> padding),2,1,fp);
+					rrtv = fread(&(the_table -> padding),2,1,fp);
 				else
 					fseek(fp, option_length, SEEK_CUR);
+				if(rrtv <1) return -1;
 			}
 			assert(the_table -> index_gap);
 		}

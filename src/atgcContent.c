@@ -82,7 +82,9 @@ void retrieve_sequence(char ** input, char ** output_seq){
 	while (fgets(line, MAX_LINE_LENGTH, fin)){
 		line_num++;
 		if(line[0] == '@'){
-			fgets(line, MAX_LINE_LENGTH, fin);
+			char * flin = fgets(line, MAX_LINE_LENGTH, fin);
+			if(NULL == flin) continue;
+
 			line_num++;
 			i=0;
 			while ((toascii(*(line+i))!=10) && (toascii(*(line+i))!=32)){

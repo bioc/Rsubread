@@ -3760,11 +3760,24 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 		base_block_temp_read_t read_rec;
 		int rlen = fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
 		int is_position_certain = read_rec.strand;
-
 		if(rlen<1) break;
-		fread(&read_len, sizeof(short), 1, tmp_fp);
-		fread(read_text, sizeof(char), read_len, tmp_fp);
-		fread(qual_text, sizeof(char), read_len, tmp_fp);
+
+		rlen = fread(&read_len, sizeof(short), 1, tmp_fp);
+		if(rlen < 1){
+			SUBREADprintf("ERROR: Unable to parse piles\n");
+			return -1;
+		}
+		rlen = fread(read_text, sizeof(char), read_len, tmp_fp);
+		if(rlen <read_len){
+			SUBREADprintf("ERROR: Unable to parse piles\n");
+			return -1;
+		}
+		rlen = fread(qual_text, sizeof(char), read_len, tmp_fp);
+		if(rlen <read_len){
+			SUBREADprintf("ERROR: Unable to parse piles\n");
+			return -1;
+		}
+
 		first_base_pos = read_rec.pos;
 		first_base_pos -= block_no * BASE_BLOCK_LENGTH;
 
@@ -3841,9 +3854,23 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 		int is_position_certain = read_rec.strand;
 
 		if(rlen<1) break;
-		fread(&read_len, sizeof(short), 1, tmp_fp);
-		fread(read_text, sizeof(char), read_len, tmp_fp);
-		fread(qual_text, sizeof(char), read_len, tmp_fp);
+		rlen = fread(&read_len, sizeof(short), 1, tmp_fp);
+		if(rlen <1){
+			SUBREADprintf("ERROR: cannot parse piles.\n");
+			return -1;
+		}
+
+		rlen = fread(read_text, sizeof(char), read_len, tmp_fp);
+		if(rlen <read_len){
+			SUBREADprintf("ERROR: cannot parse piles.\n");
+			return -1;
+		}
+
+		rlen = fread(qual_text, sizeof(char), read_len, tmp_fp);
+		if(rlen <read_len){
+			SUBREADprintf("ERROR: cannot parse piles.\n");
+			return -1;
+		}
 		first_base_pos = read_rec.pos;
 		first_base_pos -= block_no * BASE_BLOCK_LENGTH;
 		assert(first_base_pos>=0);
@@ -4205,9 +4232,12 @@ int finalise_pileup_file_by_debrujin(global_context_t * global_context , char * 
 		base_block_temp_read_t read_rec;
 		int rlen = fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
 		if(rlen<1) break;
-		fread(&read_len, sizeof(short), 1, tmp_fp);
-		fread(read_text, sizeof(char), read_len, tmp_fp);
-		fread(qual_text, sizeof(char), read_len, tmp_fp);
+		rlen = fread(&read_len, sizeof(short), 1, tmp_fp);
+		if(rlen<1) return -1;
+		rlen = fread(read_text, sizeof(char), read_len, tmp_fp);
+		if(rlen<read_len) return -1;
+		rlen = fread(qual_text, sizeof(char), read_len, tmp_fp);
+		if(rlen<read_len) return -1;
 		first_base_pos = read_rec.pos - block_no * BASE_BLOCK_LENGTH;
 
 		insert_pileup_read(global_context , block_context , first_base_pos , read_text , qual_text , read_len, read_rec.read_pos>0);

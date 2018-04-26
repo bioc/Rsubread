@@ -73,6 +73,7 @@ int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, char * rea
 		{
 			char temp_file[300];
 			unsigned int block_start_base = BASE_BLOCK_LENGTH * i;
+			int rrtv;
 			sprintf(temp_file , "%s%s-%04u.bin",temp_prefix, chromosomes[chromosome_no].chromosome_name, i);
 			chromosome_block_no++;
 
@@ -85,7 +86,8 @@ int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, char * rea
 			while(!feof(block_fp))
 			{
 				base_block_temp_read_t read_record;
-				fread(&read_record, sizeof(base_block_temp_read_t), 1, block_fp);
+				rrtv = fread(&read_record, sizeof(base_block_temp_read_t), 1, block_fp);
+				if(rrtv <1) return -1;
 				read_voting_table[read_record.pos-block_start_base] ++;
 			}
 
@@ -94,7 +96,8 @@ int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, char * rea
 			while(!feof(block_fp))
 			{
 				base_block_temp_read_t read_record;
-				fread(&read_record, sizeof(base_block_temp_read_t), 1, block_fp);
+				rrtv = fread(&read_record, sizeof(base_block_temp_read_t), 1, block_fp);
+				if(rrtv < 1) return -1;
 				if(read_voting_table[read_record.pos-block_start_base]>= threshold)
 					unselect_read_in_list(read_selection_list , read_record.read_number);
 			}

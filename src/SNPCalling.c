@@ -264,7 +264,7 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 
 	while(!feof(tmp_fp))
 	{
-		int type_char = fgetc(tmp_fp);
+		int type_char = fgetc(tmp_fp), rlen=-1;
 		if(type_char == EOF ) break;
 
 		fseek(tmp_fp, -1 , SEEK_CUR);
@@ -273,7 +273,11 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 		{
 			VCF_temp_read_t SNP_rec;
 
-			fread(&SNP_rec, sizeof(SNP_rec),1 , tmp_fp);
+			rlen = fread(&SNP_rec, sizeof(SNP_rec),1 , tmp_fp);
+			if(rlen < 1){
+				SUBREADputs("ERROR: the temporary file is broken.");
+				return -1;
+			}
 			if(!(*SNP_bitmap_recorder))
 			{
 				(*SNP_bitmap_recorder)=malloc((reference_len/8)+2);
@@ -292,10 +296,25 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 			char read[MAX_READ_LENGTH];
 			char qual[MAX_READ_LENGTH];
 
-			fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
-			fread(&read_len, sizeof(short), 1, tmp_fp);
-			fread(read, sizeof(char), read_len, tmp_fp);
-			int rlen = fread(qual, sizeof(char), read_len, tmp_fp);
+			int rlen = fread(&read_rec, sizeof(read_rec), 1, tmp_fp);
+			if(rlen < 1){
+				SUBREADputs("ERROR: the temporary file is broken.");
+				return -1;
+			}
+
+			rlen = fread(&read_len, sizeof(short), 1, tmp_fp);
+			if(rlen < 1){
+				SUBREADputs("ERROR: the temporary file is broken.");
+				return -1;
+			}
+
+			rlen = fread(read, sizeof(char), read_len, tmp_fp);
+			if(rlen < read_len){
+				SUBREADputs("ERROR: the temporary file is broken.");
+				return -1;
+			}
+			
+			rlen = fread(qual, sizeof(char), read_len, tmp_fp);
 			if(rlen < read_len){
 				SUBREADputs("ERROR: the temporary file is broken.");
 				return -1;

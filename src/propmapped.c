@@ -369,14 +369,15 @@ int prop_PE(propMapped_context * context)
 					unsigned char read_len;
 					unsigned short flags;
 					char * read_name;
-					fread(&read_len,1,1,fp);
+					int retvv = fread(&read_len,1,1,fp);
+					if(retvv<1) break;
 					if(feof(fp))break;
 					read_name = malloc((int)read_len+1);
-					fread(read_name,read_len,1,fp);
+					retvv = fread(read_name,read_len,1,fp);
+					if(retvv<1) break;
 					read_name[read_len]=0;
-					//assert(read_len == strlen(read_name));
-				//	SUBREADprintf("RNAME %s\n", read_name);
-					fread(&flags,1, sizeof(short), fp);
+					retvv = fread(&flags,1, sizeof(short), fp);
+					if(retvv<1) break;
 
 					int new_OK; 
 					

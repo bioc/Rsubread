@@ -508,8 +508,7 @@ int geinput_next_char(gene_input_t * input)
 
 			if (is_gene_char(nch))
 				return toupper(nch);
-			else
-			{
+			else {
 				long long int fpos = ftello(input->input_fp);
 				int back_search_len =2;
 				int is_empty_seq = 0;
@@ -527,7 +526,8 @@ int geinput_next_char(gene_input_t * input)
 					back_search_len++;
 				}
 
-				fgets(out_buf, 1999,input->input_fp);
+				char * fgin = fgets(out_buf, 1999,input->input_fp);
+				if(NULL == fgin) out_buf[0]=0; 
 
 				if(is_empty_seq)
 				{
@@ -3637,7 +3637,9 @@ void SAM_pairer_reset( SAM_pairer_context_t * pairer ) {
 void SAM_pairer_writer_reset( void * pairer_vp ) {
 	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
 	SAM_pairer_writer_main_t * bam_main = (SAM_pairer_writer_main_t * )pairer -> appendix1;
-	ftruncate(fileno(bam_main -> bam_fp), 0);
+	int rlen = ftruncate(fileno(bam_main -> bam_fp), 0);
+	if(rlen != 0)SUBREADprintf("ERROR: Cannot reset the output file.");
+
 	fclose(bam_main -> bam_fp);
 	bam_main -> bam_fp = f_subr_open(bam_main -> bam_name, "wb");
 	int x1;
@@ -3851,8 +3853,9 @@ int SAM_pairer_osr_next_name(FILE * fp , char * name, int thread_no, int all_thr
 	while(1){
 		if(feof(fp)) return 0;
 		int rlen =0;
-		fread(&rlen, 1, 2, fp);
-		if(rlen<1) return 0;
+		int retv = fread(&rlen, 1, 2, fp);
+		if(retv < 2) return -1;
+		if(rlen < 1) return 0;
 		assert(rlen < 1024);
 
 		int rlen2 = fread(name, 1, rlen, fp);
@@ -3863,7 +3866,8 @@ int SAM_pairer_osr_next_name(FILE * fp , char * name, int thread_no, int all_thr
 			fseek(fp, -2-rlen, SEEK_CUR);
 			return 1;
 		}
-		fread(&rlen, 1, 4, fp);
+		retv = fread(&rlen, 1, 4, fp);
+		if(retv!=4) return -1;
 		rlen +=4;
 		fseek(fp, rlen, SEEK_CUR);
 	}
@@ -3872,13 +3876,17 @@ int SAM_pairer_osr_next_name(FILE * fp , char * name, int thread_no, int all_thr
 
 void SAM_pairer_osr_next_bin(FILE * fp, char * bin){
 	int rlen =0;
-	fread(&rlen, 1, 2, fp);
+	int retv = fread(&rlen, 1, 2, fp);
+	if(retv <2) *((int*)bin)=0;
+
 	assert(rlen < 1024);
 	fseek(fp, rlen, SEEK_CUR);
 	rlen =0;
 	fread(&rlen, 1, 4, fp);
+	if(retv <4) *((int*)bin)=0;
 	rlen +=4;
 	fread(bin, 1, rlen, fp);
+	if(retv <rlen) *((int*)bin)=0;
 }
 
 int SAM_pairer_is_matched_chunks(char * c1, char * c2){
@@ -4599,7 +4607,8 @@ int fix_load_next_block(FILE * in, char * binbuf, z_stream * strm){
 			xlen_ptr += 4 + slen;
 		}
 		if(bsize > 0){
-			fread(bam_buf, 1, bsize - xlen - 19, in);
+			int rlenv = fread(bam_buf, 1, bsize - xlen - 19, in);
+			if(rlenv < bsize - xlen - 19) return -1;
 		}
 		fseek(in, 8, SEEK_CUR);
 
@@ -5641,22 +5650,29 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 				short read_len;
 				int ret = fread(&flags, 2,1 , bbfp);
 				if(ret<1) break;
-				fread(&read_name_len, 2,1 , bbfp);
+				ret = fread(&read_name_len, 2,1 , bbfp);
+				if(ret<1) break;
+
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 					fseek(bbfp, read_name_len, SEEK_CUR); 
 				else
 				{
 					read_name = malloc(read_name_len+1);
-					fread(read_name, 1, read_name_len, bbfp);
+					ret = fread(read_name, 1, read_name_len, bbfp);
+					if(ret< read_name_len) break;
 					read_name[read_name_len] = 0;
 				}
-				fread(&read_len,2,1,bbfp);
+				ret =fread(&read_len,2,1,bbfp);
+				if(ret<1) break;
+
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 					fseek(bbfp, read_len, SEEK_CUR); 
 				else
 				{
 					char * new_line_mem = malloc(read_len+1);
-					fread(new_line_mem, 1, read_len, bbfp);
+					ret = fread(new_line_mem, 1, read_len, bbfp);
+					if(ret<read_len) break;
+
 					new_line_mem[read_len] = 0;
 
 					if(read_len<2)
@@ -5709,20 +5725,25 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 				int ret = fread(&flags, 2,1 , bbfp);
 				if(ret<1) break;
 
-				fread(&read_name_len, 2,1 , bbfp);
+				ret = fread(&read_name_len, 2,1 , bbfp);
+				if(ret < 1) break;
 
 				if(read_name_len>=MAX_READ_NAME_LEN + MAX_CHROMOSOME_NAME_LEN * 2 + 26)
 					SUBREADprintf("VERY_LONG_NAME(%d)\n", read_name_len);
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 				{
-					fread(read_name_buf, 1, read_name_len, bbfp);
+					ret = fread(read_name_buf, 1, read_name_len, bbfp);
+					if(ret < read_name_len) break;
+
 					read_name_buf[read_name_len] = 0;
-				}
-				else	fseek(bbfp, read_name_len, SEEK_CUR);
-				fread(&read_len, 2,1 , bbfp);
+				} else fseek(bbfp, read_name_len, SEEK_CUR);
+				ret = fread(&read_len, 2,1 , bbfp);
+				if(ret < 1) break;
+
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
 				{
-					fread(read_line_buf, 1, read_len, bbfp);
+					ret = fread(read_line_buf, 1, read_len, bbfp);
+					if(ret < 1) break;
 					read_line_buf[read_len] = 0;
 				}
 				else	fseek(bbfp, read_len, SEEK_CUR);

@@ -85,7 +85,8 @@ int is_paired_end_BAM(char * fn){
 	FILE * fp = fopen(fn, "rb");
 	if(!fp) return 0;
 	unsigned char h2[2];
-	fread(h2, 1,2,fp);
+	int retvv = fread(h2, 1,2,fp);
+	if(retvv <2) return 0;
 	int is_bam = (h2[0]==31) && (h2[1]==139);
 	fclose(fp);
 
@@ -371,14 +372,18 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 {
 	unsigned char ID1, ID2, CM, FLG;
 	unsigned short XLEN;
-	int BSIZE=-1, rlen, is_file_broken = 0;
+	int BSIZE=-1, rlen, is_file_broken = 0, rrtv;
 
 	if(feof(bam_fp)) return -1;
 
-	fread(&ID1, 1, 1, bam_fp);
-	fread(&ID2, 1, 1, bam_fp);
-	fread(&CM, 1, 1, bam_fp);
-	fread(&FLG, 1, 1, bam_fp);
+	rrtv = fread(&ID1, 1, 1, bam_fp);
+	if(rrtv <1) return -1;
+	rrtv = fread(&ID2, 1, 1, bam_fp);
+	if(rrtv <1) return -1;
+	rrtv = fread(&CM, 1, 1, bam_fp);
+	if(rrtv <1) return -1;
+	rrtv = fread(&FLG, 1, 1, bam_fp);
+	if(rrtv <1) return -1;
 	if(feof(bam_fp)) return -1;
 
 	if(ID1!=31 || ID2!=139 || CM!=8 || FLG!=4)
@@ -387,7 +392,8 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 		return -1;
 	}
 	fseeko(bam_fp, 6, SEEK_CUR);
-	fread(&XLEN,1, 2, bam_fp );
+	rrtv = fread(&XLEN,1, 2, bam_fp );
+	if(rrtv < 2) return -1;
 
 	int XLEN_READ = 0;
 	while(1)
@@ -395,14 +401,17 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 		unsigned char SI1, SI2;
 		unsigned short SLEN, BSIZE_MID;
 		
-		fread(&SI1, 1, 1, bam_fp);
-		fread(&SI2, 1, 1, bam_fp);
+		rrtv = fread(&SI1, 1, 1, bam_fp);
+		if(rrtv <1) return -1;
+		rrtv = fread(&SI2, 1, 1, bam_fp);
+		if(rrtv <1) return -1;
 		rlen = fread(&SLEN, 2, 1, bam_fp);
 		if(rlen < 1) is_file_broken = 1;
 
 		if(SI1==66 && SI2== 67 && SLEN == 2)
 		{
-			fread(&BSIZE_MID, 1,2 , bam_fp);
+			rrtv = fread(&BSIZE_MID, 1,2 , bam_fp);
+			if(rrtv <2) return -1;
 			BSIZE = BSIZE_MID;
 		}
 		else	fseeko(bam_fp, SLEN, SEEK_CUR);
@@ -414,7 +423,8 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 	{
 		int CDATA_LEN = BSIZE - XLEN - 19;
 		int CDATA_READING = min(CDATA_LEN, buffer_length);
-		fread(buffer, 1, CDATA_READING, bam_fp);
+		rrtv = fread(buffer, 1, CDATA_READING, bam_fp);
+		if(rrtv < CDATA_READING) return -1;
 		if(CDATA_READING<CDATA_LEN)
 			fseeko(bam_fp, CDATA_LEN-CDATA_READING, SEEK_CUR);
 		fseeko(bam_fp, 4, SEEK_CUR);

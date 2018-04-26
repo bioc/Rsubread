@@ -1656,7 +1656,8 @@ void process_pairer_reset(void * pairer_vp){
 	}
 
 	if(global_context -> read_details_out_FP){
-		ftruncate(fileno(global_context -> read_details_out_FP), 0);
+		int tranc_ret = ftruncate(fileno(global_context -> read_details_out_FP), 0);
+		if(0 != tranc_ret) SUBREADprintf("ERROR: Unable to truncate assignment detail file\n");
 		fseek(global_context -> read_details_out_FP, 0 , SEEK_SET);
 	}
 }

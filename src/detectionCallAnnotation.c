@@ -193,7 +193,9 @@ calculateExonGCContent(void){
 
 
 		fseq = fopen(filename, "r");
-		fgets(line, sizeof(line), fseq);
+		char * flin = fgets(line, sizeof(line), fseq);
+		if(NULL == flin) break;
+
 		bin = exon[i].list->next;
 		pos = 0;
 		linenum = 0;
@@ -280,7 +282,9 @@ calculateIRGCContent(void){
 		// printf("IR GC content: the fa file is: %s\n", filename);
 
 		fseq = fopen(filename, "r");
-		fgets(line, sizeof(line), fseq);
+		char * flin = fgets(line, sizeof(line), fseq);
+		if(NULL == flin) break;
+
 		bin = ir[i].list->next;
 		pos = 0;
 		linenum = 0;

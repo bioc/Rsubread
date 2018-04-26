@@ -43,7 +43,7 @@ unsigned long long get_inner_pair(global_context_t * global_context , subread_re
 bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_context , thread_context_t * thread_context , subread_read_number_t pair_number, int is_second_read, int load_more);
 
 void bigtable_readonly_result(global_context_t * global_context , thread_context_t * thread_context , subread_read_number_t pair_number, int result_number, int is_second_read, mapping_result_t * return_ptr, subjunc_result_t * return_junction_ptr){
-
+	int rlen = -1;
 
 	if(global_context -> bigtable_cache_file_fp){
 		int loadjunc;
@@ -67,7 +67,9 @@ void bigtable_readonly_result(global_context_t * global_context , thread_context
 			void * write_ptr = return_ptr;
 			if(loadjunc) write_ptr = return_junction_ptr;
 
-			fread(write_ptr, loadjunc?sizeof(subjunc_result_t):sizeof(mapping_result_t), 1,  global_context -> bigtable_cache_file_fp);
+			rlen = fread(write_ptr, loadjunc?sizeof(subjunc_result_t):sizeof(mapping_result_t), 1,  global_context -> bigtable_cache_file_fp);
+			if(rlen <1)
+				SUBREADprintf("UNABLE TO READ RESULT\n");
 		}
 	}else{
 		bigtable_cached_result_t * rett = bigtable_retrieve_cache(global_context , thread_context , pair_number, is_second_read,0);
@@ -195,9 +197,6 @@ bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_con
 
 	if(global_context -> bigtable_cache_file_fp){
 
-
-		//SUBREADprintf("MARK_OCCPY=%lld BY THREAD %d\n", pair_number, thread_context ? thread_context -> thread_id : -1);
-
 		if(global_context -> bigtable_cache_file_loaded_fragments_begin == -1 ||  inner_pair_number >= global_context -> bigtable_cache_file_loaded_fragments_begin + global_context -> bigtable_chunked_fragments || inner_pair_number < global_context -> bigtable_cache_file_loaded_fragments_begin)
 		{
 			SUBREADprintf("THREAD # %d WAITING FOR %llu for RETRIEVE %llu\n", thread_context? thread_context -> thread_id:-1, global_context -> bigtable_cache_file_loaded_fragments_begin, pair_number);
@@ -205,10 +204,11 @@ bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_con
 		}
 
 		bigtable_lock(global_context);
-	//SUBREADprintf("inner_pair_number=%lld, fragments_begin=%lld\n", inner_pair_number,  global_context -> bigtable_cache_file_loaded_fragments_begn[thread_no]);
+
 		if(global_context -> bigtable_cache_file_loaded_fragments_begin == -1 ||  inner_pair_number >= global_context -> bigtable_cache_file_loaded_fragments_begin + global_context -> bigtable_chunked_fragments || inner_pair_number < global_context -> bigtable_cache_file_loaded_fragments_begin)
 		{
 			long long load_end_pair_no = load_start_pair_no + global_context -> bigtable_chunked_fragments;
+			int rlen = -1;
 
 			// this function will see if there is data to write or not.
 			bigtable_write_thread_cache(global_context);
@@ -224,17 +224,35 @@ bigtable_cached_result_t * bigtable_retrieve_cache(global_context_t * global_con
 				{
 					for(xk2 = 0; xk2 < 1 + global_context -> input_reads.is_paired_end_reads; xk2++){
 						bigtable_cached_result_t * current_cache = global_context -> bigtable_cache + xk1* (1+global_context -> input_reads.is_paired_end_reads) + xk2;
-						fread( current_cache -> big_margin_data , sizeof(short) * 3 * global_context -> config.big_margin_record_size , 1, global_context -> bigtable_cache_file_fp );
-						fread( current_cache -> alignment_res , sizeof(mapping_result_t) * global_context -> config.multi_best_reads , 1, global_context -> bigtable_cache_file_fp );
+						rlen = fread( current_cache -> big_margin_data , sizeof(short) * 3 * global_context -> config.big_margin_record_size , 1, global_context -> bigtable_cache_file_fp );
+						if(rlen < 1){
+							SUBREADprintf("ERROR: cannot read margin\n");
+							return NULL;
+						}
 
-						if(global_context -> config.do_breakpoint_detection)
-								fread( current_cache -> subjunc_res , sizeof(subjunc_result_t) * global_context -> config.multi_best_reads , 1, global_context -> bigtable_cache_file_fp);
+						rlen = fread( current_cache -> alignment_res , sizeof(mapping_result_t) * global_context -> config.multi_best_reads , 1, global_context -> bigtable_cache_file_fp );
+						if(rlen < 1){
+							SUBREADprintf("ERROR: cannot read margin\n");
+							return NULL;
+						}
+
+						if(global_context -> config.do_breakpoint_detection){
+							rlen = fread( current_cache -> subjunc_res , sizeof(subjunc_result_t) * global_context -> config.multi_best_reads , 1, global_context -> bigtable_cache_file_fp);
+							if(rlen < 1){
+								SUBREADprintf("ERROR: cannot read margin\n");
+								return NULL;
+							}
+						}
 					}
 				} 
 			}else{
 				long long new_file_size = calc_file_location(load_end_pair_no);
 				//SUBREADprintf("FILE_TRUNCATE %lld\n", load_start_pair_no);
-				ftruncate(fileno(global_context -> bigtable_cache_file_fp), new_file_size);
+				rlen = ftruncate(fileno(global_context -> bigtable_cache_file_fp), new_file_size);
+				if(rlen != 0){
+					SUBREADprintf("ERROR: cannot truncate file\n");
+					return NULL;
+				}
 				global_context -> bigtable_cache_file_fragments = load_end_pair_no;
 				int xk1, xk2;
 				for(xk1 = 0; xk1 < global_context -> bigtable_chunked_fragments; xk1++)
