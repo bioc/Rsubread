@@ -18,7 +18,7 @@ The return value from \code{flattenGTF} is a data frame. It can be directly give
 }
 \author{Wei Shi and Yang Liao}
 \seealso{
-\code{\link{getInBuiltAnnotation}}}
+\code{\link{featureCounts}}}
 \examples{\dontrun{
 library(Rsubread)
 
