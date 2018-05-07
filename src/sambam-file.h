@@ -104,22 +104,29 @@ typedef struct
 typedef struct
 {
 	FILE * bam_fp;
+	FILE * BAI_fp;
+	long long current_BAM_pos;
+	char tmpf_prefix[MAX_FILE_NAME_LENGTH];
 	z_stream output_stream;
 	char * chunk_buffer;
 	char * compressed_chunk_buffer;
 	char * header_plain_text_buffer;
 	int header_plain_text_buffer_used;
 	int header_plain_text_buffer_max;
-	int chunk_buffer_used;
+	long long chunk_buffer_used;
+	long long chunk_buffer_max_size;
 	int writer_state;
 	int is_internal_error;
+	int keep_in_memory;
+	int sorted_batch_id;
 	unsigned int crc0;
 
 	int threads;
 	z_stream * threads_output_stream;
 	char ** threads_chunk_buffer;
 	char ** threads_chunk_buffer_compressed;
-	int * threads_chunk_buffer_used;
+	long long * threads_chunk_buffer_used;
+	long long * threads_chunk_buffer_max_size;
 	
 	HashTable * chromosome_name_table;
 	HashTable * chromosome_id_table;
@@ -174,7 +181,7 @@ int SamBam_feof(SamBam_FILE * fp);
  */
 char * SamBam_fgets(SamBam_FILE * fp , char * buff , int buff_len , int seq_needed);
 
-int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads);
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int keep_in_memory, char * tmpfname);
 
 int SamBam_writer_close(SamBam_Writer * writer);
 
@@ -198,4 +205,5 @@ int convert_BAM_binary_to_SAM(SamBam_Reference_Info * chro_table, char * bam_bin
 int is_paired_end_BAM(char * fn);
 void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id);
 void SamBam_writer_finish_header( SamBam_Writer * writer );
+void SamBam_writer_finalise_one_thread(SamBam_Writer * writer);
 #endif

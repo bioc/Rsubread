@@ -2726,7 +2726,6 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
 
 		if(thread_context -> need_find_start){
 			int test_read_bin = SAM_pairer_find_start(pairer, thread_context);
-			thread_context -> need_find_start = 0;
 			//SUBREADprintf("THREAD [%d] IS_READ_BIN_OK=%d, %d\n", thread_context -> thread_id, test_read_bin, thread_context -> input_buff_BIN_used);
 			if(test_read_bin<1 && thread_context -> input_buff_BIN_used >= 32  ){
 				pairer -> is_bad_format = 1;

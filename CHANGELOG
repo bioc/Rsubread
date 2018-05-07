@@ -1,3 +1,8 @@
+3 May 2018 - 1.31.1
+(1) Added 'sortReadsByCoordinates' option to align() and subjunc().
+(2) Added the flattenGTF() function.
+(3) Allowed featureCounts() to apply different strandness checks on different input files.
+
 27 April 2018 - 1.29.6
 (1) Removed warning messages from the installation of the package.
 

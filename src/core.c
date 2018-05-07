@@ -712,6 +712,17 @@ int check_configuration(global_context_t * global_context)
 		return -1;
 	}
 
+	if(global_context->config.is_input_read_order_required && global_context->config.sort_reads_by_coordinates){
+		SUBREADputs("ERROR: you shouldn't specify keep input order and sort by coordinate at same time.");
+		return -1;
+	}
+
+	if((global_context -> config.is_BAM_output == 0 || global_context->config.output_prefix[0]==0) && global_context->config.sort_reads_by_coordinates){
+		if(global_context -> config.is_BAM_output==0)SUBREADputs("ERROR: SAM output doesn't support read sorting by coordinates.");
+		else SUBREADputs("ERROR: STDOUT output doesn't support read sorting by coordinates.");
+		return -1;
+	}
+
 	return 0;
 
 }
@@ -2462,6 +2473,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	realignment_result_t * final_realignments;
 	subread_output_context_t out_context;
 
+	//SUBREADprintf("THREAD_OPT2_start\n");
 	init_output_context(global_context, &out_context);	
 
 	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR  *  2 * global_context -> config.reported_multi_best_reads ; repeated_count ++ ){
@@ -2503,6 +2515,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 		sqr_read_number++;
 		fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 0, &current_read_number);
+		//SUBREADprintf("THREAD_OPT2_fetch %llu\n", current_read_number);
 		strcpy(raw_read_text_1, read_text_1);
 		strcpy(raw_qual_text_1, qual_text_1);
 
@@ -2968,8 +2981,9 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	}
 
 	destroy_output_context(global_context, &out_context);	
+	//SUBREADprintf("OPT2-FINISHED\n");
 	if(global_context ->config.all_threads >1 && global_context ->config.is_BAM_output && !global_context ->config.is_input_read_order_required)SamBam_writer_finalise_thread(global_context -> output_bam_writer, thread_context -> thread_id);
-	//SUBREADprintf("29NOV2016-QUIT TH-%d\n", thread_context->thread_id );
+	if(global_context ->config.all_threads <=1 && global_context ->config.is_BAM_output && global_context ->config.sort_reads_by_coordinates)SamBam_writer_finalise_one_thread(global_context -> output_bam_writer);
 	return 0;
 }
 
@@ -3653,7 +3667,7 @@ int print_configuration(global_context_t * context)
 	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):"");
 
 	if(context->config.output_prefix [0])
-	        print_in_box(80, 0, 0, "Output file   : %s (%s)%s", get_short_fname(context->config.output_prefix), context->config.is_BAM_output?"BAM":"SAM", context->config.is_input_read_order_required?", Keep Order":"");
+	        print_in_box(80, 0, 0, "Output file   : %s (%s)%s", get_short_fname(context->config.output_prefix), context->config.is_BAM_output?"BAM":"SAM", context->config.is_input_read_order_required?", Keep Order":(context->config.sort_reads_by_coordinates?", Sorted":""));
 	else
 	        print_in_box(80, 0, 0, "Output method : STDOUT (%s)" , context->config.is_BAM_output?"BAM":"SAM");
 
@@ -3765,7 +3779,7 @@ void write_sam_headers(global_context_t * context)
 			snprintf(obuf,620, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
 			SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		}
-		snprintf(obuf,299, "@PG\tID:subread\tPN:subread\tVN:%s", SUBREAD_VERSION);
+		snprintf(obuf,299, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
 		SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		SamBam_writer_finish_header(context -> output_bam_writer);
 	}
@@ -3783,7 +3797,7 @@ void write_sam_headers(global_context_t * context)
 
 		if(context->config.read_group_id[0])
 			sambamout_fprintf(context -> output_sam_fp, "@RG\tID:%s%s\n",context->config.read_group_id, context->config.read_group_txt);
-		sambamout_fprintf(context -> output_sam_fp, "@PG\tID:subread\tPN:subread\tVN:%s\n", SUBREAD_VERSION);
+		sambamout_fprintf(context -> output_sam_fp, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s\n", SUBREAD_VERSION, context->rebuilt_command_line);
 		
 	}
 }
@@ -3977,7 +3991,7 @@ int load_global_context(global_context_t * context)
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
-			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads);
+			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates, context -> config.temp_file_prefix);
 			context -> output_sam_fp = NULL;
 		}
 		else
@@ -3998,7 +4012,7 @@ int load_global_context(global_context_t * context)
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
-			SamBam_writer_create(context -> output_bam_writer ,NULL, context -> config.all_threads);
+			SamBam_writer_create(context -> output_bam_writer ,NULL, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates,  context -> config.temp_file_prefix);
 		}
 		context->output_sam_fp = NULL;
 	}
@@ -4130,8 +4144,29 @@ int destroy_global_context(global_context_t * context)
 
 	if((context -> will_remove_input_file & 1) && strstr(context ->config.first_read_file, "/core-temp")) unlink(context ->config.first_read_file);
 	if((context -> will_remove_input_file & 2) && strstr(context ->config.second_read_file, "/core-temp")) unlink(context ->config.second_read_file);
+	free(context -> rebuilt_command_line);
 	
 	return ret;
+}
+
+void subread_rebuild_cmd(int argc, char ** argv, global_context_t * global_context){
+	int c;
+	global_context -> rebuilt_command_line = malloc(2000);
+	global_context -> rebuilt_command_line_size = 2000;
+
+	global_context -> rebuilt_command_line[0]=0;
+
+	for(c = 0; c<argc;c++)
+	{
+		if(strlen(global_context -> rebuilt_command_line) + 500 > global_context -> rebuilt_command_line_size)
+		{
+			global_context -> rebuilt_command_line_size*=2;
+			global_context -> rebuilt_command_line = realloc(global_context -> rebuilt_command_line, global_context -> rebuilt_command_line_size);
+		}
+		sprintf(global_context -> rebuilt_command_line + strlen(global_context -> rebuilt_command_line), "\"%s\" ", argv[c]);
+	}
+
+
 }
 
 
@@ -4666,10 +4701,28 @@ void test_PE_and_same_chro(global_context_t * global_context , unsigned int pos1
 
 }
 
-int FIXLENstrcmp(char * fixed_len, char * rname){
-	int x=0;
-	for(; fixed_len[x]; x++){
-		if(rname[x]!=fixed_len[x]) return 1;
+int FIXLENstrcmp(char * flen, char * rname){
+	char * tt=NULL;
+	char * fixed_len = malloc(strlen(flen)+1);
+	strcpy(fixed_len, flen);
+	char * s1 = strtok_r(fixed_len, "\n", &tt);
+
+	int found = 0;
+	while(1){
+		int this_ok = 1,x=0;
+		for(; s1[x]; x++){
+			if(rname[x]!=s1[x]) {
+				this_ok = 0;
+				break;
+			}
+		}
+		if(this_ok){
+			found = 1;
+			break;
+		}
+		s1 = strtok_r(NULL, "\n", &tt);
+		if(!s1)break;
 	}
-	return 0;
+	free(fixed_len);
+	return !found;
 }

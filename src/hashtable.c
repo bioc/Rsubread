@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.19 2018/01/24 03:03:49 cvs Exp $
+ * $Id: hashtable.c,v 9999.23 2018/05/05 00:47:52 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include "hashtable.h"
 #include "core.h"
+#include "input-files.h"
 
 static int pointercmp(const void *pointer1, const void *pointer2);
 static unsigned long pointerHashFunction(const void *pointer);
@@ -28,6 +29,17 @@ ArrayList * ArrayListCreate(int init_capacity){
 	memset(ret,0,sizeof(ArrayList));
 	ret -> capacityOfElements = init_capacity;
 	ret -> elementList = malloc(sizeof(void *)*init_capacity);
+	return ret;
+}
+
+ArrayList * ArrayListDuplicate(ArrayList * ori){
+	ArrayList * ret = malloc(sizeof(ArrayList));
+	memset(ret,0,sizeof(ArrayList));
+	ret -> capacityOfElements = ori -> numOfElements;
+	ret -> numOfElements = ori -> numOfElements;
+	ret -> elementList = malloc(sizeof(void *)*ret -> capacityOfElements);
+	memcpy(ret -> elementList, ori -> elementList, sizeof(void *)*ret -> capacityOfElements);
+	ret -> elemDeallocator = ori -> elemDeallocator;
 	return ret;
 }
 
@@ -145,6 +157,12 @@ void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void *
  *	  HashTable	- a new Hashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
+HashTable * StringTableCreate(long numOfBuckets){
+	HashTable * ret = HashTableCreate(numOfBuckets);
+	HashTableSetHashFunction(ret, HashTableStringHashFunction);
+	HashTableSetKeyComparisonFunction(ret , my_strcmp);
+	return ret;
+}
 
 HashTable *HashTableCreate(long numOfBuckets) {
 	HashTable *hashTable;
@@ -843,6 +861,20 @@ void free_values_destroy(HashTable * tab)
 	}
 
 	HashTableDestroy(tab);
+}
+
+ArrayList * HashTableKeyArray(HashTable * tab){
+	ArrayList *ret = ArrayListCreate(20);
+	int i;
+	for (i=0; i< tab ->numOfBuckets; i++) {
+		KeyValuePair *pair = tab ->bucketArray[i];
+		while (pair != NULL) {
+			ArrayListPush(ret, (void *)pair -> key);
+			KeyValuePair *nextPair = pair->next;
+			pair = nextPair;
+		}
+	}
+	return ret;
 }
 
 void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) )

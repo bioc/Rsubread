@@ -6,6 +6,9 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	if(!is.null(chrAliases))chrAliases <- normalizePath(chrAliases, mustWork=T)
 	if(!is.null(genome)) genome <- normalizePath(genome, mustWork=T)
 	if(!is.null(reportReadsPath))reportReadsPath <- normalizePath(reportReadsPath, mustWork=T)
+	strandSpecific<-as.character(strandSpecific)
+	strandSpecific<-paste(strandSpecific, collapse=".")
+	strandSpecific<-gsub(",", ".", strandSpecific)
 
 	if(is.null(annot.ext)){
 	  switch(tolower(as.character(annot.inbuilt)),
@@ -94,36 +97,41 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
-	x <- read.delim(fout,stringsAsFactors=FALSE)
-	colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
+    if(file.exists(fout)){
+			x <- read.delim(fout,stringsAsFactors=FALSE)
+			colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
 
-	x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
+			x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
 
-	if(juncCounts)
-		x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
+			if(juncCounts)
+				x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
 
-	file.remove(fout)
-	file.remove(paste(fout,".summary",sep=""))
+			file.remove(fout)
+			file.remove(paste(fout,".summary",sep=""))
 
-	if(juncCounts)
-		file.remove(paste(fout,".jcounts",sep=""))
-	
-	if(flag) 
-	  file.remove(fout_annot)
-	
-	if(ncol(x) == 6){
-	  stop("No count data were generated.")
+			if(juncCounts)
+				file.remove(paste(fout,".jcounts",sep=""))
+			
+			if(flag) 
+			  file.remove(fout_annot)
+			
+			if(ncol(x) == 6){
+			  stop("No count data were generated.")
+			}
+			
+			y <- as.matrix(x[,-c(1:6)])
+			colnames(y) <- colnames(x)[-c(1:6)]
+			rownames(y) <- x$GeneID
+
+			if(juncCounts)
+				z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:6],targets=colnames(y),stat=x_summary)
+			else
+				z <- list(counts=y,annotation=x[,1:6],targets=colnames(y),stat=x_summary)	
+
+			z	
+	}else{
+		print("No counts were generated.")
+		NA
 	}
-	
-	y <- as.matrix(x[,-c(1:6)])
-	colnames(y) <- colnames(x)[-c(1:6)]
-	rownames(y) <- x$GeneID
-
-	if(juncCounts)
-		z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:6],targets=colnames(y),stat=x_summary)
-	else
-		z <- list(counts=y,annotation=x[,1:6],targets=colnames(y),stat=x_summary)	
-
-	z	
 }
 

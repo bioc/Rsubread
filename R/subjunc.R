@@ -1,4 +1,4 @@
-subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
     readfile1 <- normalizePath(as.character(readfile1), mustWork=T)
     output_file <- normalizePath(as.character(output_file), mustWork=F)
@@ -54,6 +54,8 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 		opt <- paste(opt,"-b",sep=",")
 	if(keepReadOrder)
 		opt <- paste(opt,"--keepReadOrder",sep=",")
+	if(sortReadsByCoordinates)
+		opt <- paste(opt,"--sortReadsByCoordinates",sep=",")
 
     opt <- paste(opt,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
 

@@ -44,6 +44,9 @@
 #define SAM_FLAG_DUPLICATE 0x400
 #define SAM_FLAG_UNMAPPED 0x04
 
+#define SUBREAD_MAX_ULONGLONG 0xffffffffffffffffllu
+#define SUBREAD_MAX_LONGLONG 0x7fffffffffffffffll
+
 #define FUSION_BREAK_POINT	2
 #define FUSION_JUNCTION		1
 #define SPLICING_JUNCTION	0

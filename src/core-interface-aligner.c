@@ -62,6 +62,7 @@ static struct option long_options[] =
 	{"maxRealignLocations",  required_argument, 0, 0},
 	{"multiMapping", no_argument, 0, 0},
 	{"keepReadOrder", no_argument, 0, 0},
+	{"sortReadsByCoordinates", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -176,6 +177,10 @@ void print_usage_core_aligner()
 	SUBREADputs("                    input file. Reads from the same pair are always placed next");
 	SUBREADputs("                    to each other no matter this option is specified or not.");
 	SUBREADputs("");
+	SUBREADputs("  --sortReadsByCoordinates Sort the reads by their coordinates in the output BAM");
+	SUBREADputs("                    file. A BAI file is also created for indexing the sorted");
+	SUBREADputs("                    reads. This option does not work with SAM output.");
+	SUBREADputs("");
 	SUBREADputs("# color space reads");
 	SUBREADputs("");
 	SUBREADputs("  -b                Convert color-space read bases to base-space read bases in");
@@ -247,6 +252,8 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	optind = 0;
 	opterr = 1;
 	optopt = 63;
+
+	subread_rebuild_cmd(argc, argv, global_context);
 
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
 	global_context->config.max_mismatch_exonic_reads = 3;
@@ -508,6 +515,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("keepReadOrder", long_options[option_index].name)==0) 
 				{
 					global_context->config.is_input_read_order_required=1;
+				}
+				else if(strcmp("sortReadsByCoordinates", long_options[option_index].name)==0) 
+				{
+					global_context->config.sort_reads_by_coordinates=1;
 				}
 				else if(strcmp("extraColumns", long_options[option_index].name)==0) 
 				{

@@ -173,6 +173,7 @@ typedef struct{
 	int is_BAM_input;
 	int is_BAM_output;
 	int is_input_read_order_required;
+	int sort_reads_by_coordinates;
 	int convert_color_to_base;
 	int SAM_extra_columns;
 	int report_multiple_best_in_pairs;
@@ -501,7 +502,8 @@ typedef struct{
 	int need_merge_buffer_now;
 	read_input_t input_reads;
 	bigtable_t bigtable;
-
+	int rebuilt_command_line_size;
+	char * rebuilt_command_line;
 
 	subread_lock_t bigtable_lock;
 	subread_lock_t output_lock;
@@ -667,4 +669,5 @@ int is_valid_float(char * optarg, char * optname);
 int exec_cmd(char * cmd, char * outstr, int out_limit);
 int is_pos_in_annotated_exon_regions(global_context_t * global_context, unsigned int pos);
 char * get_sam_chro_name_from_alias(HashTable * tab, char * anno_chro);
+void subread_rebuild_cmd(int argc, char ** argv, global_context_t * global_context);
 #endif
