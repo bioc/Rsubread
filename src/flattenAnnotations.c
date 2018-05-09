@@ -141,6 +141,7 @@ void flatAnno_do_anno_merge_one_array(void * key, void * hashed_obj, HashTable *
 			last_2i[1] = curr_2i[1];
 		}
 	}
+	for(i=n1_items+1; i<this_list -> numOfElements; i++)free(this_list -> elementList[i]);
 	this_list -> numOfElements = n1_items+1;
 }
 

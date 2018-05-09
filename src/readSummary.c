@@ -58,6 +58,7 @@
 #define CHROMOSOME_NAME_LENGTH 256 
 #define MAX_FC_READ_LENGTH 10001
 #define MAX_HIT_NUMBER (1000*1000*1000)
+#define MAX_EXTRA_COLS 15
 
 typedef struct{
 	char gene_name[FEATURE_NAME_LENGTH];
@@ -100,6 +101,7 @@ typedef struct {
 
 	unsigned short chro_name_pos_delta;
 	char is_negative_strand;
+	char * extra_columns;
 } fc_feature_info_t;
 
 typedef struct {
@@ -286,6 +288,7 @@ typedef struct {
 	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
 	int input_file_unique;
 
+	char * reported_extra_columns;
 	HashTable * exontable_chro_table;	// gene_name -> fc_chromosome_index_info structure (contains chro_number, feature_number, block_start, block_end, etc) 
 	int exontable_nchrs;
 	int exontable_exons;
@@ -1109,11 +1112,51 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				ret_features[xk1].sorted_order = xk1;
 				strtok_r(NULL,"\t",&token_temp);	// "frame"
 				char * extra_attrs = strtok_r(NULL,"\t",&token_temp);	// name_1 "val1"; name_2 "val2"; ... 
+				ret_features[xk1].extra_columns = NULL;
 				if(extra_attrs && (strlen(extra_attrs)>2))
 				{
 					int attr_val_len = GTF_extra_column_value(extra_attrs , global_context -> gene_id_column , feature_name_tmp, FEATURE_NAME_LENGTH);
 					if(attr_val_len>0) is_gene_id_found=1;
 			//		printf("V=%s\tR=%d\n", extra_attrs , attr_val_len);
+
+					if(global_context -> reported_extra_columns){
+						char * extcols = malloc(30);
+						int extcols_size = 30, extcols_len = 0;
+
+						char * this_exname_ptr=global_context -> reported_extra_columns;
+						while(1){
+							int padd0, is_last=1;
+							for(padd0=0; this_exname_ptr[padd0]; padd0++)
+								if(this_exname_ptr[padd0]=='\t'){
+									this_exname_ptr[padd0]=0;
+									is_last=0;
+									break;
+								}
+
+							char * tmpnameex = malloc(50001);
+							attr_val_len = GTF_extra_column_value(extra_attrs , this_exname_ptr , tmpnameex, 50000);
+
+							if(attr_val_len<0){
+								attr_val_len=2;
+								strcpy(tmpnameex,"NA");
+							}
+							if(attr_val_len + extcols_len + 2 > extcols_size){
+								extcols_size = max(extcols_size*2, attr_val_len + extcols_len+2);
+								extcols = realloc(extcols, extcols_size);
+							}
+							memcpy(extcols+extcols_len, tmpnameex, attr_val_len);
+							extcols_len += attr_val_len;
+							extcols[extcols_len]='\t';
+							extcols_len += 1;
+							
+							free(tmpnameex);
+							if(is_last)break;
+							this_exname_ptr[padd0]='\t';
+							this_exname_ptr += padd0+1;
+						}
+						extcols[extcols_len-1]=0;
+						ret_features[xk1].extra_columns = extcols;
+					}
 				}
 
 				if(is_gene_id_found)
@@ -3936,7 +3979,14 @@ void fc_thread_init_input_files(fc_thread_global_context_t * global_context, cha
 
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath )
+void fc_NCfree(void * vv){
+	char ** cc = vv;
+	int i;
+	for(i=0; cc[i]; i++) free(cc[i]);
+	free(vv);
+}
+
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names )
 {
 	int x1;
 
@@ -3946,6 +3996,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> redo = 0;
 	global_context -> read_details_out_FP = NULL;
 
+	global_context -> reported_extra_columns = extra_column_names;
 	global_context -> isCVersion = isCVersion;
 	global_context -> is_read_details_out = is_sam_out;
 	global_context -> is_multi_overlap_allowed = is_overlap_allowed;
@@ -4013,8 +4064,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	HashTableSetHashFunction(global_context -> GCcontent_table, HashTableStringHashFunction);
 	HashTableSetDeallocationFunctions(global_context -> GCcontent_table, free, free);
 	HashTableSetKeyComparisonFunction(global_context -> GCcontent_table, fc_strcmp_chro);
-			
-	
+
 	if(alias_file_name && alias_file_name[0])
 	{
 		strcpy(global_context -> alias_file_name,alias_file_name);
@@ -4282,6 +4332,27 @@ void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 	global_context -> is_input_bad_format |= assign_ret;
 }
 
+void merge_repeated_extra_columns(char * cols){
+	if(cols[0]!=';')return;
+
+	int is_diff = 0;
+	int seglen = -1, laststart = 0;
+	int xx;
+	for(xx=0; ; xx++){
+		if(cols[xx]==';' || cols[xx]==0){
+			if(seglen <0)seglen = xx -1;
+			else{
+				is_diff = (xx-laststart != seglen )|| memcmp(cols+laststart, cols+1, seglen);
+				if(is_diff)break;
+			}
+			laststart = xx+1;
+		}
+		if(cols[xx]==0)break;
+	}
+
+	if(seglen>0 && !is_diff) cols[seglen+1]=0;
+}
+
 void BUFstrcat(char * targ, char * src, char ** buf){
 	int srclen = strlen(src);
 	if( (*buf) == NULL){
@@ -4292,9 +4363,9 @@ void BUFstrcat(char * targ, char * src, char ** buf){
 	(**buf) = 0;
 }
 
-void fc_write_final_gene_results(fc_thread_global_context_t * global_context, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, const char * out_file, int features, ArrayList * column_numbers, ArrayList * column_names, fc_feature_info_t * loaded_features, int header_out)
+void fc_write_final_gene_results(fc_thread_global_context_t * global_context, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char ** et_extra_columns, const char * out_file, int features, ArrayList * column_numbers, ArrayList * column_names, fc_feature_info_t * loaded_features, int header_out)
 {
-	int xk1;
+	int xk1,xk4;
 	int genes = global_context -> gene_name_table -> numOfElements;
 	read_count_type_t *gene_columns;
 
@@ -4313,7 +4384,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	}
 
 	int i_files;
-	fprintf(fp_out,"Geneid\t%sChr\tStart\tEnd\tStrand\tLength", global_context->do_detection_call?"GCfraction\t":"");
+	fprintf(fp_out,"Geneid\t%sChr\tStart\tEnd\tStrand\tLength%s%s", global_context->do_detection_call?"GCfraction\t":"", global_context -> reported_extra_columns?"\t":"", global_context -> reported_extra_columns?global_context -> reported_extra_columns:"");
 	for(i_files=0; i_files<column_names->numOfElements; i_files++)
 	{
 		char * next_fn = ArrayListGet(column_names, i_files);
@@ -4328,6 +4399,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	unsigned int * gene_exons_start = malloc(sizeof(unsigned int) * features);
 	unsigned int * gene_exons_end = malloc(sizeof(unsigned int) * features);
 	char ** gene_exons_chr = malloc(sizeof(char *) * features);
+	char ** gene_exons_extra_columns = malloc(sizeof(char *) * features);
 	char * gene_exons_strand = malloc(features);
 
 	for(xk1 = 0; xk1 < features; xk1++)
@@ -4340,10 +4412,10 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	unsigned longest_gene_exons = 0;
 	for(xk1 = 0 ; xk1 < genes; xk1++)
 	{
-		unsigned int tmpv = gene_exons_number[xk1];
-		longest_gene_exons = max(longest_gene_exons, tmpv);
-		accumulative_no += gene_exons_number[xk1];
-		gene_exons_number[xk1] = accumulative_no - tmpv;
+		unsigned int this_gene_exons = gene_exons_number[xk1];
+		longest_gene_exons = max(longest_gene_exons, this_gene_exons);
+		gene_exons_number[xk1] = accumulative_no;
+		accumulative_no += this_gene_exons;
 	}
 
 	for(xk1 = 0; xk1 < features; xk1++)
@@ -4355,6 +4427,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		gene_exons_start[gene_write_ptr] = et_start[xk1]; 
 		gene_exons_end[gene_write_ptr] = et_stop[xk1]; 
 		gene_exons_strand[gene_write_ptr] = et_strand[xk1]; 
+		if(global_context -> reported_extra_columns!=NULL)gene_exons_extra_columns[gene_write_ptr] = et_extra_columns[xk1];
 
 		gene_exons_pointer[gene_id]++;
 	}
@@ -4381,6 +4454,21 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	char * out_end_list = malloc(11 * longest_gene_exons + 1), * tmp_end_list = NULL;
 	char * out_strand_list = malloc(2 * longest_gene_exons + 1), * tmp_strand_list = NULL;
 
+	char * out_extra_columns[MAX_EXTRA_COLS];
+	int out_extra_column_size[MAX_EXTRA_COLS];
+	int total_extra_cols = 0;
+	if(global_context -> reported_extra_columns){
+		char * tnamep = global_context -> reported_extra_columns;
+		total_extra_cols =1;
+		while(*(tnamep++))
+			total_extra_cols += '\t' ==(*tnamep);
+		for(xk1=0; xk1<total_extra_cols; xk1++){
+			out_extra_columns[xk1] = malloc(1000);
+			out_extra_column_size[xk1] = 1000;
+		}
+	}
+
+
 	for(xk1 = 0 ; xk1 < genes; xk1++)
 	{
 		int xk2;
@@ -4394,8 +4482,11 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		out_start_list[0]=0;
 		out_end_list[0]=0;
 		out_strand_list[0]=0;
+		for(xk4=0; xk4<total_extra_cols; xk4++)
+			out_extra_columns[xk4][0]=0;
 		int gene_nonoverlap_len =0;
 
+		unsigned char * gene_symbol = global_context -> gene_name_array [xk1];
 		for(xk2=0; xk2<gene_exons_pointer[xk1]; xk2++)
 		{
 			if(!is_occupied[xk2])
@@ -4409,13 +4500,30 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 				input_start_stop_list[0] = gene_exons_start[xk2 + gene_exons_number[xk1]];
 				input_start_stop_list[1] = gene_exons_end[xk2 + gene_exons_number[xk1]] + 1;
 
-				for(xk3 = xk2+1; xk3 < gene_exons_pointer[xk1]; xk3++)
+				for(xk3 = xk2; xk3 < gene_exons_pointer[xk1]; xk3++)
 				{
+					if( global_context -> reported_extra_columns &&  (xk3==xk2 || (0 == is_occupied[xk3] && strcmp(matched_chr, gene_exons_chr[xk3+gene_exons_number[xk1]])==0 && matched_strand == gene_exons_strand[xk3 + gene_exons_number[xk1]] ))){
+						char * this_col_ptr = NULL;
+						char * this_col = strtok_r(gene_exons_extra_columns[xk3+gene_exons_number[xk1]], "\t", &this_col_ptr);
+						for(xk4 = 0; xk4 < total_extra_cols; xk4++){
+							int exlen = strlen( this_col), ollen = strlen(out_extra_columns[xk4]);
+							if(ollen + exlen +2 > out_extra_column_size[xk4]){
+								out_extra_column_size[xk4] = max(ollen + exlen +2, out_extra_column_size[xk4]);
+								out_extra_columns[xk4] = realloc(out_extra_columns[xk4], out_extra_column_size[xk4]);
+							}
+							sprintf(out_extra_columns[xk4]+ollen,";%s", this_col);
+							this_col = strtok_r(NULL, "\t", &this_col_ptr);
+						}
+					}
+
+					if(xk3==xk2)continue;
+
 					if((!is_occupied[xk3]) && strcmp(matched_chr, gene_exons_chr[xk3+gene_exons_number[xk1]])==0 && matched_strand == gene_exons_strand[xk3 + gene_exons_number[xk1]])
 					{
 						is_occupied[xk3]=1;
 						input_start_stop_list[gap_merge_ptr*2] = gene_exons_start[xk3+gene_exons_number[xk1]]; 
 						input_start_stop_list[gap_merge_ptr*2+1] = gene_exons_end[xk3+gene_exons_number[xk1]]+1;
+
 						gap_merge_ptr++;
 					}
 				}
@@ -4439,12 +4547,9 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 						}
 						for(xk3=0; xk3<merged_gaps; xk3++)
 							gene_nonoverlap_len += output_start_stop_list[xk3 * 2 + 1] - output_start_stop_list[xk3 * 2];
-				}	
+				}
 			}
 		}
-
-		unsigned char * gene_symbol = global_context -> gene_name_array [xk1];
-
 		#define _cut_tail(x) (x)[strlen(x)-1]=0
 
 		_cut_tail(out_chr_list);
@@ -4461,6 +4566,10 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		}
 
 		int wlen = fprintf(fp_out, "%s\t%s%s%s\t%s\t%s\t%s\t%d", gene_symbol, QCcontent, QCtab, out_chr_list, out_start_list, out_end_list, out_strand_list, gene_nonoverlap_len);
+		for(xk4 = 0; xk4<total_extra_cols; xk4++){
+			merge_repeated_extra_columns(out_extra_columns[xk4]);
+			fprintf(fp_out, "\t%s", out_extra_columns[xk4]+1);
+		}
 
 		for(i_files=0; i_files< column_names->numOfElements; i_files++)
 		{
@@ -4476,6 +4585,8 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		fprintf(fp_out,"\n");
 		if(wlen < 6)disk_is_full = 1;
 	}
+
+	for(xk1=0; xk1<total_extra_cols; xk1++) free(out_extra_columns[xk1]);
 	free(is_occupied);
 	free(input_start_stop_list);
 	free(output_start_stop_list);
@@ -4488,6 +4599,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 	free(gene_exons_pointer);
 	free(gene_columns);
 	free(gene_exons_chr);
+	free(gene_exons_extra_columns);
 	free(gene_exons_start);
 	free(gene_exons_end);
 	free(gene_exons_strand);
@@ -4568,6 +4680,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 
 	char * next_fn;
 	fprintf(fp_out,"Geneid\tChr\tStart\tEnd\tStrand\tLength");
+	if(global_context -> reported_extra_columns)fprintf(fp_out,"\t%s", global_context -> reported_extra_columns);
 
 	for(i_files = 0; i_files < column_names -> numOfElements; i_files++){
 		next_fn = ArrayListGet(column_names, i_files);
@@ -4576,9 +4689,10 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 	fprintf(fp_out,"\n");
 	for(i=0;i<features;i++)
 	{
-		fprintf(fp_out,"%s\t%s\t%u\t%u\t%c\t%d", global_context -> unistr_buffer_space + loaded_features[i].feature_name_pos,
+		fprintf(fp_out,"%s\t%s\t%u\t%u\t%c\t%d%s%s", global_context -> unistr_buffer_space + loaded_features[i].feature_name_pos,
  							   global_context -> unistr_buffer_space + loaded_features[i].feature_name_pos + loaded_features[i].chro_name_pos_delta,
-						   	   loaded_features[i].start, loaded_features[i].end, loaded_features[i].is_negative_strand == 1?'-':(  loaded_features[i].is_negative_strand ==  0? '+':'.'),loaded_features[i].end-loaded_features[i].start+1);
+						   	   loaded_features[i].start, loaded_features[i].end, loaded_features[i].is_negative_strand == 1?'-':(  loaded_features[i].is_negative_strand ==  0? '+':'.'),
+							loaded_features[i].end-loaded_features[i].start+1, global_context -> reported_extra_columns ?"\t":"", global_context -> reported_extra_columns ?loaded_features[i].extra_columns:"");
 		for(i_files=0; i_files < column_names -> numOfElements; i_files++)
 		{
 			unsigned long long * this_list = ArrayListGet(column_numbers, i_files);			
@@ -4626,6 +4740,7 @@ static struct option long_options[] =
 	{"genome", required_argument, 0, 'G'},
 	{"maxMOp", required_argument, 0, 0},
 	{"tmpDir", required_argument, 0, 0},
+	{"additionalAttributes", required_argument, 0, 0},
 	{"largestOverlap", no_argument, 0,0},
 	{"byReadGroup", no_argument, 0,0},
 	{"verbose", no_argument, 0,0},
@@ -4671,6 +4786,8 @@ void print_usage()
 	SUBREADputs("  -g <string>         Specify attribute type in GTF annotation. 'gene_id' by ");
 	SUBREADputs("                      default. Meta-features used for read counting will be ");
 	SUBREADputs("                      extracted from annotation using the provided value.");
+	SUBREADputs("");
+	SUBREADputs("  --additionalAttributes Specify a list of attribute names (comma-separated).");
 	SUBREADputs("");
 	SUBREADputs("  -A <string>         Provide a chromosome name alias file to match chr names in");
 	SUBREADputs("                      annotation with those in the reads. This should be a two-");
@@ -5303,6 +5420,7 @@ int readSummary(int argc,char *argv[]){
 	49: as.numeric(max_missing_bases_in_feature) # maximum # of bases in an exon not overlapping with a read or fragment ; default value: "-1" means no limit
 	50: as.numeric(is_Primary_Alignment_only) # "1" : only count the primary alignment (FLAG doesn't have 0x100 bit); "0" : count alignments no metter the 0x100 bit (by default)
 	51: Rpath : the path where the assignment details per read are stored.
+	52: AdditionalColumnList: the names of additional column names written after "Length". Comma deliminated.
 	 */
 
 	int isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, do_detectionCall, max_missing_bases_in_feature, max_missing_bases_in_read, is_Primary_Alignment_only;
@@ -5311,7 +5429,7 @@ int readSummary(int argc,char *argv[]){
 	long *start, *stop;
 	int *geneid;
 
-	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr, *strand_check_mode = NULL ;
+	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr, *strand_check_mode = NULL, *extra_column_names = NULL ;
 	long nexons;
 
 
@@ -5516,15 +5634,34 @@ int readSummary(int argc,char *argv[]){
 	if(argc>50) is_Primary_Alignment_only = atoi(argv[50]);
 	else is_Primary_Alignment_only = 0;
 
-	if(argc>51) Rpath = argv[51];
+	if(argc>51 && argv[51][0]!=0 && argv[51][0]!=' ') Rpath = argv[51];
 	else Rpath = NULL;
+
+	if(argc>52 && argv[52][0]!=0 && argv[52][0]!=' ') extra_column_names = argv[52];
+	else extra_column_names = NULL;
 
 	if(SAM_pairer_warning_file_open_limit()) return -1;
 	if(strand_check_mode != NULL && Input_Files_And_Strand_Mode_Pair(argv[2],strand_check_mode)) return -1;
+	if(extra_column_names){
+		if(!isGTF){
+			SUBREADputs("ERROR: only GTF files contain additional attributes");
+			return -1;
+		}
+		int xk1, total_cols =1;
+		for(xk1=0; extra_column_names[xk1]; xk1++)
+			if(extra_column_names[xk1] == ';' || extra_column_names[xk1]==',' || extra_column_names[xk1]=='\t'){
+				extra_column_names[xk1]='\t';
+				total_cols ++;
+			}
+		if(total_cols>MAX_EXTRA_COLS){
+			SUBREADprintf("ERROR: there are more than %d additional attributes required\n", MAX_EXTRA_COLS);
+			return -1;
+		}
+	}
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -5758,9 +5895,21 @@ int readSummary(int argc,char *argv[]){
 	if(global_context.is_input_bad_format){
 		SUBREADprintf("\nFATAL Error: The program has to terminate and no counting file is generated.\n\n");
 	}else if(!global_context.disk_is_full){
-		if(isGeneLevel)
-			fc_write_final_gene_results(&global_context, geneid, chr, start, stop, sorted_strand, argv[3], nexons,  table_columns, table_column_names, loaded_features, isCVersion);
-		else
+		if(isGeneLevel){
+			char ** sorted_extra_columns = NULL;
+			if(global_context.reported_extra_columns != NULL){
+				sorted_extra_columns = malloc(sizeof(char**) * nexons);
+				int ii;
+				for(ii = 0; ii < nexons; ii++){
+					sorted_extra_columns[loaded_features[ii].sorted_order] = loaded_features[ii].extra_columns;
+					//SUBREADprintf("SSMQ: %d = %s\n", loaded_features[ii].sorted_order, loaded_features[ii].extra_columns);
+				}
+			}
+
+			fc_write_final_gene_results(&global_context, geneid, chr, start, stop, sorted_strand, sorted_extra_columns, argv[3], nexons,  table_columns, table_column_names, loaded_features, isCVersion);
+
+			if(sorted_extra_columns) free(sorted_extra_columns);
+		} else
 			fc_write_final_results(&global_context, argv[3], nexons, table_columns, table_column_names, loaded_features, isCVersion);
 	}
 	if(global_context.do_junction_counting && !global_context.disk_is_full)
@@ -5816,6 +5965,11 @@ int readSummary(int argc,char *argv[]){
 
 
 	free(global_context.unistr_buffer_space);
+
+	if(global_context.reported_extra_columns){
+		for(bucket = 0; bucket < nexons; bucket++)
+			free(loaded_features[bucket].extra_columns);
+	}
 	free(loaded_features);
 	free(geneid);
 	free(chr);
@@ -5971,7 +6125,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[52];
+	char * Rargv[53];
 	char annot_name[300];
 	char temp_dir[300];
 	char * out_name = malloc(300);
@@ -5994,8 +6148,10 @@ int feature_count_main(int argc, char ** argv)
 	char min_qual_score_str[15];
 	char feature_block_size_str[15];
 	char * Strand_Sensitive_Str = "0";
+	char * old_zero_smode = Strand_Sensitive_Str;
 	char strFeatureFracOverlap[15];
 	char Pair_Orientations[3];
+	char * extra_column_names = NULL;
 	char * very_long_file_names;
 	int is_Input_Need_Reorder = 0;
 	int is_PE = 0;
@@ -6228,6 +6384,11 @@ int feature_count_main(int argc, char ** argv)
 					max_missing_bases_in_read = atoi(optarg);
 				}
 
+				if(strcmp("additionalAttributes", long_options[option_index].name)==0)
+				{
+					extra_column_names = strdup(optarg);
+				}
+
 				if(strcmp("Rpath", long_options[option_index].name)==0)
 				{
 					strcpy(Rpath, optarg);
@@ -6425,18 +6586,20 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[49] = max_missing_bases_in_feature_str;
 	Rargv[50] = is_primary_alignment_only?"1":"0";
 	Rargv[51] = Rpath;
+	Rargv[52] = extra_column_names;
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(52, Rargv);
+	else retvalue = readSummary(53, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
 	free(alias_file_name);
 	free(fasta_contigs_name);
-	free(Strand_Sensitive_Str);
+	if(old_zero_smode != Strand_Sensitive_Str)free(Strand_Sensitive_Str);
 	free(cmd_rebuilt);
 	free(Rpath);
+	if(extra_column_names)free(extra_column_names);
 
 	return retvalue;
 

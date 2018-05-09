@@ -11,6 +11,7 @@ featureCounts(files,
 	isGTFAnnotationFile=FALSE,
 	GTF.featureType="exon",
 	GTF.attrType="gene_id",
+    additionalAttributes=NULL,
 	chrAliases=NULL,
 	
 	# level of summarization
@@ -84,6 +85,7 @@ featureCounts(files,
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{"exon"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. Feature types can be found in the third column of a GTF annotation.}
   \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{"gene_id"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. Attributes can be found in the ninth column of a GTF annotation.}
+  \item{additionalAttributes}{ a character vector giving name or names of one or more additional attributes...TODO}
   \item{chrAliases}{ a character string giving the name of a chromosome name alias file. This should be a two-column comma-delimited text file. Chromosome name aliases included in this file are used to match chr names in annotation with those in the reads. First column in the file should include chr names in the annotation and second column should include chr names in the reads. Chr names are case sensitive. No column header should be included in the file.}
   \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg. genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features, using their values in the \code{GeneID} column in the SAF-format annotation file or using the \code{GTF.attrType} attribute in the GTF-format annotation file, and then reads will be assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}
@@ -104,7 +106,7 @@ featureCounts(files,
   \item{nonSplitOnly}{ logical indicating whether only non-split alignments (their CIGAR strings do not contain letter 'N') should be included for summarization. \code{FALSE} by default.}
   \item{primaryOnly}{ logical indicating if only primary alignments should be counted. Primary and secondary alignments are identified using bit 0x100 in the Flag field of SAM/BAM files. If \code{TRUE}, all primary alignments in a dataset will be counted no matter they are from multi-mapping reads or not (ie. \code{countMultiMappingReads} is ignored).}
   \item{ignoreDup}{ logical indicating whether reads marked as duplicates should be ignored. \code{FALSE} by default. Read duplicates are identified using bit Ox400 in the FLAG field in SAM/BAM files. The whole fragment (read pair) will be ignored if paired end.}
-  \item{strandSpecific}{ \code{integer} indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
+  \item{strandSpecific}{ \code{integer} or a vector of integers (TODO) indicating if strand-specific read counting should be performed. It has three possible values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). \code{0} by default.}
   \item{juncCounts}{ logical indicating if number of reads supporting each exon-exon junction will be reported. Junctions are identified from those exon-spanning reads in input data. \code{FALSE} by default.}
   \item{genome}{ a character string giving the name of a FASTA-format file that includes the reference sequences used in read mapping that produced the provided SAM/BAM files. \code{NULL} by default. This argument should only be used when \code{juncCounts} is \code{TRUE}. Note that providing reference sequences is optional when \code{juncCounts} is set to \code{TRUE}.}
   \item{isPairedEnd}{ logical indicating if paired-end reads are used. If \code{TRUE}, fragments (templates or read pairs) will be counted instead of individual reads. \code{FALSE} by default.}

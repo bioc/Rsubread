@@ -1,11 +1,13 @@
-featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
+featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",additionalAttributes=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=FALSE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
 	files <- normalizePath(files, mustWork=T)
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- normalizePath(annot.ext, mustWork=T)
 	if(!is.null(chrAliases))chrAliases <- normalizePath(chrAliases, mustWork=T)
 	if(!is.null(genome)) genome <- normalizePath(genome, mustWork=T)
-	if(!is.null(reportReadsPath))reportReadsPath <- normalizePath(reportReadsPath, mustWork=T)
+	if(!is.null(reportReadsPath)){
+		reportReadsPath <- normalizePath(reportReadsPath, mustWork=T)
+	}else reportReadsPath <- ' '
 	strandSpecific<-as.character(strandSpecific)
 	strandSpecific<-paste(strandSpecific, collapse=".")
 	strandSpecific<-gsub(",", ".", strandSpecific)
@@ -90,48 +92,50 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	do_detection_calls <- FALSE
 	max_missing_bases_in_read <- -1
 	max_missing_bases_in_feature <- -1
+	additionalAttributes_str <- " "
 	if(!is.null(nonOverlap)) max_missing_bases_in_read <- nonOverlap
 	if(!is.null(nonOverlapFeature)) max_missing_bases_in_feature <- nonOverlapFeature
+	if(!is.null(additionalAttributes))additionalAttributes_str <- paste(additionalAttributes, collapse="\t")
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath,sep=",")
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, additionalAttributes_str,sep=",")
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
     if(file.exists(fout)){
-			x <- read.delim(fout,stringsAsFactors=FALSE)
-			colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
+		x <- read.delim(fout,stringsAsFactors=FALSE)
+		colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
 
-			x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
+		x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
 
-			if(juncCounts)
-				x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
+		if(juncCounts)
+			x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
 
-			file.remove(fout)
-			file.remove(paste(fout,".summary",sep=""))
+		file.remove(fout)
+		file.remove(paste(fout,".summary",sep=""))
 
-			if(juncCounts)
-				file.remove(paste(fout,".jcounts",sep=""))
-			
-			if(flag) 
-			  file.remove(fout_annot)
-			
-			if(ncol(x) == 6){
-			  stop("No count data were generated.")
-			}
-			
-			y <- as.matrix(x[,-c(1:6)])
-			colnames(y) <- colnames(x)[-c(1:6)]
-			rownames(y) <- x$GeneID
+		if(juncCounts)
+			file.remove(paste(fout,".jcounts",sep=""))
+		
+		if(flag) 
+		  file.remove(fout_annot)
 
-			if(juncCounts)
-				z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:6],targets=colnames(y),stat=x_summary)
-			else
-				z <- list(counts=y,annotation=x[,1:6],targets=colnames(y),stat=x_summary)	
+		add_attr_numb <- 0
+		if(!is.null(additionalAttributes)) add_attr_numb <- length(additionalAttributes)
+		if(ncol(x) <= (6 + add_attr_numb)){
+		  stop("No count data were generated.")
+		}
+		
+		y <- as.matrix(x[,-c(1:(6 + add_attr_numb))])
+		colnames(y) <- colnames(x)[-c(1:(6 + add_attr_numb))]
+		rownames(y) <- x$GeneID
 
-			z	
+		if(juncCounts)
+			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=colnames(y),stat=x_summary)
+		else
+			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=colnames(y),stat=x_summary)	
+		z	
 	}else{
-		print("No counts were generated.")
-		NA
+		stop("No counts were generated.")
 	}
 }
 

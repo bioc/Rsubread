@@ -712,6 +712,11 @@ int check_configuration(global_context_t * global_context)
 		return -1;
 	}
 
+	if(4 == sizeof(void *) && global_context->config.sort_reads_by_coordinates){
+		SUBREADputs("ERROR: the sort by coordinate function only works on 64-bit computers.");
+		return -1;
+	}
+
 	if(global_context->config.is_input_read_order_required && global_context->config.sort_reads_by_coordinates){
 		SUBREADputs("ERROR: you shouldn't specify keep input order and sort by coordinate at same time.");
 		return -1;
