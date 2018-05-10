@@ -1,6 +1,6 @@
 RsubreadUsersGuide <- function()
 {
-	f <- system.file("usersguide","SubreadUsersGuide.pdf",package="Rsubread")
+	f <- system.file("doc","SubreadUsersGuide.pdf",package="Rsubread")
 	system(paste(Sys.getenv("R_PDFVIEWER"),f,"&"))
 	return(f)
 }
