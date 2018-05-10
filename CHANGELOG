@@ -1,3 +1,8 @@
+10 May 2018 - 1.31.2
+(1) Update users guide.
+(2) Place users guide under 'doc' directory under 'inst'.
+(3) Update help page for buildindex() function.
+
 9 May 2018 - 1.31.1
 (1) Added the 'sortReadsByCoordinates' option to align() and subjunc().
 (2) Added the flattenGTF() function.

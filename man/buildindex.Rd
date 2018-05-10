@@ -19,7 +19,7 @@ TH_subread=100,colorspace=FALSE)
 This function generates a hash table (an index) for a reference genome, in which keys are subreads (16mers) and values are their chromosomal locations in the reference genome.
 By default, subreads will be extracted in every three bases from a reference genome.
 However, if \code{gappedIndex} is set to \code{FALSE}, then subreads will be extracted from every chromosomal location of genome for index building.
-The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads(Liao et al. 2013).
+The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads (Liao et al. 2013).
 
 Highly repetitive subreads (or uninformative subreads) are excluded from the hash table so as to reduce mapping ambiguity.
 \code{TH_subread} specifies the maximal number of times a subread is allowed to occur in the reference genome to be included in hash table.
@@ -31,6 +31,9 @@ The larger the \code{memory} value, the faster the read mapping will be.
 If \code{indexSplit} is set to \code{FALSE}, the index will not be splitted and this will enable maximum mapping speed to be achieved.
 
 The index needs to be built only once and it can then be re-used in the subsequent alignments.
+
+Sequences of reference genomes can be downloaded from NCBI, UCSC or Ensembl databases.
+For instance, mouse reference genome GRCm38.p6 can be downloaded from the NCBI database via \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.fna.gz}.
 }
 \value{
 No value is produced but index files are written to the current working directory.
