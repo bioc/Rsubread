@@ -1,26 +1,27 @@
 \name{flattenGTF}
 \alias{flattenGTF}
-\title{Merge the overlapping exons of each gene in a GTF file}
-\description{The overlapping exons of each gene were merged in the input GTF file. A data frame containing merged exons is returned.}
+\title{Flatten features provided in a GTF annotation}
+\description{Overlapping features in a GTF annotation, such as overlapping exons from the same gene, are collapsed into a single feature that covers all overlapping features.}
 \usage{
 flattenGTF(input.file.name, GTF.featureType = "exon", GTF.attrType = "gene_id")
 }
 \arguments{
   \item{input.file.name}{ a character string giving the name of a GTF file as input.}
-  \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{"exon"} by default. Feature types can be found in the third column of a GTF annotation.}
-  \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{"gene_id"} by default. Attributes can be found in the ninth column of a GTF annotation.}
+  \item{GTF.featureType}{ a character string giving the feature type used to select rows in a GTF annotation. \code{"exon"} by default. Feature types can be found in the third column of a GTF annotation.}
+  \item{GTF.attrType}{ a character string giving the attribute type in a GTF annotation which will be used to group features. \code{"gene_id"} by default. Attributes can be found in the ninth column of a GTF annotation.}
 }
 
 \details{
-\code{flattenGTF} merges the overlapping exons of each gene in a GTF file. Exons on different strands are not merged.
+This function locates features in a GTF annotation via \code{GTF.featureType} and then groups them into meta-features via \code{GTF.attrType}.
+Default values of these two parameters will make exons be identified and then grouped into genes.
 
-The return value from \code{flattenGTF} is a data frame. It can be directly given to \code{featureCounts} as the external annotation.
+If there is overlap found between features belonging to the same meta-feature, this function will merge all overlaping features to form a single larger feature that covers all overlapping features.
+Output of this function is a SAF format annotation which can be fed to \code{\link{featureCounts}} function for read counting.
+Description to SAF format annotation can also be found in \code{\link{featureCounts}}.
 }
-\author{Wei Shi and Yang Liao}
-\seealso{
-\code{\link{featureCounts}}}
-\examples{\dontrun{
-library(Rsubread)
-
-flattenGTF("overlapping_GTF_annotation.GTF")
-}}
+\value{
+A \code{data.frame} including a SAF format annotation.
+}
+\author{Yang Liao and Wei Shi}
+\seealso{\code{\link{featureCounts}}}
+\examples{}
