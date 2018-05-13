@@ -3,10 +3,10 @@
 \title{Flatten features provided in a GTF annotation}
 \description{Overlapping features in a GTF annotation, such as overlapping exons from the same gene, are collapsed into a single feature that covers all overlapping features.}
 \usage{
-flattenGTF(input.file.name, GTF.featureType = "exon", GTF.attrType = "gene_id")
+flattenGTF(GTFfile, GTF.featureType = "exon", GTF.attrType = "gene_id")
 }
 \arguments{
-  \item{input.file.name}{ a character string giving the name of a GTF file as input.}
+  \item{GTFfile}{ a character string giving the name of a GTF file as input.}
   \item{GTF.featureType}{ a character string giving the feature type used to select rows in a GTF annotation. \code{"exon"} by default. Feature types can be found in the third column of a GTF annotation.}
   \item{GTF.attrType}{ a character string giving the attribute type in a GTF annotation which will be used to group features. \code{"gene_id"} by default. Attributes can be found in the ninth column of a GTF annotation.}
 }

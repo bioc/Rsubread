@@ -66,6 +66,29 @@ static struct option long_options[] =
 
 
 void flatAnno_print_usage(){
+	SUBREADprintf("flattenGTF Version %s\n\n", SUBREAD_VERSION);
+	SUBREADputs("  Flatten features included in a GTF annotation and save the modified annotation");
+	SUBREADputs("  to a SAF format file.");
+	SUBREADputs("");
+	SUBREADputs("Usage:");
+	SUBREADputs("  ./flattenGTF [options] -a <input_file> -o <output_file>");
+	SUBREADputs("");
+	SUBREADputs("## Mandatory arguments: ");
+	SUBREADputs("");
+	SUBREADputs("  -a <file>      Name of an annotation file in GTF/GFF format.");
+	SUBREADputs("");
+	SUBREADputs("  -o <file>      Name of output file.");
+	SUBREADputs("");
+	SUBREADputs("## Optional arguments: ");
+	SUBREADputs("");
+	SUBREADputs("  -t <string>    Specify feature type in GTF annotation. 'exon' by default.");
+	SUBREADputs("                 Features with the specified feature type are extracted for");
+	SUBREADputs("                 processing.");
+	SUBREADputs("");
+	SUBREADputs("  -g <string>    Specify attribute type in GTF annotation. 'gene_id' by default.");
+	SUBREADputs("                 This attribute type is used to group features into meta-");
+	SUBREADputs("                 features.");
+	SUBREADputs("");
 }
 
 int flatAnno_finalise(flatAnno_context_t * context){
@@ -188,11 +211,13 @@ int flatAnno_do_anno(flatAnno_context_t * context){
 int flatAnno_start(flatAnno_context_t * context){
 	SUBREADputs("");
 	if(!context -> GTF_file_name[0]){
+		flatAnno_print_usage();
 		SUBREADprintf("Error: no input file is specified.\n");
 		return -1;
 	}
 
 	if(!context -> output_file_name[0]){
+		flatAnno_print_usage();
 		SUBREADprintf("Error: no output file is specified.\n");
 		return -1;
 	}

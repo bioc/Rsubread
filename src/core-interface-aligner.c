@@ -177,9 +177,10 @@ void print_usage_core_aligner()
 	SUBREADputs("                    input file. Reads from the same pair are always placed next");
 	SUBREADputs("                    to each other no matter this option is specified or not.");
 	SUBREADputs("");
-	SUBREADputs("  --sortReadsByCoordinates Sort the reads by their coordinates in the output BAM");
-	SUBREADputs("                    file. A BAI file is also created for indexing the sorted");
-	SUBREADputs("                    reads. This option does not work with SAM output.");
+	SUBREADputs("  --sortReadsByCoordinates Output location-sorted reads. This option is");
+	SUBREADputs("                    applicable for BAM output only. A BAI index file is also");
+	SUBREADputs("                    generated for each BAM file so the BAM files can be directly");
+	SUBREADputs("                    loaded into a genome browser.");
 	SUBREADputs("");
 	SUBREADputs("# color space reads");
 	SUBREADputs("");

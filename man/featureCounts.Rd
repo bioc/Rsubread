@@ -11,7 +11,7 @@ featureCounts(files,
 	isGTFAnnotationFile=FALSE,
 	GTF.featureType="exon",
 	GTF.attrType="gene_id",
-    additionalAttributes=NULL,
+	GTF.attrType.extra=NULL,
 	chrAliases=NULL,
 	
 	# level of summarization
@@ -85,7 +85,7 @@ featureCounts(files,
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string giving the feature type used to select rows in the GTF annotation which will be used for read summarization. \code{"exon"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. Feature types can be found in the third column of a GTF annotation.}
   \item{GTF.attrType}{ a character string giving the attribute type in the GTF annotation which will be used to group features (eg. exons) into meta-features (eg. genes). \code{"gene_id"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. Attributes can be found in the ninth column of a GTF annotation.}
-  \item{additionalAttributes}{ a character vector specifying extra GTF attribute types that will also be included in the counting output. These attribute types will not be used to group features. \code{NULL} by default.}
+  \item{GTF.attrType.extra}{ a character vector specifying extra GTF attribute types that will also be included in the counting output. These attribute types will not be used to group features. \code{NULL} by default.}
   \item{chrAliases}{ a character string giving the name of a chromosome name alias file. This should be a two-column comma-delimited text file. Chromosome name aliases included in this file are used to match chr names in annotation with those in the reads. First column in the file should include chr names in the annotation and second column should include chr names in the reads. Chr names are case sensitive. No column header should be included in the file.}
   \item{useMetaFeatures}{ logical indicating whether the read summarization should be performed at the feature level (eg. exons) or meta-feature level (eg. genes). If \code{TRUE}, features in the annotation (each row is a feature) will be grouped into meta-features, using their values in the \code{GeneID} column in the SAF-format annotation file or using the \code{GTF.attrType} attribute in the GTF-format annotation file, and then reads will be assiged to the meta-features instead of the features. See below for more details.}
   \item{allowMultiOverlap}{ logical indicating if a read is allowed to be assigned to more than one feature (or meta-feature) if it is found to overlap with more than one feature (or meta-feature). \code{FALSE} by default.}

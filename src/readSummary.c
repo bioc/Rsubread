@@ -4787,7 +4787,11 @@ void print_usage()
 	SUBREADputs("                      default. Meta-features used for read counting will be ");
 	SUBREADputs("                      extracted from annotation using the provided value.");
 	SUBREADputs("");
-	SUBREADputs("  --additionalAttributes Specify a list of attribute names (comma-separated).");
+	SUBREADputs("  --extraAttributes   Extract extra attribute types from the provided GTF");
+	SUBREADputs("                      annotation and include them in the counting output. These");
+	SUBREADputs("                      attribute types will not be used to group features. If");
+	SUBREADputs("                      more than one attribute type is provided they should be");
+	SUBREADputs("                      separated by comma.");
 	SUBREADputs("");
 	SUBREADputs("  -A <string>         Provide a chromosome name alias file to match chr names in");
 	SUBREADputs("                      annotation with those in the reads. This should be a two-");
@@ -5634,10 +5638,10 @@ int readSummary(int argc,char *argv[]){
 	if(argc>50) is_Primary_Alignment_only = atoi(argv[50]);
 	else is_Primary_Alignment_only = 0;
 
-	if(argc>51 && argv[51][0]!=0 && argv[51][0]!=' ') Rpath = argv[51];
+	if(argc>51 && argv[51]!=NULL && argv[51][0]!=0 && argv[51][0]!=' ') Rpath = argv[51];
 	else Rpath = NULL;
 
-	if(argc>52 && argv[52][0]!=0 && argv[52][0]!=' ') extra_column_names = argv[52];
+	if(argc>52 && argv[52]!=NULL && argv[52][0]!=0 && argv[52][0]!=' ') extra_column_names = argv[52];
 	else extra_column_names = NULL;
 
 	if(SAM_pairer_warning_file_open_limit()) return -1;
@@ -6384,7 +6388,7 @@ int feature_count_main(int argc, char ** argv)
 					max_missing_bases_in_read = atoi(optarg);
 				}
 
-				if(strcmp("additionalAttributes", long_options[option_index].name)==0)
+				if(strcmp("extraAttributes", long_options[option_index].name)==0)
 				{
 					extra_column_names = strdup(optarg);
 				}

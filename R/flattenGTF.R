@@ -1,9 +1,9 @@
-flattenGTF <- function(input.file.name, GTF.featureType="exon",GTF.attrType="gene_id"){
+flattenGTF <- function(GTFfile, GTF.featureType="exon",GTF.attrType="gene_id"){
 
-  input.file.name <- normalizePath(input.file.name, mustWork=T)
+  GTFfile <- normalizePath(GTFfile, mustWork=T)
 
   fout <- file.path(".",paste(".Rsubread_flattenGTF_pid",Sys.getpid(),sep=""))
-  cmd <- paste("RflattenGTF","-a",input.file.name,sep=",");
+  cmd <- paste("RflattenGTF","-a",GTFfile,sep=",");
   cmd <- paste(cmd,"-g",GTF.attrType,sep=",");
   cmd <- paste(cmd,"-t",GTF.featureType,sep=",");
   cmd <- paste(cmd,"-o",fout,sep=",");
