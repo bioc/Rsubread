@@ -1,3 +1,6 @@
+15 May 2018 - 1.31.4
+(1) Provide download link for human reference genome in builindex() help page and users guide.
+
 11 May 2018 - 1.31.3
 (1) Update users guide.
 (2) Update help page for align, subjunc, featureCounts and flattenGTF.
