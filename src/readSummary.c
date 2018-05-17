@@ -763,7 +763,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 
 void print_FC_results(fc_thread_global_context_t * global_context, char * out)
 {
-	print_in_box(89,0,1,"%c[36mRead assignment finished.%c[0m", CHAR_ESC, CHAR_ESC);
+	print_in_box(89,0,1,"%c[36mAlignment assignment finished.%c[0m", CHAR_ESC, CHAR_ESC);
 	print_in_box(80,0,0,"");
 	#ifdef MAKE_STANDALONE
 	print_in_box(80,0,PRINT_BOX_WRAPPED,"Summary of counting results can be found in file \"%s.summary\"", out);
@@ -773,29 +773,6 @@ void print_FC_results(fc_thread_global_context_t * global_context, char * out)
 	SUBREADputs("");
 	return;
 
-
-	if(0){
-		print_in_box(80,1,1,"Summary");
-		print_in_box(80,0,0,"");
-		if(global_context->is_paired_end_mode_assign)
-			print_in_box(80,0,0,"        All fragments : %llu", global_context -> all_reads);
-		else
-			print_in_box(80,0,0,"            All reads : %llu", global_context -> all_reads);
-
-		if(global_context->is_gene_level)
-			print_in_box(80,0,0,"        Meta-features : %lu", global_context -> gene_name_table -> numOfElements);
-		else
-			print_in_box(80,0,0,"             Features : %u", global_context -> exontable_exons);
-
-		if(global_context->is_paired_end_mode_assign)
-			print_in_box(80,0,0,"   Assigned fragments : %llu", global_context -> read_counters.assigned_reads);
-		else
-			print_in_box(80,0,0,"       Assigned reads : %llu", global_context -> read_counters.assigned_reads);
-
-		print_in_box(80,0,0,"            Time cost : %.3f minutes", (miltime() - global_context -> start_time)/60);
-		print_in_box(80,0,0,"");
-		print_in_box(80,2,1,"http://subread.sourceforge.net/");
-	}
 	SUBREADputs("");
 }
 
@@ -1904,10 +1881,14 @@ int reverse_flag(int mf){
 	return ret;
 }
 
-int calc_total_frag_one_len(CIGAR_interval_t * intvs, int intvn){
+int calc_total_frag_one_len(CIGAR_interval_t * intvs, int intvn, char * read_name){
 	int ret = 0, x1;
 	for(x1 = 0; x1 < intvn; x1++){
 		int x2;
+		//#warning "=========== DEBUG OUT =============="
+		if(0 && FIXLENstrcmp("V0112_0155:7:1101:20072:12961#ATCAC", read_name)==0){
+			SUBREADprintf("READ %s SINGLE: chro_len = %d, secs = %d\n" , read_name, intvs[x1].chromosomal_length, intvs[x1].insertions);
+		}
 		for(x2 = 0; x2 < intvs[x1].insertions; x2++) ret += intvs[x1].insertion_lengths[x2];
 		ret += intvs[x1].chromosomal_length;
 	}
@@ -1924,15 +1905,15 @@ int calc_total_has_overlap(unsigned int r1_start, unsigned int r1_end, unsigned 
 }
 
 int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, CIGAR_interval_t * CIGAR_intervals_R1, int CIGAR_intervals_R1_sections, CIGAR_interval_t * CIGAR_intervals_R2, int CIGAR_intervals_R2_sections, char * read_name){
-	if     ( CIGAR_intervals_R1_sections == 0 && CIGAR_intervals_R2_sections > 0) return calc_total_frag_one_len( CIGAR_intervals_R2,CIGAR_intervals_R2_sections );
-	else if( CIGAR_intervals_R1_sections  > 0 && CIGAR_intervals_R2_sections== 0) return calc_total_frag_one_len( CIGAR_intervals_R1,CIGAR_intervals_R1_sections );
+	if     ( CIGAR_intervals_R1_sections == 0 && CIGAR_intervals_R2_sections > 0) return calc_total_frag_one_len( CIGAR_intervals_R2,CIGAR_intervals_R2_sections , read_name);
+	else if( CIGAR_intervals_R1_sections  > 0 && CIGAR_intervals_R2_sections== 0) return calc_total_frag_one_len( CIGAR_intervals_R1,CIGAR_intervals_R1_sections , read_name);
 	else if( CIGAR_intervals_R1_sections == 0 && CIGAR_intervals_R2_sections== 0) return 0;
 
 	if(CIGAR_intervals_R1_sections > 0 && CIGAR_intervals_R2_sections > 0 && strcmp(CIGAR_intervals_R1[0].chro, CIGAR_intervals_R2[0].chro )!=0 )
 		// two reads are from different chromosomes
-		return calc_total_frag_one_len( CIGAR_intervals_R2,CIGAR_intervals_R2_sections ) + calc_total_frag_one_len( CIGAR_intervals_R1,CIGAR_intervals_R1_sections );
+		return calc_total_frag_one_len( CIGAR_intervals_R2,CIGAR_intervals_R2_sections , read_name) + calc_total_frag_one_len( CIGAR_intervals_R1,CIGAR_intervals_R1_sections , read_name);
 
-    if(0&& FIXLENstrcmp("V0112_0155:7:1101:11874:24723", read_name)==0){
+    if(0 && FIXLENstrcmp("V0112_0155:7:1101:20072:12961#ATCAC", read_name)==0){
 		int xx;
 		for(xx = 0; xx < CIGAR_intervals_R1_sections; xx++)
 				SUBREADprintf("R1 SEC %d: %u + %d\n", xx, CIGAR_intervals_R1[xx].start_pos,  CIGAR_intervals_R1[xx].chromosomal_length );
@@ -3273,7 +3254,7 @@ void overlap_exchange(void * arr, int L, int R){
 	pos[R*2+1] = tt;
 }
 
-unsigned int calc_score_overlaps(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char ** chros, unsigned int * start_poses, unsigned short * lens, int sections){
+unsigned int calc_score_overlaps(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char ** chros, unsigned int * start_poses, unsigned short * lens, int sections, char * read_name){
 	unsigned int in_intervals[ 2*sections ];
 	unsigned int out_intervals[ 2*sections ], x1;
 	char used_interval[ sections ];
@@ -3284,8 +3265,8 @@ unsigned int calc_score_overlaps(fc_thread_global_context_t * global_context,  f
 	for(x1 = 0  ; x1 < sections ; x1++){
 		if( used_interval [x1] )continue;
 
-		in_intervals[x1*2] = start_poses[x1];
-		in_intervals[x1*2 + 1] = start_poses[x1] + lens[x1];
+		in_intervals[0] = start_poses[x1];
+		in_intervals[1] = start_poses[x1] + lens[x1];
 		used_interval[x1]=1;
 	
 		int x2, this_sections = 1;
@@ -3301,9 +3282,8 @@ unsigned int calc_score_overlaps(fc_thread_global_context_t * global_context,  f
 		basic_sort( in_intervals, this_sections, overlap_compare, overlap_exchange );
 
 		int merged_secs = mergeIntervals( in_intervals, out_intervals, this_sections );
-		for(x2 = 0; x2 < merged_secs; x2++){
+		for(x2 = 0; x2 < merged_secs; x2++)
 			ret += ( out_intervals[x2*2+1] - out_intervals[x2*2] );
-		}
 	}
 	return ret;
 }
@@ -3441,7 +3421,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						}
 
 
-						unsigned long tested_exon_overlap_any_read = 10000L*calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps);
+						unsigned long tested_exon_overlap_any_read = 10000L*calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps, read_name);
 						if(applied_overlapping_threshold > tested_exon_overlap_any_read){
 							// remove this exon from lists
 
@@ -3525,7 +3505,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						}
 					}
 
-					scoring_overlappings [scoring_count] = calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps);
+					scoring_overlappings [scoring_count] = calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps, read_name);
 					if( global_context -> use_overlapping_break_tie )
 						scoring_numbers[scoring_count] = scoring_overlappings [scoring_count];
 					scoring_count++;
@@ -3583,7 +3563,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		int overlapping_total_count = 0;
 
 		if( global_context -> fragment_minimum_overlapping > 1 ||  global_context -> need_calculate_fragment_len || global_context -> max_missing_bases_in_read >= 0){
-
 			if(global_context -> max_missing_bases_in_read >=0){
 				if(total_frag_len <= global_context -> max_missing_bases_in_read) applied_fragment_minimum_overlapping_missing = 0;
 				else applied_fragment_minimum_overlapping_missing = 10000L * (total_frag_len - global_context -> max_missing_bases_in_read);
@@ -3604,8 +3583,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			}else thread_context->read_counters.unassigned_nofeatures ++;
 		}else{
 				for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
-					//#warning "DEBUG OUT 2"
-					//SUBREADprintf("RLTEST: %s %d\n", read_name, scoring_overlappings[score_x1]);
+//					#warning "======= DEBUG OUT ================"
+					if(0 && FIXLENstrcmp("V0112_0155:7:1101:20072:12961", read_name)==0)
+						SUBREADprintf("READ: %s  FRAG_LEN=%d,  THIS_OVERLAP=%d\n", read_name, total_frag_len, scoring_overlappings[score_x1]);
 					if( applied_fragment_minimum_overlapping > 1 )
 						if( applied_fragment_minimum_overlapping > 10000L*scoring_overlappings[score_x1] ){
 							scoring_numbers[score_x1] = 0;
@@ -3917,7 +3897,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 	
 	
 		if(unpaired_fragment_no){
-			print_in_box(80,0,0,"   Not properly paired fragments : %llu", unpaired_fragment_no);
+			print_in_box(80,0,0,"  Not properly paired alignments : %llu", unpaired_fragment_no);
 		}
 
 		int show_summary = 1;
@@ -3930,8 +3910,8 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			}
 		}
 		if(show_summary){
-			print_in_box(80,0,0,"   Total %s : %llu", global_context -> is_paired_end_mode_assign?"fragments":"reads", total_input_reads); 
-			print_in_box(pct_str[0]?81:80,0,0,"   Successfully assigned %s : %llu %s", global_context -> is_paired_end_mode_assign?"fragments":"reads", *nreads_mapped_to_exon,pct_str); 
+			print_in_box(80,0,0,"   Total alignments : %llu", total_input_reads); 
+			print_in_box(pct_str[0]?81:80,0,0,"   Successfully assigned alignments : %llu %s", *nreads_mapped_to_exon,pct_str); 
 		}
 		print_in_box(80,0,0,"   Running time : %.2f minutes", (miltime() - global_context -> start_time)/60);
 		print_in_box(80,0,0,"");
@@ -4740,7 +4720,7 @@ static struct option long_options[] =
 	{"genome", required_argument, 0, 'G'},
 	{"maxMOp", required_argument, 0, 0},
 	{"tmpDir", required_argument, 0, 0},
-	{"additionalAttributes", required_argument, 0, 0},
+	{"extraAttributes", required_argument, 0, 0},
 	{"largestOverlap", no_argument, 0,0},
 	{"byReadGroup", no_argument, 0,0},
 	{"verbose", no_argument, 0,0},
@@ -4901,9 +4881,13 @@ void print_usage()
 
 	SUBREADputs("# Strandness");
 	SUBREADputs("");
-	SUBREADputs("  -s <int>            Perform strand-specific read counting. Acceptable values:");
+	SUBREADputs("  -s <int or string>  Perform strand-specific read counting. A single integer");
+	SUBREADputs("                      value (applied to all input files) or a string of comma-");
+	SUBREADputs("                      separated values (applied to each corresponding input");
+	SUBREADputs("                      file) should be provided. Possible values include:");
 	SUBREADputs("                      0 (unstranded), 1 (stranded) and 2 (reversely stranded).");
-	SUBREADputs("                      0 by default.");
+	SUBREADputs("                      Default value is 0 (ie. unstranded read counting carried");
+	SUBREADputs("                      out for all input files).");
 	SUBREADputs("");
 
 	SUBREADputs("# Exon-exon junctions");
@@ -6098,11 +6082,11 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	{
 		if( global_context->is_paired_end_mode_assign)
 		{
-			print_in_box(80,0,0,"   Assign fragments (read pairs) to features...");
+			print_in_box(80,0,0,"   Assign alignments (paired-end) to features...");
 //				print_in_box(80,0,0,"   Each fragment is counted no more than once.");
 		}
 		else
-			print_in_box(80,0,0,"   Assign reads to features...");
+			print_in_box(80,0,0,"   Assign alignments to features...");
 	}
 
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
