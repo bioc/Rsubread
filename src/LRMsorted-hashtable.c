@@ -34,7 +34,7 @@
 #define _gehash_hash(k) ((unsigned int)(k))
 #define WITHOUT_CLUSTER_ORDERING 0
 
-inline struct LRMgehash_bucket * LRM_gehash_get_bucket(LRMgehash_t * the_table, LRMgehash_key_t key)
+struct LRMgehash_bucket * LRM_gehash_get_bucket(LRMgehash_t * the_table, LRMgehash_key_t key)
 {
 	int bucket_number;
 

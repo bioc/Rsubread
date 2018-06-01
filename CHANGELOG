@@ -1,3 +1,6 @@
+1 June 2018 - 1.30.3
+(1) Removed the "inline" keyword from the C codes. This keyword resulted in failures of installation of this package.
+
 15 May 2018 - 1.30.2
 (1) Provide download link for human reference genome in buildindex() help page and users guide.
 
