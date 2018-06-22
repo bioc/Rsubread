@@ -1,36 +1,33 @@
 \name{buildindex}
 \alias{buildindex}
 \title{Build index for a reference genome}
-\description{An index needs to be built before read mapping can be performed. This function creates a hash table for the reference genome, which can then be used by Subread and Subjunc aligners for read alignment.}
+\description{An index needs to be built before read mapping can be performed. This function creates a hash table index for the reference genome, which can then be used by Subread and Subjunc aligners for read alignment.}
 \usage{
-buildindex(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,
+buildindex(basename,reference,gappedIndex=FALSE,indexSplit=FALSE,memory=8000,
 TH_subread=100,colorspace=FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of a FASTA-format file that includes sequences of all chromosomes and contigs.}
-  \item{gappedIndex}{ logical. If \code{FALSE}, 16mers (subreads) will be extracted from every chromosomal location of a reference genome and then they will be used to build a hash table index. By default(\code{TRUE}), subreads are extracted in every three bases from the genome.}
-  \item{indexSplit}{ logical. If \code{TRUE}, the built index is allowed to be splitted into multiple segments. The number of such segments is determined by \code{memory} value, genome size and permitting of gaps between subreads(\code{gappedIndex}). If \code{indexSplit} is set to \code{FALSE}, a single-segment index (no splitting) will be generated regardless of what value is chosen for \code{memory}.}
-  \item{memory}{ numeric value specifying the amount of memory to be requested in megabytes. 8000 MB by default.}
+  \item{gappedIndex}{ logical indicating if a gapped index or a full index will be built. A gapped index contains 16mers (subreads) that are extracted every three bases from a reference genome, whereas a full index contains subreads extracted from every chromosomal location of a genome. The index contains a hash table, which includes sequences of subreads and their corresponding chromosomal locations. Default value of this argument is \code{FALSE} (ie. a full index is built). }
+  \item{indexSplit}{ logical indicating if an index can be split into multiple blocks. Size of each block is determined by value of parameter \code{memory}. \code{FALSE} by default (ie. a single-block index is generated). }
+  \item{memory}{ numeric value specifying the amount of memory (in megabytes) used for storing the index during read mapping. 8000 MB by default. Note that this option is ignored when \code{indexSplit} is \code{FALSE}. }
   \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16bp mers). 100 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
-  }
+}
 \details{
-This function generates a hash table (an index) for a reference genome, in which keys are subreads (16mers) and values are their chromosomal locations in the reference genome.
-By default, subreads will be extracted in every three bases from a reference genome.
-However, if \code{gappedIndex} is set to \code{FALSE}, then subreads will be extracted from every chromosomal location of genome for index building.
+This function generates a hash-table index for a reference genome, in which keys are subreads (16mers) and values are their chromosomal locations in the reference genome.
 The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads(Liao et al. 2013).
 
 Highly repetitive subreads (or uninformative subreads) are excluded from the hash table so as to reduce mapping ambiguity.
 \code{TH_subread} specifies the maximal number of times a subread is allowed to occur in the reference genome to be included in hash table.
 
-The built index might be splitted into multiple segments if its size is greater than \code{memory} value.
-The number of such segments is dependent on \code{memory} value, size of reference genome and whether gaps are allowed between subreads extracted from genome.
-Only one segment is loaded into memory at any time when read alignment is being carried out.
-The larger the \code{memory} value, the faster the read mapping will be.
-If \code{indexSplit} is set to \code{FALSE}, the index will not be splitted and this will enable maximum mapping speed to be achieved.
+When an index index is split into multiple blocks, only one block will be loaded into memory at any time during read mapping.
+Therefore the size of memory used during mapping can be controlled.
+The more memory is used in mapping, the faster the mapping speed.
+Generating a one-block full index (eg. setting both \code{gappedIndex} and \code{indexSplit} to \code{FALSE}) will enable the maximum mapping speed to be achieved.
 
-The index needs to be built only once and it can then be re-used in the subsequent alignments.
+Once an index is built it can be re-used in all the mappings.
 
 Sequences of reference genomes can be downloaded from NCBI, UCSC or Ensembl databases.
 For instance, human reference genome GRCh38.p12 and mouse reference genome GRCm38.p6 can be downloaded from the NCBI database via the following links:

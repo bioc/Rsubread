@@ -1,3 +1,6 @@
+22 June 2018 - 1.30.4
+(1) Change the default setting of buildindex() to enable a one-block full index to be built.
+
 1 June 2018 - 1.30.3
 (1) Removed the "inline" keyword from the C codes. This keyword resulted in failures of installation of this package.
 
