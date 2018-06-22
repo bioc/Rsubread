@@ -1,4 +1,4 @@
-buildindex <- function(basename,reference,gappedIndex=TRUE,indexSplit=TRUE,memory=8000,TH_subread=100,colorspace=FALSE)
+buildindex <- function(basename,reference,gappedIndex=FALSE,indexSplit=FALSE,memory=8000,TH_subread=100,colorspace=FALSE)
 {
 	basename <- normalizePath(basename, mustWork=F)
 	reference <- normalizePath(reference, mustWork=T)
