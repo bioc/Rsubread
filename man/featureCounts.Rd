@@ -32,7 +32,7 @@ featureCounts(files,
 	read2pos=NULL,
 	
 	# multi-mapping reads
-	countMultiMappingReads=FALSE,
+	countMultiMappingReads=TRUE,
 
 	# fractional counting
 	fraction=FALSE,
@@ -98,7 +98,7 @@ featureCounts(files,
   \item{readExtension5}{ \code{integer} giving the number of bases extended upstream from 5' end of each read. \code{0} by default.}
   \item{readExtension3}{ \code{integer} giving the number of bases extended downstream from 3' end of each read. \code{0} by default.}
   \item{read2pos}{ Specifying whether each read should be reduced to its 5' most base or 3' most base. It has three possible values: \code{NULL}, \code{5} (denoting 5' most base) and \code{3} (denoting 3' most base). The default value is \code{NULL}. With the default value, the whole read is used for summarization. When \code{read2pos} is set to \code{5} (or \code{3}), read summarization will be performed based on the 5' (or 3') most base position. \code{read2pos} can be used together with \code{readExtension5} and \code{readExtension3} parameters to set any desired length for reads.}
-  \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{FALSE} by default. If \code{TRUE}, a multi-mapping read will be counted up to N times if it has N reported mapping locations. This function uses the `NH' tag to find multi-mapping reads.}
+  \item{countMultiMappingReads}{ logical indicating if multi-mapping reads/fragments should be counted, \code{TRUE} by default. `NH' tag is used to located multi-mapping reads in the input BAM/SAM files.}
   \item{fraction}{ logical indicating if fractional counts are produced for multi-mapping reads and/or multi-overlapping reads. \code{FALSE} by default. See below for more details.}
   \item{isLongRead}{ logical indicating if input data contain long reads. This option should be set to \code{TRUE} if counting Nanopore or PacBio long reads.}
   \item{minMQS}{ \code{integer} giving the minimum mapping quality score a read must satisfy in order to be counted. For paired-end reads, at least one end should satisfy this criteria. \code{0} by default.}

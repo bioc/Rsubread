@@ -1,3 +1,6 @@
+17 Aug 2018 - 1.31.7
+(1) Default value of 'countMultiMappingReads' parameter in featureCounts is changed to TRUE.
+
 11 July 2018 - 1.31.6
 (1) Fix a typo in atgcContent.Rd file.
 
