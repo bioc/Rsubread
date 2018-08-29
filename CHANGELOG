@@ -1,3 +1,6 @@
+29 Aug 2018 - 1.31.8
+(1) Improve documentation for 'read2pos' option in featureCounts.
+
 17 Aug 2018 - 1.31.7
 (1) Default value of 'countMultiMappingReads' parameter in featureCounts is changed to TRUE.
 
