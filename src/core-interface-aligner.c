@@ -49,6 +49,9 @@ static struct option long_options[] =
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"sv", no_argument, 0, 0},
 	{"longDel", no_argument, 0, 0},
+	{"exonAnnotationScreenOut", required_argument, 0, 0},
+	{"gtfFeature", required_argument, 0, 0},
+	{"gtfAttr", required_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
@@ -595,6 +598,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.maximise_sensitivity_indel = 1;
 					global_context->config.realignment_minimum_variant_distance = 1;
 				//	global_context->config.max_indel_length = max(16, global_context->config.max_indel_length);
+				}
+				else if(strcmp("exonAnnotationScreenOut", long_options[option_index].name)==0){
+					strcpy(global_context->config.exon_annotation_file_screen_out, optarg);
 				}
 				else if(strcmp("minVoteCutoff", long_options[option_index].name)==0)
 				{

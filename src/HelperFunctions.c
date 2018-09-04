@@ -839,6 +839,7 @@ int mac_str(char * str_buff)
 	}
     return ret;
 #else
+#if defined(IFHWADDRLEN)
     struct ifreq ifr;
     struct ifconf ifc;
     char buf[1024];
@@ -878,6 +879,7 @@ int mac_str(char * str_buff)
 	    }
 		return 0;
 	}
+#endif
 	return 1;
 #endif
 #endif

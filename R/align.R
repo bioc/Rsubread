@@ -76,24 +76,24 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 
     flag <- FALSE
     if(useAnnotation){
-    
+		annot.display <- "R data.frame"
         if(is.null(annot.ext)){
             switch(tolower(as.character(annot.inbuilt)),
             mm9={
                 ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for mm9 (build 37.2) is used.\n")
+				annot.display <- "inbuilt (mm9)"
             },
             mm10={
                 ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
+				annot.display <- "inbuilt (mm10)"
             },
             hg19={
                 ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
+				annot.display <- "inbuilt (hg19)"
             },
             hg38={
                 ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for hg38 (build 38.2) is used.\n")
+				annot.display <- "inbuilt (hg38)"
             },
             {
                 stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
@@ -103,6 +103,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
         else{
             if(is.character(annot.ext)){
                 ann <- annot.ext
+				annot.display <- paste0(basename(ann), " (", ifelse(isGTF,"GTF","SAF"),")")
             }
             else{
                 annot_df <- as.data.frame(annot.ext,stringsAsFactors=FALSE)
@@ -129,6 +130,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     
         if(!is.null(chrAliases))
             opt <- paste(opt,"-A",chrAliases,sep=",")
+		opt <- paste(opt, "--exonAnnotationScreenOut", annot.display, sep=",")
     
     }
 

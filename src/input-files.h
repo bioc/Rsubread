@@ -152,7 +152,9 @@ typedef struct {
 	unsigned int BAM_n_ref;
 	int is_unsorted_notified;
 	int is_incomplete_BAM;
+	int need_read_group_tag;
 	int is_internal_error;
+	int is_final_run;
 
 	void (* reset_output_function) (void * pairer);
 	int (* output_function) (void * pairer, int thread_no, char * bin1, char * bin2); 
@@ -305,7 +307,7 @@ unsigned long long geinput_file_offset( gene_input_t * input);
 int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_header_length);
 
 
-int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * bin1, char * bin2), char * tmp_path, void * appendix1, int long_read_minimum_length) ;
+int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int need_read_group_tag, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * bin1, char * bin2), char * tmp_path, void * appendix1, int long_read_minimum_length) ;
 int SAM_pairer_run( SAM_pairer_context_t * pairer);
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer);
 void SAM_pairer_writer_reset(void * pairer);
@@ -322,4 +324,5 @@ int SAM_pairer_warning_file_open_limit();
 void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
+int geinput_preload_buffer(gene_input_t * input, subread_lock_t* read_lock);
 #endif

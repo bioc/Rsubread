@@ -27,7 +27,9 @@
 #define LRMSOFTCLIPPING_MAX_MISMATCH 2
 #define LRMJUMP_MISMATCH_TOLERANCE 4
 #define LRMDYNAMIC_MAXIMUM_GAP_LENGTH (15000)
-#define LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE 150
+
+// " * 250" is for RNA-seq mapping -- a much larger dynamic programming space.
+#define LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE (150 * 250 )
 
 
 #define LRMSUBREAD_INDEX_OPTION_INDEX_GAP 0x0101
@@ -108,9 +110,11 @@ typedef struct {
 	unsigned int chain_cov_end[LRMMAX_SUBREAD_PER_READ_HARDLIMIT];
 	unsigned int chain_chro_at_cov_start[LRMMAX_SUBREAD_PER_READ_HARDLIMIT];
 
+	ArrayList * chain_used_gaps;
 	double subread_extract_gap;
 	int subread_total;
 	int total_matched_bases ;
+	int current_alignment_no;
 	unsigned int final_mapping_location;
 } LRMread_iteration_context_t;
 
@@ -191,7 +195,6 @@ typedef struct {
 	char output_file_name [LRMMAX_FILENAME_LENGTH];
 	char index_prefix [LRMMAX_FILENAME_LENGTH];
 	
-	int do_junction_detection;
 	int threads;
 	int is_SAM_output;
 	int max_dynamic_indel_length;
@@ -205,6 +208,7 @@ typedef struct {
 	int result_merge_tolerance;
 	int show_read_validation;
 	int max_cigars_in_read;
+	int is_RNAseq_mode;
 	
 	// RUNNING STATUS
 	
