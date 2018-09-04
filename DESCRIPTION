@@ -1,19 +1,16 @@
 Package: Rsubread
-Version: 1.31.4
-Date: 2018-05-15
-Title: Subread sequence alignment for R
-Author: Wei Shi and Yang Liao with contributions from Gordon Smyth, Jenny Dai
+Version: 1.31.8
+Date: 2018-08-29
+Title: Subread sequence alignment and counting for R
+Author: Wei Shi and Yang Liao with contributions from Gordon K Smyth, Jenny Dai
         and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.EDU.AU>
-Description: Provides powerful and easy-to-use tools for
-        analyzing next-gen sequencing read data.
-        Includes quality assessment of sequence reads, read
-        alignment, read summarization, exon-exon junction detection,
-        fusion detection, detection of short and long indels, absolute
-        expression calling and SNP calling. Can be used with reads
-        generated from any of the major sequencing platforms including
-        Illumina GA/HiSeq/MiSeq, Roche GS-FLX, ABI SOLiD and
-        LifeTech Ion PGM/Proton sequencers.
+Description: Rsubread is a toolbox developed for the analyses of
+        second and third generation sequencing data. It can be used
+        for read mapping, read counting, SNP calling, structural
+        variant detection and gene fusion discovery. It can be applied
+        to all major sequencing techologies and is suitable for the
+        analysis of both short and long reads.
 URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
 License: GPL-3
 biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq,

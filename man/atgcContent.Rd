@@ -1,7 +1,7 @@
 \name{atgcContent}
 \alias{atgcContent}
-\title{Calculate percentages of nucletodies A, T, G and C in a sequencing read datafile}
-\description{Calculate percentages of nucletodies A, T, G and C
+\title{Calculate percentages of nucleotides A, T, G and C in a sequencing read datafile}
+\description{Calculate percentages of nucleotides A, T, G and C
 }
 \usage{
 atgcContent(filename, basewise=FALSE)
