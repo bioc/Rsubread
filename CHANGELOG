@@ -1,3 +1,8 @@
+4 Sep 2018 - 1.31.8
+(1) Largely improved the speed of align and subjunc
+(2) Minor changes on the screen outputs of align, subjunc and featureCounts
+(3) Bug fixes
+
 11 May 2018 - 1.31.3
 (1) Update users guide.
 (2) Update help page for align, subjunc, featureCounts and flattenGTF.
