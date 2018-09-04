@@ -89,6 +89,8 @@ void R_mergeVCF(int * nargs, char ** argv)
 void R_sublong_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
+	uintptr_t old_cstack_limit = R_CStackLimit;
+	R_CStackLimit =(uintptr_t)-1;
 
 	r_argv = (char *)calloc(1000, sizeof(char));
 	strcpy(r_argv,*argv);
@@ -104,6 +106,8 @@ void R_sublong_wrapper(int * nargs, char ** argv){
 	for(i=0;i<n;i++) free(c_argv[i]);
 	free(c_argv);
 	free(r_argv);
+
+	R_CStackLimit = old_cstack_limit;
 }
 
 
