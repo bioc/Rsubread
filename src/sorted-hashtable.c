@@ -1394,7 +1394,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 		size_t rdbytes = fread(the_table -> malloc_ptr, 1, rem_len, fp);
 		fclose(fp);
-		assert(rdbytes == rem_len);
+		if(rdbytes != rem_len) assert(rdbytes == rem_len);
 
 		char * curr_ptr = the_table -> malloc_ptr;
 		for (i=0; i<the_table -> buckets_number; i++)
