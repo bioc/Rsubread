@@ -93,6 +93,7 @@ typedef struct{
 
 typedef struct{
 	int is_paired_end_reads;
+	int is_internal_error;
 	gene_input_t first_read_file;
 	gene_input_t second_read_file;
 	unsigned long long first_read_file_size;
@@ -140,6 +141,7 @@ typedef struct{
 	char first_read_file[MAX_FILE_NAME_LENGTH];
 	char second_read_file[MAX_FILE_NAME_LENGTH];
 	char exon_annotation_file[MAX_FILE_NAME_LENGTH];
+	char exon_annotation_file_screen_out[MAX_FILE_NAME_LENGTH];
 	char exon_annotation_alias_file[MAX_FILE_NAME_LENGTH];
 	int exon_annotation_file_type;
 	char exon_annotation_gene_id_column[MAX_READ_NAME_LEN];
@@ -449,6 +451,19 @@ typedef struct {
 
 
 typedef struct{
+	void * junction_tmp_r1;
+	void * junction_tmp_r2;
+
+	void * alignment_tmp_r1;
+	void * alignment_tmp_r2;
+
+	void * vote_simple_1_buffer;
+	void * vote_simple_2_buffer;
+
+	void * comb_buffer;
+} topK_buffer_t;
+
+typedef struct{
 	unsigned long long all_correct_PE_reads;
 	int thread_id;
 	pthread_t thread;
@@ -468,6 +483,8 @@ typedef struct{
 	unsigned int not_properly_pairs_only_one_end_mapped;
 	unsigned int all_multimapping_reads;
 	unsigned int all_uniquely_mapped_reads;
+
+	topK_buffer_t topKbuff;
 } thread_context_t;
 
 
@@ -512,6 +529,7 @@ typedef struct{
 	long long bigtable_cache_file_loaded_fragments_begin;
 	long long bigtable_cache_file_fragments;
 	bigtable_cached_result_t * bigtable_cache;
+	char *bigtable_cache_malloc_ptr, *bigtable_cache_malloc_ptr_junc;
 	unsigned int bigtable_chunked_fragments;
 	int bigtable_dirty_data;
 	
@@ -559,6 +577,7 @@ typedef struct{
 
 	bucketed_table_t translocation_result_table;
 	bucketed_table_t inversion_result_table;
+	topK_buffer_t topKbuff;
 
 	// per chunk parameters
 	subread_read_number_t read_block_start;

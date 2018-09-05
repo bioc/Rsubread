@@ -81,9 +81,9 @@ void flatAnno_print_usage(){
 	SUBREADputs("");
 	SUBREADputs("## Optional arguments: ");
 	SUBREADputs("");
-	SUBREADputs("  -t <string>    Specify feature type in GTF annotation. 'exon' by default.");
-	SUBREADputs("                 Features with the specified feature type are extracted for");
-	SUBREADputs("                 processing.");
+	SUBREADputs("  -t <string>    Specify feature type in a GTF annotation. 'exon' by default.");
+	SUBREADputs("                 Features with the specified feature type are extracted from the");
+	SUBREADputs("                 annotation for processing.");
 	SUBREADputs("");
 	SUBREADputs("  -g <string>    Specify attribute type in GTF annotation. 'gene_id' by default.");
 	SUBREADputs("                 This attribute type is used to group features into meta-");
@@ -212,7 +212,8 @@ int flatAnno_start(flatAnno_context_t * context){
 	SUBREADputs("");
 	if(!context -> GTF_file_name[0]){
 		flatAnno_print_usage();
-		SUBREADprintf("Error: no input file is specified.\n");
+
+		if(context -> output_file_name[0]) SUBREADprintf("Error: no input file is specified.\n");
 		return -1;
 	}
 

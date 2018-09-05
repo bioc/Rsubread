@@ -476,8 +476,7 @@ void fishers_test_on_POI(struct SNP_Calling_Parameters * parameters, float * snp
 		}
 	}
 }
-void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * snp_fisher_raw, unsigned int * snp_voting_piles, char * referenced_genome, unsigned int  reference_len, double multiplex_base, char * SNP_bitmap_recorder, unsigned short * snp_filter_background_matched, unsigned short * snp_filter_background_unmatched, int all_result_needed)
-{
+void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * snp_fisher_raw, unsigned int * snp_voting_piles, char * referenced_genome, unsigned int  reference_len, double multiplex_base, char * SNP_bitmap_recorder, unsigned short * snp_filter_background_matched, unsigned short * snp_filter_background_unmatched, int all_result_needed, char * chro_name, unsigned int block_start) {
 
 		int i, j, is_fresh_jumppd, remove_old;
 		int a=0, b=0, c=0, d=0, go_ahead = 0, left_tail = 0;
@@ -547,6 +546,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				float observed_coverage = (b+d) *1./(1. + 2 * parameters -> fisher_exact_testlen) ;
 				double p_cutoff = pow(10, -(observed_coverage/multiplex_base));
 				p_cutoff = min(parameters -> cutoff_upper_bound, p_cutoff);
+				p_cutoff = max(1E-320, p_cutoff);
 
 				int flanking_unmatched = b-a;
 				int flanking_matched = d-c;
@@ -557,8 +557,11 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				}
 
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
-				if(0 && flanking_matched > 10000 && p_middle < 1E-5)
-					SUBREADprintf("TEST: %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", i,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
+
+				unsigned int chro_pos = 1 + block_start + i;
+				if(0 && chro_pos < 11109861+10 && chro_pos > 11109861-10)
+					SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", chro_name, chro_pos ,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
+
 				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
@@ -663,7 +666,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 		pcutoff_list[i]=-1.;
 	}
 
-	int read_is_error = read_tmp_block(parameters, tmp_fp,&SNP_bitmap_recorder,snp_voting_piles,block_no, reference_len, referenced_genome, chro_name, offset);
+	int read_is_error = read_tmp_block(parameters, tmp_fp,&SNP_bitmap_recorder,snp_voting_piles,block_no, reference_len, referenced_genome, chro_name, offset -  reference_len);
 
 	fclose(tmp_fp);
 	if (parameters -> delete_piles)
@@ -832,10 +835,10 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 
 	if(parameters -> fisher_exact_testlen)
 	{
-		fishers_test_on_block(parameters, snp_fisher_raw, snp_voting_piles, referenced_genome, reference_len, multiplex_base, SNP_bitmap_recorder, snp_filter_background_matched, snp_filter_background_unmatched, 0);
+		fishers_test_on_block(parameters, snp_fisher_raw, snp_voting_piles, referenced_genome, reference_len, multiplex_base, SNP_bitmap_recorder, snp_filter_background_matched, snp_filter_background_unmatched, 0, chro_name, BASE_BLOCK_LENGTH*block_no +1);
 		if(parameters->background_input_file[0])
 		{
-			fishers_test_on_block(parameters, snp_fisher_BGC, snp_BGC_piles, referenced_genome, reference_len, multiplex_base, SNP_bitmap_recorder, NULL, NULL, 1);
+			fishers_test_on_block(parameters, snp_fisher_BGC, snp_BGC_piles, referenced_genome, reference_len, multiplex_base, SNP_bitmap_recorder, NULL, NULL, 1, chro_name, BASE_BLOCK_LENGTH*block_no +1);
 			fishers_test_on_POI(parameters, snp_fisher_VS, snp_voting_piles, snp_BGC_piles, referenced_genome, reference_len, snp_fisher_raw);
 		}
 	}

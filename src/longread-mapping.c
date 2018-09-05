@@ -104,6 +104,8 @@ void LRMprint_usage(){
 	LRMputs("");
 	LRMputs(" -v            Output version of the program.");
 	LRMputs("");
+	LRMputs(" -X            Turn on the RNA-seq mode.");
+	LRMputs("");
 	LRMputs("Refer to Users Manual for detailed description to the arguments.");
 	LRMputs("");
 }
@@ -130,17 +132,18 @@ int LRMvalidate_and_init_context(LRMcontext_t ** context, int argc, char ** argv
 	opterr = 1;
 	optopt = 63;
 	int option_index = 0;
-	while ((c = getopt_long (argc, argv, "r:i:o:T:P:vV", long_options, &option_index))!=-1){
+	while ((c = getopt_long (argc, argv, "Xr:i:o:B:T:v", long_options, &option_index))!=-1){
 		switch(c){
-			case 'P':
-				(*context) -> is_Phred_64=(optarg[0]=='6');
+			case 'B':
+				(*context)->multi_best_read_alignments = min(max(1,atoi(optarg)),20);
 				break;
-			case 'j':
-				(*context) -> do_junction_detection = 1;
-				(*context) -> result_merge_tolerance = 500000;
-				break;
-			case 'V':
-				(*context) -> show_read_validation = 1;
+			case 'X':
+				(*context) -> is_RNAseq_mode = 1;
+				(*context)->dynamic_programming_score_match = 6;
+				(*context)->dynamic_programming_score_mismatch = 0;
+				(*context)->dynamic_programming_score_create_gap = -6;
+				(*context)->dynamic_programming_score_extend_gap = -1;
+
 				break;
 			case 'r':
 				strcpy((*context) -> input_file_name, optarg);
@@ -157,10 +160,6 @@ int LRMvalidate_and_init_context(LRMcontext_t ** context, int argc, char ** argv
 				break;
 			case 'T':
 				(*context) -> threads = min(max(1,atoi(optarg)),LRMMAX_THREADS);
-				break;
-			case 'X':
-				(*context) -> max_mismatched_bases_in_subread = atoi(optarg);
-				assert((*context) -> max_mismatched_bases_in_subread <3);
 				break;
 			case 'm':
 				(*context) -> min_voting_number = atoi(optarg);
@@ -250,7 +249,7 @@ void LRMset_default_values_context(LRMcontext_t * context){
 }
 
 int LRMshow_conf(LRMcontext_t * context){
-	LRMprintf("\n ====== Subread long read mapping ======\n\n");
+	LRMprintf("\n ====== Subread long read mapping %s======\n\n", context -> is_RNAseq_mode? "(RNA-seq) ": "");
 	LRMprintf("Threads: %d\n" , context->threads);
 	LRMprintf("Input file: %s\n" , context->input_file_name);
 	LRMprintf("Output file: %s (%s)\n" , context->output_file_name,  context->is_SAM_output?"SAM":"BAM");
@@ -563,6 +562,7 @@ void LRMprint_longvote( LRMcontext_t * context, LRMthread_context_t * thread_con
 	int ii;
 	LRMprintf("\n+++ READ %s ++++++++++++++++++++\n", iteration_context -> read_name);
 
+	if(0)
 	for(ii = 0; ii< iteration_context -> sorting_total_votes; ii++){
 		char postxt[55];
 		LRMgene_vote_t * vtab = &(iteration_context->vote_table);
@@ -616,12 +616,30 @@ void LRMcopy_longvotes_to_itr( LRMcontext_t * context, LRMthread_context_t * thr
 	}
 }
 
+int LRMis_gap_in_used_gap(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, unsigned int vote_start_pos, unsigned int vote_cov_len){
+	unsigned int vote_end_pos = vote_start_pos + vote_cov_len;
+	int xxi;
+	for(xxi = 0; xxi < iteration_context -> chain_used_gaps -> numOfElements; xxi+=2){
+		unsigned int used_start = LRMArrayListGet(iteration_context -> chain_used_gaps, xxi) - NULL;
+		unsigned int used_end = LRMArrayListGet(iteration_context -> chain_used_gaps, xxi+1) - NULL;
+
+		//LRMprintf("ADD_VOTE? OLD: %u ~ %u ; NEXT: %u ~ %u\n", used_start, used_end, vote_start_pos, vote_end_pos);
+
+		if(used_start <= vote_start_pos && used_end >= vote_start_pos) return 1;
+		if(vote_start_pos <= used_start && vote_end_pos >= used_start) return 1;
+	}
+	return 0;
+}
+
+
+
 #define LRM_SORTED_VOTE_WINDOW_SIZE 1500000
 
 void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_context,LRMread_iteration_context_t * iteration_context){
 	int ii, max_window_no = LRMMAX_SORTED_WINDOW_NO_HARD_LIMIT, is_reversed; 
 	int testing_window_width = min(LRM_SORTED_VOTE_WINDOW_SIZE, iteration_context -> read_length *4/3);
 	if(iteration_context -> read_length < 10000) testing_window_width = 20000;
+	if(context -> is_RNAseq_mode ) testing_window_width = min(1000000, testing_window_width);
 	if(iteration_context -> sorting_total_votes<1){
 		iteration_context -> sorted_window_total_votes[0]=0;
 		return;
@@ -645,15 +663,11 @@ void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_c
 					LRMprintf("    PASSING %d += %d : Vote in win = %d\n", ii, iteration_context -> sorting_subread_votes[ii], votes_in_win);
 			votes_in_win += iteration_context -> sorting_subread_votes[ii];
 
-			while(1){
-				while(iteration_context -> sorting_is_negative_strand[win_start_ii] != is_reversed){
-			//		LRMprintf("TSTARTT : %d ; II=%d (%d != %d)\n", win_start_ii, ii, iteration_context -> sorting_is_negative_strand[win_start_ii] , is_reversed);
-					win_start_ii ++;
-				}
-				if(iteration_context -> sorting_vote_locations[ii] - iteration_context -> sorting_vote_locations[win_start_ii] < testing_window_width)break;
+			while(win_start_ii < iteration_context -> sorting_total_votes && win_start_ii < ii){
+				while(iteration_context -> sorting_is_negative_strand[win_start_ii] != is_reversed) win_start_ii ++;
 
-			if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0)
-					LRMprintf("    PASSINGSUB  %d -= %d : Vote in win = %d\n", win_start_ii, iteration_context -> sorting_subread_votes[win_start_ii], votes_in_win);
+				if(iteration_context -> sorting_vote_locations[ii] - iteration_context -> sorting_vote_locations[win_start_ii] < testing_window_width && !LRMis_gap_in_used_gap(context, thread_context, iteration_context,iteration_context -> sorting_vote_locations[win_start_ii], 15))break;
+
 				votes_in_win -= iteration_context -> sorting_subread_votes[win_start_ii];
 				win_start_ii ++;
 				while(iteration_context -> sorting_is_negative_strand[win_start_ii] != is_reversed){
@@ -668,7 +682,9 @@ void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_c
 			if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0 && votes_in_win > 8200){
 				LRMprintf("    EXCHANGE: %d > %d ; window = %d ~ %d\n=================================\n", votes_in_win , iteration_context -> sorted_window_total_votes[max_window_no-1], win_start_ii, ii);
 			}
-			if(votes_in_win > iteration_context -> sorted_window_total_votes[max_window_no-1]){
+
+			//LRMprintf("LRMtest_window_in : %u ~ %u\n", iteration_context->sorting_vote_locations[win_start_ii], iteration_context->sorting_vote_locations[ii] - iteration_context -> sorting_vote_locations[win_start_ii] + 16);
+			if(votes_in_win > iteration_context -> sorted_window_total_votes[max_window_no-1] && ! LRMis_gap_in_used_gap(context, thread_context, iteration_context, iteration_context->sorting_vote_locations[win_start_ii], iteration_context->sorting_vote_locations[ii] - iteration_context -> sorting_vote_locations[win_start_ii] + 15)){
 				int tins = -1;
 				int tt;
 				int has_in_window = 0;
@@ -715,8 +731,12 @@ void LRMfind_top_windows( LRMcontext_t * context, LRMthread_context_t * thread_c
 	}
 }
 
-int LRM_test_chain_extension(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, int window_no, int go_larger, long long N2W_read_dist, long long N2W_chro_dist, unsigned int last_chro_pos, unsigned int this_chro_pos){
+#define MAX_INTRON_LENGTH 700000
+
+int LRM_test_chain_extension(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, int window_no, int go_larger, long long N2W_read_dist, long long N2W_chro_dist, unsigned int last_chro_pos, unsigned int this_chro_pos, unsigned int this_cov_len){
 	//LRMprintf("TESTING CHAIN: N2W_READ: %lld ; N2W_CHRO: %lld  %s\n", N2W_read_dist, N2W_chro_dist, go_larger?"GO_LARGE":"GO_SMALL");
+	if(LRMis_gap_in_used_gap( context, thread_context, iteration_context, this_chro_pos, this_cov_len )) return 0;
+	
 	if(N2W_read_dist == 0 || N2W_chro_dist == 0) return 0;
 
 	if(go_larger){
@@ -725,7 +745,8 @@ int LRM_test_chain_extension(LRMcontext_t * context, LRMthread_context_t * threa
 		if(N2W_read_dist > 0 || N2W_chro_dist > 0) return 0;
 	}
 
-	if( abs(N2W_chro_dist) > 50 || abs(N2W_read_dist) > 50 )if(abs(N2W_chro_dist) >= abs(N2W_read_dist)* 14/10 || abs(N2W_chro_dist) <= abs(N2W_read_dist) * 6 / 10) return 0;
+	if(!context -> is_RNAseq_mode)if( abs(N2W_chro_dist) > 50 || abs(N2W_read_dist) > 50 )if(abs(N2W_chro_dist) >= abs(N2W_read_dist)* 14/10 || abs(N2W_chro_dist) <= abs(N2W_read_dist) * 6 / 10) return 0;
+	if(context -> is_RNAseq_mode)if( abs(N2W_chro_dist) > 50 || abs(N2W_read_dist) > 50 )if( abs(N2W_chro_dist) >= abs(N2W_read_dist) + MAX_INTRON_LENGTH || abs(N2W_chro_dist) <= abs(N2W_read_dist) * 6 / 10) return 0;
 
 	if(abs(N2W_read_dist) > context -> result_merge_tolerance) return 0;
 
@@ -772,114 +793,6 @@ void LRMfix_extension_overlapping(LRMcontext_t * context, LRMthread_context_t * 
 		}
 	}
 }
-
-
-
-void LRMbuild_chains_old(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, int window_no ){
-	int testing_window_width = min(LRM_SORTED_VOTE_WINDOW_SIZE, iteration_context -> read_length *4/3);
-	if(iteration_context -> read_length < 10000) testing_window_width = 20000;
-	if(iteration_context -> sorted_window_total_votes[window_no] < 1){
-		iteration_context -> chain_total_items = iteration_context -> chain_tosmall_items = iteration_context -> chain_tolarge_items = 0;
-		return;
-	}
-	int seed_subread_no = iteration_context -> sorted_window_vote_start[window_no];
-
-	int test_subread_no, go_large, has_overlapping = 0;
-	for(test_subread_no = iteration_context -> sorted_window_vote_start[window_no] ; test_subread_no < iteration_context -> sorted_window_vote_stop[window_no] ; test_subread_no++){
-		if(iteration_context -> sorted_window_is_negative_strand[window_no] != iteration_context -> sorting_is_negative_strand[test_subread_no])
-			continue;
-		if(iteration_context -> sorting_subread_votes[test_subread_no] > iteration_context -> sorting_subread_votes[seed_subread_no]) seed_subread_no = test_subread_no;
-	}
-
-	LRMgene_vote_t * vtab = &(iteration_context->vote_table);
-	
-	for(go_large = 0; go_large < 2; go_large ++){
-		int last_added_tt, last_added_ii;
-		last_added_tt = iteration_context -> sorting_subread_nos[seed_subread_no] >> 16;
-		last_added_ii = iteration_context -> sorting_subread_nos[seed_subread_no] & 0xffff;
-		unsigned int last_added_read_pos = vtab -> coverage_start[last_added_tt][last_added_ii];
-		long long last_added_chro_pos = vtab -> pos[last_added_tt][last_added_ii] + vtab -> coverage_start[last_added_tt][last_added_ii];
-		//LRMprintf("SEED %s : [%d:%d] ; pos=%u OR %u\n", iteration_context -> sorted_window_is_negative_strand[window_no]?"NEG":"POS", last_added_tt, last_added_ii, last_added_read_pos, iteration_context -> sorting_vote_locations[seed_subread_no]);
-
-		int last_added_read_edge = go_large?vtab -> coverage_end[last_added_tt][last_added_ii]: vtab -> coverage_start[last_added_tt][last_added_ii];
-
-		if(!go_large){
-			iteration_context ->chain_tosmall_items = 1;
-			iteration_context ->chain_tolarge_items = 0;
-			iteration_context -> chain_cov_start[0] = last_added_read_pos;
-			iteration_context -> chain_cov_end[0] = vtab -> coverage_end[last_added_tt][last_added_ii];
-			iteration_context -> chain_chro_at_cov_start[0] = last_added_chro_pos;
-		}
-
-		int delta = go_large?1:-1;
-		for(test_subread_no = seed_subread_no ; test_subread_no >= 0 && test_subread_no < iteration_context -> sorting_total_votes; test_subread_no+= delta){
-			int test_tt, test_ii;
-			test_tt = iteration_context -> sorting_subread_nos[test_subread_no] >> 16;
-			test_ii = iteration_context -> sorting_subread_nos[test_subread_no] &0xffff;
-
-			if( test_ii >= LRMGENE_VOTE_SPACE || test_tt >= LRMGENE_VOTE_TABLE_SIZE) LRMprintf("Error: Table oversize %s , Subr: %d/%d : %d %d\n", iteration_context -> read_name, test_subread_no, iteration_context -> sorting_total_votes, test_tt, test_ii);
-			assert(test_ii < LRMGENE_VOTE_SPACE);
-			assert(test_tt < LRMGENE_VOTE_TABLE_SIZE);
-			int this_read_pos = vtab -> coverage_start[test_tt][test_ii];
-			int this_read_end = vtab -> coverage_end[test_tt][test_ii];
-
-			int N2W_read_dist = this_read_pos;
-			N2W_read_dist -= last_added_read_pos;
-
-			long long this_chro_pos = iteration_context -> sorting_vote_locations[test_subread_no];
-			long long N2W_chro_dist = this_chro_pos;
-			N2W_chro_dist -= last_added_chro_pos;
-			if(abs(N2W_chro_dist) > testing_window_width) break;
-
-			//LRMprintf("CALC N2W_chro_dist : %lld = %lld - %lld \n", N2W_chro_dist, last_added_chro_pos, this_chro_pos);
-
-			if(iteration_context -> sorted_window_is_negative_strand[window_no] == iteration_context -> sorting_is_negative_strand[test_subread_no] && LRM_test_chain_extension(context, thread_context, iteration_context, window_no, go_large, N2W_read_dist, N2W_chro_dist, last_added_chro_pos , this_chro_pos)){
-				int idx = iteration_context ->chain_tosmall_items;
-				if(go_large) idx += iteration_context ->chain_tolarge_items;
-
-				int this_added_read_inner = go_large? this_read_pos:this_read_end;
-				if( go_large && this_added_read_inner <= last_added_read_edge ){
-					//LRMprintf("OVERLAPPING_LAGRE %s : %d <= %d\n", iteration_context -> read_name, this_added_read_inner, last_added_read_edge);
-					has_overlapping = 1;
-				}else if( (!go_large) && this_added_read_inner >= last_added_read_edge ){
-					//LRMprintf("OVERLAPPING_SMALL %s : %d >= %d\n", iteration_context -> read_name, this_added_read_inner, last_added_read_edge);
-					has_overlapping = 1;
-				}
-
-				iteration_context -> chain_cov_start[idx] = this_read_pos;
-				iteration_context -> chain_cov_end[idx] = this_read_end;
-				iteration_context -> chain_chro_at_cov_start[idx] = this_chro_pos;
-
-				if(go_large) iteration_context ->chain_tolarge_items++; else iteration_context ->chain_tosmall_items++;
-
-				last_added_read_pos = this_read_pos;
-				last_added_chro_pos = this_chro_pos;
-				last_added_read_edge = go_large? this_read_end : this_read_pos ;
-			}
-		}
-	}
-
-	int ii;
-	for(ii = 0; ii < iteration_context -> chain_tosmall_items/2 ; ii++){
-		unsigned int tv;
-
-		tv = iteration_context -> chain_cov_start[ii];
-		iteration_context -> chain_cov_start[ii] = iteration_context -> chain_cov_start[iteration_context -> chain_tosmall_items - 1 - ii];
-		iteration_context -> chain_cov_start[iteration_context -> chain_tosmall_items - 1 - ii] = tv;
-
-		tv = iteration_context -> chain_cov_end[ii];
-		iteration_context -> chain_cov_end[ii] = iteration_context -> chain_cov_end[iteration_context -> chain_tosmall_items - 1 - ii];
-		iteration_context -> chain_cov_end[iteration_context -> chain_tosmall_items - 1 - ii] = tv;
-
-		tv = iteration_context -> chain_chro_at_cov_start[ii];
-		iteration_context -> chain_chro_at_cov_start[ii] = iteration_context -> chain_chro_at_cov_start[iteration_context -> chain_tosmall_items - 1 - ii];
-		iteration_context -> chain_chro_at_cov_start[iteration_context -> chain_tosmall_items - 1 - ii] = tv;
-	}
-	iteration_context -> chain_total_items = iteration_context -> chain_tosmall_items + iteration_context -> chain_tolarge_items;
-
-	if(has_overlapping) LRMfix_extension_overlapping(context, thread_context, iteration_context, window_no);
-}
-
 
 void LRMbuild_chains(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, int window_no ){
 	int testing_window_width = min(LRM_SORTED_VOTE_WINDOW_SIZE, iteration_context -> read_length *4/3);
@@ -984,7 +897,9 @@ void LRMbuild_chains(LRMcontext_t * context, LRMthread_context_t * thread_contex
 
 			//LRMprintf("CALC N2W_chro_dist : %lld = %lld - %lld \n", N2W_chro_dist, last_added_chro_pos, this_chro_pos);
 
-			if(iteration_context -> sorted_window_is_negative_strand[window_no] == iteration_context -> sorting_is_negative_strand[test_subread_no] && LRM_test_chain_extension(context, thread_context, iteration_context, window_no, go_large, N2W_read_dist, N2W_chro_dist, last_added_chro_pos , this_chro_pos)){
+			int can_add_this = iteration_context -> sorted_window_is_negative_strand[window_no] == iteration_context -> sorting_is_negative_strand[test_subread_no] &&
+                               LRM_test_chain_extension(context, thread_context, iteration_context, window_no, go_large, N2W_read_dist, N2W_chro_dist, last_added_chro_pos , this_chro_pos, this_read_end - this_read_pos);
+			if(can_add_this){
 				int idx = iteration_context ->chain_tosmall_items;
 				if(go_large) idx += iteration_context ->chain_tolarge_items;
 
@@ -1032,6 +947,17 @@ void LRMbuild_chains(LRMcontext_t * context, LRMthread_context_t * thread_contex
 	iteration_context -> chain_total_items = iteration_context -> chain_tosmall_items + iteration_context -> chain_tolarge_items;
 
 	if(has_overlapping) LRMfix_extension_overlapping(context, thread_context, iteration_context, window_no);
+
+	unsigned int this_gap_start_corr = iteration_context -> chain_chro_at_cov_start[0];
+	unsigned int this_gap_end_corr = iteration_context -> chain_chro_at_cov_start[iteration_context -> chain_total_items -1] + iteration_context -> chain_cov_end[iteration_context -> chain_total_items -1] - iteration_context -> chain_cov_start[ iteration_context -> chain_total_items -1 ];
+
+	if(iteration_context -> chain_total_items>0){
+		LRMArrayListPush(iteration_context -> chain_used_gaps, NULL+this_gap_start_corr);
+		LRMArrayListPush(iteration_context -> chain_used_gaps, NULL+this_gap_end_corr);
+		//LRMprintf("USED_CHAIN_RANGE ITEMS=%d  : %u ~ %u\n", iteration_context -> chain_total_items, this_gap_start_corr , this_gap_end_corr);
+	}else{
+		//LRMprintf("NO_CHAIN_IS_BUILT\n");
+	}
 }
 
 void LRMfill_gaps_addNM(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, int window_no, int subread_no){
@@ -1188,28 +1114,41 @@ void LRMfill_gaps(LRMcontext_t * context, LRMthread_context_t * thread_context, 
 	if(mapped_length < context->min_matched_bases_in_alignment) iteration_context -> chain_total_items=0;
 }
 
-void LRMdo_dynamic_programming_read( LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context ){
+void LRMreset_iteration_context_before_read_one_alignment(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context){
 	iteration_context -> total_matched_bases = 0;
+	iteration_context -> chain_tolarge_items = 0;
+	iteration_context -> chain_tosmall_items = 0;
+	iteration_context -> chain_total_items = 0;
+	memset(iteration_context -> sorted_window_total_votes, 0, sizeof(int) * LRMMAX_SORTED_WINDOW_NO_HARD_LIMIT);
 	thread_context -> dynamic_programming_indel_movement_start = 1;
 	thread_context -> dynamic_programming_indel_movement_buf[0]='/';
+}
+
+void LRMreset_iteration_context_before_read( LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context ){
+	if(iteration_context -> chain_used_gaps) LRMArrayListDestroy(iteration_context -> chain_used_gaps);
+	iteration_context -> chain_used_gaps = LRMArrayListCreate(40);
+}
+
+void LRMdo_dynamic_programming_read( LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context ){
+	LRMreset_iteration_context_before_read(context , thread_context , iteration_context);
 	LRMcopy_longvotes_to_itr(context, thread_context, iteration_context);
 	LRMmerge_sort(iteration_context, iteration_context -> sorting_total_votes, LRM_longvote_location_compare, LRM_longvote_location_exchange, LRM_longvote_location_merge);
-	LRMfind_top_windows(context, thread_context, iteration_context);
 
-	int ww = 0;
-//	int max_window_no = LRMMAX_SORTED_WINDOW_NO_HARD_LIMIT; 
-//	for(ww = 0; ww < max_window_no ; ww++){
-//	}
-	if(iteration_context -> sorted_window_total_votes [ww] >0){
-		LRMbuild_chains(context, thread_context, iteration_context, ww);
-
-		if(0 && LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0 )
-			LRMprint_longvote(context, thread_context, iteration_context);
-
-		LRMfill_gaps(context, thread_context, iteration_context, ww);
-	}else iteration_context -> chain_total_items = iteration_context -> chain_tosmall_items = iteration_context -> chain_tolarge_items = 0;
-	LRMsave_mapping_result(context, thread_context, iteration_context, ww);
-	//LRMprintf("Finished : %s  Len=%d   %s\n", iteration_context -> read_name, iteration_context -> read_length, thread_context -> final_cigar_string);
+	for(iteration_context -> current_alignment_no = 0; iteration_context -> current_alignment_no < context -> multi_best_read_alignments; iteration_context -> current_alignment_no++){
+		LRMreset_iteration_context_before_read_one_alignment(context , thread_context , iteration_context);
+		LRMfind_top_windows(context, thread_context, iteration_context);
+	
+		int ww = 0;
+		if(iteration_context -> sorted_window_total_votes [ww] >0){
+			LRMbuild_chains(context, thread_context, iteration_context, ww);
+	
+			if(0&& LRMFIXLENstrcmp("R4", iteration_context->read_name) == 0 )
+				LRMprint_longvote(context, thread_context, iteration_context);
+	
+			LRMfill_gaps(context, thread_context, iteration_context, ww);
+		}else iteration_context -> chain_total_items = iteration_context -> chain_tosmall_items = iteration_context -> chain_tolarge_items = 0;
+		LRMsave_mapping_result(context, thread_context, iteration_context, ww);
+	}
 }
 
 int LRMchunk_read_iteration(LRMcontext_t * context, int thread_id, int task){
@@ -1229,6 +1168,8 @@ int LRMchunk_read_iteration(LRMcontext_t * context, int thread_id, int task){
 		if(iteration_context -> read_no_in_chunk % 2000 == 0)
 			LRMprintf("Processing %d-th read for task %d; used %.1f minutes\n", context -> all_processed_reads + iteration_context -> read_no_in_chunk, task, (LRMmiltime() - context -> start_running_time)/60);
 	}
+	if(iteration_context -> chain_used_gaps) LRMArrayListDestroy(iteration_context -> chain_used_gaps);
+	iteration_context -> chain_used_gaps = NULL;
 	free(iteration_context);
 	return 0;
 }

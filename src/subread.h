@@ -184,8 +184,8 @@ typedef short gene_vote_number_t;
 #define GENE_VOTE_SPACE 173 
 #define GENE_VOTE_TABLE_SIZE 331
 #else
-#define GENE_VOTE_SPACE 24 
-#define GENE_VOTE_TABLE_SIZE 30
+#define GENE_VOTE_SPACE 24
+#define GENE_VOTE_TABLE_SIZE 30 
 #endif
 
 #define MAX_ANNOTATION_EXONS 30000 
@@ -267,6 +267,7 @@ typedef struct {
 	struct gehash_bucket * buckets;
 	int index_gap;
 	int padding;
+	char * malloc_ptr;
 } gehash_t;
 
 
@@ -372,35 +373,43 @@ struct thread_input_buffer {
 
 };
 
+#define SEEKGZ_CHAIN_BLOCKS_NO 15 
 #define SEEKGZ_ZLIB_WINDOW_SIZE (32*1024)
 
 
 typedef struct {
-	FILE * gz_fp;
-	char * current_chunk_txt;
-	char * current_chunk_bin;
-	z_stream stem;
-	int current_chunk_txt_size;
-	unsigned int in_pointer;
-	unsigned int in_chunk_offset;
-	unsigned int in_block_offset;
-	//unsigned int txt_buffer_size;
-	unsigned int txt_buffer_used;
 	unsigned long long block_start_in_file_offset;
 	unsigned int block_start_in_file_bits;
 
-	unsigned long long next_block_file_offset;
-	unsigned int next_block_file_bits;
-
-	int is_the_last_chunk;
-	int internal_error;
-
-	unsigned int dict_window_pointer;
-	unsigned int dict_window_used;
-	char dict_window[SEEKGZ_ZLIB_WINDOW_SIZE];
-
+	char block_dict_window[SEEKGZ_ZLIB_WINDOW_SIZE]; // copied from the rolling window before this block is decompressed.
 	unsigned int block_dict_window_size;
-	char block_dict_window[SEEKGZ_ZLIB_WINDOW_SIZE];
+
+	char * block_txt;
+	unsigned int * linebreak_positions;
+	int linebreaks;
+	int block_txt_size;
+} seekable_decompressed_block_t;
+
+typedef struct {
+	FILE * gz_fp;
+	z_stream stem;
+	char * in_zipped_buffer;
+	unsigned int in_zipped_buff_read_ptr;
+
+	unsigned int current_block_txt_read_ptr;
+	int blocks_in_chain;
+	int has_multi_thread_accessed;
+	int block_chain_current_no;
+	seekable_decompressed_block_t block_rolling_chain[SEEKGZ_CHAIN_BLOCKS_NO];
+	
+	int internal_error;
+	subread_lock_t write_lock;
+
+	unsigned int rolling_dict_window_used;
+	char rolling_dict_window[SEEKGZ_ZLIB_WINDOW_SIZE];
+
+	unsigned long long next_block_file_offset; // for the next block after ALL blocks in the chain
+	unsigned int next_block_file_bits;  // for the next block after ALL blocks in the chain
 } seekable_zfile_t;
 
 typedef struct{

@@ -118,6 +118,23 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 			free(ret);
 			return NULL;
 		}
+
+		ret -> header_length = 0;
+		char nch0=-1, nchold=-1;
+
+		while(!feof(ret -> os_file)){
+			nchold = nch0;
+			nch0=fgetc(ret -> os_file);
+
+			if(nchold=='\n' && nch0!='@') break;
+
+			if(nch0!='@' && ret -> header_length == 0){
+				ret -> header_length = 0;
+				break;
+			}
+			ret -> header_length++;
+		}
+		//SUBREADprintf("The SAM header has %d bytes\n", ret -> header_length);
 		fseek(ret -> os_file,0,SEEK_SET);
 	}
 	else

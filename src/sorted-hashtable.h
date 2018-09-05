@@ -27,8 +27,7 @@
 #include "gene-value-index.h"
 
 #define GEHASH_DEFAULT_SIZE	2000000000
-#define GEHASH_BUCKET_LENGTH	2291
-
+#define GEHASH_BUCKET_LENGTH 100
 
 #define gehash_fast_t gehash_t
 #define gehash_destory_fast gehash_destory
@@ -58,11 +57,11 @@ size_t gehash_get(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_r
 int gehash_exist(gehash_t * the_table, gehash_key_t key);
 
 
-size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
+size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, unsigned int low_border, unsigned int high_border);
 
 size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote, gene_vote_number_t weight, gene_quality_score_t quality, int max_match_number, int indel_tolerance, int subread_number,int max_error_bases, int subread_len, unsigned int low_border, unsigned int high_border);
 
-size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_quality_score_t quality, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border);
+size_t gehash_go_q(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border);
 
 // This function performs the same functionality, but runs only on AMD-64 cpus, and the length of each key must be 4 bytes.
 size_t gehash_get_hpc(gehash_t * the_table, gehash_key_t key, gehash_data_t * data_result, size_t max_result_space);

@@ -356,21 +356,26 @@ int show_summary(global_context_t * global_context)
 	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "");
 	print_in_box(80, 1,1,"Summary");
 	print_in_box(80, 0,1,"");
-	print_in_box(80, 0,0,"          Processed : %'llu %s" , global_context -> all_processed_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads");
-	print_in_box(81, 0,0,"             Mapped : %'u %s (%.1f%%%%), wherein", global_context -> all_mapped_reads, global_context->input_reads.is_paired_end_reads?"fragments":"reads" ,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
+
+    if(global_context->input_reads.is_paired_end_reads)
+	print_in_box(80, 0,0,"    Total fragments : %'llu" , global_context -> all_processed_reads);
+    else
+	print_in_box(80, 0,0,"        Total reads : %'llu" , global_context -> all_processed_reads);
+
+	print_in_box(81, 0,0,"             Mapped : %'u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
 	print_in_box(80, 0,0,"    Uniquely mapped : %'u",  global_context -> all_uniquely_mapped_reads);
 	print_in_box(80, 0,0,"      Multi-mapping : %'u",  global_context -> all_multimapping_reads);
 	print_in_box(80, 0,1,"");
-	print_in_box(80, 0,0,"         Not mapped : %'u",  global_context -> all_unmapped_reads);
+	print_in_box(80, 0,0,"           Unmapped : %'u",  global_context -> all_unmapped_reads);
 	if(global_context->input_reads.is_paired_end_reads){
 		print_in_box(80, 0,1,"");
-	        print_in_box(80, 0,0,"   Correctly paired : %'llu fragments", global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"   Correctly paired : %'llu fragments", global_context -> all_correct_PE_reads);
 		print_in_box(80, 0,0,"Not mapped in pairs : %'llu fragments, wherein", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
-	        print_in_box(80, 0,0,"Only one end mapped : %'u fragments", global_context -> not_properly_pairs_only_one_end_mapped);
+		print_in_box(80, 0,0,"Only one end mapped : %'u fragments", global_context -> not_properly_pairs_only_one_end_mapped);
 		print_in_box(80, 0,0,"  Multi-chromosomes : %'u fragments", global_context -> not_properly_pairs_different_chro);
 		print_in_box(80, 0,0,"  Different strands : %'u fragments", global_context -> not_properly_different_strands);
-	        print_in_box(80, 0,0," Not in PE distance : %'u fragments", global_context -> not_properly_pairs_TLEN_wrong);
-	        print_in_box(80, 0,0,"     Abnormal order : %'u fragments", global_context -> not_properly_pairs_wrong_arrangement);
+	 	print_in_box(80, 0,0," Not in PE distance : %'u fragments", global_context -> not_properly_pairs_TLEN_wrong);
+	 	print_in_box(80, 0,0,"     Abnormal order : %'u fragments", global_context -> not_properly_pairs_wrong_arrangement);
 	}
 
 	print_in_box(80, 0,1,"");
@@ -998,6 +1003,9 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 	int is_second_R1, is_second_R2;
 	subread_read_number_t this_number = -1;
 
+	geinput_preload_buffer(ginp1, &global_context -> input_reads.input_lock);
+	if(ginp2) geinput_preload_buffer(ginp2, &global_context -> input_reads.input_lock);
+
 	subread_lock_occupy(&global_context -> input_reads.input_lock); 
 	if(global_context -> running_processed_reads_in_chunk < global_context -> config.reads_per_chunk)
 	{
@@ -1033,6 +1041,10 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 			}
 			if(rl1 <= 0 || (rl2 <= 0 && ginp2)) break;
 		} while(is_second_R1||is_second_R2) ;
+
+
+		//SUBREADprintf("IMBRL1=%d\tRL2=%d\n", rl1, rl2);
+		//
 		if(rl1 >0 || (rl2 > 0 && ginp2)){
 			this_number = global_context -> running_processed_reads_in_chunk;
 			global_context -> running_processed_reads_in_chunk ++;
@@ -1040,14 +1052,17 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 	}
 	subread_lock_release(&global_context -> input_reads.input_lock); 
 
-	if( global_context->config.space_type == GENE_SPACE_COLOR)
-	{
+	if( global_context->config.space_type == GENE_SPACE_COLOR) {
 		rl1-=1;rl2-=1;
 	}
 
-
-	if(rl1>0 && (rl2>0 || !ginp2) && this_number>=0)
-	{
+	if(ginp2 && rl1 * rl2 <=0 && (rl1>0 || rl2>0)){
+		if(!global_context-> input_reads.is_internal_error)
+			SUBREADprintf("\nERROR: two input files have different amounts of reads!\nThe program has to terminate and no alignment results were generated!\n\n");
+		global_context-> input_reads.is_internal_error = 1;
+		*read_no_in_chunk = -1;
+		return 1;
+	} else if(rl1>0 && (rl2>0 || !ginp2) && this_number>=0) {
 		if(global_context->config.is_first_read_reversed)
 		{
 			reverse_read(read_text_1, rl1, global_context->config.space_type);
@@ -1067,8 +1082,8 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 		if(ginp2)
 			*read_len_2 = rl2;
 		return 0;
-	}
-	else{
+	} else {
+		// normally finished
 		*read_no_in_chunk = -1;
 		return 1;
 	}
@@ -1080,8 +1095,7 @@ int write_final_results(global_context_t * context)
 	if((context ->  config.do_fusion_detection || context ->  config.do_long_del_detection) && context -> config.do_structural_variance_detection)
 		finalise_structural_variances(context);
 
-	if(context -> config.output_prefix[0])
-	{
+	if(context -> config.output_prefix[0] && 0==context -> input_reads.is_internal_error && !(context -> config.is_BAM_output && context -> output_bam_writer -> is_internal_error) ) {
 		write_indel_final_results(context);
 
 		if(context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && (context -> config.prefer_donor_receptor_junctions||!(context ->  config.do_fusion_detection || context ->  config.do_long_del_detection)))
@@ -1946,25 +1960,25 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 	}
 
 	char extra_additional_1 [1000+CORE_ADDITIONAL_INFO_LENGTH], extra_additional_2[1000+CORE_ADDITIONAL_INFO_LENGTH];
+	int extra_additional_1_ptr=0, extra_additional_2_ptr=0;
 
-	extra_additional_1[0]=0;
-	extra_additional_2[0]=0;
+	extra_additional_1[0] = extra_additional_2[0]=0;
 
 	if(is_R1_OK || is_R2_OK){	// no NH and HI only if both ends are unmapped.
-		snprintf(extra_additional_1, 310, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
-		snprintf(extra_additional_2, 310, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+		extra_additional_1_ptr +=snprintf(extra_additional_1, 310, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
+		extra_additional_2_ptr +=snprintf(extra_additional_2, 310, "HI:i:%d\tNH:i:%d", current_location+1, all_locations);
 	}
 
 	if(global_context->config.read_group_id[0])
 	{
-		snprintf(extra_additional_1+strlen(extra_additional_1), 310, "\tRG:Z:%s", global_context->config.read_group_id);
-		snprintf(extra_additional_2+strlen(extra_additional_2), 310, "\tRG:Z:%s", global_context->config.read_group_id);
+		extra_additional_1_ptr += snprintf(extra_additional_1+ extra_additional_1_ptr, 310, "\tRG:Z:%s", global_context->config.read_group_id);
+		extra_additional_2_ptr += snprintf(extra_additional_2+ extra_additional_2_ptr, 310, "\tRG:Z:%s", global_context->config.read_group_id);
 	}
 
 	char * out_chro1, * out_chro2, *out_cigar1, *out_cigar2;
 	if(is_R1_OK)
 	{
-		strcat(extra_additional_1, rec1->additional_information);
+		strcpy(extra_additional_1 + extra_additional_1_ptr, rec1->additional_information);
 		out_chro1 = rec1->chro;
 		out_cigar1 = rec1->cigar;
 	}
@@ -1976,7 +1990,7 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 
 	if(is_R2_OK)
 	{
-		strcat(extra_additional_2, rec2->additional_information);
+		strcpy(extra_additional_2 + extra_additional_2_ptr, rec2->additional_information);
 		out_chro2 = rec2->chro;
 		out_cigar2 = rec2->cigar;
 	}
@@ -2151,79 +2165,7 @@ int locate_current_value_index(global_context_t * global_context, thread_context
 
 int do_iteration_one(global_context_t * global_context, thread_context_t * thread_context)
 {
-	gene_input_t * ginp1 = NULL , * ginp2 = NULL;
-	subread_read_number_t current_read_number=0;
-	char read_text_1[MAX_READ_LENGTH+1], read_text_2[MAX_READ_LENGTH+1];
-	char qual_text_1[MAX_READ_LENGTH+1], qual_text_2[MAX_READ_LENGTH+1];
-	char read_name_1[MAX_READ_NAME_LEN+1], read_name_2[MAX_READ_NAME_LEN+1];
-	int read_len_1, read_len_2=0;
-	int need_junction_step = global_context -> config.do_breakpoint_detection || global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection;
-	int sqr_interval, sqr_read_number = 0;
-
-	init_chunk_scanning_parameters(global_context,thread_context, & ginp1, & ginp2);
-	sqr_interval = max(5000,global_context -> processed_reads_in_chunk/10/ global_context -> config.all_threads);
-
-	if(0) while(1)
-	{
-		int is_second_read;
-
-		sqr_read_number++;
-		fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 1, &current_read_number);
-
-		for (is_second_read = 0; is_second_read < 1 + global_context -> input_reads.is_paired_end_reads; is_second_read ++)
-		{
-			int best_read_id, is_reversed_already = 0;
-			for(best_read_id = 0; best_read_id < global_context -> config.multi_best_reads; best_read_id++)
-			{
-				mapping_result_t *current_result = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, best_read_id); 
-
-				if(current_result -> selected_votes<1) break;
-				//if(!global_context->config.report_multi_mapping_reads)if(current_result -> result_flags & CORE_IS_BREAKEVEN) continue;
-
-				char * current_read =  is_second_read?read_text_2 : read_text_1;
-				char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
-				char * current_read_name = is_second_read?read_name_2:read_name_1;
-				int current_rlen = is_second_read?read_len_2:read_len_1;
-
-				if(current_result->selected_votes < global_context->config.minimum_subread_for_first_read)
-					continue;
-				int is_negative_strand = (current_result  -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
-
-				if(is_negative_strand + is_reversed_already == 1)
-				{
-					reverse_read(current_read, current_rlen ,  global_context->config.space_type);
-					reverse_quality(current_qual, current_rlen);
-					is_reversed_already = !is_reversed_already;
-				}
-
-				if(locate_current_value_index(global_context, thread_context, current_result, current_rlen))
-				{
-				//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR, "Read position excesses index boundary : %u (%s : %s). V=%d", current_result -> selected_position, current_read_name, is_second_read?"SECOND":"FIRST", current_result -> selected_votes);
-					continue;
-				}
-
-				// DISABLED
-				find_new_indels(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
-				if(need_junction_step)
-					find_new_junctions(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
-			}
-		}
-		
-		if(!thread_context || thread_context->thread_id == 0)
-		{
-			if(sqr_read_number > sqr_interval)	
-			{
-				show_progress(global_context, thread_context, current_read_number, STEP_ITERATION_ONE);
-				sqr_read_number = 0;
-			}
-		}
-
-		//bigtable_release_result(global_context, thread_context, current_read_number, 1);
-
-	}
-
-
-
+	assert(0); // not needed anymore
 	return 0;
 }
 
@@ -2557,7 +2499,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				fastq_64_to_33(raw_qual_text_2);
 		}
 
-		if((global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) || 
+		if((global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) ||  global_context -> input_reads.is_internal_error || 
 		   (global_context -> output_sam_is_full))break;
 		if(current_read_number < 0) break;
 
@@ -2637,9 +2579,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				unsigned int final_alignments = explain_read(global_context, thread_context , final_realignments + (is_second_read + 2 * best_read_id) * MAX_ALIGNMENT_PER_ANCHOR,
 							   current_read_number, current_rlen, current_read_name, current_read, current_qual, is_second_read, best_read_id, is_negative_strand);
 
-				if(0 && FIXLENstrcmp("R010442852", read_name_1)==0)
-					SUBREADprintf("Final alignments of %s [R%d] =%d, cand = %d , FLAG=%d,  final_MATCH=%d\n", read_name_1, is_second_read +1, final_alignments , (* current_candidate_locations), current_result -> result_flags & CORE_IS_FULLY_EXPLAINED , final_realignments[0].final_matched_bases);
-
 				final_realignment_number[ best_read_id * 2 + is_second_read ] = final_alignments;
 
 				for(realignment_i = 0 ; realignment_i < final_alignments ; realignment_i ++){
@@ -2662,19 +2601,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				//#warning ">>>>>>> COMMENT THIS <<<<<<<"
 				//printf("OCT27-FI-%s:%d-ALN%02d-THRE %d\n", current_read_name, is_second_read + 1, best_read_id, thread_context -> thread_id);
 			}
-		}
-
-		//#warning ">>>>>>> COMMENT THIS <<<<<<<"
-		//printf("OCT27-FIND-%s-THRE %d ; cand locs = %d , %d\n", read_name_1, thread_context -> thread_id, r1_candidate_locations, r2_candidate_locations );
-		//if(0 && FIXLENstrcmp("R000000359", read_name_1)==0)
-		//#warning ">>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<"
-		if(0){
-			printf("OCT27-STEPMSM %s %d (%d), %d (%d)\n", read_name_1, r1_candidate_locations, r1_candidate_locations? final_MATCH_buffer1[0]:-9999 , r2_candidate_locations, r2_candidate_locations?final_MATCH_buffer2[0]:-9999);
-			int xxx1;
-			for(xxx1=0; xxx1<r1_candidate_locations; xxx1++)
-				printf("OCT27-STEPMSM-R1 %s [%02d] %d\n", read_name_1, xxx1, final_MATCH_buffer1[xxx1]);
-			for(xxx1=0; xxx1<r2_candidate_locations; xxx1++)
-				printf("OCT27-STEPMSM-R2 %s [%02d] %d\n", read_name_1, xxx1, final_MATCH_buffer2[xxx1]);
 		}
 
 		//if(161430 <= current_read_number) SUBREADprintf("LOC1=%d, LOC2=%d\n", r1_candidate_locations, r2_candidate_locations);
@@ -2709,13 +2635,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						}else{
 							unsigned int skip = 0; int is_exonic_regions = 1;
 							if(global_context -> exonic_region_bitmap)calc_end_pos(current_realignment_result -> first_base_position, current_realignment_result -> cigar_string, &skip, &is_exonic_regions, global_context  );
-
-							int weight = is_exonic_regions?3000:1000;
-
-							if(1) weight = 1;
-
 							this_SCORE = (100000llu * (10000 - this_MISMATCH) + this_MATCH)*50llu + current_realignment_result -> known_junction_supp;
-							this_SCORE *= weight;
 						}
 
 
@@ -3098,23 +3018,23 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			{
 				gene_vote_t * current_vote = is_second_read?vote_2: vote_1;
 				char * current_read =  is_second_read?read_text_2 : read_text_1;
-				char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
 				int current_rlen = is_second_read?read_len_2:read_len_1;
 				int subread_step;
 				if(current_rlen< 16) continue;
+				int CR15GLS = (current_rlen - 15 - GENE_SLIDING_STEP)<<16;
 				if(current_rlen<= EXON_LONG_READ_LENGTH)
 				{
-					subread_step = (((current_rlen - 15 - GENE_SLIDING_STEP)<<16))/(global_context -> config.total_subreads -1);
+					subread_step =  CR15GLS /(global_context -> config.total_subreads -1);
 					if(subread_step<(GENE_SLIDING_STEP<<16))subread_step = GENE_SLIDING_STEP<<16;
 				}else{
 					subread_step = 6<<16;
-					if(((current_rlen - 15-GENE_SLIDING_STEP)<<16) / subread_step > 62)
-						subread_step = ((current_rlen - 15-GENE_SLIDING_STEP)<<16)/62;
+					if( CR15GLS / subread_step > 62)
+						subread_step = CR15GLS/62;
 				}
 
 				int noninformative_subreads_for_each_gap[GENE_SLIDING_STEP];
 
-				applied_subreads = 1 + ((current_rlen - 15-GENE_SLIDING_STEP)<<16) / subread_step;
+				applied_subreads = 1 + CR15GLS / subread_step;
 				if(is_second_read) v2_all_subreads = applied_subreads;
 				else	 v1_all_subreads = applied_subreads;
 
@@ -3123,8 +3043,11 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				unsigned int current_high_border = high_index_border -  current_rlen;
 
 				if(global_context->config.do_breakpoint_detection && current_rlen > EXON_LONG_READ_LENGTH)//&& global_context->config.all_threads<2)
+				{
+					char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
 					core_fragile_junction_voting(global_context, thread_context, read_name_1, current_read, current_qual, current_rlen, is_reversed, global_context->config.space_type, low_index_border, current_high_border, vote_fg);
 
+				}
 				if(global_context->config.SAM_extra_columns)
 				{
 					for(xk1=0;xk1<GENE_SLIDING_STEP;xk1++)
@@ -3145,24 +3068,17 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						if(GENE_SLIDING_STEP > 1)
 							subread_offset -= subread_offset%(GENE_SLIDING_STEP) - xk1; 
 
-						int subread_quality = 1;
 						char * subread_string = current_read + subread_offset;
 
 						gehash_key_t subread_integer = genekey2int(subread_string, global_context->config.space_type);
 
 						if(global_context->config.is_methylation_reads)
-							gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, subread_quality, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
+							gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
 						else
-							gehash_go_q(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, subread_quality, voting_max_indel_length, subread_no,  low_index_border, current_high_border);
-
-
+							gehash_go_q(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,voting_max_indel_length, subread_no,  low_index_border, current_high_border);
 
 						if(global_context->config.SAM_extra_columns)
-						{
 							noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
-						}
-
-
 					}
 					//SUBREADprintf(",");
 				}
@@ -3191,7 +3107,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
-				if(0)if(1||FIXLENstrcmp("simulated.603514/", read_name_1) ==0 || FIXLENstrcmp("simulated.1613132", read_name_1) ==0 ) {
+				if(0){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
@@ -3218,23 +3134,13 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed == 0)
 			{
 				reverse_read(read_text_1, read_len_1,  global_context->config.space_type);
-				reverse_quality(qual_text_1, read_len_1);
+				if(0)reverse_quality(qual_text_1, read_len_1); // qual is not used at all.
 
-				if(global_context -> input_reads.is_paired_end_reads)
-				{
+				if(global_context -> input_reads.is_paired_end_reads){
 					reverse_read(read_text_2, read_len_2,  global_context->config.space_type);
-					reverse_quality(qual_text_2, read_len_2);
+					if(0)reverse_quality(qual_text_2, read_len_2);  // qual is not used at all.
 				}
 			}
-			else if(0)
-			{
-				mapping_result_t * current_result_1  = _global_retrieve_alignment_ptr (global_context, current_read_number, 0,0);
-				mapping_result_t * current_result_2  = _global_retrieve_alignment_ptr (global_context, current_read_number, 1,0);
-
-				SUBREADprintf("FIN R %s : V=%d , %d",read_name_1, current_result_1 -> selected_votes, current_result_2 -> selected_votes);
-			}
-
-
 		}
 
 		int read_1_reversed = 1;
@@ -3315,6 +3221,32 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	return 0;
 }
 
+void subread_init_topKbuff(global_context_t * global_context, topK_buffer_t * topKbuff){
+	topKbuff -> vote_simple_1_buffer = malloc(global_context -> config.max_vote_simples * sizeof(simple_mapping_t));
+	topKbuff -> vote_simple_2_buffer = malloc(global_context -> config.max_vote_simples * sizeof(simple_mapping_t));
+
+	topKbuff -> junction_tmp_r1 = malloc(sizeof(subjunc_result_t) * global_context->config.multi_best_reads);
+	topKbuff -> junction_tmp_r2 = malloc(sizeof(subjunc_result_t) * global_context->config.multi_best_reads);
+
+	topKbuff -> alignment_tmp_r1 = malloc(sizeof(mapping_result_t) * global_context->config.multi_best_reads);
+	topKbuff -> alignment_tmp_r2 = malloc(sizeof(mapping_result_t) * global_context->config.multi_best_reads);
+
+	topKbuff -> comb_buffer = malloc(global_context -> config.max_vote_combinations * sizeof(vote_combination_t));
+}
+
+void subread_free_topKbuff(global_context_t * global_context, topK_buffer_t * topKbuff){
+	
+    free(topKbuff ->junction_tmp_r1);
+    free(topKbuff ->junction_tmp_r2);
+    free(topKbuff ->alignment_tmp_r1);
+    free(topKbuff ->alignment_tmp_r2);
+    free(topKbuff ->comb_buffer);
+    free(topKbuff ->vote_simple_1_buffer);
+    free(topKbuff ->vote_simple_2_buffer);
+}
+
+
+
 void * run_in_thread(void * pthread_param)
 {
 	void ** parameters = (void **)pthread_param;
@@ -3332,9 +3264,6 @@ void * run_in_thread(void * pthread_param)
 	{
 		case STEP_VOTING:
 			*ret_value_pointer = do_voting(global_context, thread_context);
-		break;
-		case STEP_ITERATION_ONE:
-			*ret_value_pointer = do_iteration_one(global_context, thread_context);
 		break;
 		case STEP_ITERATION_TWO:
 			*ret_value_pointer = do_iteration_two(global_context, thread_context);
@@ -3385,6 +3314,8 @@ int run_maybe_threads(global_context_t *global_context, int task)
 			if((global_context->config.do_breakpoint_detection || global_context-> config.do_fusion_detection || global_context->config.do_breakpoint_detection || global_context-> config.do_long_del_detection))
 				init_junction_thread_contexts(global_context, thread_contexts+current_thread_no, task);
 
+			if(STEP_VOTING == task) subread_init_topKbuff(global_context,&thread_contexts[current_thread_no].topKbuff);
+
 			subread_lock_occupy(&global_context -> thread_initial_lock);
 			thr_parameters[0] = global_context;
 			thr_parameters[1] = thread_contexts+current_thread_no;
@@ -3411,6 +3342,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 				global_context -> all_uniquely_mapped_reads += thread_contexts[current_thread_no].all_uniquely_mapped_reads;
 
 			}
+			if(STEP_VOTING == task) subread_free_topKbuff(global_context,&thread_contexts[current_thread_no].topKbuff);
 			ret_value += *(ret_values + current_thread_no);
 			if(ret_value)break;
 		}
@@ -3595,7 +3527,7 @@ int read_chunk_circles(global_context_t *global_context)
 		if(ret) return ret;
 
 		if(global_context -> processed_reads_in_chunk < global_context->config.reads_per_chunk ||
-		  (global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) || 
+		  (global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) || global_context -> input_reads.is_internal_error  || 
 		  (global_context -> output_sam_is_full))
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			// the indexes will be destroyed in destroy_global_context
@@ -3677,34 +3609,39 @@ int print_configuration(global_context_t * context)
 	        print_in_box(80, 0, 0, "Output method : STDOUT (%s)" , context->config.is_BAM_output?"BAM":"SAM");
 
 	print_in_box(80, 0, 0,         "Index name    : %s", get_short_fname(context->config.index_prefix));
-	if(context->config.exon_annotation_file[0])
-		print_in_box(80, 0, 0,         "Annotations   : %s (%s)",get_short_fname( context->config.exon_annotation_file), context->config.exon_annotation_file_type==FILE_TYPE_GTF?"GTF":"SAF");
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 0, 1, "------------------------------------");
 	print_in_box(80, 0, 0, "");
-	print_in_box(80, 0, 0, "                      Threads : %d", context->config.all_threads);
-	print_in_box(80, 0, 0, "                 Phred offset : %d", (context->config.phred_score_format == FASTQ_PHRED33)?33:64);
+	print_in_box(80, 0, 0, "                              Threads : %d", context->config.all_threads);
+	print_in_box(80, 0, 0, "                         Phred offset : %d", (context->config.phred_score_format == FASTQ_PHRED33)?33:64);
 	if( context->config.second_read_file[0])
 	{
-	print_in_box(80, 0, 0, "      # of extracted subreads : %d", context->config.total_subreads);
-	print_in_box(80, 0, 0, "               Min read1 vote : %d", context->config.minimum_subread_for_first_read);
-	print_in_box(80, 0, 0, "               Min read2 vote : %d", context->config.minimum_subread_for_second_read);
-	print_in_box(80, 0, 0, "            Max fragment size : %d", context->config.maximum_pair_distance);
-	print_in_box(80, 0, 0, "            Min fragment size : %d", context->config.minimum_pair_distance);
+	print_in_box(80, 0, 0, "              # of extracted subreads : %d", context->config.total_subreads);
+	print_in_box(80, 0, 0, "                       Min read1 vote : %d", context->config.minimum_subread_for_first_read);
+	print_in_box(80, 0, 0, "                       Min read2 vote : %d", context->config.minimum_subread_for_second_read);
+	print_in_box(80, 0, 0, "                    Max fragment size : %d", context->config.maximum_pair_distance);
+	print_in_box(80, 0, 0, "                    Min fragment size : %d", context->config.minimum_pair_distance);
 	}
 	else
-	print_in_box(80, 0, 0, "                    Min votes : %d / %d", context->config.minimum_subread_for_first_read, context->config.total_subreads);
+	print_in_box(80, 0, 0, "                            Min votes : %d / %d", context->config.minimum_subread_for_first_read, context->config.total_subreads);
 
-	print_in_box(80, 0, 0, "   Maximum allowed mismatches : %d", context->config.max_mismatch_exonic_reads);
-	print_in_box(80, 0, 0, "  Maximum allowed indel bases : %d", context->config.max_indel_length);
-	print_in_box(80, 0, 0, "# of best alignments reported : %d", context->config.multi_best_reads);
-	print_in_box(80, 0, 0, "               Unique mapping : %s", context->config.report_multi_mapping_reads?"no":"yes");
+	print_in_box(80, 0, 0, "                       Max mismatches : %d", context->config.max_mismatch_exonic_reads);
+	print_in_box(80, 0, 0, "                     Max indel length : %d", context->config.max_indel_length);
+	print_in_box(80, 0, 0, "           Report multi-mapping reads : %s", context->config.report_multi_mapping_reads?"yes":"no");
+	print_in_box(80, 0, 0, "Max alignments per multi-mapping read : %d", context->config.multi_best_reads);
+
+	if(context->config.exon_annotation_file[0]){
+	if(context->config.exon_annotation_file_screen_out[0])
+	print_in_box(80, 0, 0, "                          Annotations : %s", context->config.exon_annotation_file_screen_out);
+	else
+	print_in_box(80, 0, 0, "                          Annotations : %s (%s)",get_short_fname( context->config.exon_annotation_file), context->config.exon_annotation_file_type==FILE_TYPE_GTF?"GTF":"SAF");
+	}
 
 	if(context->config.max_insertion_at_junctions)
-	print_in_box(80, 0, 0, "           Insertions at junc : %d", context->config.max_insertion_at_junctions);
+	print_in_box(80, 0, 0, "                   Insertions at junc : %d", context->config.max_insertion_at_junctions);
 
 	if(context->config.read_group_id[0])
-	print_in_box(80, 0, 0, "              Read group name : %s", context->config.read_group_id);
+	print_in_box(80, 0, 0, "                      Read group name : %s", context->config.read_group_id);
 
 	print_in_box(80, 0, 1, "");
 	print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
@@ -3764,12 +3701,15 @@ int init_paired_votes(global_context_t *context)
 
 void write_sam_headers(global_context_t * context)
 {
+	char *  sorting_str = context -> config.sort_reads_by_coordinates?"coordinate":"unsorted";
 	if(context -> config.is_BAM_output)
 	{
-		SamBam_writer_add_header(context -> output_bam_writer,"@HD\tVN:1.0\tSO:unsorted", 0);
+		char header_buff[100];
+		sprintf(header_buff, "@HD\tVN:1.0\tSO:%s", sorting_str);
+		SamBam_writer_add_header(context -> output_bam_writer, header_buff, 0);
 		int xk1;
 		int last_offset = 0;
-		char obuf[1000];
+		char * obuf = malloc(1000+5000);
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
 		{
 			int seq_len = FETCH_SEQ_LEN(x1);
@@ -3784,13 +3724,14 @@ void write_sam_headers(global_context_t * context)
 			snprintf(obuf,620, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
 			SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		}
-		snprintf(obuf,299, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
+		snprintf(obuf,299+4900, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
 		SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		SamBam_writer_finish_header(context -> output_bam_writer);
+		free(obuf);
 	}
 	else
 	{
-		sambamout_fprintf(context -> output_sam_fp, "@HD\tVN:1.0\tSO:unsorted\n");
+		sambamout_fprintf(context -> output_sam_fp, "@HD\tVN:1.0\tSO:%s\n", sorting_str);
 		int xk1;
 		int last_offset = 0;
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
@@ -3908,8 +3849,7 @@ int load_global_context(global_context_t * context)
 	}
 
 	subread_init_lock(&context->input_reads.input_lock);
-	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1))
-	{
+	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1)) {
 		//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
 		return -1;
 	}
@@ -4067,6 +4007,7 @@ int load_global_context(global_context_t * context)
 	// ====== init other variables ======
 	if(context -> config.all_threads>1)
 		subread_init_lock(&context -> thread_initial_lock);
+	else subread_init_topKbuff(context, &context -> topKbuff);
 
 	if(init_paired_votes(context))
 	{
@@ -4085,9 +4026,6 @@ int load_global_context(global_context_t * context)
 	} else context -> exonic_region_bitmap = NULL;
 	return 0;
 }
-
-
-
 
 
 int init_modules(global_context_t * context)
@@ -4118,8 +4056,10 @@ int destroy_global_context(global_context_t * context)
 	for(block_no = 0; block_no< context->index_block_number; block_no++)
 		gvindex_destory(&context -> all_value_indexes[block_no]);
 
-	if(context->output_sam_fp)
-	{
+	if(context->config.all_threads<2){
+		subread_free_topKbuff( context,&context -> topKbuff );
+	}
+	if(context->output_sam_fp) {
 		if(context -> output_sam_is_full){
 			unlink(context->config.output_prefix);
 			SUBREADprintf("\nERROR: cannot finish the SAM file! Please check the disk space in the output directory.\nNo output file was generated.\n");
@@ -4127,8 +4067,13 @@ int destroy_global_context(global_context_t * context)
 		}
 		fclose(context -> output_sam_fp);
 	}
-	if(context->output_bam_writer)
-	{
+
+	if(context->input_reads.is_internal_error){
+		unlink(context->config.output_prefix);
+		return 1;
+	}
+
+	if(context->output_bam_writer) {
 		SamBam_writer_close(context->output_bam_writer);
 		if(context->output_bam_writer -> is_internal_error){
 			unlink(context->config.output_prefix);
@@ -4567,9 +4512,8 @@ void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * 
 	pivot = spot_high;
 	i = spot_low;
 
-	for(j = spot_low; j < spot_high; j++)
-		if(compare(arr, j, pivot)<=0)
-		{
+	for(j = spot_low+1; j < spot_high; j++)
+		if(compare(arr, j, pivot)<=0) {
 			exchange(arr,i,j);
 			i++;
 		}
@@ -4684,26 +4628,27 @@ void test_PE_and_same_chro(global_context_t * global_context , unsigned int pos1
  	char * r1_chr, * r2_chr;
 	int r1_pos, r2_pos;
 
-	locate_gene_position(pos1, &global_context -> chromosome_table, & r1_chr, & r1_pos);
-	locate_gene_position(pos2, &global_context -> chromosome_table, & r2_chr, & r2_pos);
-
 	(*is_same_chromosome) = 0;
 	(*is_PE_distance) = 0;
 
-	long long tlen = r1_pos;
-	tlen  -= r2_pos;
-	tlen = abs(tlen);
-	tlen += (r1_pos > r2_pos)?read_len_1:read_len_2;
-	unsigned int tlenI = (unsigned int) tlen;
+	int re1 = locate_gene_position(pos1, &global_context -> chromosome_table, & r1_chr, & r1_pos);
+	int re2 = locate_gene_position(pos2, &global_context -> chromosome_table, & r2_chr, & r2_pos);
 
-	//SUBREADprintf("TEST PE: %p == %p , TLEN=%u\n", r1_chr, r2_chr, tlenI);
+	if(re1 ==0 && 0 ==re2) {
+		long long tlen = r1_pos;
+		tlen  -= r2_pos;
+		tlen = abs(tlen);
+		tlen += (r1_pos > r2_pos)?read_len_1:read_len_2;
+		unsigned int tlenI = (unsigned int) tlen;
 
-	if(r1_chr == r2_chr){
-		(*is_same_chromosome) = 1;
-		if(tlenI >= global_context -> config.minimum_pair_distance && tlenI <= global_context -> config.maximum_pair_distance)
-			(* is_PE_distance) = 1;
+		//SUBREADprintf("TEST PE: %p == %p , TLEN=%u\n", r1_chr, r2_chr, tlenI);
+
+		if(r1_chr == r2_chr){
+			(*is_same_chromosome) = 1;
+			if(tlenI >= global_context -> config.minimum_pair_distance && tlenI <= global_context -> config.maximum_pair_distance)
+				(* is_PE_distance) = 1;
+		}
 	}
-
 }
 
 int FIXLENstrcmp(char * flen, char * rname){
