@@ -4123,7 +4123,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	HashTableSetKeyComparisonFunction(global_context -> GCcontent_table, fc_strcmp_chro);
 
 	if(annotation_file_screen_output) strcpy(global_context -> annotation_file_screen_output, annotation_file_screen_output);
-	else annotation_file_screen_output[0]=0;
+	else global_context ->annotation_file_screen_output[0]=0;
 
 	if(alias_file_name && alias_file_name[0])
 	{

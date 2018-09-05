@@ -369,13 +369,13 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 0,0,"           Unmapped : %'u",  global_context -> all_unmapped_reads);
 	if(global_context->input_reads.is_paired_end_reads){
 		print_in_box(80, 0,1,"");
-		print_in_box(80, 0,0,"   Correctly paired : %'llu fragments", global_context -> all_correct_PE_reads);
-		print_in_box(80, 0,0,"Not mapped in pairs : %'llu fragments, wherein", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
-		print_in_box(80, 0,0,"Only one end mapped : %'u fragments", global_context -> not_properly_pairs_only_one_end_mapped);
-		print_in_box(80, 0,0,"  Multi-chromosomes : %'u fragments", global_context -> not_properly_pairs_different_chro);
-		print_in_box(80, 0,0,"  Different strands : %'u fragments", global_context -> not_properly_different_strands);
-	 	print_in_box(80, 0,0," Not in PE distance : %'u fragments", global_context -> not_properly_pairs_TLEN_wrong);
-	 	print_in_box(80, 0,0,"     Abnormal order : %'u fragments", global_context -> not_properly_pairs_wrong_arrangement);
+		print_in_box(80, 0,0,"   Correctly paired : %'llu", global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"Not mapped in pairs : %'llu", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"Only one end mapped : %'u", global_context -> not_properly_pairs_only_one_end_mapped);
+		print_in_box(80, 0,0,"  Multi-chromosomes : %'u", global_context -> not_properly_pairs_different_chro);
+		print_in_box(80, 0,0,"  Different strands : %'u", global_context -> not_properly_different_strands);
+	 	print_in_box(80, 0,0," Not in PE distance : %'u", global_context -> not_properly_pairs_TLEN_wrong);
+	 	print_in_box(80, 0,0,"     Abnormal order : %'u", global_context -> not_properly_pairs_wrong_arrangement);
 	}
 
 	print_in_box(80, 0,1,"");

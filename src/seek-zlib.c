@@ -415,7 +415,7 @@ int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 	int line_write_ptr = 0, is_end_line = 0;
 	while(1){
 		int consumed_bytes;
-		if(fp -> blocks_in_chain<1) seekgz_load_more_blocks(fp, 5000, NULL);
+		if(fp -> blocks_in_chain<1 && !seekgz_eof(fp)) seekgz_load_more_blocks(fp, 5000, NULL);
 
 		seekable_decompressed_block_t *cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
 		if( cblk -> linebreaks >0 && fp-> current_block_txt_read_ptr <= cblk->linebreak_positions[cblk -> linebreaks-1] ){
