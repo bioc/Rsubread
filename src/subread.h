@@ -373,7 +373,7 @@ struct thread_input_buffer {
 
 };
 
-#define SEEKGZ_CHAIN_BLOCKS_NO 15 
+#define SEEKGZ_CHAIN_BLOCKS_NO 15
 #define SEEKGZ_ZLIB_WINDOW_SIZE (32*1024)
 
 

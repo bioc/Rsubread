@@ -589,6 +589,8 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer_3000)
 #define SKIP_LINE { nch=' '; while(nch != EOF && nch != '\n') nch = geinput_getc(input); }
 #define SKIP_LINE_NOEMPTY {int content_line_l = 0; nch=' '; while(nch != EOF && (nch != '\n' ||! content_line_l)){nch = geinput_getc(input); content_line_l += (nch != '\n');} }
 
+//#define SKIP_LINE { nch=' '; while(nch != EOF && nch != '\n') nch = geinput_getc(input); }
+
 void geinput_jump_read(gene_input_t * input)
 {
 	char nch=' ';
@@ -860,7 +862,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		ret = 0;
 		while(1) // fetch read text
 		{
-			char nch;
+			char nch = 0;
 			ret += read_line(MAX_READ_LENGTH-ret, input->input_fp, read_string+ret, 1);
 
 			nch = fgetc(input->input_fp);
@@ -877,7 +879,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		return ret;
 		
 	} else if(input->file_type == GENE_INPUT_FASTQ || input->file_type == GENE_INPUT_GZIP_FASTQ) {
-		char nch;
+		char nch = 0;
 		int ret;
 
 		//if(input->file_type == GENE_INPUT_GZIP_FASTQ)seekgz_preload_buffer(input, NULL);
@@ -929,7 +931,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		//if(input->file_type == GENE_INPUT_GZIP_FASTQ)seekgz_preload_buffer(input, NULL);
 		// READ LINE 
 		ret = read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
-		//SUBREADprintf("READ_STRING [len=%d] : '''%s'''\n", ret, read_string);
+		//SUBREADprintf("READ_SHOULD_ATGC [len=%d] : '''%s'''\n", ret, read_string);
 
 		// SKIP "+"
 		do{

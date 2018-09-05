@@ -391,9 +391,9 @@ int seqs = 0;
 int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock){
 	int do_preload = 0;
 	seqs+=1;// (unsigned int)(fp->rolling_dict_window[0]);
-	if(( read_lock || !fp -> has_multi_thread_accessed) && fp -> blocks_in_chain < 4 && !seekgz_eof(fp) ) do_preload =1;
-	else if(read_lock && fp -> blocks_in_chain < SEEKGZ_CHAIN_BLOCKS_NO -2){
-		if(seqs >= 1500) {
+	if(( read_lock || !fp -> has_multi_thread_accessed) && fp -> blocks_in_chain < 5 && !seekgz_eof(fp) ) do_preload =1;
+	else if(read_lock && fp -> blocks_in_chain < SEEKGZ_CHAIN_BLOCKS_NO ){
+		if(seqs >= 1000) {
 			do_preload = 1;
 			seqs = 0;
 		}
@@ -407,88 +407,70 @@ int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock){
 	return 0;
 }
 
-
 // return : > 0  : N bytes loaded
 //          == 0 : EOF
 //          < 0  :  data error
 int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
-	if(fp -> blocks_in_chain<1) return EOF;
-	seekable_decompressed_block_t *cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
+	if(fp -> blocks_in_chain<1) return 0;
+	int line_write_ptr = 0, is_end_line = 0;
+	while(1){
+		int consumed_bytes;
+		if(fp -> blocks_in_chain<1) seekgz_load_more_blocks(fp, 5000, NULL);
 
-	if( fp -> current_block_txt_read_ptr > cblk->linebreak_positions[cblk -> linebreaks-1] ){
-		if(fp -> blocks_in_chain<=1){
-			SUBREADprintf("LINE_EXHAUSTED: EOF=%d\n", seekgz_eof(fp));
-		}
-		assert(fp -> blocks_in_chain>1);
-		int read_bytes = cblk -> block_txt_size -  fp -> current_block_txt_read_ptr;
-		read_bytes = max(0 , read_bytes);
-		if(read_bytes>0)memcpy(buff, cblk -> block_txt + fp -> current_block_txt_read_ptr, min( buff_len, read_bytes ));
-
-		free(cblk->block_txt);
-		free(cblk->linebreak_positions);
-		fp-> current_block_txt_read_ptr = 0;
-		fp -> block_chain_current_no++;
-		if(fp -> block_chain_current_no>= SEEKGZ_CHAIN_BLOCKS_NO) fp -> block_chain_current_no=0;
-		fp->blocks_in_chain --;
-
-		cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
-		assert(cblk -> linebreaks>0);
-		//SUBREADprintf("HALF_BLOCK STEP 1+2:%d + %d\n", read_bytes, cblk-> linebreak_positions [0] +1);
-		memcpy(buff  + read_bytes, cblk -> block_txt , min( buff_len - read_bytes, cblk-> linebreak_positions [0] +1));
-		read_bytes += cblk-> linebreak_positions [0] +1;
-		buff[ min(read_bytes, buff_len-1) ] = 0;
-		fp -> current_block_txt_read_ptr +=  cblk-> linebreak_positions [0] +1;
-		//SUBREADprintf("HALF_BLOCK %p remain_blocks=%d RAD='''%s'''\n", fp, fp->blocks_in_chain,buff);
-
-		return read_bytes;
-	}
-
-	int read_bytes;
-	if(fp -> current_block_txt_read_ptr < cblk->linebreak_positions[0]){
-		assert(cblk->linebreaks>0);
-		read_bytes = cblk->linebreak_positions[0] - fp -> current_block_txt_read_ptr +1;
-	}else{
-	
-		int high_idx = cblk -> linebreaks - 1 , low_idx = 0, idx = -1;
-		while(1){
-			if(high_idx <= low_idx+1) { 
-				idx = min(low_idx, high_idx); 
-				break;
+		seekable_decompressed_block_t *cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
+		if( cblk -> linebreaks >0 && fp-> current_block_txt_read_ptr <= cblk->linebreak_positions[cblk -> linebreaks-1] ){
+			if(fp-> current_block_txt_read_ptr <=cblk->linebreak_positions[0]){
+				consumed_bytes = cblk->linebreak_positions[0] - fp-> current_block_txt_read_ptr +1;
+			}else{
+				int high_idx = cblk -> linebreaks - 1 , low_idx = 0, idx = -1;
+				while(1){
+					if(high_idx <= low_idx+1) { 
+						idx = min(low_idx, high_idx); 
+						break;
+					}
+					int mid_idx = (high_idx+low_idx)/2;
+					if(cblk->linebreak_positions[mid_idx] > fp -> current_block_txt_read_ptr)
+						high_idx = mid_idx;
+					else if( cblk->linebreak_positions[mid_idx] < fp -> current_block_txt_read_ptr )
+						low_idx = mid_idx;
+					else{
+						idx = high_idx;
+						break;
+					}
+				}
+				
+				if(idx>0)idx--;
+				while( cblk->linebreak_positions[idx+1] < fp -> current_block_txt_read_ptr) idx++;
+				assert( idx <  cblk -> linebreaks-1 );
+				consumed_bytes = cblk->linebreak_positions[idx+1] - fp-> current_block_txt_read_ptr +1;
 			}
-			int mid_idx = (high_idx+low_idx)/2;
-			if(cblk->linebreak_positions[mid_idx] > fp -> current_block_txt_read_ptr)
-				high_idx = mid_idx;
-			else if( cblk->linebreak_positions[mid_idx] < fp -> current_block_txt_read_ptr )
-				low_idx = mid_idx;
-			else{
-				idx = high_idx;
-				break;
-			}
+			is_end_line = 1;
+		} else
+			consumed_bytes = cblk -> block_txt_size - fp-> current_block_txt_read_ptr ;
+
+		if(buff){
+			int cp_bytes = min(consumed_bytes, buff_len - line_write_ptr);
+			memcpy( buff + line_write_ptr , cblk-> block_txt + fp-> current_block_txt_read_ptr, cp_bytes );
+			line_write_ptr += cp_bytes;
+			if(buff)buff[line_write_ptr] = 0;
 		}
-	
-		if(idx>0)idx--;
-		//SUBREADprintf(" START_IDX=%d in %d ; val[idx]=%d ; TARGET=%d\n", idx,  cblk -> linebreaks, cblk->linebreak_positions[idx],  fp -> current_block_txt_read_ptr);
-		while( cblk->linebreak_positions[idx+1] < fp -> current_block_txt_read_ptr  && idx < cblk -> linebreaks-1 ) idx++;
 
-		read_bytes = cblk->linebreak_positions[idx+1] - fp -> current_block_txt_read_ptr +1; 
+		//SUBREADprintf("OUT_TXT  in BLC %d / %d %p  ENDL=%d CUNS_BYTES=%d / %d / %d : '''%s'''\n", fp -> block_chain_current_no, fp -> blocks_in_chain, fp, is_end_line, consumed_bytes,  fp-> current_block_txt_read_ptr, cblk -> block_txt_size ,  buff);
+
+		fp-> current_block_txt_read_ptr += consumed_bytes;
+
+		if( fp-> current_block_txt_read_ptr >= cblk -> block_txt_size ){
+			free(cblk->block_txt);
+			free(cblk->linebreak_positions);
+			fp-> current_block_txt_read_ptr = 0;
+			fp -> block_chain_current_no++;
+			if(fp -> block_chain_current_no>= SEEKGZ_CHAIN_BLOCKS_NO) fp -> block_chain_current_no=0;
+			fp->blocks_in_chain --;
+		}
+
+		if(is_end_line) break;
 	}
-	//int old_ptr =  fp -> current_block_txt_read_ptr;
-	//SUBREADprintf(" READ_BYTES[IDX=%d] =%d = %d - %d\n", idx, read_bytes, cblk->linebreak_positions[idx+1], cblk->linebreak_positions[idx]);
-	memcpy(buff, cblk -> block_txt + fp -> current_block_txt_read_ptr, min(read_bytes, buff_len));
-	fp -> current_block_txt_read_ptr += read_bytes;
-	buff[ min(read_bytes, buff_len-1) ] = 0;
-	//SUBREADprintf("FULL_BLOCK %p LEN=%d FROM %d to %d in %d ; remain_blocks=%d ; BR_0=%d ;  TXT='''%s'''\n", fp, read_bytes, old_ptr, old_ptr + read_bytes, cblk-> block_txt_size, fp->blocks_in_chain, cblk->linebreak_positions[0],buff);
-
-	if(fp-> current_block_txt_read_ptr >= cblk -> block_txt_size){
-		free(cblk->block_txt);
-		free(cblk->linebreak_positions);
-		fp-> current_block_txt_read_ptr = 0;
-		fp -> block_chain_current_no++;
-		if(fp -> block_chain_current_no>= SEEKGZ_CHAIN_BLOCKS_NO) fp -> block_chain_current_no=0;
-		fp->blocks_in_chain --;
-	}
-
-	return read_bytes;
+	return line_write_ptr;
 }
 
 int seekgz_next_char(seekable_zfile_t * fp){ // MUST BE PROTECTED BY read_lock
