@@ -260,12 +260,24 @@ void seekgz_update_current_window(seekable_zfile_t * fp , char * txt, int tlen){
 	fp -> rolling_dict_window_used += cplen;
 }
 
+int seekgz_eof(seekable_zfile_t * fp){
+	if(fp -> stem.avail_in < 1 && feof(fp->gz_fp))return 1;
+	return 0;
+}
+
 
 #define SEEKGZ_ONE_BLOCK_TEXT_INIT_SIZE (256*1024)
 // 1block ret < 0 : bad error
 // 1block ret > 0 : data is loaded
 // 1block ret == 0 : no data is loaded
+
+// A block MUST have at least 10000 bytes otherwise multiple blocks are concatinated
+
+#define MINIMUM_GZIP_BLOCK_SIZE 10000
+
 int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
+	if(seekgz_eof(fp))return 0;
+
 	char * out_txt = malloc(SEEKGZ_ONE_BLOCK_TEXT_INIT_SIZE);
 	int out_txt_size = SEEKGZ_ONE_BLOCK_TEXT_INIT_SIZE;
 	int out_txt_used = 0;
@@ -277,56 +289,62 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 	fp -> block_rolling_chain[empty_block_no].block_start_in_file_offset = fp -> next_block_file_offset;
 	fp -> block_rolling_chain[empty_block_no].block_start_in_file_bits = fp -> next_block_file_bits;
 
-	int is_block_end = 0;
-	int is_gzip_unit_end = 0;
 	int is_data_error = 0;
+	int is_eof = 0;
 	while(1){
-		int is_eof = 0;
-		seekgz_try_read_some_zipped_data(fp, &is_eof);
-		if(fp -> stem.avail_in < 1 && is_eof)return 0;
+		int is_block_end = 0;
+		int is_gzip_unit_end = 0;
+		while(1){
+			seekgz_try_read_some_zipped_data(fp, &is_eof);
+			if(fp -> stem.avail_in < 1 && is_eof)break;
 
-		if(out_txt_size < out_txt_used *4/3){
-			out_txt_size *= 2;
-			out_txt = realloc(out_txt,out_txt_size);
+			if(out_txt_size < out_txt_used *4/3){
+				out_txt_size *= 2;
+				out_txt = realloc(out_txt,out_txt_size);
+			}
+
+			//int old_avail_in = fp -> stem.avail_in;
+			fp -> stem.avail_out = out_txt_size - out_txt_used;
+			fp -> stem.next_out = (unsigned char *)out_txt + out_txt_used;
+
+			void * old_next_in = fp -> stem.next_in;
+				
+				//SUBREADprintf("i  INFLATINHG: FILEPOS=%llu  IN_AVAIL=%d  OUT_AVAIL=%d\n", seekgz_ftello(fp), fp -> stem.avail_in, fp -> stem.avail_out);
+			int ret_ifl = inflate(&(fp -> stem), Z_BLOCK);
+			int have = (out_txt_size - out_txt_used) - fp -> stem.avail_out;
+			//if(0 && ret_ifl != Z_OK){
+			//	SUBREADprintf("o  INFLATINHG: RET=%d BY IN %d zipped bytes  ==>  %d PLAIN TXT\n", ret_ifl, old_avail_in - fp -> stem.avail_in, have);
+			//	SUBREADprintf("o  INFLATINHG: BEND=%d\n", ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64));
+			//}
+			if(ret_ifl != Z_OK && ret_ifl != Z_STREAM_END){
+				is_data_error = 1;
+				break;
+			}
+			int zipped_data_used = (void *)fp -> stem.next_in - old_next_in;
+
+			fp -> in_zipped_buff_read_ptr += zipped_data_used;
+			seekgz_update_current_window(fp, out_txt + out_txt_used, have);
+			out_txt_used += have;
+			if( ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64)) is_block_end = 1;
+			if(ret_ifl == Z_STREAM_END) is_gzip_unit_end = 1;
+
+			if(is_block_end){
+				fp -> next_block_file_offset = seekgz_ftello(fp);
+				fp -> next_block_file_bits = fp->stem.data_type & 7;
+			}
+
+			if(is_gzip_unit_end){
+				seekgz_skip_gzfile_header(fp, 8);
+				inflateReset(&fp->stem);
+			}
+
+			if(is_block_end || is_gzip_unit_end) break;
 		}
-
-		int old_avail_in = fp -> stem.avail_in;
-		fp -> stem.avail_out = out_txt_size - out_txt_used;
-		fp -> stem.next_out = (unsigned char *)out_txt + out_txt_used;
-
-		void * old_next_in = fp -> stem.next_in;
-		
-		//SUBREADprintf("i  INFLATINHG: FILEPOS=%llu  IN_AVAIL=%d  OUT_AVAIL=%d\n", seekgz_ftello(fp), fp -> stem.avail_in, fp -> stem.avail_out);
-		int ret_ifl = inflate(&(fp -> stem), Z_BLOCK);
-		int have = (out_txt_size - out_txt_used) - fp -> stem.avail_out;
-		if(0 && ret_ifl != Z_OK){
-			SUBREADprintf("o  INFLATINHG: RET=%d BY IN %d zipped bytes  ==>  %d PLAIN TXT\n", ret_ifl, old_avail_in - fp -> stem.avail_in, have);
-			SUBREADprintf("o  INFLATINHG: BEND=%d\n", ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64));
-		}
-		if(ret_ifl != Z_OK && ret_ifl != Z_STREAM_END){
-			is_data_error = 1;
-			break;
-		}
-		int zipped_data_used = (void *)fp -> stem.next_in - old_next_in;
-
-		fp -> in_zipped_buff_read_ptr += zipped_data_used;
-		seekgz_update_current_window(fp, out_txt + out_txt_used, have);
-		out_txt_used += have;
-		if( ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64)) is_block_end = 1;
-		if(ret_ifl == Z_STREAM_END) is_gzip_unit_end = 1;
-		if(is_block_end || is_gzip_unit_end) break;
+		if(out_txt_used >= MINIMUM_GZIP_BLOCK_SIZE || is_data_error ) break;
+		if(fp -> stem.avail_in < 1 && is_eof)break;
 	}
 
 	if(is_data_error) return -1;
-
-	if(is_block_end){
-		fp -> next_block_file_offset = seekgz_ftello(fp);
-		fp -> next_block_file_bits = fp->stem.data_type & 7;
-	}
-	if(is_gzip_unit_end){
-		seekgz_skip_gzfile_header(fp, 8);
-		inflateReset(&fp->stem);
-	}
 
 	//SUBREADprintf("o  END_1BLK: GOT %d PLAIN TXT i; first char: '%c'  fp==%p\n\n", out_txt_used, out_txt[0], fp);
 	if(out_txt_used>0){
@@ -338,11 +356,6 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 		free(out_txt);
 		return 0;
 	}
-}
-
-int seekgz_eof(seekable_zfile_t * fp){
-	if(fp -> stem.avail_in < 1 && feof(fp->gz_fp))return 1;
-	return 0;
 }
 
 int seekgz_load_more_blocks( seekable_zfile_t * fp , int bytes_ahead, subread_lock_t * read_lock ){
@@ -415,7 +428,9 @@ int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 	int line_write_ptr = 0, is_end_line = 0;
 	while(1){
 		int consumed_bytes;
-		if(fp -> blocks_in_chain<1 && !seekgz_eof(fp)) seekgz_load_more_blocks(fp, 5000, NULL);
+		if( fp -> blocks_in_chain<1 ){ // should be VERY VERY rear.
+			sleep(3); // all other threads will be waiting for the read_lock now.
+		}
 
 		seekable_decompressed_block_t *cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
 		if( cblk -> linebreaks >0 && fp-> current_block_txt_read_ptr <= cblk->linebreak_positions[cblk -> linebreaks-1] ){
