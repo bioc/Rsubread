@@ -436,10 +436,6 @@ int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock){
 //          < 0  :  data error
 int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 	//if(fp -> blocks_in_chain<3)SUBREADprintf("GTS: %d BLK, %d AVI\n", fp -> blocks_in_chain, fp -> stem.avail_in);
-	if(fp -> blocks_in_chain<1){
-		SUBREADprintf("FEOF %p\n", fp);
-		return 0;
-	}
 	int line_write_ptr = 0, is_end_line = 0;
 	while(1){
 		int consumed_bytes;
