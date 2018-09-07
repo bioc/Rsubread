@@ -893,6 +893,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		{
 			do{
 				nch = geinput_getc(input);
+				//SUBREADprintf("B4_READ_NAME: %d '%c'\n", nch,nch);
 			} while (nch == '\n');
 			if(nch==EOF) return -1;
 			

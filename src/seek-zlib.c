@@ -208,6 +208,8 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 	fp -> next_block_file_bits = pos -> block_gzfile_bits;
 	seekgz_load_more_blocks(fp, 30000, NULL);
 	fp -> current_block_txt_read_ptr = pos -> in_block_text_offset; 
+
+	//SUBREADprintf("SEK: %d WIN=%d BLK (%d / %d), %d AVI\n", fp -> blocks_in_chain,  pos -> block_dict_window_size, fp -> current_block_txt_read_ptr , fp -> block_rolling_chain[0].block_txt_size, fp -> stem.avail_in);
 }
 
 
@@ -284,7 +286,7 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 
 	memcpy(fp -> block_rolling_chain[empty_block_no].block_dict_window, fp -> rolling_dict_window, fp -> rolling_dict_window_used);
 	fp -> block_rolling_chain[empty_block_no].block_dict_window_size = fp -> rolling_dict_window_used;
-	fp -> rolling_dict_window_used = 0;
+	//fp -> rolling_dict_window_used = 0;
 
 	fp -> block_rolling_chain[empty_block_no].block_start_in_file_offset = fp -> next_block_file_offset;
 	fp -> block_rolling_chain[empty_block_no].block_start_in_file_bits = fp -> next_block_file_bits;
@@ -303,7 +305,7 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 				out_txt = realloc(out_txt,out_txt_size);
 			}
 
-			//int old_avail_in = fp -> stem.avail_in;
+			int old_avail_in = fp -> stem.avail_in;
 			fp -> stem.avail_out = out_txt_size - out_txt_used;
 			fp -> stem.next_out = (unsigned char *)out_txt + out_txt_used;
 
@@ -312,9 +314,13 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 				//SUBREADprintf("i  INFLATINHG: FILEPOS=%llu  IN_AVAIL=%d  OUT_AVAIL=%d\n", seekgz_ftello(fp), fp -> stem.avail_in, fp -> stem.avail_out);
 			int ret_ifl = inflate(&(fp -> stem), Z_BLOCK);
 			int have = (out_txt_size - out_txt_used) - fp -> stem.avail_out;
-			//if(0 && ret_ifl != Z_OK){
-			//	SUBREADprintf("o  INFLATINHG: RET=%d BY IN %d zipped bytes  ==>  %d PLAIN TXT\n", ret_ifl, old_avail_in - fp -> stem.avail_in, have);
-			//	SUBREADprintf("o  INFLATINHG: BEND=%d\n", ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64));
+			if(ret_ifl != Z_OK && ret_ifl != Z_STREAM_END){
+				SUBREADprintf("ERR  INFLATINHG: RET=%d BY IN %d zipped bytes  ==>  %d PLAIN TXT\n", ret_ifl, old_avail_in - fp -> stem.avail_in, have);
+				SUBREADprintf("ERR  INFLATINHG: BEND=%d\n", ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64));
+			}
+
+			//if(ret_ifl != Z_STREAM_END){
+			//	SUBREADprintf("INF: STREAM_END\n");
 			//}
 			if(ret_ifl != Z_OK && ret_ifl != Z_STREAM_END){
 				is_data_error = 1;
@@ -323,10 +329,15 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 			int zipped_data_used = (void *)fp -> stem.next_in - old_next_in;
 
 			fp -> in_zipped_buff_read_ptr += zipped_data_used;
-			seekgz_update_current_window(fp, out_txt + out_txt_used, have);
-			out_txt_used += have;
 			if( ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64)) is_block_end = 1;
 			if(ret_ifl == Z_STREAM_END) is_gzip_unit_end = 1;
+
+			//if(is_block_end)
+			//	fp -> rolling_dict_window_used = 0;
+			//else
+			seekgz_update_current_window(fp, out_txt + out_txt_used, have);
+
+			out_txt_used += have;
 
 			if(is_block_end){
 				fp -> next_block_file_offset = seekgz_ftello(fp);
@@ -404,9 +415,9 @@ int seqs = 0;
 int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock){
 	int do_preload = 0;
 	seqs+=1;// (unsigned int)(fp->rolling_dict_window[0]);
-	if(( read_lock || !fp -> has_multi_thread_accessed) && fp -> blocks_in_chain < 5 && !seekgz_eof(fp) ) do_preload =1;
+	if(( read_lock || !fp -> has_multi_thread_accessed) && fp -> blocks_in_chain < 3 && !seekgz_eof(fp) ) do_preload =1;
 	else if(read_lock && fp -> blocks_in_chain < SEEKGZ_CHAIN_BLOCKS_NO ){
-		if(seqs >= 1000) {
+		if(seqs >= 2000) {
 			do_preload = 1;
 			seqs = 0;
 		}
@@ -424,7 +435,11 @@ int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock){
 //          == 0 : EOF
 //          < 0  :  data error
 int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
-	if(fp -> blocks_in_chain<1) return 0;
+	//if(fp -> blocks_in_chain<3)SUBREADprintf("GTS: %d BLK, %d AVI\n", fp -> blocks_in_chain, fp -> stem.avail_in);
+	if(fp -> blocks_in_chain<1){
+		SUBREADprintf("FEOF %p\n", fp);
+		return 0;
+	}
 	int line_write_ptr = 0, is_end_line = 0;
 	while(1){
 		int consumed_bytes;
@@ -490,6 +505,7 @@ int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 
 int seekgz_next_char(seekable_zfile_t * fp){ // MUST BE PROTECTED BY read_lock
 	//SUBREADprintf("gen_next_char: block_in_chain=%d\n", fp -> blocks_in_chain);
+	//if(fp -> blocks_in_chain<3)SUBREADprintf("1CH: %d BLK, %d AVI\n", fp -> blocks_in_chain, fp -> stem.avail_in);
 	if(fp -> blocks_in_chain<1){
 		return EOF;
 	}
