@@ -970,13 +970,18 @@ void LRMsave_mapping_result(LRMcontext_t * context, LRMthread_context_t * thread
 	int flags = 4;
 	//if(iteration_context -> total_matched_bases >= context -> min_matched_bases_in_alignment)
 	char * chro_name;
-	int chro_pos, map_quality = 10, mis_matched = 0;
+	int chro_pos, map_quality = 10, mis_matched = 0, corr_report = 0;
 
 	if( iteration_context -> chain_total_items > 0 ){
 		flags = iteration_context -> sorted_window_is_negative_strand[window_no]?16:0;
 		LRMlocate_gene_position(context, iteration_context -> final_mapping_location, &chro_name, &chro_pos);
-		thread_context -> mapped_reads++;
-	}else{
+		if(NULL != chro_name){
+			corr_report = 1;
+			thread_context -> mapped_reads++;
+		}
+	}
+
+	if(!corr_report){
 		strcpy(thread_context -> final_cigar_string, "*");
 		chro_name = "*";
 		chro_pos = -1;
