@@ -1,19 +1,14 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
+10 Sep 2018 - 1.31.10
+(1) Fixed all bugs found in pre-release tests.
+
+8 Sep 2018 - 1.31.9
+(1) Fixed some bugs found in pre-release tests.
+
 4 Sep 2018 - 1.31.8
 (1) Largely improved the speed of align and subjunc
 (2) Minor changes on the screen outputs of align, subjunc and featureCounts
-(3) Bug fixes
-=======
-=======
-4 Sep 2018 - 1.31.9
-(1) Largely improved the speed of align() and subjunc()
-(2) Minor changes on screen outputs
-(3) Bug fixes
-
->>>>>>> cf7fe3d16a8b235d55a32e86b8009028a41abc91
-29 Aug 2018 - 1.31.8
-(1) Improve documentation for 'read2pos' option in featureCounts.
+(3) Improve documentation for 'read2pos' option in featureCounts.
+(4) Bug fixes
 
 17 Aug 2018 - 1.31.7
 (1) Default value of 'countMultiMappingReads' parameter in featureCounts is changed to TRUE.
