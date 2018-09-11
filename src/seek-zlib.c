@@ -437,12 +437,11 @@ int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock){
 int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 	//if(fp -> blocks_in_chain<3)SUBREADprintf("GTS: %d BLK, %d AVI\n", fp -> blocks_in_chain, fp -> stem.avail_in);
 	int line_write_ptr = 0, is_end_line = 0;
+	if(fp->blocks_in_chain < 1 && seekgz_eof(fp)) return 0;
 	while(1){
 		int consumed_bytes;
-		if( fp -> blocks_in_chain<1 ){ // should be VERY VERY rear.
-			sleep(3); // all other threads will be waiting for the read_lock now.
-		}
 
+		assert(fp->blocks_in_chain>0); 
 		seekable_decompressed_block_t *cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
 		if( cblk -> linebreaks >0 && fp-> current_block_txt_read_ptr <= cblk->linebreak_positions[cblk -> linebreaks-1] ){
 			if(fp-> current_block_txt_read_ptr <=cblk->linebreak_positions[0]){

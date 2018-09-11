@@ -120,7 +120,7 @@ void print_usage_core_subjunc()
 	SUBREADputs("                    subreads that map in consensus) . If paired-end, this gives");
 	SUBREADputs("                    the consensus threshold for the anchor read (anchor read");
 	SUBREADputs("                    receives more votes than the other read in the same pair).");
-	SUBREADputs("                    1 by default");
+	SUBREADputs("                    1 by default.");
 	SUBREADputs("");
 	SUBREADputs("  -p <int>          Consensus threshold for the non- anchor read in a pair. 1 by");
 	SUBREADputs("                    default.");
