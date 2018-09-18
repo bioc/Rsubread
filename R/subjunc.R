@@ -127,6 +127,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 	else
 		opt <- paste(opt,"-P",6,sep=",")	
 
+	return.summary <- data.frame()
 	for(i in 1:length(readfile1)){
 		opt_files <- paste("-r",readfile1[i],sep=",")
 		if(!is.null(readfile2)) 
@@ -136,9 +137,18 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 		cmd <- paste("subjunc",opt_files,opt,sep=",")
 		n <- length(unlist(strsplit(cmd,",")))
 		C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+		summary.data <- .load.delete.summary(output_file[i])
+		if(i ==1){
+			return.summary <- summary.data
+			colnames(return.summary) <-c("Stat", output_file[i])
+		}else{
+			return.summary <- cbind(return.summary, summary.data[,2] )
+			colnames(return.summary)[ncol(return.summary)] <- output_file[i]
+		}
 	}
 
     if(flag)
         file.remove(fout_annot)
 
+	return(return.summary)
 }

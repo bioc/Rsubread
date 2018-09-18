@@ -1,3 +1,6 @@
+18 Sep 2018 - 1.31.12
+(1) align() and subjunc() return the mapping summary data frame. The summary includes total reads, mapped reads, indels, etc.
+
 11 Sep 2018 - 1.31.11
 (1) Fixed a big that featureCounts didn't allow gzipped annotation.
 

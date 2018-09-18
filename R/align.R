@@ -1,3 +1,14 @@
+.load.delete.summary <- function(bam.name){
+  sumfile <- paste0(bam.name,".summary")
+  if(!file.exists(sumfile)){
+    stop(paste("ERROR: Summary file",sumfile,"was not generated! The program terminated wrongly!"))
+  } 
+
+  tmp.frame <- read.delim(sumfile, header=F, stringsAsFactors=F)
+  file.remove(sumfile)
+  return(tmp.frame)
+}
+
 align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subread",output_format,sep="."),phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
     readfile1 <- normalizePath(as.character(readfile1), mustWork=T)
@@ -139,6 +150,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 	else
 		opt <- paste(opt,"-P",6,sep=",")
 	
+	return.summary <- data.frame()
 	for(i in 1:length(readfile1)){
 		opt_files <- paste("-r",readfile1[i],sep=",")
 		if(!is.null(readfile2)) 
@@ -148,8 +160,17 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 		cmd <- paste("subread-align",opt_files,opt,sep=",")
 		n <- length(unlist(strsplit(cmd,",")))
 		C_args <- .C("R_align_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+		summary.data <- .load.delete.summary(output_file[i])
+		if(i ==1){
+			return.summary <- summary.data
+			colnames(return.summary) <-c("Stat", output_file[i])
+		}else{
+			return.summary <- cbind(return.summary, summary.data[,2] )
+			colnames(return.summary)[ncol(return.summary)] <- output_file[i]
+		}
 	}
 
     if(flag)
         file.remove(fout_annot)
+	return(return.summary)
 }

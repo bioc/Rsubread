@@ -339,6 +339,24 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 int show_summary(global_context_t * global_context)
 {
 
+#ifndef MAKE_STANDALONE
+	// SAVE summary into files. This is only for Rsubread currently.
+	char sumname[MAX_FILE_NAME_LENGTH];
+	sprintf(sumname, "%s.summary", global_context->config.output_prefix);
+	FILE * sumfp = fopen(sumname,"w");
+	fprintf(sumfp, "Total_%s\t%llu\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
+	fprintf(sumfp, "Mapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_mapped_reads);
+	fprintf(sumfp, "Mapped_fraction\t%.6f\n",global_context -> all_mapped_reads *1.0 / ( global_context -> all_processed_reads * 1.0));
+	if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !(global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)))
+		fprintf(sumfp, "Junctions\t%u\n", global_context -> all_junctions);
+	if((global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
+		fprintf(sumfp, "Fusions\t%u\n", global_context -> all_fusions);
+	fprintf(sumfp, "Indels\t%u\n", global_context -> all_indels);
+
+
+	fclose(sumfp);
+#endif
+
 	if(progress_report_callback)
 	{
 	        long long int all_reads_K = global_context -> all_processed_reads / 1000;
