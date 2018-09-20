@@ -163,7 +163,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 		summary.data <- .load.delete.summary(output_file[i])
 		if(i ==1){
 			return.summary <- summary.data
-			colnames(return.summary) <-c("Stat", output_file[i])
+			colnames(return.summary) <-c("Category", output_file[i])
 		}else{
 			return.summary <- cbind(return.summary, summary.data[,2] )
 			colnames(return.summary)[ncol(return.summary)] <- output_file[i]
