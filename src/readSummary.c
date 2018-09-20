@@ -1183,7 +1183,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 					{
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nWarning: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n",  global_context -> gene_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \nThe program has to terminate.\n\n",  global_context -> gene_id_column, extra_attrs);
 					}
 					is_GFF_warned++;
 				}
@@ -1240,19 +1240,19 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	global_context -> exontable_nchrs = (int)chro_name_table-> numOfElements;
 	global_context -> exontable_chro_table = chro_name_table;
 
-	print_in_box(80,0,0,"   Features : %d\n", features);
-	if(features < 1)
-	{
 
+	if(is_GFF_warned) return -2;
+	if(features < 1){
 		if(global_context -> annotation_file_screen_output[0]){
-			print_in_box(80,0,0,"WARNING no features were loaded in format %s.", file_type == FILE_TYPE_GTF?"GTF":"SAF");
-			print_in_box(80,0,0,"        The annotation format can be specified using the");
-			print_in_box(80,0,0,"        'isGTFAnnotationFile' option");
+			SUBREADprintf("ERROR: no features were loaded in format %s. The annotation format can be specified by the 'isGTFAnnotationFile' option%s.\n", file_type == FILE_TYPE_GTF?"GTF":"SAF", file_type == FILE_TYPE_GTF?", and the required feature type can be specified by the 'GTF.featureType' option":"");
 		}else{
-			print_in_box(80,0,0,"WARNING no features were loaded in format %s.", file_type == FILE_TYPE_GTF?"GTF":"SAF");
-			print_in_box(80,0,0,"        annotation format can be specified using '-F'.");
+			SUBREADprintf("ERROR: no features were loaded in format %s. The annotation format can be specified by the '-F' option%s.\n", file_type == FILE_TYPE_GTF?"GTF":"SAF", file_type == FILE_TYPE_GTF?", and the required feature type can be specified by the '-t' option.":"");
 		}
+		SUBREADprintf("The porgram has to terminate.\n\n");
+		return -2;
 	}
+
+	print_in_box(80,0,0,"   Features : %d\n", features);
 	return features;
 }
 

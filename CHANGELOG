@@ -1,5 +1,6 @@
 20 Sep 2018 - 1.31.13
 (1) Changed the return format of align() and subjunc() to include more information
+(2) Fixed the issue of featureCounts(), align() and subjunc() not quiting when the annotation format is wrong.
 
 18 Sep 2018 - 1.31.12
 (1) align() and subjunc() return the mapping summary data frame. The summary includes total reads, mapped reads, indels, etc.

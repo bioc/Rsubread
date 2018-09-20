@@ -1120,7 +1120,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 					if(!is_GFF_geneid_warned){
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nWarning: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n",  gene_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n",  gene_id_column, extra_attrs);
 					}
 					is_GFF_geneid_warned++;
 				}
@@ -1129,7 +1129,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 					if(!is_GFF_txid_warned){
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nWarning: failed to find the transcript identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n", transcript_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the transcript identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \n\n", transcript_id_column, extra_attrs);
 					}
 					is_GFF_txid_warned++;
 				}
@@ -1143,7 +1143,13 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 		
 	}
 	autozip_close(&afp);
-	free(file_line);		
+	free(file_line);
+
+	if(is_GFF_txid_warned || is_GFF_geneid_warned)return -2;
+	if(loaded_features<1){
+		SUBREADprintf("\nERROR: No feature was loaded from the annotation file. Please check if the annotation format was correctly specified, and also if the feature type was correctly specified if the annotation is in the GTF format.\n\n");
+		return -2;
+	}
 	return loaded_features;
 }
 
