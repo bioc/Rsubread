@@ -1183,7 +1183,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 					{
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nThe attributes included in your GTF annotation are '%s' \nThe program has to terminate.\n\n",  global_context -> gene_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nAn example of attributes included in your GTF annotation is '%s' \nThe program has to terminate.\n\n",  global_context -> gene_id_column, extra_attrs);
 					}
 					is_GFF_warned++;
 				}
