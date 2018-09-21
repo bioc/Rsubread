@@ -386,9 +386,9 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 0,1,"");
 
     if(global_context->input_reads.is_paired_end_reads)
-	print_in_box(80, 0,0,"    Total fragments : %'llu" , global_context -> all_processed_reads);
+		print_in_box(80, 0,0,"    Total fragments : %'llu" , global_context -> all_processed_reads);
     else
-	print_in_box(80, 0,0,"        Total reads : %'llu" , global_context -> all_processed_reads);
+		print_in_box(80, 0,0,"        Total reads : %'llu" , global_context -> all_processed_reads);
 
 	print_in_box(81, 0,0,"             Mapped : %'u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
 	print_in_box(80, 0,0,"    Uniquely mapped : %'u",  global_context -> all_uniquely_mapped_reads);

@@ -3120,7 +3120,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 
 				if(nch == 'M')
 				{
-					char cigar_tiny [11];
+					char cigar_tiny [12];
 					int is_Last_M = (cigar_string[cigar_cursor]==0);
 					if(is_First_M && head_soft_clipped>0)
 					{

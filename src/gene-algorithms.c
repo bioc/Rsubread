@@ -2554,17 +2554,17 @@ void bad_reverse_cigar(char * cigar)
 		}
 		else if((cc>='A'&&cc<='Z')||(cc>='a'&&cc<='z')) 
 		{
-			char ncg2[100];
+			char ncg2[103];
 			sprintf(ncg2, "%lld%c", tmpv, cc);
-			strcat(ncg2, ncg);
-			strcpy(ncg, ncg2);
+			strncat(ncg2, ncg, 99);
+			strncpy(ncg, ncg2, 99);
 			tmpv=0;
 		}
 		else
 		{
-			char ncg2[100];
+			char ncg2[103];
 			sprintf(ncg2, "%c%s",cc,ncg);
-			strcpy(ncg, ncg2);
+			strncpy(ncg, ncg2, 99);
 			tmpv=0;
 		}
 		cigar_cursor++;
