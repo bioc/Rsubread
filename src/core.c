@@ -352,11 +352,11 @@ int show_summary(global_context_t * global_context)
 
 	if(global_context->input_reads.is_paired_end_reads){
 		fprintf(sumfp, "Properly_paired_fragments\t%llu\n",global_context -> all_correct_PE_reads);
-		fprintf(sumfp, "Singleton_fragments\t%llu\n", global_context -> not_properly_pairs_only_one_end_mapped);
-		fprintf(sumfp, "More_than_one_chr_fragments\t%llu\n", global_context -> not_properly_pairs_different_chro);
-		fprintf(sumfp, "Unexpected_strandness_fragments\t%llu\n", global_context -> not_properly_different_strands);
-		fprintf(sumfp, "Unexpected_template_length\t%llu\n", global_context -> not_properly_pairs_TLEN_wrong);
-		fprintf(sumfp, "Inversed_mapping\t%llu\n", global_context -> not_properly_pairs_wrong_arrangement);
+		fprintf(sumfp, "Singleton_fragments\t%u\n", global_context -> not_properly_pairs_only_one_end_mapped);
+		fprintf(sumfp, "More_than_one_chr_fragments\t%u\n", global_context -> not_properly_pairs_different_chro);
+		fprintf(sumfp, "Unexpected_strandness_fragments\t%u\n", global_context -> not_properly_different_strands);
+		fprintf(sumfp, "Unexpected_template_length\t%u\n", global_context -> not_properly_pairs_TLEN_wrong);
+		fprintf(sumfp, "Inversed_mapping\t%u\n", global_context -> not_properly_pairs_wrong_arrangement);
 	}
 	
 	if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !(global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)))
