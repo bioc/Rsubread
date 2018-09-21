@@ -83,7 +83,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	int file_number, table_no;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
-	unsigned int segment_size = (unsigned int)(memory_megabytes * 1024.0 / 12.) * 1024 ;
+	unsigned int segment_size = (unsigned int)(memory_megabytes * 1024.0 / 8.) * 1024 ;
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 	double local_begin_ftime = 0.;
 
@@ -1146,7 +1146,7 @@ int main_buildindex(int argc,char ** argv)
 	if(IS_FORCED_ONE_BLOCK)
 	{
 		print_in_box(80, 0, 0, "          One block index : yes");
-		memory_limit = GENE_SLIDING_STEP==1?17000:8500;
+		memory_limit = GENE_SLIDING_STEP==1?22000:11500;
 	}
 	else
 	{
