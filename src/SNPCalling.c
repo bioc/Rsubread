@@ -1479,7 +1479,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		}
 		if(parameters -> background_input_file[0])
 		{
-			char temp_file_prefix2[300];
+			char temp_file_prefix2[350];
 			sprintf(temp_file_prefix2, "%sBGC-", temp_file_prefix);
 			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL)) return -1;
 		}

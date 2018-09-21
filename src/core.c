@@ -341,7 +341,7 @@ int show_summary(global_context_t * global_context)
 
 #ifndef MAKE_STANDALONE
 	// SAVE summary into files. This is only for Rsubread currently.
-	char sumname[MAX_FILE_NAME_LENGTH];
+	char sumname[MAX_FILE_NAME_LENGTH+30];
 	sprintf(sumname, "%s.summary", global_context->config.output_prefix);
 	FILE * sumfp = fopen(sumname,"w");
 	fprintf(sumfp, "Total_%s\t%llu\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
