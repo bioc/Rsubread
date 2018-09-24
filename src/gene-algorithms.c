@@ -437,23 +437,23 @@ unsigned int get_gene_linear(int chrono, int offset, const unsigned int offsets 
 	return offset;
 }
 
-
 int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos, int * head_cut_length, int * tail_cut_length, int rl)
 {
 	int n = 0;
 
-	int total_offsets = offsets -> total_offsets;
-
-	int GENE_LOCATE_JUMP = total_offsets/3;
-
-	while (GENE_LOCATE_JUMP >3)
-	{
-		while(n+GENE_LOCATE_JUMP < total_offsets &&  offsets->read_offsets[n+GENE_LOCATE_JUMP] <= linear)
-			n+=GENE_LOCATE_JUMP;
-		GENE_LOCATE_JUMP /=3;
+	int low_idx=0, high_idx= offsets->total_offsets;
+	while(1){
+		if(high_idx <= low_idx+1) {
+			n = max(low_idx-2,0);
+			break;
+		}
+		int mid_idx = (low_idx+high_idx)/2;
+		unsigned int mid_val = offsets->read_offsets[mid_idx];
+		if(mid_val > linear) high_idx = mid_idx;
+		else low_idx = mid_idx+1;
 	}
 
-	for (; offsets->read_offsets[n]; n++)
+	for (; n<offsets->total_offsets; n++)
 	{
 		if (offsets->read_offsets[n] > linear)
 		{
@@ -470,7 +470,9 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 
 			if(tail_cut_length == NULL){ 
-				if(rl + linear > offsets->read_offsets[n] + 15 - offsets -> padding) return 1;
+				if(rl + linear > offsets->read_offsets[n] + 15 - offsets -> padding){
+					return 1;
+				}
 			} else {
 				unsigned int posn1 = 0;
 				if(n>0) posn1 = offsets->read_offsets[n-1];
@@ -480,7 +482,9 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 				//SUBREADprintf("CHRO_LEN : %lld, READ_TAIL %lld , RL=%d\n", chro_leng, tct, rl);
 				tct -= chro_leng;
-				if( tct >= rl )return 1;
+				if( tct >= rl ){
+					return 1;
+				}
 				if( tct <0    )tct=0;
 				(*tail_cut_length) = tct;
 			}
@@ -498,15 +502,11 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 
 			*chro_name = (char *)offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
 
-			//#warning ">>>>>>>>>>>>>>NOT <<<<<<<<<<<<<<<<<"
-			//printf("OCT27-NULL_LOCATION: %u > %u; N=%d\n", linear, offsets->read_offsets[n-1], n);
-
 			return 0;
 		}
 	}
 	return -1;
 }
-
 
 
 int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , char ** chro_name, int * pos)
@@ -518,13 +518,11 @@ int locate_gene_position(unsigned int linear, const gene_offset_t* offsets , cha
 
 #ifdef USE_SLOW_HASHTABLE_INDEX
 int vv=0;
-void add_gene_vote(gene_vote_t* vote, int key , int add_new)
-{
+void add_gene_vote(gene_vote_t* vote, int key , int add_new) {
 	add_gene_vote_weighted(vote, key, add_new, 1);
 }
 
-void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int w)
-{
+void add_gene_vote_weighted(gene_vote_t* vote, int key , int add_new, int w) {
 	int offset = _index_vote(key);
 	int datalen = vote -> items[offset];
 	unsigned int * dat = vote -> pos[offset];
@@ -2556,17 +2554,17 @@ void bad_reverse_cigar(char * cigar)
 		}
 		else if((cc>='A'&&cc<='Z')||(cc>='a'&&cc<='z')) 
 		{
-			char ncg2[100];
+			char ncg2[103];
 			sprintf(ncg2, "%lld%c", tmpv, cc);
-			strcat(ncg2, ncg);
-			strcpy(ncg, ncg2);
+			strncat(ncg2, ncg, 99);
+			strncpy(ncg, ncg2, 99);
 			tmpv=0;
 		}
 		else
 		{
-			char ncg2[100];
+			char ncg2[103];
 			sprintf(ncg2, "%c%s",cc,ncg);
-			strcpy(ncg, ncg2);
+			strncpy(ncg, ncg2, 99);
 			tmpv=0;
 		}
 		cigar_cursor++;

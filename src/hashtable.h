@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.13 2018/03/09 00:13:00 cvs Exp $
+ * $Id: hashtable.h,v 9999.16 2018/05/05 00:47:52 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -49,6 +49,7 @@ typedef struct {
 } ArrayList;
 
 ArrayList * ArrayListCreate(int init_capacity);
+ArrayList * ArrayListDuplicate(ArrayList * ori);
 void ArrayListDestroy(ArrayList * list);
 void * ArrayListGet(ArrayList * list, long n);
 int ArrayListPush(ArrayList * list, void * new_elem);
@@ -58,6 +59,7 @@ void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void *
 
 
 void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
+ArrayList * HashTableKeyArray(HashTable * tab);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -86,6 +88,7 @@ void HashTableIteration(HashTable * tab, void process_item(void * key, void * ha
  *      HashTable    - a new Hashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
+HashTable * StringTableCreate(long numOfBuckets);
 HashTable *HashTableCreate(long numOfBuckets);
 
 /*--------------------------------------------------------------------------*\

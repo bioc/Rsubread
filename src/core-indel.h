@@ -200,4 +200,5 @@ chromosome_event_t * local_add_indel_event(global_context_t * global_context, th
 void print_indel_table(global_context_t * global_context);
 int sort_junction_entry_table(global_context_t * global_context);
 void mark_event_bitmap(unsigned char * bitmap, unsigned int pos);
+int check_event_bitmap(unsigned char * bitmap, unsigned int pos);
 #endif

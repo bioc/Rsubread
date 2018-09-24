@@ -157,40 +157,32 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 	HashTable * event_table = NULL;
 	chromosome_event_t * event_space = NULL;
 
-	gene_value_index_t * value_index = thread_context?thread_context->current_value_index:global_context->current_value_index ;
-
-	if(thread_context)
-	{
+	if(thread_context) {
 		event_table = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_entry_table; 
 		event_space = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
-	}
-	else
-	{
+	} else {
 		event_table = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_entry_table; 
 		event_space = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
 	}
 
+	gene_value_index_t * value_index = thread_context?thread_context->current_value_index:global_context->current_value_index ;
 
-	int event_search_method;
-	if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection))
-		event_search_method = EVENT_SEARCH_BY_BOTH_SIDES;
-	else
-		event_search_method = EVENT_SEARCH_BY_SMALL_SIDE;
-
-	// tested_read_pos is the index of the first base unwanted!
+	if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)|| there_are_events_in_range(event_table->appendix1, read_head_abs_offset, remainder_len)) {
 	
-
-	int move_start = do_not_jump?0:global_context -> config.realignment_minimum_variant_distance;
-	if(suggested_movement) move_start = suggested_movement-1;
-	int is_junction_scanned = 0;
-
-	if(0 && FIXLENstrcmp("D00491:294:C8E5GANXX:2:2302:8191:22433", explain_context -> read_name) == 0)
-	{
-		SUBREADprintf("FF REM LEN = %d , EVENT MAY HAVE FRONT=%d\t%d > %d\tPAIR_NO=%llu\n\nSCAN_START=%d\n", remainder_len, there_are_events_in_range(event_table->appendix1, read_head_abs_offset , remainder_len  ), MAX_EVENTS_IN_READ-1, explain_context -> tmp_search_sections, explain_context -> pair_number, move_start);
-	}
-
-	if(((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)|| there_are_events_in_range(event_table->appendix1, read_head_abs_offset, remainder_len)) && 
-		MAX_EVENTS_IN_READ - 1 > explain_context -> tmp_search_sections)
+		int event_search_method;
+		if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection))
+			event_search_method = EVENT_SEARCH_BY_BOTH_SIDES;
+		else
+			event_search_method = EVENT_SEARCH_BY_SMALL_SIDE;
+	
+		// tested_read_pos is the index of the first base unwanted!
+		
+	
+		int move_start = do_not_jump?0:global_context -> config.realignment_minimum_variant_distance;
+		if(suggested_movement) move_start = suggested_movement-1;
+		int is_junction_scanned = 0;
+	
+		if(MAX_EVENTS_IN_READ - 1 > explain_context -> tmp_search_sections)
 		for(tested_read_pos = move_start ; tested_read_pos <= remainder_len; tested_read_pos++)
 		{
 			int xk1, matched_bases_to_site;
@@ -203,6 +195,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 				potential_event_pos = read_head_abs_offset - tested_read_pos +1;
 			else
 				potential_event_pos = read_head_abs_offset + tested_read_pos -1;
+			if(!check_event_bitmap(  event_table->appendix1, potential_event_pos )) continue;
 
 			int search_types =  CHRO_EVENT_TYPE_INDEL | CHRO_EVENT_TYPE_JUNCTION | CHRO_EVENT_TYPE_FUSION;
 			int site_events_no = search_event(global_context, event_table , event_space , potential_event_pos, event_search_method , search_types , site_events);
@@ -328,7 +321,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 			if( (global_context ->config.limited_tree_scan) && explain_context -> full_read_len <= EXON_LONG_READ_LENGTH) break;
 			is_junction_scanned = max(is_junction_scanned, this_round_junction_scanned);
 		}
-
+	}
 	//#warning "SUBREAD_151 REMOVE THE ASSERT! "
 	//assert( remainder_len< 102 );
 	int whole_section_matched = match_chro(read_text , value_index, explain_context -> current_is_strand_jumped?read_head_abs_offset - remainder_len +1:read_head_abs_offset, remainder_len , explain_context -> current_is_strand_jumped, global_context -> config.space_type);
@@ -620,43 +613,34 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 
 	HashTable * event_table = NULL;
 	chromosome_event_t * event_space = NULL;
-
-	if(thread_context)
-	{
+	
+	if(thread_context) {
 		event_table = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_entry_table; 
 		event_space = ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
-	}
-	else
-	{
+	} else {
 		event_table = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_entry_table; 
 		event_space = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_space_dynamic;
 	}
 
 	gene_value_index_t * value_index = thread_context?thread_context->current_value_index:global_context->current_value_index ;
-
-	int event_search_method;
-	if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection))
-		event_search_method = EVENT_SEARCH_BY_BOTH_SIDES;
-	else
-		event_search_method = EVENT_SEARCH_BY_LARGE_SIDE;
-
-
-	int is_junction_scanned = 0;
-	// minimum perfect section length is 1
-	// tested_read_pos is the first WANTED BASE in section.
-	int move_start = read_tail_pos - (do_not_jump?0:global_context -> config.realignment_minimum_variant_distance);
-	if(suggested_movement) move_start = read_tail_pos - suggested_movement + 1;
-
-
-	if(0 && FIXLENstrcmp("D00491:294:C8E5GANXX:2:2302:8191:22433", explain_context -> read_name) == 0)
-	{
-		SUBREADprintf("BF EVENT MAY HAVE BETWEEN (%u, %u) BACK=%d\t%d > %d\tPAIR_NO=%llu\nMOVE_START=%d\n", read_tail_abs_offset - read_tail_pos, read_tail_pos , there_are_events_in_range(event_table -> appendix2, read_tail_abs_offset - read_tail_pos, read_tail_pos), MAX_EVENTS_IN_READ-1, explain_context -> tmp_search_sections, explain_context -> pair_number, move_start);
-	}
-
+	if( there_are_events_in_range(event_table -> appendix2, read_tail_abs_offset - read_tail_pos, read_tail_pos) || global_context ->  config.do_fusion_detection ||global_context ->  config.do_long_del_detection ){
+		int event_search_method;
+		if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection))
+			event_search_method = EVENT_SEARCH_BY_BOTH_SIDES;
+		else
+			event_search_method = EVENT_SEARCH_BY_LARGE_SIDE;
+	
+	
+		int is_junction_scanned = 0;
+		// minimum perfect section length is 1
+		// tested_read_pos is the first WANTED BASE in section.
+		int move_start = read_tail_pos - (do_not_jump?0:global_context -> config.realignment_minimum_variant_distance);
+		if(suggested_movement) move_start = read_tail_pos - suggested_movement + 1;
+	
 	//#warning ">>>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<<<"
 	//printf("OCT27-STEP-BKIN : %s , STT=%d, %u, %d\n", explain_context -> read_name, move_start, read_tail_abs_offset, read_tail_pos);
 
-	if(MAX_EVENTS_IN_READ - 1> explain_context -> tmp_search_sections && ( there_are_events_in_range(event_table -> appendix2, read_tail_abs_offset - read_tail_pos, read_tail_pos)||global_context ->  config.do_fusion_detection ||global_context ->  config.do_long_del_detection))
+		if(MAX_EVENTS_IN_READ - 1> explain_context -> tmp_search_sections)
 		for(tested_read_pos =  move_start; tested_read_pos >=0;tested_read_pos --)
 		{
 			int xk1, matched_bases_to_site;
@@ -671,20 +655,11 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 				potential_event_pos = read_tail_abs_offset - ( read_tail_pos - tested_read_pos);
 	
 
+			if(!check_event_bitmap(  event_table->appendix2, potential_event_pos )) continue;
 			int search_types = CHRO_EVENT_TYPE_INDEL | CHRO_EVENT_TYPE_JUNCTION | CHRO_EVENT_TYPE_FUSION;
 			int site_events_no = search_event(global_context, event_table , event_space , potential_event_pos, event_search_method , search_types, site_events);
 			//#warning ">>>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<<<"
 			//printf("OCT27-STEP-BKIN-SR: %s at %u, FOUND=%d\n" , explain_context -> read_name,potential_event_pos,site_events_no);
-
-			if(0 && FIXLENstrcmp("R000404427", explain_context -> read_name) == 0)
-			{
-				if(site_events_no) {
-					SUBREADprintf("FOUND THE EVENT BACK:%d at %u\t", site_events_no, potential_event_pos);
-					SUBREADprintf("EVENT0_type = %d\n", site_events[0]->event_type);
-				}else{
-					SUBREADprintf("NO EVENT BACK:%d at %u\n", site_events_no, potential_event_pos);
-				}
-			}
 
 			if(!site_events_no)continue;
 
@@ -802,7 +777,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 			if(( global_context ->config.limited_tree_scan) && explain_context -> full_read_len <= EXON_LONG_READ_LENGTH) break;
 			this_round_junction_scanned = max(this_round_junction_scanned, is_junction_scanned);
 		} 
-
+	}
 	int whole_section_matched = match_chro(read_text , value_index, read_tail_abs_offset - (explain_context -> current_is_strand_jumped?-1:read_tail_pos), read_tail_pos , explain_context -> current_is_strand_jumped, global_context -> config.space_type);
  
 	explain_context -> tmp_total_matched_bases = whole_section_matched + sofar_matched ;	
@@ -1131,8 +1106,6 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 	align_res -> used_subreads_in_vote = used_subreads_in_vote;
 	align_res -> noninformative_subreads_in_vote = noninformative_subreads_in_vote;
 	align_res -> is_fully_covered = *is_fully_covered ;
-
-	//insert_big_margin_record(global_context , _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read), align_res -> selected_votes, align_res -> confident_coverage_start, align_res -> confident_coverage_end, curr_read_len, (current_vote -> masks[vote_i][vote_j] & IS_NEGATIVE_STRAND)?1:0);
 
 	if(global_context -> config.do_breakpoint_detection)
 	{
@@ -2259,13 +2232,16 @@ int find_path(global_context_t * global_context, thread_context_t * thread_conte
 	return ret;
 }
 
+
 int process_voting_junction_PE_topK(global_context_t * global_context, thread_context_t * thread_context, subread_read_number_t pair_number, gene_vote_t * vote_1, gene_vote_t * vote_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, int read_len_1, int read_len_2, int is_negative_strand, gene_vote_number_t v1_all_subreads, gene_vote_number_t v2_all_subreads)
 {
-	vote_combination_t * comb_buffer = malloc(global_context -> config.max_vote_combinations * sizeof(vote_combination_t));
+	topK_buffer_t * topbuf = thread_context?&thread_context->topKbuff:&global_context ->topKbuff ;
+	
+	vote_combination_t * comb_buffer = (vote_combination_t *) topbuf -> comb_buffer;
 	simple_mapping_t * vote_simple_1_buffer, * vote_simple_2_buffer;
-	vote_simple_1_buffer = malloc(global_context -> config.max_vote_simples * sizeof(simple_mapping_t));
-	vote_simple_2_buffer = malloc(global_context -> config.max_vote_simples * sizeof(simple_mapping_t));
-	memset(comb_buffer, 0 , sizeof(vote_combination_t) * global_context -> config.max_vote_combinations);
+	vote_simple_1_buffer =(simple_mapping_t *) topbuf -> vote_simple_1_buffer;
+	vote_simple_2_buffer =(simple_mapping_t *) topbuf -> vote_simple_2_buffer;
+	//memset(comb_buffer, 0 , sizeof(vote_combination_t) * global_context -> config.max_vote_combinations);
 
 	int is_second_read,i,j;
 	int third_highest_votes[2][9];
@@ -2329,15 +2305,9 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				for (j=0; j< current_vote->items[i]; j++)
 				{
 					if(current_simple_number >= global_context -> config.max_vote_simples)break;
-					if(third_k == 0 && current_vote->votes[i][j] >= third_highest_votes [is_second_read][global_context -> config.top_scores - 1])
-					{
-
-						//#warning ">>>>>> COMMENT THIS <<<<<<<<"
-						//SUBREADprintf("OCT27-STEP0-%s-POS%u-COV=%d.%d-V%d\n", read_name_1, current_vote -> pos[i][j], current_vote -> coverage_start[i][j], current_vote -> coverage_end[i][j] , current_vote -> votes[i][j]);
-
+					if(global_context->config.do_big_margin_filtering_for_junctions && third_k == 0 && current_vote->votes[i][j] >= third_highest_votes [is_second_read][global_context -> config.top_scores - 1])
 						insert_big_margin_record(global_context , _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read), current_vote -> votes[i][j], current_vote -> coverage_start[i][j], current_vote -> coverage_end[i][j] , current_read_len, (current_vote -> masks[i][j] & IS_NEGATIVE_STRAND)?1:0);
-
-					}
+					
 					if(current_vote->votes[i][j] == this_vote_N && current_vote->votes[i][j] >= global_context->config.minimum_subread_for_second_read)
 					{
 						current_simple[current_simple_number].is_vote_t_item = 1;
@@ -2356,8 +2326,6 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 			for(i = 0; i < global_context -> config.multi_best_reads; i++)
 			{
 				mapping_result_t * old_result = _global_retrieve_alignment_ptr(global_context, pair_number, is_second_read, i);
-				if(0 && FIXLENstrcmp("V0112_0155:7:1101:2293:2015", read_name_1)==0)
-					SUBREADprintf("OLD_VOTE_N[%d]; VOTE = %d  ( %d == X ) ; SIMP_NO %d > %d POS=%u\n", i, old_result -> selected_votes,  this_vote_N,  current_simple_number, global_context -> config.max_vote_simples, old_result -> selected_position);
 				if(current_simple_number >= global_context -> config.max_vote_simples)break;
 				if(old_result -> selected_votes == this_vote_N)
 				{
@@ -2371,8 +2339,6 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				}
 			}
 
-			if(0 && strcmp(read_name_1, "V0112_0155:7:1101:2293:2015")==0)
-				SUBREADprintf("Read %d : Anchors = %d\n", is_second_read + 1, current_simple_number);
 		}
 		simple_record_numbers[is_second_read] = current_simple_number;
 	}
@@ -2389,13 +2355,10 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				if(max(vote_simple_1_buffer[i].major_half_votes, vote_simple_2_buffer[j].major_half_votes) < global_context->config.minimum_subread_for_first_read)continue;
 				
 				simple_PE_and_same_chro(global_context , vote_simple_1_buffer+i, vote_simple_2_buffer+j , &is_PE_distance, &is_same_chromosome , read_len_1, read_len_2);
+
 				if((!is_PE_distance) && min(vote_simple_1_buffer[i].major_half_votes, vote_simple_2_buffer[j].major_half_votes) < global_context->config.minimum_subread_for_first_read)continue;
 				if( global_context ->  exonic_region_bitmap && is_same_chromosome)is_both_exonic_regions =  is_pos_in_annotated_exon_regions(global_context, vote_simple_1_buffer[i].mapping_position + vote_simple_1_buffer[i].read_start_base ) && is_pos_in_annotated_exon_regions(global_context, vote_simple_2_buffer[j].mapping_position + vote_simple_2_buffer[j].read_start_base  ) ;
 
-				if(0 && strcmp(read_name_1, "R010442852")==0)
-					SUBREADprintf("KNOWN_EXONS: %s: %u + %u ~    %u + %u : %s\n", read_name_1, vote_simple_1_buffer[i].mapping_position , vote_simple_1_buffer[i].read_start_base ,  vote_simple_2_buffer[j].mapping_position , vote_simple_2_buffer[j].read_start_base, is_both_exonic_regions?"YES":"NO");
-				//#warning " ============== USE THE FIRST WEIGHT FORMULA IN RELEASE ================ "
-				//#warning " ============== USE THE SECOND WEIGHT FORMULA FOR SVs GRANT APP ======== "
 				int adjusted_weight;
 
 				if(1){
@@ -2438,12 +2401,12 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 	}
 
 	mapping_result_t * alignment_tmp_r1, * alignment_tmp_r2;
-	alignment_tmp_r1 = malloc(sizeof(mapping_result_t) * global_context->config.multi_best_reads);
-	alignment_tmp_r2 = malloc(sizeof(mapping_result_t) * global_context->config.multi_best_reads);
+	alignment_tmp_r1 = (mapping_result_t *) topbuf -> alignment_tmp_r1;
+	alignment_tmp_r2 = (mapping_result_t *) topbuf -> alignment_tmp_r2;
 
 	subjunc_result_t * junction_tmp_r2 , * junction_tmp_r1;
-	junction_tmp_r1 = malloc(sizeof(subjunc_result_t) * global_context->config.multi_best_reads);
-	junction_tmp_r2 = malloc(sizeof(subjunc_result_t) * global_context->config.multi_best_reads);
+	junction_tmp_r1 = (subjunc_result_t *) topbuf -> junction_tmp_r1;
+	junction_tmp_r2 = (subjunc_result_t *) topbuf -> junction_tmp_r2;
 
 	memset(junction_tmp_r1, 0, sizeof(subjunc_result_t) * global_context->config.multi_best_reads);
 	memset(junction_tmp_r2, 0, sizeof(subjunc_result_t) * global_context->config.multi_best_reads);
@@ -2474,6 +2437,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				simple_mapping_t * current_loc = is_second_read?comb_buffer[i].r2_loc:comb_buffer[i].r1_loc;
 				assert(current_loc);
 				unsigned int current_pos = current_loc->mapping_position;
+				//SUBREADprintf("CLLL BUF %d R_%d : %u\n", i, 1+is_second_read,  current_loc->mapping_position);
 
 				int is_exist = 0;
 				for(j = 0; j < *current_r_cursor; j++)
@@ -2590,14 +2554,6 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 		}
 	}
 
-	free(junction_tmp_r1);
-	free(junction_tmp_r2);
-	free(alignment_tmp_r1);
-	free(alignment_tmp_r2);
-	free(comb_buffer);
-	free(vote_simple_1_buffer);
-	free(vote_simple_2_buffer);
-
 	return 0;
 }
 
@@ -2689,7 +2645,6 @@ int process_voting_junction(global_context_t * global_context, thread_context_t 
 unsigned int explain_read(global_context_t * global_context, thread_context_t * thread_context, realignment_result_t * final_realignments, subread_read_number_t pair_number, int read_len, char * read_name , char *read_text, char *qual_text, int is_second_read, int best_read_id, int is_negative_strand)
 {
 	explain_context_t explain_context;
-
 	mapping_result_t *current_result = _global_retrieve_alignment_ptr(global_context, pair_number, is_second_read, best_read_id); 
 
 	if(global_context -> config.do_big_margin_filtering_for_reads)
@@ -2697,11 +2652,8 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 		int current_repeated_times = is_ambiguous_voting(global_context, pair_number, is_second_read, current_result->selected_votes, current_result->confident_coverage_start, current_result->confident_coverage_end, read_len, (current_result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0);
 		if( global_context -> config.do_big_margin_filtering_for_reads && current_repeated_times>1) return 0;
 	}
-	
-
 
 	memset(&explain_context,0, sizeof(explain_context_t));
-
 	explain_context.full_read_len = read_len;
 	explain_context.is_fully_covered = current_result -> is_fully_covered ;
 	explain_context.full_read_text = read_text;
@@ -2752,16 +2704,7 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 		front_search_start_position = current_result -> selected_position + front_search_read_start;
 	}
 
-	if(0 && FIXLENstrcmp("SRR3439488.572382", explain_context.read_name)==0) {
-		char * q_res_chro=NULL;
-		int q_res_offset=0;
-		locate_gene_position(current_result -> selected_position,&global_context -> chromosome_table, &q_res_chro, &q_res_offset);
-		SUBREADprintf("EXPLAIN_READ_%d %s [%d]: POS=%u (%s:%d);; BACK SEARCH TAILPOS=%u, READTAIL=%d ; INDEL_IN_CONF=%d ; READ_COV=%d~%d\n", 1+is_second_read, explain_context.read_name, best_read_id, current_result -> selected_position,q_res_chro,q_res_offset, back_search_tail_position, back_search_read_tail, current_result -> indels_in_confident_coverage, front_search_read_start, back_search_read_tail);
-	}
-
 	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 0, 1);
-	if(0 && FIXLENstrcmp("R_chr901_932716_91M1D9M",explain_context.read_name ) == 0)
-		 SUBREADprintf("B_SEARCH has found %d result sets\n", explain_context.all_back_alignments);
 
 	//int is_backsearch_tie = explain_context.is_currently_tie;
 	int back_search_matches_diff = -9999;
@@ -2837,22 +2780,6 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	int front_search_matches_diff = explain_context.best_matching_bases - explain_context.second_best_matching_bases;
 	explain_context.best_second_match_diff = front_search_matches_diff + back_search_matches_diff;
 
-	/*
-	if((!global_context -> config.report_multi_mapping_reads )&& (is_frontsearch_tie || is_backsearch_tie))
-	{
-		current_result -> final_quality = 0;
-		current_result -> result_flags &= ~CORE_IS_FULLY_EXPLAINED;
-		current_result -> result_flags &= ~CORE_IS_PAIRED_END;
-		if(explain_context. best_read_id)
-		{
-			mapping_result_t * result_prime = _global_retrieve_alignment_ptr(global_context, explain_context.pair_number, 0, 0); 
-			result_prime -> result_flags &= ~CORE_IS_PAIRED_END;
-			result_prime = _global_retrieve_alignment_ptr(global_context, explain_context.pair_number, 1, 0); 
-			result_prime -> result_flags &= ~CORE_IS_PAIRED_END;
-		}
-	}
-	// calc
-	else*/
 	int realignment_number = finalise_explain_CIGAR(global_context, thread_context, &explain_context, final_realignments);
 
 	if(0 && FIXLENstrcmp("SRR3439488.572382", explain_context.read_name)==0) 
@@ -3193,7 +3120,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 
 				if(nch == 'M')
 				{
-					char cigar_tiny [11];
+					char cigar_tiny [12];
 					int is_Last_M = (cigar_string[cigar_cursor]==0);
 					if(is_First_M && head_soft_clipped>0)
 					{
@@ -3931,48 +3858,8 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 	//if(result -> selected_votes < global_context->config.minimum_subread_for_first_read)return;
 
 	if(global_context->config.do_big_margin_filtering_for_junctions)
-	{
-
-
-		if(0 && FIXLENstrcmp("R003738400", read_name) == 0 ) 
-		{
-			char posout[100];
-			int xk1;
-			absoffset_to_posstr(global_context, result -> selected_position, posout);
-
-			
-			unsigned short * big_margin_record = _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read);
-			for(xk1 = 0; xk1 < global_context->config.big_margin_record_size ; xk1+=3)
-			{
-				SUBREADprintf("[%d] %d:%d:%d\t", xk1, big_margin_record[xk1], big_margin_record[xk1+1], big_margin_record[xk1+2]);
-			}
-
-			SUBREADprintf("\nSIZE=%d, [%s] ENCOUNTER=%d at %s  (PROBE: v=%d  coverage=%d - %d)\n", global_context->config.big_margin_record_size, read_name, is_ambiguous_voting(global_context, pair_number, is_second_read, result->selected_votes, result -> confident_coverage_start, result -> confident_coverage_end, read_len, (result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), posout, result->selected_votes, result -> confident_coverage_start, result -> confident_coverage_end);
-
-			SUBREADprintf("NEWJUNC: %s , L1 MAIN_POS=%u; MINOR_POS=%u ; LEN=%d ; SPL=%d\nMNVT=%d ; RSSV=%d\n", read_name, result -> selected_position, subjunc_result -> minor_position, read_len, selected_real_split_point, subjunc_result -> minor_votes , result -> selected_votes ); 
-		}
-
-
-		//print_big_margin(global_context, pair_number, is_second_read);
 		if(is_ambiguous_voting(global_context, pair_number, is_second_read, result->selected_votes, result -> confident_coverage_start, result -> confident_coverage_end, read_len, (result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0))return;
-	}
 
-	if(0){
-		#define TEST_SUBJUNC_POS0 225127476 
-		if((result -> selected_position > TEST_SUBJUNC_POS0 - 100 && result -> selected_position < TEST_SUBJUNC_POS0 + 100)||
-			(subjunc_result -> minor_position > TEST_SUBJUNC_POS0 - 100 && subjunc_result -> minor_position < TEST_SUBJUNC_POS0 + 100))
-		//if(FIXLENstrcmp("V0112_0155:7:1101:14157:2012", read_name)==0)
-			SUBREADprintf("NEWJUNC: %s , L1 MAIN_POS=%u; MINOR_POS=%u ; LEN=%d ; SPL=%d\nMNVT=%d ; RSSV=%d\nENCOUNTER=%d\n", read_name, result -> selected_position, subjunc_result -> minor_position, read_len, selected_real_split_point, subjunc_result -> minor_votes , result -> selected_votes , is_ambiguous_voting(global_context, pair_number, is_second_read, result->selected_votes, result -> confident_coverage_start, result -> confident_coverage_end, read_len, (result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0)); 
-	}
-
-
-
-
-	//if(strcmp(read_name, "dd1")==0)
-	//	SUBREADprintf("SPLIT=%d\n",  subjunc_result->split_point);
-
-	//SUBREADprintf("L1 SPLIT=%d\n",  subjunc_result->split_point);
-	
 	unsigned int left_virtualHead_abs_offset = min(result -> selected_position, subjunc_result -> minor_position);
 	unsigned int right_virtualHead_abs_offset = max(result -> selected_position, subjunc_result -> minor_position);
 
@@ -5317,7 +5204,7 @@ void core_fragile_junction_voting(global_context_t * global_context, thread_cont
 				char * subread_string = InBuff + subread_offset;
 				gehash_key_t subread_integer = genekey2int(subread_string, color_space);
 
-				gehash_go_q(global_context->current_index, subread_integer , subread_offset, read_len,negative_strand, vote_p1, 100, 5, subread_no,  low_border, high_border - read_len);
+				gehash_go_q(global_context->current_index, subread_integer , subread_offset, read_len,negative_strand, vote_p1, 5, subread_no,  low_border, high_border - read_len);
 			}
 			if(subread_offset1 >= read_len -16)
 				break;

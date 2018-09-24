@@ -93,6 +93,7 @@ typedef struct{
 
 typedef struct{
 	int is_paired_end_reads;
+	int is_internal_error;
 	gene_input_t first_read_file;
 	gene_input_t second_read_file;
 	unsigned long long first_read_file_size;
@@ -140,6 +141,7 @@ typedef struct{
 	char first_read_file[MAX_FILE_NAME_LENGTH];
 	char second_read_file[MAX_FILE_NAME_LENGTH];
 	char exon_annotation_file[MAX_FILE_NAME_LENGTH];
+	char exon_annotation_file_screen_out[MAX_FILE_NAME_LENGTH];
 	char exon_annotation_alias_file[MAX_FILE_NAME_LENGTH];
 	int exon_annotation_file_type;
 	char exon_annotation_gene_id_column[MAX_READ_NAME_LEN];
@@ -173,6 +175,7 @@ typedef struct{
 	int is_BAM_input;
 	int is_BAM_output;
 	int is_input_read_order_required;
+	int sort_reads_by_coordinates;
 	int convert_color_to_base;
 	int SAM_extra_columns;
 	int report_multiple_best_in_pairs;
@@ -448,6 +451,19 @@ typedef struct {
 
 
 typedef struct{
+	void * junction_tmp_r1;
+	void * junction_tmp_r2;
+
+	void * alignment_tmp_r1;
+	void * alignment_tmp_r2;
+
+	void * vote_simple_1_buffer;
+	void * vote_simple_2_buffer;
+
+	void * comb_buffer;
+} topK_buffer_t;
+
+typedef struct{
 	unsigned long long all_correct_PE_reads;
 	int thread_id;
 	pthread_t thread;
@@ -467,6 +483,8 @@ typedef struct{
 	unsigned int not_properly_pairs_only_one_end_mapped;
 	unsigned int all_multimapping_reads;
 	unsigned int all_uniquely_mapped_reads;
+
+	topK_buffer_t topKbuff;
 } thread_context_t;
 
 
@@ -501,7 +519,8 @@ typedef struct{
 	int need_merge_buffer_now;
 	read_input_t input_reads;
 	bigtable_t bigtable;
-
+	int rebuilt_command_line_size;
+	char * rebuilt_command_line;
 
 	subread_lock_t bigtable_lock;
 	subread_lock_t output_lock;
@@ -510,6 +529,7 @@ typedef struct{
 	long long bigtable_cache_file_loaded_fragments_begin;
 	long long bigtable_cache_file_fragments;
 	bigtable_cached_result_t * bigtable_cache;
+	char *bigtable_cache_malloc_ptr, *bigtable_cache_malloc_ptr_junc;
 	unsigned int bigtable_chunked_fragments;
 	int bigtable_dirty_data;
 	
@@ -557,6 +577,7 @@ typedef struct{
 
 	bucketed_table_t translocation_result_table;
 	bucketed_table_t inversion_result_table;
+	topK_buffer_t topKbuff;
 
 	// per chunk parameters
 	subread_read_number_t read_block_start;
@@ -667,4 +688,5 @@ int is_valid_float(char * optarg, char * optname);
 int exec_cmd(char * cmd, char * outstr, int out_limit);
 int is_pos_in_annotated_exon_regions(global_context_t * global_context, unsigned int pos);
 char * get_sam_chro_name_from_alias(HashTable * tab, char * anno_chro);
+void subread_rebuild_cmd(int argc, char ** argv, global_context_t * global_context);
 #endif

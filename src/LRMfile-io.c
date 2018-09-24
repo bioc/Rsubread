@@ -599,6 +599,8 @@ int LRMlocate_gene_position(LRMcontext_t * context, unsigned int linear, char **
 
 	//LRMprintf("LINEAR = %u\n", linear);
 
+	(*chro_name)=NULL;
+	(*pos) = -1;
 	while (jump_ns > 5)
 	{
 		while(n+jump_ns < total_offsets && LRMArrayListGet(context->chromosome_size_list, n + jump_ns) - NULL <= linear)

@@ -160,41 +160,33 @@ int BINsearch_event(chromosome_event_t * event_space, int * event_ids, int is_sm
 	}
 }
 
+
+typedef struct{
+	int thread_id;
+	int block_start;
+	int block_end;
+	HashTable * result_tab;
+	int * small_side_ordered_event_ids, * large_side_ordered_event_ids;
+	chromosome_event_t * event_space;
+	global_context_t * global_context;
+} AT_context_t;
+
+
 #define ANTI_SUPPORTING_READ_LIMIT 100
 
-int anti_supporting_read_scan(global_context_t * global_context)
-{
+void * anti_support_thread_run(void * v_cont){
+	AT_context_t * atcont = v_cont;
 
+	int * cancelled_event_list = malloc(sizeof(int)*ANTI_SUPPORTING_READ_LIMIT), x2;
+	int * small_side_ordered_event_ids = atcont -> small_side_ordered_event_ids, * large_side_ordered_event_ids = atcont -> large_side_ordered_event_ids;
+	global_context_t * global_context = atcont -> global_context;
+	chromosome_event_t * event_space = atcont -> event_space;
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
-	if(indel_context->total_events<1)return 0;
+	if(indel_context->total_events<1)return NULL;
 
-	chromosome_event_t * event_space = indel_context -> event_space_dynamic;
+	int current_read_number, cancelled_events, x1;
 
-	int x1, * small_side_ordered_event_ids, * large_side_ordered_event_ids, cancelled_events=0, * cancelled_event_list = malloc(sizeof(int)*ANTI_SUPPORTING_READ_LIMIT), x2;
-
-	small_side_ordered_event_ids = malloc(sizeof(int)*indel_context -> total_events);
-	large_side_ordered_event_ids = malloc(sizeof(int)*indel_context -> total_events);
-
-	for(x1=0; x1<indel_context->total_events; x1++)
-	{
-		small_side_ordered_event_ids[x1]=x1;
-		large_side_ordered_event_ids[x1]=x1;
-	}
-
-	void * sort_data[3];
-	sort_data[0] = small_side_ordered_event_ids;
-	sort_data[1] = event_space;
-	sort_data[2] = (void *)0xffff;	// small_side_ordering
-
-	merge_sort(sort_data, indel_context->total_events, compare_event_sides, exchange_event_sides, merge_event_sides);
-
-	sort_data[0] = large_side_ordered_event_ids;
-	sort_data[2] = NULL;	// large_side_ordering
-
-	merge_sort(sort_data, indel_context->total_events, compare_event_sides, exchange_event_sides, merge_event_sides);
-
-	int current_read_number;
-	for(current_read_number = 0; current_read_number < global_context -> processed_reads_in_chunk; current_read_number++)
+	for(current_read_number = atcont -> block_start; current_read_number < atcont -> block_end; current_read_number++)
 	{
 		int is_second_read;
 		for (is_second_read = 0; is_second_read < 1 + global_context -> input_reads.is_paired_end_reads; is_second_read ++)
@@ -228,8 +220,9 @@ int anti_supporting_read_scan(global_context_t * global_context)
 					if(event_body -> event_small_side <= coverage_start + 5) continue;
 					if(event_body -> event_small_side >= coverage_end - 5) continue;
 
-					event_body -> anti_supporting_reads ++;
-					//printf("OCT27-ANTISUP-READ @ %u has SMALL @ %u~%u , INDELS = %d, ASUP = %d\n", coverage_start - 1, event_body -> event_small_side,  event_body -> event_large_side,  event_body -> indel_length, event_body -> anti_supporting_reads);
+					long long cur_count = HashTableGet(atcont -> result_tab , NULL+small_side_ordered_event_ids[x1]+1 ) - NULL;
+					cur_count++;
+					HashTablePut( atcont -> result_tab , NULL+small_side_ordered_event_ids[x1]+1  , NULL+cur_count );
 
 					cancelled_event_list[cancelled_events++] = small_side_ordered_event_ids[x1];
 				}
@@ -251,13 +244,84 @@ int anti_supporting_read_scan(global_context_t * global_context)
 
 					if(to_be_add){
 					//	printf("OCT27-ANTISUP-READ @ %u has LARGE @ %u~%u, INDELS = %d, ASUP = %d\n", coverage_end, event_body -> event_small_side,  event_body -> event_large_side, event_body -> indel_length, event_body -> anti_supporting_reads);
-						event_body -> anti_supporting_reads ++;
+						long long cur_count = HashTableGet(atcont -> result_tab , NULL+large_side_ordered_event_ids[x1]+1 ) - NULL;
+						cur_count++;
+						HashTablePut( atcont -> result_tab , NULL+large_side_ordered_event_ids[x1]+1  , NULL+cur_count );
 					}
 				}
 			}
 		}
-		bigtable_release_result(global_context, NULL, current_read_number, 0);
 	} 
+
+	free(cancelled_event_list);
+	return NULL;
+}
+
+
+void anti_support_add_count(void * ky, void * va, HashTable * tab){
+	chromosome_event_t * event_space = tab -> appendix1 ;
+	int eno = ky-NULL-1;
+	chromosome_event_t * event_body = event_space + eno;
+	event_body -> anti_supporting_reads+= (va - NULL);
+}
+
+int anti_supporting_read_scan(global_context_t * global_context)
+{
+
+	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
+	if(indel_context->total_events<1)return 0;
+
+	chromosome_event_t * event_space = indel_context -> event_space_dynamic;
+
+	int x1, * small_side_ordered_event_ids, * large_side_ordered_event_ids;
+
+	small_side_ordered_event_ids = malloc(sizeof(int)*indel_context -> total_events);
+	large_side_ordered_event_ids = malloc(sizeof(int)*indel_context -> total_events);
+
+	for(x1=0; x1<indel_context->total_events; x1++) {
+		small_side_ordered_event_ids[x1]=x1;
+		large_side_ordered_event_ids[x1]=x1;
+	}
+
+	void * sort_data[3];
+	sort_data[0] = small_side_ordered_event_ids;
+	sort_data[1] = event_space;
+	sort_data[2] = (void *)0xffff;	// small_side_ordering
+
+	merge_sort(sort_data, indel_context->total_events, compare_event_sides, exchange_event_sides, merge_event_sides);
+
+	sort_data[0] = large_side_ordered_event_ids;
+	sort_data[2] = NULL;	// large_side_ordering
+
+	merge_sort(sort_data, indel_context->total_events, compare_event_sides, exchange_event_sides, merge_event_sides);
+
+
+	AT_context_t ATconts[64];
+	pthread_t AThreads[64];
+	
+	int thread_no, last_end = 0;
+	for(thread_no=0; thread_no< global_context -> config.all_threads; thread_no++){
+		AT_context_t * atc = ATconts + thread_no;
+		atc -> thread_id = thread_no;
+		atc -> block_start = last_end;
+		atc -> block_end = last_end = global_context -> processed_reads_in_chunk / global_context -> config.all_threads * thread_no;
+		if(thread_no == global_context -> config.all_threads-1)  atc -> block_end = global_context -> processed_reads_in_chunk;
+
+		atc -> global_context = global_context;
+		atc -> result_tab = HashTableCreate(200000);
+		atc -> small_side_ordered_event_ids = small_side_ordered_event_ids;
+		atc -> large_side_ordered_event_ids = large_side_ordered_event_ids;
+		atc -> event_space = event_space;
+
+		pthread_create(AThreads + thread_no , NULL, anti_support_thread_run, atc);
+	}
+
+	for(thread_no=0; thread_no< global_context -> config.all_threads; thread_no++){
+		pthread_join(AThreads[thread_no], NULL);
+		ATconts[thread_no].result_tab -> appendix1 = event_space;
+		HashTableIteration( ATconts[thread_no].result_tab, anti_support_add_count );
+		HashTableDestroy(ATconts[thread_no].result_tab);
+	}
 
 	free(small_side_ordered_event_ids);
 	free(large_side_ordered_event_ids);
@@ -2799,7 +2863,7 @@ int rectify_read_text(global_context_t * global_context, reassembly_by_voting_bl
 		unsigned int subread_int = 0, xk2;
 		for(xk2=0; xk2< global_context -> config.reassembly_subread_length; xk2++)
 			subread_int = (subread_int << 2) | base2int(next_read_txt[read_offset + xk2]);
-		gehash_go_q(index, subread_int , read_offset, read_len, 0, block_context -> vote_list_rectify, 22, 0, read_offset,  0, 0x7fffffff);
+		gehash_go_q(index, subread_int , read_offset, read_len, 0, block_context -> vote_list_rectify, 22, read_offset,  0, 0x7fffffff);
 	}
 
 	memset(block_context -> read_rectify_space, 0, MAX_READ_LENGTH * 4 * sizeof(short));
@@ -2929,7 +2993,7 @@ int search_window_once(global_context_t * global_context, reassembly_by_voting_b
 		if(global_context -> config.reassembly_tolerable_voting)
 			gehash_go_q_tolerable(&block_context->voting_indexes[window_no], subread_int , read_offset, read_len, 0, block_context -> vote_list, 1, 22, 24, 0, read_offset, global_context -> config.reassembly_tolerable_voting, global_context -> config.reassembly_subread_length,  0, 0x7fffffff);
 		else
-			gehash_go_q(&block_context->voting_indexes[window_no], subread_int , read_offset, read_len, 0, block_context -> vote_list, 22, 0, read_offset,  0, 0x7fffffff);
+			gehash_go_q(&block_context->voting_indexes[window_no], subread_int , read_offset, read_len, 0, block_context -> vote_list,0,read_offset,  0, 0x7fffffff);
 	}
 
 	int WINDOW_SEARCH_TREE_WIDTH = 1;

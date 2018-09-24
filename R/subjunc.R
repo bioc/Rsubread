@@ -1,4 +1,4 @@
-subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
+subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
     readfile1 <- normalizePath(as.character(readfile1), mustWork=T)
     output_file <- normalizePath(as.character(output_file), mustWork=F)
@@ -54,6 +54,8 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 		opt <- paste(opt,"-b",sep=",")
 	if(keepReadOrder)
 		opt <- paste(opt,"--keepReadOrder",sep=",")
+	if(sortReadsByCoordinates)
+		opt <- paste(opt,"--sortReadsByCoordinates",sep=",")
 
     opt <- paste(opt,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
 
@@ -62,24 +64,24 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 
     flag <- FALSE
     if(useAnnotation){
-
+		annot.display <- "R data.frame"
         if(is.null(annot.ext)){
             switch(tolower(as.character(annot.inbuilt)),
             mm9={
                 ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for mm9 (build 37.2) is used.\n")
+				annot.display <- "inbuilt (mm9)"
             },
             mm10={
                 ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
+				annot.display <- "inbuilt (mm10)"
             },
             hg19={
                 ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
+				annot.display <- "inbuilt (hg19)"
             },
             hg38={
                 ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
-                cat("NCBI RefSeq annotation for hg38 (build 38.2) is used.\n")
+				annot.display <- "inbuilt (hg38)"
             },
             {
                 stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
@@ -89,6 +91,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
         else{
             if(is.character(annot.ext)){
                 ann <- annot.ext
+				annot.display <- paste0(basename(ann), " (", ifelse(isGTF,"GTF","SAF"),")")
             }
             else{
                 annot_df <- as.data.frame(annot.ext,stringsAsFactors=FALSE)
@@ -116,6 +119,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
         if(!is.null(chrAliases))
             opt <- paste(opt,"-A",chrAliases,sep=",")
 
+		opt <- paste(opt, "--exonAnnotationScreenOut", annot.display, sep=",")
     }
 
 	if(phredOffset == 33)
@@ -123,6 +127,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 	else
 		opt <- paste(opt,"-P",6,sep=",")	
 
+	return.summary <- data.frame()
 	for(i in 1:length(readfile1)){
 		opt_files <- paste("-r",readfile1[i],sep=",")
 		if(!is.null(readfile2)) 
@@ -132,9 +137,18 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
 		cmd <- paste("subjunc",opt_files,opt,sep=",")
 		n <- length(unlist(strsplit(cmd,",")))
 		C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+		summary.data <- .load.delete.summary(output_file[i])
+		if(i ==1){
+			return.summary <- summary.data
+			colnames(return.summary) <-c("Category", output_file[i])
+		}else{
+			return.summary <- cbind(return.summary, summary.data[,2] )
+			colnames(return.summary)[ncol(return.summary)] <- output_file[i]
+		}
 	}
 
     if(flag)
         file.remove(fout_annot)
 
+	return(return.summary)
 }

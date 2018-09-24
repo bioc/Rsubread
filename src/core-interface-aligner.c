@@ -49,6 +49,9 @@ static struct option long_options[] =
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"sv", no_argument, 0, 0},
 	{"longDel", no_argument, 0, 0},
+	{"exonAnnotationScreenOut", required_argument, 0, 0},
+	{"gtfFeature", required_argument, 0, 0},
+	{"gtfAttr", required_argument, 0, 0},
 	{"extraColumns",  no_argument, 0, 0},
 	{"forcedPE",  no_argument, 0, 0},
 	{"ignoreUnmapped",  no_argument, 0, 0},
@@ -62,6 +65,7 @@ static struct option long_options[] =
 	{"maxRealignLocations",  required_argument, 0, 0},
 	{"multiMapping", no_argument, 0, 0},
 	{"keepReadOrder", no_argument, 0, 0},
+	{"sortReadsByCoordinates", no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -176,6 +180,11 @@ void print_usage_core_aligner()
 	SUBREADputs("                    input file. Reads from the same pair are always placed next");
 	SUBREADputs("                    to each other no matter this option is specified or not.");
 	SUBREADputs("");
+	SUBREADputs("  --sortReadsByCoordinates Output location-sorted reads. This option is");
+	SUBREADputs("                    applicable for BAM output only. A BAI index file is also");
+	SUBREADputs("                    generated for each BAM file so the BAM files can be directly");
+	SUBREADputs("                    loaded into a genome browser.");
+	SUBREADputs("");
 	SUBREADputs("# color space reads");
 	SUBREADputs("");
 	SUBREADputs("  -b                Convert color-space read bases to base-space read bases in");
@@ -247,6 +256,8 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 	optind = 0;
 	opterr = 1;
 	optopt = 63;
+
+	subread_rebuild_cmd(argc, argv, global_context);
 
 	global_context->config.entry_program_name = CORE_PROGRAM_SUBREAD;
 	global_context->config.max_mismatch_exonic_reads = 3;
@@ -509,6 +520,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				{
 					global_context->config.is_input_read_order_required=1;
 				}
+				else if(strcmp("sortReadsByCoordinates", long_options[option_index].name)==0) 
+				{
+					global_context->config.sort_reads_by_coordinates=1;
+				}
 				else if(strcmp("extraColumns", long_options[option_index].name)==0) 
 				{
 					global_context->config.SAM_extra_columns=1;
@@ -583,6 +598,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context->config.maximise_sensitivity_indel = 1;
 					global_context->config.realignment_minimum_variant_distance = 1;
 				//	global_context->config.max_indel_length = max(16, global_context->config.max_indel_length);
+				}
+				else if(strcmp("exonAnnotationScreenOut", long_options[option_index].name)==0){
+					strcpy(global_context->config.exon_annotation_file_screen_out, optarg);
 				}
 				else if(strcmp("minVoteCutoff", long_options[option_index].name)==0)
 				{

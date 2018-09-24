@@ -10,7 +10,7 @@ TH_subread=100,colorspace=FALSE)
   \item{basename}{ character string giving the basename of created index files.}
   \item{reference}{ charater string giving the name of a FASTA-format file that includes sequences of all chromosomes and contigs.}
   \item{gappedIndex}{ logical indicating if a gapped index or a full index will be built. A gapped index contains 16mers (subreads) that are extracted every three bases from a reference genome, whereas a full index contains subreads extracted from every chromosomal location of a genome. The index contains a hash table, which includes sequences of subreads and their corresponding chromosomal locations. Default value of this argument is \code{FALSE} (ie. a full index is built). }
-  \item{indexSplit}{ logical indicating if an index can be split into multiple blocks. Size of each block is determined by value of parameter \code{memory}. \code{FALSE} by default (ie. a single-block index is generated). }
+  \item{indexSplit}{ logical indicating if an index can be split into multiple blocks. The block size is determined by value of parameter \code{memory}. \code{FALSE} by default (ie. a single-block index is generated). }
   \item{memory}{ numeric value specifying the amount of memory (in megabytes) used for storing the index during read mapping. 8000 MB by default. Note that this option is ignored when \code{indexSplit} is \code{FALSE}. }
   \item{TH_subread}{ numeric value specifying the threshold for removing highly repetitive subreads (16bp mers). 100 by default. Subreads will be excluded from the index if they occur more than threshold number of times in the genome.}
   \item{colorspace}{ logical. If \code{TRUE}, a color space index will be built. Otherwise, a base space index will be built.}
@@ -27,7 +27,7 @@ Therefore the size of memory used during mapping can be controlled.
 The more memory is used in mapping, the faster the mapping speed.
 Generating a one-block full index (eg. setting both \code{gappedIndex} and \code{indexSplit} to \code{FALSE}) will enable the maximum mapping speed to be achieved.
 
-Once an index is built it can be re-used in all the mappings.
+Once an index is built, it can be re-used in each mapping.
 
 Sequences of reference genomes can be downloaded from NCBI, UCSC or Ensembl databases.
 For instance, human reference genome GRCh38.p12 and mouse reference genome GRCm38.p6 can be downloaded from the NCBI database via the following links:
