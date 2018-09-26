@@ -214,7 +214,7 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in BAM/SAM output. 
 }
 \value{ 
-No value is produced but SAM or BAM format files are written to the current working directory. For \code{Subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
+Return a \code{data.frame} object that includes mapping statistics for each library. Read mapping results are saved to BAM or SAM files in the current working directory. For \code{subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
@@ -230,7 +230,7 @@ buildindex(basename="./reference_index",reference=ref)
 
 # align a sample read dataset ('reads.txt') to the sample reference
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
-align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM",phredOffset=64)
+align.stat <- align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM",phredOffset=64)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
