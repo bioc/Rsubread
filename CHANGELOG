@@ -1,3 +1,7 @@
+26 Sept 2018 - 1.30.8
+(1) Update align.Rd and buildindex.Rd.
+(2) Update users guide.
+
 24 Sep 2018 - 1.30.7
 (1) Fix bugs in align(), subjunc() and featureCounts().
 (2) Improve documentation.
