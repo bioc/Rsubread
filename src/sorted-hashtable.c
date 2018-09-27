@@ -1533,6 +1533,13 @@ void write_options(FILE * fp, gehash_t * the_table)
 	fwrite(&option_key, 2, 1, fp);
 }
 
+int is_1_greater_than_2(short k1, gehash_data_t v1, short k2, gehash_data_t v2){
+	if(k1 > k2) return 1;
+	if(k1 == k2 && ((k1%791)%2==0) && v1>v2) return 1;
+	if(k1 == k2 && ((k1%791)%2==1) && v1<v2) return 1;
+	return 0;
+}
+
 int gehash_dump(gehash_t * the_table, const char fname [])
 {
 	int ii, jj, xx;
@@ -1595,8 +1602,8 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 					for (jj = ii+1; jj < current_bucket -> current_items; jj++)
 					{
 						
-						if (current_bucket -> item_keys[ii] > current_bucket -> item_keys[jj])
-						{
+						if(is_1_greater_than_2( current_bucket -> item_keys[ii], current_bucket -> item_values[ii],
+											    current_bucket -> item_keys[jj], current_bucket -> item_values[jj] )) {
 							tmp_key = current_bucket -> item_keys[ii];
 							current_bucket -> item_keys[ii] = current_bucket -> item_keys[jj];
 							current_bucket -> item_keys[jj] = tmp_key;
@@ -1610,27 +1617,6 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 			}
 			else
 			{
-
-				if(0){
-					for(ii=0;ii<current_bucket -> current_items -1; ii++)
-					{
-						short tmp_key;
-						for (jj = ii+1; jj < current_bucket -> current_items; jj++)
-						{
-							
-							if (current_bucket -> new_item_keys[ii] > current_bucket -> new_item_keys[jj])
-							{
-								tmp_key = current_bucket -> new_item_keys[ii];
-								current_bucket -> new_item_keys[ii] = current_bucket -> new_item_keys[jj];
-								current_bucket -> new_item_keys[jj] = tmp_key;
-
-								tmp_val = current_bucket -> item_values[ii];
-								current_bucket -> item_values[ii] = current_bucket -> item_values[jj];
-								current_bucket -> item_values[jj] = tmp_val;
-							}
-						}
-					}
-				}
 				if(1){
 					memset(items_in_sort, 0, sizeof(int)*SORT_LANE_NUMBER);
 					for(ii=0;ii<current_bucket -> current_items;ii++)
@@ -1640,6 +1626,8 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 						sort_space_new_key[sort_lane_no][xx_th_item] = current_bucket -> new_item_keys[ii];
 						sort_space_data[sort_lane_no][xx_th_item] = current_bucket -> item_values[ii];
 					}
+
+					// sort the individual lanes.
 					for(xx=0;xx<SORT_LANE_NUMBER;xx++)
 					{
 						for(ii=0;ii<items_in_sort[xx]-1; ii++)
@@ -1647,8 +1635,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 							for(jj = ii+1; jj < items_in_sort[xx]; jj++)
 							{
 								short tmp_key;
-								if(sort_space_new_key[xx][ii] > sort_space_new_key[xx][jj])
-								{
+								if(is_1_greater_than_2(  sort_space_new_key[xx][ii], sort_space_data[xx][ii], sort_space_new_key[xx][jj], sort_space_data[xx][jj] )) {
 									tmp_key = sort_space_new_key[xx][ii];
 									sort_space_new_key[xx][ii] = sort_space_new_key[xx][jj];
 									sort_space_new_key[xx][jj] = tmp_key;
@@ -1661,26 +1648,36 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 						}
 					}
 
-
+					// items_in_sort : array, each element for a lane
+					// items_in_merge : how many items in each lane that have been merged (ie, read_ptr for each lane)
+					// sort_space_new_key : N lanes each has been sorted, each has many keys (ie subreads)
+					// sort_space_data : N lanes, each has many values (ie positions)
+					// current_bucket -> new_item_keys : One array containing sorted keys (write_ptr is ii)
+					// current_bucket -> item_values:  One array containing sorted values (write_ptr is ii)) 
 					memset(items_in_merge, 0, sizeof(int)*SORT_LANE_NUMBER);
+
+					// tmp_key : the current key being examed. A larger key is put AFTER a smaller key.
 					for(ii=0;ii<current_bucket -> current_items;ii++)
 					{
 						int tmp_key=0x7fffffff;
-						int selected_lane = 0;
-						for(xx=0;xx<SORT_LANE_NUMBER;xx++)
+						int selected_lane = 0, trying_lane;
+						for(trying_lane=0;trying_lane<SORT_LANE_NUMBER;trying_lane++)
 						{
-							int ii_in_xx = items_in_merge[xx];
-							if(ii_in_xx >= items_in_sort[xx]) continue;
+							int ii_in_trying_lane = items_in_merge[trying_lane];
+							if(ii_in_trying_lane >= items_in_sort[trying_lane]) continue;
 
-							if(tmp_key>sort_space_new_key[xx][ii_in_xx])
-							{
-								selected_lane=xx;
-								tmp_key = sort_space_new_key[xx][ii_in_xx];
+							if(tmp_key >= 0x10000 ||is_1_greater_than_2(
+									sort_space_new_key[selected_lane][items_in_merge[selected_lane]], 
+									sort_space_data[selected_lane][items_in_merge[selected_lane]],
+									sort_space_new_key[trying_lane][items_in_merge[trying_lane]],
+									sort_space_data[trying_lane][items_in_merge[trying_lane]]
+								)){
+								selected_lane=trying_lane;
+								tmp_key = sort_space_new_key[trying_lane][ii_in_trying_lane];
 							}
 						}
 
-						assert(tmp_key<0x10000);
-						current_bucket -> new_item_keys[ii] = (short)tmp_key;
+						current_bucket -> new_item_keys[ii] = sort_space_new_key[selected_lane][items_in_merge[selected_lane]];
 						current_bucket -> item_values[ii] = sort_space_data[selected_lane][items_in_merge[selected_lane]];
 
 						items_in_merge[selected_lane]++;
