@@ -1,3 +1,9 @@
+26 Sept 2018 - 1.31.15
+(1) Update align.Rd and buildindex.Rd.
+
+26 Sept 2018 - 1.31.14
+(1) Update users guide.
+
 20 Sep 2018 - 1.31.13
 (1) Changed the return format of align() and subjunc() to include more information
 (2) Fixed the issue of featureCounts(), align() and subjunc() not quiting when the annotation format is wrong.

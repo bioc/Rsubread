@@ -29,12 +29,12 @@ Generating a one-block full index (eg. setting both \code{gappedIndex} and \code
 
 Once an index is built, it can be re-used in each mapping.
 
-Sequences of reference genomes can be downloaded from NCBI, UCSC or Ensembl databases.
-For instance, human reference genome GRCh38.p12 and mouse reference genome GRCm38.p6 can be downloaded from the NCBI database via the following links:
+Sequences of reference genomes can be downloaded from public databases.
+For instance, primary assembly of human genome GRCh38/hg38 or mouse genome GRCm38/mm10 can be downloaded from the GENCODE database via the following links:
 
-\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.38_GRCh38.p12/GCF_000001405.38_GRCh38.p12_genomic.fna.gz}
+\url{ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_28/GRCh38.primary_assembly.genome.fa.gz}
 
-\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/635/GCF_000001635.26_GRCm38.p6/GCF_000001635.26_GRCm38.p6_genomic.fna.gz}
+\url{ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M18/GRCm38.primary_assembly.genome.fa.gz}
 }
 \value{
 No value is produced but index files are written to the current working directory.

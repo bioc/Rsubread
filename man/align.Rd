@@ -186,35 +186,28 @@ chrAliases=NULL)
   \item{chrAliases}{ a character string providing the name of a comma-delimited text file that includes aliases of chromosome names. This file should contain two columns. First column contains names of chromosomes included in the SAF or GTF annotation and second column contains corresponding names of chromosomes in the reference genome. No column headers should be provided. Also note that chromosome names are case sensitive. This file can be used to match chromosome names between the annotation and the reference genome.}
 }
 \details{
-The \code{align} function implements the \code{Subread} aligner (Liao et al., 2013) that uses a new mapping paradigm called ``seed-and-vote".
-\code{Subread} is general-purpose aligner that can be used to align both genomic DNA-seq reads and RNA-seq reads.
+The \code{align} function is an R wrapper for the Subread aligner (Liao et al., 2013) that uses a novel mapping paradigm called ``seed-and-vote".
+Subread is general-purpose aligner that can be used to align both genomic DNA-seq reads and RNA-seq reads.
+The \code{subjunc} function is an R wrapper for the Subjunc aligner (Liao et al., 2013) that is designed for mapping RNA-seq reads only.
 
-\code{Subjunc} is designed for mapping RNA-seq reads.
-The major difference between \code{Subjunc} and \code{Subread} is that \code{Subjunc} reports discovered exon-exon junctions and it also performs full alignments for every read including exon-spanning reads.
-\code{Subread} uses the largest mappable regions in the reads to find their mapping locations.
-The seed-and-vote paradigm has been found to be not only more accurate than the conventional seed-and-extend (adopted by most aligners) in read mapping, but it is a lot more efficient (Liao et al., 2013).
+The main difference between \code{subjunc} and \code{align} is that \code{subjunc} reports discovered exon-exon junctions and it also performs full alignments for every read including exon-spanning reads.
+\code{align} reports the largest mappable regions for each read.
 
-Both \code{Subread} and \code{Subjunc} can be used to align reads generated from major sequencing platforms including Illumina GA/HiSeq, ABI SOLiD, Roche 454 and Ion Torrent sequencers.
-Note that to map color-space reads (e.g. SOLiD reads), a color-space index should be built for the reference genome (see \code{\link{buildindex}} for details).
+\code{align} and \code{subjunc} can be run with a full index or a gapped index (see \code{\link{buildindex}} for more details).
+Maximum mapping speed is achieved when a one-block full index is used for mapping.
 
-\code{Subread} and \code{Subjunc} have adjustable memory usage.
-See \code{\link{buildindex}} function for more details.
+\code{subjunc} requires the presence of donor and receptor sites when calling exon-exon junctions.
+It can detect up to four junction locations in a junction read.
 
-Mapping performance is largely determined by the number of subreads extracted from each read \code{nsubreads} and the consensus threshold \code{TH1} (also \code{TH2} for paired-end read data).
-Default settings are recommended for most of the read mapping tasks.
-
-\code{Subjunc} requires donor/receptor sites to be present when detecting exon-exon junctions.
-It can detect up to four junction locations in each exon-spanning read.
-
-\code{detectSV} option should be used for SV detection in genomic DNA sequencing data.
-For RNA-seq data, users may use \code{subjunc} with the \code{reportAllJunctions} option to detect SVs (and also junctions).
-For each library, breakpoints detected from SV events will be saved to a file with suffix name `.breakpoints.txt', which includes chromosomal coordinates of SV breakpoints and numbers of supporting reads.
+The \code{detectSV} parameter in \code{align} function can be used to detect structural variants (SVs) in genomic DNA sequencing data.
+The \code{reportAllJunctions} parameter in \code{subjunc} function can be used for the detection of SVs in RNA-seq data, as well as the detection of non-canonical junctions that do not have the canonical donor/receptor sites.
+For each library, breakpoints detected from SV events are saved to a file with suffix name `.breakpoints.txt', which includes chromosomal coordinates of SV breakpoints and numbers of supporting reads.
 The BAM/SAM output includes extra fields to describe the complete alignments of breakpoint-containing reads.
 For a breakpoint-containing read, mapping of its major sequence segment is described in the main fields of BAM/SAM ouptut whereas mapping of its minor sequence segment, which does not map along with the major segment due to the presence of a breakpoint, is described in the extra fields including `CC'(Chr), `CP'(Position),`CG'(CIGAR) and `CT'(strand).
-Note that each breakpoint-containing read occupies only one row in BAM/SAM output. 
+Note that each breakpoint-containing read occupies only one row in BAM/SAM output.
 }
-\value{ 
-No value is produced but SAM or BAM format files are written to the current working directory. For \code{Subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
+\value{
+Return a \code{data.frame} object that includes mapping statistics for each library. Read mapping results are saved to BAM or SAM files in the current working directory. For \code{subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
@@ -230,7 +223,7 @@ buildindex(basename="./reference_index",reference=ref)
 
 # align a sample read dataset ('reads.txt') to the sample reference
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
-align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM",phredOffset=64)
+align.stat <- align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM",phredOffset=64)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
