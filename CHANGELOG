@@ -1,3 +1,7 @@
+29 Sept 2018 - 1.31.17
+(1) Further change the order of locations in the index.
+(2) Remove two screen output messages from featureCounts().
+
 28 Sept 2018 - 1.31.16
 (1) Change the order of locations of the same subread in the index, making the mapping results consistant no matter how many buckets are in the index.
 

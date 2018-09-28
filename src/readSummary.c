@@ -772,7 +772,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 
 void print_FC_results(fc_thread_global_context_t * global_context, char * out)
 {
-	print_in_box(89,0,1,"%c[36mAlignment assignment finished.%c[0m", CHAR_ESC, CHAR_ESC);
+	//print_in_box(89,0,1,"%c[36mAlignment assignment finished.%c[0m", CHAR_ESC, CHAR_ESC);
 	print_in_box(80,0,0,"");
 	#ifdef MAKE_STANDALONE
 	print_in_box(80,0,PRINT_BOX_WRAPPED,"Summary of counting results can be found in file \"%s.summary\"", out);
@@ -5392,8 +5392,8 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	free(key_list);
 	free(junction_source_list);
 
-	print_in_box(80,0,PRINT_BOX_CENTER,"Found %llu junctions in all the input files.", merged_junction_table -> numOfElements);
-	print_in_box(80,0,0,"");
+	//print_in_box(80,0,PRINT_BOX_CENTER,"Found %llu junctions in all the input files.", merged_junction_table -> numOfElements);
+	//print_in_box(80,0,0,"");
 
 	HashTableDestroy(merged_junction_table);
 	HashTableDestroy(merged_splicing_table);
