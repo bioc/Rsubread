@@ -1533,10 +1533,14 @@ void write_options(FILE * fp, gehash_t * the_table)
 	fwrite(&option_key, 2, 1, fp);
 }
 
-int is_1_greater_than_2(short k1, gehash_data_t v1, short k2, gehash_data_t v2){
+int is_1_greater_than_2(int bucket_i, int all_buckets , short k1, gehash_data_t v1, short k2, gehash_data_t v2){
 	if(k1 > k2) return 1;
-	if(k1 == k2 && ((k1%791)%2==0) && v1>v2) return 1;
-	if(k1 == k2 && ((k1%791)%2==1) && v1<v2) return 1;
+	if(k1 == k2){
+		unsigned int real_key = 1u*k1*1u*all_buckets;
+		real_key += bucket_i;
+		if((real_key%791)%2==0 && v1>v2) return 1;
+		if((real_key%791)%2==1 && v1<v2) return 1;
+	}
 	return 0;
 }
 
@@ -1602,7 +1606,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 					for (jj = ii+1; jj < current_bucket -> current_items; jj++)
 					{
 						
-						if(is_1_greater_than_2( current_bucket -> item_keys[ii], current_bucket -> item_values[ii],
+						if(is_1_greater_than_2(i, the_table -> buckets_number, current_bucket -> item_keys[ii], current_bucket -> item_values[ii],
 											    current_bucket -> item_keys[jj], current_bucket -> item_values[jj] )) {
 							tmp_key = current_bucket -> item_keys[ii];
 							current_bucket -> item_keys[ii] = current_bucket -> item_keys[jj];
@@ -1635,7 +1639,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 							for(jj = ii+1; jj < items_in_sort[xx]; jj++)
 							{
 								short tmp_key;
-								if(is_1_greater_than_2(  sort_space_new_key[xx][ii], sort_space_data[xx][ii], sort_space_new_key[xx][jj], sort_space_data[xx][jj] )) {
+								if(is_1_greater_than_2(i, the_table -> buckets_number,   sort_space_new_key[xx][ii], sort_space_data[xx][ii], sort_space_new_key[xx][jj], sort_space_data[xx][jj] )) {
 									tmp_key = sort_space_new_key[xx][ii];
 									sort_space_new_key[xx][ii] = sort_space_new_key[xx][jj];
 									sort_space_new_key[xx][jj] = tmp_key;
@@ -1667,6 +1671,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 							if(ii_in_trying_lane >= items_in_sort[trying_lane]) continue;
 
 							if(tmp_key >= 0x10000 ||is_1_greater_than_2(
+									i, the_table -> buckets_number, 
 									sort_space_new_key[selected_lane][items_in_merge[selected_lane]], 
 									sort_space_data[selected_lane][items_in_merge[selected_lane]],
 									sort_space_new_key[trying_lane][items_in_merge[trying_lane]],
@@ -1684,6 +1689,24 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 						//printf("V [%d] [%d] =%d\n",i , ii, tmp_key);
 					}
 				}
+			}
+		}
+
+
+		if(0) // debug
+		{
+			int inidx=0;
+			long int real_old = -1;
+			for(xx = 0; xx < current_bucket -> current_items; xx++){
+				unsigned int real_key = 1u * current_bucket -> new_item_keys[xx] *1u * the_table -> buckets_number;
+				real_key += i;
+
+				if(real_old != real_key) inidx=0;
+
+				if(1||real_key >= 0xffffff00 || real_key <5000)
+				SUBREADprintf("SUBREAD_%010u POS_%010u INIDX_%04d BUCKET_%04d_ITEM_%08d\n",real_key ,current_bucket -> item_values[xx], inidx, i, xx);
+				real_old = real_key;
+				inidx++;
 			}
 		}
 
