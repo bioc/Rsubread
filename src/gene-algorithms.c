@@ -441,6 +441,8 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 {
 	int n = 0;
 
+	(*chro_name) = NULL;
+	(*pos) = -1;
 	int low_idx=0, high_idx= offsets->total_offsets;
 	while(1){
 		if(high_idx <= low_idx+1) {
@@ -499,7 +501,6 @@ int locate_gene_position_max(unsigned int linear, const gene_offset_t* offsets ,
 			}
 
 			(*pos) -= offsets -> padding;
-
 			*chro_name = (char *)offsets->read_names+n*MAX_CHROMOSOME_NAME_LEN;
 
 			return 0;
