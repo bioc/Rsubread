@@ -1,7 +1,7 @@
 04 Oct 2018 - 1.30.9
 (1) Improve the index builder by removing the bias on smaller coordinates in mapping.
 
-30 Oct 2018 - 1.30.8
+30 Sep 2018 - 1.30.8
 (1) Update align.Rd and buildindex.Rd.
 (2) Update users guide.
 
