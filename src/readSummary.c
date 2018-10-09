@@ -176,6 +176,10 @@ typedef struct {
 	fc_read_counters read_counters;
 } fc_thread_thread_context_t;
 
+#define READ_SHIFT_UPSTREAM 10
+#define READ_SHIFT_DOWNSTREAM 20
+#define READ_SHIFT_LEFT 30
+#define READ_SHIFT_RIGHT 40
 #define REVERSE_TABLE_BUCKET_LENGTH 131072
 #define REDUCE_TO_5_PRIME_END 5
 #define REDUCE_TO_3_PRIME_END 3
@@ -243,6 +247,8 @@ typedef struct {
 	int longest_chro_name;
 	int five_end_extension;
 	int three_end_extension;
+	int read_shift_type;
+	int read_shift_size;
 	int fragment_minimum_overlapping;
 	float fractional_minimum_overlapping; 
 	float fractional_minimum_feature_overlapping;
@@ -736,6 +742,8 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%% to reads", global_context -> fractional_minimum_overlapping*100);
 	if(global_context -> fractional_minimum_feature_overlapping > 0.000001)
 		print_in_box(81,0,0,"  Min overlapping frac. : %0.1f%%%% to features", global_context -> fractional_minimum_feature_overlapping*100);
+	if(global_context -> read_shift_size >0)
+		print_in_box(80,0,0,"             Read shift : %d to %s", global_context -> read_shift_size, global_context -> read_shift_type==READ_SHIFT_UPSTREAM?"upstream":( global_context -> read_shift_type==READ_SHIFT_DOWNSTREAM?"downstream":( global_context -> read_shift_type==READ_SHIFT_LEFT?"left":"right")));
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
 		print_in_box(80,0,0,"        Read extensions : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
 	if(global_context -> reduce_5_3_ends_to_one)
@@ -3001,11 +3009,33 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 		if(1) {
-		//#warning "=================== COMMENT THESE 2 LINES ================================"
-		//for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
-		//	SUBREADprintf("BCCC: %llu , sec[%d] %s: %u ~ %u ; secs=%d ; flags=%d ; second=%d\n", read_pos, cigar_section_id , ChroNames[cigar_section_id] , Starting_Chro_Points[cigar_section_id], Section_Lengths[cigar_section_id], cigar_sections, alignment_masks, is_second_read);
+			if(global_context -> read_shift_size>0){
+				int shifting_applied_length = 0;
+				int shifting_i;
 
-			// Extending the reads to the 3' and 5' ends. (from the read point of view) 
+				if((global_context -> read_shift_type == READ_SHIFT_UPSTREAM   && (!is_this_negative_strand))||
+					(global_context -> read_shift_type == READ_SHIFT_DOWNSTREAM &&   is_this_negative_strand ))
+					shifting_applied_length = -global_context -> read_shift_size;
+
+				if((global_context -> read_shift_type == READ_SHIFT_UPSTREAM   &&   is_this_negative_strand)||
+					(global_context -> read_shift_type == READ_SHIFT_DOWNSTREAM && (!is_this_negative_strand)))
+					shifting_applied_length = global_context -> read_shift_size;
+
+				if(global_context -> read_shift_type == READ_SHIFT_LEFT) shifting_applied_length = -global_context -> read_shift_size;
+				if(global_context -> read_shift_type == READ_SHIFT_RIGHT) shifting_applied_length = global_context -> read_shift_size;
+
+				for(shifting_i = 0; shifting_i < cigar_sections ; shifting_i++){
+					if(shifting_applied_length > 0 || Starting_Chro_Points[shifting_i] > -shifting_applied_length)
+						Starting_Chro_Points[shifting_i] += shifting_applied_length;
+					else{ 
+						if(Starting_Chro_Points[shifting_i] + Section_Read_Lengths[shifting_i] > -shifting_applied_length)
+							Section_Read_Lengths[shifting_i] = Starting_Chro_Points[shifting_i] + Section_Read_Lengths[shifting_i] + shifting_applied_length;
+						else  Section_Read_Lengths[shifting_i] =1;
+						Starting_Chro_Points[shifting_i] = 1;
+					}
+				}
+			}
+
 			if(global_context -> five_end_extension)
 			{
 				if(is_this_negative_strand){
@@ -4043,7 +4073,7 @@ void fc_NCfree(void * vv){
 	free(vv);
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output) {
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size) {
 	int x1;
 	srand(time(NULL));
 
@@ -4092,6 +4122,8 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> feature_block_size = feature_block_size;
 	global_context -> five_end_extension = fiveEndExtension;
 	global_context -> three_end_extension = threeEndExtension;
+	global_context -> read_shift_type = read_shift_type;
+	global_context -> read_shift_size = read_shift_size;
 	global_context -> fragment_minimum_overlapping = minFragmentOverlap;
 	global_context -> fractional_minimum_overlapping = fracOverlap;
 	global_context -> fractional_minimum_feature_overlapping = frac_feature_overlap;
@@ -4781,6 +4813,9 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 static struct option long_options[] =
 {
 	{"primary",no_argument, 0, 0},
+	{"readShiftSize", required_argument, 0, 0},
+	{"readShiftType", required_argument, 0, 0},
+	{"readExtension5", required_argument, 0, 0},
 	{"readExtension5", required_argument, 0, 0},
 	{"readExtension3", required_argument, 0, 0},
 	{"read2pos", required_argument, 0, 0},
@@ -5490,9 +5525,11 @@ int readSummary(int argc,char *argv[]){
 	51: Rpath : the path where the assignment details per read are stored.
 	52: AdditionalColumnList: the names of additional column names written after "Length". Comma deliminated.
 	53: annotation_file_screen_output : just for displaying the annotation file name or inbuilt (mm10/hg39/...) or R data.frame.
+	54: read_shift_type : how to shift reads? "upstream" : to the 5' end; "downstream" : to the 3' end; "left" : to the smaller coordinates in chromosome ; "right" : to the larger coordinates in chromosome.
+	55: as.numeric(read_shift_size) : how many bases to shift. Mush be a positive number or zero.
 	 */
 
-	int isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, do_detectionCall, max_missing_bases_in_feature, max_missing_bases_in_read, is_Primary_Alignment_only;
+	int isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, do_detectionCall, max_missing_bases_in_feature, max_missing_bases_in_read, is_Primary_Alignment_only, read_shift_size, read_shift_type;
 	float fracOverlap, fracOverlapFeature;
 	char **chr;
 	long *start, *stop;
@@ -5709,8 +5746,31 @@ int readSummary(int argc,char *argv[]){
 	if(argc>52 && argv[52]!=NULL && argv[52][0]!=0 && argv[52][0]!=' ') extra_column_names = argv[52];
 	else extra_column_names = NULL;
 
+	annotation_file_screen_output = NULL;
+#ifndef MAKE_STANDALONE
 	if(argc>53) annotation_file_screen_output = argv[53];
-	else annotation_file_screen_output = NULL;
+#endif
+
+	if(argc>54){
+		read_shift_type = -1;
+		if(strcmp(argv[54], "upstream")==0)read_shift_type = READ_SHIFT_UPSTREAM;
+		if(strcmp(argv[54], "downstream")==0) read_shift_type = READ_SHIFT_DOWNSTREAM;
+		if(strcmp(argv[54], "left")==0) read_shift_type = READ_SHIFT_LEFT;
+		if(strcmp(argv[54], "right")==0) read_shift_type = READ_SHIFT_RIGHT;
+	} else read_shift_type = READ_SHIFT_UPSTREAM;
+
+	if(argc>55) read_shift_size = atoi(argv[55]);
+	else read_shift_size = 0;
+
+	if(read_shift_size<0){
+		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
+		return -1;
+	}
+
+	if(read_shift_type<0){
+		SUBREADprintf("ERROR: why the value for read_shift_type is %s?\n", argv[54]);
+		return -1;
+	}
 
 	if(SAM_pairer_warning_file_open_limit()) return -1;
 	if(strand_check_mode != NULL && Input_Files_And_Strand_Mode_Pair(argv[2],strand_check_mode)) return -1;
@@ -5733,7 +5793,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -6197,7 +6257,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[53];
+	char * Rargv[56];
 	char annot_name[300];
 	char temp_dir[300];
 	char * out_name = malloc(300);
@@ -6212,11 +6272,14 @@ int feature_count_main(int argc, char ** argv)
 	int min_qual_score = 0;
 	int min_dist = 50;
 	int max_dist = 600;
+	int read_shift_size = 0;
 	char debug_command[15];
 	char max_missing_bases_in_read_str[15];
 	char max_missing_bases_in_feature_str[15];
 	char min_dist_str[15];
 	char max_dist_str[15];
+	char read_shift_size_str[15];
+	char read_shift_type[15];
 	char min_qual_score_str[15];
 	char feature_block_size_str[15];
 	char * Strand_Sensitive_Str = "0";
@@ -6266,6 +6329,7 @@ int feature_count_main(int argc, char ** argv)
 	alias_file_name[0]=0;
 	debug_command[0] = 0;
 
+	strcpy(read_shift_type,"upstream");
 	strcpy(nameFeatureTypeColumn,"exon");
 	strcpy(nameGeneIDColumn,"gene_id");
 	strcpy(temp_dir, "<use output directory>");
@@ -6523,6 +6587,22 @@ int feature_count_main(int argc, char ** argv)
 					do_not_sort = 1;
 				}
 
+				if(strcmp("readShiftSize", long_options[option_index].name)==0)
+				{
+					if(!is_valid_digit_range(optarg, "readShiftSize", 1 , 0x7fffffff))
+						STANDALONE_exit(-1);
+					read_shift_size = atoi(optarg);
+				}
+
+				if(strcmp("readShiftType", long_options[option_index].name)==0)
+				{
+					if(strcmp(optarg,"upstream")!=0 && strcmp(optarg,"downstream")!=0 && strcmp(optarg,"left")!=0 && strcmp(optarg,"right")!=0){
+						SUBREADprintf("Error: the readShiftType parameter can only be 'upstream', 'downstream', 'left' or 'right'\n");
+						STANDALONE_exit(-1);
+					}
+					strcpy(read_shift_type, optarg);
+				}
+
 				if(strcmp("splitOnly", long_options[option_index].name)==0)
 				{
 					if(is_Split_or_Exonic_Only == 2) {
@@ -6605,6 +6685,7 @@ int feature_count_main(int argc, char ** argv)
 	sprintf(strFeatureFracOverlap, "%g", fracOverlapFeature);
 	sprintf(max_missing_bases_in_feature_str, "%d", max_missing_bases_in_feature);
 	sprintf(max_missing_bases_in_read_str, "%d", max_missing_bases_in_read);
+	sprintf(read_shift_size_str, "%d", read_shift_size);
 
 	Rargv[0] = "CreadSummary";
 	Rargv[1] = annot_name;
@@ -6659,10 +6740,13 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[50] = is_primary_alignment_only?"1":"0";
 	Rargv[51] = Rpath;
 	Rargv[52] = extra_column_names;
+	Rargv[54] = "NA"; // C featureCounts dosn't need the display_annotation_name.
+	Rargv[54] = read_shift_type;
+	Rargv[55] = read_shift_size_str;
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(53, Rargv);
+	else retvalue = readSummary(56, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
