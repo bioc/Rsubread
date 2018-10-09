@@ -147,7 +147,7 @@ typedef struct {
 	long * hits_indices1;
 	long * hits_indices2;
 
-	unsigned int proc_Starting_Chro_Points[65536];
+	unsigned int proc_Starting_Chro_Points_1BASE[65536];
 	unsigned short proc_Starting_Read_Points[65536];
 	unsigned short proc_Section_Read_Lengths[65536];
 	char * proc_ChroNames[65536];
@@ -745,9 +745,9 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	if(global_context -> read_shift_size >0)
 		print_in_box(80,0,0,"             Read shift : %d to %s", global_context -> read_shift_size, global_context -> read_shift_type==READ_SHIFT_UPSTREAM?"upstream":( global_context -> read_shift_type==READ_SHIFT_DOWNSTREAM?"downstream":( global_context -> read_shift_type==READ_SHIFT_LEFT?"left":"right")));
 	if(global_context -> five_end_extension || global_context -> three_end_extension)
-		print_in_box(80,0,0,"        Read extensions : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
+		print_in_box(80,0,0,"         Read extension : %d on 5' and %d on 3' ends", global_context -> five_end_extension , global_context -> three_end_extension);
 	if(global_context -> reduce_5_3_ends_to_one)
-		print_in_box(80,0,0,"      Read reduction to : %d' end" , global_context -> reduce_5_3_ends_to_one == REDUCE_TO_5_PRIME_END ?5:3);
+		print_in_box(80,0,0,"         Read reduction : to %d' end" , global_context -> reduce_5_3_ends_to_one == REDUCE_TO_5_PRIME_END ?5:3);
 	if(global_context -> is_duplicate_ignored)
 		print_in_box(80,0,0,"       Duplicated Reads : ignored");
 	if(global_context -> long_read_minimum_length < 5000)
@@ -2196,7 +2196,7 @@ void get_readname_from_bin(char * bin, char ** read_name){
 	(*read_name) = bin + 36;
 }
 
-void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin2, char ** read_name, int * flag, char ** chro, long * pos, int * mapq, char ** mate_chro, long * mate_pos, long * tlen, int * is_junction_read, int * cigar_sect, unsigned int * Starting_Chro_Points, unsigned short * Starting_Read_Points, unsigned short * Section_Read_Lengths, char ** ChroNames, char * Event_After_Section, int * NH_value, int max_M, CIGAR_interval_t * intervals_buffer, int * intervals_i, int assign_reads_to_RG, char ** RG_ptr){
+void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin2, char ** read_name, int * flag, char ** chro, long * pos, int * mapq, char ** mate_chro, long * mate_pos, long * tlen, int * is_junction_read, int * cigar_sect, unsigned int * Starting_Chro_Points_1BASE, unsigned short * Starting_Read_Points, unsigned short * Section_Read_Lengths, char ** ChroNames, char * Event_After_Section, int * NH_value, int max_M, CIGAR_interval_t * intervals_buffer, int * intervals_i, int assign_reads_to_RG, char ** RG_ptr, int * ret_me_refID, int * ret_mate_refID){
 	int x1, len_of_S1 = 0;
 	*cigar_sect = 0;
 	*NH_value = 1;
@@ -2211,13 +2211,9 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 		(*flag) = (*flag) >> 16;
 		int refID, mate_refID;
 		memcpy(&refID, bin + 4, 4);
-		if(refID >= 0){
-			/*if(sambam_chro_table[refID].chro_name < NULL + 0xfffff){
-				SUBREADprintf("DANGEROUS: PARSE: chro[%d] = %p, TABLE_PTR=%p\n", refID , sambam_chro_table[refID].chro_name, sambam_chro_table);
-			}*/
-			(*chro) = sambam_chro_table[refID].chro_name;
-		}
+		if(refID >= 0) (*chro) = sambam_chro_table[refID].chro_name;
 		else (*chro) = NULL;
+
 		(*pos) = 0;
 		memcpy(pos, bin+8, 4);
 		(*pos) ++;
@@ -2229,13 +2225,11 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 		int seq_len;
 		memcpy(&seq_len, bin + 20,4);
 		memcpy(&mate_refID, bin+24, 4);
-		if(mate_refID>=0){
-			/*if(sambam_chro_table[mate_refID].chro_name < NULL + 0xfffff){
-				SUBREADprintf("DANGEROUS: PARSE: matechro[%d] = %p, TABLE_PTR=%p\n", mate_refID , sambam_chro_table[mate_refID].chro_name, sambam_chro_table);
-			}*/
-			(*mate_chro) = sambam_chro_table[mate_refID].chro_name;
-		}
+		if(mate_refID>=0) (*mate_chro) = sambam_chro_table[mate_refID].chro_name;
 		else	(*mate_chro) = NULL;
+
+		*ret_mate_refID = mate_refID;
+		*ret_me_refID = refID;
 
 		(*mate_pos)=0;
 		memcpy(mate_pos, bin+28, 4);
@@ -2282,7 +2276,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 
 				if( (*cigar_sect) < max_M){
 					Event_After_Section[*cigar_sect] = event_char;
-					Starting_Chro_Points[*cigar_sect] = section_start_chro; 
+					Starting_Chro_Points_1BASE[*cigar_sect] = section_start_chro; 
 					Starting_Read_Points[*cigar_sect] = section_start_read;
 					Section_Read_Lengths[*cigar_sect] = this_section_length;
 					ChroNames[*cigar_sect] = (*chro);
@@ -2327,7 +2321,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 					intervals_buffer[ *intervals_i ].chromosomal_length = chro_cursor - intervals_buffer[ *intervals_i ].start_pos + len_of_S1;
 					(*intervals_i)++;
 				}
-				Starting_Chro_Points[*cigar_sect] = section_start_chro; 
+				Starting_Chro_Points_1BASE[*cigar_sect] = section_start_chro; 
 				Starting_Read_Points[*cigar_sect] = section_start_read;
 				Section_Read_Lengths[*cigar_sect] = this_section_length ;
 				ChroNames[*cigar_sect] = (*chro);
@@ -2362,6 +2356,8 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 
 		if(mate_refID < 0) *mate_chro = NULL;
 		else (*mate_chro) = sambam_chro_table[mate_refID].chro_name; 
+		*ret_mate_refID = mate_refID;
+		*ret_me_refID = refID;
 
 		*pos=0;
 		memcpy(pos, bin2+28, 4);
@@ -2401,12 +2397,12 @@ typedef struct {
 } fc_junction_info_t;
 
 */
-int calc_junctions_from_cigarInts(fc_thread_global_context_t * global_context, int alignment_masks , int cigar_sections, unsigned int * Starting_Chro_Points, unsigned short * Starting_Read_Points, unsigned short * Section_Lengths, char ** ChroNames, char * Event_After_Section, fc_junction_info_t * junctions_current){
+int calc_junctions_from_cigarInts(fc_thread_global_context_t * global_context, int alignment_masks , int cigar_sections, unsigned int * Starting_Chro_Points_1BASE, unsigned short * Starting_Read_Points, unsigned short * Section_Lengths, char ** ChroNames, char * Event_After_Section, fc_junction_info_t * junctions_current){
 	int x1, ret = 0;
-	unsigned int last_base_pos = Starting_Chro_Points[0] + Section_Lengths[0] - 1;
+	unsigned int last_base_pos = Starting_Chro_Points_1BASE[0] + Section_Lengths[0] - 1;
 	for(x1 = 1; x1 < cigar_sections; x1++){
 		if(Event_After_Section[x1-1] == 'N'){
-			unsigned int first_base_pos = Starting_Chro_Points[x1];
+			unsigned int first_base_pos = Starting_Chro_Points_1BASE[x1];
 			junctions_current[ret].last_exon_base_left = last_base_pos;
 			junctions_current[ret].first_exon_base_right = first_base_pos;
 			strcpy(junctions_current[ret].chromosome_name_left, ChroNames[x1]);
@@ -2414,7 +2410,7 @@ int calc_junctions_from_cigarInts(fc_thread_global_context_t * global_context, i
 			ret ++;
 		}
 
-		last_base_pos = Starting_Chro_Points[x1] + Section_Lengths[x1] - 1;
+		last_base_pos = Starting_Chro_Points_1BASE[x1] + Section_Lengths[x1] - 1;
 	}
 	return ret;
 }
@@ -2430,21 +2426,22 @@ void process_line_junctions(fc_thread_global_context_t * global_context, fc_thre
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++){
 		char * read_chr, *read_name, *mate_chr;
 		long read_pos, fragment_length = 0, mate_pos;
-		unsigned int Starting_Chro_Points[global_context -> max_M];
+		unsigned int Starting_Chro_Points_1BASE[global_context -> max_M];
 		unsigned short Starting_Read_Points[global_context -> max_M];
 		unsigned short Section_Read_Lengths[global_context -> max_M];
 		char * ChroNames[global_context -> max_M];
 		char Event_After_Section[global_context -> max_M];
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
 		char * RG_ptr_one = NULL;
+		int me_refID, mate_refID;
 
-		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M, NULL, NULL, global_context -> assign_reads_to_RG, &RG_ptr_one);
+		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M, NULL, NULL, global_context -> assign_reads_to_RG, &RG_ptr_one, &me_refID, &mate_refID);
 		assert(cigar_sections <= global_context -> max_M);
 		if(RG_ptr_one) RG_ptr = RG_ptr_one;
 
 		int * njunc_current = is_second_read?&njunc2:&njunc1;
 		fc_junction_info_t * junctions_current = is_second_read?supported_junctions2:supported_junctions1;
-		(*njunc_current) = calc_junctions_from_cigarInts(global_context, alignment_masks , cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, junctions_current);
+		(*njunc_current) = calc_junctions_from_cigarInts(global_context, alignment_masks , cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, junctions_current);
 
 		//if(0 && FIXLENstrcmp("HWI-ST212:219:C0C1TACXX:1:1101:13391:171460", read_name)==0){
 		//	SUBREADprintf("JUNC_FOUND_IN_READ OF %s : %d\n", read_name , *njunc_current);
@@ -2776,7 +2773,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	unsigned int  total_frag_len =0;
 
 	int cigar_sections, is_junction_read;
-    unsigned int * Starting_Chro_Points = thread_context -> proc_Starting_Chro_Points;
+    unsigned int * Starting_Chro_Points_1BASE = thread_context -> proc_Starting_Chro_Points_1BASE;
     unsigned short * Starting_Read_Points = thread_context -> proc_Starting_Read_Points;
     unsigned short * Section_Read_Lengths = thread_context -> proc_Section_Read_Lengths;
     char ** ChroNames = thread_context -> proc_ChroNames;
@@ -2804,12 +2801,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 
 	char * RG_ptr;
+	int me_refID =-1, mate_refID =-1;
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++)
 	{
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
 
 		RG_ptr = NULL;
-		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr);
+		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
 
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 
@@ -3009,6 +3007,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 		if(1) {
+
+			if(0)SUBREADprintf("MAPPED R_%d to %s : CHR_POS=%u + %u, CHR_LEN=%u\n", is_second_read+1, global_context -> sambam_chro_table[me_refID]. chro_name, Starting_Chro_Points_1BASE[0], Section_Read_Lengths[0], global_context -> sambam_chro_table[me_refID] .chro_length );
+
 			if(global_context -> read_shift_size>0){
 				int shifting_applied_length = 0;
 				int shifting_i;
@@ -3024,77 +3025,76 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(global_context -> read_shift_type == READ_SHIFT_LEFT) shifting_applied_length = -global_context -> read_shift_size;
 				if(global_context -> read_shift_type == READ_SHIFT_RIGHT) shifting_applied_length = global_context -> read_shift_size;
 
-				for(shifting_i = 0; shifting_i < cigar_sections ; shifting_i++){
-					if(shifting_applied_length > 0 || Starting_Chro_Points[shifting_i] > -shifting_applied_length)
-						Starting_Chro_Points[shifting_i] += shifting_applied_length;
-					else{ 
-						if(Starting_Chro_Points[shifting_i] + Section_Read_Lengths[shifting_i] > -shifting_applied_length)
-							Section_Read_Lengths[shifting_i] = Starting_Chro_Points[shifting_i] + Section_Read_Lengths[shifting_i] + shifting_applied_length;
-						else  Section_Read_Lengths[shifting_i] =1;
-						Starting_Chro_Points[shifting_i] = 1;
-					}
-				}
+				if(shifting_applied_length < 0 && Starting_Chro_Points_1BASE[0] <=-shifting_applied_length) shifting_applied_length = - Starting_Chro_Points_1BASE[0]+1;
+				if(shifting_applied_length > 0 && Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1] + shifting_applied_length > global_context -> sambam_chro_table[me_refID].chro_length +1 )
+					shifting_applied_length =  global_context -> sambam_chro_table[me_refID].chro_length +1 - (Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1]);
+
+				for(shifting_i = 0; shifting_i < cigar_sections ; shifting_i++)
+						Starting_Chro_Points_1BASE[shifting_i] += shifting_applied_length;
 			}
 
 			if(global_context -> five_end_extension)
 			{
 				if(is_this_negative_strand){
-					Section_Read_Lengths [cigar_sections - 1] += global_context -> five_end_extension;
+					int applied_ext = global_context -> five_end_extension;
+
+					if( Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1] + applied_ext > global_context -> sambam_chro_table[me_refID].chro_length +1  )
+						applied_ext =  global_context -> sambam_chro_table[me_refID].chro_length +1 - (Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1]);
+
+					Section_Read_Lengths [cigar_sections - 1] += applied_ext;
 				}else{
-					//SUBREADprintf("5-end extension: %d [%d]\n", Starting_Chro_Points[0], Section_Lengths[0]);
+					//SUBREADprintf("5-end extension: %d [%d]\n", Starting_Chro_Points_1BASE[0], Section_Lengths[0]);
 					if( read_pos > global_context -> five_end_extension)
 					{
 						Section_Read_Lengths [0] += global_context -> five_end_extension;
-						Starting_Chro_Points [0] -= global_context -> five_end_extension;
+						Starting_Chro_Points_1BASE [0] -= global_context -> five_end_extension;
 					}
 					else
 					{
 						Section_Read_Lengths [0] += read_pos-1;
-						Starting_Chro_Points [0] -= read_pos-1;
+						Starting_Chro_Points_1BASE [0] -= read_pos-1;
 					}
 				}
 			}
 
-			if(global_context -> three_end_extension)
-			{
+			if(global_context -> three_end_extension) {
 
 				if(is_this_negative_strand){
 					if( read_pos > global_context -> three_end_extension)
 					{
 						Section_Read_Lengths [0] += global_context -> three_end_extension;
-						Starting_Chro_Points [0] -= global_context -> three_end_extension;
+						Starting_Chro_Points_1BASE [0] -= global_context -> three_end_extension;
 					}
 					else
 					{
 						Section_Read_Lengths [0] += read_pos - 1;
-						Starting_Chro_Points [0] -= read_pos - 1;
+						Starting_Chro_Points_1BASE [0] -= read_pos - 1;
 					}
+				} else{
+					int applied_ext = global_context -> three_end_extension;
+					if( Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1] + applied_ext > global_context -> sambam_chro_table[me_refID].chro_length +1 )
+						applied_ext = global_context -> sambam_chro_table[me_refID].chro_length +1 - (Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1]);
+					Section_Read_Lengths [cigar_sections - 1] += applied_ext;
 				}
-				else	Section_Read_Lengths [cigar_sections - 1] += global_context -> three_end_extension;
 
 			}
 
-			if(global_context -> reduce_5_3_ends_to_one)
-			{
+			if(global_context -> reduce_5_3_ends_to_one) {
 				if((REDUCE_TO_5_PRIME_END == global_context -> reduce_5_3_ends_to_one) + is_this_negative_strand == 1) // reduce to 5' end (small coordinate if positive strand / large coordinate if negative strand)
 				{
 					Section_Read_Lengths[0]=1;
 				}
 				else
 				{
-					Starting_Chro_Points[0] = Starting_Chro_Points[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1] - 1;
+					Starting_Chro_Points_1BASE[0] = Starting_Chro_Points_1BASE[cigar_sections-1] + Section_Read_Lengths[cigar_sections-1] - 1;
 					Section_Read_Lengths[0]=1;
 				}
-
 				cigar_sections = 1;
 			}
 
-
-
-
 			for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
 			{
-				long section_begin_pos = Starting_Chro_Points[cigar_section_id];
+				long section_begin_pos = Starting_Chro_Points_1BASE[cigar_section_id];
 				long section_end_pos = Section_Read_Lengths[cigar_section_id] + section_begin_pos - 1;
 
 				
@@ -3213,7 +3213,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 										hits_indices[nhits] = search_item_id;
 
 										if(global_context -> need_calculate_overlap_len) {
-											hits_start_pos[nhits] = max(Starting_Chro_Points[cigar_section_id], global_context -> exontable_start[search_item_id]);
+											hits_start_pos[nhits] = max(Starting_Chro_Points_1BASE[cigar_section_id], global_context -> exontable_start[search_item_id]);
 											hits_length[nhits] =  min(global_context -> exontable_stop[search_item_id] , section_end_pos)+1 - hits_start_pos[nhits] ;
 											hits_chro[nhits] = ChroNames[cigar_section_id];
 											if(0 && FIXLENstrcmp("V0112_0155:7:1101:10214:3701", read_name)==0)
@@ -5797,22 +5797,8 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
-	if(0){ // && global_context.is_multi_mapping_allowed != ALLOW_ALL_MULTI_MAPPING && (!isMultiOverlapAllowed) && global_context.use_fraction_multi_mapping) {
-		SUBREADprintf("ERROR: '--fraction' option should be used together with '-M' or '-O'. Please change the parameters to allow multi-mapping reads and/or multi-overlapping features.\n");
-		return -1;
-	}
 	if( print_FC_configuration(&global_context, argv[1], file_name_ptr, argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport) )
 		return -1;
-
-
-	//print_in_box(80,0,0,"IG=%d, IS=%d", isGeneLevel, isSplitOrExonicOnly);
-	if(0)if(isSplitOrExonicOnly && ( isGeneLevel || !isMultiOverlapAllowed) )
-	{
-		print_in_box(80,0,0,"NOTICE --splitOnly is specified, but '-O' and '-f' are not");
-		print_in_box(80,0,0,"       both specified. Please read the manual for details.");
-		print_in_box(80,0,0,"");
-	}
-
 	// Loading the annotations.
 	// Nothing is done if the annotation does not exist.
 	fc_feature_info_t * loaded_features;
