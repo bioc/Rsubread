@@ -3703,6 +3703,7 @@ int SAM_pairer_multi_thread_output(void * pairer_vp, int thread_no, char * bin1,
 void SAM_pairer_do_read_test( SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context , int read_name_len, char * read_full_name, int bin_len, char * bin , int flags){
 
 	unsigned char * mate_bin = HashTableGet(thread_context -> orphant_table, read_full_name);
+
 	if(mate_bin){
 		if(pairer -> output_function)
 			pairer -> output_function(pairer, thread_context -> thread_id, bin, (char*)mate_bin);
@@ -3754,7 +3755,6 @@ void SAM_pairer_do_one_BIN(SAM_pairer_context_t * pairer , SAM_pairer_thread_t *
 		if(strcmp(read_full_name , thread_context -> immediate_last_read_full_name) == 0){
 			if(pairer -> output_function)
 				pairer -> output_function(pairer, thread_context -> thread_id, (char*) bin, (char*)thread_context -> immediate_last_read_bin);
-
 			thread_context -> immediate_last_read_full_name[0] = 0;
 		}else{
 
@@ -4463,7 +4463,6 @@ void * SAM_pairer_thread_run( void * params ){
 		if(pairer -> is_bad_format) break;
 
 		if(thread_context -> immediate_last_read_full_name[0]){
-
 			SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name, thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_bin_len ,  thread_context -> immediate_last_read_flags);
 			SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
 			thread_context -> immediate_last_read_full_name[0] = 0;
@@ -4534,7 +4533,17 @@ void SAM_pairer_finish_margins(void * kv, void * val , HashTable * tab){
 void  SAM_pairer_finish_margin_table( SAM_pairer_context_t * pairer){
 	pairer -> bam_margin_table -> appendix1 = pairer;
 	pairer -> bam_margin_table -> appendix2 = NULL;
+
+	SAM_pairer_thread_t * thread_context = pairer -> threads+0;
+	thread_context -> immediate_last_read_full_name[0] = 0;
 	HashTableIteration(pairer -> bam_margin_table, SAM_pairer_finish_margins);
+
+	if(thread_context -> immediate_last_read_full_name[0]){
+		SAM_pairer_register_matcher(pairer, thread_context -> chunk_number, thread_context -> readno_in_chunk - 1, thread_context -> immediate_last_read_full_name, thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_bin_len ,  thread_context -> immediate_last_read_flags);
+		SAM_pairer_do_read_test(pairer , thread_context , thread_context -> immediate_last_read_name_len , thread_context -> immediate_last_read_full_name , thread_context -> immediate_last_read_bin_len , thread_context -> immediate_last_read_bin, thread_context -> immediate_last_read_flags);
+		thread_context -> immediate_last_read_full_name[0] = 0;
+	}
+
 	pairer -> is_internal_error |= SAM_pairer_update_orphant_table(pairer, pairer -> threads+0);
 	assert(NULL == pairer -> bam_margin_table -> appendix2);
 }
