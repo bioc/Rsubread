@@ -1,3 +1,6 @@
+15 Oct 2018 - 1.31.18
+(1) Add the read shifting operation into featureCounts(). 
+
 29 Sept 2018 - 1.31.17
 (1) Further change the order of locations in the index.
 (2) Remove two screen output messages from featureCounts().
