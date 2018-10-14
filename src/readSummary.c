@@ -4725,7 +4725,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	}
 
 	fprintf(fp_out,"\n");
-	char * keys [] ={ "Assigned" ,  "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_Chimera", "Unassigned_FragmentLength", "Unassigned_Duplicate", "Unassigned_MultiMapping" , "Unassigned_Secondary",  (global_context->is_split_or_exonic_only == 2)?"Unassigned_Hasjunction":"Unassigned_Nonjunction", "Unassigned_NoFeatures", "Unassigned_Overlapping_Length", "Unassigned_Ambiguity"};
+	char * keys [] ={ "Assigned" ,  "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_Chimera", "Unassigned_FragmentLength", "Unassigned_Duplicate", "Unassigned_MultiMapping" , "Unassigned_Secondary",  (global_context->is_split_or_exonic_only == 2)?"Unassigned_Split":"Unassigned_NonSplit", "Unassigned_NoFeatures", "Unassigned_Overlapping_Length", "Unassigned_Ambiguity"};
 
 	for(xk1=0; xk1<12; xk1++)
 	{
