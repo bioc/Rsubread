@@ -1,5 +1,8 @@
-15 Oct 2018 - 1.31.18
+15 Oct 2018 - 1.31.19
 (1) Add the read shifting operation into featureCounts(). 
+
+12 Oct 2018 - 1.31.18
+(1) Update NEWS.
 
 29 Sept 2018 - 1.31.17
 (1) Further change the order of locations in the index.

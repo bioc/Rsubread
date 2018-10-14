@@ -1,3 +1,23 @@
+CHANGES IN VERSION 1.32.0
+------------------------
+
+NEW FEATURES
+
+o New function flattenGTF() that merges overlapping features into a single interval.
+
+o New parameter for align() and subjunc(): sortReadsByCoordinates.
+
+o New parameter for featureCounts(): additionalAttributes.
+
+o Specify strand protocol for each library individually in featureCounts().
+
+o Much improved speed of align() and subjunc().
+
+o align() and subjunc() return mapping statistics.
+
+o buildindex() builds a one-block full index by default.
+
+
 CHANGES IN VERSION 1.30.0
 ------------------------
 
