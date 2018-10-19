@@ -11,7 +11,7 @@ New function flattenGTF() that merges overlapping features into a single interva
 New parameter for align() and subjunc(): sortReadsByCoordinates.
 
 \item
-New parameter for featureCounts(): additionalAttributes.
+New parameters for featureCounts(): readShiftType, readShiftSize and additionalAttributes.
 
 \item
 Specify strand protocol for each library individually in featureCounts().
