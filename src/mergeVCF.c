@@ -120,6 +120,8 @@ void set_hash_funcs(HashTable * tab, int is_key_freed, int is_value_string)
 	HashTableSetKeyComparisonFunction(tab,fc_strcmp_chro);
 }
 
+int warning_reported_repeated;
+
 void do_find_common(char ** file_names, int files) 
 {
 	int badfiles = 0;
@@ -223,7 +225,8 @@ void do_find_common(char ** file_names, int files)
 					}
 					else
 					{
-						SUBREADprintf("Warning: repeated rows are found in the first input file!\n");
+						if(!warning_reported_repeated)SUBREADprintf("Warning: repeated rows are found in the first input file!\n");
+						warning_reported_repeated=1;
 						free(ky);
 					}
 				}
@@ -365,6 +368,7 @@ int findCommonVariants(int argc, char ** argv)
 	opterr = 1;
 	optopt = 63;
 	output_file_name[0]=0;
+	warning_reported_repeated=0;
 
 	while((c = getopt_long (argc, argv, "o:h", propm_long_options, &option_index)) != -1)
 	{
