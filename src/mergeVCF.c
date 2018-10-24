@@ -196,6 +196,7 @@ void do_find_common(char ** file_names, int files)
 
 			char *tmp_pnt_alt = NULL;
 
+			//SUBREADprintf("GO_INTO_STR: %s\n", alt_str);
 			while(1)
 			{
 				char * alt_one = strtok_r(tmp_pnt_alt?NULL:alt_str,",", &tmp_pnt_alt);
@@ -252,6 +253,7 @@ void do_find_common(char ** file_names, int files)
 					}
 					free(ky);
 				}
+				if(NULL == tmp_pnt_alt) break;
 			}
 		}
 
