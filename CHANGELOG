@@ -1,3 +1,6 @@
+25 Oct 2018 - 1.31.23
+(1) Fix a bug in findCommonVariants() running in Mac OS X. 
+
 23 Oct 2018 - 1.31.22
 (1) Update users guide. 
 
