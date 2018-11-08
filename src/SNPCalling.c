@@ -476,6 +476,9 @@ void fishers_test_on_POI(struct SNP_Calling_Parameters * parameters, float * snp
 		}
 	}
 }
+
+#define KEEP_WINDOW_SAME_SIZE 0
+
 void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * snp_fisher_raw, unsigned int * snp_voting_piles, char * referenced_genome, unsigned int  reference_len, double multiplex_base, char * SNP_bitmap_recorder, unsigned short * snp_filter_background_matched, unsigned short * snp_filter_background_unmatched, int all_result_needed, char * chro_name, unsigned int block_start) {
 
 		int i, j, is_fresh_jumppd, remove_old;
@@ -491,8 +494,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 		{
 			a=0; c=0; is_fresh_jumppd = 1;
 
-			if(i>=0)
-			{
+			if(i>=0) {
 				char true_value = referenced_genome[i];
 				int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
 
@@ -506,7 +508,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 
 
 				// if the POI reached in this step is not fresh (known SNPs with < 80% support)
-				if(SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c))
+				if(KEEP_WINDOW_SAME_SIZE && SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i))
 				{
 					is_fresh_jumppd = 0;
 					go_ahead --;
@@ -529,18 +531,25 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 							mm += snp_voting_piles[ (i+parameters -> fisher_exact_testlen + go_ahead) *4 + j ] ;
 					}
 
-					if((!SNP_bitmap_recorder)||(!is_snp_bitmap(SNP_bitmap_recorder, go_ahead + i + parameters -> fisher_exact_testlen)) || (mm *4 < pm))
+
+					unsigned int chro_pos = block_start + i + parameters -> fisher_exact_testlen;
+					if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
+						SUBREADprintf("ADD-BASE-AT-RIGHT : %s : %u : KNOWN-SNP : %d  a b c d : %d %d %d %d  A 4 > C : %d\n" , chro_name, chro_pos,  is_snp_bitmap(SNP_bitmap_recorder,i + parameters -> fisher_exact_testlen), a,b,c,d, (a *4 >= c));
+					}
+					// if this is not POI : add this matched/unmatched into "flanking+PoI" counts.
+					if((!SNP_bitmap_recorder)||(!is_snp_bitmap(SNP_bitmap_recorder, go_ahead + i + parameters -> fisher_exact_testlen)))
 					{
 						d += pm;
 						b += mm;
 						is_added = 1;
 					}
-					if(is_added) break;
-					else	go_ahead++;
+					if(is_added || (!KEEP_WINDOW_SAME_SIZE)) break;
+					else go_ahead++;
 				}
 			}
 
 			// test the middle base
+			// a : mismatched at POI ; c : matched at POI
 			if(i>=0 && a > 0){
 
 				float observed_coverage = (b+d) *1./(1. + 2 * parameters -> fisher_exact_testlen) ;
@@ -550,7 +559,14 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 
 				int flanking_unmatched = b-a;
 				int flanking_matched = d-c;
-				if(SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c))
+
+
+				unsigned int chro_pos = block_start + i;
+				if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
+					SUBREADprintf("KNOWN-SNP-AT-PoI at %s : %u : KNOWN-SNP : %d  a b c d : %d %d %d %d  A 4 > C : %d\n" , chro_name, chro_pos,  is_snp_bitmap(SNP_bitmap_recorder,i), a,b,c,d, (a *4 >= c));
+				}
+
+				if(0 && SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c)) // no reason to include the current POI into the flanking window, even if it is a SNP.
 				{
 					flanking_unmatched = b;
 					flanking_matched = d;
@@ -558,9 +574,9 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 
 				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
 
-				unsigned int chro_pos = 1 + block_start + i;
-				if(0 && chro_pos < 11109861+10 && chro_pos > 11109861-10)
-					SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n", chro_name, chro_pos ,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff);
+				if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
+					SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n    KNOWN-SNP : %d    A 4 > C : %d\n", chro_name, chro_pos ,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff,  is_snp_bitmap(SNP_bitmap_recorder,i), (a *4 >= c));
+				}
 
 				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
@@ -590,20 +606,20 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 						else
 							mm += snp_voting_piles[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] ;
 					}
-					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen-left_tail) || (mm*4<pm))
+					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen-left_tail))
 					{
 						d-=pm;
 						b-=mm;
 						is_removed =1;
 					}
 
-					if(is_removed) break;
-					else	left_tail--;
+					if(is_removed || !KEEP_WINDOW_SAME_SIZE) break;
+					else if(KEEP_WINDOW_SAME_SIZE)	left_tail--;
 				}
 			}
 
 			// if a fresh base is at POI, the tail is removed in next step.
-			if(is_fresh_jumppd)
+			if(is_fresh_jumppd || !KEEP_WINDOW_SAME_SIZE)
 				remove_old = 1;
 			else{
 				left_tail ++;
@@ -1575,6 +1591,8 @@ void print_usage_snp(char * myname)
 	SUBREADputs("");
 	SUBREADputs("  -v         output version of the program.");
 	SUBREADputs("");
+	SUBREADputs("  -C <path>  Specify the path to save the temporary files.");
+	SUBREADputs("");
 	SUBREADputs("Example:");
 	SUBREADputs("");
 	SUBREADputs("  ./exactSNP -i my-alignment.sam -g mm10.fa -o my-SNPs.txt");
@@ -1668,7 +1686,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_usage_snp(argv[0]);
 		return 0;
 	}
-	while ((c = getopt_long (argc, argv, "7:N:a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
+	while ((c = getopt_long (argc, argv, "7:N:C:a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
 	{
 		switch (c)
 		{
@@ -1745,6 +1763,10 @@ int main_snp_calling_test(int argc,char ** argv)
 
 			case 'x':
 				parameters.max_supporting_read_number = atof(optarg);
+				break;
+
+			case 'C':
+				strncpy(temp_path, optarg,299);	
 				break;
 
 			case 'r':
@@ -1828,6 +1850,7 @@ int main_snp_calling_test(int argc,char ** argv)
 	print_in_box(80,0,0,"                  Input file : %s (%s)", get_short_fname(in_SAM_file), parameters.is_BAM_file_input?"BAM":"SAM");
 	print_in_box(80,0,0,"                 Output file : %s", get_short_fname(out_BED_file));
 	print_in_box(80,0,0,"            Reference genome : %s", get_short_fname(in_FASTA_file));
+	print_in_box(80,0,0,"                   Temp path : %s", temp_path);
 	print_in_box(80,0,1,"");
 	print_in_box(80,0,0,"                     Threads : %d", threads);
 	print_in_box(80,0,0,"        Min supporting reads : %d", parameters.min_supporting_read_number);
@@ -1857,14 +1880,18 @@ int main_snp_calling_test(int argc,char ** argv)
 	warning_file_type(in_FASTA_file, FILE_TYPE_FASTA);
 	warning_file_limit();
 	int x1;
-	for(x1 = strlen(out_BED_file); x1 >= 0; x1--){
-		if(out_BED_file[x1]=='/'){
-			memcpy(temp_path, out_BED_file, x1);
-			temp_path[x1]=0;
-			break;
+
+	if(temp_path[0]==0){
+		// temp path = out_dir
+		for(x1 = strlen(out_BED_file); x1 >= 0; x1--){
+			if(out_BED_file[x1]=='/'){
+				memcpy(temp_path, out_BED_file, x1);
+				temp_path[x1]=0;
+				break;
+			}
 		}
+		if(temp_path[0]==0)strcpy(temp_path, "./");
 	}
-	if(temp_path[0]==0)strcpy(temp_path, "./");
 	ret = SNP_calling(in_SAM_file, out_BED_file, in_FASTA_file, temp_path, read_count, threads, &parameters);
 	if(ret != -1)
 	{

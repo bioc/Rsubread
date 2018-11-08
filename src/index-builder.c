@@ -411,7 +411,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				if(offset > 0xFFFFFFFDU)	
 				{
-					SUBREADprintf("ERROR: The chromosome data contains too many bases. The size of the input FASTA file(s) should be less than 4G Bytes\n") ;
+					SUBREADprintf("ERROR: the provided reference sequences include more than 4 billion bases.\n") ;
 					return -1;
 				}
 
@@ -652,7 +652,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 				if(offset > 0xFFFFFFFDU)	
 				{
-					SUBREADprintf("ERROR: The chromosome data contains too many bases. The size of the input FASTA files should be less than 4G Bytes\n") ;
+					SUBREADprintf("ERROR: the provided reference sequences include more than 4 billion bases.\n") ;
 					return -1;
 				}
 
