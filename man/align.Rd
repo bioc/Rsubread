@@ -207,7 +207,7 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in BAM/SAM output.
 }
 \value{
-Return a \code{data.frame} object that includes mapping statistics for each library. Read mapping results are saved to BAM or SAM files in the current working directory. For \code{subjunc}, BED files including discovered exon-exon junctions are also written to the current working directory.
+Return a \code{data.frame} object that includes mapping statistics for each library. Read mapping results are saved to BAM or SAM files in the current working directory. Short indels detected during mapping are saved to BED files. \code{subjunc} also outputs discovered exon-exon junctions to BED files (separate BED files).
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
