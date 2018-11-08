@@ -1,3 +1,6 @@
+25 Oct 2018 - 1.31.23
+(1) Fix a bug in findCommonVariants() running in Mac OS X. 
+
 23 Oct 2018 - 1.31.22
 (1) Update users guide. 
 
@@ -60,7 +63,6 @@
 
 15 May 2018 - 1.31.4
 (1) Provide download link for human reference genome in builindex() help page and users guide.
->>>>>>> 3ea1b82a740d15657af4b718c005578ebe3490b5
 
 11 May 2018 - 1.31.3
 (1) Update users guide.
