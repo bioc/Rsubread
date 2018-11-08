@@ -1,3 +1,6 @@
+8 Nov 2018 - 1.32.1
+(1) Improve help page for align and subjunc.
+
 25 Oct 2018 - 1.31.23
 (1) Fix a bug in findCommonVariants() running in Mac OS X. 
 
