@@ -41,10 +41,10 @@ static struct option long_options[] =
 	{"outputPrefix",  required_argument, 0, 'o'},
 	{"randSeed",  required_argument, 0, 'S'},
 	{"readLen",  required_argument, 0, 'L'},
-	{"fragmentLenMean",  required_argument, 0, 'F'},
-	{"fragmentLenMin",  required_argument, 0, 'N'},
-	{"fragmentLenMax",  required_argument, 0, 'X'},
-	{"fragmentLenSigma",  required_argument, 0, 'V'},
+	{"insertionLenMean",  required_argument, 0, 'F'},
+	{"insertionLenMin",  required_argument, 0, 'N'},
+	{"insertionLenMax",  required_argument, 0, 'X'},
+	{"insertionLenSigma",  required_argument, 0, 'V'},
 	{0, 0, 0, 0}
 };
 
@@ -55,12 +55,12 @@ typedef struct {
 	char expression_level_file[MAX_FILE_NAME_LENGTH];
 	char quality_string_file[MAX_FILE_NAME_LENGTH];
 
-	unsigned long long total_fragments;
+	unsigned long long output_sample_size;
 	int is_paired_end;
-	float fragment_length_mean;
-	int fragment_length_max;
-	int fragment_length_min;
-	float fragment_length_sigma;
+	float insertion_length_mean;
+	int insertion_length_max;
+	int insertion_length_min;
+	float insertion_length_sigma;
 	int read_length;
 
 	ArrayList * quality_strings;
@@ -124,15 +124,15 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 	char * trans_name = ArrayListGet(grc->transcript_names, this_transcript_no);
 	char * trans_seq = HashTableGet(grc->transcript_sequences, trans_name);
 	int actual_transcript_len = HashTableGet(grc->transcript_lengths, trans_name) - NULL;
-	int applied_fragment_maxlen = min(grc -> fragment_length_max, actual_transcript_len);
+	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_transcript_len);
 	double rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 	int rand_01_int = (int)(rand_01*901267351);
 	srand(rand_01_int); // for generating sequencing errors.
 	grc_incrand(grc);
 
 	if(grc -> is_paired_end){
-		float fragment_len = inverse_sample_normal(rand_01) * grc-> fragment_length_sigma + grc -> fragment_length_mean;
-		int fraglen = (int)(min(max(fragment_len, grc -> fragment_length_min), applied_fragment_maxlen));
+		float insertion_len = inverse_sample_normal(rand_01) * grc-> insertion_length_sigma + grc -> insertion_length_mean;
+		int fraglen = (int)(min(max(insertion_len, grc -> insertion_length_min), applied_insertion_maxlen));
 		rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 		grc_incrand(grc);
 		int start_pos = (actual_transcript_len - fraglen) * rand_01;
@@ -159,18 +159,18 @@ int grc_check_parameters(genRand_context_t * grc){
 		ret=1;
 	}
 	if(grc->is_paired_end){
-		if(grc->fragment_length_min>grc->fragment_length_max){
-			SUBREADprintf("ERROR: the minimum fragment length must be equal or higher than the maximum fragment length!\n");
+		if(grc->insertion_length_min>grc->insertion_length_max){
+			SUBREADprintf("ERROR: the minimum insertion length must be equal or higher than the maximum insertion length!\n");
 			ret=1;
 		}
 	
-		if(grc->fragment_length_min<grc->read_length){
-			SUBREADprintf("ERROR: the minimum fragment length must be equal or higher than read length!\n");
+		if(grc->insertion_length_min<grc->read_length){
+			SUBREADprintf("ERROR: the minimum insertion length must be equal or higher than read length!\n");
 			ret=1;
 		}
 	
-		if(grc->fragment_length_max<1){
-			SUBREADprintf("ERROR: the maximum fragment length must be a positive number!\n");
+		if(grc->insertion_length_max<1){
+			SUBREADprintf("ERROR: the maximum insertion length must be a positive number!\n");
 			ret=1;
 		}
 	}
@@ -206,9 +206,9 @@ int grc_check_parameters(genRand_context_t * grc){
 		ret=1;
 	}
 
-	if(grc->total_fragments < 1){
+	if(grc->output_sample_size < 1){
 		SUBREADprintf("WARNING: no read number is specified. Generating one million read%s.\n", grc->is_paired_end?"-pairs":"s");
-		grc->total_fragments = 1000000;
+		grc->output_sample_size = 1000000;
 	}
 
 	return ret;
@@ -228,15 +228,15 @@ int grc_gen( genRand_context_t *grc ){
 	unsigned long long lastv = 0, current_total =0;
 	ArrayList * rescure_hitting_space = ArrayListCreate(100000);
 	unsigned long long to_rescure_read_top=0;
-	int min_seq_len = grc->is_paired_end?grc->fragment_length_min:grc->read_length;
+	int min_seq_len = grc->is_paired_end?grc->insertion_length_min:grc->read_length;
 
 	for(read_i = 0; read_i < grc->transcript_hitting_space->numOfElements ; read_i++){
 		char *seq_name = ArrayListGet(grc->transcript_names, read_i);
 		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
 		unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, read_i) - NULL;
 		unsigned long long this_space_span = thisv - lastv;
-		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->total_fragments*0.99999999);
-		unsigned long long to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->total_fragments- 1.*expected_reads)*100000.);
+		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->output_sample_size*0.99999999);
+		unsigned long long to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->output_sample_size- 1.*expected_reads)*100000.);
 		if( seq_len < min_seq_len ){
 			to_rescure_reads = 0;
 			expected_reads = 0;
@@ -249,10 +249,10 @@ int grc_gen( genRand_context_t *grc ){
 
 		lastv = thisv;
 	}
-	assert(current_total<=grc->total_fragments);
-	//SUBREADprintf("TESTRESCURE_NO\t%llu\n", grc->total_fragments - current_total);
+	assert(current_total<=grc->output_sample_size);
+	//SUBREADprintf("TESTRESCURE_NO\t%llu\n", grc->output_sample_size - current_total);
 
-	for(read_i = current_total; read_i < grc->total_fragments; read_i++){
+	for(read_i = current_total; read_i < grc->output_sample_size; read_i++){
 		unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
 		grc_incrand(grc);
 
@@ -276,7 +276,7 @@ int grc_gen( genRand_context_t *grc ){
 		total_read_top+=expected_reads;
 		ArrayListPush(per_transcript_reads_hitting_space, NULL+total_read_top);
 	}
-	assert(total_read_top == grc->total_fragments);
+	assert(total_read_top == grc->output_sample_size);
 
 	if(0)
 		for(read_i =0; read_i < num_of_frags_per_transcript -> numOfElements; read_i++) {
@@ -287,9 +287,9 @@ int grc_gen( genRand_context_t *grc ){
 		}
 	else{
 		unsigned long long mod_class = total_read_top/2; // an arbitratry starting point.
-		for(read_i =0; read_i < grc->total_fragments; read_i++) {
+		for(read_i =0; read_i < grc->output_sample_size; read_i++) {
 			mod_class += A_LARGE_PRIME_FOR_MOD;
-			mod_class = mod_class % grc->total_fragments;
+			mod_class = mod_class % grc->output_sample_size;
 			long this_transcript_no = ArrayListFindNextDent(per_transcript_reads_hitting_space, mod_class);
 			//char * trans_name = ArrayListGet(grc->transcript_names, this_transcript_no);
 			//SUBREADprintf("TESTGEN\t%s\n", trans_name);
@@ -590,11 +590,11 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	optopt = 63;
 
 	rebuild_command_line(&grc.cmd_line, argc, argv);
-	// default settings of the read/fragment length: 100bp, a general illumina feeling 
-	grc.fragment_length_sigma = 30.;
-	grc.fragment_length_min = 110;
-	grc.fragment_length_max = 400;
-	grc.fragment_length_mean = 160.;
+	// default settings of the read/insertion length: 100bp, a general illumina feeling 
+	grc.insertion_length_sigma = 30.;
+	grc.insertion_length_min = 110;
+	grc.insertion_length_max = 400;
+	grc.insertion_length_mean = 160.;
 	grc.read_length = 100;
 
 	long long seed = -1;
@@ -605,16 +605,16 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				do_fasta_summary = 1;
 				break;
 			case 'V':
-				grc.fragment_length_sigma = atof(optarg);
+				grc.insertion_length_sigma = atof(optarg);
 				break;
 			case 'N':
-				grc.fragment_length_min = atoi(optarg);
+				grc.insertion_length_min = atoi(optarg);
 				break;
 			case 'X':
-				grc.fragment_length_max = atoi(optarg);
+				grc.insertion_length_max = atoi(optarg);
 				break;
 			case 'F':
-				grc.fragment_length_mean = atof(optarg);
+				grc.insertion_length_mean = atof(optarg);
 				break;
 			case 'L':
 				grc.read_length = atoi(optarg);
@@ -632,7 +632,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				strcpy(grc.transcript_fasta_file, optarg);
 				break;
 			case 'r':
-				grc.total_fragments = atoll(optarg);
+				grc.output_sample_size = atoll(optarg);
 				break;
 			case 'S':
 				seed = atoll(optarg);

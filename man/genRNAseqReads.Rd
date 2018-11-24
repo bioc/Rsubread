@@ -25,18 +25,40 @@ generateRNAseqReads(
 
   # parameters for generating paired-end reads.
   isPairedEndOutput=F,
-  Fragment.Length.Min=100,
-  Fragment.Length.Max=500,
-  Fragment.Length.Mean=150,
-  Fragment.Length.Sigma=25
+  Insertion.Length.Min=100,
+  Insertion.Length.Max=500,
+  Insertion.Length.Mean=150,
+  Insertion.Length.Sigma=25
 )
 }
 \arguments{
   \item{transcript.file}{ character string giving the name of a file that contains the transcript names and sequences. File format can be FASTA or gzipped-FASTA.}
-  \item{transcript.TPM}{ a data frame giving the Transcripts Per Kilobase Million (TPM) values of the transcripts. The data frame should have two columns: TranscriptID and TPM. The sum of the TPM values in the data frame must be one million.}
+  \item{transcript.TPM}{ a data frame giving the Transcripts Per Kilobase Million (TPM) values of the transcripts. The data frame should have two columns with the order of TranscriptID and TPM. The sum of the TPM values in the data frame must be one million. TPMs are essencially the ratios of the RPKM values in a sample. See https://www.biostars.org/p/273537/ for more details about TPM and RPKM.}
   \item{output.prefix}{ character string giving the basename of output files.}
   \item{out.sample.size}{ numeric value giving the number of reads or read-pairs to be generated. One million by default.}
-  \item{read.length}{ numeric value giving the length of each read in the output. The current version can only generate 75- or 100-bp long reads. 75 by default.}
-  \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the }
-  \item{quality.reference} { character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred 33 format. }
+  \item{read.length}{ numeric value giving the length of each read in the output. Maximum length is 250bp. 75 by default.}
+  \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the reads are 100-bp or 75-bp long. If the output read length is 100-bp or 75-bp, you can optionally omit the \code{quality.reference} parameter for simulating sequencing errors, and the function will use its inbuilt quality strings.}
+  \item{quality.reference} { character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred 33 format. The sequencing quality strings must have the same length as \code{read.length}.}
+  \item{isPairedEndOutput}{ logical indicating if paired-end reads should be generated. FALSE by default.}
+  \item{Insertion.Length.Min, Insertion.Length.Max, Insertion.Length.Mean and Insertion.Length.Sigma}{ numeric values giving the minimum, maximum, mean and standard error of the insertion lengths when paired-end reads are generated. The minimum insertion length must be higher than the output read length. Transcripts that are shorther than the minimum insertion length will \emph{not} be used for generating simulation reads.}
+}
+\details{
+  The \code{summarizeTranscripts} and \code{generateRNAseqReads} functions are 
+}
+\value{
+  The \code{summarizeTranscripts} function returns a \code{data.frame} object that includes
+}
+\references{
+Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
+}
+\author{Wei Shi and Yang Liao}
+\examples{
+# Build an index for the artificial sequence included in file 'reference.fa'.
+library(Rsubread)
+ref <- system.file("extdata","reference.fa",package="Rsubread")
+buildindex(basename="./reference_index",reference=ref)
+
+# align a sample read dataset ('reads.txt') to the sample reference
+reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
+align.stat <- align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM",phredOffset=64)
 }

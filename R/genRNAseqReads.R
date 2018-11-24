@@ -12,7 +12,7 @@ summarizeTranscripts <- function(transcript.file){
 	summ
 }
 
-generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Fragment.Length.Min=100, Fragment.Length.Max=500, Fragment.Length.Mean=150, Fragment.Length.Sigma=25){
+generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25){
 	transcript.file <- normalizePath(transcript.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
@@ -22,12 +22,12 @@ generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, 
 	if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
 
 	if( isPairedEndOutput ){
-		if(Fragment.Length.Min < read.length) stop("Error: the minimum fragment length must be higher than the read length")
-		if(Fragment.Length.Min > Fragment.Length.Max) stop("Error: the minimum fragment length must be equal or lower than the maximum length")
-		if(Fragment.Length.Mean < Fragment.Length.Min || Fragment.Length.Mean >Fragment.Length.Max) stop("Error: the mean fragment length must be between the minimum and maximum fragment lengths")
+		if(Insertion.Length.Min < read.length) stop("Error: the minimum insertion length must be higher than the read length")
+		if(Insertion.Length.Min > Insertion.Length.Max) stop("Error: the minimum insertion length must be equal or lower than the maximum length")
+		if(Insertion.Length.Mean < Insertion.Length.Min || Insertion.Length.Mean >Insertion.Length.Max) stop("Error: the mean insertion length must be between the minimum and maximum insertion lengths")
 	}
 	if(out.sample.size<1) stop("Error: the output sample size must be a positive number")
-	if(out.sample.size>1000*1000*1000) stop("Error: the current version cannot generate more than one billion reads/fragments in a single run")
+	if(out.sample.size>1000*1000*1000) stop("Error: the current version cannot generate more than one billion reads/insertions in a single run")
 
 	fin_TPMtab <- file.path(".",paste(".Rsubread_genReadTPM_pid",Sys.getpid(),sep=""))
 	transcript.TPM<-as.data.frame(transcript.TPM)
@@ -47,7 +47,7 @@ generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, 
 	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
 	cmd<-paste("RgenerateRNAseqReads,--transcriptFasta",transcript.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
-	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--fragmentLenMean",Fragment.Length.Mean, "--fragmentLenMax",Fragment.Length.Max,"--fragmentLenMin",Fragment.Length.Min,"--fragmentLenSigma",Fragment.Length.Sigma, sep=",")
+	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
 
 	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))
