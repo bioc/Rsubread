@@ -259,7 +259,7 @@ int grc_gen( genRand_context_t *grc ){
 		if(seq_len >= min_seq_len)
 			fprintf(grc->counts_out_fp, "%s\t%d\t%llu\n", seq_name, seq_len, expected_reads);
 		else
-			fprintf(grc->counts_out_fp, "%s\t%d\tna\n", seq_name, seq_len);
+			fprintf(grc->counts_out_fp, "%s\t%d\tNA\n", seq_name, seq_len);
 		total_read_top+=expected_reads;
 		ArrayListPush(per_transcript_reads_hitting_space, NULL+total_read_top);
 	}

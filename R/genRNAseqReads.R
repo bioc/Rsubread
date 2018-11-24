@@ -46,13 +46,13 @@ generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, 
 
 	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
-	cmd<-paste("RgenerateRNAseqReads,-t",transcript.file,"-e",fin_TPMtab,"-o",output.prefix,"-q",qualfile, "-r",out.sample.size, "-L",read.length, "-F",Fragment.Length.Mean, "-X",Fragment.Length.Max,"-N",Fragment.Length.Min,"-V",Fragment.Length.Sigma, sep=",")
-	if(isPairedEndOutput) cmd<-paste0(cmd, ",-p")
+	cmd<-paste("RgenerateRNAseqReads,-t",transcript.file,"-e",fin_TPMtab,"-o",output.prefix,"-q",qualfile, "-r",sprintf("%d",out.sample.size), "-L",read.length, sep=",")
+	if(isPairedEndOutput) cmd<-paste(cmd, "-p,-F",Fragment.Length.Mean, "-X",Fragment.Length.Max,"-N",Fragment.Length.Min,"-V",Fragment.Length.Sigma, sep=",")
 
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
 
-	summ <- read.delim(paste0(output.prefix,".truthCounts"), stringsAsFactors=FALSE, header=T, comment.char="#")
+	summ <- read.delim(paste0(output.prefix,".truthCounts"), stringsAsFactors=FALSE, header=T, comment.char="#", colClasses=c("character", "numeric", "numeric"))
 	file.remove(fin_TPMtab)
 	summ
 }
