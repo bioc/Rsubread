@@ -30,7 +30,7 @@
 
 static struct option long_options[] =
 {
-	{"summarizeFasta",  required_argument, 0, 'M'},
+	{"summarizeFasta",  no_argument, 0, 'M'},
 	{"transcriptFasta",  required_argument, 0, 't'},
 	{"totalReads",  required_argument, 0, 'r'},
 	{"pairedEnd",  no_argument, 0, 'p'},

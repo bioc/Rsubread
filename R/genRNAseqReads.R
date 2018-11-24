@@ -1,7 +1,7 @@
 summarizeTranscripts <- function(transcript.file){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
 	transcript.file <- normalizePath(transcript.file, mustWork=T)
-	cmd <- paste("RsummarizeTranscripts,-M,-t",transcript.file,"-o", fout_sum, sep=",")
+	cmd <- paste("RsummarizeTranscripts,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=",")
 
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
@@ -23,7 +23,7 @@ generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, 
 
 	if( isPairedEndOutput ){
 		if(Fragment.Length.Min < read.length) stop("Error: the minimum fragment length must be higher than the read length")
-		if(Fragment.Length.Min < Fragment.Length.Max) stop("Error: the minimum fragment length must be equal or lower than the maximum length")
+		if(Fragment.Length.Min > Fragment.Length.Max) stop("Error: the minimum fragment length must be equal or lower than the maximum length")
 		if(Fragment.Length.Mean < Fragment.Length.Min || Fragment.Length.Mean >Fragment.Length.Max) stop("Error: the mean fragment length must be between the minimum and maximum fragment lengths")
 	}
 	if(out.sample.size<1) stop("Error: the output sample size must be a positive number")
@@ -46,9 +46,10 @@ generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, 
 
 	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
-	cmd<-paste("RgenerateRNAseqReads,-t",transcript.file,"-e",fin_TPMtab,"-o",output.prefix,"-q",qualfile, "-r",sprintf("%d",out.sample.size), "-L",read.length, sep=",")
-	if(isPairedEndOutput) cmd<-paste(cmd, "-p,-F",Fragment.Length.Mean, "-X",Fragment.Length.Max,"-N",Fragment.Length.Min,"-V",Fragment.Length.Sigma, sep=",")
+	cmd<-paste("RgenerateRNAseqReads,--transcriptFasta",transcript.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
+	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--fragmentLenMean",Fragment.Length.Mean, "--fragmentLenMax",Fragment.Length.Max,"--fragmentLenMin",Fragment.Length.Min,"--fragmentLenSigma",Fragment.Length.Sigma, sep=",")
 
+	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
 
