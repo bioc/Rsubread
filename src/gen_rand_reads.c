@@ -28,6 +28,8 @@
 #include "input-files.h"
 #include "gene-algorithms.h"
 
+#define MAX_SIMULATION_READ_LEN 250
+
 static struct option long_options[] =
 {
 	{"summarizeFasta",  no_argument, 0, 'M'},
@@ -68,6 +70,7 @@ typedef struct {
 	HashTable * transcript_lengths;
 	HashTable * expression_levels;
 
+	char fake_quality_string[MAX_SIMULATION_READ_LEN];
 	char * cmd_line;
 	gzFile out_fps[2];
 	FILE * counts_out_fp;
@@ -98,9 +101,20 @@ void gen_one_read_here(genRand_context_t * grc, char * seq, int is_PE_second, in
 	memcpy(read_seq, seq, grc -> read_length);
 	read_seq[grc -> read_length]=0;
 	if(trans_negative) reverse_read(read_seq , grc -> read_length , GENE_SPACE_BASE);
-	char * qual_str = ArrayListRandom(grc->quality_strings);
-	//SUBREADprintf("TESTQUAL\t%p\n", qual_str);
-	grc_sequencing_error_read(read_seq, grc -> read_length, qual_str);
+
+	char * qual_str = NULL;
+	if(grc->quality_strings->numOfElements>0){
+		qual_str = ArrayListRandom(grc->quality_strings);
+		//SUBREADprintf("TESTQUAL\t%p\n", qual_str);
+		grc_sequencing_error_read(read_seq, grc -> read_length, qual_str);
+	}else{
+		if(!grc->fake_quality_string[0]){
+			int xx;
+			for(xx = 0; xx < grc -> read_length; xx++) grc->fake_quality_string[xx]='X';
+			grc->fake_quality_string[xx]=0;
+		}
+		qual_str = grc->fake_quality_string;
+	}
 
 	gzFile thisfp = (is_PE_second==1) ? grc -> out_fps[1] : grc -> out_fps[0];
 	gzprintf(thisfp, "@R%09llu\n%s\n+\n%s\n", rno, read_seq, qual_str);
@@ -140,6 +154,10 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 int grc_check_parameters(genRand_context_t * grc){
 	int ret = 0;
 
+	if(grc->read_length > MAX_SIMULATION_READ_LEN){
+		SUBREADprintf("ERROR: the read length cannot be higher than  %d.\n", MAX_SIMULATION_READ_LEN);
+		ret=1;
+	}
 	if(grc->is_paired_end){
 		if(grc->fragment_length_min>grc->fragment_length_max){
 			SUBREADprintf("ERROR: the minimum fragment length must be equal or higher than the maximum fragment length!\n");
@@ -184,12 +202,7 @@ int grc_check_parameters(genRand_context_t * grc){
 	}
 
 	if(!grc->expression_level_file[0]){
-		SUBREADprintf("ERROR: the wanted expression levels must be provide!\n");
-		ret=1;
-	}
-
-	if(!grc->quality_string_file[0]){
-		SUBREADprintf("ERROR: the reference quality strings must be provide!\n");
+		SUBREADprintf("ERROR: the wanted expression levels must be provided!\n");
 		ret=1;
 	}
 
@@ -450,25 +463,31 @@ int grc_load_env(genRand_context_t *grc){
 
 
 
-	ret = autozip_open(grc->quality_string_file, &auto_FP);
-	if(ret<0){
-		ret = 1;
-		SUBREADprintf("ERROR: unable to open the quality string file!\n");
-	}else ret = 0;
-	if(ret) return ret;
-	while(1){
-		char linebuf[400];
-		int rline = autozip_gets(&auto_FP, linebuf, 399);
-		if(rline<1) break;
-		char * qstr = malloc(rline);
-		memcpy(qstr, linebuf, rline-1);
-		qstr[rline-1]=0;
-		ArrayListPush(grc -> quality_strings, qstr);
+	if(grc->quality_string_file[0]){
+		ret = autozip_open(grc->quality_string_file, &auto_FP);
+		if(ret<0){
+			ret = 1;
+			SUBREADprintf("ERROR: unable to open the quality string file!\n");
+		}else ret = 0;
+		if(ret) return ret;
+		while(1){
+			char linebuf[400];
+			int rline = autozip_gets(&auto_FP, linebuf, 399);
+			if(rline<1) break;
+			if(rline!=grc->read_length +1) {
+				SUBREADprintf("ERROR: all your quality strings must be %d-byte long.\n", grc->read_length);
+				ret = 1;
+				break;
+			}
+			char * qstr = malloc(rline);
+			memcpy(qstr, linebuf, rline-1);
+			qstr[rline-1]=0;
+			ArrayListPush(grc -> quality_strings, qstr);
+		}
+		autozip_close(&auto_FP);
 	}
-	autozip_close(&auto_FP);
 
-
-
+	if(ret) return ret;
 
 	ret = autozip_open(grc->transcript_fasta_file, &auto_FP);
 	if(ret<0){

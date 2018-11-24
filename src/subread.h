@@ -62,8 +62,8 @@
 
 //#warning "============== REMOVE '* 15' FROM THE NEXT LINE ================"
 #define MAX_READ_LENGTH ( 1210 )
-#define MAX_READ_NAME_LEN 100 
-#define MAX_CHROMOSOME_NAME_LEN 100 
+#define MAX_READ_NAME_LEN 200 
+#define MAX_CHROMOSOME_NAME_LEN 200 
 #define MAX_FILE_NAME_LENGTH 300
 #define FEATURE_NAME_LENGTH 256 
 
