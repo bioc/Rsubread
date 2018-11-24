@@ -42,7 +42,7 @@ static struct option long_options[] =
 	{"fragmentLenMean",  required_argument, 0, 'F'},
 	{"fragmentLenMin",  required_argument, 0, 'N'},
 	{"fragmentLenMax",  required_argument, 0, 'X'},
-	{"fragmentLenVar",  required_argument, 0, 'V'},
+	{"fragmentLenSigma",  required_argument, 0, 'V'},
 	{0, 0, 0, 0}
 };
 
@@ -58,7 +58,7 @@ typedef struct {
 	float fragment_length_mean;
 	int fragment_length_max;
 	int fragment_length_min;
-	float fragment_length_var;
+	float fragment_length_sigma;
 	int read_length;
 
 	ArrayList * quality_strings;
@@ -68,6 +68,7 @@ typedef struct {
 	HashTable * transcript_lengths;
 	HashTable * expression_levels;
 
+	char * cmd_line;
 	gzFile out_fps[2];
 	FILE * counts_out_fp;
 } genRand_context_t;
@@ -116,7 +117,7 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 	grc_incrand(grc);
 
 	if(grc -> is_paired_end){
-		float fragment_len = inverse_sample_normal(rand_01) * grc-> fragment_length_var + grc -> fragment_length_mean;
+		float fragment_len = inverse_sample_normal(rand_01) * grc-> fragment_length_sigma + grc -> fragment_length_mean;
 		int fraglen = (int)(min(max(fragment_len, grc -> fragment_length_min), applied_fragment_maxlen));
 		rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 		grc_incrand(grc);
@@ -299,6 +300,7 @@ int grc_finalize(genRand_context_t *grc){
 	gzclose(grc->out_fps[0]);
 	if(grc->out_fps[1]) gzclose(grc->out_fps[1]);
 	fclose(grc->counts_out_fp);
+	free(grc->cmd_line);
 	return 0;
 }
 
@@ -329,7 +331,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		SUBREADprintf("ERROR: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "TrnascriptID\tLength\n");
+	fprintf(sumfp, "TranscriptID\tLength\n");
 
 	char * seq_name = NULL;
 	int seq_len = 0;
@@ -539,6 +541,7 @@ int grc_load_env(genRand_context_t *grc){
 
 	sprintf(outname,"%s.truthCounts", grc->output_prefix);
 	grc->counts_out_fp = fopen(outname,"w");
+	fprintf(grc->counts_out_fp, "## CMD :%s\nTranscriptID\tLength\tCount\n", grc->cmd_line);
 
 	sprintf(outname,"%s_R1.fastq.gz", grc->output_prefix);
 	grc->out_fps[0] = gzopen(outname, "wb");
@@ -567,8 +570,9 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	opterr = 1;
 	optopt = 63;
 
+	rebuild_command_line(&grc.cmd_line, argc, argv);
 	// default settings of the read/fragment length: 100bp, a general illumina feeling 
-	grc.fragment_length_var = 30.;
+	grc.fragment_length_sigma = 30.;
 	grc.fragment_length_min = 110;
 	grc.fragment_length_max = 400;
 	grc.fragment_length_mean = 160.;
@@ -582,7 +586,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				do_fasta_summary = 1;
 				break;
 			case 'V':
-				grc.fragment_length_var = atof(optarg);
+				grc.fragment_length_sigma = atof(optarg);
 				break;
 			case 'N':
 				grc.fragment_length_min = atoi(optarg);
