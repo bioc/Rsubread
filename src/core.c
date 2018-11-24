@@ -4128,23 +4128,7 @@ int destroy_global_context(global_context_t * context)
 }
 
 void subread_rebuild_cmd(int argc, char ** argv, global_context_t * global_context){
-	int c;
-	global_context -> rebuilt_command_line = malloc(2000);
-	global_context -> rebuilt_command_line_size = 2000;
-
-	global_context -> rebuilt_command_line[0]=0;
-
-	for(c = 0; c<argc;c++)
-	{
-		if(strlen(global_context -> rebuilt_command_line) + 500 > global_context -> rebuilt_command_line_size)
-		{
-			global_context -> rebuilt_command_line_size*=2;
-			global_context -> rebuilt_command_line = realloc(global_context -> rebuilt_command_line, global_context -> rebuilt_command_line_size);
-		}
-		sprintf(global_context -> rebuilt_command_line + strlen(global_context -> rebuilt_command_line), "\"%s\" ", argv[c]);
-	}
-
-
+	global_context -> rebuilt_command_line_size = rebuild_command_line(&global_context -> rebuilt_command_line , argc, argv);
 }
 
 

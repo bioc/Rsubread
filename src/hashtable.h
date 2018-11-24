@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.16 2018/05/05 00:47:52 cvs Exp $
+ * $Id: hashtable.h,v 9999.20 2018/11/23 05:13:57 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -52,10 +52,21 @@ ArrayList * ArrayListCreate(int init_capacity);
 ArrayList * ArrayListDuplicate(ArrayList * ori);
 void ArrayListDestroy(ArrayList * list);
 void * ArrayListGet(ArrayList * list, long n);
+void * ArrayListRandom(ArrayList * list);
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
 void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
 void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem));
+
+// A simple comparison function if you want to sort unsigned long long ints.
+int ArrayListLLUComparison(void * L_elem, void * R_elem);
+
+// This function returns the index of the value in the list that is the minumum value greater than "value_less_than_dent".
+// The elements in the list are all zero-based unsigned long long ints. The list must be sorted (small -> large) before calling this function.
+// If the "value_less_than_dent" is larger than all the values in the list, "-1" is returned;
+// If there are repeated numbers in the list, this function will always return the index of the first of them when this repeated number is the next dent.
+//
+long ArrayListFindNextDent(ArrayList * list, unsigned long long value_less_than_dent);
 
 
 void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );

@@ -521,6 +521,7 @@ int seekgz_next_char(seekable_zfile_t * fp){ // MUST BE PROTECTED BY read_lock
 void seekgz_close(seekable_zfile_t * fp){
 	fclose(fp -> gz_fp);
 	free(fp -> in_zipped_buffer);
+	inflateEnd(&fp -> stem);
 	subread_destroy_lock(&fp -> write_lock);
 }
 

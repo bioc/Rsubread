@@ -77,4 +77,18 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 HashTable * load_alias_table(char * fname) ;
 
 char * get_short_fname(char * lname);
+
+// Rebuild a string containing the command line.
+// Return the string length (without the terminating \0)
+// You need to free(*lineptr) after all.
+int rebuild_command_line(char ** lineptr, int argc, char ** argv);
+
+
+// Calculate a full round of MD5 or SHA256. 
+void Helper_md5sum(char * plain_txt, int plain_len, unsigned char * bin_md5_buff);
+void Helper_sha256sum(char * plain_txt, int plain_len, unsigned char * bin_md5_buff);
+unsigned long long plain_txt_to_long_rand(char * plain_txt, int plain_len);
+
+// give me a p, I give you the value such that Pr( x < value ) == p in a 0/1 normal distribution.
+double inverse_sample_normal(double p);
 #endif

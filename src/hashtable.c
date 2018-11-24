@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.23 2018/05/05 00:47:52 cvs Exp $
+ * $Id: hashtable.c,v 9999.29 2018/11/23 05:13:57 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -22,6 +22,25 @@ static int pointercmp(const void *pointer1, const void *pointer2);
 static unsigned long pointerHashFunction(const void *pointer);
 static int isProbablePrime(long number);
 static long calculateIdealNumOfBuckets(HashTable *hashTable);
+
+long long_random_val(){
+	long ret = 0;
+	if(RAND_MAX<255){
+		SUBREADprintf("Is this a embedded computer????\n");
+		return -1;
+	}
+	int i;
+	for(i=0;i<8;i++){
+		if(i>0)ret = (ret << 8) ^ (rand() & 0xff);
+		else ret = (ret << 8) ^ (rand() & 0x7f);
+	}
+	return ret;
+}
+
+void * ArrayListRandom(ArrayList * list){
+	long ii = long_random_val() % list -> numOfElements;
+	return list -> elementList[ii];
+}
 
 
 ArrayList * ArrayListCreate(int init_capacity){
@@ -128,6 +147,36 @@ void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void *
 	sortdata[1] = compare_L_minus_R;
 
 	merge_sort(sortdata, list -> numOfElements, ArrayListSort_compare, ArrayListSort_exchange, ArrayListSort_merge);
+}
+
+int ArrayListLLUComparison(void * L_elem, void * R_elem){
+	unsigned long long lint = L_elem-NULL;
+	unsigned long long rint = R_elem-NULL;
+	if(lint<rint)return -1;
+	if(lint>rint)return 1;
+	return 0;
+}
+
+long ArrayListFindNextDent(ArrayList * list, unsigned long long value_less_than_dent){
+	long h=list->numOfElements-1,l=0,m=-1l;
+	if( list -> elementList[h]- NULL <= value_less_than_dent )return -1l;
+	while(h>l){
+		m=(h+l)/2;
+		unsigned long long mv = list -> elementList[m] - NULL;
+		if(mv < value_less_than_dent) l=m+1;
+		else if(mv > value_less_than_dent) h=m-1;
+		else break;
+	}
+	if(m<2)m=0;
+	else m-=2;
+
+	for(; m>=0 && list -> elementList[m] - NULL >= value_less_than_dent; m--);
+
+	for(m = max(0, m); m < list->numOfElements ; m++){
+		if( list -> elementList[m] - NULL > value_less_than_dent )return m;
+	}
+	SUBREADprintf("ALGORITHM ERROR!! DID YOU SORT THE LIST???\n");
+	return -2l;
 }
 
 /*--------------------------------------------------------------------------*\

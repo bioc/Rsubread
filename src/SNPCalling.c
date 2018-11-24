@@ -88,6 +88,7 @@ struct SNP_Calling_Parameters{
 	gene_offset_t * subread_index_offsets;
 	gene_value_index_t * subread_index_array;
 	HashTable * cigar_event_table;
+	char * rebuilt_command_line;
 
 	unsigned long long int all_mapped_bases;
 	unsigned int fisher_normalisation_target; 
@@ -938,7 +939,7 @@ int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference
 						sprintf( BGC_Qvalue_str, ";CTRL_DP=%d;CTRL_MM=%d;CTRL_QV=%.4f;VS_QV=%.4f",BGC_all_reads, BGC_alt_reads, BGC_Qvalue,max(0,VS_Qvalue));
 					}
 
-					snprintf(sprint_line,999, "%s\t%u\t.\t%c\t%s\t%.4f\t.\tDP=%d;MM=%s;BGTOTAL=%d;BGMM=%d%s\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, Qvalue, all_reads, supporting_list , snp_filter_background_matched[i]+snp_filter_background_unmatched[i], snp_filter_background_unmatched[i], BGC_Qvalue_str);
+					snprintf(sprint_line,999, "%s\t%u\t.\t%c\t%s\t%.4f\t.\tDP=%d;MMsum=%d;MM=%s;BGTOTAL=%d;BGMM=%d%s\n", chro_name, BASE_BLOCK_LENGTH*block_no +1 + i, true_value,base_list, Qvalue, all_reads, POI_MM, supporting_list , snp_filter_background_matched[i]+snp_filter_background_unmatched[i], snp_filter_background_unmatched[i], BGC_Qvalue_str);
 					if(parameters->output_fp_lock)
 						subread_lock_occupy(parameters->output_fp_lock);
 					int sprint_line_len = strlen(sprint_line);
@@ -1220,6 +1221,7 @@ int parse_read_lists_maybe_threads(char * in_FASTA_file, char * out_BED_file, ch
 		SUBREADprintf("Cannot open the output file: '%s'\n", out_BED_file);
 	}
 	fputs("##fileformat=VCFv4.0\n",out_fp);
+	fprintf(out_fp, "##exactSNP_Commandline=%s\n", parameters -> rebuilt_command_line);
 	fputs("##comment=The QUAL values for the SNPs in this VCF file are calculated as min(40, - log_10 (p_value)), where p_value is from the Fisher's Exact Test. The QUAL values for the Indels in this VCF file are always 1.0.\n", out_fp);
 	fputs("##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read Depth\">\n", out_fp);
 	fputs("##INFO=<ID=BGMM,Number=1,Type=Integer,Description=\"Number of mismatched bases in the background (for SNP only)\">\n", out_fp);
@@ -1643,6 +1645,7 @@ int main_snp_calling_test(int argc,char ** argv)
 
 
 	memset(&parameters, 0, sizeof(struct SNP_Calling_Parameters));
+	rebuild_command_line(&parameters . rebuilt_command_line, argc, argv);
 	parameters.start_time = miltime();
 	parameters.empty_blocks = 0;
 	parameters.reported_SNPs = 0;

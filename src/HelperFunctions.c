@@ -1191,3 +1191,659 @@ HashTable * load_alias_table(char * fname) {
 	return ret;
 }
 
+int rebuild_command_line(char ** lineptr, int argc, char ** argv){
+	int linecap = 1000,c;
+	*lineptr = malloc(linecap);
+	**lineptr = 0;
+
+	for(c = 0; c<argc;c++)
+	{
+		if(strlen(*lineptr) + 500 > linecap)
+		{
+			linecap *=2;
+			*lineptr = realloc(*lineptr, linecap);
+		}
+		sprintf((*lineptr) + strlen(*lineptr), "\"%s\" ", argv[c]);
+	}
+
+	return strlen(*lineptr);
+}
+
+// The following code was downloaded from
+//   https://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
+//   on the 23rd of Nov, 2018. I (Yang LIAO) made minor changes to the code.
+//
+// It says "Public Domain" in the licence but the original author should be acknwoledged (only for expressing my gratitude):
+//   Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
+
+/* Any 32-bit or wider unsigned integer data type will do */
+typedef unsigned int HelpFuncMD5_u32plus;
+
+typedef struct {
+	HelpFuncMD5_u32plus lo, hi;
+	HelpFuncMD5_u32plus a, b, c, d;
+	unsigned char buffer[64];
+	HelpFuncMD5_u32plus block[16];
+} HelpFuncMD5_CTX;
+ 
+/*
+ * The basic HelpFuncMD5 functions.
+ *
+ * F and G are optimized compared to their RFC 1321 definitions for
+ * architectures that lack an AND-NOT instruction, just like in Colin Plumb's
+ * implementation.
+ */
+#define F(x, y, z)			((z) ^ ((x) & ((y) ^ (z))))
+#define G(x, y, z)			((y) ^ ((z) & ((x) ^ (y))))
+#define H(x, y, z)			(((x) ^ (y)) ^ (z))
+#define H2(x, y, z)			((x) ^ ((y) ^ (z)))
+#define I(x, y, z)			((y) ^ ((x) | ~(z)))
+ 
+/*
+ * The HelpFuncMD5 transformation for all four rounds.
+ */
+#define STEP(f, a, b, c, d, x, t, s) \
+	(a) += f((b), (c), (d)) + (x) + (t); \
+	(a) = (((a) << (s)) | (((a) & 0xffffffff) >> (32 - (s)))); \
+	(a) += (b);
+ 
+/*
+ * SET reads 4 input bytes in little-endian byte order and stores them in a
+ * properly aligned word in host byte order.
+ *
+ * The check for little-endian architectures that tolerate unaligned memory
+ * accesses is just an optimization.  Nothing will break if it fails to detect
+ * a suitable architecture.
+ *
+ * Unfortunately, this optimization may be a C strict aliasing rules violation
+ * if the caller's data buffer has effective type that cannot be aliased by
+ * HelpFuncMD5_u32plus.  In practice, this problem may occur if these HelpFuncMD5 routines are
+ * inlined into a calling function, or with future and dangerously advanced
+ * link-time optimizations.  For the time being, keeping these HelpFuncMD5 routines in
+ * their own translation unit avoids the problem.
+ */
+#define SET(n) (*(HelpFuncMD5_u32plus *)&ptr[(n) * 4])
+#define GET(n) SET(n)
+/*
+ * This processes one or more 64-byte data blocks, but does NOT update the bit
+ * counters.  There are no alignment requirements.
+ */
+static const void *body(HelpFuncMD5_CTX *ctx, const void *data, unsigned long size)
+{
+	const unsigned char *ptr;
+	HelpFuncMD5_u32plus a, b, c, d;
+	HelpFuncMD5_u32plus saved_a, saved_b, saved_c, saved_d;
+ 
+	ptr = (const unsigned char *)data;
+ 
+	a = ctx->a;
+	b = ctx->b;
+	c = ctx->c;
+	d = ctx->d;
+ 
+	do {
+		saved_a = a;
+		saved_b = b;
+		saved_c = c;
+		saved_d = d;
+ 
+/* Round 1 */
+		STEP(F, a, b, c, d, SET(0), 0xd76aa478, 7)
+		STEP(F, d, a, b, c, SET(1), 0xe8c7b756, 12)
+		STEP(F, c, d, a, b, SET(2), 0x242070db, 17)
+		STEP(F, b, c, d, a, SET(3), 0xc1bdceee, 22)
+		STEP(F, a, b, c, d, SET(4), 0xf57c0faf, 7)
+		STEP(F, d, a, b, c, SET(5), 0x4787c62a, 12)
+		STEP(F, c, d, a, b, SET(6), 0xa8304613, 17)
+		STEP(F, b, c, d, a, SET(7), 0xfd469501, 22)
+		STEP(F, a, b, c, d, SET(8), 0x698098d8, 7)
+		STEP(F, d, a, b, c, SET(9), 0x8b44f7af, 12)
+		STEP(F, c, d, a, b, SET(10), 0xffff5bb1, 17)
+		STEP(F, b, c, d, a, SET(11), 0x895cd7be, 22)
+		STEP(F, a, b, c, d, SET(12), 0x6b901122, 7)
+		STEP(F, d, a, b, c, SET(13), 0xfd987193, 12)
+		STEP(F, c, d, a, b, SET(14), 0xa679438e, 17)
+		STEP(F, b, c, d, a, SET(15), 0x49b40821, 22)
+ 
+/* Round 2 */
+		STEP(G, a, b, c, d, GET(1), 0xf61e2562, 5)
+		STEP(G, d, a, b, c, GET(6), 0xc040b340, 9)
+		STEP(G, c, d, a, b, GET(11), 0x265e5a51, 14)
+		STEP(G, b, c, d, a, GET(0), 0xe9b6c7aa, 20)
+		STEP(G, a, b, c, d, GET(5), 0xd62f105d, 5)
+		STEP(G, d, a, b, c, GET(10), 0x02441453, 9)
+		STEP(G, c, d, a, b, GET(15), 0xd8a1e681, 14)
+		STEP(G, b, c, d, a, GET(4), 0xe7d3fbc8, 20)
+		STEP(G, a, b, c, d, GET(9), 0x21e1cde6, 5)
+		STEP(G, d, a, b, c, GET(14), 0xc33707d6, 9)
+		STEP(G, c, d, a, b, GET(3), 0xf4d50d87, 14)
+		STEP(G, b, c, d, a, GET(8), 0x455a14ed, 20)
+		STEP(G, a, b, c, d, GET(13), 0xa9e3e905, 5)
+		STEP(G, d, a, b, c, GET(2), 0xfcefa3f8, 9)
+		STEP(G, c, d, a, b, GET(7), 0x676f02d9, 14)
+		STEP(G, b, c, d, a, GET(12), 0x8d2a4c8a, 20)
+ 
+/* Round 3 */
+		STEP(H, a, b, c, d, GET(5), 0xfffa3942, 4)
+		STEP(H2, d, a, b, c, GET(8), 0x8771f681, 11)
+		STEP(H, c, d, a, b, GET(11), 0x6d9d6122, 16)
+		STEP(H2, b, c, d, a, GET(14), 0xfde5380c, 23)
+		STEP(H, a, b, c, d, GET(1), 0xa4beea44, 4)
+		STEP(H2, d, a, b, c, GET(4), 0x4bdecfa9, 11)
+		STEP(H, c, d, a, b, GET(7), 0xf6bb4b60, 16)
+		STEP(H2, b, c, d, a, GET(10), 0xbebfbc70, 23)
+		STEP(H, a, b, c, d, GET(13), 0x289b7ec6, 4)
+		STEP(H2, d, a, b, c, GET(0), 0xeaa127fa, 11)
+		STEP(H, c, d, a, b, GET(3), 0xd4ef3085, 16)
+		STEP(H2, b, c, d, a, GET(6), 0x04881d05, 23)
+		STEP(H, a, b, c, d, GET(9), 0xd9d4d039, 4)
+		STEP(H2, d, a, b, c, GET(12), 0xe6db99e5, 11)
+		STEP(H, c, d, a, b, GET(15), 0x1fa27cf8, 16)
+		STEP(H2, b, c, d, a, GET(2), 0xc4ac5665, 23)
+ 
+/* Round 4 */
+		STEP(I, a, b, c, d, GET(0), 0xf4292244, 6)
+		STEP(I, d, a, b, c, GET(7), 0x432aff97, 10)
+		STEP(I, c, d, a, b, GET(14), 0xab9423a7, 15)
+		STEP(I, b, c, d, a, GET(5), 0xfc93a039, 21)
+		STEP(I, a, b, c, d, GET(12), 0x655b59c3, 6)
+		STEP(I, d, a, b, c, GET(3), 0x8f0ccc92, 10)
+		STEP(I, c, d, a, b, GET(10), 0xffeff47d, 15)
+		STEP(I, b, c, d, a, GET(1), 0x85845dd1, 21)
+		STEP(I, a, b, c, d, GET(8), 0x6fa87e4f, 6)
+		STEP(I, d, a, b, c, GET(15), 0xfe2ce6e0, 10)
+		STEP(I, c, d, a, b, GET(6), 0xa3014314, 15)
+		STEP(I, b, c, d, a, GET(13), 0x4e0811a1, 21)
+		STEP(I, a, b, c, d, GET(4), 0xf7537e82, 6)
+		STEP(I, d, a, b, c, GET(11), 0xbd3af235, 10)
+		STEP(I, c, d, a, b, GET(2), 0x2ad7d2bb, 15)
+		STEP(I, b, c, d, a, GET(9), 0xeb86d391, 21)
+ 
+		a += saved_a;
+		b += saved_b;
+		c += saved_c;
+		d += saved_d;
+ 
+		ptr += 64;
+	} while (size -= 64);
+ 
+	ctx->a = a;
+	ctx->b = b;
+	ctx->c = c;
+	ctx->d = d;
+ 
+	return ptr;
+}
+ 
+void HelpFuncMD5_Init(HelpFuncMD5_CTX *ctx)
+{
+	ctx->a = 0x67452301;
+	ctx->b = 0xefcdab89;
+	ctx->c = 0x98badcfe;
+	ctx->d = 0x10325476;
+ 
+	ctx->lo = 0;
+	ctx->hi = 0;
+}
+ 
+void HelpFuncMD5_Update(HelpFuncMD5_CTX *ctx, const void *data, unsigned long size)
+{
+	HelpFuncMD5_u32plus saved_lo;
+	unsigned long used, available;
+ 
+	saved_lo = ctx->lo;
+	if ((ctx->lo = (saved_lo + size) & 0x1fffffff) < saved_lo)
+		ctx->hi++;
+	ctx->hi += size >> 29;
+ 
+	used = saved_lo & 0x3f;
+ 
+	if (used) {
+		available = 64 - used;
+ 
+		if (size < available) {
+			memcpy(&ctx->buffer[used], data, size);
+			return;
+		}
+ 
+		memcpy(&ctx->buffer[used], data, available);
+		data = (const unsigned char *)data + available;
+		size -= available;
+		body(ctx, ctx->buffer, 64);
+	}
+ 
+	if (size >= 64) {
+		data = body(ctx, data, size & ~(unsigned long)0x3f);
+		size &= 0x3f;
+	}
+ 
+	memcpy(ctx->buffer, data, size);
+}
+ 
+#define OUT(dst, src) \
+	(dst)[0] = (unsigned char)(src); \
+	(dst)[1] = (unsigned char)((src) >> 8); \
+	(dst)[2] = (unsigned char)((src) >> 16); \
+	(dst)[3] = (unsigned char)((src) >> 24);
+ 
+void HelpFuncMD5_Final(unsigned char *result, HelpFuncMD5_CTX *ctx)
+{
+	unsigned long used, available;
+ 
+	used = ctx->lo & 0x3f;
+ 
+	ctx->buffer[used++] = 0x80;
+ 
+	available = 64 - used;
+ 
+	if (available < 8) {
+		memset(&ctx->buffer[used], 0, available);
+		body(ctx, ctx->buffer, 64);
+		used = 0;
+		available = 64;
+	}
+ 
+	memset(&ctx->buffer[used], 0, available - 8);
+ 
+	ctx->lo <<= 3;
+	OUT(&ctx->buffer[56], ctx->lo)
+	OUT(&ctx->buffer[60], ctx->hi)
+ 
+	body(ctx, ctx->buffer, 64);
+ 
+	OUT(&result[0], ctx->a)
+	OUT(&result[4], ctx->b)
+	OUT(&result[8], ctx->c)
+	OUT(&result[12], ctx->d)
+ 
+	memset(ctx, 0, sizeof(*ctx));
+}
+
+
+void Helper_md5sum(char * plain_txt, int plain_len, unsigned char * bin_md5_buff){
+	HelpFuncMD5_CTX ctx;
+	HelpFuncMD5_Init(&ctx);
+	HelpFuncMD5_Update(&ctx, plain_txt, plain_len);
+	HelpFuncMD5_Final(bin_md5_buff, &ctx);
+}
+
+unsigned long long plain_txt_to_long_rand(char * plain_txt, int plain_len){
+	unsigned char md5v[16];
+	Helper_md5sum(plain_txt, plain_len, md5v);
+	unsigned long long ret = 0;
+	memcpy(&ret, md5v, sizeof(ret));
+	return ret;
+}
+
+void md5txt(char *s){
+	unsigned char md5v[16];
+	unsigned long long randv;
+	Helper_md5sum(s, strlen(s), md5v);
+	int x;
+	randv = plain_txt_to_long_rand(s, strlen(s));
+
+	for(x=0;x<16;x++){
+		printf("%02X", md5v[x]);
+	}
+	printf("\t'%s'\t%016llX\t%llu\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
+}
+
+//#define TESTHelpermain main
+
+int TESTHelpermain(){
+	int xx;
+	for(xx=0; xx<100; xx++){
+		char xt[10];
+		sprintf(xt, "%08d", xx);
+		md5txt(xt);
+	}
+	
+	return 0;
+}
+
+
+// The following code was retrieved from 
+//   https://github.com/google/omaha/blob/master/third_party/lzma/files/C/Helper_Sha256.c
+// Thank the authors -- Igor Pavlov and Wei Dai.
+
+/* Crypto/Helper_Sha256.c -- SHA-256 Hash
+2010-06-11 : Igor Pavlov : Public domain
+This code is based on public domain code from Wei Dai's Crypto++ library. */
+#define SHA256_DIGEST_SIZE 32
+
+typedef struct
+{
+  unsigned int state[8];
+  unsigned long long count;
+  unsigned char buffer[64];
+} CHelper_Sha256;
+
+/* define it for speed optimization */
+/* #define _SHA256_UNROLL */
+/* #define _SHA256_UNROLL2 */
+
+void Helper_Sha256_Init(CHelper_Sha256 *p)
+{
+  p->state[0] = 0x6a09e667;
+  p->state[1] = 0xbb67ae85;
+  p->state[2] = 0x3c6ef372;
+  p->state[3] = 0xa54ff53a;
+  p->state[4] = 0x510e527f;
+  p->state[5] = 0x9b05688c;
+  p->state[6] = 0x1f83d9ab;
+  p->state[7] = 0x5be0cd19;
+  p->count = 0;
+}
+
+#define rotlFixed(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+#define rotrFixed(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+
+#define S0(x) (rotrFixed(x, 2) ^ rotrFixed(x,13) ^ rotrFixed(x, 22))
+#define S1(x) (rotrFixed(x, 6) ^ rotrFixed(x,11) ^ rotrFixed(x, 25))
+#define s0(x) (rotrFixed(x, 7) ^ rotrFixed(x,18) ^ (x >> 3))
+#define s1(x) (rotrFixed(x,17) ^ rotrFixed(x,19) ^ (x >> 10))
+
+#define blk0(i) (W[i] = data[i])
+#define blk2(i) (W[i&15] += s1(W[(i-2)&15]) + W[(i-7)&15] + s0(W[(i-15)&15]))
+
+#define Ch(x,y,z) (z^(x&(y^z)))
+#define Maj(x,y,z) ((x&y)|(z&(x|y)))
+
+#define a(i) T[(0-(i))&7]
+#define b(i) T[(1-(i))&7]
+#define c(i) T[(2-(i))&7]
+#define d(i) T[(3-(i))&7]
+#define e(i) T[(4-(i))&7]
+#define f(i) T[(5-(i))&7]
+#define g(i) T[(6-(i))&7]
+#define h(i) T[(7-(i))&7]
+
+
+#ifdef _SHA256_UNROLL2
+
+#define R(a,b,c,d,e,f,g,h, i) h += S1(e) + Ch(e,f,g) + K[i+j] + (j?blk2(i):blk0(i));\
+  d += h; h += S0(a) + Maj(a, b, c)
+
+#define RX_8(i) \
+  R(a,b,c,d,e,f,g,h, i); \
+  R(h,a,b,c,d,e,f,g, i+1); \
+  R(g,h,a,b,c,d,e,f, i+2); \
+  R(f,g,h,a,b,c,d,e, i+3); \
+  R(e,f,g,h,a,b,c,d, i+4); \
+  R(d,e,f,g,h,a,b,c, i+5); \
+  R(c,d,e,f,g,h,a,b, i+6); \
+  R(b,c,d,e,f,g,h,a, i+7)
+
+#else
+
+#define R(i) h(i) += S1(e(i)) + Ch(e(i),f(i),g(i)) + K[i+j] + (j?blk2(i):blk0(i));\
+  d(i) += h(i); h(i) += S0(a(i)) + Maj(a(i), b(i), c(i))
+
+#ifdef _SHA256_UNROLL
+
+#define RX_8(i) R(i+0); R(i+1); R(i+2); R(i+3); R(i+4); R(i+5); R(i+6); R(i+7);
+
+#endif
+
+#endif
+
+static const unsigned int K[64] = {
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+  0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+  0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+  0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+  0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+  0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+  0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+  0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+  0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+};
+
+static void Helper_Sha256_Transform(unsigned int *state, const unsigned int *data)
+{
+  unsigned int W[16];
+  unsigned j;
+  #ifdef _SHA256_UNROLL2
+  unsigned int a,b,c,d,e,f,g,h;
+  a = state[0];
+  b = state[1];
+  c = state[2];
+  d = state[3];
+  e = state[4];
+  f = state[5];
+  g = state[6];
+  h = state[7];
+  #else
+  unsigned int T[8];
+  for (j = 0; j < 8; j++)
+    T[j] = state[j];
+  #endif
+
+  for (j = 0; j < 64; j += 16)
+  {
+    #if defined(_SHA256_UNROLL) || defined(_SHA256_UNROLL2)
+    RX_8(0); RX_8(8);
+    #else
+    unsigned i;
+    for (i = 0; i < 16; i++) { R(i); }
+    #endif
+  }
+
+  #ifdef _SHA256_UNROLL2
+  state[0] += a;
+  state[1] += b;
+  state[2] += c;
+  state[3] += d;
+  state[4] += e;
+  state[5] += f;
+  state[6] += g;
+  state[7] += h;
+  #else
+  for (j = 0; j < 8; j++)
+    state[j] += T[j];
+  #endif
+  
+  /* Wipe variables */
+  /* memset(W, 0, sizeof(W)); */
+  /* memset(T, 0, sizeof(T)); */
+}
+
+#undef S0
+#undef S1
+#undef s0
+#undef s1
+
+static void Helper_Sha256_WritecharBlock(CHelper_Sha256 *p)
+{
+  unsigned int data32[16];
+  unsigned i;
+  for (i = 0; i < 16; i++)
+    data32[i] =
+      ((unsigned int)(p->buffer[i * 4    ]) << 24) +
+      ((unsigned int)(p->buffer[i * 4 + 1]) << 16) +
+      ((unsigned int)(p->buffer[i * 4 + 2]) <<  8) +
+      ((unsigned int)(p->buffer[i * 4 + 3]));
+  Helper_Sha256_Transform(p->state, data32);
+}
+
+void Helper_Sha256_Update(CHelper_Sha256 *p, const char *data, size_t size)
+{
+  unsigned int curBufferPos = (unsigned int)p->count & 0x3F;
+  while (size > 0)
+  {
+    p->buffer[curBufferPos++] = (char)*data;
+    p->count++;
+
+	data++;
+    size--;
+    if (curBufferPos == 64)
+    {
+      curBufferPos = 0;
+      Helper_Sha256_WritecharBlock(p);
+    }
+  }
+}
+
+void Helper_Sha256_Final( unsigned char *digest , CHelper_Sha256 *p)
+{
+  unsigned long long lenInBits = (p->count << 3);
+  unsigned int curBufferPos = (unsigned int)p->count & 0x3F;
+  unsigned i;
+  p->buffer[curBufferPos++] = 0x80;
+  while (curBufferPos != (64 - 8))
+  {
+    curBufferPos &= 0x3F;
+    if (curBufferPos == 0)
+      Helper_Sha256_WritecharBlock(p);
+    p->buffer[curBufferPos++] = 0;
+  }
+  for (i = 0; i < 8; i++)
+  {
+    p->buffer[curBufferPos++] = (char)(lenInBits >> 56);
+    lenInBits <<= 8;
+  }
+  Helper_Sha256_WritecharBlock(p);
+
+  for (i = 0; i < 8; i++)
+  {
+    *digest++ = (unsigned char)(p->state[i] >> 24);
+    *digest++ = (unsigned char)(p->state[i] >> 16);
+    *digest++ = (unsigned char)(p->state[i] >> 8);
+    *digest++ = (unsigned char)(p->state[i]);
+  }
+}
+
+void Helper_sha256sum(char * plain_txt, int plain_len, unsigned char * bin_md5_buff){
+	CHelper_Sha256 ctx;
+	Helper_Sha256_Init(&ctx);
+	Helper_Sha256_Update(&ctx, plain_txt, plain_len);
+	Helper_Sha256_Final(bin_md5_buff, &ctx);
+}
+
+void sha256txt(char *s){
+	unsigned char sha256v[32];
+	Helper_sha256sum(s, strlen(s), sha256v);
+	int x;
+
+	for(x=0;x<32;x++){
+		printf("%02X", sha256v[x]);
+	}
+	printf("\t'%s'\n", s);
+}
+
+//#define  TEST256Helpermain main
+int TEST256Helpermain(){
+	int xx;
+	for(xx=0; xx<100; xx++){
+		char xt[10];
+		sprintf(xt, "%08d", xx);
+		sha256txt(xt);
+	}
+	return 0;
+}
+
+
+
+// The code of Helper_erfinv() was retreived from
+//    https://github.com/antelopeusersgroup/antelope_contrib/blob/master/lib/location/libgenloc/erfinv.c
+// I (Yang LIAO) adopted and modified it because it is under the New BSD license.
+//
+// Copyright (c) 2014 Indiana University
+// All rights reserved. 
+//
+// Written by Prof. Gary L. Pavlis, Dept. of Geol. Sci.,
+//   Indiana University, Bloomington, IN
+//
+// This software is licensed under the New BSD license: 
+//
+// Redistribution and use in source and binary forms,
+// with or without modification, are permitted provided
+// that the following conditions are met:
+//
+// Redistributions of source code must retain the above
+// copyright notice, this list of conditions and the
+// following disclaimer.
+//
+// Redistributions in binary form must reproduce the
+// above copyright notice, this list of conditions and
+// the following disclaimer in the documentation and/or
+// other materials provided with the distribution.
+//
+// Neither the name of Indiana University nor
+// the names of its contributors may be used to endorse
+// or promote products derived from this software without
+// specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+// CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+// WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+// PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+// USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+// IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+// NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+// USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+
+#include <math.h>
+#include <float.h>
+#define MAXDOUBLE DBL_MAX
+
+#define CENTRAL_RANGE 0.7
+double Helper_erfinv( double y) {
+        double x=0,z,num,dem; /*working variables */
+        /* coefficients in rational expansion */
+        double a[4]={ 0.886226899, -1.645349621,  0.914624893, -0.140543331};
+        double b[4]={-2.118377725,  1.442710462, -0.329097515,  0.012229801};
+        double c[4]={-1.970840454, -1.624906493,  3.429567803,  1.641345311};
+        double d[2]={ 3.543889200,  1.637067800};
+        if(fabs(y) > 1.0) return (atof("NaN"));  /* This needs IEEE constant*/
+        if(fabs(y) == 1.0) return((copysign(1.0,y))*MAXDOUBLE); 
+        if( fabs(y) <= CENTRAL_RANGE ) 
+        {
+                z = y*y;
+                num = (((a[3]*z + a[2])*z + a[1])*z + a[0]);
+                dem = ((((b[3]*z + b[2])*z + b[1])*z +b[0])*z + 1.0);
+                x = y*num/dem;
+        }
+        else if( (fabs(y) > CENTRAL_RANGE) && (fabs(y) < 1.0) )
+        {
+                z = sqrt(-log((1.0-fabs(y))/2.0));
+                num = ((c[3]*z + c[2])*z + c[1])*z + c[0];
+                dem = (d[1]*z + d[0])*z + 1.0;
+                x = (copysign(1.0,y))*num/dem;
+        }
+        /* Two steps of Newton-Raphson correction */
+        x = x - (erf(x) - y)/( (2.0/sqrt(M_PI))*exp(-x*x));
+        x = x - (erf(x) - y)/( (2.0/sqrt(M_PI))*exp(-x*x));
+
+        return(x);
+}
+
+
+double inverse_sample_normal(double p){
+	return Helper_erfinv(2*p-1)*1.4142135623730950488;
+}
+
+//#define TestNormalMain main
+void TestNormalMain(){
+	int i;
+	for(i=0; i<=10; i++){
+		double ii = i*1./10;
+		double p_0 = inverse_sample_normal(ii);
+		SUBREADprintf("p of %.1f = %.40f\n\n" , ii, p_0);
+	}
+}
