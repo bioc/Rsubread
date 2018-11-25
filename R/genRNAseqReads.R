@@ -35,7 +35,7 @@ generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size
 		contig.TPM<-data.frame(ContigID=contig.TPM$ContigID, TPM=as.numeric(as.character(contig.TPM$TPM)))
 	}else{
 		if(ncol(contig.TPM)!=2) stop("Error: the TPM parameter must be a two-column data.frame. The first column contains the contig names and the second column contains the TPM values")
-		contig.TPM[,2] <- as.numeric(contig.TPM[,2])
+		contig.TPM[,2] <- as.numeric(as.character(contig.TPM[,2]))
 	}
 	colnames( contig.TPM )<-c("ContigID","TPM")
 
