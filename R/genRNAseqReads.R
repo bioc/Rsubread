@@ -1,7 +1,7 @@
-summarizeTranscripts <- function(transcript.file){
+summarizeContigs <- function(contig.file){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
-	transcript.file <- normalizePath(transcript.file, mustWork=T)
-	cmd <- paste("RsummarizeTranscripts,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=",")
+	contig.file <- normalizePath(contig.file, mustWork=T)
+	cmd <- paste("RsummarizeContigs,--summarizeFasta,--contigFasta",contig.file,"--outputPrefix", fout_sum, sep=",")
 
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
@@ -12,8 +12,8 @@ summarizeTranscripts <- function(transcript.file){
 	summ
 }
 
-generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25){
-	transcript.file <- normalizePath(transcript.file, mustWork=T)
+generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25){
+	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
 		stop("Error: the current version can only generate 75-bp or 100-bp reads")
@@ -30,23 +30,23 @@ generateRNAseqReads <- function(transcript.file, transcript.TPM, output.prefix, 
 	if(out.sample.size>1000*1000*1000) stop("Error: the current version cannot generate more than one billion reads/insertions in a single run")
 
 	fin_TPMtab <- file.path(".",paste(".Rsubread_genReadTPM_pid",Sys.getpid(),sep=""))
-	transcript.TPM<-as.data.frame(transcript.TPM)
-	if( "TranscriptID" %in% colnames(transcript.TPM) && "TPM" %in% colnames(transcript.TPM) ){
-		transcript.TPM<-data.frame(TranscriptID=transcript.TPM$TranscriptID, TPM=as.numeric(as.character(transcript.TPM$TPM)))
+	contig.TPM<-as.data.frame(TPM)
+	if( "ContigID" %in% colnames(contig.TPM) && "TPM" %in% colnames(contig.TPM) ){
+		contig.TPM<-data.frame(ContigID=contig.TPM$ContigID, TPM=as.numeric(as.character(contig.TPM$TPM)))
 	}else{
-		if(ncol(transcript.TPM)!=2) stop("Error: the transcript.TPM parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the TPM values")
-		transcript.TPM[,2] <- as.numeric(transcript.TPM[,2])
+		if(ncol(contig.TPM)!=2) stop("Error: the TPM parameter must be a two-column data.frame. The first column contains the contig names and the second column contains the TPM values")
+		contig.TPM[,2] <- as.numeric(contig.TPM[,2])
 	}
-	colnames( transcript.TPM )<-c("TranscriptID","TPM")
+	colnames( contig.TPM )<-c("ContigID","TPM")
 
-	#print(transcript.TPM[1:6,])
-	if(abs(sum( transcript.TPM$TPM ) - 1000000) > 100)
-		stop(paste0("Error: the transcript.TPM parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the TPM values. The sum of all the TPM values must be 1,000,000 (but not ",sum( transcript.TPM$TPM ),"). See https://www.biostars.org/p/273537/ for the definition of TPM."))
-	if(any(transcript.TPM$TPM< -0.0000000001))stop("Error: no negative TPM is allowed")
+	#print(contig.TPM[1:6,])
+	if(abs(sum( contig.TPM$TPM ) - 1000000) > 100)
+		stop(paste0("Error: the TPM parameter must be a two-column data.frame. The first column contains the contig names and the second column contains the TPM values. The sum of all the TPM values must be 1,000,000 (but not ",sum( contig.TPM$TPM ),"). See https://www.biostars.org/p/273537/ for the definition of TPM."))
+	if(any(contig.TPM$TPM< -0.0000000001))stop("Error: no negative TPM is allowed")
 
-	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
+	write.table(contig.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
-	cmd<-paste("RgenerateRNAseqReads,--transcriptFasta",transcript.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
+	cmd<-paste("RgenerateRNAseqReads,--contigFasta",contig.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
 	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
 
 	#print(substr(cmd,1,2000))
