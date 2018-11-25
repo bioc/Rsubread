@@ -37,13 +37,16 @@ generateRNAseqReads(
   \item{output.prefix}{ character string giving the basename of output files.}
   \item{out.sample.size}{ numeric value giving the number of reads or read-pairs to be generated. One million by default.}
   \item{read.length}{ numeric value giving the length of each read in the output. Maximum length is 250bp. 75 by default.}
-  \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the reads are 100-bp or 75-bp long. If the output read length is 100-bp or 75-bp, you can optionally omit the \code{quality.reference} parameter for simulating sequencing errors, and the function will use its inbuilt quality strings.}
+  \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, you can optionally omit the \code{quality.reference} parameter for simulating sequencing errors, and the function will use its inbuilt quality strings.}
   \item{quality.reference} { character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred 33 format. The sequencing quality strings must have the same length as \code{read.length}.}
   \item{isPairedEndOutput}{ logical indicating if paired-end reads should be generated. FALSE by default.}
   \item{Insertion.Length.Min, Insertion.Length.Max, Insertion.Length.Mean and Insertion.Length.Sigma}{ numeric values giving the minimum, maximum, mean and standard error of the insertion lengths when paired-end reads are generated. The minimum insertion length must be higher than the output read length. Transcripts that are shorther than the minimum insertion length will \emph{not} be used for generating simulation reads.}
 }
 \details{
-  The \code{summarizeTranscripts} and \code{generateRNAseqReads} functions are 
+  The \code{summarizeTranscripts} and \code{generateRNAseqReads} functions are useful in generating simulative RNA-seq reads from transcript sequences. 
+  The \code{summarizeTranscripts} function scans a FASTA or gzipped-FASTA file that contains transcript sequences, and reports the list of transcripts with their lengths. From the output of \code{summarizeTranscripts}, the user can create a data frame specifying the wanted Transcripts Per Kilobase Million (TPM) value for each transcript, and run \code{generateRNAseqReads} to generate reads that express the transcripts at the wanted TPM levels. 
+  Substitution sequencing errors can be simulated in the reads by following real samples.
+ when reference sequencing quality strings are provided. 
 }
 \value{
   The \code{summarizeTranscripts} function returns a \code{data.frame} object that includes
