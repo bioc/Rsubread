@@ -596,10 +596,6 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	genRand_context_t grc;
 	memset(&grc,0,sizeof(grc));
 
-	optind = 1;
-	opterr = 1;
-	optopt = 63;
-
 	rebuild_command_line(&grc.cmd_line, argc, argv);
 	// default settings of the read/insertion length: 100bp, a general illumina feeling 
 	grc.insertion_length_sigma = 30.;
@@ -609,6 +605,11 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	grc.read_length = 100;
 
 	long long seed = -1;
+
+	optind = 1;
+	opterr = 1;
+	optopt = 63;
+
 
 	while ((c = getopt_long (argc, argv, "TCS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){

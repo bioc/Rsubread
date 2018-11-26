@@ -375,21 +375,27 @@ void R_qualityScores_wrapper(int * nargs, char ** argv)
 void R_generate_random_RNAseq_reads(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
+	uintptr_t old_cstack_limit = R_CStackLimit;
 	
-	r_argv = (char *)calloc(1000, sizeof(char));
+	r_argv = (char *)calloc(1500, sizeof(char));
 	strcpy(r_argv,*argv);
+	//fprintf(stderr, "ARGSSS=%s\n", r_argv);
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
 	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
 	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=1;i<n;i++){
+		strcpy(c_argv[i],strtok(NULL,","));
+		//fprintf(stderr, "ARG_%d=%s\n",i,c_argv[i]);
+	}
 
 	gen_rnaseq_reads_main(n,c_argv);
 
 	for(i=0;i<n;i++) free(c_argv[i]);
 	free(c_argv);
 	free(r_argv);
+	R_CStackLimit = old_cstack_limit;
 }
 void R_flattenGTF_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
