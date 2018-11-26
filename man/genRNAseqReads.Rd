@@ -50,10 +50,10 @@ summarizeContigs(
   \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
   \item{quality.reference}{ character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
   \item{isPairedEndOutput}{ logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
-  \item{Insertion.Length.Min}{}
-  \item{Insertion.Length.Max}{}
-  \item{Insertion.Length.Mean}{}
-  \item{Insertion.Length.Sigma}{ numeric values giving the minimum, maximum, mean and standard deviation of a truncated normal distribution, from which the insertion lengths are drawn for generating paired-end reads. The minimum insertion length must be equal or greater than the output read length. The default values of the four parameters are 100, 500, 150 and 25.}
+  \item{Insertion.Length.Min}{ numeric values giving the minimum insertion length. The minimum insertion length must be equal or greater than the output read length. 100 by default.}
+  \item{Insertion.Length.Max}{ numeric values giving the maximum insertion length. 500 by default.}
+  \item{Insertion.Length.Mean}{ numeric values giving the mean of insertion lengths. 150 by default.}
+  \item{Insertion.Length.Sigma}{ numeric values giving the standard deviation of insertion lengths. The insertion lengths are drawn for a truncated normal distribution that is defined by \code{Insertion.Length.Min}, \code{Insertion.Length.Max}, \code{Insertion.Length.Mean} and \code{Insertion.Length.Sigma}. 25 by default.}
   \item{simplify.contig.names}{ logical indicating if contig names should be simplified. If \code{TRUE}, the contig names are truncated to the first \code{|} or space. \code{FALSE} by default.}
 }
 \details{
