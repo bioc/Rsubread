@@ -13,7 +13,7 @@ summarizeContigs <- function(contig.file, simplify.contig.names=F){
 	summ
 }
 
-generateSimulativeReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
+generateSimulativeReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=F, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
@@ -50,6 +50,7 @@ generateSimulativeReads <- function(contig.file, TPM, output.prefix, out.sample.
 	cmd<-paste("RgenerateRNAseqReads,--contigFasta",contig.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
 	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
 	if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
+	if(truth.in.read.names) cmd<-paste(cmd, "--truthInReadNames", sep=",")
 
 	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))

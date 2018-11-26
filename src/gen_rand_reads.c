@@ -32,6 +32,7 @@
 
 static struct option long_options[] =
 {
+	{"truthInReadNames", no_argument, 0, 'T'},
 	{"simpleContigId", no_argument, 0, 'C'},
 	{"summarizeFasta",  no_argument, 0, 'M'},
 	{"contigFasta",  required_argument, 0, 't'},
@@ -59,6 +60,7 @@ typedef struct {
 	unsigned long long output_sample_size;
 	int is_paired_end;
 	int simple_contig_names;
+	int truth_in_read_names;
 	float insertion_length_mean;
 	int insertion_length_max;
 	int insertion_length_min;
@@ -98,7 +100,7 @@ void grc_sequencing_error_read(char * seq, int qlen, char * qua){
 	}
 }
 
-void gen_one_read_here(genRand_context_t * grc, char * seq, int is_PE_second, int trans_negative, unsigned long long rno){
+void gen_one_read_here(genRand_context_t * grc, char * seq, int is_PE_second, int trans_negative, unsigned long long rno, char * seq_name, int my_pos, int mate_pos){
 	char read_seq [grc -> read_length+1];
 	memcpy(read_seq, seq, grc -> read_length);
 	read_seq[grc -> read_length]=0;
@@ -119,7 +121,13 @@ void gen_one_read_here(genRand_context_t * grc, char * seq, int is_PE_second, in
 	}
 
 	gzFile thisfp = (is_PE_second==1) ? grc -> out_fps[1] : grc -> out_fps[0];
-	gzprintf(thisfp, "@R%09llu\n%s\n+\n%s\n", rno, read_seq, qual_str);
+	int R1_pos = is_PE_second?mate_pos:my_pos;
+	int R2_pos = is_PE_second?my_pos:mate_pos;
+	if(grc->truth_in_read_names){
+		if(is_PE_second<0) gzprintf(thisfp, "@R%09llu:%s:%d\n%s\n+\n%s\n", rno, seq_name, 1+my_pos, read_seq, qual_str);
+		else gzprintf(thisfp, "@R%09llu:%s:%d:%d\n%s\n+\n%s\n", rno, seq_name, 1+R1_pos, 1+R2_pos, read_seq, qual_str);
+	}
+	else gzprintf(thisfp, "@R%09llu\n%s\n+\n%s\n", rno, read_seq, qual_str);
 }
 
 void gen_a_read_from_one_contig(genRand_context_t * grc, long this_contig_no, unsigned  long long rno){
@@ -140,16 +148,16 @@ void gen_a_read_from_one_contig(genRand_context_t * grc, long this_contig_no, un
 		int start_pos = (actual_contig_len - fraglen) * rand_01;
 		int is_first_end_negative = rand_01_int % 2;
 		if(is_first_end_negative){
-			gen_one_read_here(grc, trans_seq + start_pos + fraglen - grc -> read_length, 0, 1, rno);
-			gen_one_read_here(grc, trans_seq + start_pos, 1, 0, rno);
+			gen_one_read_here(grc, trans_seq + start_pos + fraglen - grc -> read_length, 0, 1, rno, trans_name, start_pos + fraglen - grc -> read_length, start_pos);
+			gen_one_read_here(grc, trans_seq + start_pos, 1, 0, rno, trans_name, start_pos, start_pos + fraglen - grc -> read_length);
 		}else{
-			gen_one_read_here(grc, trans_seq + start_pos, 0, 0, rno);
-			gen_one_read_here(grc, trans_seq + start_pos + fraglen - grc -> read_length, 1, 1, rno);
+			gen_one_read_here(grc, trans_seq + start_pos, 0, 0, rno, trans_name, start_pos, start_pos + fraglen - grc -> read_length);
+			gen_one_read_here(grc, trans_seq + start_pos + fraglen - grc -> read_length, 1, 1, rno, trans_name, start_pos + fraglen - grc -> read_length, start_pos);
 		}
 	}else{
 		int start_pos = (actual_contig_len - grc -> read_length)*rand_01;
 		int is_negative = rand_01_int % 2;
-		gen_one_read_here(grc, trans_seq + start_pos, -1, is_negative, rno);
+		gen_one_read_here(grc, trans_seq + start_pos, -1, is_negative, rno, trans_name, start_pos, -1);
 	}
 }
 
@@ -602,7 +610,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 
 	long long seed = -1;
 
-	while ((c = getopt_long (argc, argv, "CS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (argc, argv, "TCS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){
 			case 'M':
 				do_fasta_summary = 1;
@@ -633,6 +641,9 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				break;
 			case 't':
 				strcpy(grc.contig_fasta_file, optarg);
+				break;
+			case 'T':
+				grc.truth_in_read_names=1;
 				break;
 			case 'C':
 				grc.simple_contig_names = 1;
