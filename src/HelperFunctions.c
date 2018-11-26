@@ -1483,9 +1483,9 @@ void md5txt(char *s){
 	randv = plain_txt_to_long_rand(s, strlen(s));
 
 	for(x=0;x<16;x++){
-		printf("%02X", md5v[x]);
+		SUBREADprintf("%02X", md5v[x]);
 	}
-	printf("\t'%s'\t%016llX\t%llu\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
+	SUBREADprintf("\t'%s'\t%016llX\t%llu\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
 }
 
 //#define TESTHelpermain main
@@ -1733,9 +1733,9 @@ void sha256txt(char *s){
 	int x;
 
 	for(x=0;x<32;x++){
-		printf("%02X", sha256v[x]);
+		SUBREADprintf("%02X", sha256v[x]);
 	}
-	printf("\t'%s'\n", s);
+	SUBREADprintf("\t'%s'\n", s);
 }
 
 //#define  TEST256Helpermain main
