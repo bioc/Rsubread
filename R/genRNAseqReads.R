@@ -49,7 +49,7 @@ generateSimulativeReads <- function(contig.file, TPM, output.prefix, out.sample.
 
 	cmd<-paste("RgenerateRNAseqReads,--contigFasta",contig.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
 	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
-    if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
+	if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
 
 	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))
