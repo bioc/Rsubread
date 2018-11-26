@@ -1,10 +1,10 @@
-\name{generateSimulatedReads}
-\alias{generateSimulatedReads}
-\alias{summarizeContigs}
+\name{simReads}
+\alias{simReads}
+\alias{scanFasta}
 \title{Generate simulated reads from a set of contigs}
-\description{The \code{generateSimulatedReads} function generates simulated reads from a set of contigs. Each contig has a predefined abundance in the output.}
+\description{The \code{simReads} function generates simulated reads from a set of contigs. Each contig has a predefined abundance in the output.}
 \usage{
-generateSimulatedReads(
+simReads(
   # the contig database and the wanted abundances
   contig.file,
   TPM,
@@ -32,7 +32,7 @@ generateSimulatedReads(
   simplify.contig.names=FALSE
 )
 
-summarizeContigs(
+scanFasta(
   # the file containing the transcript database
   contig.file,
 
@@ -57,16 +57,16 @@ summarizeContigs(
   \item{simplify.contig.names}{ logical indicating if contig names should be simplified. If \code{TRUE}, the contig names are truncated to the first \code{|} or space. \code{FALSE} by default.}
 }
 \details{
-  The \code{generateSimulatedReads} function is for generating simulated reads from a set of contig sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a contig file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each contig. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each contig. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all contigs can have reads generated from them. To have reads generated from it, a contig has to have a length equal or greater than the output read length, and also equal or greater than the minimum insertion length in case of paired-end reads. The contigs that are too short for read generation have \code{NA} read numbers in the output truth file. 
+  The \code{simReads} function is for generating simulated reads from a set of contig sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a contig file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each contig. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each contig. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all contigs can have reads generated from them. To have reads generated from it, a contig has to have a length equal or greater than the output read length, and also equal or greater than the minimum insertion length in case of paired-end reads. The contigs that are too short for read generation have \code{NA} read numbers in the output truth file. 
 
   When generating paired-end reads, the insertion lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{Insertion.Length.Mean} and \code{Insertion.Length.Sigma}; the minimum and maximum insertion lengths are specified in \code{Insertion.Length.Min} and \code{Insertion.Length.Max}. The insertion lengths that are greater than the actually contig length are truncated to the contig length.
 
-  Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error} is \code{TRUE} and a set of Phred+33 encoded quality strings are provided to \code{generateSimulatedReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
+  Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error} is \code{TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
 
-  The \code{summarizeContigs} function is provided for facilitating the calculation of wanted TPM values. This function scans through a FASTA or gzipped-FASTA file that contains the contig sequences, and returns the list of contig names with their sequence lengths.
+  The \code{scanFasta} function is provided for facilitating the calculation of wanted TPM values. This function scans through a FASTA or gzipped-FASTA file that contains the contig sequences, and returns the list of contig names with their sequence lengths.
 }
 \value{
-  The \code{summarizeContigs} function returns a \code{data.frame} object that has two columns: the name of the contigs (\code{ContigID}) and their lengths (\code{Length}). The \code{generateSimulatedReads} function returns a \code{data.frame} object that has three columns: the name of the contigs (\code{ContigID}), their lengths (\code{Length}) and the actual read counts (\code{Count}).
+  The \code{scanFasta} function returns a \code{data.frame} object that has two columns: the name of the contigs (\code{ContigID}) and their lengths (\code{Length}). The \code{simReads} function returns a \code{data.frame} object that has three columns: the name of the contigs (\code{ContigID}), their lengths (\code{Length}) and the actual read counts (\code{Count}).
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
@@ -77,14 +77,14 @@ Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and s
 # Build an index for the artificial sequence included in file 'reference.fa'.
 library(Rsubread)
 
-contigs <- summarizeContigs("GENCODE-Human-transcripts.fa.gz")
+contigs <- scanFasta("GENCODE-Human-transcripts.fa.gz")
 
 # Assigned a random TPM value to each contig. 
 TPMs <- data.frame(ContigID=contigs$ContigID, TPM=rnorm(nrow(contigs), mean=2, sd=1))
 TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
 TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1000000
 
-true.counts <- generateSimulatedReads("GENCODE-Human-transcripts.fa.gz", TPMs, "my-simulated-sample")
+true.counts <- simReads("GENCODE-Human-transcripts.fa.gz", TPMs, "my-simulated-sample")
 print(true.counts[1:10,])
 }
 }
