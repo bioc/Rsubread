@@ -1,6 +1,6 @@
 \name{generateSimulatedReads}
 \alias{generateSimulatedReads}
-\alias{summarizeTranscripts}
+\alias{summarizeContigs}
 \title{Generate simulated reads from a set of contigs}
 \description{The \code{generateSimulatedReads} function generates simulated reads from a set of contigs. Each contig has a predefined abundance in the output.}
 \usage{
@@ -50,7 +50,10 @@ summarizeContigs(
   \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
   \item{quality.reference}{ character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
   \item{isPairedEndOutput}{ logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
-  \item{Insertion.Length.Min, Insertion.Length.Max, Insertion.Length.Mean and Insertion.Length.Sigma}{ numeric values giving the minimum, maximum, mean and standard deviation of a truncated normal distribution, from which the insertion lengths are drawn for generating paired-end reads. The minimum insertion length must be equal or greater than the output read length. The default values of the four parameters are 100, 500, 150 and 25.}
+  \item{Insertion.Length.Min}{}
+  \item{Insertion.Length.Max}{}
+  \item{Insertion.Length.Mean}{}
+  \item{Insertion.Length.Sigma}{ numeric values giving the minimum, maximum, mean and standard deviation of a truncated normal distribution, from which the insertion lengths are drawn for generating paired-end reads. The minimum insertion length must be equal or greater than the output read length. The default values of the four parameters are 100, 500, 150 and 25.}
   \item{simplify.contig.names}{ logical indicating if contig names should be simplified. If \code{TRUE}, the contig names are truncated to the first \code{|} or space. \code{FALSE} by default.}
 }
 \details{
@@ -70,6 +73,7 @@ Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and s
 }
 \author{Wei Shi and Yang Liao}
 \examples{
+\dontrun{
 # Build an index for the artificial sequence included in file 'reference.fa'.
 library(Rsubread)
 
@@ -81,4 +85,5 @@ TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
 
 true.counts <- generateSimulatedReads("GENCODE-Human-transcripts.fa.gz", TPMs, "my-simulated-sample")
 print(true.counts[1:10,])
+}
 }
