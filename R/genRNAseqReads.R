@@ -13,7 +13,7 @@ summarizeContigs <- function(contig.file, simplify.contig.names=F){
 	summ
 }
 
-generateSimulativeReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=F, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
+generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=F, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
