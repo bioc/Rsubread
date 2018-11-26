@@ -32,6 +32,7 @@
 
 static struct option long_options[] =
 {
+	{"simpleContigId", no_argument, 0, 'C'},
 	{"summarizeFasta",  no_argument, 0, 'M'},
 	{"contigFasta",  required_argument, 0, 't'},
 	{"totalReads",  required_argument, 0, 'r'},
@@ -57,6 +58,7 @@ typedef struct {
 
 	unsigned long long output_sample_size;
 	int is_paired_end;
+	int simple_contig_names;
 	float insertion_length_mean;
 	int insertion_length_max;
 	int insertion_length_min;
@@ -365,6 +367,10 @@ int grc_summary_fasta(genRand_context_t * grc){
 			}
 			seq_name=malloc(rlength);
 			clinebuf[rlength-1]=0;
+			if(grc->simple_contig_names){
+				int xx;
+				for(xx=1; xx<rlength-1; xx++) if(clinebuf[xx]=='|' || clinebuf[xx]==' ') clinebuf[xx]=0;
+			}
 			strcpy(seq_name, clinebuf+1);
 		}else{
 			seq_len += rlength-1; // no \n
@@ -513,12 +519,9 @@ int grc_load_env(genRand_context_t *grc){
 			if(NULL != seq_name)
 				grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 
-			for(xk1 = 1; clinebuf[xk1]; xk1++){
-				if(clinebuf[xk1]=='\r'||clinebuf[xk1]=='\n'){
-					clinebuf[xk1]=0;
-					break;
-				}
-			}
+			clinebuf[rlength-1]=0;
+			if(grc->simple_contig_names)
+				for(xk1=1; xk1<rlength-1; xk1++) if(clinebuf[xk1]=='|' || clinebuf[xk1]==' ') clinebuf[xk1]=0;
 
 			seq_name = malloc(strlen(clinebuf));
 			if( clinebuf[1]==0 ){
@@ -599,7 +602,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 
 	long long seed = -1;
 
-	while ((c = getopt_long (argc, argv, "S:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (argc, argv, "CS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){
 			case 'M':
 				do_fasta_summary = 1;
@@ -630,6 +633,9 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				break;
 			case 't':
 				strcpy(grc.contig_fasta_file, optarg);
+				break;
+			case 'C':
+				grc.simple_contig_names = 1;
 				break;
 			case 'r':
 				grc.output_sample_size = atoll(optarg);

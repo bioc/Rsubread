@@ -1,7 +1,8 @@
-summarizeContigs <- function(contig.file){
+summarizeContigs <- function(contig.file, simplify.contig.names=F){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	cmd <- paste("RsummarizeContigs,--summarizeFasta,--contigFasta",contig.file,"--outputPrefix", fout_sum, sep=",")
+    if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
 
 	n <- length(unlist(strsplit(cmd,",")))
 	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
@@ -12,7 +13,7 @@ summarizeContigs <- function(contig.file){
 	summ
 }
 
-generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25){
+generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
@@ -48,6 +49,7 @@ generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size
 
 	cmd<-paste("RgenerateRNAseqReads,--contigFasta",contig.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
 	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
+    if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
 
 	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))

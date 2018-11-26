@@ -23,12 +23,16 @@ generateRNAseqReads(
   Insertion.Length.Min=100,
   Insertion.Length.Max=500,
   Insertion.Length.Mean=150,
-  Insertion.Length.Sigma=25
+  Insertion.Length.Sigma=25,
+
+  # manipulating contig names
+  simplify.contig.names=FALSE
 )
 
 summarizeContigs(
   # the file containing the transcript database
-  contig.file
+  contig.file,
+  simplify.contig.names=FALSE
 )
 }
 \arguments{
@@ -41,6 +45,7 @@ summarizeContigs(
   \item{quality.reference} { character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
   \item{isPairedEndOutput}{ logical indicating if paired-end reads should be generated. FALSE by default.}
   \item{Insertion.Length.Min, Insertion.Length.Max, Insertion.Length.Mean and Insertion.Length.Sigma}{ numeric values giving the minimum, maximum, mean and standard deviation of a truncated normal distribution, from which the insertion lengths are drawn for generating paired-end reads. The minimum insertion length must be equal or greater than the output read length. The default values of the four parameters are 100, 500, 150 and 25.}
+  \item{simplify.contig.names} { logical indicating if contig names should be simplified. If \code{TRUE}, the contig names are truncated to the first \code{|} or space. FALSE by default.}
 }
 \details{
   The \code{generateRNAseqReads} function is for generating simulative reads from a set of contig sequences (eg all the transcript sequences of human) at wanted expression levels. The input to this function includes a contig file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted expression level for each contig. The output of this function is one or two gzipped FASTQ files that contain the simulative reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each contig. The output reads usually do not have exactly the same expression levels as wanted due to round-off errors and randomness. It is also remarked that not all contigs can have reads generated from them. To have reads generated from it, a contig has to have a length equal or greater than the output read length, and also equal or greater than the minimum insertion length in case of paired-end reads. The contigs that are too short for read generation have \code{NA} read numbers in the output truth file. 
