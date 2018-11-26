@@ -13,14 +13,22 @@ summarizeContigs <- function(contig.file, simplify.contig.names=F){
 	summ
 }
 
-generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=F, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
+generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=F, simulate.sequencing.error=T, quality.reference=NULL, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
 		stop("Error: the current version can only generate 75-bp or 100-bp reads")
 
-	qualfile<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
-	if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
+	qualfile <- NULL
+	if(simulate.sequencing.error){
+		if(quality.reference ==NULL){
+			if(read.length==75) qualfile<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
+			if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
+			if(qualfile == NULL) stop("When you want to simulate sequencing error in the reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings.")
+		}else{
+			qualfile <- quality.reference
+		}
+	}
 
 	if( isPairedEndOutput ){
 		if(Insertion.Length.Min < read.length) stop("Error: the minimum insertion length must be higher than the read length")
@@ -47,10 +55,11 @@ generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.s
 
 	write.table(contig.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
-	cmd<-paste("RgenerateRNAseqReads,--contigFasta",contig.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix,"--qualityRefFile",qualfile, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
+	cmd<-paste("RgenerateRNAseqReads,--contigFasta",contig.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
 	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
 	if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
 	if(truth.in.read.names) cmd<-paste(cmd, "--truthInReadNames", sep=",")
+	if(qualfile != NULL) cmd<-paste(cmd, "--qualityRefFile", qualfile, sep=",")
 
 	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))
