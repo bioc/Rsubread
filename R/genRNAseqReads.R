@@ -13,7 +13,7 @@ summarizeContigs <- function(contig.file, simplify.contig.names=F){
 	summ
 }
 
-generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
+generateSimulativeReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
@@ -36,7 +36,7 @@ generateRNAseqReads <- function(contig.file, TPM, output.prefix, out.sample.size
 		contig.TPM<-data.frame(ContigID=contig.TPM$ContigID, TPM=as.numeric(as.character(contig.TPM$TPM)))
 	}else{
 		if(ncol(contig.TPM)!=2) stop("Error: the TPM parameter must be a two-column data.frame. The first column contains the contig names and the second column contains the TPM values")
-		contig.TPM[,2] <- as.numeric(contig.TPM[,2])
+		contig.TPM[,2] <- as.numeric(as.character(contig.TPM[,2]))
 	}
 	colnames( contig.TPM )<-c("ContigID","TPM")
 
