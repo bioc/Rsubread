@@ -21,10 +21,10 @@ generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.s
 
 	qualfile <- NULL
 	if(simulate.sequencing.error){
-		if(quality.reference ==NULL){
+		if(is.null(quality.reference)){
 			if(read.length==75) qualfile<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
 			if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
-			if(qualfile == NULL) stop("When you want to simulate sequencing error in the reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings.")
+			if(is.null(qualfile)) stop("When you want to simulate sequencing error in the reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings.")
 		}else{
 			qualfile <- quality.reference
 		}
@@ -59,7 +59,7 @@ generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.s
 	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
 	if(simplify.contig.names) cmd<-paste(cmd, "--simpleContigId", sep=",")
 	if(truth.in.read.names) cmd<-paste(cmd, "--truthInReadNames", sep=",")
-	if(qualfile != NULL) cmd<-paste(cmd, "--qualityRefFile", qualfile, sep=",")
+	if(!is.null(qualfile)) cmd<-paste(cmd, "--qualityRefFile", qualfile, sep=",")
 
 	#print(substr(cmd,1,2000))
 	n <- length(unlist(strsplit(cmd,",")))
