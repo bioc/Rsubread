@@ -82,7 +82,7 @@ contigs <- summarizeContigs("GENCODE-Human-transcripts.fa.gz")
 # Assigned a random TPM value to each contig. 
 TPMs <- data.frame(ContigID=contigs$ContigID, TPM=rnorm(nrow(contigs), mean=2, sd=1))
 TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
-TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM)
+TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1000000
 
 true.counts <- generateSimulatedReads("GENCODE-Human-transcripts.fa.gz", TPMs, "my-simulated-sample")
 print(true.counts[1:10,])
