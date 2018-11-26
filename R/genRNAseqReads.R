@@ -1,4 +1,4 @@
-summarizeContigs <- function(contig.file, simplify.contig.names=F){
+summarizeContigs <- function(contig.file, simplify.contig.names=FALSE){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	cmd <- paste("RsummarizeContigs,--summarizeFasta,--contigFasta",contig.file,"--outputPrefix", fout_sum, sep=",")
@@ -13,7 +13,7 @@ summarizeContigs <- function(contig.file, simplify.contig.names=F){
 	summ
 }
 
-generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=F, simulate.sequencing.error=T, quality.reference=NULL, isPairedEndOutput=F, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=F){
+generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, isPairedEndOutput=FALSE, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.contig.names=FALSE){
 	contig.file <- normalizePath(contig.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if( !read.length %in% c(100,75) )
