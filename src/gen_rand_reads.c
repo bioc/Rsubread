@@ -74,7 +74,7 @@ typedef struct {
 	HashTable * contig_lengths;
 	HashTable * expression_levels;
 
-	char fake_quality_string[MAX_SIMULATION_READ_LEN];
+	char fake_quality_string[MAX_SIMULATION_READ_LEN+3];
 	char * cmd_line;
 	gzFile out_fps[2];
 	FILE * counts_out_fp;
@@ -92,8 +92,9 @@ void grc_sequencing_error_read(char * seq, int qlen, char * qua){
 	for(b=0; b<qlen; b++){
 		if(seq[b]=='N') continue;
 
+		int qub = qua[b];
 		float randv = rand()*1./RAND_MAX;
-		float errorp = pow(10,3.3 - qua[b]*.1); // Phred 33
+		float errorp = pow(10,3.3 - qub*.1); // Phred 33
 		if(randv < errorp * 1.3333333333){// ATGC random can be the original
 			seq[b]="ACGT"[rand()%4];
 		}
@@ -496,7 +497,7 @@ int grc_load_env(genRand_context_t *grc){
 				break;
 			}
 			char * qstr = malloc(rline);
-			memcpy(qstr, linebuf, rline-1);
+			memcpy(qstr, linebuf, rline);
 			if(qstr[rline-1]=='\n') qstr[rline-1]=0;
 
 			ArrayListPush(grc -> quality_strings, qstr);
@@ -599,7 +600,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	genRand_context_t grc;
 	memset(&grc,0,sizeof(grc));
 
-	optind = 1;
+	optind = 0;
 	opterr = 1;
 	optopt = 63;
 
