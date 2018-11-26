@@ -488,14 +488,17 @@ int grc_load_env(genRand_context_t *grc){
 			char linebuf[400];
 			int rline = autozip_gets(&auto_FP, linebuf, 399);
 			if(rline<1) break;
-			if(rline!=grc->read_length +1) {
+			if(rline==grc->read_length +1 || ( rline==grc->read_length && linebuf[rline-1]!='\n' ) ) {
+				// is OK.
+			}else{
 				SUBREADprintf("ERROR: all your quality strings must be %d-byte long.\n", grc->read_length);
 				ret = 1;
 				break;
 			}
 			char * qstr = malloc(rline);
 			memcpy(qstr, linebuf, rline-1);
-			qstr[rline-1]=0;
+			if(qstr[rline-1]=='\n') qstr[rline-1]=0;
+
 			ArrayListPush(grc -> quality_strings, qstr);
 		}
 		autozip_close(&auto_FP);
@@ -596,6 +599,10 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	genRand_context_t grc;
 	memset(&grc,0,sizeof(grc));
 
+	optind = 1;
+	opterr = 1;
+	optopt = 63;
+
 	rebuild_command_line(&grc.cmd_line, argc, argv);
 	// default settings of the read/insertion length: 100bp, a general illumina feeling 
 	grc.insertion_length_sigma = 30.;
@@ -605,11 +612,6 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	grc.read_length = 100;
 
 	long long seed = -1;
-
-	optind = 1;
-	opterr = 1;
-	optopt = 63;
-
 
 	while ((c = getopt_long (argc, argv, "TCS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){

@@ -1,11 +1,11 @@
 \name{generateSimulatedReads}
 \alias{generateSimulatedReads}
 \alias{summarizeTranscripts}
-\title{Generate simulated reads from a contig database}
-\description{\code{generateSimulatedReads} function can generate simulated reads from a contig database. Each contig has a predefined expression level.}
+\title{Generate simulated reads from a set of contigs}
+\description{The \code{generateSimulatedReads} function generates simulated reads from a set of contigs. Each contig has a predefined abundance in the output.}
 \usage{
 generateSimulatedReads(
-  # the contig database and the wanted expression levels
+  # the contig database and the wanted abundances
   contig.file,
   TPM,
 
@@ -54,7 +54,7 @@ summarizeContigs(
   \item{simplify.contig.names}{ logical indicating if contig names should be simplified. If \code{TRUE}, the contig names are truncated to the first \code{|} or space. \code{FALSE} by default.}
 }
 \details{
-  The \code{generateSimulatedReads} function is for generating simulated reads from a set of contig sequences (for example, all the transcript sequences of human) at predefined expression levels. The input to this function includes a contig file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted expression level for each contig. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each contig. The output reads usually do not have exactly the same expression levels as wanted due to round-off errors and randomness. It is also remarked that not all contigs can have reads generated from them. To have reads generated from it, a contig has to have a length equal or greater than the output read length, and also equal or greater than the minimum insertion length in case of paired-end reads. The contigs that are too short for read generation have \code{NA} read numbers in the output truth file. 
+  The \code{generateSimulatedReads} function is for generating simulated reads from a set of contig sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a contig file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each contig. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each contig. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all contigs can have reads generated from them. To have reads generated from it, a contig has to have a length equal or greater than the output read length, and also equal or greater than the minimum insertion length in case of paired-end reads. The contigs that are too short for read generation have \code{NA} read numbers in the output truth file. 
 
   When generating paired-end reads, the insertion lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{Insertion.Length.Mean} and \code{Insertion.Length.Sigma}; the minimum and maximum insertion lengths are specified in \code{Insertion.Length.Min} and \code{Insertion.Length.Max}. The insertion lengths that are greater than the actually contig length are truncated to the contig length.
 

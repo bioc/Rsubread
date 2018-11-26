@@ -24,7 +24,7 @@ generateSimulatedReads <- function(contig.file, TPM, output.prefix, out.sample.s
 		if(is.null(quality.reference)){
 			if(read.length==75) qualfile<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
 			if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
-			if(is.null(qualfile)) stop("When you want to simulate sequencing error in the reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings.")
+			if(is.null(qualfile)) stop("When you want to simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings that have the length as the output reads.")
 		}else{
 			qualfile <- quality.reference
 		}
