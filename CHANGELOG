@@ -1,3 +1,6 @@
+26 Nov 2018 - 1.33.2
+(1) Add generateSimulatedReads() and summarizeContigs() functions.
+
 8 Nov 2018 - 1.33.1
 (1) Improve help page for align and subjunc.
 
