@@ -79,7 +79,7 @@ library(Rsubread)
 # scan through the fasta file for the contig names and lengths
 contigs <- scanFasta("GENCODE-Human-transcripts.fa.gz")
 
-# Assigned a random TPM value to each contig. 
+# assigned a random TPM value to each contig. 
 TPMs <- data.frame(ContigID=contigs$ContigID, TPM=rnorm(nrow(contigs), mean=2, sd=1))
 TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
 TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1000000
