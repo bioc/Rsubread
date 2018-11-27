@@ -30,6 +30,55 @@
 
 #define MAX_SIMULATION_READ_LEN 250
 
+int print_usage_gen_reads(char * pgname) {
+	SUBREADputs("");
+	SUBREADputs("Usage:");
+	SUBREADputs("");
+	SUBREADputs(" For scanning a FASTA/gz file:");
+	SUBREADprintf("    %s --summarizeFasta \\\n", pgname);
+	SUBREADputs("       --contigFasta <file> --outputPrefix <string> {--simpleContigId}");
+	SUBREADputs("");
+	SUBREADputs(" For generating read/pairs:");
+	SUBREADprintf("    %s --contigFasta <file>\\\n", pgname);
+	SUBREADputs("       --outputPrefix <string> --expressionLevels <file> {other options}");
+	SUBREADputs("");
+	SUBREADputs(" --summarizeFasta           Only output the contig names and lengths.");
+	SUBREADputs("");
+	SUBREADputs(" --contigFasta <file>       The contig database in FASTA/gz format.");
+	SUBREADputs("");
+	SUBREADputs(" --outputPrefix <string>    The prefix of the output files.");
+	SUBREADputs("");
+	SUBREADputs(" --totalReads  <int>        Total read/pairs in output.");
+	SUBREADputs("");
+	SUBREADputs(" --expressionLevels <file>  Two column table delimited by <TAB>, giving the");
+	SUBREADputs("                            wanted TPM values. Columns: ContigID and TPM");
+	SUBREADputs("");
+	SUBREADputs(" --readLen <int>            The length of the output reads. 100 by default.");
+	SUBREADputs("");
+	SUBREADputs(" --totalReads <int>         Total read/pairs in the output.");
+	SUBREADputs("");
+	SUBREADputs(" --randSeed <int64>         Seed to generate random numbers. UNIXTIME is used");
+	SUBREADputs("                            as the random seed by default.");
+	SUBREADputs("");
+	SUBREADputs(" --qualityRefFile <file>    A textual file containing Phred+33 quanlity strings");
+	SUBREADputs("                            for simulating sequencing errors. The quality");
+	SUBREADputs("                            strings have to have the same length as the output");
+	SUBREADputs("                            reads. No sequencing errors are simulated when this");
+	SUBREADputs("                            option is omitted.");
+	SUBREADputs("");
+	SUBREADputs(" --pairedEnd                Generate paired-end reads.");
+	SUBREADputs("");
+	SUBREADputs(" --insertionLenMean <float>,--insertionLenSigma <float>,--insertionLenMin <int>,");
+	SUBREADputs(" --insertionLenMax <int>    Parameters for a truncated normal distribution for");
+	SUBREADputs("                            deciding insertion lengths of paired-end reads.");
+	SUBREADputs("");
+	SUBREADputs(" --simpleContigId           Trancate contig names to the first '|' or space.");
+	SUBREADputs("");
+	SUBREADputs(" --truthInReadNames         Encode the true locations of reads in read names.");
+	SUBREADputs("");
+	return 1;
+}
+
 static struct option long_options[] =
 {
 	{"truthInReadNames", no_argument, 0, 'T'},
@@ -664,7 +713,8 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				break;
 			default:
 			case '?':
-				break;
+				print_usage_gen_reads(argv[0]);
+				return 0;
 		}
 	} 
 
@@ -677,7 +727,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	if(do_fasta_summary){
 		return grc_summary_fasta(&grc);
 	}else{
-		int ret = grc_check_parameters(&grc);
+		int ret = grc_check_parameters(&grc) && print_usage_gen_reads(argv[0]);
 		ret =  ret || grc_load_env(&grc);
 		ret =  ret || grc_gen(&grc);
 		return ret || grc_finalize(&grc);
