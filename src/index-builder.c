@@ -850,8 +850,8 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 			int ret = autozip_gets(&fafp, line_buf, MAX_READ_LENGTH);
 			if(ret<1) break;
 
-			fcc.line_no = line_no;
 			line_no ++;
+			fcc.line_no = line_no;
 			int line_buf_len = strlen(line_buf);
 
 			for(; line_buf[line_buf_len-1] == '\r' || line_buf[line_buf_len-1]=='\n' ;line_buf_len--)
