@@ -84,7 +84,8 @@ void print_usage_core_aligner()
 	SUBREADputs("  -r <string>       Name of an input read file. If paired-end, this should be");
 	SUBREADputs("                    the first read file (typically containing \"R1\"in the file");
 	SUBREADputs("                    name) and the second should be provided via \"-R\".");
-	SUBREADputs("                    Acceptable formats include gzipped FASTQ, FASTQ and FASTA.");
+	SUBREADputs("                    Acceptable formats include gzipped FASTQ, FASTQ, gzipped");
+	SUBREADputs("                    FASTA and FASTA.");
 	SUBREADputs("                    These formats are identified automatically.");
 	SUBREADputs("    ");
 	SUBREADputs("  -t <int>          Type of input sequencing data. Its values include");

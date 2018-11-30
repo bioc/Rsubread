@@ -4545,9 +4545,12 @@ void init_global_context(global_context_t * context)
 	context->config.all_threads = 1;
 	context->config.is_first_iteration_running = 1;
 	context->config.is_second_iteration_running = 1;
-	context->config.reads_per_chunk = 1024*1024*1024;
 
 	context->config.reads_per_chunk = 20*1024*1024;
+
+//#warning "=========== 2*1024*1024 IS FOR TESTING BLOCKING AND SHOULD BE COMMENTED ==============="
+//	context->config.reads_per_chunk = 2*1024*1024;
+
 	context->config.use_memory_buffer = 1;
 	context->config.is_methylation_reads = 0;
 	context->config.report_no_unpaired_reads = 0;

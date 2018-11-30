@@ -31,6 +31,7 @@
 #include "HelperFunctions.h"
 #include "gene-algorithms.h"
 #include "sorted-hashtable.h"
+#include "seek-zlib.h"
 #include "input-files.h"
 
 #define NO_GENE_DEBUG_
@@ -704,10 +705,19 @@ char *rtrim(char *s)
 	return s;
 }
 
+typedef struct{
+	char * filename;
+	unsigned int line_no;
+	int byte_in_line;
+} format_check_context_t;
+
 int ERROR_FOUND_IN_FASTA = 0;
-#define CHAR_ESC 27
-void check_and_convert_warn(char * FN, long long int fpos_line_head, unsigned line_no, int line_pos, char * msg, FILE * log_fp)
+void check_and_convert_warn(format_check_context_t * fcc, char * msg, FILE * log_fp){
+	fprintf(log_fp, "A format issue is found in the %u-th line in file '%s': %s.\n", fcc->line_no, fcc->filename, msg);
+}
+void check_and_convert_warnOLD(char * FN, long long int fpos_line_head, unsigned line_no, int line_pos, char * msg, FILE * log_fp)
 {
+#define CHAR_ESC 27
 	int x1,brs=0;
 	long long int back_search_ptr;
 	char * line_buf = malloc(MAX_READ_LENGTH+1);
@@ -799,6 +809,8 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	int chrom_lens_len = 0;
 	ERROR_FOUND_IN_FASTA = 0;
 	FILE * out_fp = f_subr_open(out_fa,"w");
+	format_check_context_t fcc;
+	memset(&fcc,0,sizeof(fcc));
 
 	if(!out_fp)
 	{
@@ -818,12 +830,12 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	print_in_box( 80,0,0,"Check the integrity of provided reference sequences ...");
 	for(inp_file_no = 0; inp_file_no < fa_number; inp_file_no++)
 	{
-		FILE * in_fp = f_subr_open(input_fas[inp_file_no],"r");
-		long long int last_read_head_pos = 0;
-		unsigned int last_read_line_no = 1;
+		autozip_fp fafp;
+		memset(&fafp, 0, sizeof(fafp));
+		int faret = autozip_open(input_fas[inp_file_no], &fafp);
+		fcc.filename = input_fas[inp_file_no];
 
-		if(!in_fp)
-		{
+		if(faret <0) {
 			SUBREADprintf("ERROR: Input file '%s' is not found or is not accessible. No index was built.\n", input_fas[inp_file_no]);
 			HashTableDestroy(rep_name_table);
 			return -1;
@@ -832,12 +844,12 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 		line_no = 0;
 		int is_head_written=0;
 		read_head_buf[0]=0;
-		while(!feof(in_fp))
-		{
-			long long int line_head_pos = ftello(in_fp);
+		while(1) {
 			unsigned int read_len = 0;
-			char * ret = fgets(line_buf, MAX_READ_LENGTH-1 , in_fp);
-			if(!ret) break;
+			int ret = autozip_gets(&fafp, line_buf, MAX_READ_LENGTH);
+			if(ret<1) break;
+
+			fcc.line_no = line_no;
 			line_no ++;
 			int line_buf_len = strlen(line_buf);
 
@@ -848,7 +860,8 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 					if(!is_R_warnned)
 					{
 						is_R_warnned=1;
-						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, line_buf_len -1 ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.", log_fp);
+						fcc.byte_in_line = line_buf_len-1;
+						check_and_convert_warn(&fcc ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.", log_fp);
 					}	
 				}
 				line_buf[line_buf_len-1] =0;
@@ -857,7 +870,8 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 
 			if(line_buf_len<1)
 			{
-				check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no ,0 ,"This line is empty. This is not allowed in the FASTA file.", log_fp);
+				fcc.byte_in_line = -1;
+				check_and_convert_warn(&fcc ,"This line is empty. This is not allowed in the FASTA file.", log_fp);
 				continue;
 			}
 
@@ -865,11 +879,10 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 			{
 				if(line_no>1 &&!is_head_written)
 				{
-					check_and_convert_warn(input_fas[inp_file_no], last_read_head_pos, last_read_line_no, 0,"This sequence has less than 16 bases. It is ignored in the index because no subreads can be extracted.", log_fp);
+					fcc.byte_in_line = 0;
+					check_and_convert_warn(&fcc,"This sequence has less than 16 bases. It is ignored in the index because no subreads can be extracted.", log_fp);
 				}
 				is_head_written = 0;
-				last_read_line_no = line_no;
-				last_read_head_pos = line_head_pos;
 				read_len = 0;
 				read_head_buf[0]=0;
 
@@ -897,9 +910,10 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 				HashTablePut(rep_name_table, keymem, NULL+1);
 
 			}
-			else if(line_head_pos<1)
+			else if(line_no<1)
 			{
-				check_and_convert_warn(input_fas[inp_file_no], 0, 0, 0 ,"This file is not started with a header line. It seems not to be a FASTA file.", log_fp);
+				fcc.byte_in_line=0;
+				check_and_convert_warn(&fcc ,"This file is not started with a header line. It seems not to be a FASTA file.", log_fp);
 			}
 			else
 			{
@@ -910,7 +924,8 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 					int lowerch = tolower(nextch);
 					if(!( lowerch == 'a' || lowerch == 't' || lowerch == 'g' || lowerch == 'c' || nextch == '.' || nextch=='-' || lowerch=='n'))
 					{	
-						check_and_convert_warn(input_fas[inp_file_no], line_head_pos, line_no, xk2, "The pointed base was converted to an 'A'.", log_fp);
+						fcc.byte_in_line=xk2;
+						check_and_convert_warn(&fcc, "The non-ACGT base was converted to an 'A'.", log_fp);
 						line_buf[xk2] = 'A';
 					}
 					else if(nextch == '.' || nextch=='-' ||  lowerch=='n')
@@ -956,7 +971,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 			}
 		}
 
-		fclose(in_fp);
+		autozip_close(&fafp);
 		if(is_disk_full) break;
 	}
 
@@ -1097,7 +1112,8 @@ int main_buildindex(int argc,char ** argv)
 	*/
 		 SUBREADputs("Usage:");
 		 SUBREADputs("");
-		 SUBREADputs(" ./subread-buildindex [options] -o <basename> {FASTA file1} [FASTA file2] ...");
+		 SUBREADputs(" ./subread-buildindex [options] -o <basename> {FASTA[.gz] file1}\\");
+		 SUBREADputs("      [FASTA[.gz] file2] ...");
 		 SUBREADputs("");
 		 SUBREADputs("Required arguments:");
 		 SUBREADputs("");
@@ -1185,15 +1201,11 @@ int main_buildindex(int argc,char ** argv)
 	{
 		char * fasta_fn = *(argv+optind+x1);
 		int f_type = probe_file_type_fast(fasta_fn);
-		if(f_type != FILE_TYPE_FASTA && f_type != FILE_TYPE_NONEXIST){
+		if(f_type != FILE_TYPE_GZIP_FASTA && f_type != FILE_TYPE_FASTA && f_type != FILE_TYPE_NONEXIST){
 			SUBREADprintf("ERROR: '%s' is not a Fasta file.\n", fasta_fn);
-			if(f_type == FILE_TYPE_GZIP_FASTA){
-				SUBREADprintf("The index builder does not accept gzipped Fasta files.\nPlease decompress the gzipped Fasza files before building the index.\n");
-			}
 			STANDALONE_exit(-1);
 		}
 	}
-
 
 	begin_ftime = miltime();
 

@@ -87,7 +87,7 @@ double guess_reads_density(char * fname, int is_sam)
 }
 
 unsigned long long geinput_file_offset( gene_input_t * input){
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ){
+	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		if(((seekable_zfile_t*)input -> input_fp) -> blocks_in_chain<1)return 0;
 		seekable_decompressed_block_t * ct = ((seekable_zfile_t*)input -> input_fp) -> block_rolling_chain+((seekable_zfile_t*)input -> input_fp) -> block_chain_current_no;
 		return ct -> block_start_in_file_offset + ((seekable_zfile_t*)input -> input_fp) -> current_block_txt_read_ptr * 5/16; // compressed text ~= plain text * 28%
@@ -199,12 +199,13 @@ int geinput_preload_buffer(gene_input_t * input, subread_lock_t * read_lock){
 
 
 
-
+// read the line EXCLUDE last \n
+// returns bytes WITHOUT \n
 int read_line_noempty(int max_read_len, gene_input_t * input, char * buff, int must_upper)
 {
 	int ret =0;
 
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ){
+	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_preload_buffer((seekable_zfile_t*)input -> input_fp, NULL);
 		ret = seekgz_gets((seekable_zfile_t*)input->input_fp, buff, MAX_READ_LENGTH-1);
 		if(ret > 0){
@@ -407,6 +408,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 	if(strlen(filename)>298)
 		return 1;
 
+	input -> gzfa_last_name[0]=0;
 	strcpy(input->filename, filename);
 	FILE * TMP_FP = f_subr_open(filename, "rb");
 
@@ -420,7 +422,6 @@ int geinput_open(const char * filename, gene_input_t * input)
 	if(id1 == 31 && id2 == 139) {
 		fclose(TMP_FP);
 		input->input_fp = malloc(sizeof(seekable_zfile_t));
-		input->file_type = GENE_INPUT_GZIP_FASTQ;
 		ret = seekgz_open(filename, input->input_fp, NULL );
 		if(ret == 0){
 			int fq_stat = 0;
@@ -429,6 +430,8 @@ int geinput_open(const char * filename, gene_input_t * input)
 				if(fl < 1)break;	// EOF
 				else if(fl == 1)continue;	// empty line 
 				else{		// text line
+
+					if(line_no==0)input->file_type = in_buff[0]=='@'? GENE_INPUT_GZIP_FASTQ: GENE_INPUT_GZIP_FASTA;
 					if(fq_stat%4 == 1) // read text
 					{
 						input->space_type = is_read(in_buff);
@@ -439,7 +442,8 @@ int geinput_open(const char * filename, gene_input_t * input)
 			}
 			seekgz_close(input->input_fp);
 			seekgz_open(filename, input->input_fp, NULL);
-		}	
+		}
+		//SUBREADprintf("ZFAtest: type=%d\n", input->file_type);
 	}else{
 		input->file_type = GENE_INPUT_FASTQ;
 		input->input_fp = TMP_FP;
@@ -664,16 +668,20 @@ unsigned int read_numbers(gene_input_t * input)
 }
 
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ){
+	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
+		if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
+		else pos -> gzfa_last_name[0]=0;
 	}else{
 		pos -> simple_file_position = ftello((FILE *)input -> input_fp);
 	}
 }
 
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ){
+	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
+		if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
+		else input -> gzfa_last_name[0]=0;
 	}else{
 		fseeko((FILE *)input -> input_fp, pos -> simple_file_position, SEEK_SET);
 	}
@@ -735,6 +743,8 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 {
 	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0, NULL);
 }
+
+// returns read length if OK 
 int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary)
 {
 	if(input -> file_type == GENE_INPUT_PLAIN) {
@@ -824,6 +834,36 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			if(quality_string)
 				reverse_quality(quality_string, ret);
 			reverse_read(read_string, ret, input->space_type);
+		}
+		if(trim_5 || trim_3) ret = trim_read_inner(read_string, quality_string, ret, trim_5, trim_3);
+		return ret;
+	} else if(input->file_type == GENE_INPUT_GZIP_FASTA) {
+		// it is currently at ">"
+		int tr = 0, ret = 0;
+		char rbuf [MAX_READ_LENGTH+2];
+		if(input -> gzfa_last_name [0] == 0){
+			ret = read_line_noempty(MAX_READ_NAME_LEN, input, rbuf, 0);
+			if(ret <1) return -1;
+			if(read_name)strcpy(read_name, rbuf+1);
+		}
+		else if(read_name)strcpy(read_name, input -> gzfa_last_name);
+		ret=0;
+
+		while(1){
+			tr = read_line_noempty(MAX_READ_LENGTH, input, rbuf, 0);
+			if(tr<1) {
+				if(ret<1) return -1;
+				break;
+			}else{
+				if(rbuf[0]=='>'){
+					strcpy(input -> gzfa_last_name, rbuf+1);
+					break;
+				}else{
+					strcpy(read_string+ret, rbuf);
+					ret += tr; // read_line_noempty have no \n
+				}
+				read_string[ret]=0;
+			}
 		}
 		if(trim_5 || trim_3) ret = trim_read_inner(read_string, quality_string, ret, trim_5, trim_3);
 		return ret;
@@ -994,7 +1034,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 }
 void geinput_close(gene_input_t * input)
 {
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ)
+	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA)
 		seekgz_close((seekable_zfile_t * ) input->input_fp);
 	else
 		fclose((FILE*)input->input_fp);
@@ -6228,8 +6268,7 @@ int warning_file_type(char * fname, int expected_type)
 		SUBREADprintf("\nERROR: file '%s' is empty.\n\n", fname);
 		return -1;
 	}
-
-	else if((expected_type == FILE_TYPE_FAST_ && (read_type!= FILE_TYPE_FASTQ && read_type!= FILE_TYPE_FASTA && read_type!= FILE_TYPE_GZIP_FASTQ))||
+	else if((expected_type == FILE_TYPE_FAST_ && (read_type!= FILE_TYPE_FASTQ && read_type!= FILE_TYPE_FASTA && read_type!= FILE_TYPE_GZIP_FASTQ && read_type!= FILE_TYPE_GZIP_FASTA))||
 		(expected_type == FILE_TYPE_GZIP_FAST_ && read_type!= FILE_TYPE_GZIP_FASTA) ||
 		((  expected_type != FILE_TYPE_GZIP_FAST_ && expected_type != FILE_TYPE_FAST_) && expected_type != read_type))
 	{

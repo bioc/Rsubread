@@ -3938,18 +3938,20 @@ int load_global_context(global_context_t * context)
 		if(abs(min_phred_score - 33) < abs(min_phred_score - 64))  inferred_offset = 33;
 		else	inferred_offset = 64;
 
-		if((context->config.phred_score_format == FASTQ_PHRED64 && inferred_offset == 33) ||
-		   (context->config.phred_score_format == FASTQ_PHRED33 && inferred_offset == 64))
-		{
-			print_in_box(80,0,0, "WARNING  - The specified Phred score offset (%d) seems incorrect.", context->config.phred_score_format == FASTQ_PHRED33?33:64);
-			print_in_box(80,0,0, "           ASCII values of the quality scores of read bases included in");
-			print_in_box(80,0,0, "           the first %d reads were found to be within the range of",guess_tested_reads);
-			print_in_box(80,0,0, "           [%d,%d].", min_phred_score, max_phred_score);
-			print_in_box(80,0,0, "");
-			context -> is_phred_warning = 1;
-		}
-		else{
-			print_in_box(80,0,0, "The range of Phred scores observed in the data is [%d,%d]", min_phred_score - inferred_offset, max_phred_score - inferred_offset);
+		if(context -> input_reads.first_read_file.file_type != GENE_INPUT_GZIP_FASTA){
+			if((context->config.phred_score_format == FASTQ_PHRED64 && inferred_offset == 33) ||
+			   (context->config.phred_score_format == FASTQ_PHRED33 && inferred_offset == 64))
+			{
+				print_in_box(80,0,0, "WARNING  - The specified Phred score offset (%d) seems incorrect.", context->config.phred_score_format == FASTQ_PHRED33?33:64);
+				print_in_box(80,0,0, "           ASCII values of the quality scores of read bases included in");
+				print_in_box(80,0,0, "           the first %d reads were found to be within the range of",guess_tested_reads);
+				print_in_box(80,0,0, "           [%d,%d].", min_phred_score, max_phred_score);
+				print_in_box(80,0,0, "");
+				context -> is_phred_warning = 1;
+			}
+			else{
+				print_in_box(80,0,0, "The range of Phred scores observed in the data is [%d,%d]", min_phred_score - inferred_offset, max_phred_score - inferred_offset);
+			}
 		}
 	}
 

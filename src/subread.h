@@ -428,6 +428,7 @@ typedef struct {
 	int space_type ;
 	int file_type ;
 	void * input_fp;   // can be system (FILE * sam or fastq or fasta), (seekable_zfile_t *)
+	char gzfa_last_name[MAX_READ_NAME_LEN];
 	unsigned long long read_chunk_start;
 } gene_input_t;
 
@@ -436,6 +437,7 @@ typedef struct{
 		unsigned long long simple_file_position;
 		seekable_position_t seekable_gzip_position;
 	};
+	char gzfa_last_name[MAX_READ_NAME_LEN];
 } gene_inputfile_position_t;
 
 

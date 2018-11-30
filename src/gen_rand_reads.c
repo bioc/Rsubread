@@ -69,8 +69,9 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs(" --pairedEnd                Generate paired-end reads.");
 	SUBREADputs("");
 	SUBREADputs(" --insertionLenMean <float>,--insertionLenSigma <float>,--insertionLenMin <int>,");
-	SUBREADputs(" --insertionLenMax <int>    Parameters for a truncated normal distribution for");
+	SUBREADputs(" --insertionLenMax <int>    Parameters of a truncated normal distribution for");
 	SUBREADputs("                            deciding insertion lengths of paired-end reads.");
+	SUBREADputs("                            Default values: mean=160, sigma=30, min=110, max=400");
 	SUBREADputs("");
 	SUBREADputs(" --simpleContigId           Trancate contig names to the first '|' or space.");
 	SUBREADputs("");
@@ -346,7 +347,10 @@ int grc_gen( genRand_context_t *grc ){
 			for(xx =0; xx<expected_reads; xx++) SUBREADprintf("TESTGEN\t%s\n", trans_name);
 		}
 	else{
-		unsigned long long mod_class = total_read_top/2; // an arbitratry starting point.
+		unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
+		grc_incrand(grc);
+
+		unsigned long long mod_class = longrand % total_read_top; // an arbitratry starting point.
 		for(read_i =0; read_i < grc->output_sample_size; read_i++) {
 			mod_class += A_LARGE_PRIME_FOR_MOD;
 			mod_class = mod_class % grc->output_sample_size;
@@ -497,7 +501,7 @@ int grc_load_env(genRand_context_t *grc){
 		char linebuf[400], * tokbuf=NULL;
 		int rline = autozip_gets(&auto_FP, linebuf, 399);
 		if(rline<1) break;
-		if(strstr(linebuf, "GeneID\tTPM"))continue;
+		if(strstr(linebuf, "ID\tTPM"))continue;
 		char * seqname = strtok_r(linebuf, "\t", &tokbuf);
 		char * seqexp_str = tokbuf;
 		if(NULL == seqexp_str){
