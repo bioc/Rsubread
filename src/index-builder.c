@@ -849,6 +849,10 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 			unsigned int read_len = 0;
 			int ret = autozip_gets(&fafp, line_buf, MAX_READ_LENGTH);
 			if(ret<1) break;
+			if(ret >= MAX_READ_LENGTH-2){
+				SUBREADprintf("ERROR: A fasta file cannot have a line longer than 1000 bytes. You need to split a very long line into many lines.\n");
+				return -1;
+			}
 
 			line_no ++;
 			fcc.line_no = line_no;
