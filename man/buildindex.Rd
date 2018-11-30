@@ -8,7 +8,7 @@ TH_subread=100,colorspace=FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
-  \item{reference}{ charater string giving the name of a FASTA-format file that includes sequences of all chromosomes and contigs.}
+  \item{reference}{ charater string giving the name of a FASTA or gzipped FASTA file that includes sequences of all chromosomes and contigs.}
   \item{gappedIndex}{ logical indicating if a gapped index or a full index will be built. A gapped index contains 16mers (subreads) that are extracted every three bases from a reference genome, whereas a full index contains subreads extracted from every chromosomal location of a genome. The index contains a hash table, which includes sequences of subreads and their corresponding chromosomal locations. Default value of this argument is \code{FALSE} (ie. a full index is built). }
   \item{indexSplit}{ logical indicating if an index can be split into multiple blocks. The block size is determined by value of parameter \code{memory}. \code{FALSE} by default (ie. a single-block index is generated). }
   \item{memory}{ numeric value specifying the amount of memory (in megabytes) used for storing the index during read mapping. 8000 MB by default. Note that this option is ignored when \code{indexSplit} is \code{FALSE}. }
