@@ -713,6 +713,7 @@ typedef struct{
 
 int ERROR_FOUND_IN_FASTA = 0;
 void check_and_convert_warn(format_check_context_t * fcc, char * msg, FILE * log_fp){
+	ERROR_FOUND_IN_FASTA += 1;
 	fprintf(log_fp, "A format issue is found in the %u-th line in file '%s': %s.\n", fcc->line_no, fcc->filename, msg);
 }
 void check_and_convert_warnOLD(char * FN, long long int fpos_line_head, unsigned line_no, int line_pos, char * msg, FILE * log_fp)
