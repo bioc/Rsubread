@@ -1,6 +1,7 @@
 1 Dec 2018 - 1.33.3
 (1) Change functions generateSimulatedReads() and summarizeContigs() to simReads() and scanFasta().
 (2) Add warning and error messages to simReads() and scanFasta() for duplicate contig sequences and duplicate contig names. 
+(3) Support gzipped FASTA format input in align(), subjunc() and buildindex().
 
 26 Nov 2018 - 1.33.2
 (1) Add generateSimulatedReads() and summarizeContigs() functions.
