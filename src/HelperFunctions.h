@@ -86,6 +86,22 @@ int rebuild_command_line(char ** lineptr, int argc, char ** argv);
 
 // Calculate a full round of MD5 or SHA256. 
 void Helper_md5sum(char * plain_txt, int plain_len, unsigned char * bin_md5_buff);
+
+typedef unsigned int HelpFuncMD5_u32plus;
+
+typedef struct {
+	HelpFuncMD5_u32plus lo, hi;
+	HelpFuncMD5_u32plus a, b, c, d;
+	unsigned char buffer[64];
+	HelpFuncMD5_u32plus block[16];
+} HelpFuncMD5_CTX;
+ 
+
+void HelpFuncMD5_Init(HelpFuncMD5_CTX *ctx);
+void HelpFuncMD5_Update(HelpFuncMD5_CTX *ctx, const void *data, unsigned long size);
+void HelpFuncMD5_Final(unsigned char *result, HelpFuncMD5_CTX *ctx);
+
+
 void Helper_sha256sum(char * plain_txt, int plain_len, unsigned char * bin_md5_buff);
 unsigned long long plain_txt_to_long_rand(char * plain_txt, int plain_len);
 

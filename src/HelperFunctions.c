@@ -1217,15 +1217,7 @@ int rebuild_command_line(char ** lineptr, int argc, char ** argv){
 //   Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
 
 /* Any 32-bit or wider unsigned integer data type will do */
-typedef unsigned int HelpFuncMD5_u32plus;
 
-typedef struct {
-	HelpFuncMD5_u32plus lo, hi;
-	HelpFuncMD5_u32plus a, b, c, d;
-	unsigned char buffer[64];
-	HelpFuncMD5_u32plus block[16];
-} HelpFuncMD5_CTX;
- 
 /*
  * The basic HelpFuncMD5 functions.
  *

@@ -41,8 +41,8 @@ scanFasta(
 )
 }
 \arguments{
-  \item{contig.file}{ character string giving the name of a file that contains the contig names and sequences. The format can be FASTA or gzipped-FASTA.}
-  \item{TPM}{ a data frame giving the Transcripts Per Kilobase Million (TPM) values of the contigs. The data frame should have only two columns: \code{ContigID} and \code{TPM}. The sum of the TPM values in the data frame must be one million, and no negative TPM value is allowed. See https://www.biostars.org/p/273537/ for the difinition of TPM.}
+  \item{contig.file}{ character string giving the name of a file that contains the contig names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
+  \item{TPM}{ a data frame giving the Transcripts Per Kilobase Million (TPM) values of the contigs. The data frame should have only two columns: \code{ContigID} and \code{TPM}. The sum of the TPM values in the data frame must be one million, and no negative TPM value is allowed. See https://www.biostars.org/p/273537/ for the difinition of TPM. No duplicate ContigID is allowed in the data frame.}
   \item{output.prefix}{ character string giving the basename of all the output files.}
   \item{out.sample.size}{ numeric value giving the number of reads or read-pairs to be generated. One million by default.}
   \item{read.length}{ numeric value giving the length of each read in the output. Maximum length is 250bp. Contigs that are shorter than the read length will not be used for generating simulated reads. 75 by default.}

@@ -298,6 +298,8 @@ int grc_gen( genRand_context_t *grc ){
 		unsigned long long this_space_span = thisv - lastv;
 		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->output_sample_size*0.99999999);
 		unsigned long long to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->output_sample_size- 1.*expected_reads)*100000.);
+		//if(this_space_span < 1) SUBREADprintf("%llu + %llu : %llu ; expf %g ; %g - %g == 0?\n", to_rescure_read_top, to_rescure_reads, expected_reads, (this_space_span *1.0/space_end) * grc->output_sample_size*0.99999999, (this_space_span *1.0/space_end * grc->output_sample_size),(1.*expected_reads));
+		if(this_space_span < 1) to_rescure_reads=0;
 		if( seq_len < min_seq_len ){
 			to_rescure_reads = 0;
 			expected_reads = 0;
@@ -401,7 +403,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 	if(ret<0){
 		SUBREADprintf("ERROR: cannot open the fasta file as input\n");
 		return -1;
-	}
+	}else ret = 0;
 
 	FILE * sumfp = fopen(outname, "w");
 	if(sumfp == NULL){
@@ -411,7 +413,14 @@ int grc_summary_fasta(genRand_context_t * grc){
 	fprintf(sumfp, "ContigID\tLength\n");
 
 	char * seq_name = NULL;
+	unsigned char md5res[16];
 	int seq_len = 0;
+	HelpFuncMD5_CTX md5ctx;
+	HelpFuncMD5_Init(&md5ctx);
+	HashTable * seq_duplicate_tab = StringTableCreate(100000);
+	HashTable * name_duplicate_tab = StringTableCreate(100000);
+	HashTableSetDeallocationFunctions(seq_duplicate_tab, free,free);
+
 	while(1){
 		char clinebuf[TRANSCRIPT_FASTA_LINE_WIDTH];
 		int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
@@ -423,27 +432,58 @@ int grc_summary_fasta(genRand_context_t * grc){
 		}
 		if(clinebuf[0]=='>'){
 			if(seq_name){
+				HelpFuncMD5_Final(md5res, &md5ctx);
+				//SUBREADprintf("%s\t",seq_name);int md5i;for(md5i=0;md5i<16;md5i++)SUBREADprintf("%02X",0xff&(int)md5res[md5i]);SUBREADputs("");
+				char * md5mem = malloc(33);
+				int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+
+				char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
+				if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+
+				HashTablePut( seq_duplicate_tab, md5mem, strdup(seq_name) );
+
 				fprintf(sumfp, "%s\t%d\n", seq_name, seq_len);
-				free(seq_name);
+				//free(seq_name);
 				seq_len = 0;
 			}
-			seq_name=malloc(rlength);
 			clinebuf[rlength-1]=0;
 			if(grc->simple_contig_names){
 				int xx;
 				for(xx=1; xx<rlength-1; xx++) if(clinebuf[xx]=='|' || clinebuf[xx]==' ') clinebuf[xx]=0;
 			}
+
+			void * had_tab = HashTableGet(name_duplicate_tab, clinebuf+1);
+			//SUBREADprintf("CHECK PTR: %s => %p\n", clinebuf+1, had_tab);
+			if(had_tab){
+				SUBREADprintf("ERROR: duplicate sequence name was found : '%s'. The program terminates without output.\n", clinebuf+1);
+				return -1;
+			}
+			seq_name=malloc(rlength);
 			strcpy(seq_name, clinebuf+1);
+
+			HashTablePut(name_duplicate_tab, seq_name, seq_name);
+			HelpFuncMD5_Init(&md5ctx);
 		}else{
+			int xx; for(xx=0; xx<rlength-1; xx++) clinebuf[xx] = toupper(clinebuf[xx]);
+			HelpFuncMD5_Update(&md5ctx, clinebuf, rlength-1);
 			seq_len += rlength-1; // no \n
 		}
 	}
 
 	if(seq_name){
+		HelpFuncMD5_Final(md5res, &md5ctx);
+		//SUBREADprintf("%s\t",seq_name);int md5i;for(md5i=0;md5i<16;md5i++)SUBREADprintf("%02X",0xff&(int)md5res[md5i]);SUBREADputs("");
+		char * md5mem = malloc(33);
+		int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+		char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
+		if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+		free(md5mem);
+
 		fprintf(sumfp, "%s\t%d\n", seq_name, seq_len);
 		free(seq_name);
 	}
-
+	HashTableDestroy(seq_duplicate_tab);
+	HashTableDestroy(name_duplicate_tab);
 	autozip_close(&auto_FP);
 	fclose(sumfp);
 	return ret;
@@ -517,6 +557,12 @@ int grc_load_env(genRand_context_t *grc){
 		total_tpm += seqexp_int;
 		char * seqname_buf = malloc(strlen(seqname)+1);
 		strcpy(seqname_buf, seqname);
+
+		void * had_tab = HashTableGet(grc->expression_levels, seqname_buf);
+		if(had_tab){
+			SUBREADprintf("ERROR: duplicate contig name was found in the TMP table: '%s'. The program terminates without output.\n", seqname_buf);
+			return -1;
+		}
 		HashTablePut(grc->expression_levels, seqname_buf, NULL+seqexp_int+1);
 	}
 	autozip_close(&auto_FP);
@@ -567,6 +613,12 @@ int grc_load_env(genRand_context_t *grc){
 	} else ret = 0;
 	if(ret) return ret;
 	
+
+	HelpFuncMD5_CTX md5ctx;
+	HelpFuncMD5_Init(&md5ctx);
+	HashTable * seq_duplicate_tab = StringTableCreate(100000);
+	HashTableSetDeallocationFunctions(seq_duplicate_tab, free, NULL);
+
 	unsigned long long linear_space_top = 0;
 	char * lbuf = NULL, * seq_name = NULL;
 	unsigned int lbuf_cap = 0, lbuf_used = 0, this_seq_len = 0;
@@ -581,8 +633,22 @@ int grc_load_env(genRand_context_t *grc){
 			break;
 		}
 		if(clinebuf[0]=='>'){
-			if(NULL != seq_name)
+			if(NULL != seq_name){
+				char * md5mem = malloc(33); unsigned char md5res[16];
+				HelpFuncMD5_Final(md5res, &md5ctx);
+				int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+				char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
+				if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+				HashTablePut(seq_duplicate_tab, md5mem, seq_name);	
+
+				had_tab = HashTableGet(grc-> contig_sequences, seq_name);
+				if(had_tab){
+					SUBREADprintf("ERROR: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+					return -1;
+				}
+
 				grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
+			}
 
 			clinebuf[rlength-1]=0;
 			if(grc->simple_contig_names)
@@ -598,6 +664,7 @@ int grc_load_env(genRand_context_t *grc){
 			lbuf_used = 0;
 			lbuf = malloc(TRANSCRIPT_FASTA_LINE_INIT);
 			lbuf_cap = TRANSCRIPT_FASTA_LINE_INIT;
+			HelpFuncMD5_Init(&md5ctx);
 		}else{
 			if(NULL == seq_name){
 				SUBREADprintf("ERROR: The fasta file did not start correctly! \n");
@@ -609,6 +676,7 @@ int grc_load_env(genRand_context_t *grc){
 				lbuf = realloc(lbuf, lbuf_cap);
 			}
 			//SUBREADprintf("STCP1 : %d used, %d len, %d cap\n", lbuf_used, strlen(clinebuf), lbuf_cap);
+			HelpFuncMD5_Update(&md5ctx, clinebuf, rlength-1);
 			strcpy(lbuf + lbuf_used, clinebuf );
 			*(lbuf+lbuf_used+rlength-1)=0; // '\n' => 0
 
@@ -620,9 +688,30 @@ int grc_load_env(genRand_context_t *grc){
 		SUBREADprintf("ERROR: The fasta file did not end correctly! \n");
 		ret = 1;
 	}
-	if(NULL != seq_name && lbuf_used >0) grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
+	if(NULL != seq_name && lbuf_used >0){
+		char * md5mem = malloc(33); unsigned char md5res[16];
+		HelpFuncMD5_Final(md5res, &md5ctx);
+		int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+		char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
+		if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+		free(md5mem);
+
+		had_tab = HashTableGet(grc-> contig_sequences, seq_name);
+		if(had_tab){
+			SUBREADprintf("ERROR: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+			return -1;
+		}
+
+		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
+	}
 	
 	autozip_close(&auto_FP);
+	HashTableDestroy(seq_duplicate_tab);
+
+	if(linear_space_top<1){
+		SUBREADprintf("ERROR: no valid contig found in the input. No reads can be generated.\n");
+		return -1;
+	}
 
 	char outname[MAX_FILE_NAME_LENGTH+30];
 
@@ -728,12 +817,23 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	}
 	memcpy(grc.random_seeds, &seed, sizeof(seed));
 
+
+	int ret = 0;
 	if(do_fasta_summary){
-		return grc_summary_fasta(&grc);
+		ret = grc_summary_fasta(&grc);
+
+		if(ret && strlen(grc.output_prefix)>0){
+			char delfn[30+MAX_FILE_NAME_LENGTH];
+			sprintf(delfn, "%s.faSummary", grc.output_prefix);
+			//SUBREADprintf("UNLINK: %s\n", delfn);
+			unlink(delfn);
+		}
 	}else{
 		int ret = grc_check_parameters(&grc) && print_usage_gen_reads(argv[0]);
 		ret =  ret || grc_load_env(&grc);
 		ret =  ret || grc_gen(&grc);
-		return ret || grc_finalize(&grc);
+		ret =  ret || grc_finalize(&grc);
 	}
+
+	return ret;
 }
