@@ -724,6 +724,8 @@ int grc_load_env(genRand_context_t *grc){
 				lbuf_cap = max(lbuf_cap *8/5, lbuf_cap + rlength);
 				lbuf = realloc(lbuf, lbuf_cap);
 			}
+
+			int xx; for(xx=0; xx<rlength-1; xx++) clinebuf[xx] = toupper(clinebuf[xx]);
 			//SUBREADprintf("STCP1 : %d used, %d len, %d cap\n", lbuf_used, strlen(clinebuf), lbuf_cap);
 			HelpFuncMD5_Update(&md5ctx, clinebuf, rlength-1);
 			strcpy(lbuf + lbuf_used, clinebuf );
