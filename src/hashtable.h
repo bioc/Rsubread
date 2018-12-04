@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.20 2018/11/23 05:13:57 cvs Exp $
+ * $Id: hashtable.h,v 9999.21 2018/12/04 03:08:26 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -16,7 +16,7 @@
  * All access should be via the public functions declared below. */
 
 typedef struct KeyValuePair_struct {
-    const void *key;
+    void *key;
     void *value;
     struct KeyValuePair_struct *next;
 } KeyValuePair;
@@ -198,7 +198,8 @@ int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int 
  *                     doesn't exist in the HashTable
 \*--------------------------------------------------------------------------*/
 
-void *HashTableGet(const HashTable *hashTable, const void *key);
+void * HashTableGetKey(const HashTable *hashTable, const void *key);
+void * HashTableGet(const HashTable *hashTable, const void *key);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:

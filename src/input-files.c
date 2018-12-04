@@ -1518,7 +1518,9 @@ void my_fclose(void * fp)
 
 int my_strcmp(const void * s1, const void * s2)
 {
-	return strcmp((char*)s1, (char*)s2);
+	int ret = strcmp((char*)s1, (char*)s2);
+	//SUBREADprintf("SCM:%s %s = %d\n", s1, s2, ret);
+	return ret;
 }
 
 int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len)

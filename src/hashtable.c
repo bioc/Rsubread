@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.29 2018/11/23 05:13:57 cvs Exp $
+ * $Id: hashtable.c,v 9999.30 2018/12/04 03:08:25 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -395,13 +395,13 @@ int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, in
 			if(replace_key) {
 				if(hashTable->keyDeallocator && dealloc_key)
 					hashTable->keyDeallocator((void *) pair->key);
-				pair->key = key;
+				pair->key = (void *)key;
 			}
 		}
 		if (pair->value != value) {
 			if (hashTable->valueDeallocator != NULL && dealloc_value)
 				hashTable->valueDeallocator(pair->value);
-			pair->value = value;
+			pair->value = (void *)value;
 		}
 	}
 	else {
@@ -410,8 +410,8 @@ int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, in
 		return -1;
 		}
 		else {
-			newPair->key = key;
-			newPair->value = value;
+			newPair->key = (void *)key;
+			newPair->value = (void *)value;
 			newPair->next = hashTable->bucketArray[hashValue];
 			hashTable->bucketArray[hashValue] = newPair;
 			hashTable->numOfElements++;
@@ -447,6 +447,18 @@ int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int 
  *	  void *	   - the value of the specified key, or NULL if the key
  *					 doesn't exist in the HashTable
 \*--------------------------------------------------------------------------*/
+
+void *HashTableGetKey(const HashTable *hashTable, const void *key) {
+	long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+
+	KeyValuePair *pair = hashTable->bucketArray[hashValue];
+
+	while (pair != NULL && hashTable->keycmp(key, pair->key) != 0)
+		pair = pair->next;
+
+	return (pair == NULL)? NULL : pair->key;
+}
+
 
 void *HashTableGet(const HashTable *hashTable, const void *key) {
 	long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;

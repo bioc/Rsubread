@@ -216,38 +216,38 @@ int grc_check_parameters(genRand_context_t * grc){
 	int ret = 0;
 
 	if(grc->read_length > MAX_SIMULATION_READ_LEN){
-		SUBREADprintf("ERROR: the read length cannot be higher than  %d.\n", MAX_SIMULATION_READ_LEN);
+		SUBREADprintf("Error: the read length cannot be higher than  %d.\n", MAX_SIMULATION_READ_LEN);
 		ret=1;
 	}
 	if(grc->is_paired_end){
 		if(grc->insertion_length_min>grc->insertion_length_max){
-			SUBREADprintf("ERROR: the minimum insertion length must be equal or higher than the maximum insertion length!\n");
+			SUBREADprintf("Error: the minimum insertion length must be equal or higher than the maximum insertion length!\n");
 			ret=1;
 		}
 	
 		if(grc->insertion_length_min<grc->read_length){
-			SUBREADprintf("ERROR: the minimum insertion length must be equal or higher than read length!\n");
+			SUBREADprintf("Error: the minimum insertion length must be equal or higher than read length!\n");
 			ret=1;
 		}
 	
 		if(grc->insertion_length_max<1){
-			SUBREADprintf("ERROR: the maximum insertion length must be a positive number!\n");
+			SUBREADprintf("Error: the maximum insertion length must be a positive number!\n");
 			ret=1;
 		}
 	}
 
 	if(grc->read_length<1){
-		SUBREADprintf("ERROR: the read length must be a positive number!\n");
+		SUBREADprintf("Error: the read length must be a positive number!\n");
 		ret=1;
 	}
 
 	if(!grc->contig_fasta_file[0]){
-		SUBREADprintf("ERROR: a contig file must be provide!\n");
+		SUBREADprintf("Error: a contig file must be provide!\n");
 		ret=1;
 	}
 
 	if(!grc->output_prefix[0]){
-		SUBREADprintf("ERROR: the output prefix must be provide!\n");
+		SUBREADprintf("Error: the output prefix must be provide!\n");
 		ret=1;
 	}else{
 		char outname[MAX_FILE_NAME_LENGTH+30];
@@ -257,18 +257,18 @@ int grc_check_parameters(genRand_context_t * grc){
 			fclose(test_out);
 			unlink(outname);
 		}else{
-			SUBREADprintf("ERROR: cannot create the output file!\n");
+			SUBREADprintf("Error: cannot create the output file!\n");
 			ret=1;
 		}
 	}
 
 	if(!grc->expression_level_file[0]){
-		SUBREADprintf("ERROR: the wanted expression levels must be provided!\n");
+		SUBREADprintf("Error: the wanted expression levels must be provided!\n");
 		ret=1;
 	}
 
 	if(grc->output_sample_size < 1){
-		SUBREADprintf("WARNING: no read number is specified. Generating one million read%s.\n", grc->is_paired_end?"-pairs":"s");
+		SUBREADprintf("Warning: no read number is specified. Generating one million read%s.\n", grc->is_paired_end?"-pairs":"s");
 		grc->output_sample_size = 1000000;
 	}
 
@@ -385,7 +385,7 @@ int grc_finalize(genRand_context_t *grc){
 
 #define TRANSCRIPT_FASTA_LINE_INIT 800
 #define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000000.000001
-#define TRANSCRIPT_FASTA_LINE_WIDTH 300
+#define TRANSCRIPT_FASTA_LINE_WIDTH 1000
 
 
 
@@ -394,56 +394,71 @@ int grc_summary_fasta(genRand_context_t * grc){
 	autozip_fp auto_FP;
 
 	if(!grc->output_prefix[0]){
-		SUBREADprintf("ERROR: the output prefix must be provide!\n");
+		SUBREADprintf("Error: the output prefix must be provide!\n");
 		return -1;
 	}
 
 	sprintf(outname,"%s.faSummary", grc->output_prefix);
 	int ret = autozip_open(grc->contig_fasta_file, &auto_FP);
 	if(ret<0){
-		SUBREADprintf("ERROR: cannot open the fasta file as input\n");
+		SUBREADprintf("Error: cannot open the fasta file as input\n");
 		return -1;
 	}else ret = 0;
 
 	FILE * sumfp = fopen(outname, "w");
 	if(sumfp == NULL){
-		SUBREADprintf("ERROR: cannot open the putput file\n");
+		SUBREADprintf("Error: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "ContigID\tLength\n");
+	fprintf(sumfp, "ContigID\tLength\tMD5\tDuplicate\tOccurance\tFresh\n");
 
 	char * seq_name = NULL;
 	unsigned char md5res[16];
-	int seq_len = 0;
+	int seq_len = 0, total_rep_seq = 0;
 	HelpFuncMD5_CTX md5ctx;
 	HelpFuncMD5_Init(&md5ctx);
 	HashTable * seq_duplicate_tab = StringTableCreate(100000);
 	HashTable * name_duplicate_tab = StringTableCreate(100000);
-	HashTableSetDeallocationFunctions(seq_duplicate_tab, free,free);
+	HashTable * seq_length_tab = StringTableCreate(100000);
+	HashTable * seq_md5_tab = StringTableCreate(100000);
+	ArrayList * seq_name_list = ArrayListCreate(100000);
+	HashTableSetDeallocationFunctions(seq_duplicate_tab, free,NULL);
+	ArrayListSetDeallocationFunction(seq_name_list, free);
 
 	while(1){
 		char clinebuf[TRANSCRIPT_FASTA_LINE_WIDTH];
 		int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
 		if(rlength < 1)break;
 		if(rlength >= TRANSCRIPT_FASTA_LINE_WIDTH -1 || clinebuf[rlength]!='\0' || clinebuf[rlength-1]!='\n'){
-			SUBREADprintf("ERROR: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
+			SUBREADprintf("Error: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
 			ret = 1;
 			break;
 		}
 		if(clinebuf[0]=='>'){
 			if(seq_name){
+				if(seq_len<1){
+					SUBREADprintf("Error: a contig has no sequence: '%s'\n", seq_name);
+					return -1;
+				}
 				HelpFuncMD5_Final(md5res, &md5ctx);
 				//SUBREADprintf("%s\t",seq_name);int md5i;for(md5i=0;md5i<16;md5i++)SUBREADprintf("%02X",0xff&(int)md5res[md5i]);SUBREADputs("");
 				char * md5mem = malloc(33);
 				int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
 
-				char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
-				if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+				long dupval = HashTableGet(seq_duplicate_tab,md5mem)-NULL;
+				dupval++;
+				HashTablePutReplace( seq_duplicate_tab, md5mem, NULL+dupval , 0);
+				if(dupval>1){
+					char * newmd5mem =HashTableGetKey(seq_duplicate_tab, md5mem);
+					free(md5mem);
+					md5mem = newmd5mem;
+				}
+				ArrayListPush( seq_name_list, seq_name);
+				HashTablePut( seq_length_tab, seq_name, NULL+seq_len);
+				HashTablePut( seq_md5_tab, seq_name, md5mem);
+				//if(strcmp("ENST00000410691.1",seq_name)==0)SUBREADprintf("MD5CHECK: %s has %s (%p)\n", seq_name, md5mem, md5mem);
+				//if(strcmp("ENST00000634833.2",seq_name)==0)SUBREADprintf("MD5CHECK: %s has %s (%p), not %s (%p)\n", seq_name, md5mem, md5mem, HashTableGet(seq_md5_tab, "ENST00000410691.1"), HashTableGet(seq_md5_tab, "ENST00000410691.1"));
 
-				HashTablePut( seq_duplicate_tab, md5mem, strdup(seq_name) );
-
-				fprintf(sumfp, "%s\t%d\n", seq_name, seq_len);
-				//free(seq_name);
 				seq_len = 0;
 			}
 			clinebuf[rlength-1]=0;
@@ -455,13 +470,13 @@ int grc_summary_fasta(genRand_context_t * grc){
 			void * had_tab = HashTableGet(name_duplicate_tab, clinebuf+1);
 			//SUBREADprintf("CHECK PTR: %s => %p\n", clinebuf+1, had_tab);
 			if(had_tab){
-				SUBREADprintf("ERROR: duplicate sequence name was found : '%s'. The program terminates without output.\n", clinebuf+1);
+				SUBREADprintf("Error: duplicate sequence name was found : '%s'. The program terminates without output.\n", clinebuf+1);
 				return -1;
 			}
 			seq_name=malloc(rlength);
 			strcpy(seq_name, clinebuf+1);
 
-			HashTablePut(name_duplicate_tab, seq_name, seq_name);
+			HashTablePut(name_duplicate_tab, seq_name, NULL+1);
 			HelpFuncMD5_Init(&md5ctx);
 		}else{
 			int xx; for(xx=0; xx<rlength-1; xx++) clinebuf[xx] = toupper(clinebuf[xx]);
@@ -471,17 +486,49 @@ int grc_summary_fasta(genRand_context_t * grc){
 	}
 
 	if(seq_name){
+		if(seq_len<1){
+			SUBREADprintf("Error: a contig has no sequence: '%s'\n", seq_name);
+			return -1;
+		}
+
 		HelpFuncMD5_Final(md5res, &md5ctx);
 		//SUBREADprintf("%s\t",seq_name);int md5i;for(md5i=0;md5i<16;md5i++)SUBREADprintf("%02X",0xff&(int)md5res[md5i]);SUBREADputs("");
 		char * md5mem = malloc(33);
 		int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
-		char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
-		if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
-		free(md5mem);
+		long dupval = HashTableGet(seq_duplicate_tab,md5mem)-NULL;
+		dupval++;
+		HashTablePutReplace( seq_duplicate_tab, md5mem, NULL+dupval ,0);
 
-		fprintf(sumfp, "%s\t%d\n", seq_name, seq_len);
-		free(seq_name);
+		if(dupval>1){
+			char * newmd5mem =HashTableGetKey(seq_duplicate_tab, md5mem);
+			free(md5mem);
+			md5mem = newmd5mem;
+		}
+
+		ArrayListPush( seq_name_list, seq_name);
+		HashTablePut( seq_length_tab, seq_name, NULL+seq_len);
+		HashTablePut( seq_md5_tab, seq_name, md5mem);
 	}
+
+	int seqi;
+	HashTable * reprs_tab = StringTableCreate(100000);
+	for(seqi = 0 ; seqi < seq_name_list->numOfElements; seqi++){
+		char * seqnam = ArrayListGet(seq_name_list,seqi);
+		char * md5str = HashTableGet(seq_md5_tab,seqnam);
+		long md5repeated = HashTableGet(seq_duplicate_tab, md5str) - NULL;
+		if(md5repeated>1) total_rep_seq++;
+		long seqlen = HashTableGet(seq_length_tab,seqnam)-NULL;
+		int is_reprs = HashTableGet(reprs_tab,md5str)==NULL;
+		HashTablePut(reprs_tab,md5str,NULL+1);
+		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"TRUE":"FALSE", md5repeated, is_reprs?"TRUE":"FALSE");
+	}
+	HashTableDestroy(reprs_tab);
+
+	if(total_rep_seq)SUBREADprintf("Warning: %d duplicate sequences were found in the input. Please check the summary table.\n",total_rep_seq);
+
+	ArrayListDestroy(seq_name_list);
+	HashTableDestroy(seq_length_tab);
+	HashTableDestroy(seq_md5_tab);
 	HashTableDestroy(seq_duplicate_tab);
 	HashTableDestroy(name_duplicate_tab);
 	autozip_close(&auto_FP);
@@ -491,13 +538,13 @@ int grc_summary_fasta(genRand_context_t * grc){
 
 void grc_put_new_trans(genRand_context_t *grc, char * seq_name, char * seq_str, unsigned int seq_len, unsigned long long * linear_space_top){
 	if(seq_len<1){
-		SUBREADprintf("WARNING: a contig, '%s', has a zero length. No read is generated from it!\n", seq_name);
+		SUBREADprintf("Warning: a contig, '%s', has a zero length. No read is generated from it!\n", seq_name);
 	}
 	HashTablePut(grc-> contig_sequences,seq_name, seq_str);
 	HashTablePut(grc-> contig_lengths, seq_name, NULL+ seq_len);
 	unsigned long long this_seq_exp_10000 = HashTableGet(grc->expression_levels, seq_name)-NULL;
 	if(this_seq_exp_10000<1){
-		SUBREADprintf("WARNING: a contig, '%s', has no wanted expression level. No read is generated from it!\n", seq_name);
+		SUBREADprintf("Warning: a contig, '%s', has no wanted expression level. No read is generated from it!\n", seq_name);
 		this_seq_exp_10000=0;
 	}else this_seq_exp_10000-=1;
 	//SUBREADprintf("TESTLEN\t%s\t%d\n", seq_name, seq_len);
@@ -532,7 +579,7 @@ int grc_load_env(genRand_context_t *grc){
 	int ret = autozip_open(grc->expression_level_file, &auto_FP);
 	if(ret<0){
 		ret = 1;
-		SUBREADprintf("ERROR: unable to open the expression level file!\n");
+		SUBREADprintf("Error: unable to open the expression level file!\n");
 	}else ret = 0;
 	if(ret) return ret;
 
@@ -545,12 +592,12 @@ int grc_load_env(genRand_context_t *grc){
 		char * seqname = strtok_r(linebuf, "\t", &tokbuf);
 		char * seqexp_str = tokbuf;
 		if(NULL == seqexp_str){
-			SUBREADprintf("ERROR: expression level file format error!\n");
+			SUBREADprintf("Error: expression level file format error!\n");
 			ret = 1;
 		}
 		double seqexp = atof(seqexp_str);
 		if(seqexp > TRANSCRIPT_MAX_EXPRESSION_LEVEL){
-			SUBREADprintf("ERROR: The contig expression level shouldn't excess %.0f\n", TRANSCRIPT_MAX_EXPRESSION_LEVEL);
+			SUBREADprintf("Error: The contig expression level shouldn't excess %.0f\n", TRANSCRIPT_MAX_EXPRESSION_LEVEL);
 		}
 		
 		unsigned long long seqexp_int = (unsigned long long )(seqexp*10000.);
@@ -560,7 +607,7 @@ int grc_load_env(genRand_context_t *grc){
 
 		void * had_tab = HashTableGet(grc->expression_levels, seqname_buf);
 		if(had_tab){
-			SUBREADprintf("ERROR: duplicate contig name was found in the TMP table: '%s'. The program terminates without output.\n", seqname_buf);
+			SUBREADprintf("Error: duplicate contig name was found in the TMP table: '%s'. The program terminates without output.\n", seqname_buf);
 			return -1;
 		}
 		HashTablePut(grc->expression_levels, seqname_buf, NULL+seqexp_int+1);
@@ -570,7 +617,7 @@ int grc_load_env(genRand_context_t *grc){
 
 	#define ROUNDUP_TOLERANCE ( 1000llu * 10000llu )
 	if(total_tpm > 1000000llu * 10000llu + ROUNDUP_TOLERANCE || total_tpm < 1000000llu * 10000llu - ROUNDUP_TOLERANCE) {
-		SUBREADprintf("ERROR: total TPM is not 1,000,000\n");
+		SUBREADprintf("Error: total TPM is not 1,000,000\n");
 		return 1;
 	}
 
@@ -581,7 +628,7 @@ int grc_load_env(genRand_context_t *grc){
 		ret = autozip_open(grc->quality_string_file, &auto_FP);
 		if(ret<0){
 			ret = 1;
-			SUBREADprintf("ERROR: unable to open the quality string file!\n");
+			SUBREADprintf("Error: unable to open the quality string file!\n");
 		}else ret = 0;
 		if(ret) return ret;
 		while(1){
@@ -591,7 +638,7 @@ int grc_load_env(genRand_context_t *grc){
 			if(rline==grc->read_length +1 || ( rline==grc->read_length && linebuf[rline-1]!='\n' ) ) {
 				// is OK.
 			}else{
-				SUBREADprintf("ERROR: all your quality strings must be %d-byte long.\n", grc->read_length);
+				SUBREADprintf("Error: all your quality strings must be %d-byte long.\n", grc->read_length);
 				ret = 1;
 				break;
 			}
@@ -609,7 +656,7 @@ int grc_load_env(genRand_context_t *grc){
 	ret = autozip_open(grc->contig_fasta_file, &auto_FP);
 	if(ret<0){
 		ret = 1;
-		SUBREADprintf("ERROR: unable to open the contig file!\n");
+		SUBREADprintf("Error: unable to open the contig file!\n");
 	} else ret = 0;
 	if(ret) return ret;
 	
@@ -621,14 +668,14 @@ int grc_load_env(genRand_context_t *grc){
 
 	unsigned long long linear_space_top = 0;
 	char * lbuf = NULL, * seq_name = NULL;
-	unsigned int lbuf_cap = 0, lbuf_used = 0, this_seq_len = 0;
+	unsigned int lbuf_cap = 0, lbuf_used = 0, this_seq_len = 0, total_dup=0;
 	while(1){
 		
 		char clinebuf[TRANSCRIPT_FASTA_LINE_WIDTH];
 		int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
 		if(rlength < 1)break;
 		if(rlength >= TRANSCRIPT_FASTA_LINE_WIDTH -1 || clinebuf[rlength]!='\0' || clinebuf[rlength-1]!='\n'){
-			SUBREADprintf("ERROR: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
+			SUBREADprintf("Error: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
 			ret = 1;
 			break;
 		}
@@ -638,12 +685,14 @@ int grc_load_env(genRand_context_t *grc){
 				HelpFuncMD5_Final(md5res, &md5ctx);
 				int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
 				char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
-				if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
-				HashTablePut(seq_duplicate_tab, md5mem, seq_name);	
+				long seq_exp = HashTableGet(grc->expression_levels, seq_name)-NULL;
+				if(had_tab && seq_exp>1) total_dup++;//SUBREADprintf("Warning: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+				if(seq_exp>1)HashTablePut(seq_duplicate_tab, md5mem, 1+NULL);	
+				else free(md5mem);
 
 				had_tab = HashTableGet(grc-> contig_sequences, seq_name);
 				if(had_tab){
-					SUBREADprintf("ERROR: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+					SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
 					return -1;
 				}
 
@@ -656,7 +705,7 @@ int grc_load_env(genRand_context_t *grc){
 
 			seq_name = malloc(strlen(clinebuf));
 			if( clinebuf[1]==0 ){
-				SUBREADprintf("ERROR: Every contig needs a name!\n");
+				SUBREADprintf("Error: Every contig needs a name!\n");
 				ret = 1;
 				break;
 			}
@@ -667,7 +716,7 @@ int grc_load_env(genRand_context_t *grc){
 			HelpFuncMD5_Init(&md5ctx);
 		}else{
 			if(NULL == seq_name){
-				SUBREADprintf("ERROR: The fasta file did not start correctly! \n");
+				SUBREADprintf("Error: The fasta file did not start correctly! \n");
 				ret = 1;
 				break;
 			}
@@ -685,31 +734,33 @@ int grc_load_env(genRand_context_t *grc){
 		}
 	}
 	if(lbuf_used<1){
-		SUBREADprintf("ERROR: The fasta file did not end correctly! \n");
+		SUBREADprintf("Error: The fasta file did not end correctly! \n");
 		ret = 1;
 	}
 	if(NULL != seq_name && lbuf_used >0){
 		char * md5mem = malloc(33); unsigned char md5res[16];
 		HelpFuncMD5_Final(md5res, &md5ctx);
 		int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+		long seq_exp = HashTableGet(grc->expression_levels, seq_name)-NULL;
 		char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
-		if(had_tab) SUBREADprintf("WARNING: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
+		if(had_tab && seq_exp>1)total_dup++;// SUBREADprintf("Warning: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
 		free(md5mem);
 
 		had_tab = HashTableGet(grc-> contig_sequences, seq_name);
 		if(had_tab){
-			SUBREADprintf("ERROR: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+			SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
 			return -1;
 		}
 
 		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 	}
 	
+	if(total_dup)SUBREADprintf("Warning: there are %d contigs that have replicate sequences and the wanted TPM values are non-zero. You may use scanFasta() to find their names.\n", total_dup);
 	autozip_close(&auto_FP);
 	HashTableDestroy(seq_duplicate_tab);
 
 	if(linear_space_top<1){
-		SUBREADprintf("ERROR: no valid contig found in the input. No reads can be generated.\n");
+		SUBREADprintf("Error: no valid contig found in the input. No reads can be generated.\n");
 		return -1;
 	}
 
@@ -828,12 +879,14 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 			//SUBREADprintf("UNLINK: %s\n", delfn);
 			unlink(delfn);
 		}
+		free(grc.cmd_line);
 	}else{
 		int ret = grc_check_parameters(&grc) && print_usage_gen_reads(argv[0]);
 		ret =  ret || grc_load_env(&grc);
 		ret =  ret || grc_gen(&grc);
 		ret =  ret || grc_finalize(&grc);
 	}
+
 
 	return ret;
 }
