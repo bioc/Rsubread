@@ -1,6 +1,6 @@
 Package: Rsubread
-Version: 1.32.1
-Date: 2018-11-08
+Version: 1.32.2
+Date: 2018-12-05
 Title: Subread sequence alignment and counting for R
 Author: Wei Shi and Yang Liao with contributions from Gordon K Smyth, Jenny Dai
         and Timothy Triche, Jr.
@@ -14,6 +14,6 @@ Description: Rsubread is a toolbox developed for the analyses of
 URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
 License: GPL-3
 biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq,
-        GeneExpression, GeneRegulation, Genetics, SNP,
+        GeneExpression, GeneRegulation, Genetics, ImmunoOncology, SNP,
         GeneticVariability, Preprocessing, QualityControl,
         GenomeAnnotation, Software
