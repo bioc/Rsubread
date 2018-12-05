@@ -1,3 +1,6 @@
+5 Dec 2018 - 1.33.5
+(1) Add biocViews tag 'ImmunoOncology' to the biocViews.
+
 5 Dec 2018 - 1.33.4
 (1) Indicate the uniqueness of sequences in the returned data frame from scanFasta()
 (2) Minor changes on the screen outputs from scanFasta() and genReads()
