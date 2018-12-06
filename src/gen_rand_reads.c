@@ -36,22 +36,22 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("");
 	SUBREADputs(" For scanning a FASTA/gz file:");
 	SUBREADprintf("    %s --summarizeFasta \\\n", pgname);
-	SUBREADputs("       --contigFasta <file> --outputPrefix <string> {--simpleContigId}");
+	SUBREADputs("       --transcriptFasta <file> --outputPrefix <string> {--simpleTranscriptId}");
 	SUBREADputs("");
 	SUBREADputs(" For generating read/pairs:");
-	SUBREADprintf("    %s --contigFasta <file>\\\n", pgname);
+	SUBREADprintf("    %s --transcriptFasta <file>\\\n", pgname);
 	SUBREADputs("       --outputPrefix <string> --expressionLevels <file> {other options}");
 	SUBREADputs("");
-	SUBREADputs(" --summarizeFasta           Only output the contig names and lengths.");
+	SUBREADputs(" --summarizeFasta           Only output the transcript names and lengths.");
 	SUBREADputs("");
-	SUBREADputs(" --contigFasta <file>       The contig database in FASTA/gz format.");
+	SUBREADputs(" --transcriptFasta <file>   The transcript database in FASTA/gz format.");
 	SUBREADputs("");
 	SUBREADputs(" --outputPrefix <string>    The prefix of the output files.");
 	SUBREADputs("");
 	SUBREADputs(" --totalReads  <int>        Total read/pairs in output.");
 	SUBREADputs("");
 	SUBREADputs(" --expressionLevels <file>  Two column table delimited by <TAB>, giving the");
-	SUBREADputs("                            wanted TPM values. Columns: ContigID and TPM");
+	SUBREADputs("                            wanted TPM values. Columns: TranscriptID and TPM");
 	SUBREADputs("");
 	SUBREADputs(" --readLen <int>            The length of the output reads. 100 by default.");
 	SUBREADputs("");
@@ -73,7 +73,7 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("                            deciding insertion lengths of paired-end reads.");
 	SUBREADputs("                            Default values: mean=160, sigma=30, min=110, max=400");
 	SUBREADputs("");
-	SUBREADputs(" --simpleContigId           Trancate contig names to the first '|' or space.");
+	SUBREADputs(" --simpleTranscriptId       Trancate transcript names to the first '|' or space.");
 	SUBREADputs("");
 	SUBREADputs(" --truthInReadNames         Encode the true locations of reads in read names.");
 	SUBREADputs("");
@@ -83,9 +83,9 @@ int print_usage_gen_reads(char * pgname) {
 static struct option long_options[] =
 {
 	{"truthInReadNames", no_argument, 0, 'T'},
-	{"simpleContigId", no_argument, 0, 'C'},
+	{"simpleTranscriptId", no_argument, 0, 'C'},
 	{"summarizeFasta",  no_argument, 0, 'M'},
-	{"contigFasta",  required_argument, 0, 't'},
+	{"transcriptFasta",  required_argument, 0, 't'},
 	{"totalReads",  required_argument, 0, 'r'},
 	{"pairedEnd",  no_argument, 0, 'p'},
 	{"expressionLevels",  required_argument, 0, 'e'},
@@ -102,14 +102,14 @@ static struct option long_options[] =
 
 typedef struct {
 	char random_seeds[16];
-	char contig_fasta_file[MAX_FILE_NAME_LENGTH];
+	char transcript_fasta_file[MAX_FILE_NAME_LENGTH];
 	char output_prefix[MAX_FILE_NAME_LENGTH];
 	char expression_level_file[MAX_FILE_NAME_LENGTH];
 	char quality_string_file[MAX_FILE_NAME_LENGTH];
 
 	unsigned long long output_sample_size;
 	int is_paired_end;
-	int simple_contig_names;
+	int simple_transcript_names;
 	int truth_in_read_names;
 	float insertion_length_mean;
 	int insertion_length_max;
@@ -118,10 +118,10 @@ typedef struct {
 	int read_length;
 
 	ArrayList * quality_strings;
-	ArrayList * contig_hitting_space;
-	ArrayList * contig_names;
-	HashTable * contig_sequences;
-	HashTable * contig_lengths;
+	ArrayList * transcript_hitting_space;
+	ArrayList * transcript_names;
+	HashTable * transcript_sequences;
+	HashTable * transcript_lengths;
 	HashTable * expression_levels;
 
 	char fake_quality_string[MAX_SIMULATION_READ_LEN+3];
@@ -181,11 +181,11 @@ void gen_one_read_here(genRand_context_t * grc, char * seq, int is_PE_second, in
 	else gzprintf(thisfp, "@R%09llu\n%s\n+\n%s\n", rno, read_seq, qual_str);
 }
 
-void gen_a_read_from_one_contig(genRand_context_t * grc, long this_contig_no, unsigned  long long rno){
-	char * trans_name = ArrayListGet(grc->contig_names, this_contig_no);
-	char * trans_seq = HashTableGet(grc->contig_sequences, trans_name);
-	int actual_contig_len = HashTableGet(grc->contig_lengths, trans_name) - NULL;
-	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_contig_len);
+void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcript_no, unsigned  long long rno){
+	char * trans_name = ArrayListGet(grc->transcript_names, this_transcript_no);
+	char * trans_seq = HashTableGet(grc->transcript_sequences, trans_name);
+	int actual_transcript_len = HashTableGet(grc->transcript_lengths, trans_name) - NULL;
+	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_transcript_len);
 	double rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 	int rand_01_int = (int)(rand_01*901267351);
 	srand(rand_01_int); // for generating sequencing errors.
@@ -196,7 +196,7 @@ void gen_a_read_from_one_contig(genRand_context_t * grc, long this_contig_no, un
 		int fraglen = (int)(min(max(insertion_len, grc -> insertion_length_min), applied_insertion_maxlen));
 		rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 		grc_incrand(grc);
-		int start_pos = (actual_contig_len - fraglen) * rand_01;
+		int start_pos = (actual_transcript_len - fraglen) * rand_01;
 		int is_first_end_negative = rand_01_int % 2;
 		if(is_first_end_negative){
 			gen_one_read_here(grc, trans_seq + start_pos + fraglen - grc -> read_length, 0, 1, rno, trans_name, start_pos + fraglen - grc -> read_length, start_pos);
@@ -206,7 +206,7 @@ void gen_a_read_from_one_contig(genRand_context_t * grc, long this_contig_no, un
 			gen_one_read_here(grc, trans_seq + start_pos + fraglen - grc -> read_length, 1, 1, rno, trans_name, start_pos + fraglen - grc -> read_length, start_pos);
 		}
 	}else{
-		int start_pos = (actual_contig_len - grc -> read_length)*rand_01;
+		int start_pos = (actual_transcript_len - grc -> read_length)*rand_01;
 		int is_negative = rand_01_int % 2;
 		gen_one_read_here(grc, trans_seq + start_pos, -1, is_negative, rno, trans_name, start_pos, -1);
 	}
@@ -241,8 +241,8 @@ int grc_check_parameters(genRand_context_t * grc){
 		ret=1;
 	}
 
-	if(!grc->contig_fasta_file[0]){
-		SUBREADprintf("Error: a contig file must be provide!\n");
+	if(!grc->transcript_fasta_file[0]){
+		SUBREADprintf("Error: a transcript file must be provide!\n");
 		ret=1;
 	}
 
@@ -284,17 +284,17 @@ int grc_gen( genRand_context_t *grc ){
 	int ret = 0;
 	unsigned long long read_i = 0;
 
-	unsigned long long space_end = ArrayListGet(grc->contig_hitting_space, grc->contig_hitting_space->numOfElements -1)-NULL;
-	ArrayList * num_of_frags_per_contig = ArrayListCreate(100000);
+	unsigned long long space_end = ArrayListGet(grc->transcript_hitting_space, grc->transcript_hitting_space->numOfElements -1)-NULL;
+	ArrayList * num_of_frags_per_transcript = ArrayListCreate(100000);
 	unsigned long long lastv = 0, current_total =0;
 	ArrayList * rescure_hitting_space = ArrayListCreate(100000);
 	unsigned long long to_rescure_read_top=0;
 	int min_seq_len = grc->is_paired_end?grc->insertion_length_min:grc->read_length;
 
-	for(read_i = 0; read_i < grc->contig_hitting_space->numOfElements ; read_i++){
-		char *seq_name = ArrayListGet(grc->contig_names, read_i);
-		int seq_len = HashTableGet(grc-> contig_lengths, seq_name)-NULL;
-		unsigned long long thisv = ArrayListGet(grc->contig_hitting_space, read_i) - NULL;
+	for(read_i = 0; read_i < grc->transcript_hitting_space->numOfElements ; read_i++){
+		char *seq_name = ArrayListGet(grc->transcript_names, read_i);
+		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
+		unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, read_i) - NULL;
 		unsigned long long this_space_span = thisv - lastv;
 		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->output_sample_size*0.99999999);
 		unsigned long long to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->output_sample_size- 1.*expected_reads)*100000.);
@@ -307,7 +307,7 @@ int grc_gen( genRand_context_t *grc ){
 		to_rescure_read_top+= to_rescure_reads;
 		assert(to_rescure_read_top < 0x5fffffffffffffffllu);
 		ArrayListPush(rescure_hitting_space, NULL+to_rescure_read_top);
-		ArrayListPush(num_of_frags_per_contig, NULL+expected_reads);
+		ArrayListPush(num_of_frags_per_transcript, NULL+expected_reads);
 		current_total += expected_reads;
 
 		lastv = thisv;
@@ -320,31 +320,31 @@ int grc_gen( genRand_context_t *grc ){
 		grc_incrand(grc);
 
 		longrand = longrand % to_rescure_read_top;
-		long this_contig_no = ArrayListFindNextDent(rescure_hitting_space, longrand);
-		unsigned long long expected_reads = ArrayListGet(num_of_frags_per_contig, this_contig_no)-NULL;
+		long this_transcript_no = ArrayListFindNextDent(rescure_hitting_space, longrand);
+		unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, this_transcript_no)-NULL;
 		expected_reads++;
-		num_of_frags_per_contig->elementList[this_contig_no] = NULL+expected_reads;
+		num_of_frags_per_transcript->elementList[this_transcript_no] = NULL+expected_reads;
 	}
 
-	ArrayList * per_contig_reads_hitting_space = ArrayListCreate(100000);
+	ArrayList * per_transcript_reads_hitting_space = ArrayListCreate(100000);
 	unsigned long long total_read_top =0;
-	for(read_i =0; read_i < num_of_frags_per_contig -> numOfElements; read_i++) {
-		char *seq_name = ArrayListGet(grc->contig_names, read_i);
-		int seq_len = HashTableGet(grc-> contig_lengths, seq_name)-NULL;
-		unsigned long long expected_reads = ArrayListGet(num_of_frags_per_contig, read_i)-NULL;
+	for(read_i =0; read_i < num_of_frags_per_transcript -> numOfElements; read_i++) {
+		char *seq_name = ArrayListGet(grc->transcript_names, read_i);
+		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
+		unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, read_i)-NULL;
 		if(seq_len >= min_seq_len)
 			fprintf(grc->counts_out_fp, "%s\t%d\t%llu\n", seq_name, seq_len, expected_reads);
 		else
 			fprintf(grc->counts_out_fp, "%s\t%d\tNA\n", seq_name, seq_len);
 		total_read_top+=expected_reads;
-		ArrayListPush(per_contig_reads_hitting_space, NULL+total_read_top);
+		ArrayListPush(per_transcript_reads_hitting_space, NULL+total_read_top);
 	}
 	assert(total_read_top == grc->output_sample_size);
 
 	if(0)
-		for(read_i =0; read_i < num_of_frags_per_contig -> numOfElements; read_i++) {
-			char * trans_name = ArrayListGet(grc->contig_names, read_i);
-			unsigned long long expected_reads = ArrayListGet(num_of_frags_per_contig, read_i)-NULL;
+		for(read_i =0; read_i < num_of_frags_per_transcript -> numOfElements; read_i++) {
+			char * trans_name = ArrayListGet(grc->transcript_names, read_i);
+			unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, read_i)-NULL;
 			long long int xx;
 			for(xx =0; xx<expected_reads; xx++) SUBREADprintf("TESTGEN\t%s\n", trans_name);
 		}
@@ -356,26 +356,26 @@ int grc_gen( genRand_context_t *grc ){
 		for(read_i =0; read_i < grc->output_sample_size; read_i++) {
 			mod_class += A_LARGE_PRIME_FOR_MOD;
 			mod_class = mod_class % grc->output_sample_size;
-			long this_contig_no = ArrayListFindNextDent(per_contig_reads_hitting_space, mod_class);
-			//char * trans_name = ArrayListGet(grc->contig_names, this_contig_no);
+			long this_transcript_no = ArrayListFindNextDent(per_transcript_reads_hitting_space, mod_class);
+			//char * trans_name = ArrayListGet(grc->transcript_names, this_transcript_no);
 			//SUBREADprintf("TESTGEN\t%s\n", trans_name);
-			gen_a_read_from_one_contig(grc, this_contig_no, read_i);
+			gen_a_read_from_one_transcript(grc, this_transcript_no, read_i);
 		}
 	}
 
-	ArrayListDestroy(num_of_frags_per_contig);
+	ArrayListDestroy(num_of_frags_per_transcript);
 	ArrayListDestroy(rescure_hitting_space);
-	ArrayListDestroy(per_contig_reads_hitting_space);
+	ArrayListDestroy(per_transcript_reads_hitting_space);
 	return ret;
 }
 
 int grc_finalize(genRand_context_t *grc){
 	HashTableDestroy(grc->expression_levels);
-	HashTableDestroy(grc->contig_sequences);
-	HashTableDestroy(grc->contig_lengths);
+	HashTableDestroy(grc->transcript_sequences);
+	HashTableDestroy(grc->transcript_lengths);
 	ArrayListDestroy(grc->quality_strings);
-	ArrayListDestroy(grc->contig_hitting_space);
-	ArrayListDestroy(grc->contig_names);
+	ArrayListDestroy(grc->transcript_hitting_space);
+	ArrayListDestroy(grc->transcript_names);
 	gzclose(grc->out_fps[0]);
 	if(grc->out_fps[1]) gzclose(grc->out_fps[1]);
 	fclose(grc->counts_out_fp);
@@ -399,7 +399,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 	}
 
 	sprintf(outname,"%s.faSummary", grc->output_prefix);
-	int ret = autozip_open(grc->contig_fasta_file, &auto_FP);
+	int ret = autozip_open(grc->transcript_fasta_file, &auto_FP);
 	if(ret<0){
 		SUBREADprintf("Error: cannot open the fasta file as input\n");
 		return -1;
@@ -410,7 +410,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		SUBREADprintf("Error: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "ContigID\tLength\tMD5\tDuplicate\tOccurance\tFresh\n");
+	fprintf(sumfp, "TranscriptID\tLength\tMD5\tDuplicate\tOccurance\tFresh\n");
 
 	char * seq_name = NULL;
 	unsigned char md5res[16];
@@ -437,7 +437,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		if(clinebuf[0]=='>'){
 			if(seq_name){
 				if(seq_len<1){
-					SUBREADprintf("Error: a contig has no sequence: '%s'\n", seq_name);
+					SUBREADprintf("Error: a transcript has no sequence: '%s'\n", seq_name);
 					return -1;
 				}
 				HelpFuncMD5_Final(md5res, &md5ctx);
@@ -462,7 +462,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 				seq_len = 0;
 			}
 			clinebuf[rlength-1]=0;
-			if(grc->simple_contig_names){
+			if(grc->simple_transcript_names){
 				int xx;
 				for(xx=1; xx<rlength-1; xx++) if(clinebuf[xx]=='|' || clinebuf[xx]==' ') clinebuf[xx]=0;
 			}
@@ -487,7 +487,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 
 	if(seq_name){
 		if(seq_len<1){
-			SUBREADprintf("Error: a contig has no sequence: '%s'\n", seq_name);
+			SUBREADprintf("Error: a transcript has no sequence: '%s'\n", seq_name);
 			return -1;
 		}
 
@@ -538,19 +538,19 @@ int grc_summary_fasta(genRand_context_t * grc){
 
 void grc_put_new_trans(genRand_context_t *grc, char * seq_name, char * seq_str, unsigned int seq_len, unsigned long long * linear_space_top){
 	if(seq_len<1){
-		SUBREADprintf("Warning: a contig, '%s', has a zero length. No read is generated from it!\n", seq_name);
+		SUBREADprintf("Warning: a transcript, '%s', has a zero length. No read is generated from it!\n", seq_name);
 	}
-	HashTablePut(grc-> contig_sequences,seq_name, seq_str);
-	HashTablePut(grc-> contig_lengths, seq_name, NULL+ seq_len);
+	HashTablePut(grc-> transcript_sequences,seq_name, seq_str);
+	HashTablePut(grc-> transcript_lengths, seq_name, NULL+ seq_len);
 	unsigned long long this_seq_exp_10000 = HashTableGet(grc->expression_levels, seq_name)-NULL;
 	if(this_seq_exp_10000<1){
-		SUBREADprintf("Warning: a contig, '%s', has no wanted expression level. No read is generated from it!\n", seq_name);
+		SUBREADprintf("Warning: a transcript, '%s', has no wanted expression level. No read is generated from it!\n", seq_name);
 		this_seq_exp_10000=0;
 	}else this_seq_exp_10000-=1;
 	//SUBREADprintf("TESTLEN\t%s\t%d\n", seq_name, seq_len);
 	(*linear_space_top) += this_seq_exp_10000 * seq_len;
-	ArrayListPush(grc->contig_names, seq_name);
-	ArrayListPush(grc->contig_hitting_space, NULL+*linear_space_top);
+	ArrayListPush(grc->transcript_names, seq_name);
+	ArrayListPush(grc->transcript_hitting_space, NULL+*linear_space_top);
 }
 
 int grc_load_env(genRand_context_t *grc){
@@ -560,19 +560,19 @@ int grc_load_env(genRand_context_t *grc){
 	HashTableSetKeyComparisonFunction(grc->expression_levels, fc_strcmp_chro);
 	HashTableSetHashFunction(grc->expression_levels, fc_chro_hash);
 
-	grc->contig_sequences = HashTableCreate(100000);
-	HashTableSetDeallocationFunctions(grc->contig_sequences, free, free);
-	HashTableSetKeyComparisonFunction(grc->contig_sequences, fc_strcmp_chro);
-	HashTableSetHashFunction(grc->contig_sequences, fc_chro_hash);
+	grc->transcript_sequences = HashTableCreate(100000);
+	HashTableSetDeallocationFunctions(grc->transcript_sequences, free, free);
+	HashTableSetKeyComparisonFunction(grc->transcript_sequences, fc_strcmp_chro);
+	HashTableSetHashFunction(grc->transcript_sequences, fc_chro_hash);
 
-	grc->contig_lengths = HashTableCreate(100000);
-	HashTableSetKeyComparisonFunction(grc->contig_lengths, fc_strcmp_chro);
-	HashTableSetHashFunction(grc->contig_lengths, fc_chro_hash);
+	grc->transcript_lengths = HashTableCreate(100000);
+	HashTableSetKeyComparisonFunction(grc->transcript_lengths, fc_strcmp_chro);
+	HashTableSetHashFunction(grc->transcript_lengths, fc_chro_hash);
 
 	grc -> quality_strings = ArrayListCreate(100000);
 	ArrayListSetDeallocationFunction(grc -> quality_strings, free);
-	grc -> contig_hitting_space = ArrayListCreate(100000);
-	grc -> contig_names = ArrayListCreate(100000); // the names are destroyed by destroying grc->contig_sequences
+	grc -> transcript_hitting_space = ArrayListCreate(100000);
+	grc -> transcript_names = ArrayListCreate(100000); // the names are destroyed by destroying grc->transcript_sequences
 
 	autozip_fp auto_FP;
 	int xk1;
@@ -597,7 +597,7 @@ int grc_load_env(genRand_context_t *grc){
 		}
 		double seqexp = atof(seqexp_str);
 		if(seqexp > TRANSCRIPT_MAX_EXPRESSION_LEVEL){
-			SUBREADprintf("Error: The contig expression level shouldn't excess %.0f\n", TRANSCRIPT_MAX_EXPRESSION_LEVEL);
+			SUBREADprintf("Error: The transcript expression level shouldn't excess %.0f\n", TRANSCRIPT_MAX_EXPRESSION_LEVEL);
 		}
 		
 		unsigned long long seqexp_int = (unsigned long long )(seqexp*10000.);
@@ -607,7 +607,7 @@ int grc_load_env(genRand_context_t *grc){
 
 		void * had_tab = HashTableGet(grc->expression_levels, seqname_buf);
 		if(had_tab){
-			SUBREADprintf("Error: duplicate contig name was found in the TMP table: '%s'. The program terminates without output.\n", seqname_buf);
+			SUBREADprintf("Error: duplicate transcript name was found in the TMP table: '%s'. The program terminates without output.\n", seqname_buf);
 			return -1;
 		}
 		HashTablePut(grc->expression_levels, seqname_buf, NULL+seqexp_int+1);
@@ -653,10 +653,10 @@ int grc_load_env(genRand_context_t *grc){
 
 	if(ret) return ret;
 
-	ret = autozip_open(grc->contig_fasta_file, &auto_FP);
+	ret = autozip_open(grc->transcript_fasta_file, &auto_FP);
 	if(ret<0){
 		ret = 1;
-		SUBREADprintf("Error: unable to open the contig file!\n");
+		SUBREADprintf("Error: unable to open the transcript file!\n");
 	} else ret = 0;
 	if(ret) return ret;
 	
@@ -690,7 +690,7 @@ int grc_load_env(genRand_context_t *grc){
 				if(seq_exp>1)HashTablePut(seq_duplicate_tab, md5mem, 1+NULL);	
 				else free(md5mem);
 
-				had_tab = HashTableGet(grc-> contig_sequences, seq_name);
+				had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
 				if(had_tab){
 					SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
 					return -1;
@@ -700,12 +700,12 @@ int grc_load_env(genRand_context_t *grc){
 			}
 
 			clinebuf[rlength-1]=0;
-			if(grc->simple_contig_names)
+			if(grc->simple_transcript_names)
 				for(xk1=1; xk1<rlength-1; xk1++) if(clinebuf[xk1]=='|' || clinebuf[xk1]==' ') clinebuf[xk1]=0;
 
 			seq_name = malloc(strlen(clinebuf));
 			if( clinebuf[1]==0 ){
-				SUBREADprintf("Error: Every contig needs a name!\n");
+				SUBREADprintf("Error: Every transcript needs a name!\n");
 				ret = 1;
 				break;
 			}
@@ -724,6 +724,8 @@ int grc_load_env(genRand_context_t *grc){
 				lbuf_cap = max(lbuf_cap *8/5, lbuf_cap + rlength);
 				lbuf = realloc(lbuf, lbuf_cap);
 			}
+
+			int xx; for(xx=0; xx<rlength-1; xx++) clinebuf[xx] = toupper(clinebuf[xx]);
 			//SUBREADprintf("STCP1 : %d used, %d len, %d cap\n", lbuf_used, strlen(clinebuf), lbuf_cap);
 			HelpFuncMD5_Update(&md5ctx, clinebuf, rlength-1);
 			strcpy(lbuf + lbuf_used, clinebuf );
@@ -746,7 +748,7 @@ int grc_load_env(genRand_context_t *grc){
 		if(had_tab && seq_exp>1)total_dup++;// SUBREADprintf("Warning: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
 		free(md5mem);
 
-		had_tab = HashTableGet(grc-> contig_sequences, seq_name);
+		had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
 		if(had_tab){
 			SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
 			return -1;
@@ -755,12 +757,12 @@ int grc_load_env(genRand_context_t *grc){
 		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 	}
 	
-	if(total_dup)SUBREADprintf("Warning: there are %d contigs that have replicate sequences and the wanted TPM values are non-zero. You may use scanFasta() to find their names.\n", total_dup);
+	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted TPM values are non-zero. You may use scanFasta() to find their names.\n", total_dup);
 	autozip_close(&auto_FP);
 	HashTableDestroy(seq_duplicate_tab);
 
 	if(linear_space_top<1){
-		SUBREADprintf("Error: no valid contig found in the input. No reads can be generated.\n");
+		SUBREADprintf("Error: no valid transcript found in the input. No reads can be generated.\n");
 		return -1;
 	}
 
@@ -768,7 +770,7 @@ int grc_load_env(genRand_context_t *grc){
 
 	sprintf(outname,"%s.truthCounts", grc->output_prefix);
 	grc->counts_out_fp = fopen(outname,"w");
-	fprintf(grc->counts_out_fp, "## CMD :%s\nContigID\tLength\tCount\n", grc->cmd_line);
+	fprintf(grc->counts_out_fp, "## CMD :%s\nTranscriptID\tLength\tCount\n", grc->cmd_line);
 
 	sprintf(outname,"%s_R1.fastq.gz", grc->output_prefix);
 	grc->out_fps[0] = gzopen(outname, "wb");
@@ -837,13 +839,13 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				strcpy(grc.expression_level_file, optarg);
 				break;
 			case 't':
-				strcpy(grc.contig_fasta_file, optarg);
+				strcpy(grc.transcript_fasta_file, optarg);
 				break;
 			case 'T':
 				grc.truth_in_read_names=1;
 				break;
 			case 'C':
-				grc.simple_contig_names = 1;
+				grc.simple_transcript_names = 1;
 				break;
 			case 'r':
 				grc.output_sample_size = atoll(optarg);
