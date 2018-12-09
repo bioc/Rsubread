@@ -86,7 +86,6 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	unsigned int offset, read_no;
 	unsigned int segment_size = (unsigned int)(memory_megabytes * 1024.0 / 8.) * 1024 ;
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
-	double local_begin_ftime = 0.;
 
 	int chro_table_maxsize=100, dump_res = 0;
 	unsigned int * read_offsets = malloc(sizeof(unsigned int) * chro_table_maxsize);
@@ -207,9 +206,6 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			{
 
 				geinput_readline(&ginp, fn, 0);
-
-				if(offset==table.padding)
-					local_begin_ftime = miltime();
 
 				if(read_no>0){
 					read_offsets[read_no-1] = offset + table.padding;
@@ -476,7 +472,6 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	int file_number, i ,j;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
-	double local_begin_ftime = miltime();
 	long long int guess_all_bases = guess_gene_bases(chro_files,chro_file_number);
 	int padding_around_contigs = MAX_READ_LENGTH;
 	*actual_total_bases_inc_marging = padding_around_contigs;
