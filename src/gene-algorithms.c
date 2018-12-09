@@ -2651,7 +2651,6 @@ void remove_indel_neighbours(HashTable * indel_table)
 void print_version_info()
 {
 	SUBREADprintf("\nSubread %s\n", SUBREAD_VERSION);
-	SUBREADprintf("http://www.sourceforge.net/projects/subread/\n");
 	SUBREADprintf("\n");
 }
 

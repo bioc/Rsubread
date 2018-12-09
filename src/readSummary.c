@@ -765,7 +765,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	}
 
 	print_in_box(80,0,0,"");
-	print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	print_in_box(80,2,1,"");
 	SUBREADputs("");
 	print_in_box(80,1,1,"Running");
 	print_in_box(80,0,0,"");
@@ -786,7 +786,7 @@ void print_FC_results(fc_thread_global_context_t * global_context, char * out)
 	print_in_box(80,0,PRINT_BOX_WRAPPED,"Summary of counting results can be found in file \"%s.summary\"", out);
 	print_in_box(80,0,0,"");
 	#endif
-	print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	print_in_box(80,2,1,"");
 	SUBREADputs("");
 	return;
 

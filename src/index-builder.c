@@ -53,7 +53,7 @@ int IS_FORCED_ONE_BLOCK = 0;
 
 void print_build_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads)
 {
-	print_in_box( 81,0,0,"%4d%%%%, %3d mins elapsed, rate=%.1fk bps/s, total=%llum\r", (int)(finished_rate*100), (int)(miltime()-begin_ftime)/60, read_per_second/1000 ,total_reads/1000000);
+	print_in_box( 81,0,0,"%4d%%%%, %3d mins elapsed, rate=%.1fk bps/s", (int)(finished_rate*100), (int)(miltime()-begin_ftime)/60, read_per_second/1000 );
 }
 
 void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_table)
@@ -79,7 +79,7 @@ void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_tabl
 
 #define MAX_BASES_IN_INDEX 4294900000.0
 
-int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold, gehash_t * huge_table, unsigned int * chro_lens)
+int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold, gehash_t * huge_table, unsigned int * chro_lens, long long actual_bases)
 {
 	int file_number, table_no;
 	int status = NEXT_FILE;
@@ -396,13 +396,13 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					array_int_key = int_key;
 				}
 
-				if(all_bases > 12){
-					if (offset>0 && offset % (all_bases / 12) == 0)
+				if(actual_bases > 12){
+					if (offset>0 && offset % (actual_bases / 12) == 0)
 					{
-						double finished_rate = offset*1.0/all_bases;
-						double base_per_second = offset / (miltime()-local_begin_ftime);
-						double ETA = (all_bases-offset) / base_per_second;
-						print_build_log(finished_rate,base_per_second,ETA, all_bases);
+						double finished_rate = offset*1.0/actual_bases;
+						double base_per_second = offset / (miltime()-begin_ftime);
+						double ETA = (actual_bases-offset) / base_per_second;
+						print_build_log(finished_rate,base_per_second,ETA, actual_bases);
 						SUBREADfflush(stdout) ;
 					}
 				}
@@ -471,13 +471,15 @@ int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** hu
 }
 
 
-int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, gehash_t *huge_table)
+int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, gehash_t *huge_table, long long * actual_total_bases_inc_marging)
 {
 	int file_number, i ,j;
 	int status = NEXT_FILE;
 	unsigned int offset, read_no;
 	double local_begin_ftime = miltime();
-	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
+	long long int guess_all_bases = guess_gene_bases(chro_files,chro_file_number);
+	int padding_around_contigs = MAX_READ_LENGTH;
+	*actual_total_bases_inc_marging = padding_around_contigs;
 
 	gehash_t occurance_table;
 	unsigned char * huge_index[1024];
@@ -513,9 +515,9 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		SUBREADprintf("ERROR: The path is too long. It should not be longer than 290 chars.\n");
 		return -1;
 	}
-	if(all_bases<1)
+	if(guess_all_bases<1)
 	{
-		SUBREADprintf("ERROR: File '%s' is inaccessible.\n", chro_files[-all_bases-1]);
+		SUBREADprintf("ERROR: File '%s' is inaccessible.\n", chro_files[-guess_all_bases-1]);
 		return -1;
 	}
 
@@ -545,6 +547,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 			if (status == NEXT_FILE)
 			{
+				(*actual_total_bases_inc_marging)+=padding_around_contigs;
 				if(file_number == chro_file_number)
 				{
 					geinput_close(&ginp);
@@ -561,6 +564,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			}
 			if (status == NEXT_READ)
 			{
+				(*actual_total_bases_inc_marging)+=2*padding_around_contigs;
 
 				geinput_readline(&ginp, fn, 0);
 
@@ -637,19 +641,8 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				}
 
 				offset ++;
+				(*actual_total_bases_inc_marging)++;
 				read_len ++;
-
-
-				if (all_bases>12){
-					if (offset % (all_bases / 12) == 0)
-					{
-						double finished_rate = offset*1.0/all_bases;
-						double base_per_second = offset / (miltime()-local_begin_ftime);
-						double ETA = (all_bases-offset) / base_per_second;
-						print_build_log(finished_rate,base_per_second,ETA, all_bases);
-						SUBREADfflush(stdout) ;
-					}
-				}
 
 				if(offset > 0xFFFFFFFDU)	
 				{
@@ -1159,14 +1152,14 @@ int main_buildindex(int argc,char ** argv)
 	print_subread_logo();
 
 	SUBREADputs("");
-	print_in_box(80, 1, 1, "indexBuilder setting");
+	print_in_box(80, 1, 1, "setting");
 	print_in_box(80, 0, 1, "");
 	print_in_box(80, 0, 0, "               Index name : %s", get_short_fname(output_file));
-	print_in_box(80, 0, 0, "              Index space : %s", IS_COLOR_SPACE?"color-space":"base-space");
+	print_in_box(80, 0, 0, "              Index space : %s", IS_COLOR_SPACE?"color space":"base space");
 
 	if(IS_FORCED_ONE_BLOCK)
 	{
-		print_in_box(80, 0, 0, "          One block index : yes");
+	print_in_box(80, 0, 0, "              Index split : ns");
 		memory_limit = GENE_SLIDING_STEP==1?22000:11500;
 	}
 	else
@@ -1180,7 +1173,7 @@ int main_buildindex(int argc,char ** argv)
 			print_in_box(80, 0, 0, "                   Memory : %u Mbytes", memory_limit);
 	}
 	print_in_box(80, 0, 0, "         Repeat threshold : %d repeats", threshold);
-	print_in_box(80, 0, 0, " Distance to next subread : %d", GENE_SLIDING_STEP);
+	print_in_box(80, 0, 0, "             Gapped index : %s", GENE_SLIDING_STEP>1?"yes":"no");
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
@@ -1196,7 +1189,7 @@ int main_buildindex(int argc,char ** argv)
 		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  get_short_fname(fasta_fn) , CHAR_ESC);
 	}
 	print_in_box(80, 0, 0, "");
-	print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
+	print_in_box(80, 2, 1, "");
 	SUBREADputs("");
 
 	print_in_box(80, 1, 1, "Running");
@@ -1243,10 +1236,11 @@ int main_buildindex(int argc,char ** argv)
 
 	if(!ret)
 	{
+		long long actual_bases=0;
 		gehash_t huge_table;
 		gehash_create(& huge_table, 50000000 * (GENE_SLIDING_STEP==1?3:1), 0);
-		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table);
-		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths);
+		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table, &actual_bases);
+		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths, actual_bases);
 		if(!ret){
 			print_in_box(80, 0, 1, "Total running time: %.1f minutes.", (miltime()-begin_ftime)/60);
 			print_in_box(89, 0, 1, "Index %c[36m%s%c[0m was successfully built!", CHAR_ESC, output_file, CHAR_ESC);
@@ -1260,7 +1254,7 @@ int main_buildindex(int argc,char ** argv)
 	tmp_fa_file[0]=0;
 
 	print_in_box(80, 0, 0, "");
-	print_in_box(80, 2, 1, "http://subread.sourceforge.net/");
+	print_in_box(80, 2, 1, "");
 	SUBREADputs("");
 	return ret;
 }

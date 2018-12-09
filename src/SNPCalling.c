@@ -1868,7 +1868,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_in_box(80,0,0,"       Known SNP annotations : %s", get_short_fname(parameters.known_SNP_vcf));
 	
 	print_in_box(80,0,1,"");
-	print_in_box(80,2,1,"http://subread.sourceforge.net/");
+	print_in_box(80,2,1,"");
 	SUBREADputs("");
 
 
@@ -1914,7 +1914,7 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_in_box(80,0,1,"");
 		print_in_box(80,0,0,"                Running time : %.1f minutes", (miltime() - parameters.start_time)/60);
 		print_in_box(80,0,1,"");
-		print_in_box(80,2,1,"http://subread.sourceforge.net/");
+		print_in_box(80,2,1,"");
 		SUBREADputs("");
 	}
 
