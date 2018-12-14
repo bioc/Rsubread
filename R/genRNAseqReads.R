@@ -16,8 +16,8 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 simReads <- function(transcript.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, isPairedEndOutput=FALSE, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.transcript.names=FALSE){
 	transcript.file <- normalizePath(transcript.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
-	if( !read.length %in% c(100,75) )
-		stop("Error: the current version can only generate 75-bp or 100-bp reads")
+	if(read.length > 250)stop("Error: the current version can generate reads at most 250bp long.")
+	if(read.length <1) stop("Error: the read length must be positive.")
 
 	qualfile <- NULL
 	if(simulate.sequencing.error){
