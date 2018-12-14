@@ -165,7 +165,7 @@ void gen_one_read_here(genRand_context_t * grc, char * seq, int is_PE_second, in
 	}else{
 		if(!grc->fake_quality_string[0]){
 			int xx;
-			for(xx = 0; xx < grc -> read_length; xx++) grc->fake_quality_string[xx]='X';
+			for(xx = 0; xx < grc -> read_length; xx++) grc->fake_quality_string[xx]='H';
 			grc->fake_quality_string[xx]=0;
 		}
 		qual_str = grc->fake_quality_string;
