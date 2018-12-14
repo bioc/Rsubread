@@ -77,7 +77,7 @@ Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and s
 library(Rsubread)
 
 # Scan through the fasta file for the transcript names and lengths
-contigs <- scanFasta("GENCODE-Human-transcripts.fa.gz")
+transcripts <- scanFasta("GENCODE-Human-transcripts.fa.gz")
 
 # Assigned a random TPM value to each transcript. 
 TPMs <- data.frame(TranscriptID=transcripts$TranscriptID, TPM=rnorm(nrow(transcripts), mean=2, sd=1))
@@ -85,7 +85,7 @@ TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
 TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1000000
 
 # Generate actual reads.
-# The output file is my-simulated-sample_R1.fastq.gz 
+# The output read file is my-simulated-sample_R1.fastq.gz 
 # The true read counts are returned, and also in file my-simulated-sample.trueCounts
 true.counts <- simReads("GENCODE-Human-transcripts.fa.gz", TPMs, "my-simulated-sample")
 print(true.counts[1:10,])
