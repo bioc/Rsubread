@@ -1,3 +1,6 @@
+15 Dec 2018 - 1.33.7
+(1) Add "low.transcripts" option to simReads() to avoid generating reads from transcripts that have less than one expected reads.
+
 14 Dec 2018 - 1.33.6
 (1) Update the document for simReads() and scanFasta(): "contig" is changed to "transcript".
 (2) Change the simReads() function to generate quality strings of "H"s for non-sequencing error reads.

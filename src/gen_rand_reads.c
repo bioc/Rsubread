@@ -36,11 +36,11 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("");
 	SUBREADputs(" For scanning a FASTA/gz file:");
 	SUBREADprintf("    %s --summarizeFasta \\\n", pgname);
-	SUBREADputs("       --transcriptFasta <file> --outputPrefix <string> {--simpleTranscriptId}");
+	SUBREADputs("       --transcriptFasta <file> --outputPrefix <string> [--simpleTranscriptId]");
 	SUBREADputs("");
 	SUBREADputs(" For generating read/pairs:");
 	SUBREADprintf("    %s --transcriptFasta <file>\\\n", pgname);
-	SUBREADputs("       --outputPrefix <string> --expressionLevels <file> {other options}");
+	SUBREADputs("       --outputPrefix <string> --expressionLevels <file> [other options]");
 	SUBREADputs("");
 	SUBREADputs(" --summarizeFasta           Only output the transcript names and lengths.");
 	SUBREADputs("");
@@ -66,6 +66,10 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("                            reads. No sequencing errors are simulated when this");
 	SUBREADputs("                            option is omitted.");
 	SUBREADputs("");
+	SUBREADputs(" --noLowTranscripts         Do not generate reads for the transcripts that have");
+    SUBREADputs("                            less than one expected read. The output read/pairs");
+	SUBREADputs("                            can be less than the wanted number.");
+	SUBREADputs("");
 	SUBREADputs(" --pairedEnd                Generate paired-end reads.");
 	SUBREADputs("");
 	SUBREADputs(" --insertionLenMean <float>,--insertionLenSigma <float>,--insertionLenMin <int>,");
@@ -73,7 +77,7 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("                            deciding insertion lengths of paired-end reads.");
 	SUBREADputs("                            Default values: mean=160, sigma=30, min=110, max=400");
 	SUBREADputs("");
-	SUBREADputs(" --simpleTranscriptId       Trancate transcript names to the first '|' or space.");
+	SUBREADputs(" --simpleTranscriptId       Truncate transcript names to the first '|' or space.");
 	SUBREADputs("");
 	SUBREADputs(" --truthInReadNames         Encode the true locations of reads in read names.");
 	SUBREADputs("");
@@ -93,6 +97,7 @@ static struct option long_options[] =
 	{"outputPrefix",  required_argument, 0, 'o'},
 	{"randSeed",  required_argument, 0, 'S'},
 	{"readLen",  required_argument, 0, 'L'},
+	{"noLowTranscripts",  no_argument, 0, 'O'},
 	{"insertionLenMean",  required_argument, 0, 'F'},
 	{"insertionLenMin",  required_argument, 0, 'N'},
 	{"insertionLenMax",  required_argument, 0, 'X'},
@@ -108,6 +113,7 @@ typedef struct {
 	char quality_string_file[MAX_FILE_NAME_LENGTH];
 
 	unsigned long long output_sample_size;
+	int avoid_starvation;
 	int is_paired_end;
 	int simple_transcript_names;
 	int truth_in_read_names;
@@ -296,9 +302,13 @@ int grc_gen( genRand_context_t *grc ){
 		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
 		unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, read_i) - NULL;
 		unsigned long long this_space_span = thisv - lastv;
-		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->output_sample_size*0.99999999);
-		unsigned long long to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->output_sample_size- 1.*expected_reads)*100000.);
-		//if(this_space_span < 1) SUBREADprintf("%llu + %llu : %llu ; expf %g ; %g - %g == 0?\n", to_rescure_read_top, to_rescure_reads, expected_reads, (this_space_span *1.0/space_end) * grc->output_sample_size*0.99999999, (this_space_span *1.0/space_end * grc->output_sample_size),(1.*expected_reads));
+
+		// the many 9's is to aovid the sum of read numbers larger than wanted.
+		double floor_chopping = grc -> avoid_starvation?0.999999999:1;
+		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->output_sample_size*floor_chopping);
+		unsigned long long to_rescure_reads = 0;
+		if(grc -> avoid_starvation) to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->output_sample_size- 1.*expected_reads)*100000.);
+
 		if(this_space_span < 1) to_rescure_reads=0;
 		if( seq_len < min_seq_len ){
 			to_rescure_reads = 0;
@@ -312,10 +322,11 @@ int grc_gen( genRand_context_t *grc ){
 
 		lastv = thisv;
 	}
-	assert(current_total<=grc->output_sample_size);
-	//SUBREADprintf("TESTRESCURE_NO\t%llu\n", grc->output_sample_size - current_total);
 
-	for(read_i = current_total; read_i < grc->output_sample_size; read_i++){
+	// I'm not sure why this is so important but let it be.
+	assert(current_total<=grc->output_sample_size);
+
+	if(grc -> avoid_starvation)for(read_i = current_total; read_i < grc->output_sample_size; read_i++){
 		unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
 		grc_incrand(grc);
 
@@ -339,7 +350,8 @@ int grc_gen( genRand_context_t *grc ){
 		total_read_top+=expected_reads;
 		ArrayListPush(per_transcript_reads_hitting_space, NULL+total_read_top);
 	}
-	assert(total_read_top == grc->output_sample_size);
+	if(grc->avoid_starvation) assert(total_read_top == grc->output_sample_size);
+	else grc->output_sample_size = total_read_top;
 
 	if(0)
 		for(read_i =0; read_i < num_of_frags_per_transcript -> numOfElements; read_i++) {
@@ -352,7 +364,7 @@ int grc_gen( genRand_context_t *grc ){
 		unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
 		grc_incrand(grc);
 
-		unsigned long long mod_class = longrand % total_read_top; // an arbitratry starting point.
+		unsigned long long mod_class = longrand % grc->output_sample_size; // an arbitratry starting point.
 		for(read_i =0; read_i < grc->output_sample_size; read_i++) {
 			mod_class += A_LARGE_PRIME_FOR_MOD;
 			mod_class = mod_class % grc->output_sample_size;
@@ -807,10 +819,15 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	grc.insertion_length_mean = 160.;
 	grc.read_length = 100;
 
+	grc.avoid_starvation = 1;
+
 	long long seed = -1;
 
-	while ((c = getopt_long (argc, argv, "TCS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (argc, argv, "OTCS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){
+			case 'O':
+				grc.avoid_starvation = 0;
+				break;
 			case 'M':
 				do_fasta_summary = 1;
 				break;
