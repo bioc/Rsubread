@@ -21,7 +21,7 @@ simReads(
   simulate.sequencing.error=TRUE,
   quality.reference=NULL,
 
-  # random model parameters
+  # consider lowly expressed transcripts
   low.transcripts=TRUE,
 
   # parameters for generating paired-end reads.
@@ -52,7 +52,7 @@ scanFasta(
   \item{truth.in.read.names}{ logical indicating if the true mapping location of reads or read-pairs should be encoded into the read names. \code{FALSE} by default.}
   \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
   \item{quality.reference}{ character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
-  \item{low.transcripts}{ logical indicating if the transcripts that have expected read numbers less than one should be used for generating reads. Giving \code{FALSE} to this option can result in less reads/read-pairs generated than the wanted read/read-pair number. \code{FALSE} by default.}
+  \item{low.transcripts}{ logical indicating if the transcripts that have expected read numbers less than one should be used for generating reads. Giving \code{FALSE} to this option can result in less reads/read-pairs generated than the wanted read/read-pair number. \code{TRUE} by default.}
   \item{isPairedEndOutput}{ logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
   \item{Insertion.Length.Min}{ numeric value giving the minimum insertion length. The minimum insertion length must be equal to or greater than the output read length. 100 by default.}
   \item{Insertion.Length.Max}{ numeric value giving the maximum insertion length. 500 by default.}
