@@ -86,6 +86,7 @@ transcripts <- scanFasta("GENCODE-Human-transcripts.fa.gz")
 # Assigned a random TPM value to each transcript. 
 TPMs <- data.frame(TranscriptID=transcripts$TranscriptID, TPM=rnorm(nrow(transcripts), mean=2, sd=1))
 TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
+TPMs$TPM <- ifelse(transcripts$Fresh, TPMs$TPM, 0) # only generate reads from destinct sequences (ie if multiple transcripts have exactly the same sequence, only one of them is given the non-zero TPM value).
 TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1000000
 
 # Generate actual reads.
