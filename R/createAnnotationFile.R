@@ -1,5 +1,5 @@
-createAnnotationFile <- function(GR) {
-
+createAnnotationFile <- function(GR)
+{
   if(!(is(GR, 'GRanges'))) {
     message('To create Rsubread annotations from a TxDb or FeatureDb,')
     message('extract a GRanges using exons(), transcripts(), or features().')
@@ -11,14 +11,13 @@ createAnnotationFile <- function(GR) {
     stop('Aborting.')
   }
 
-  annot <- data.frame(GeneID=as.character(unlist(values(GR)[,'id'])),
-                         Chr=as.character(seqnames(GR)), 
-                         Start=start(GR),
-                         End=end(GR),
-						 Strand=as.character(strand(GR)),
-						 stringsAsFactors=FALSE)
-  return(annot)
+  data.frame(GeneID=as.character(unlist(values(GR)[,'id'])),
+             Chr=as.character(seqnames(GR)), 
+             Start=start(GR),
+             End=end(GR),
+             Strand=as.character(strand(GR)),
+             stringsAsFactors=FALSE)
 }
 
 # an alias for backward compatibility:
- write.Rsubread <- createAnnotationFile
+write.Rsubread <- createAnnotationFile
