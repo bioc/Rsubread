@@ -11,6 +11,7 @@ Description: Rsubread is a toolbox developed for the analyses of
         variant detection and gene fusion discovery. It can be applied
         to all major sequencing techologies and is suitable for the
         analysis of both short and long reads.
+Imports: methods
 URL: http://bioconductor.org/packages/Rsubread
 License: GPL-3
 biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq,
