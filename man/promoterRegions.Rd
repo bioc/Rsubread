@@ -26,7 +26,6 @@ A SAF format \code{data.frame} with columns \code{GeneID}, \code{Chr}, \code{Sta
 \seealso{
 \code{\link{featureCounts}}, \code{\link{getInBuiltAnnotation}}}
 \examples{
-library(Rsubread)
 x <- promoterRegions()
 head(x)
 }

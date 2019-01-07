@@ -34,7 +34,6 @@ If this limited is exceeded, the read will be soft clipped.
 }
 \author{Yang Liao and Wei Shi}
 \examples{
-library(Rsubread)
 ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./full_index",reference=ref,gappedIndex=FALSE, indexSplit=FALSE)
 reads <- system.file("extdata","longreads.txt.gz",package="Rsubread")

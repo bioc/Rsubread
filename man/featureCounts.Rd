@@ -217,8 +217,6 @@ Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpo
 \seealso{
 \code{\link{getInBuiltAnnotation}}}
 \examples{\dontrun{
-library(Rsubread)
-
 # Summarize SAM format single-end reads using built-in RefSeq annotation for mouse genome mm10:
 featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm10")
 

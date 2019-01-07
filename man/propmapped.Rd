@@ -28,7 +28,6 @@ A data frame containing the total number of reads, number of mapped reads and pr
 \examples{
 # build an index using the sample reference sequence provided in the package
 # and save it to the current directory
-library(Rsubread)
 ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./reference_index",reference=ref)
 

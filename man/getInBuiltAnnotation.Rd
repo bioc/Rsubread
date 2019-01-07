@@ -23,7 +23,6 @@ A data frame with five columns including \code{GeneID}, \code{Chr}, \code{Start}
 \seealso{
 \code{\link{featureCounts}}}
 \examples{
-library(Rsubread)
 x <- getInBuiltAnnotation("hg38")
 x[1:5,]
 }

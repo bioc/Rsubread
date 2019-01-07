@@ -1,19 +1,19 @@
 Package: Rsubread
-Version: 1.33.8
-Date: 2019-01-02
+Version: 1.33.9
+Date: 2019-01-07
 Title: Subread sequence alignment and counting for R
 Author: Wei Shi and Yang Liao with contributions from Gordon K Smyth, Jenny Dai
         and Timothy Triche, Jr.
-Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.EDU.AU>
+Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.edu.au>
 Description: Rsubread is a toolbox developed for the analyses of
         second and third generation sequencing data. It can be used
         for read mapping, read counting, SNP calling, structural
         variant detection and gene fusion discovery. It can be applied
         to all major sequencing techologies and is suitable for the
         analysis of both short and long reads.
-URL: http://bioconductor.org/packages/release/bioc/html/Rsubread.html
+URL: http://bioconductor.org/packages/Rsubread
 License: GPL-3
 biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq,
         GeneExpression, GeneRegulation, Genetics, ImmunoOncology, SNP,
         GeneticVariability, Preprocessing, QualityControl,
-        GenomeAnnotation, Software
+        GenomeAnnotation

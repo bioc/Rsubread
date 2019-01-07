@@ -24,4 +24,4 @@ A \code{data.frame} including a SAF format annotation.
 }
 \author{Yang Liao and Wei Shi}
 \seealso{\code{\link{featureCounts}}}
-\examples{}
+%\examples{}

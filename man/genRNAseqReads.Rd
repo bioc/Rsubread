@@ -78,8 +78,6 @@ Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and s
 \author{Wei Shi and Yang Liao}
 \examples{
 \dontrun{
-library(Rsubread)
-
 # Scan through the fasta file for the transcript names and lengths
 transcripts <- scanFasta("GENCODE-Human-transcripts.fa.gz")
 
