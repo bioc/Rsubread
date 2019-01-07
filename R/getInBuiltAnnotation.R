@@ -19,7 +19,7 @@ getInBuiltAnnotation <- function(annotation="mm10")
 	      message("NCBI RefSeq annotation for hg38 (build 38.2).")
 	       },
 	       {
-		stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
+		stop("In-built annotation for ", annotation, " is not available.\n")
 	       }
 	  ) # end switch
 	  
