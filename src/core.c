@@ -1,15 +1,15 @@
 /***************************************************************
 
-   The Subread software package is free software package: 
+   The Subread software package is free software package:
    you can redistribute it and/or modify it under the terms
-   of the GNU General Public License as published by the 
+   of the GNU General Public License as published by the
    Free Software Foundation, either version 3 of the License,
    or (at your option) any later version.
 
    Subread is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty
    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-   
+
    See the GNU General Public License for more details.
 
    Authors: Drs Yang Liao and Wei Shi
@@ -20,9 +20,9 @@
 
    The ASCII Art used in this file was generated using FIGlet and
    the big font, contributed by Glenn Chappell to FIGlet.
-  
+
   ***************************************************************/
-  
+
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -161,7 +161,7 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 	put_color_for_colon = (options & PRINT_BOX_NOCOLOR_FOR_COLON)?0:1;
 	is_center = (options & PRINT_BOX_CENTER)?1:0;
 	is_wrapped = (options & PRINT_BOX_WRAPPED)?1:0;
-	
+
 	content= malloc(1200);
 	int content_len = vsprintf(content, pattern, args);
 	out_line_buff= malloc(1200);
@@ -172,7 +172,7 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 		for(seg_i=0; seg_i < content_len; seg_i += line_width-7){
 			strcpy(out_line_buff, content + seg_i);
 			out_line_buff[line_width-7] = 0;
-			
+
 			print_in_box(line_width, is_boundary, options & (~PRINT_BOX_WRAPPED), out_line_buff);
 		}
 	}else{
@@ -205,11 +205,11 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 				real_lenwidth --;
 			}else{
 				txt_len++;
-				
+
 				if(txt_len == 80 - 6)
 				{
 					is_cut = 1;
-				} 
+				}
 			}
 
 			if(nch == 'm' && state)
@@ -234,7 +234,7 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 						content_len = 80 - 4;
 						line_width = 80;
 						break;
-					} 
+					}
 				}
 				if(nch == 'm' && state)
 					state = 0;
@@ -271,13 +271,13 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 			return;
 		}
 
-		int right_spaces, left_spaces;	
+		int right_spaces, left_spaces;
 		if(is_center)
 			left_spaces = (line_width - content_len)/2-2;
 		else
 			left_spaces = 1;
 
-		right_spaces = line_width - 4 - content_len- left_spaces; 
+		right_spaces = line_width - 4 - content_len- left_spaces;
 
 		char spaces[81];
 		memset(spaces , ' ', 80);
@@ -286,7 +286,7 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 		spaces[80]=0;
 
 		//sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO,"||");
-		
+
 		//for(x1=0;x1<left_spaces;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
 
 		spaces[left_spaces+2] = 0;
@@ -320,11 +320,11 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 				strcat(out_line_buff,content);
 		}
 	//	for(x1=0;x1<right_spaces - 1;x1++) sublog_fwrite(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO," ");
-		
+
 		memset(spaces , ' ', 80);
 		spaces[79]='|';
 		spaces[78]='|';
-		
+
 		right_spaces = max(1,right_spaces);
 		sprintf(out_line_buff+strlen(out_line_buff)," %c[0m%s", CHAR_ESC , spaces + (78 - right_spaces + 1));
 		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, out_line_buff);
@@ -358,7 +358,7 @@ int show_summary(global_context_t * global_context)
 		fprintf(sumfp, "Unexpected_template_length\t%u\n", global_context -> not_properly_pairs_TLEN_wrong);
 		fprintf(sumfp, "Inversed_mapping\t%u\n", global_context -> not_properly_pairs_wrong_arrangement);
 	}
-	
+
 	if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !(global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)))
 		fprintf(sumfp, "Junctions\t%u\n", global_context -> all_junctions);
 	fprintf(sumfp, "Indels\t%u\n", global_context -> all_indels);
@@ -416,7 +416,7 @@ int show_summary(global_context_t * global_context)
 	                print_in_box(80, 0,0,"                    Fusions : %'u", global_context -> all_fusions);
 	        print_in_box(80, 0,0,"                     Indels : %'u", global_context -> all_indels);
 	}
-	
+
 
 	if(global_context -> is_phred_warning)
 	{
@@ -481,7 +481,7 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 		reads_finished_in_this_chunk = (ginp1_file_pos - current_block_start_file_offset) / global_context -> input_reads . avg_read_length;
 
 	unsigned long long finished_steps = guessed_all_reads_before_this_chunk * (global_context -> index_block_number * 2 + 1 + is_thred_step_running);
-	
+
 
 	// add steps for voting
 	if(task == STEP_VOTING)
@@ -541,7 +541,7 @@ int main(int argc, char ** argv)
 int parse_opts_core(int argc , char ** argv, global_context_t * global_context)
 {
 	int c;
-	int option_index = 0;	
+	int option_index = 0;
 
 	optind = 1;
 	opterr = 1;
@@ -552,7 +552,7 @@ int parse_opts_core(int argc , char ** argv, global_context_t * global_context)
 		switch(c)
 		{
 			case 'Q':
-				global_context->config.multi_best_reads = atoi(optarg); 
+				global_context->config.multi_best_reads = atoi(optarg);
 				break;
 			case 'H':
 				global_context->config.use_hamming_distance_break_ties = 1;
@@ -688,9 +688,9 @@ int parse_opts_core(int argc , char ** argv, global_context_t * global_context)
 				strcpy(global_context->config.exon_annotation_file, optarg);
 				break;
 			case 'c':
-				global_context->config.space_type = GENE_SPACE_COLOR; 
+				global_context->config.space_type = GENE_SPACE_COLOR;
 				break;
-				
+
 			case 0:
 				//if(strcmp("memory-optimisation",long_options[option_index].name)==0)
 				//	memory_optimisation = atoi(optarg);
@@ -728,7 +728,7 @@ int check_configuration(global_context_t * global_context)
 		expected_type = FILE_TYPE_SAM;
 	else if(global_context -> config.is_gzip_fastq)
 		expected_type = FILE_TYPE_GZIP_FAST_;
-	
+
 	if(global_context -> config.max_indel_length > 16)
 		warning_file_limit();
 
@@ -792,7 +792,7 @@ int myrand_rand(){
 
 int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_context_t * )))
 {
-	struct timeval xtime; 
+	struct timeval xtime;
 	gettimeofday(&xtime,NULL);
 	myrand_srand(time(NULL)^xtime.tv_usec);
 
@@ -940,7 +940,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 			}
 		}
 
-		if(is_file_sorted) 
+		if(is_file_sorted)
 			fclose(sam_fp);
 		else{
 			int ret = sort_SAM_finalise(&writer);
@@ -967,7 +967,7 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 	char temp_file_name[350];
 	char * linebuff=malloc(3001);
 	gzFile rawfp = gzopen(fname, "r");
-	
+
 	if(rawfp)
 	{
 		print_in_box(80,0,0,"Decompress %s...", fname);
@@ -1034,7 +1034,7 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 	geinput_preload_buffer(ginp1, &global_context -> input_reads.input_lock);
 	if(ginp2) geinput_preload_buffer(ginp2, &global_context -> input_reads.input_lock);
 
-	subread_lock_occupy(&global_context -> input_reads.input_lock); 
+	subread_lock_occupy(&global_context -> input_reads.input_lock);
 	if(global_context -> running_processed_reads_in_chunk < global_context -> config.reads_per_chunk)
 	{
 		do
@@ -1078,7 +1078,7 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 			global_context -> running_processed_reads_in_chunk ++;
 		}
 	}
-	subread_lock_release(&global_context -> input_reads.input_lock); 
+	subread_lock_release(&global_context -> input_reads.input_lock);
 
 	if( global_context->config.space_type == GENE_SPACE_COLOR) {
 		rl1-=1;rl2-=1;
@@ -1132,7 +1132,7 @@ int write_final_results(global_context_t * context)
 		if((context ->  config.do_fusion_detection || context ->  config.do_long_del_detection))
 			write_fusion_final_results(context);
 	}
-	
+
 	return 0;
 }
 
@@ -1247,7 +1247,7 @@ int calc_edit_dist(global_context_t * global_context, mapping_result_t * current
 			{
 				all_mm+=tmpi;
 			}
-	
+
 			tmpi = 0;
 		}
 	}
@@ -1266,11 +1266,11 @@ unsigned int move_to_read_head(unsigned int tailpos, char * cigar){
 		}
 	}
 	return tailpos;
-} 
+}
 
 
 // This function returns 1 if the cut was added.
-// It returns 0 if the head or tail cut is not able to be added (e.g., the cigar ends up like "50M4I10S" or "10S30N90M") 
+// It returns 0 if the head or tail cut is not able to be added (e.g., the cigar ends up like "50M4I10S" or "10S30N90M")
 int add_head_tail_cut_softclipping(global_context_t * global_context, unsigned int linear, char * cigar, int rlen, int head_cut, int tail_cut){
 	//SUBREADprintf("ADD_SOFT: %s , %d, %d\n", cigar,head_cut,tail_cut);
 
@@ -1296,7 +1296,7 @@ int add_head_tail_cut_softclipping(global_context_t * global_context, unsigned i
 			}
 
 			int head_S = 0, tail_S =0, remainder_tmpi = tmpi, is_skip = 0;
-			
+
 			if(next_read_cursor <= head_cut) is_skip = 1;
 			if(read_cursor >= rlen - tail_cut) is_skip = 1;
 			if(!is_skip){
@@ -1308,7 +1308,7 @@ int add_head_tail_cut_softclipping(global_context_t * global_context, unsigned i
 					if(tail_S) remainder_tmpi-= next_read_cursor - (rlen - tail_S);
 				}
 				//SUBREADprintf("OPTR=%c, THREE-LENS=%d,%d,%d\n", nch, head_S, remainder_tmpi, tail_S);
-				if(head_S >0 || tail_S > 0) if(nch !='M') return 0; 
+				if(head_S >0 || tail_S > 0) if(nch !='M') return 0;
 
 				if(head_S > 0) sprintf(cigar_added + strlen(cigar_added), "%dS", head_S );
 				if(remainder_tmpi > 0){
@@ -1368,7 +1368,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 		//printf("SM='%s'\n", r->additional_information);
 
 		if((global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection))
-		{			
+		{
 			chimeric_sections = chimeric_cigar_parts(global_context, r->linear_position, is_first_section_jumped ^ current_strand, is_first_section_jumped, r->current_cigar_decompress, r->out_poses, output_context->out_cigar_buffer, r->out_strands, read_len, r->out_lens, read_name);
 
 			if(chimeric_sections > 0){
@@ -1431,7 +1431,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 		/*
 		if(global_context -> config.more_accurate_fusions)
 		{
-			
+
 			sprintf(r->additional_information + strlen(r->additional_information), "\tDF:i:%d", current_result -> best_second_diff_bases >0?current_result -> best_second_diff_bases:9999 );
 		}*/
 
@@ -1443,7 +1443,7 @@ int convert_read_to_tmp(global_context_t * global_context , subread_output_conte
 
 
 int add_event_detected_from_cigar(global_context_t * global_context, unsigned int left_last_base, unsigned int right_first_base, int is_indel, int indel_len, int left_extend, int right_extend, int read_length, char * read_name)
-{	
+{
 	HashTable * event_table = NULL;
 	chromosome_event_t * event_space = NULL;
 	event_table = ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> event_entry_table;
@@ -1559,7 +1559,7 @@ void remove_soft_clipping(char * dst, char * src){
 	if(last_M){
 		sprintf(dst + strlen(dst), "%uM" , last_M + tail_clip + head_clip);
 	}
-	
+
 }
 
 int getFirstM(char * cig){
@@ -1709,7 +1709,7 @@ int calc_tlen(global_context_t * global_context, subread_output_tmp_t * rec1 , s
 						read_cursor += tmpi;
 					}
 
-					if(nch == 'B' || nch == 'b' || nch == 'n') break;	// fusion block, unable to determine the TLEN after the fusion point. 
+					if(nch == 'B' || nch == 'b' || nch == 'n') break;	// fusion block, unable to determine the TLEN after the fusion point.
 
 					tmpi = 0;
 				}
@@ -1717,14 +1717,14 @@ int calc_tlen(global_context_t * global_context, subread_output_tmp_t * rec1 , s
 				break;
 			}
 
-		} 
+		}
 
 		if(ret < 0)
 			ret  = larger_head_pos - section_end + len_larger_rec + len_smaller_rec;
 	}
 
 
-	//SUBREADprintf("TLEN = %d :: \tREC1 : %s:%u (%s  - %d) ; REC2: %s:%u (%s  - %d )\n", ret, rec1 -> chro, rec1 -> offset, rec1 -> cigar, rec1 -> soft_clipping_movements, 
+	//SUBREADprintf("TLEN = %d :: \tREC1 : %s:%u (%s  - %d) ; REC2: %s:%u (%s  - %d )\n", ret, rec1 -> chro, rec1 -> offset, rec1 -> cigar, rec1 -> soft_clipping_movements,
 	//								       rec2 -> chro, rec2 -> offset, rec2 -> cigar, rec2 -> soft_clipping_movements);
 
 	return ret;
@@ -1810,7 +1810,7 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 					int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name1, flags1, chro_name1, chro_position1, mapping_quality1, cigar1, next_chro_name1, next_chro_pos1,  temp_len1, read_text1, qual_text1, additional_columns1[0]?"\t":"", additional_columns1);
 					if(global_context->input_reads.is_paired_end_reads)
 						write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%d\t%s\t%s%s%s\n", read_name2, flags2, chro_name2, chro_position2, mapping_quality2, cigar2, next_chro_name2, next_chro_pos2,  temp_len2, read_text2, qual_text2, additional_columns2[0]?"\t":"", additional_columns2);
-			
+
 					if( write_len < 10 || write_len_2 < 10 ){
 						global_context -> output_sam_is_full = 1;
 					}
@@ -1888,9 +1888,9 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		colorread2base(read_text_1, read_len_1+1);
 		//SUBREADprintf("CONV: %s\n\n", read_text_1);
 
-		if(global_context->input_reads.is_paired_end_reads) 
+		if(global_context->input_reads.is_paired_end_reads)
 			colorread2base(read_text_2, read_len_2+1);
-		
+
 		applied_reverse_space = GENE_SPACE_BASE;
 	}
 
@@ -1975,7 +1975,7 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		read_text_2[strlen(read_text_2)-1]=0;
 
 
-	if(global_context -> config.space_type == GENE_SPACE_BASE){ 
+	if(global_context -> config.space_type == GENE_SPACE_BASE){
 		if(is_R1_OK) {// && !strstr(rec1->additional_information, "\tNM:i:")){
 			short rec1_edit = calc_edit_dist(global_context, rec1->raw_result, rec1->cigar , rec1->linear_position, read_text_1, raw_r1 -> final_mismatched_bases);
 			sprintf(rec1->additional_information + strlen( rec1->additional_information), "\tNM:i:%d", rec1_edit );
@@ -2131,7 +2131,7 @@ gene_value_index_t * find_current_value_index(global_context_t * global_context,
 	int block_no;
 	if(global_context->index_block_number<2)
 	{
-		unsigned index_begin = global_context -> all_value_indexes [0] . start_base_offset; 
+		unsigned index_begin = global_context -> all_value_indexes [0] . start_base_offset;
 		unsigned index_end = global_context -> all_value_indexes [0] . start_base_offset + global_context -> all_value_indexes [0] . length;
 
 		if(pos>=index_begin && pos + len<index_end)
@@ -2141,7 +2141,7 @@ gene_value_index_t * find_current_value_index(global_context_t * global_context,
 	else
 		for(block_no=0; block_no<global_context->index_block_number; block_no++)
 		{
-			unsigned index_begin = global_context -> all_value_indexes [block_no] . start_base_offset; 
+			unsigned index_begin = global_context -> all_value_indexes [block_no] . start_base_offset;
 			unsigned index_end = global_context -> all_value_indexes [block_no] . start_base_offset + global_context -> all_value_indexes [block_no] . length;
 			if((block_no == 0 && pos >=  index_begin && pos < index_end - 1000000) ||
 			   (block_no>0 && block_no<global_context->index_block_number-1 && pos >= index_begin+ 1000000 && pos < index_end - 1000000) ||
@@ -2159,7 +2159,7 @@ int locate_current_value_index(global_context_t * global_context, thread_context
 
 	if(global_context->index_block_number<2)
 	{
-		unsigned index_begin = global_context -> all_value_indexes [0] . start_base_offset; 
+		unsigned index_begin = global_context -> all_value_indexes [0] . start_base_offset;
 		unsigned index_end = global_context -> all_value_indexes [0] . start_base_offset + global_context -> all_value_indexes [0] . length;
 
 		//SUBREADprintf("RESET2 : %u should <= %u\n",  result->selected_position + rlen, index_end);
@@ -2174,7 +2174,7 @@ int locate_current_value_index(global_context_t * global_context, thread_context
 	}
 	for(block_no=0; block_no<global_context->index_block_number; block_no++)
 	{
-		unsigned index_begin = global_context -> all_value_indexes [block_no] . start_base_offset; 
+		unsigned index_begin = global_context -> all_value_indexes [block_no] . start_base_offset;
 		unsigned index_end = global_context -> all_value_indexes [block_no] . start_base_offset + global_context -> all_value_indexes [block_no] . length;
 		if((block_no == 0 && result->selected_position >=  index_begin && result->selected_position < index_end - 1000000) ||
 		   (block_no>0 && block_no<global_context->index_block_number-1 && result->selected_position >= index_begin+ 1000000 && result->selected_position < index_end - 1000000) ||
@@ -2214,7 +2214,7 @@ int do_iteration_three(global_context_t * global_context, thread_context_t * thr
 	int read_len_1, read_len_2=0, sqr_interval, sqr_read_number = 0;
 
 	//unsigned int low_index_border = global_context -> current_value_index -> start_base_offset;
-	//unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length; 
+	//unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length;
 
 	print_in_box(80,0,0,"Prepare for long indel deleteion...");
 	init_chunk_scanning_parameters(global_context,thread_context, & ginp1, & ginp2);
@@ -2282,7 +2282,7 @@ int do_iteration_three(global_context_t * global_context, thread_context_t * thr
 
 						build_local_reassembly(global_context , thread_context , current_read_number , current_read_name , current_read , current_qual , current_rlen, mate_rlen , is_second_read, best_read_id, 1, current_result, mate_result);
 					}
-				}	
+				}
 			}
 		}
 
@@ -2449,7 +2449,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	subread_output_context_t out_context;
 
 	//SUBREADprintf("THREAD_OPT2_start\n");
-	init_output_context(global_context, &out_context);	
+	init_output_context(global_context, &out_context);
 
 	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR  *  2 * global_context -> config.reported_multi_best_reads ; repeated_count ++ ){
 		repeated_buffer_cigars[repeated_count] = malloc(2*CORE_MAX_CIGAR_STR_LEN);
@@ -2477,7 +2477,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	r2_subjunc_result_buffer = malloc(sizeof(subjunc_result_t) * global_context -> config.multi_best_reads);
 
 	//unsigned int low_index_border = global_context -> current_value_index -> start_base_offset;
-	//unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length; 
+	//unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length;
 
 	init_chunk_scanning_parameters(global_context,thread_context, & ginp1, & ginp2);
 	sqr_interval = max(5000,global_context -> processed_reads_in_chunk/10/ global_context -> config.all_threads);
@@ -2527,7 +2527,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				fastq_64_to_33(raw_qual_text_2);
 		}
 
-		if((global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) ||  global_context -> input_reads.is_internal_error || 
+		if((global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) ||  global_context -> input_reads.is_internal_error ||
 		   (global_context -> output_sam_is_full))break;
 		if(current_read_number < 0) break;
 
@@ -2556,7 +2556,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			int * current_MISMATCH_buffer = is_second_read?final_MISMATCH_buffer2:final_MISMATCH_buffer1;
 			int * current_realignment_index = is_second_read?final_realignment_index2:final_realignment_index1;
 
-	
+
 			for(best_read_id = 0; best_read_id < global_context -> config.multi_best_reads; best_read_id++)
 			{
 				mapping_result_t *current_result = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, best_read_id);
@@ -2651,7 +2651,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 					for(read_record_i = 0; read_record_i < current_candidate_locations; read_record_i++){
 						realignment_result_t * current_realignment_result = final_realignments + current_realignment_index[read_record_i];
-						//mapping_result_t *current_result = current_realignment_result -> mapping_result; 
+						//mapping_result_t *current_result = current_realignment_result -> mapping_result;
 						//assert(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED);
 
 						unsigned int this_MATCH = current_MATCH_buffer[read_record_i];
@@ -2708,7 +2708,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								strcpy(qual_text_1, raw_qual_text_1);
 								strcpy(qual_text_2, raw_qual_text_2);
 
-								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
+								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN;
 								current_realignment_result -> MAPQ_adjustment = current_MISMATCH_buffer [read_record_i] + ( is_second_read?(r2_step2_locations): (r1_step2_locations));
 
 								//if(161430 <= current_read_number) SUBREADprintf("ALL_SE=%d, THIS_HIT=%d\n", highest_score_occurence, output_cursor);
@@ -2760,7 +2760,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 					if(global_context -> config.experiment_type == CORE_EXPERIMENT_DNASEQ){
 						int weight;
-						
+
 						//#warning " ============ USE THE FIRST THREE WEIGHTS! ======== "
 
 						if(is_PE)
@@ -2811,9 +2811,9 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 					assert(final_SCORE > 0);
 					final_SCORE_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] = final_SCORE;
-	
+
 					if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0){
-						SUBREADprintf("Highest=%llu, This=%llu, Occurance=%d\n", highest_score , final_SCORE , highest_score_occurence);
+						SUBREADprintf("Highest=%llu, This=%llu, Occurrence=%d\n", highest_score , final_SCORE , highest_score_occurence);
 					}
 
 					if(final_SCORE > highest_score) {
@@ -2840,9 +2840,9 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				}
 			}
 
-			//SUBREADprintf("Highest score = %llu, Occurance = %d\n", highest_score , highest_score_occurence);
+			//SUBREADprintf("Highest score = %llu, Occurrence = %d\n", highest_score , highest_score_occurence);
 			// Then, copy the (R1, R2) that have the highest score into the align_res buffer.
-			
+
 			//#warning ">>>>>>> COMMENT THIS <<<<<<<"
 			//printf("OCT27-WRITE-BOTHMAOOED-%s-THRE %d ; occu=%d\n", read_name_1, thread_context -> thread_id, highest_score_occurence);
 
@@ -2862,7 +2862,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						int r2_matched = final_MATCH_buffer2[r2_best_id];
 						if(r2_matched < 1) continue;
 
-						if(final_SCORE_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] == highest_score && 
+						if(final_SCORE_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] == highest_score &&
 							output_cursor < global_context -> config.reported_multi_best_reads){
 								realignment_result_t * r1_realign = final_realignments + final_realignment_index1[r1_best_id];
 								realignment_result_t * r2_realign = final_realignments + final_realignment_index2[r2_best_id];
@@ -2899,7 +2899,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			strcpy(qual_text_2, raw_qual_text_2);
 			write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, NULL, NULL, read_name_1, read_name_2, read_text_1, read_text_2, raw_qual_text_1, raw_qual_text_2, read_len_1, read_len_2, 0, 0, non_informative_subreads_r1, non_informative_subreads_r2);
 		}
-		
+
 		if(!thread_context || thread_context->thread_id == 0)
 		{
 			if(sqr_read_number>sqr_interval)
@@ -2933,7 +2933,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 		free(repeated_buffer_cigars[repeated_count]);
 	}
 
-	destroy_output_context(global_context, &out_context);	
+	destroy_output_context(global_context, &out_context);
 	//SUBREADprintf("OPT2-FINISHED\n");
 	if(global_context ->config.all_threads >1 && global_context ->config.is_BAM_output && !global_context ->config.is_input_read_order_required)SamBam_writer_finalise_thread(global_context -> output_bam_writer, thread_context -> thread_id);
 	if(global_context ->config.all_threads <=1 && global_context ->config.is_BAM_output && global_context ->config.sort_reads_by_coordinates)SamBam_writer_finalise_one_thread(global_context -> output_bam_writer);
@@ -2947,7 +2947,7 @@ int core_get_subread_quality(global_context_t * global_context, thread_context_t
 	if(!qual)return 1;
 	if(!qual[0])return 1;
 
-	int offset = (global_context->config.phred_score_format == FASTQ_PHRED33)?33:64; 
+	int offset = (global_context->config.phred_score_format == FASTQ_PHRED33)?33:64;
 
 	for(x1=0; (x1 < qual_len) && qual[x1]; x1++)
 		ret +=  (qual[x1] - offset);
@@ -2961,7 +2961,7 @@ int has_better_mapping(global_context_t * global_context, thread_context_t * thr
 	mapping_result_t * this_r = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, this_aln_id);
 	for(better_read_id = 0; better_read_id < this_aln_id; better_read_id++){
 		mapping_result_t * better_r = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read, better_read_id);
-		if( this_r -> selected_position >= better_r -> selected_position - global_context -> config.max_indel_length - 1 
+		if( this_r -> selected_position >= better_r -> selected_position - global_context -> config.max_indel_length - 1
 		 && this_r -> selected_position <=  better_r -> selected_position +  global_context -> config.max_indel_length +1 )
 		if( this_r -> confident_coverage_start >= better_r -> confident_coverage_start
 		 && this_r -> confident_coverage_end <= better_r -> confident_coverage_end) return 1;
@@ -2978,7 +2978,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	char * qual_text_1, * qual_text_2;
 	char read_name_1[MAX_READ_NAME_LEN+1], read_name_2[MAX_READ_NAME_LEN+1];
 	int read_len_1, read_len_2=0;
-	int min_first_read_votes = global_context -> config.minimum_subread_for_first_read; 
+	int min_first_read_votes = global_context -> config.minimum_subread_for_first_read;
 	int voting_max_indel_length = min(16, global_context->config.max_indel_length);
 	int sqr_interval=10000, sqr_read_number = 0;
 
@@ -3002,7 +3002,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 	init_chunk_scanning_parameters(global_context,thread_context, & ginp1, & ginp2);
 
 	unsigned int low_index_border = global_context -> current_value_index -> start_base_offset;
-	unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length; 
+	unsigned int high_index_border = global_context -> current_value_index -> start_base_offset + global_context -> current_value_index -> length;
 	int has_second_read = 1 + global_context -> input_reads.is_paired_end_reads;
 
 	if(thread_context)
@@ -3094,7 +3094,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 						int subread_offset = ((subread_step * subread_no) >> 16);
 						if(GENE_SLIDING_STEP > 1)
-							subread_offset -= subread_offset%(GENE_SLIDING_STEP) - xk1; 
+							subread_offset -= subread_offset%(GENE_SLIDING_STEP) - xk1;
 
 						char * subread_string = current_read + subread_offset;
 
@@ -3158,7 +3158,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 					}
 				}
 			}
-		
+
 			if(is_reversed == 0)
 			{
 				reverse_read(read_text_1, read_len_1,  global_context->config.space_type);
@@ -3183,12 +3183,12 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				char * current_read =  is_second_read?read_text_2 : read_text_1;
 				char * current_qual =  is_second_read?qual_text_2 : qual_text_1;
 				int current_rlen = is_second_read?read_len_2:read_len_1;
-	
+
 				for(best_read_id = 0; best_read_id < global_context -> config.multi_best_reads; best_read_id++)
 				{
 					mapping_result_t * current_r = _global_retrieve_alignment_ptr(global_context, current_read_number, is_second_read,best_read_id);
 					if(current_r -> selected_votes < 1) continue;
-					
+
 					int this_read_should_be_reversed = (current_r -> result_flags & CORE_IS_NEGATIVE_STRAND) ? 1:0;
 
 					//SUBREADprintf("DETECT INDEL: should_reverse = %d, this_has_reversed = %d\n", this_read_should_be_reversed, *this_read_has_reversed);
@@ -3219,7 +3219,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				}
 			}
 		}
-		
+
 		if(!thread_context || thread_context->thread_id == 0)
 		{
 			if(sqr_read_number > sqr_interval)
@@ -3263,7 +3263,7 @@ void subread_init_topKbuff(global_context_t * global_context, topK_buffer_t * to
 }
 
 void subread_free_topKbuff(global_context_t * global_context, topK_buffer_t * topKbuff){
-	
+
     free(topKbuff ->junction_tmp_r1);
     free(topKbuff ->junction_tmp_r2);
     free(topKbuff ->alignment_tmp_r1);
@@ -3296,7 +3296,7 @@ void * run_in_thread(void * pthread_param)
 		case STEP_ITERATION_TWO:
 			*ret_value_pointer = do_iteration_two(global_context, thread_context);
 		break;
-	
+
 	}
 
 	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_DETAILS, "finished running %d", task);
@@ -3356,7 +3356,7 @@ int run_maybe_threads(global_context_t *global_context, int task)
 
 		for(current_thread_no = 0 ; current_thread_no < global_context->config.all_threads ; current_thread_no ++) {
 			pthread_join(thread_contexts[current_thread_no].thread, NULL);
-			
+
 			if(STEP_ITERATION_TWO == task){
 				global_context -> all_mapped_reads += thread_contexts[current_thread_no].all_mapped_reads;
 				global_context -> all_correct_PE_reads += thread_contexts[current_thread_no].all_correct_PE_reads;
@@ -3400,7 +3400,7 @@ void clean_context_after_chunk(global_context_t * context)
 	//memset(context -> big_margin_record  , 0 , sizeof(*context -> big_margin_record) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.big_margin_record_size);
 	for(event_id = 0; event_id < indel_context->total_events; event_id++){
 		chromosome_event_t * event_body = event_space + event_id;
-		event_body -> critical_read_id = 0xffffffffffffffffllu; 
+		event_body -> critical_read_id = 0xffffffffffffffffllu;
 	}
 }
 
@@ -3420,7 +3420,7 @@ void locate_read_files(global_context_t * global_context, int type)
 		geinput_tell(&global_context -> input_reads.first_read_file, &global_context -> current_circle_end_position_file1);
 		if(global_context ->input_reads.is_paired_end_reads)
 			geinput_tell(&global_context -> input_reads.second_read_file, &global_context -> current_circle_end_position_file2);
-	
+
 	}
 }
 void reward_read_files(global_context_t * global_context, int type)
@@ -3436,7 +3436,7 @@ void reward_read_files(global_context_t * global_context, int type)
 		geinput_seek(&global_context -> input_reads.first_read_file, & global_context -> current_circle_end_position_file1);
 		if(global_context ->input_reads.is_paired_end_reads)
 			geinput_seek(&global_context -> input_reads.second_read_file, & global_context -> current_circle_end_position_file2);
-	
+
 	}
 	global_context -> running_processed_reads_in_chunk=0;
 }
@@ -3447,7 +3447,7 @@ int read_chunk_circles(global_context_t *global_context)
 	int block_no;
 
 //	printf("GINP1 AT %llu\n", ftello(global_context -> input_reads.first_read_file.input_fp));
-	
+
 	unsigned int chunk_no = 0;
 
 	global_context -> current_index = (gehash_t*) malloc(sizeof(gehash_t));
@@ -3555,12 +3555,12 @@ int read_chunk_circles(global_context_t *global_context)
 		if(ret) return ret;
 
 		if(global_context -> processed_reads_in_chunk < global_context->config.reads_per_chunk ||
-		  (global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) || global_context -> input_reads.is_internal_error  || 
+		  (global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) || global_context -> input_reads.is_internal_error  ||
 		  (global_context -> output_sam_is_full))
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			// the indexes will be destroyed in destroy_global_context
 			break;
-		
+
 		clean_context_after_chunk(global_context);
 		chunk_no++;
 	}
@@ -3772,13 +3772,13 @@ void write_sam_headers(global_context_t * context)
 		if(context->config.read_group_id[0])
 			sambamout_fprintf(context -> output_sam_fp, "@RG\tID:%s%s\n",context->config.read_group_id, context->config.read_group_txt);
 		sambamout_fprintf(context -> output_sam_fp, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s\n", SUBREAD_VERSION, context->rebuilt_command_line);
-		
+
 	}
 }
 
 #define EXONIC_REGION_RESOLUTION 16
 
-int is_pos_in_annotated_exon_regions(global_context_t * global_context, unsigned int pos){ 
+int is_pos_in_annotated_exon_regions(global_context_t * global_context, unsigned int pos){
 	int exonic_map_byte = pos / EXONIC_REGION_RESOLUTION / 8;
 	int exonic_map_bit = (pos / EXONIC_REGION_RESOLUTION) % 8;
 
@@ -3869,8 +3869,8 @@ int load_global_context(global_context_t * context)
 {
 	char tmp_fname [MAX_FILE_NAME_LENGTH + 50];
 	int min_phred_score = -1 , max_phred_score = -1;
-	context -> is_phred_warning = 0; 
-	
+	context -> is_phred_warning = 0;
+
 	if(context->config.multi_best_reads>1 && ! context->config.report_multi_mapping_reads){
 		print_in_box(80,0,0,"WARNING: Multi-mapping reads are reported.");
 		context->config.report_multi_mapping_reads = 1;
@@ -3991,7 +3991,7 @@ int load_global_context(global_context_t * context)
 		}
 		context->output_sam_fp = NULL;
 	}
-	
+
 	// ====== check index files, count blocks and load chro table ======
 	sprintf(tmp_fname, "%s.reads", context->config.index_prefix);
 	if(!does_file_exist(tmp_fname))
@@ -3999,7 +3999,7 @@ int load_global_context(global_context_t * context)
 		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable top open index '%s'. Please make sure that the correct prefix is specified and you have the permission to read these files. For example, if there are files '/opt/my_index.reads', '/opt/my_index.files' and etc, the index prefix should be specified as '/opt/my_index' without any suffix. \n", context->config.index_prefix);
 		return -1;
 	}
-	
+
 	context->current_index_block_number = 0;
 	if(load_offsets(&context->chromosome_table, context->config.index_prefix)){
 		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"\nThe index was built by using an old version of Subread; its format is no longer supported. Please use the current version of the index builder to rebuild it.\n");
@@ -4017,7 +4017,7 @@ int load_global_context(global_context_t * context)
 	}
 
 
-	context->index_block_number = 0; 
+	context->index_block_number = 0;
 	while(1)
 	{
 		sprintf(tmp_fname, "%s.%02d.%c.tab", context->config.index_prefix, context->index_block_number, context->config.space_type == GENE_SPACE_COLOR?'c':'b');
@@ -4049,7 +4049,7 @@ int load_global_context(global_context_t * context)
 	memset( context->all_value_indexes , 0 , 100 * sizeof(gene_value_index_t));
 
 	context -> sam_chro_to_anno_chr_alias = NULL;
-	if(context->config.exon_annotation_file[0]){ 
+	if(context->config.exon_annotation_file[0]){
 		if( load_annotated_exon_regions( context ) ) return -1;
 		if(context->config.exon_annotation_alias_file[0])
 			 context -> sam_chro_to_anno_chr_alias = load_alias_table(context->config.exon_annotation_alias_file);
@@ -4114,7 +4114,7 @@ int destroy_global_context(global_context_t * context)
 		context->output_bam_writer=NULL;
 	}
 	//free(context->big_margin_record);
-	
+
 	for(xk1=0; xk1<5; xk1++)
 		if(context->module_contexts[xk1])free(context->module_contexts[xk1]);
 	geinput_close(&context -> input_reads.first_read_file);
@@ -4125,7 +4125,7 @@ int destroy_global_context(global_context_t * context)
 	if((context -> will_remove_input_file & 1) && strstr(context ->config.first_read_file, "/core-temp")) unlink(context ->config.first_read_file);
 	if((context -> will_remove_input_file & 2) && strstr(context ->config.second_read_file, "/core-temp")) unlink(context ->config.second_read_file);
 	free(context -> rebuilt_command_line);
-	
+
 	return ret;
 }
 
@@ -4146,7 +4146,7 @@ int write_bincigar_part(char * bincigar, int chropt, unsigned int optlen, int bi
 	else if(optlen < 67108864) binbytes=4;
 	else binbytes=5;
 
-	if(bincigar_len<binbytes) return -1; 
+	if(bincigar_len<binbytes) return -1;
 
 	switch(chropt)
 	{
@@ -4233,28 +4233,28 @@ int write_cigar_part(char *bincigar, char *cigar, int cigar_len , int * bincigar
 	switch(binopt)
 	{
 		case CORE_CIGAR_OPT_D:
-			charopt='D'; 
+			charopt='D';
 			break;
 		case CORE_CIGAR_OPT_I:
-			charopt='I'; 
+			charopt='I';
 			break;
 		case CORE_CIGAR_OPT_M:
-			charopt='M'; 
+			charopt='M';
 			break;
 		case CORE_CIGAR_OPT_S:
-			charopt='S'; 
+			charopt='S';
 			break;
 		case CORE_CIGAR_OPT_B:
-			charopt='B'; 
+			charopt='B';
 			break;
 		case CORE_CIGAR_OPT_BB:
-			charopt='b'; 
+			charopt='b';
 			break;
 		case CORE_CIGAR_OPT_N:
-			charopt='N'; 
+			charopt='N';
 			break;
 		default:
-			charopt='n'; 
+			charopt='n';
 			break;
 	}
 
@@ -4263,7 +4263,7 @@ int write_cigar_part(char *bincigar, char *cigar, int cigar_len , int * bincigar
 	{
 		unsigned int dtmpv = 0xff & bincigar[x1];
 		dtmpv <<= (x1*8 - 6);
-		tmpv += dtmpv; 
+		tmpv += dtmpv;
 	}
 
 	int added_len = sprintf(sec_buf, "%u%c", tmpv, charopt);
@@ -4513,8 +4513,8 @@ void quick_sort(void * arr, int arr_size, int compare (void * arr, int l, int r)
 {
 	quick_sort_run(arr, 0, arr_size-1, compare, exchange);
 }
- 
- 
+
+
 void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r))
 {
 	// https://en.wikipedia.org/wiki/Quicksort
@@ -4536,7 +4536,7 @@ void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * 
 
 	quick_sort_run(arr, spot_low, i-1, compare, exchange);
 	quick_sort_run(arr, i+1, spot_high, compare, exchange);
-	
+
 }
 void basic_sort_run(void * arr, int start, int items, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r)){
 	int i, j;
