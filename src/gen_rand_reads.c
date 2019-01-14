@@ -422,7 +422,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		SUBREADprintf("Error: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "TranscriptID\tLength\tMD5\tDuplicate\tOccurance\tFresh\n");
+	fprintf(sumfp, "TranscriptID\tLength\tMD5\tUnique\tOccurance\tDuplicated\n");
 
 	char * seq_name = NULL;
 	unsigned char md5res[16];
@@ -532,7 +532,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		long seqlen = HashTableGet(seq_length_tab,seqnam)-NULL;
 		int is_reprs = HashTableGet(reprs_tab,md5str)==NULL;
 		HashTablePut(reprs_tab,md5str,NULL+1);
-		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"TRUE":"FALSE", md5repeated, is_reprs?"TRUE":"FALSE");
+		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"FALSE":"TRUE" /*"Unique"*/, md5repeated, is_reprs?"FALSE":"TRUE" /*"Duplicated"*/);
 	}
 	HashTableDestroy(reprs_tab);
 

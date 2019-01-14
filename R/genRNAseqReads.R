@@ -48,11 +48,19 @@ simReads <- function(transcript.file, TPM, output.prefix, out.sample.size=100000
 	}
 	colnames( transcript.TPM )<-c("TranscriptID","TPM")
 
-	#print(transcript.TPM[1:6,])
-	if(abs(sum( transcript.TPM$TPM ) - 1000000) > 100)
-		stop(paste0("Error: the TPM parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the TPM values. The sum of all the TPM values must be 1,000,000 (but not ",sum( transcript.TPM$TPM ),"). See https://www.biostars.org/p/273537/ for the definition of TPM."))
-	if(any(transcript.TPM$TPM< -0.0000000001))stop("Error: no negative TPM is allowed")
+	
+	if(F){ # do not check one million.
+		if(abs(sum( transcript.TPM$TPM ) - 1000000) > 100)
+			stop(paste0("Error: the TPM parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the TPM values. The sum of all the TPM values must be 1,000,000 (but not ",sum( transcript.TPM$TPM ),"). See https://www.biostars.org/p/273537/ for the definition of TPM."))
+	}
 
+	# we allow any ratio values for the expression values.
+	# however, the C code only allows the sum of one million.
+	# hence, there is a conversion in R.
+
+	if(any(transcript.TPM$TPM< -0.0000000001))stop("Error: no negative TPM is allowed")
+	if( sum(transcript.TPM$TPM) <= 0 ) stop("Error: the sum of the expression levels is zero or negative.")
+	transcript.TPM$TPM <- transcript.TPM$TPM / sum(transcript.TPM$TPM) * 1000000.
 	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
 	cmd<-paste("RgenerateRNAseqReads,--transcriptFasta",transcript.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
