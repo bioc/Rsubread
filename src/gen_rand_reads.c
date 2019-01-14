@@ -396,7 +396,7 @@ int grc_finalize(genRand_context_t *grc){
 }
 
 #define TRANSCRIPT_FASTA_LINE_INIT 800
-#define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000000.000001
+#define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000001.0
 #define TRANSCRIPT_FASTA_LINE_WIDTH 1000
 
 
@@ -769,7 +769,7 @@ int grc_load_env(genRand_context_t *grc){
 		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 	}
 	
-	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted TPM values are non-zero. You may use scanFasta() to find their names.\n", total_dup);
+	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted expression levels are non-zero. You may use scanFasta() to find their names.\n", total_dup);
 	autozip_close(&auto_FP);
 	HashTableDestroy(seq_duplicate_tab);
 
