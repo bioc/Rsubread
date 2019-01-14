@@ -43,7 +43,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 	if( "TranscriptID" %in% colnames(transcript.TPM) && "TPM" %in% colnames(transcript.TPM) ){
 		transcript.TPM<-data.frame(TranscriptID=transcript.TPM$TranscriptID, TPM=as.numeric(as.character(transcript.TPM$TPM)))
 	}else{
-		if(ncol(transcript.TPM)!=2) stop("Error: the TPM parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the TPM values")
+		if(ncol(transcript.TPM)!=2) stop("Error: the 'expression.levels' parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the relative expression levels")
 		transcript.TPM[,2] <- as.numeric(as.character(transcript.TPM[,2]))
 	}
 	colnames( transcript.TPM )<-c("TranscriptID","TPM")
@@ -58,7 +58,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 	# however, the C code only allows the sum of one million.
 	# hence, there is a conversion in R.
 
-	if(any(transcript.TPM$TPM< -0.0000000001))stop("Error: no negative TPM is allowed")
+	if(any(transcript.TPM$TPM< -0.0000000001))stop("Error: no negative expression levels are allowed")
 	if( sum(transcript.TPM$TPM) <= 0 ) stop("Error: the sum of the expression levels is zero or negative.")
 	transcript.TPM$TPM <- transcript.TPM$TPM / sum(transcript.TPM$TPM) * 1000000.
 	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
