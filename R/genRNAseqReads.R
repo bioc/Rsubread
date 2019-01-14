@@ -13,7 +13,7 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 	summ
 }
 
-simReads <- function(transcript.file, TPM, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, isPairedEndOutput=FALSE, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.transcript.names=FALSE){
+simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, isPairedEndOutput=FALSE, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.transcript.names=FALSE){
 	transcript.file <- normalizePath(transcript.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if(read.length > 250)stop("Error: the current version can generate reads at most 250bp long.")
@@ -39,7 +39,7 @@ simReads <- function(transcript.file, TPM, output.prefix, out.sample.size=100000
 	if(out.sample.size>1000*1000*1000) stop("Error: the current version cannot generate more than one billion reads/insertions in a single run")
 
 	fin_TPMtab <- file.path(".",paste(".Rsubread_genReadTPM_pid",Sys.getpid(),sep=""))
-	transcript.TPM<-as.data.frame(TPM)
+	transcript.TPM<-as.data.frame(expression.levels)
 	if( "TranscriptID" %in% colnames(transcript.TPM) && "TPM" %in% colnames(transcript.TPM) ){
 		transcript.TPM<-data.frame(TranscriptID=transcript.TPM$TranscriptID, TPM=as.numeric(as.character(transcript.TPM$TPM)))
 	}else{
