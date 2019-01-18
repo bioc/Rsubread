@@ -13,7 +13,7 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 	summ
 }
 
-simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, isPairedEndOutput=FALSE, Insertion.Length.Min=100, Insertion.Length.Max=500, Insertion.Length.Mean=150, Insertion.Length.Sigma=25, simplify.transcript.names=FALSE){
+simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, insertion.length.min=100, insertion.length.max=500, insertion.length.mean=150, insertion.length.sigma=25, simplify.transcript.names=FALSE){
 	transcript.file <- normalizePath(transcript.file, mustWork=T)
 	output.prefix <- normalizePath(output.prefix, mustWork=F)
 	if(read.length > 250)stop("Error: the current version can generate reads at most 250bp long.")
@@ -30,10 +30,10 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 		}
 	}
 
-	if( isPairedEndOutput ){
-		if(Insertion.Length.Min < read.length) stop("Error: the minimum insertion length must be higher than the read length")
-		if(Insertion.Length.Min > Insertion.Length.Max) stop("Error: the minimum insertion length must be equal or lower than the maximum length")
-		if(Insertion.Length.Mean < Insertion.Length.Min || Insertion.Length.Mean >Insertion.Length.Max) stop("Error: the mean insertion length must be between the minimum and maximum insertion lengths")
+	if( paired.end ){
+		if(insertion.length.min < read.length) stop("Error: the minimum insertion length must be higher than the read length")
+		if(insertion.length.min > insertion.length.max) stop("Error: the minimum insertion length must be equal or lower than the maximum length")
+		if(insertion.length.mean < insertion.length.min || insertion.length.mean >insertion.length.max) stop("Error: the mean insertion length must be between the minimum and maximum insertion lengths")
 	}
 	if(out.sample.size<1) stop("Error: the output sample size must be a positive number")
 	if(out.sample.size>1000*1000*1000) stop("Error: the current version cannot generate more than one billion reads/insertions in a single run")
@@ -64,7 +64,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 	write.table(transcript.TPM, fin_TPMtab, sep="\t", row.names=F, quote=F)
 
 	cmd<-paste("RgenerateRNAseqReads,--transcriptFasta",transcript.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
-	if(isPairedEndOutput) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",Insertion.Length.Mean, "--insertionLenMax",Insertion.Length.Max,"--insertionLenMin",Insertion.Length.Min,"--insertionLenSigma",Insertion.Length.Sigma, sep=",")
+	if(paired.end) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",insertion.length.mean, "--insertionLenMax",insertion.length.max,"--insertionLenMin",insertion.length.min,"--insertionLenSigma",insertion.length.sigma, sep=",")
 	if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=",")
 	if(truth.in.read.names) cmd<-paste(cmd, "--truthInReadNames", sep=",")
 	if(!low.transcripts) cmd <- paste(cmd, "--noLowTranscripts", sep=",")
