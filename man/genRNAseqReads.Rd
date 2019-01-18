@@ -72,7 +72,7 @@ scanFasta(
   It additionally checks the transcript sequences for uniqueness.
 }
 \value{
-  \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{paired.end}, containing the simulated read s.
+  \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{paired.end}, containing the simulated reads.
   It also returns a \code{data.frame} with three columns:
   \tabular{lll}{
     \code{TranscriptID} \tab character \tab transcript name\cr
