@@ -3,7 +3,6 @@ useDynLib(Rsubread)
 exportPattern("^[^\\.]")
 
 importFrom("grDevices", "dev.off", "pdf")
-importFrom("methods", "is")
 importFrom("stats", "approxfun", "density", "dpois", "end", "lowess",
            "ppois", "runif", "start")
 importFrom("utils", "download.file", "read.csv", "read.delim",
