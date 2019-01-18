@@ -41,6 +41,8 @@ No value is produced but index files are written to the current working director
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
+
+Yang Liao, Gordon K Smyth and Wei Shi. The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. bioRxiv 26 July 2018. \url{https://doi.org/10.1101/377762}
 }
 \author{Wei Shi and Yang Liao}
 %\note{}

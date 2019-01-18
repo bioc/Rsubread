@@ -211,6 +211,8 @@ A list with the following components:
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi. featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, 30(7):923-30, 2014.
+
+Yang Liao, Gordon K Smyth and Wei Shi. The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. bioRxiv 26 July 2018. \url{https://doi.org/10.1101/377762}
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
