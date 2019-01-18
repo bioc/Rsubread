@@ -7,7 +7,7 @@
 simReads(
   # the transcript database and the wanted abundances
   transcript.file,
-  TPM,
+  expression.levels,
 
   # the name of the output
   output.prefix,
@@ -45,7 +45,7 @@ scanFasta(
 }
 \arguments{
   \item{transcript.file}{character string giving the name of a file that contains the transcript names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
-  \item{TPM}{a data frame giving the Transcripts Per Million (TPM) values of the transcripts. The data frame should have only two columns: \code{TranscriptID} and \code{TPM}. The sum of the TPM values in the data frame must be one million, and no negative TPM value is allowed. See https://www.biostars.org/p/273537/ for the definition of TPM. No duplicate \code{TranscriptID} is allowed in the data frame.}
+  \item{expression.levels}{data frame with two columns specifying the transcript IDs (first column) and relative expression levels (second column). Transcript IDs must be unique and expression levels much not be negative.}
   \item{output.prefix}{character string giving the basename of all the output files.}
   \item{out.sample.size}{numeric value giving the number of reads or read-pairs to be generated. One million by default.}
   \item{read.length}{numeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
@@ -67,14 +67,33 @@ scanFasta(
 
   Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error} is \code{TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
 
-  The \code{scanFasta} function is provided for facilitating the calculation of wanted TPM values. This function scans through a FASTA or gzipped-FASTA file that contains the transcript sequences, and returns the list of transcript names with their sequence lengths.
+  The \code{scanFasta} function checks and processes the FASTA file.
+  It scans through the FASTA file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths.
+  It additionally checks the transcript sequences for uniqueness.
 }
 \value{
-  The \code{scanFasta} function returns a \code{data.frame} object that has six columns: the name of the transcripts (\code{TranscriptID}), their lengths (\code{Length}), the MD5 digests of their sequences (\code{MD5}), if each transcript has multiple occurrences in the input (\code{Duplicate}), the number of times each sequence is observed in the input (\code{Occurrence}) and if each transcript has a sequence that is not observed in all the transcripts above it (\code{Fresh}). Selecting all transcripts with \code{Fresh} == \code{TRUE} will give you all the unique sequences in the input (ie each sequence that is observed multiple times in the input will be only included once in the selection). The \code{simReads} function returns a \code{data.frame} object that has three columns: the name of the transcripts (\code{TranscriptID}), their lengths (\code{Length}) and the actual read counts (\code{Count}).
+  \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{isPairedEndOutput}, containing the simulated read s.
+  It also returns a \code{data.frame} with three columns:
+  \tabular{lll}{
+    \code{TranscriptID} \tab character \tab transcript name\cr
+    \code{Length} \tab integer \tab length of transcript sequence\cr
+    \code{Count} \tab integer \tab simulated read count
+  }
+
+  \code{scanFasta} returns a \code{data.frame} with six columns:
+  \tabular{lll}{
+    \code{TranscriptID} \tab character \tab transcript name\cr
+    \code{Length} \tab integer \tab length of transcript sequence\cr
+    \code{MD5} \tab character \tab MD5 digest of the transcript sequence\cr
+    \code{Unique} \tab logical \tab is this transcript's sequence unique in the FASTA file?\cr
+    \code{Occurrence} \tab integer \tab number of times this transcript's sequence was observed\cr
+    \code{Duplicate} \tab logical \tab this transcript's sequence is a duplicate of a previous sequence.
+  }
+  Note that selecting transcripts with \code{Duplicate == FALSE} will ensure unique sequences, i.e., any sequence that was observed multiple times in the FASTQ file will be only included only once in the selection.
 }
-\references{
-Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. \emph{Nucleic Acids Research}, 41(10):e108, 2013.
-}
+%\references{
+%Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. #%%\emph{Nucleic Acids Research}, 41(10):e108, 2013.
+%}
 \author{Wei Shi and Yang Liao}
 \examples{
 \dontrun{
