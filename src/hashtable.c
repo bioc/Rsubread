@@ -31,8 +31,8 @@ long long_random_val(){
 	}
 	int i;
 	for(i=0;i<8;i++){
-		if(i>0)ret = (ret << 8) ^ (rand() & 0xff);
-		else ret = (ret << 8) ^ (rand() & 0x7f);
+		if(i>0)ret = (ret << 8) ^ (myrand_rand() & 0xff);
+		else ret = (ret << 8) ^ (myrand_rand() & 0x7f);
 	}
 	return ret;
 }

@@ -149,10 +149,10 @@ void grc_sequencing_error_read(char * seq, int qlen, char * qua){
 		if(seq[b]=='N') continue;
 
 		int qub = qua[b];
-		float randv = rand()*1./RAND_MAX;
+		float randv = myrand_rand()*1./RAND_MAX;
 		float errorp = pow(10,3.3 - qub*.1); // Phred 33
 		if(randv < errorp * 1.3333333333){// ATGC random can be the original
-			seq[b]="ACGT"[rand()%4];
+			seq[b]="ACGT"[myrand_rand()%4];
 		}
 	}
 }
@@ -194,7 +194,7 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_transcript_len);
 	double rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 	int rand_01_int = (int)(rand_01*901267351);
-	srand(rand_01_int); // for generating sequencing errors.
+	myrand_srand(rand_01_int); // for generating sequencing errors.
 	grc_incrand(grc);
 
 	if(grc -> is_paired_end){
@@ -396,7 +396,7 @@ int grc_finalize(genRand_context_t *grc){
 }
 
 #define TRANSCRIPT_FASTA_LINE_INIT 800
-#define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000001.0
+#define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000000.000001
 #define TRANSCRIPT_FASTA_LINE_WIDTH 1000
 
 
@@ -422,7 +422,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		SUBREADprintf("Error: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "TranscriptID\tLength\tMD5\tUnique\tOccurance\tDuplicated\n");
+	fprintf(sumfp, "TranscriptID\tLength\tMD5\tDuplicate\tOccurance\tFresh\n");
 
 	char * seq_name = NULL;
 	unsigned char md5res[16];
@@ -532,7 +532,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		long seqlen = HashTableGet(seq_length_tab,seqnam)-NULL;
 		int is_reprs = HashTableGet(reprs_tab,md5str)==NULL;
 		HashTablePut(reprs_tab,md5str,NULL+1);
-		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"FALSE":"TRUE" /*"Unique"*/, md5repeated, is_reprs?"FALSE":"TRUE" /*"Duplicated"*/);
+		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"TRUE":"FALSE", md5repeated, is_reprs?"TRUE":"FALSE");
 	}
 	HashTableDestroy(reprs_tab);
 
@@ -769,7 +769,7 @@ int grc_load_env(genRand_context_t *grc){
 		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 	}
 	
-	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted expression levels are non-zero. You may use scanFasta() to find their names.\n", total_dup);
+	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted TPM values are non-zero. You may use scanFasta() to find their names.\n", total_dup);
 	autozip_close(&auto_FP);
 	HashTableDestroy(seq_duplicate_tab);
 

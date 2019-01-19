@@ -1291,7 +1291,9 @@ typedef struct {
 } do_load_juncs_context_t;
 
 int do_juncs_add_feature(char * gene_name, char * transcript_id, char * chro_name, unsigned int feature_start, unsigned int feature_end, int is_negative_strand, void * context){
-	//#warning ">>>>>>> COMMENt NEXT <<<<<<<<<<<<<<"
+	//#warning ">>>>>>>>>>>>>>>>> COMMENT NEXT <<<<<<<<<<<<<<<<<<<<"
+	//return 0;
+	//#warning ">>>>>>>>>>>>>>>>> COMMENT NEXT <<<<<<<<<<<<<<<<<<<<"
 	//SUBREADprintf("INJ LOCS: %s : %u, %u\n", chro_name, feature_start, feature_end);
 	do_load_juncs_context_t * do_load_juncs_context = context;
 	HashTable * feature_sorting_table = do_load_juncs_context -> feature_sorting_table;
@@ -1462,8 +1464,6 @@ void put_new_event(HashTable * event_table, chromosome_event_t * new_event , int
 		unsigned int * id_list = HashTableGet(event_table, NULL+sides[xk1]);
 		if(!id_list)
 		{
-			//#warning "====== DO NOT NEED TO CLEAR THE MEMORY BUFFER!  MALLOC IS GOOD ======"
-			//id_list = calloc(sizeof(unsigned int),EVENT_ENTRIES_INIT_SIZE);
 			id_list = malloc(sizeof(unsigned int)*(1+EVENT_ENTRIES_INIT_SIZE));
 			id_list[0]=EVENT_ENTRIES_INIT_SIZE;
 			id_list[1]=0;
@@ -1510,9 +1510,6 @@ int search_event(global_context_t * global_context, HashTable * event_table, chr
 		int current_size = res[0]&0x0fffffff;
 		for(xk2=1; xk2< current_size+1 ; xk2++)
 		{
-			if(0 && res[xk2] > 520000){
-				SUBREADprintf("TOO LARGE EVENT : %u ; POS=%d/%u\n", res[xk2] , xk2, res[0]);
-			} 
 			if(!res[xk2])break;
 			//if(res[xk2] - 1>= ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ) { SUBREADprintf("FATAL ERROR: Event id out-of-boundary: %u > %u!\n", res[xk2],  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ); continue;}
 			chromosome_event_t * event_body = &event_space[res[xk2]-1]; 
