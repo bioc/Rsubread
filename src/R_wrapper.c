@@ -86,6 +86,7 @@ void R_mergeVCF(int * nargs, char ** argv)
 	free(c_argv);
 }
 
+#define SAVE_R_CS_STACK
 
 void R_sublong_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
