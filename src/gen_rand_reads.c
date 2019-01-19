@@ -396,7 +396,7 @@ int grc_finalize(genRand_context_t *grc){
 }
 
 #define TRANSCRIPT_FASTA_LINE_INIT 800
-#define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000000.000001
+#define TRANSCRIPT_MAX_EXPRESSION_LEVEL 1000001.0
 #define TRANSCRIPT_FASTA_LINE_WIDTH 1000
 
 
@@ -422,7 +422,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		SUBREADprintf("Error: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "TranscriptID\tLength\tMD5\tDuplicate\tOccurance\tFresh\n");
+	fprintf(sumfp, "TranscriptID\tLength\tMD5\tUnique\tOccurance\tDuplicated\n");
 
 	char * seq_name = NULL;
 	unsigned char md5res[16];
@@ -532,7 +532,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		long seqlen = HashTableGet(seq_length_tab,seqnam)-NULL;
 		int is_reprs = HashTableGet(reprs_tab,md5str)==NULL;
 		HashTablePut(reprs_tab,md5str,NULL+1);
-		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"TRUE":"FALSE", md5repeated, is_reprs?"TRUE":"FALSE");
+		fprintf(sumfp, "%s\t%ld\t%s\t%s\t%ld\t%s\n", seqnam, seqlen, md5str, md5repeated>1?"FALSE":"TRUE" /*"Unique"*/, md5repeated, is_reprs?"FALSE":"TRUE" /*"Duplicated"*/);
 	}
 	HashTableDestroy(reprs_tab);
 
@@ -769,7 +769,7 @@ int grc_load_env(genRand_context_t *grc){
 		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 	}
 	
-	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted TPM values are non-zero. You may use scanFasta() to find their names.\n", total_dup);
+	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted expression levels are non-zero. You may use scanFasta() to find their names.\n", total_dup);
 	autozip_close(&auto_FP);
 	HashTableDestroy(seq_duplicate_tab);
 
