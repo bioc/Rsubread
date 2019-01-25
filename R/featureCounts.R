@@ -1,6 +1,7 @@
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
+	if(!is.character(files)) stop("files must be a character vector of file paths")
 	files <- normalizePath(files, mustWork=T)
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- normalizePath(annot.ext, mustWork=T)
 	if(!is.null(chrAliases))chrAliases <- normalizePath(chrAliases, mustWork=T)
