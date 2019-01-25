@@ -4031,6 +4031,9 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 
 			int new_event_type =(((global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_fusion_detection)||(global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_long_del_detection))&& !global_context -> config.prefer_donor_receptor_junctions)?CHRO_EVENT_TYPE_FUSION:CHRO_EVENT_TYPE_JUNCTION;
 
+			//#warning "=========================== DELETE NEXT LINE !!! =================================="
+			//new_event_type = CHRO_EVENT_TYPE_REMOVED;
+
 			if(is_strand_jumped) new_event_type = CHRO_EVENT_TYPE_FUSION;
 			if((subjunc_result->minor_coverage_start > result->confident_coverage_start) + (subjunc_result -> minor_position >  result -> selected_position) ==1)
 				new_event_type = CHRO_EVENT_TYPE_FUSION;

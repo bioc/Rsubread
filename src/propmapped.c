@@ -288,7 +288,7 @@ int init_PE_sambam(propMapped_context * context)
 	char mac_rand[13];
 	mac_or_rand_str(mac_rand);
 	#ifdef MAKE_STANDALONE
-	srand(time(NULL));
+	myrand_srand(time(NULL));
 	#endif
 
 	int x1;

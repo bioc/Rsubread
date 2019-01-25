@@ -86,12 +86,16 @@ void R_mergeVCF(int * nargs, char ** argv)
 	free(c_argv);
 }
 
+#define SAVE_R_CS_STACK
 
 void R_sublong_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
+
+	#ifdef SAVE_R_CS_STACK
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
+	#endif
 
 	r_argv = (char *)calloc(1000, sizeof(char));
 	strcpy(r_argv,*argv);
@@ -108,7 +112,9 @@ void R_sublong_wrapper(int * nargs, char ** argv){
 	free(c_argv);
 	free(r_argv);
 
+	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
+	#endif
 }
 
 
@@ -158,8 +164,10 @@ void R_buildindex_wrapper(int * nargs, char ** argv)
 
 void R_align_wrapper(int * nargs, char ** argv)
 {
+	#ifdef SAVE_R_CS_STACK
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
+	#endif
 	
         char * r_argv, ** c_argv;
         int i,n;
@@ -179,13 +187,17 @@ void R_align_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
+	#endif
 }
 
 void R_junction_wrapper(int * nargs, char ** argv)
 {
+	#ifdef SAVE_R_CS_STACK
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
+	#endif
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -205,7 +217,9 @@ void R_junction_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
+	#endif
 }
 
 
@@ -258,8 +272,10 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
 
 void R_readSummary_wrapper(int * nargs, char ** argv)
 {
+	#ifdef SAVE_R_CS_STACK
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
+	#endif
 	//printf("RCL=%ld\n", R_CStackLimit);
 
         char * r_argv, ** c_argv;
@@ -294,14 +310,18 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
+	#endif
 }
 
 
 void R_SNPcalling_wrapper(int * nargs, char ** argv)
 {
+	#ifdef SAVE_R_CS_STACK
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
+	#endif
 
         char * r_argv, ** c_argv;
         int i,n;
@@ -321,7 +341,9 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
+	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
+	#endif
 }
 
 
@@ -375,7 +397,6 @@ void R_qualityScores_wrapper(int * nargs, char ** argv)
 void R_generate_random_RNAseq_reads(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
-	uintptr_t old_cstack_limit = R_CStackLimit;
 	
 	r_argv = (char *)calloc(1500, sizeof(char));
 	strcpy(r_argv,*argv);
@@ -395,7 +416,6 @@ void R_generate_random_RNAseq_reads(int * nargs, char ** argv){
 	for(i=0;i<n;i++) free(c_argv[i]);
 	free(c_argv);
 	free(r_argv);
-	R_CStackLimit = old_cstack_limit;
 }
 void R_flattenGTF_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;

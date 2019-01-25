@@ -149,10 +149,10 @@ void grc_sequencing_error_read(char * seq, int qlen, char * qua){
 		if(seq[b]=='N') continue;
 
 		int qub = qua[b];
-		float randv = rand()*1./RAND_MAX;
+		float randv = myrand_rand()*1./RAND_MAX;
 		float errorp = pow(10,3.3 - qub*.1); // Phred 33
 		if(randv < errorp * 1.3333333333){// ATGC random can be the original
-			seq[b]="ACGT"[rand()%4];
+			seq[b]="ACGT"[myrand_rand()%4];
 		}
 	}
 }
@@ -194,7 +194,7 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_transcript_len);
 	double rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 	int rand_01_int = (int)(rand_01*901267351);
-	srand(rand_01_int); // for generating sequencing errors.
+	myrand_srand(rand_01_int); // for generating sequencing errors.
 	grc_incrand(grc);
 
 	if(grc -> is_paired_end){
