@@ -4,7 +4,11 @@
 \description{For each transcript, number of unique bases and total number of bases will be reported.
 }
 \usage{
-txUnique(GTF_Annotation_File, Feature_Type = "exon", Gene_ID_Attribute = "gene_id", Transcript_ID_Attribute = "transcript_id")
+txUnique(
+  GTF_Annotation_File,
+  Feature_Type = "exon",
+  Gene_ID_Attribute = "gene_id",
+  Transcript_ID_Attribute = "transcript_id")
 }
 \arguments{
   \item{GTF_Annotation_File}{ character string giving the name of a GTF file containing the transcript-level annotations.}
