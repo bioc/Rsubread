@@ -46,6 +46,7 @@ void * R_child_thread_child(void * aa){
 }
 
 void R_child_thread_run(int (*func)(int , char *[]), int n, char **args){
+  msgqu_init();
   struct R_child_thread_run_opt *opts = malloc(sizeof(struct R_child_thread_run_opt));
   opts -> func = func;
   opts -> n = n;
@@ -54,6 +55,7 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args){
   pthread_create(&thread, NULL, R_child_thread_child , opts);
   msgqu_main_loop();
   pthread_join(thread, NULL);
+  msgqu_destroy();
 }
 
 // ========== END: main thread screen output ============
@@ -308,7 +310,6 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
   R_CStackLimit =(uintptr_t)-1;
   #endif
 
-  msgqu_init();
   //printf("RCL=%ld\n", R_CStackLimit);
 
   char * r_argv, ** c_argv;
@@ -347,7 +348,6 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
   R_CStackLimit = old_cstack_limit;
   #endif
 
-  msgqu_destroy();
 }
 
 void R_SNPcalling_wrapper(int * nargs, char ** argv)
