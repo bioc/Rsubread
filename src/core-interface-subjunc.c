@@ -7,7 +7,7 @@
 #include "subread.h"
 #include "input-files.h"
 #include "core.h"
-
+#include "HelperFunctions.h"
 
 static struct option long_options[] =
 {
