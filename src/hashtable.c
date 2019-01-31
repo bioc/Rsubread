@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.31 2019/01/19 03:12:04 cvs Exp $
+ * $Id: hashtable.c,v 9999.32 2019/01/31 03:15:09 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -36,6 +36,21 @@ long long_random_val(){
 	}
 	return ret;
 }
+
+void * ArrayListShift(ArrayList * list){
+	if(list->numOfElements<1) return NULL;
+	void *ret = list->elementList [0];
+	long xx;
+	list->numOfElements -- ;
+	for(xx=0; xx<list->numOfElements; xx++) list->elementList [ xx ] = list->elementList [ xx+1 ];
+	return ret;
+}
+
+void * ArrayListPop(ArrayList * list){
+	if(list->numOfElements<1) return NULL;
+	return list->elementList [ -- list->numOfElements];
+}
+
 
 void * ArrayListRandom(ArrayList * list){
 	long ii = long_random_val() % list -> numOfElements;
