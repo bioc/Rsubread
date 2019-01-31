@@ -29,7 +29,7 @@
 #endif 
 #include "HelperFunctions.h"
 
-// ========== This part of code is to run everything in thread threads; the main thread is only for screen output ============
+// ========== This part of code is to run everything in child threads; the main thread is only for screen output ============
 struct R_child_thread_run_opt{
   int (*func)(int , char * []);
   char ** args;
@@ -57,24 +57,23 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args){
   pthread_join(thread, NULL);
   msgqu_destroy();
 }
-
 // ========== END: main thread screen output ============
 
-int main_junction(int argc,char ** argv);
-int main_align(int argc,char ** argv);
-int main_buildindex(int argc,char ** argv);
-int sam2bed(int argc,char *argv[]);
-int propmapped(int argc,char *argv[]);
-int readSummary(int argc,char *argv[]);
-int main_snp_calling_test(int argc,char *argv[]);
-int main_repeated_test(int argc, char *argv[]);
-int main_read_repair(int argc,char *argv[]);
-int main_qualityScores(int argc, char *argv[]);
-int findCommonVariants(int argc, char *argv[]);
-int longread_mapping_R(int argc, char *argv[]);
-int TxUniqueMain(int argc, char *argv[]);
-int R_flattenAnnotations(int argc, char *argv[]);
-int gen_rnaseq_reads_main(int argc, char *argv[]);
+extern int main_junction(int argc,char ** argv);
+extern int main_align(int argc,char ** argv);
+extern int main_buildindex(int argc,char ** argv);
+extern int sam2bed(int argc,char *argv[]);
+extern int propmapped(int argc,char *argv[]);
+extern int readSummary(int argc,char *argv[]);
+extern int main_snp_calling_test(int argc,char *argv[]);
+extern int main_repeated_test(int argc, char *argv[]);
+extern int main_read_repair(int argc,char *argv[]);
+extern int main_qualityScores(int argc, char *argv[]);
+extern int findCommonVariants(int argc, char *argv[]);
+extern int longread_mapping_R(int argc, char *argv[]);
+extern int TxUniqueMain(int argc, char *argv[]);
+extern int R_flattenAnnotations(int argc, char *argv[]);
+extern int gen_rnaseq_reads_main(int argc, char *argv[]);
 
 void R_txUnique_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
@@ -470,3 +469,30 @@ void R_flattenGTF_wrapper(int * nargs, char ** argv){
 	free(c_argv);
 	free(r_argv);
 }
+
+static const R_CMethodDef CEntries[] = {
+  {"R_txUnique_wrapper",             (DL_FUNC) &R_txUnique_wrapper,             2},
+  {"R_mergeVCF",                     (DL_FUNC) &R_mergeVCF,                     2},
+  {"R_sublong_wrapper",              (DL_FUNC) &R_sublong_wrapper,              2},
+  {"R_repair_wrapper",               (DL_FUNC) &R_repair_wrapper,               2},
+  {"R_buildindex_wrapper",           (DL_FUNC) &R_buildindex_wrapper,           2},
+  {"R_align_wrapper",                (DL_FUNC) &R_align_wrapper,                2},
+  {"R_junction_wrapper",             (DL_FUNC) &R_junction_wrapper,             2},
+  {"R_sam2bed_wrapper",              (DL_FUNC) &R_sam2bed_wrapper,              2},
+  {"R_propmapped_wrapper",           (DL_FUNC) &R_propmapped_wrapper,           2},
+  {"R_readSummary_wrapper",          (DL_FUNC) &R_readSummary_wrapper,          2},
+  {"R_SNPcalling_wrapper",           (DL_FUNC) &R_SNPcalling_wrapper,           2},
+  {"R_removeDupReads_wrapper",       (DL_FUNC) &R_removeDupReads_wrapper,       2},
+  {"R_qualityScores_wrapper",        (DL_FUNC) &R_qualityScores_wrapper,        2},
+  {"R_generate_random_RNAseq_reads", (DL_FUNC) &R_generate_random_RNAseq_reads, 2},
+  {"R_flattenGTF_wrapper",           (DL_FUNC) &R_flattenGTF_wrapper,           2},
+  {NULL, NULL, 0}
+};
+
+
+void R_init_Rsubread( DllInfo *dll ){
+  R_registerRoutines(dll, CEntries, NULL, NULL, NULL);
+  R_useDynamicSymbols(dll, FALSE);
+}
+
+
