@@ -1,4 +1,4 @@
-check_and_NormPath<- function(files, mustWork=F, opt=NULL){
+.check_and_NormPath<- function(files, mustWork=F, opt=NULL){
   if(is.na(files) || is.null(files) || class(files) != "character"){
     if( is.null(opt) ){
       if(is.na(files) || is.null(files)){
@@ -22,12 +22,12 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 {
 	flag <- FALSE
 	if(!is.character(files)) stop("files must be a character vector of file paths")
-	files <- check_and_NormPath(files, mustWork=T, opt="files")
-	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
-	if(!is.null(chrAliases))chrAliases <- check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
-	if(!is.null(genome)) genome <- check_and_NormPath(genome, mustWork=T, opt="genome")
+	files <- .check_and_NormPath(files, mustWork=T, opt="files")
+	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
+	if(!is.null(chrAliases))chrAliases <- .check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
+	if(!is.null(genome)) genome <- .check_and_NormPath(genome, mustWork=T, opt="genome")
 	if(!is.null(reportReadsPath)){
-		reportReadsPath <- check_and_NormPath(reportReadsPath, mustWork=T, opt="reportReadsPath")
+		reportReadsPath <- .check_and_NormPath(reportReadsPath, mustWork=T, opt="reportReadsPath")
 	}else reportReadsPath <- ' '
 	strandSpecific<-as.character(strandSpecific)
 	strandSpecific<-paste(strandSpecific, collapse=".")

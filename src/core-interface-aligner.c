@@ -664,6 +664,8 @@ int main_align(int argc , char ** argv)
 
 //	printf("SIZE_OF_ALN=%d\n", sizeof(mapping_result_t));
 //	printf("SIZE_OF_VOT=%d\n", sizeof(voting_context_t));
-	return core_main(argc, argv, parse_opts_aligner);
+	int ret = core_main(argc, argv, parse_opts_aligner);
+	msgqu_notifyFinish();
+	return ret;
 }
 

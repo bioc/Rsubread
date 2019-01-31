@@ -29,6 +29,34 @@
 #endif 
 #include "HelperFunctions.h"
 
+// ========== This part of code is to run everything in thread threads; the main thread is only for screen output ============
+struct R_child_thread_run_opt{
+  int (*func)(int , char * []);
+  char ** args;
+  int n;
+};
+
+
+void * R_child_thread_child(void * aa){
+  struct R_child_thread_run_opt *opts = aa;
+  opts->func(opts->n, opts->args);
+  free(opts);
+  return NULL;
+}
+
+void R_child_thread_run(int (*func)(int , char *[]), int n, char **args){
+  struct R_child_thread_run_opt *opts = malloc(sizeof(struct R_child_thread_run_opt));
+  opts -> func = func;
+  opts -> n = n;
+  opts -> args = args;
+  pthread_t thread;
+  pthread_create(&thread, NULL, R_child_thread_child , opts);
+  msgqu_main_loop();
+  pthread_join(thread, NULL);
+}
+
+// ========== END: main thread screen output ============
+
 int main_junction(int argc,char ** argv);
 int main_align(int argc,char ** argv);
 int main_buildindex(int argc,char ** argv);
@@ -182,7 +210,7 @@ void R_align_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        main_align(n,c_argv);
+		R_child_thread_run(main_align,n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);
@@ -212,7 +240,7 @@ void R_junction_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        main_junction(n,c_argv);
+		R_child_thread_run(main_junction,n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);
@@ -269,30 +297,6 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
         free(c_argv);
         free(r_argv);
 
-}
-
-struct R_child_thread_run_opt{
-  int (*func)(int , char * []);
-  char ** args;
-  int n;
-};
-
-
-void * R_child_thread_child(void * aa){
-  struct R_child_thread_run_opt *opts = aa;
-  opts->func(opts->n, opts->args);
-  free(opts);
-}
-
-void * R_child_thread_run(int (*func)(int , char *[]), int n, char **args){
-  struct R_child_thread_run_opt *opts = malloc(sizeof(struct R_child_thread_run_opt));
-  opts -> func = func;
-  opts -> n = n;
-  opts -> args = args;
-  pthread_t thread;
-  pthread_create(&thread, NULL, R_child_thread_child , opts);
-  msgqu_main_loop();
-  pthread_join(thread, NULL);
 }
 
 void R_readSummary_wrapper(int * nargs, char ** argv)
@@ -364,7 +368,7 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        main_snp_calling_test(n,c_argv);
+    	R_child_thread_run(main_snp_calling_test,n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);

@@ -1403,9 +1403,6 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 	chromosome_t * known_chromosomes;
 	unsigned int real_read_count=0;
 
-	double start_time = miltime();
-	unsigned short rand48_seed[3];
-
 	int i, fpos;
 
 	signal (SIGTERM, EXSNP_SIGINT_hook);
@@ -1471,7 +1468,6 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		HashTableSetDeallocationFunctions(parameters-> cigar_event_table, NULL, NULL);
 		HashTableSetKeyComparisonFunction(parameters-> cigar_event_table, my_strcmp);
 
-		memcpy(rand48_seed, &start_time, 6);
 		char mac_rand[13];
 		mac_or_rand_str(mac_rand);
 
@@ -1921,6 +1917,7 @@ int main_snp_calling_test(int argc,char ** argv)
 
 	EXSNP_SIGINT_hook(0);
 	}	// XK1 END
+	msgqu_notifyFinish();
 	return ret;
 	
 }

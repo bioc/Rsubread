@@ -1905,7 +1905,7 @@ void msgqu_printf(const char * fmt, ...){
 	va_start(args , fmt);
 	va_end(args);
 	char * obuf = malloc(MSGQU_LINE_SIZE+1);
-	int rlen = vsnprintf( obuf, MSGQU_LINE_SIZE, fmt, args );
+	vsnprintf( obuf, MSGQU_LINE_SIZE, fmt, args );
 	obuf[MSGQU_LINE_SIZE]=0;
 
 	#ifdef MAKE_STANDALONE

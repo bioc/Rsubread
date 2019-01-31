@@ -695,6 +695,8 @@ int subread_subjunc_main(int argc , char ** argv)
 int main_junction(int argc , char ** argv)
 {
 #endif
-	return core_main(argc, argv, parse_opts_subjunc);
+	int ret = core_main(argc, argv, parse_opts_subjunc);
+    msgqu_notifyFinish();
+    return ret;
 }
 
