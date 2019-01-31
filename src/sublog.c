@@ -124,12 +124,7 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 		vsnprintf(vsbuf, 1199, pattern , args);
 		remove_ESC_effects(vsbuf);
 		if(strlen(vsbuf)>0)
-		{
-			fputs(vsbuf,stderr);
 			SUBREADprintf("%s",vsbuf);
-
-
-		}
 		free(vsbuf);
 	}
 	else
