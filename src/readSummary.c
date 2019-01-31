@@ -973,6 +973,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 	unsigned int ret_features_size = 400000;
 	fc_feature_info_t * ret_features = malloc(sizeof(fc_feature_info_t) * ret_features_size);
+	char * tmpnameex = malloc(50001);
 
 	lineno = 0;
 	while(1)
@@ -1160,7 +1161,6 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 									break;
 								}
 
-							char * tmpnameex = malloc(50001);
 							attr_val_len = GTF_extra_column_value(extra_attrs , this_exname_ptr , tmpnameex, 50000);
 
 							if(attr_val_len<0){
@@ -1176,7 +1176,6 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 							extcols[extcols_len]='\t';
 							extcols_len += 1;
 							
-							free(tmpnameex);
 							if(is_last)break;
 							this_exname_ptr[padd0]='\t';
 							this_exname_ptr += padd0+1;
@@ -1243,6 +1242,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	features = xk1;
 	autozip_close(&anno_fp);
 	free(file_line);
+	free(tmpnameex);
 
 	(*loaded_features) = ret_features;
 	global_context -> exontable_nchrs = (int)chro_name_table-> numOfElements;
@@ -4555,8 +4555,8 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 		while(*(tnamep++))
 			total_extra_cols += '\t' ==(*tnamep);
 		for(xk1=0; xk1<total_extra_cols; xk1++){
-			out_extra_columns[xk1] = malloc(1000);
-			out_extra_column_size[xk1] = 1000;
+			out_extra_columns[xk1] = malloc(220);
+			out_extra_column_size[xk1] = 220;
 		}
 	}
 
@@ -6103,7 +6103,7 @@ int readSummary(int argc,char *argv[]){
 	free(strand_mode_list);
 	free(nreads);
 
-
+	msgqu_notifyFinish();
 	return total_written_coulmns?0:-1;
 }
 

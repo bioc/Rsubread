@@ -1,12 +1,32 @@
+check_and_NormPath<- function(files, mustWork=F, opt=NULL){
+  if(is.na(files) || is.null(files) || class(files) != "character"){
+    if( is.null(opt) ){
+      if(is.na(files) || is.null(files)){
+        stop("Error: the file name is NA or NULL.")
+      }else{
+        stop(paste0("Error: the file name must be a character vector. The current input is ",class(files)))
+      }
+    }else{
+      if(is.na(files) || is.null(files)){
+        stop(paste0("Error: the argument to '",opt,"' is NA or NULL."))
+      }else{
+        stop(paste0("Error: the argument to '",opt,"' must be a character vector. The current input is ",class(files)))
+      }
+    }
+  }
+
+  normalizePath(files, mustWork = mustWork)
+}
+
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
-	files <- normalizePath(files, mustWork=T)
-	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- normalizePath(annot.ext, mustWork=T)
-	if(!is.null(chrAliases))chrAliases <- normalizePath(chrAliases, mustWork=T)
-	if(!is.null(genome)) genome <- normalizePath(genome, mustWork=T)
+	files <- check_and_NormPath(files, mustWork=T, opt="files")
+	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
+	if(!is.null(chrAliases))chrAliases <- check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
+	if(!is.null(genome)) genome <- check_and_NormPath(genome, mustWork=T, opt="genome")
 	if(!is.null(reportReadsPath)){
-		reportReadsPath <- normalizePath(reportReadsPath, mustWork=T)
+		reportReadsPath <- check_and_NormPath(reportReadsPath, mustWork=T, opt="reportReadsPath")
 	}else reportReadsPath <- ' '
 	strandSpecific<-as.character(strandSpecific)
 	strandSpecific<-paste(strandSpecific, collapse=".")

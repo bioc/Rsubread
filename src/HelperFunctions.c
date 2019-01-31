@@ -1839,3 +1839,86 @@ void TestNormalMain(){
 		SUBREADprintf("p of %.1f = %.40f\n\n" , ii, p_0);
 	}
 }
+
+
+#ifndef MAKE_STANDALONE
+
+message_queue_t mt_message_queue;
+
+
+int safeRprintf(char * fmt,...){
+	va_list args;
+	va_start(args , fmt);
+	FILE * ofp = fopen("/tmp/del4-Rlog.txt", "a");
+	//fprintf(ofp, "NEW LOG : %p \"%s\"\n", fmt, fmt);
+	fprintf(ofp, fmt, args);
+	fclose(ofp);
+	va_end(args);
+	return 0;
+}
+
+#endif
+
+void msgqu_destroy(){
+	#ifndef MAKE_STANDALONE
+	ArrayListDestroy(mt_message_queue.message_queue);
+	subread_destroy_lock(&mt_message_queue.queue_lock);
+	#endif
+}
+
+void msgqu_notifyFinish(){
+	#ifndef MAKE_STANDALONE
+	mt_message_queue.is_finished = 1;
+	#endif
+}
+
+void msgqu_init(){
+	#ifndef MAKE_STANDALONE
+	mt_message_queue.is_finished = 0;
+	Rprintf("INIT MSGQUEUE 1\n");
+	mt_message_queue.message_queue = ArrayListCreate(100);
+	ArrayListSetDeallocationFunction(mt_message_queue.message_queue,free);
+	Rprintf("INIT MSGQUEUE 2\n");
+	subread_init_lock(&mt_message_queue.queue_lock);
+	subread_init_lock(&mt_message_queue.queue_notifier);
+	Rprintf("INIT MSGQUEUE 3\n");
+	#endif
+}
+
+void msgqu_main_loop(){
+	#ifndef MAKE_STANDALONE
+	while(1){
+		long i;
+		subread_lock_occupy(&mt_message_queue.queue_lock);
+		for(i=0; i< mt_message_queue.message_queue->numOfElements ; i++){
+			char * amsg = ArrayListShift(mt_message_queue.message_queue);
+			Rprintf("%s\n", amsg);
+			free(amsg);
+		}
+		if(mt_message_queue.is_finished) break;
+		subread_lock_release(&mt_message_queue.queue_lock);
+		usleep(50000);
+	}
+	#endif
+}
+
+#define MSGQU_LINE_SIZE 3000
+void msgqu_printf(const char * fmt, ...){
+	va_list args;
+	va_start(args , fmt);
+	va_end(args);
+	char * obuf = malloc(MSGQU_LINE_SIZE+1);
+	int rlen = vsnprintf( obuf, MSGQU_LINE_SIZE, fmt, args );
+	obuf[MSGQU_LINE_SIZE]=0;
+
+	#ifdef MAKE_STANDALONE
+		fputs(obuf, stderr);
+		free(obuf);
+	#else
+		subread_lock_occupy(&mt_message_queue.queue_lock);
+		ArrayListPush(mt_message_queue.message_queue, obuf);
+		subread_lock_release(&mt_message_queue.queue_lock);
+		// it will be freed in the Main thread after printing.
+	#endif
+}
+

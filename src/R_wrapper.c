@@ -27,6 +27,7 @@
 #define CSTACK_DEFNS 1
 #include <Rinterface.h>
 #endif 
+#include "HelperFunctions.h"
 
 int main_junction(int argc,char ** argv);
 int main_align(int argc,char ** argv);
@@ -86,7 +87,7 @@ void R_mergeVCF(int * nargs, char ** argv)
 	free(c_argv);
 }
 
-#define SAVE_R_CS_STACK
+//#define SAVE_R_CS_STACK
 
 void R_sublong_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
@@ -270,49 +271,77 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
 
 }
 
+struct R_child_thread_run_opt{
+  int (*func)(int , char * []);
+  char ** args;
+  int n;
+};
+
+
+void * R_child_thread_child(void * aa){
+  struct R_child_thread_run_opt *opts = aa;
+  opts->func(opts->n, opts->args);
+  free(opts);
+}
+
+void * R_child_thread_run(int (*func)(int , char *[]), int n, char **args){
+  struct R_child_thread_run_opt *opts = malloc(sizeof(struct R_child_thread_run_opt));
+  opts -> func = func;
+  opts -> n = n;
+  opts -> args = args;
+  pthread_t thread;
+  pthread_create(&thread, NULL, R_child_thread_child , opts);
+  msgqu_main_loop();
+  pthread_join(thread, NULL);
+}
+
 void R_readSummary_wrapper(int * nargs, char ** argv)
 {
-	#ifdef SAVE_R_CS_STACK
-	uintptr_t old_cstack_limit = R_CStackLimit;
-	R_CStackLimit =(uintptr_t)-1;
-	#endif
-	//printf("RCL=%ld\n", R_CStackLimit);
+  #ifdef SAVE_R_CS_STACK
+  uintptr_t old_cstack_limit = R_CStackLimit;
+  R_CStackLimit =(uintptr_t)-1;
+  #endif
 
-        char * r_argv, ** c_argv;
-        int i,n, arg_len;
+  msgqu_init();
+  //printf("RCL=%ld\n", R_CStackLimit);
 
-	arg_len = strlen(*argv);
-        r_argv = (char *)calloc(1+arg_len, sizeof(char));
-        strcpy(r_argv,*argv);
+  char * r_argv, ** c_argv;
+  int i,n, arg_len;
 
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
+  arg_len = strlen(*argv);
+  r_argv = (char *)calloc(1+arg_len, sizeof(char));
+  strcpy(r_argv,*argv);
 
-	if(strstr(r_argv, ",,")==NULL )
-	{
-		for(i=0; i<n; i++)
-		{
-			char * current_arg = strtok(i?NULL:r_argv,",");
-			if(current_arg == NULL)
-				break;
-			arg_len = strlen(current_arg);
-			c_argv[i] = (char *)calloc(1+arg_len,sizeof(char));
-			strcpy(c_argv[i], current_arg);
-		}
+  n = *nargs;
+  c_argv = (char **) calloc(n,sizeof(char *));
 
-		n=i;
+  if(strstr(r_argv, ",,")==NULL )
+  {
+    for(i=0; i<n; i++)
+    {
+      char * current_arg = strtok(i?NULL:r_argv,",");
+      if(current_arg == NULL)
+        break;
+      arg_len = strlen(current_arg);
+      c_argv[i] = (char *)calloc(1+arg_len,sizeof(char));
+      strcpy(c_argv[i], current_arg);
+    }
 
-		readSummary(n,c_argv);
+    n=i;
 
-		for(i=0;i<n;i++) free(c_argv[i]);
-	}
-	else Rprintf("No input files are provided. \n");
-        free(c_argv);
-        free(r_argv);
+    R_child_thread_run(readSummary,n,c_argv);
 
-	#ifdef SAVE_R_CS_STACK
-	R_CStackLimit = old_cstack_limit;
-	#endif
+    for(i=0;i<n;i++) free(c_argv[i]);
+  }
+  else Rprintf("No input files are provided. \n");
+    free(c_argv);
+    free(r_argv);
+
+  #ifdef SAVE_R_CS_STACK
+  R_CStackLimit = old_cstack_limit;
+  #endif
+
+  msgqu_destroy();
 }
 
 

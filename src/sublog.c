@@ -89,12 +89,7 @@ void sublog_printf(int stage, int level, const char * pattern, ...)
 		vsnprintf(vsbuf, 1199, pattern , args);
 		remove_ESC_effects(vsbuf);
 
-		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
-		fputs(vsbuf,stderr);
-		fputs("\n", stderr);
-		#else
-		Rprintf("%s\n",vsbuf);
-		#endif
+		SUBREADprintf("%s\n",vsbuf);
 
 		free(vsbuf);
 	}
@@ -102,12 +97,12 @@ void sublog_printf(int stage, int level, const char * pattern, ...)
 	{
 		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
 		vfprintf(stderr, pattern , args);
-		va_end(args);
 		fputs("\n", stderr);
 
 		fflush(stderr);
 		#endif
 	}
+	va_end(args);
 }
 
 void sublog_fwrite(int stage, int level, const char * pattern, ...)
@@ -130,14 +125,8 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 		remove_ESC_effects(vsbuf);
 		if(strlen(vsbuf)>0)
 		{
-			#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
 			fputs(vsbuf,stderr);
-			#else
-			int vslen = strlen(vsbuf);
-			if(vsbuf[vslen-1]!='\n')
-				strcat(vsbuf+vslen, "\n");
-			Rprintf("%s",vsbuf);
-			#endif
+			SUBREADprintf("%s",vsbuf);
 
 
 		}
@@ -147,11 +136,11 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 	{
 		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
 		vfprintf(stderr, pattern , args);
-		va_end(args);
 
 		fflush(stderr);
 		#endif
 	}
+	va_end(args);
 
 }
 

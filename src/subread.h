@@ -129,9 +129,13 @@ typedef pthread_spinlock_t subread_lock_t;
 #define CORE_SOFT_BR_CHAR '\n'
 #else
 #define STANDALONE_exit(i) return i;
-#define SUBREADprintf Rprintf
-#define SUBREADputs(x) Rprintf("%s\n",(x))
-#define SUBREADputchar(X) Rprintf("%c",(X)) 
+
+int safeRprintf(char *fmt, ...);
+void msgqu_printf(const char * fmt, ...);
+
+#define SUBREADprintf  msgqu_printf
+#define SUBREADputs(x) msgqu_printf("%s\n",(x))
+#define SUBREADputchar(X) msgqu_printf("%c",(X)) 
 #define SUBREADfflush(X) 
 #define CORE_SOFT_BR_CHAR '\n'
 
