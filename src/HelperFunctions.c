@@ -1868,7 +1868,9 @@ void msgqu_destroy(){
 
 void msgqu_notifyFinish(){
 	#ifndef MAKE_STANDALONE
+	subread_lock_occupy(&mt_message_queue.queue_lock);
 	mt_message_queue.is_finished = 1;
+	subread_lock_release(&mt_message_queue.queue_lock);
 	#endif
 }
 
