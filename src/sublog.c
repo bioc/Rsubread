@@ -89,12 +89,7 @@ void sublog_printf(int stage, int level, const char * pattern, ...)
 		vsnprintf(vsbuf, 1199, pattern , args);
 		remove_ESC_effects(vsbuf);
 
-		#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
-		fputs(vsbuf,stderr);
-		fputs("\n", stderr);
-		#else
-		safeRprintf("%s\n",vsbuf);
-		#endif
+		SUBREADprintf("%s\n",vsbuf);
 
 		free(vsbuf);
 	}
@@ -129,18 +124,7 @@ void sublog_fwrite(int stage, int level, const char * pattern, ...)
 		vsnprintf(vsbuf, 1199, pattern , args);
 		remove_ESC_effects(vsbuf);
 		if(strlen(vsbuf)>0)
-		{
-			#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
-			fputs(vsbuf,stderr);
-			#else
-			int vslen = strlen(vsbuf);
-			if(vsbuf[vslen-1]!='\n')
-				strcat(vsbuf+vslen, "\n");
-			safeRprintf("%s",vsbuf);
-			#endif
-
-
-		}
+			SUBREADprintf("%s",vsbuf);
 		free(vsbuf);
 	}
 	else
