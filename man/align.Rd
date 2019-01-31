@@ -224,7 +224,8 @@ buildindex(basename="./reference_index",reference=ref)
 
 # align a sample read dataset ('reads.txt') to the sample reference
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
-align.stat <- align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM",phredOffset=64)
+align.stat <- align(index = "./reference_index", readfile1 = reads,
+                    output_file = "./Rsubread_alignment.BAM", phredOffset = 64)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
