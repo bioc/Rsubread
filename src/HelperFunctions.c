@@ -1875,13 +1875,10 @@ void msgqu_notifyFinish(){
 void msgqu_init(){
 	#ifndef MAKE_STANDALONE
 	mt_message_queue.is_finished = 0;
-	Rprintf("INIT MSGQUEUE 1\n");
 	mt_message_queue.message_queue = ArrayListCreate(100);
 	ArrayListSetDeallocationFunction(mt_message_queue.message_queue,free);
-	Rprintf("INIT MSGQUEUE 2\n");
 	subread_init_lock(&mt_message_queue.queue_lock);
 	subread_init_lock(&mt_message_queue.queue_notifier);
-	Rprintf("INIT MSGQUEUE 3\n");
 	#endif
 }
 
@@ -1892,12 +1889,12 @@ void msgqu_main_loop(){
 		subread_lock_occupy(&mt_message_queue.queue_lock);
 		for(i=0; i< mt_message_queue.message_queue->numOfElements ; i++){
 			char * amsg = ArrayListShift(mt_message_queue.message_queue);
-			Rprintf("%s\n", amsg);
+			Rprintf("%s", amsg);
 			free(amsg);
 		}
 		if(mt_message_queue.is_finished) break;
 		subread_lock_release(&mt_message_queue.queue_lock);
-		usleep(50000);
+		usleep(40000);
 	}
 	#endif
 }
