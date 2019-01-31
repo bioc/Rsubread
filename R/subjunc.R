@@ -1,16 +1,16 @@
 subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
-    readfile1 <- normalizePath(as.character(readfile1), mustWork=T)
-    output_file <- normalizePath(as.character(output_file), mustWork=F)
-	index <- normalizePath(index, mustWork=F)
-    if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = normalizePath(annot.ext, mustWork=T)
-	if(!is.null(chrAliases)) chrAliases = normalizePath(chrAliases, mustWork=T)
+    readfile1 <- .check_and_NormPath(as.character(readfile1), mustWork=T, opt="readfile1")
+    output_file <- .check_and_NormPath(as.character(output_file), mustWork=F, opt="output_file")
+	index <- .check_and_NormPath(index, mustWork=F, opt="index")
+    if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
+	if(!is.null(chrAliases)) chrAliases = .check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
     
 	if(length(readfile1) != length(output_file))
 		stop("The number of input file names is different from the number of output file names.")
 
 	if(!is.null(readfile2)){
-        readfile2 <- normalizePath(as.character(readfile2), mustWork=T)
+        readfile2 <- .check_and_NormPath(as.character(readfile2), mustWork=T, opt="readfile2")
 		if(length(readfile1) != length(readfile2))
 			stop("The number of file names for the first reads is different from the number of file names for the second reads.")
 	}

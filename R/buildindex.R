@@ -1,7 +1,7 @@
 buildindex <- function(basename,reference,gappedIndex=FALSE,indexSplit=FALSE,memory=8000,TH_subread=100,colorspace=FALSE)
 {
-	basename <- normalizePath(basename, mustWork=F)
-	reference <- normalizePath(reference, mustWork=T)
+	basename <- .check_and_NormPath(basename, mustWork=F, opt="basename")
+	reference <- .check_and_NormPath(reference, mustWork=T, opt="reference")
 
 	opt <- paste("-o",basename,"-f",TH_subread,"-M",memory,reference,sep=",")
 
