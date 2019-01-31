@@ -299,6 +299,12 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
 
 }
 
+int readSummary_retval(int n, char * args[]){
+  int ret = readSummary(n, args);
+  msgqu_notifyFinish();
+  return ret;
+}
+
 void R_readSummary_wrapper(int * nargs, char ** argv)
 {
   #ifdef SAVE_R_CS_STACK
@@ -333,7 +339,7 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
 
     n=i;
 
-    R_child_thread_run(readSummary,n,c_argv);
+    R_child_thread_run(readSummary_retval,n,c_argv);
 
     for(i=0;i<n;i++) free(c_argv[i]);
   }
