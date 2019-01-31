@@ -55,15 +55,6 @@ void * ArrayListGet(ArrayList * list, long n);
 void * ArrayListRandom(ArrayList * list);
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
-// Shift is the other direction of Pop:
-// Say, a list has elements 0,1,2,3,4
-// Pop removes 4 from the list and returns it.
-// Shift repoves 0 from the list and returns it.
-//
-// Caller has to be sure that at least one element is in the list or a NULL is returned. 
-// Due to its nature, the caller has to deallocate the returned object. The internal deallocater is NOT called on the returned object.
-void * ArrayListShift(ArrayList * list);
-void * ArrayListPop(ArrayList * list);
 void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
 void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem));
 

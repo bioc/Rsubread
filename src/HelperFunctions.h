@@ -20,7 +20,6 @@
 #ifndef __HELPER_FUNCTIONS_H_
 #define __HELPER_FUNCTIONS_H_
 
-#include "subread.h"
 #include "hashtable.h"
 
 #define PARSE_STATUS_TAGNAME 1
@@ -31,24 +30,6 @@ typedef struct{
 	HashTable * contig_table;
 	HashTable * size_table;
 } fasta_contigs_t;
-
-#ifndef MAKE_STANDALONE
-
-typedef struct{
-	ArrayList * message_queue;
-	subread_lock_t queue_lock;
-	subread_lock_t queue_notifier;
-	int is_finished;
-} message_queue_t;
-
-extern message_queue_t mt_message_queue;
-#endif
-
-void msgqu_init();
-void msgqu_destroy();
-void msgqu_main_loop();
-void msgqu_notifyFinish();
-void msgqu_printf(const char * fmt, ...);
 
 int read_contig_fasta(fasta_contigs_t * tab, char * fname);
 int get_contig_fasta(fasta_contigs_t * tab, char * chro, unsigned int pos, int len, char * out_bases);

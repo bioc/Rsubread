@@ -18,6 +18,7 @@
   
   
 #include <ctype.h>
+#include <sys/types.h>
 #include <string.h>
 #include <assert.h>
 #include <math.h>
@@ -25,7 +26,6 @@
 
 #ifdef MACOS
 
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
@@ -1843,79 +1843,30 @@ void TestNormalMain(){
 
 #ifndef MAKE_STANDALONE
 
-message_queue_t mt_message_queue;
-
-
+/*
 int safeRprintf(char * fmt,...){
 	va_list args;
 	va_start(args , fmt);
 	FILE * ofp = fopen("/tmp/del4-Rlog.txt", "a");
-	//fprintf(ofp, "NEW LOG : %p \"%s\"\n", fmt, fmt);
+	fprintf(ofp, "NEW LOG : %p \"%s\", \"%s\"\n", fmt, fmt, (fmt[0]=='%' && fmt[1]=='s')?va_arg(args,char *):"NO_PARAM");
 	fprintf(ofp, fmt, args);
 	fclose(ofp);
 	va_end(args);
 	return 0;
 }
-
-#endif
-
-void msgqu_destroy(){
-	#ifndef MAKE_STANDALONE
-	ArrayListDestroy(mt_message_queue.message_queue);
-	subread_destroy_lock(&mt_message_queue.queue_lock);
-	#endif
-}
-
-void msgqu_notifyFinish(){
-	#ifndef MAKE_STANDALONE
-	mt_message_queue.is_finished = 1;
-	#endif
-}
-
-void msgqu_init(){
-	#ifndef MAKE_STANDALONE
-	mt_message_queue.is_finished = 0;
-	mt_message_queue.message_queue = ArrayListCreate(100);
-	ArrayListSetDeallocationFunction(mt_message_queue.message_queue,free);
-	subread_init_lock(&mt_message_queue.queue_lock);
-	subread_init_lock(&mt_message_queue.queue_notifier);
-	#endif
-}
-
-void msgqu_main_loop(){
-	#ifndef MAKE_STANDALONE
-	while(1){
-		long i;
-		subread_lock_occupy(&mt_message_queue.queue_lock);
-		for(i=0; i< mt_message_queue.message_queue->numOfElements ; i++){
-			char * amsg = ArrayListShift(mt_message_queue.message_queue);
-			Rprintf("%s", amsg);
-			free(amsg);
-		}
-		if(mt_message_queue.is_finished) break;
-		subread_lock_release(&mt_message_queue.queue_lock);
-		usleep(40000);
-	}
-	#endif
-}
-
-#define MSGQU_LINE_SIZE 3000
-void msgqu_printf(const char * fmt, ...){
+*/
+int safeRprintf(char * fmt,...){
 	va_list args;
 	va_start(args , fmt);
+	char so [400];
+	so[399]=0;
+	vsnprintf(so, 399, fmt,args);
 	va_end(args);
-	char * obuf = malloc(MSGQU_LINE_SIZE+1);
-	vsnprintf( obuf, MSGQU_LINE_SIZE, fmt, args );
-	obuf[MSGQU_LINE_SIZE]=0;
 
-	#ifdef MAKE_STANDALONE
-		fputs(obuf, stderr);
-		free(obuf);
-	#else
-		subread_lock_occupy(&mt_message_queue.queue_lock);
-		ArrayListPush(mt_message_queue.message_queue, obuf);
-		subread_lock_release(&mt_message_queue.queue_lock);
-		// it will be freed in the Main thread after printing.
-	#endif
+	Rprintf("%s",so);
+	//FILE * ofp = fopen("/tmp/del4-Rlog.txt", "a");
+	//fprintf(ofp, "CALL_TPID=%d\n", tid);
+	//fclose(ofp);
+	return 0;
 }
-
+#endif
