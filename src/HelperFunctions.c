@@ -1887,9 +1887,8 @@ void msgqu_init(){
 void msgqu_main_loop(){
 	#ifndef MAKE_STANDALONE
 	while(1){
-		long i;
 		subread_lock_occupy(&mt_message_queue.queue_lock);
-		for(i=0; i< mt_message_queue.message_queue->numOfElements ; i++){
+		while(0< mt_message_queue.message_queue->numOfElements){
 			char * amsg = ArrayListShift(mt_message_queue.message_queue);
 			Rprintf("%s", amsg);
 			free(amsg);
