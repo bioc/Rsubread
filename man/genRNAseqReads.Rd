@@ -97,14 +97,14 @@ scanFasta(
 \author{Wei Shi and Yang Liao}
 \examples{
 \dontrun{
-# Scan through the fasta file for the transcript names and lengths
+# Scan through the fasta file to get transcript names and lengths
 transcripts <- scanFasta("GENCODE-Human-transcripts.fa.gz")
+nsequences <- nrow(transcripts) - sum(transcripts$Duplicate)
 
-# Assigned a random TPM value to each transcript. 
-TPMs <- data.frame(TranscriptID=transcripts$TranscriptID, TPM=rnorm(nrow(transcripts), mean=2, sd=1))
-TPMs$TPM <- ifelse(TPMs$TPM < 0, 0, TPMs$TPM) # no negative TPM is allowed
-TPMs$TPM <- ifelse(transcripts$Fresh, TPMs$TPM, 0) # only generate reads from destinct sequences (ie if multiple transcripts have exactly the same sequence, only one of them is given the non-zero TPM value).
-TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1000000
+# Assign a random TPM value to each non-duplicated transcript sequence
+TPMs <- data.frame(TranscriptID = transcripts$TranscriptID, TPM = 0)
+TPMs$TPM[!transcripts$Duplicate] <- rexp(nsequences)
+TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1e6
 
 # Generate actual reads.
 # The output read file is my-simulated-sample_R1.fastq.gz 
