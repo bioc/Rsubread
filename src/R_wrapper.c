@@ -354,6 +354,11 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
   msgqu_destroy();
 }
 
+int main_snp_calling_test_retval(int n, char * args[]){
+	int ret = main_snp_calling_test(n , args);
+	msgqu_notifyFinish();
+	return ret;
+}
 
 void R_SNPcalling_wrapper(int * nargs, char ** argv)
 {
@@ -374,7 +379,7 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-    	R_child_thread_run(main_snp_calling_test,n,c_argv);
+    	R_child_thread_run(main_snp_calling_test_retval,n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);
