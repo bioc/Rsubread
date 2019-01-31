@@ -6103,7 +6103,6 @@ int readSummary(int argc,char *argv[]){
 	free(strand_mode_list);
 	free(nreads);
 
-	msgqu_notifyFinish();
 	return total_written_coulmns?0:-1;
 }
 

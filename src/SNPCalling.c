@@ -1917,7 +1917,6 @@ int main_snp_calling_test(int argc,char ** argv)
 
 	EXSNP_SIGINT_hook(0);
 	}	// XK1 END
-	msgqu_notifyFinish();
 	return ret;
 	
 }

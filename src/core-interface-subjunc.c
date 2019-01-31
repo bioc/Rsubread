@@ -696,7 +696,6 @@ int main_junction(int argc , char ** argv)
 {
 #endif
 	int ret = core_main(argc, argv, parse_opts_subjunc);
-    msgqu_notifyFinish();
     return ret;
 }
 

@@ -41,6 +41,7 @@ void * R_child_thread_child(void * aa){
   struct R_child_thread_run_opt *opts = aa;
   opts->func(opts->n, opts->args);
   free(opts);
+  msgqu_notifyFinish();
   return NULL;
 }
 
@@ -183,7 +184,7 @@ void R_buildindex_wrapper(int * nargs, char ** argv)
 	strcpy(c_argv[0],strtok(r_argv,","));
 	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-	main_buildindex(n,c_argv);
+	R_child_thread_run(main_buildindex,n,c_argv);
 
 	for(i=0;i<n;i++) free(c_argv[i]);
 	free(c_argv);
@@ -299,11 +300,6 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
 
 }
 
-int readSummary_retval(int n, char * args[]){
-  int ret = readSummary(n, args);
-  msgqu_notifyFinish();
-  return ret;
-}
 
 void R_readSummary_wrapper(int * nargs, char ** argv)
 {
@@ -339,7 +335,7 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
 
     n=i;
 
-    R_child_thread_run(readSummary_retval,n,c_argv);
+    R_child_thread_run(readSummary,n,c_argv);
 
     for(i=0;i<n;i++) free(c_argv[i]);
   }
@@ -352,12 +348,6 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
   #endif
 
   msgqu_destroy();
-}
-
-int main_snp_calling_test_retval(int n, char * args[]){
-	int ret = main_snp_calling_test(n , args);
-	msgqu_notifyFinish();
-	return ret;
 }
 
 void R_SNPcalling_wrapper(int * nargs, char ** argv)
@@ -379,7 +369,7 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
         strcpy(c_argv[0],strtok(r_argv,","));
         for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-    	R_child_thread_run(main_snp_calling_test_retval,n,c_argv);
+    	R_child_thread_run(main_snp_calling_test,n,c_argv);
 
         for(i=0;i<n;i++) free(c_argv[i]);
         free(c_argv);
