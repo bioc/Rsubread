@@ -1880,7 +1880,7 @@ void msgqu_init(){
 	mt_message_queue.message_queue = ArrayListCreate(100);
 	ArrayListSetDeallocationFunction(mt_message_queue.message_queue,free);
 	subread_init_lock(&mt_message_queue.queue_lock);
-	subread_init_lock(&mt_message_queue.queue_notifier);
+//	subread_init_lock(&mt_message_queue.queue_notifier);
 	#endif
 }
 
