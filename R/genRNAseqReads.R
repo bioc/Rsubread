@@ -1,6 +1,6 @@
 scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
-	transcript.file <- normalizePath(transcript.file, mustWork=T)
+	transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
 	cmd <- paste("RscanFasta,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=",")
     if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=",")
 
@@ -14,8 +14,8 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 }
 
 simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, insertion.length.min=100, insertion.length.max=500, insertion.length.mean=150, insertion.length.sigma=25, simplify.transcript.names=FALSE){
-	transcript.file <- normalizePath(transcript.file, mustWork=T)
-	output.prefix <- normalizePath(output.prefix, mustWork=F)
+	transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
+	output.prefix <- .check_and_NormPath(output.prefix, mustWork=F, opt="output.prefix")
 	if(read.length > 250)stop("Error: the current version can generate reads at most 250bp long.")
 	if(read.length <1) stop("Error: the read length must be positive.")
 
@@ -26,7 +26,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 			if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
 			if(is.null(qualfile)) stop("When you want to simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings that have the length as the output reads.")
 		}else{
-			qualfile <- normalizePath(quality.reference, mustWork=T)
+			qualfile <- .check_and_NormPath(quality.reference, mustWork=T, opt="qualfile")
 		}
 	}
 

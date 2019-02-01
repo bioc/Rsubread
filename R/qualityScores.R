@@ -1,6 +1,6 @@
 qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000)
 {
-	filename <- normalizePath(filename, mustWork=T)
+	filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
 
 	if (file.exists(filename) == FALSE)
 		stop("Can not find the input file. Pleaes check whether the file name is correct.")

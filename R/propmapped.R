@@ -1,6 +1,6 @@
 propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
 {
-	files <- normalizePath(files, mustWork=T)
+	files <- .check_and_NormPath(files, mustWork=T, opt="files")
     fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
     for(i in 1:length(files)){

@@ -1,6 +1,6 @@
 findCommonVariants <- function(VCF_files)
 {
-	VCF_files <- normalizePath(VCF_files, mustWork=T)
+	VCF_files <- .check_and_NormPath(VCF_files, mustWork=T, opt="VCF_files")
 	fout <- file.path(".",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
 
 	files_C <- paste(VCF_files,collapse=";")

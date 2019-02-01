@@ -1,7 +1,7 @@
 detectionCall <- function(dataset, species="hg", plot=FALSE)
 {
 	
-	dataset <- normalizePath(dataset, mustWork=T)
+	dataset <- .check_and_NormPath(dataset, mustWork=T, opt="dataset")
 	if (file.exists(dataset) == FALSE) {
 		stop("File for the given dataset doesn't exist!\n")
 	} 

@@ -1,6 +1,6 @@
 atgcContent <- function(filename, basewise=FALSE)
 {
-	filename <- normalizePath(filename, mustWork=T)
+	filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
 	if (file.exists(filename) == FALSE){
 		print("Souce file specified doesn't exist!")
 	} 
