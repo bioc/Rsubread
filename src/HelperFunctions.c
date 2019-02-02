@@ -1910,16 +1910,16 @@ void msgqu_printf(const char * fmt, ...){
 	vsnprintf( obuf, MSGQU_LINE_SIZE, fmt, args );
 	va_end(args);
 	obuf[MSGQU_LINE_SIZE]=0;
-	if(!mt_message_queue.is_thread_mode){
-		Rprintf("%s", obuf);
-		free(obuf);
-		return;
-	}
-
 	#ifdef MAKE_STANDALONE
 		fputs(obuf, stderr);
 		free(obuf);
 	#else
+		if(!mt_message_queue.is_thread_mode){
+			Rprintf("%s", obuf);
+			free(obuf);
+			return;
+		}
+
 		subread_lock_occupy(&mt_message_queue.queue_lock);
 		ArrayListPush(mt_message_queue.message_queue, obuf);
 		subread_lock_release(&mt_message_queue.queue_lock);
