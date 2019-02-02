@@ -26,6 +26,7 @@
 #define R_INTERFACE_PTRS 1
 #define CSTACK_DEFNS 1
 #include <Rinterface.h>
+#include <R_ext/Rdynload.h>
 #endif 
 #include "HelperFunctions.h"
 
