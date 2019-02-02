@@ -52,10 +52,14 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args, int is_
     opts -> func = func;
     opts -> n = n;
     opts -> args = args;
+    pthread_attr_t thread_attr;
+    pthread_attr_init(&thread_attr);
+    pthread_attr_setstacksize(&thread_attr,32*1024*1024);
     pthread_t thread;
-    pthread_create(&thread, NULL, R_child_thread_child , opts);
+    pthread_create(&thread, &thread_attr, R_child_thread_child , opts);
     msgqu_main_loop();
     pthread_join(thread, NULL);
+    pthread_attr_destroy(&thread_attr);
     msgqu_destroy();
   }else{
     func(n, args);
