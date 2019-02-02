@@ -36,6 +36,7 @@ typedef struct{
 
 typedef struct{
 	ArrayList * message_queue;
+	int is_thread_mode;
 	subread_lock_t queue_lock;
 	subread_lock_t queue_notifier;
 	int is_finished;

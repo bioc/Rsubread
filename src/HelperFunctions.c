@@ -1874,7 +1874,9 @@ void msgqu_notifyFinish(){
 	#endif
 }
 
-void msgqu_init(){
+void msgqu_init(int thread_mode){
+	mt_message_queue.is_thread_mode = thread_mode;
+	if(!thread_mode) return;
 	#ifndef MAKE_STANDALONE
 	mt_message_queue.is_finished = 0;
 	mt_message_queue.message_queue = ArrayListCreate(100);
@@ -1908,6 +1910,11 @@ void msgqu_printf(const char * fmt, ...){
 	vsnprintf( obuf, MSGQU_LINE_SIZE, fmt, args );
 	va_end(args);
 	obuf[MSGQU_LINE_SIZE]=0;
+	if(!mt_message_queue.is_thread_mode){
+		Rprintf("%s", obuf);
+		free(obuf);
+		return;
+	}
 
 	#ifdef MAKE_STANDALONE
 		fputs(obuf, stderr);
