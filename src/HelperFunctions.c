@@ -1875,9 +1875,9 @@ void msgqu_notifyFinish(){
 }
 
 void msgqu_init(int thread_mode){
+	#ifndef MAKE_STANDALONE
 	mt_message_queue.is_thread_mode = thread_mode;
 	if(!thread_mode) return;
-	#ifndef MAKE_STANDALONE
 	mt_message_queue.is_finished = 0;
 	mt_message_queue.message_queue = ArrayListCreate(100);
 	ArrayListSetDeallocationFunction(mt_message_queue.message_queue,free);
