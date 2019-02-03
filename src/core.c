@@ -796,15 +796,24 @@ void myrand_srand(unsigned long long seed){
 	myrand_seed ^= seed;
 	myrand_seed2 = 0;
 	myrand_rand();
+	myrand_rand();
+	myrand_rand();
+	myrand_rand();
+	myrand_rand();
+	myrand_rand();
+	myrand_rand();
+	myrand_rand();
+	myrand_rand();
 }
 
+#define THE_966666773323RD_PRIME 28962406029617llu
 int myrand_rand(){
 	//if(myrand_seed % 3133LLU == 0) myrand_srand(0);
 
 	myrand_seed ^= (858173 + myrand_seed % 104729);
 	myrand_seed2 += myrand_seed;
 	myrand_seed ^= myrand_seed2 << 13;
-	return (int)((myrand_seed^myrand_seed2) % (1LLU+RAND_MAX));
+	return (int)(((myrand_seed^myrand_seed2) %THE_966666773323RD_PRIME) % (1LLU+RAND_MAX));
 }
 
 
