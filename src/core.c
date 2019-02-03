@@ -771,10 +771,11 @@ unsigned long long myrand_seed2 = 0;
 void myrand_srand(unsigned long long seed){
 
 	// when it is in R, the seed is NOT used but the R random numbers are used as the seed.
+	myrand_seed = 0;
+	myrand_seed2 = 0;
 
 	#ifndef MAKE_STANDALONE
 	GetRNGstate();
-
 	seed = 0;
 	seed = (seed << 16)+ (int)(unif_rand()*65521);
 	seed = (seed << 16)+ (int)(unif_rand()*65521);
@@ -782,19 +783,9 @@ void myrand_srand(unsigned long long seed){
 	seed = (seed << 16)+ (int)(unif_rand()*65521);
 
 	PutRNGstate();	
-	myrand_seed = 0;
-	#else
-	struct timeval xtime;
-	gettimeofday(&xtime,NULL);
-
-	unsigned long long tv = xtime.tv_usec ^ (xtime.tv_sec * 81811);
-	myrand_seed ^= tv;
-	tv = xtime.tv_sec ^ (xtime.tv_usec << 23);
-	myrand_seed ^= tv;
 	#endif
 	myrand_rand();
 	myrand_seed ^= seed;
-	myrand_seed2 = 0;
 	myrand_rand();
 	myrand_rand();
 	myrand_rand();
