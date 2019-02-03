@@ -766,6 +766,7 @@ int check_configuration(global_context_t * global_context)
 }
 
 unsigned long long myrand_seed = 0;
+unsigned long long myrand_seed2 = 0;
 
 void myrand_srand(unsigned long long seed){
 
@@ -793,6 +794,7 @@ void myrand_srand(unsigned long long seed){
 	#endif
 	myrand_rand();
 	myrand_seed ^= seed;
+	myrand_seed2 = 0;
 	myrand_rand();
 }
 
@@ -800,8 +802,9 @@ int myrand_rand(){
 	//if(myrand_seed % 3133LLU == 0) myrand_srand(0);
 
 	myrand_seed ^= (858173 + myrand_seed % 104729);
-	myrand_seed ^= myrand_seed << 13;
-	return (int)(myrand_seed % (1LLU+RAND_MAX));
+	myrand_seed2 += myrand_seed;
+	myrand_seed ^= myrand_seed2 << 13;
+	return (int)((myrand_seed^myrand_seed2) % (1LLU+RAND_MAX));
 }
 
 
