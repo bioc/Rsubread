@@ -54,18 +54,22 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	    mm9={
 	      ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
 		  annot.screen.output <- 'inbuilt (mm9)'
+          cat("NCBI RefSeq annotation for mm9 (build 37.2) is used.\n")
 		},
 	    mm10={
 	      ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
 		  annot.screen.output <- 'inbuilt (mm10)'
+          cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
 		 },
 	    hg19={
 	      ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
 		  annot.screen.output <- 'inbuilt (hg19)'
+          cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
 	       },
 	    hg38={
 	      ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
 		  annot.screen.output <- 'inbuilt (hg38)'
+          cat("NCBI RefSeq annotation for hg38 (build 38.2) is used.\n")
 	       },
 	       {
 		stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
