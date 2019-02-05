@@ -12,11 +12,12 @@ processExons(filename="human_seq_gene.md", species="hg")
 \details{
 This is an internal function and should not be called by users directly.
 
-It processes the NCBI mapview annotation data downloaded from the following links: (these annotations include chromosomal coordinates of UTR and CDS regions of genes).
+It processes annotation of genes in human genome GRCh37/hg19 or mouse genome GRCm37/mm9.
+The annotation is available for download from the following links (these annotations include chromosomal coordinates of UTR and CDS regions of genes):
 
-\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/mapview/seq_gene.md.gz}
+\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/ARCHIVE/BUILD.37.2/mapview/seq_gene.md.gz}
 
-\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/mapview/seq_gene.md.gz}
+\url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.37.2/mapview/seq_gene.md.gz}
 
 This function finds the chromosomal coordinates of intergenic regions (regions between neighbouring genes) and then outputs them to a file.
 It also outputs to a file chromosomal coordinates of exons of genes by concatenating UTRs with CDSs and merging overlapping CDSs within each gene.

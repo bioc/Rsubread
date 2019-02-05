@@ -1,3 +1,6 @@
+5 Feb 2019 - 1.33.12
+(1) Update processExons.Rd file.
+
 3 Feb 2019 - 1.33.11
 (1) Remove irregular calls of rand(), srand() and removed the modification of the R stack limit.
 (2) Register the ".C" functions when the Rsubread package is loaded.
