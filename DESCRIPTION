@@ -1,8 +1,8 @@
 Package: Rsubread
-Version: 1.32.2
-Date: 2018-12-05
+Version: 1.32.3
+Date: 2019-02-25
 Title: Subread sequence alignment and counting for R
-Author: Wei Shi and Yang Liao with contributions from Gordon K Smyth, Jenny Dai
+Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
         and Timothy Triche, Jr.
 Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.EDU.AU>
 Description: Rsubread is a toolbox developed for the analyses of
