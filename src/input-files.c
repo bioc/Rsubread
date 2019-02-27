@@ -1523,9 +1523,10 @@ int my_strcmp(const void * s1, const void * s2)
 	return ret;
 }
 
-int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len)
+int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len, unsigned short mapped_seg)
 {
 	base_block_temp_read_t datum;
+	memset(&datum,0,sizeof(datum));
 	datum.record_type = 100;
 	datum.read_number = read_number;
 	datum.pos = pos;
@@ -1534,6 +1535,7 @@ int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_n
 	datum.read_pos = read_pos;
 	datum.read_len = read_len;
 	datum.mapping_quality = mapping_quality;
+	datum.mapped_segment_in_read = mapped_seg;
 
 	if(rl < 1|| rl > MAX_READ_LENGTH)
 	{
@@ -1799,7 +1801,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 	autozip_close(&vzfp);
 }
 
-int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_mapped_bases, HashTable * event_table, char * VCF_file)
+int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_mapped_bases, HashTable * event_table, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head)
 {
 	int i, is_first_read=1, is_error = 0;
 	HashTable * fp_table;
@@ -1813,6 +1815,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 		SUBREADprintf("SAM file does not exist or is not accessible: '%s'\n", in_SAM_file);
 		return 1;
 	}
+	if(push_to_read_head)assert(is_sequence_needed==0);
 
 	fp_table = HashTableCreate( 11011 );
 	HashTableSetDeallocationFunctions(fp_table, free, my_fclose);
@@ -1914,7 +1917,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 
 			//SUBREADprintf("ARRI_0=%p ; OFFS=%p ; EVT=%p\n%s\n",array_index, offsets, event_table, line_buffer);
 			int line_parse_result = parse_SAM_line(line_buffer, read_name, &flags, chro, &pos, cigar, & mapping_quality, &pairdist, sequence, quality_string, &rl, &repeated);
-			//SUBREADprintf("ARRI_2=%p ; OFFS=%p ; EVT=%p\n",array_index, offsets, event_table);
+			if(line_parse_result<0)SUBREADprintf("WRONG LINE FORMAT: %s\n", line_buffer);
 
 			if(strlen(quality_string)<2)
 			{
@@ -1926,12 +1929,17 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 				quality_string[xk1]=0;
 			}
 
-			if(line_parse_result || (flags & SAM_FLAG_UNMAPPED)|| (((flags & SAM_FLAG_PAIRED_TASK) && (pairdist ==0 || pairdist > 500000)))){
+			if(line_parse_result || (flags & SAM_FLAG_UNMAPPED)){
 				read_number ++;
 				continue;
 			}
 
-			if(array_index)
+			if(do_fragment_filtering && (flags & SAM_FLAG_PAIRED_TASK) && (pairdist ==0 || pairdist > 500000)){
+				read_number ++;
+				continue;
+			}
+
+			if(do_fragment_filtering && array_index)
 			{
 				int mismatch = 0;
 
@@ -1945,6 +1953,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 			}
 
 			is_negative_strand = (flags & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0;
+			if((flags & 4) ==0 && all_mapped_reads)(*all_mapped_reads)++;
+
 
 			if(is_sequence_needed == 2)
 			{
@@ -1957,6 +1967,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 				unsigned int chromosome_cursor = pos;
 				int j, tmpv=0;
 				char cc;
+				unsigned short M_parts=0;
 
 				for(j=0; cigar[j]; j++)
 				{
@@ -2015,12 +2026,13 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 									if(all_mapped_bases)
 										(*all_mapped_bases) += insert_length;
 
-									is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl);
+									is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl, M_parts);
 									if(close_now) fclose(temp_fp);
 								}
 								insertion_cursor += insert_length;
 								read_cursor += insert_length;
 							}
+							if(M_parts < 65535)M_parts ++;
 						}
 						else 
 							read_cursor += tmpv;
@@ -2054,17 +2066,30 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 
 				}
 				
-			}else
-			{
-				if(get_read_block(chro, pos, temp_file_suffix, known_chromosomes, NULL))
-				{
+			}else{ // NO sequence is needed : no CIGAR is parsed.
+				int cgi, cc;
+				int pushback = 0;
+
+				for(cgi=0; cigar[cgi]; cgi++){
+					cc = cigar[cgi];
+					if(cc >='0' && cc<='9') pushback = pushback*10 + cc-'0';
+					else{
+						if(cc!='S') pushback=0;
+						break;
+					}
+				}
+
+				assert(pos>=pushback);
+				pos -= pushback;
+
+				if(get_read_block(chro, pos, temp_file_suffix, known_chromosomes, NULL)) {
 					read_number ++;
 					continue;
 				}
 				sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 	
 				temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
-				is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand, 0,rl);
+				is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand, 0,rl, 0);
 				if(close_now)fclose(temp_fp);
 			}
 			read_number ++;
@@ -2078,7 +2103,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 	if(real_read_count)
 		(*real_read_count) = read_number;
 	if(is_error){
-		SUBREADprintf("ERROR: cannot write into the temporary files. Please check the disk space in the output directory.\n");
+		SUBREADprintf("ERROR: cannot write into the temporary files. Please check the disk space in the temp directory.\n");
 	}
 	return is_error;
 }
@@ -4326,26 +4351,27 @@ int SAM_pairer_update_orphant_table(SAM_pairer_context_t * pairer , SAM_pairer_t
 	char tmp_fname[MAX_FILE_NAME_LENGTH+40];
 	sprintf(tmp_fname, "%s-TH%02d-BK%06d.tmp", pairer->tmp_file_prefix, thread_context -> thread_id, thread_context -> orphant_block_no++);
 	FILE * tmp_fp = fopen(tmp_fname, "wb");
-
-	for(x1 = 0; x1 < x2;  x1 ++){
-		unsigned int bin_len;
-
-		memcpy(&bin_len, bin_list[x1] , 4);
-		int namelen = strlen((char *)name_list[x1]);
-
-		int write_len = fwrite(&namelen,2,1,tmp_fp);
-		is_error = (write_len <1);
-		write_len = fwrite(name_list[x1], 1, namelen, tmp_fp);
-		is_error |= (write_len <namelen);
-		write_len = fwrite(&bin_len,4, 1,tmp_fp);
-		is_error |= (write_len <1);
-		write_len = fwrite(bin_list[x1],  1, bin_len + 4, tmp_fp);
-		is_error |= (write_len < bin_len + 4);
-
-		HashTableRemove(thread_context->orphant_table , name_list[x1]);
-	}
+	if(tmp_fp){
+		for(x1 = 0; x1 < x2;  x1 ++){
+			unsigned int bin_len;
+	
+			memcpy(&bin_len, bin_list[x1] , 4);
+			int namelen = strlen((char *)name_list[x1]);
+	
+			int write_len = fwrite(&namelen,2,1,tmp_fp);
+			is_error |= (write_len <1);
+			write_len = fwrite(name_list[x1], 1, namelen, tmp_fp);
+			is_error |= (write_len <namelen);
+			write_len = fwrite(&bin_len,4, 1,tmp_fp);
+			is_error |= (write_len <1);
+			write_len = fwrite(bin_list[x1],  1, bin_len + 4, tmp_fp);
+			is_error |= (write_len < bin_len + 4);
+	
+			HashTableRemove(thread_context->orphant_table , name_list[x1]);
+		}
+		fclose(tmp_fp);
+	}else is_error =1;
 	assert(thread_context -> orphant_table-> numOfElements == 0);
-	fclose(tmp_fp);
 	free(name_list);	
 	free(bin_list);	
 	thread_context -> orphant_space = 0;

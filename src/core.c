@@ -784,8 +784,7 @@ void myrand_srand(unsigned long long seed){
 
 	PutRNGstate();	
 	#endif
-	myrand_rand();
-	myrand_seed ^= seed;
+	myrand_seed = seed;
 	myrand_rand();
 	myrand_rand();
 	myrand_rand();
@@ -801,7 +800,7 @@ void myrand_srand(unsigned long long seed){
 int myrand_rand(){
 	//if(myrand_seed % 3133LLU == 0) myrand_srand(0);
 
-	myrand_seed ^= (858173 + myrand_seed % 104729);
+	myrand_seed ^= (myrand_seed % 858173 + myrand_seed % 104729);
 	myrand_seed2 += myrand_seed;
 	myrand_seed ^= myrand_seed2 << 13;
 	return (int)(((myrand_seed^myrand_seed2) %THE_966666773323RD_PRIME) % (1LLU+RAND_MAX));

@@ -261,7 +261,7 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 
 int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
 
-int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file);
+int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head);
 
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes);
 
@@ -276,7 +276,7 @@ double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int
 
 FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * close_immediately);
 
-int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len);
+int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len, unsigned short M_seg);
 
 int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromosome_t *known_chromosomes, unsigned int * max_base_position);
 int my_strcmp(const void * s1, const void * s2);

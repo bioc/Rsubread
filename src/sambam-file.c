@@ -285,7 +285,12 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 {
 	if(fp->file_type==SAMBAM_FILE_SAM){
 		char * ret = fgets(buff, buff_len, fp->os_file);
-		int strlenbuff = strlen(buff);
+		int strlenbuff = 0;
+		if(ret){
+			strlenbuff = strlen(buff);
+			///if(buff[0]!='@')
+			//	if(strlenbuff < 100)SUBREADprintf("WRONG LOAD: '%s'\n", buff);
+		}
 		if(strlenbuff < 1 || ret == NULL) return NULL;
 		else{
 			if(ret[strlenbuff-1]!='\n')
@@ -1571,6 +1576,75 @@ void SamBam_writer_finish_header( SamBam_Writer * writer ){
 
 #define FC_MAX_CIGAR_SECTIONS 96
 
+// The caller has to free the returned pointer.
+// It returns NULL if no such field.
+char * duplicate_TAB_record_field(char * rline, int fno, int to_end){
+	int i, fldi = 0, start_pos = -1;
+	if(fno >=1)
+		for(i=0;rline[i] && rline[i] != '\n'; i++){
+			int nch = rline[i];
+			if(nch == '\t'){
+				fldi++;
+				if(fldi == fno) start_pos = i+1;
+				if(fldi == fno+1) break;
+			}
+		}
+	else{
+		start_pos = rline[0]>0?0:-1;
+		if(start_pos == 0) for(i=0;rline[i] && rline[i] != '\n' && rline[i] != '\t'; i++);
+		else i=-1;
+	}
+	int end_pos =i;
+	if(to_end){
+		end_pos = strlen(rline);
+		if(end_pos<1)  return NULL;
+
+		if(rline[end_pos-1]=='\n') end_pos--;
+	}
+
+	if(start_pos<0 || end_pos <= start_pos) return NULL;
+	char * ret = malloc(end_pos - start_pos +1);
+	memcpy(ret, rline+start_pos, end_pos -start_pos);
+	ret[end_pos -start_pos] = 0;
+	return ret;
+}
+
+int SamBam_writer_add_read_line(SamBam_Writer * writer, int thread_no, char * rline, int committable){
+	char * read_name, * flag_str, *chro_name, *chro_position_str, * mapping_quality_str, * cigar, * next_chro_name, *next_chro_position_str, *temp_len_str, *read_text, *qual_text, *additional_columns;
+	read_name = duplicate_TAB_record_field(rline, 0,0);
+	flag_str = duplicate_TAB_record_field(rline, 1,0);
+	chro_name = duplicate_TAB_record_field(rline, 2,0);
+	chro_position_str = duplicate_TAB_record_field(rline, 3,0);
+	mapping_quality_str = duplicate_TAB_record_field(rline, 4,0);
+	cigar = duplicate_TAB_record_field(rline, 5,0);
+	next_chro_name = duplicate_TAB_record_field(rline, 6,0);
+	next_chro_position_str = duplicate_TAB_record_field(rline, 7,0);
+	temp_len_str = duplicate_TAB_record_field(rline, 8,0);
+	read_text = duplicate_TAB_record_field(rline, 9,0);
+	qual_text = duplicate_TAB_record_field(rline, 10,0);
+	additional_columns = duplicate_TAB_record_field(rline, 11,1);
+	if(qual_text==NULL){
+		SUBREADprintf("FATAL ERROR : bad read format: %s, %s, %s, %s\n", read_name, flag_str, chro_name, rline);
+		return -1;
+	}
+
+	SamBam_writer_add_read(writer, thread_no, read_name, atoi(flag_str), chro_name, atoi(chro_position_str), atoi(mapping_quality_str), cigar, next_chro_name, atoi(next_chro_position_str), atoi(temp_len_str), strlen(read_text), read_text, qual_text, additional_columns, committable);
+
+	if(additional_columns) free(additional_columns);
+	free(qual_text);
+	free(read_text);
+	free(temp_len_str);
+	free(next_chro_position_str);
+	free(next_chro_name);
+	free(cigar);
+	free(mapping_quality_str);
+	free(chro_position_str);
+	free(chro_name);
+	free(flag_str);
+	free(read_name);
+	return 0;
+}
+
 int SamBam_writer_add_read(SamBam_Writer * writer, int thread_no, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_position, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns, int committable)
 {
 	assert(writer -> writer_state!=0);
@@ -1584,7 +1658,8 @@ int SamBam_writer_add_read(SamBam_Writer * writer, int thread_no, char * read_na
 	int cigar_opts[FC_MAX_CIGAR_SECTIONS], xk1, cover_length = 0;
 	int cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, FC_MAX_CIGAR_SECTIONS);
 	int read_name_len = 1+strlen(read_name) ;
-	int additional_bin_len = SamBam_compress_additional(additional_columns, additional_bin);
+	int additional_bin_len = 0;
+	if(additional_columns) SamBam_compress_additional(additional_columns, additional_bin);
 	int record_length = 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len + additional_bin_len;
 
 
@@ -1731,7 +1806,7 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	ArrayListSort(sort_linear_pos, SamBam_writer_sort_buff_one_compare);
 
 	char * nbin = malloc(binlen);
-	int nb_cursor = 0, xx;
+	int nb_cursor = 0, xx, wlen=0;
 	for(xx=0; xx<ii_reads;xx++){
 		int * binpos = ArrayListGet(sort_linear_pos, xx);
 		int block_len = 0;
@@ -1749,9 +1824,16 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	sprintf(tmpfname, "%s-%06d.sortedbin", writer -> tmpf_prefix, writer -> sorted_batch_id++);
 	if(writer -> threads>1) subread_lock_release(&writer -> thread_bam_lock);
 	FILE * tofp  = fopen(tmpfname, "wb");
-	fwrite(nbin, binlen,1, tofp);
-	fclose(tofp);
+	if(tofp){
+		wlen = fwrite(nbin, binlen,1, tofp);
+		fclose(tofp);
+	}
 	free(nbin);
+	if(wlen < 1) {
+		SUBREADprintf("ERROR: no space in the temp directory. The program cannot run properly.\n");
+		writer ->is_internal_error = 1;
+		return -1;
+	}
 	return ii_reads;
 }
 

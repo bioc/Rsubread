@@ -1487,7 +1487,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
 			one_fn[fpos-fpos0]=0;
 
-			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table, parameters->known_SNP_vcf)) return -1;
+			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table, parameters->known_SNP_vcf, NULL, 1,0)) return -1;
 			if(!in_SAM_file[fpos]) break;
 			fpos++;
 		}
@@ -1495,7 +1495,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		{
 			char temp_file_prefix2[350];
 			sprintf(temp_file_prefix2, "%sBGC-", temp_file_prefix);
-			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL)) return -1;
+			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 1,0)) return -1;
 		}
 
 

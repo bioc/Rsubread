@@ -472,6 +472,7 @@ typedef struct{
 	unsigned short flags;
 	unsigned int read_number;
 	unsigned int pos;
+	unsigned short mapped_segment_in_read;
 	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
 

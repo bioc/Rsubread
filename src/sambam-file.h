@@ -206,4 +206,6 @@ int is_paired_end_BAM(char * fn);
 void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id);
 void SamBam_writer_finish_header( SamBam_Writer * writer );
 void SamBam_writer_finalise_one_thread(SamBam_Writer * writer);
+int SamBam_writer_add_read_line(SamBam_Writer * writer, int thread_no, char * rline, int commitable);
+char *duplicate_TAB_record_field(char * rline, int fld_no, int toend);
 #endif

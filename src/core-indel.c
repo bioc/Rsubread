@@ -2517,7 +2517,7 @@ int write_local_reassembly(global_context_t *global_context, HashTable *pileup_f
 
 		FILE * pileup_fp = get_temp_file_pointer(temp_file_name, pileup_fp_table, &close_now); 
 		//assert(read_len == strlen(read_text) && read_len > 90);
-		write_read_block_file(pileup_fp , 0, read_name, 0, chro_name , chro_offset, NULL, 0, read_text , qual_text, read_len , 1 , is_anchor_certain , anchor_pos, read_len);
+		write_read_block_file(pileup_fp , 0, read_name, 0, chro_name , chro_offset, NULL, 0, read_text , qual_text, read_len , 1 , is_anchor_certain , anchor_pos, read_len, 0);
 		if(close_now) fclose(pileup_fp);
 	}
 
@@ -4588,7 +4588,7 @@ void init_global_context(global_context_t * context)
 	int seed_rand[2];
 	double double_time = miltime();
 	memcpy(seed_rand, &double_time, 2*sizeof(int));
-	myrand_srand(seed_rand[0]^seed_rand[1]);
+	myrand_srand(seed_rand[0]^seed_rand[1]); // the seed is NOT used in R because myrand_srand will always takes four random numbers from R's RNG
 
 	context->config.max_indel_length = 5;
 	context->config.phred_score_format = FASTQ_PHRED33;
