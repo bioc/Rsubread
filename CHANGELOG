@@ -1,4 +1,7 @@
-27 Feb 2019 1.33.15
+28 Feb 2019 - 1.33.16
+(1) Edits to package citation file.
+
+27 Feb 2019 - 1.33.15
 (1) Add BAM format support in removeDupReads().
 
 25 Feb 2019 - 1.33.14
