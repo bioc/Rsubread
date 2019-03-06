@@ -13,11 +13,12 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 	summ
 }
 
-simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, insertion.length.min=100, insertion.length.max=500, insertion.length.mean=150, insertion.length.sigma=25, simplify.transcript.names=FALSE){
+simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, iterative.find.N=FALSE, paired.end=FALSE, insertion.length.min=100, insertion.length.max=500, insertion.length.mean=150, insertion.length.sigma=25, simplify.transcript.names=FALSE,gen.reads=TRUE){
 	transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
 	output.prefix <- .check_and_NormPath(output.prefix, mustWork=F, opt="output.prefix")
 	if(read.length > 250)stop("Error: the current version can generate reads at most 250bp long.")
 	if(read.length <1) stop("Error: the read length must be positive.")
+	if(iterative.find.N && low.transcripts) stop("Error: when using the iterative algorithm to find the best sample size, the lowly expressed transcripts have to be excluded (ie low.transcripts=FALSE)")
 
 	qualfile <- NULL
 	if(simulate.sequencing.error){
@@ -67,7 +68,11 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 	if(paired.end) cmd<-paste(cmd, "--pairedEnd,--insertionLenMean",insertion.length.mean, "--insertionLenMax",insertion.length.max,"--insertionLenMin",insertion.length.min,"--insertionLenSigma",insertion.length.sigma, sep=",")
 	if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=",")
 	if(truth.in.read.names) cmd<-paste(cmd, "--truthInReadNames", sep=",")
-	if(!low.transcripts) cmd <- paste(cmd, "--noLowTranscripts", sep=",")
+
+	if(iterative.find.N) cmd <- paste(cmd, "--floorStrategy","ITERATIVE", sep=",")
+	if(!(low.transcripts || iterative.find.N )) cmd <- paste(cmd, "--floorStrategy","FLOOR", sep=",")
+
+	if(!gen.reads) cmd <- paste(cmd, "--noActualReads" ,sep=",")
 	if(!is.null(qualfile)) cmd<-paste(cmd, "--qualityRefFile", qualfile, sep=",")
 
 	#print(substr(cmd,1,2000))

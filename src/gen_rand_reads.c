@@ -29,6 +29,9 @@
 #include "gene-algorithms.h"
 
 #define MAX_SIMULATION_READ_LEN 250
+#define STRATEGY_LESS_THAN_N 10
+#define STRATEGY_RANDOM_ASSIGN 20
+#define STRATEGY_ITERATIVE_M 30
 
 int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("");
@@ -66,9 +69,10 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("                            reads. No sequencing errors are simulated when this");
 	SUBREADputs("                            option is omitted.");
 	SUBREADputs("");
-	SUBREADputs(" --noLowTranscripts         Do not generate reads for the transcripts that have");
-    SUBREADputs("                            less than one expected read. The output read/pairs");
-	SUBREADputs("                            can be less than the wanted number.");
+	SUBREADputs(" --floorStrategy            How to deal with round-up errors. 'FLOOR': generate");
+	SUBREADputs("                            less than wanted reads; 'RANDOM': randomly assign");
+	SUBREADputs("                            margin reads to transcripts; 'ITERATIVE': find the");
+	SUBREADputs("                            best M value to have ~N reads.");
 	SUBREADputs("");
 	SUBREADputs(" --pairedEnd                Generate paired-end reads.");
 	SUBREADputs("");
@@ -80,6 +84,8 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs(" --simpleTranscriptId       Truncate transcript names to the first '|' or space.");
 	SUBREADputs("");
 	SUBREADputs(" --truthInReadNames         Encode the true locations of reads in read names.");
+	SUBREADputs("");
+	SUBREADputs(" --noActualReads            Do not actually generate reads in fastq.gz files.");
 	SUBREADputs("");
 	return 1;
 }
@@ -97,7 +103,8 @@ static struct option long_options[] =
 	{"outputPrefix",  required_argument, 0, 'o'},
 	{"randSeed",  required_argument, 0, 'S'},
 	{"readLen",  required_argument, 0, 'L'},
-	{"noLowTranscripts",  no_argument, 0, 'O'},
+	{"floorStrategy",  required_argument, 0, 'O'},
+	{"noActualReads",  no_argument, 0, 'x'},
 	{"insertionLenMean",  required_argument, 0, 'F'},
 	{"insertionLenMin",  required_argument, 0, 'N'},
 	{"insertionLenMax",  required_argument, 0, 'X'},
@@ -113,7 +120,8 @@ typedef struct {
 	char quality_string_file[MAX_FILE_NAME_LENGTH];
 
 	unsigned long long output_sample_size;
-	int avoid_starvation;
+	unsigned long long applied_M;
+	int floor_strategy;
 	int is_paired_end;
 	int simple_transcript_names;
 	int truth_in_read_names;
@@ -122,6 +130,7 @@ typedef struct {
 	int insertion_length_min;
 	float insertion_length_sigma;
 	int read_length;
+	int no_actual_reads;
 
 	ArrayList * quality_strings;
 	ArrayList * transcript_hitting_space;
@@ -194,7 +203,7 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_transcript_len);
 	double rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 	int rand_01_int = (int)(rand_01*901267351);
-	myrand_srand(rand_01_int); // for generating sequencing errors.
+	myrand_srand(rand_01_int); // for generating sequencing errors. NOTE: the argument is unused in R. MYRAND module uses R's RNG for seeding.
 	grc_incrand(grc);
 
 	if(grc -> is_paired_end){
@@ -281,6 +290,102 @@ int grc_check_parameters(genRand_context_t * grc){
 	return ret;
 }
 
+unsigned long long calc_N_from_M(genRand_context_t *grc , unsigned long long Mval){
+	long ti;
+	unsigned long long space_end = ArrayListGet(grc->transcript_hitting_space, grc->transcript_hitting_space->numOfElements -1)-NULL;
+	unsigned long long ret =0, lastv=0;
+
+	for(ti = 0; ti < grc->transcript_hitting_space->numOfElements; ti++){
+		unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, ti) - NULL;
+		unsigned long long this_space_span = thisv - lastv;
+		unsigned long long expected_reads =(unsigned long long )(this_space_span *1.0/space_end * Mval);  // expected_reads = exp_level * seq_length / sum(Q*L) * M
+		ret += expected_reads;
+		lastv = thisv;
+	}
+	return ret;
+}
+
+unsigned long long itr_find_M(genRand_context_t *grc){
+	long transcripts=  grc->transcript_hitting_space->numOfElements;
+	unsigned long long wanted_reads = grc->output_sample_size;
+
+	unsigned long long LL = wanted_reads, HH = wanted_reads + transcripts;
+	unsigned long long MM = 0;
+	
+	while(1){
+		MM = (LL+HH)/2;
+		unsigned long long thisN_at_M = calc_N_from_M(grc, MM);
+		if(thisN_at_M < wanted_reads) LL = MM+1;
+		else if(thisN_at_M > wanted_reads) HH = MM-1;
+		else break;
+		if(LL >=HH){
+			MM = max(LL,HH);
+			break;
+		}
+	}
+	return MM;
+}
+
+unsigned long long convert_hitting_space_to_num_of_reads(genRand_context_t *grc , ArrayList * num_of_frags_per_transcript, int min_seq_len){
+	unsigned long long lastv = 0, current_total =0;
+
+	ArrayList * rescure_hitting_space = ArrayListCreate(100000);
+	unsigned long long to_rescure_read_top=0;
+	unsigned long long read_i = 0;
+	unsigned long long space_end = ArrayListGet(grc->transcript_hitting_space, grc->transcript_hitting_space->numOfElements -1)-NULL;
+
+	if(grc -> floor_strategy == STRATEGY_ITERATIVE_M){
+		grc->applied_M = itr_find_M(grc);
+	}else grc->applied_M = grc->output_sample_size;
+	// after M is here, the reminder is just like "LESS_THAN_N.
+
+	{
+		for(read_i = 0; read_i < grc->transcript_hitting_space->numOfElements ; read_i++){
+			char *seq_name = ArrayListGet(grc->transcript_names, read_i);
+			int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
+			unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, read_i) - NULL;
+			unsigned long long this_space_span = thisv - lastv;
+	
+			// the many 9's is to aovid the sum of read numbers larger than wanted.
+			double floor_chopping = grc -> floor_strategy ==   STRATEGY_RANDOM_ASSIGN ?0.999999999:1;
+			unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->applied_M*floor_chopping);
+			unsigned long long to_rescure_reads = 0;
+			if(grc -> floor_strategy == STRATEGY_RANDOM_ASSIGN) to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->applied_M- 1.*expected_reads)*100000.);
+	
+			if(this_space_span < 1) to_rescure_reads=0;
+			if( seq_len < min_seq_len ){
+				to_rescure_reads = 0;
+				expected_reads = 0;
+			}
+			to_rescure_read_top+= to_rescure_reads;
+			assert(to_rescure_read_top < 0x5fffffffffffffffllu);
+			ArrayListPush(rescure_hitting_space, NULL+to_rescure_read_top);
+			ArrayListPush(num_of_frags_per_transcript, NULL+expected_reads);
+			current_total += expected_reads;
+	
+			lastv = thisv;
+		}
+	
+		// I'm not sure why this is so important but let it be.
+		assert(current_total<=grc->applied_M);
+	
+		if(grc -> floor_strategy == STRATEGY_RANDOM_ASSIGN)for(read_i = current_total; read_i < grc->applied_M; read_i++){
+			unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
+			grc_incrand(grc);
+	
+			longrand = longrand % to_rescure_read_top;
+			long this_transcript_no = ArrayListFindNextDent(rescure_hitting_space, longrand);
+			unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, this_transcript_no)-NULL;
+			expected_reads++;
+			num_of_frags_per_transcript->elementList[this_transcript_no] = NULL+expected_reads;
+			current_total ++;
+		}
+	}
+
+	ArrayListDestroy(rescure_hitting_space);
+	return current_total;
+}
+
 // The 823,532,653,200th prime is 24,537,224,085,139.
 //     -- https://primes.utm.edu/nthprime/index.php
 #define A_LARGE_PRIME_FOR_MOD 24537224085139llu
@@ -290,55 +395,14 @@ int grc_gen( genRand_context_t *grc ){
 	int ret = 0;
 	unsigned long long read_i = 0;
 
-	unsigned long long space_end = ArrayListGet(grc->transcript_hitting_space, grc->transcript_hitting_space->numOfElements -1)-NULL;
 	ArrayList * num_of_frags_per_transcript = ArrayListCreate(100000);
-	unsigned long long lastv = 0, current_total =0;
-	ArrayList * rescure_hitting_space = ArrayListCreate(100000);
-	unsigned long long to_rescure_read_top=0;
 	int min_seq_len = grc->is_paired_end?grc->insertion_length_min:grc->read_length;
 
-	for(read_i = 0; read_i < grc->transcript_hitting_space->numOfElements ; read_i++){
-		char *seq_name = ArrayListGet(grc->transcript_names, read_i);
-		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
-		unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, read_i) - NULL;
-		unsigned long long this_space_span = thisv - lastv;
-
-		// the many 9's is to aovid the sum of read numbers larger than wanted.
-		double floor_chopping = grc -> avoid_starvation?0.999999999:1;
-		unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->output_sample_size*floor_chopping);
-		unsigned long long to_rescure_reads = 0;
-		if(grc -> avoid_starvation) to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->output_sample_size- 1.*expected_reads)*100000.);
-
-		if(this_space_span < 1) to_rescure_reads=0;
-		if( seq_len < min_seq_len ){
-			to_rescure_reads = 0;
-			expected_reads = 0;
-		}
-		to_rescure_read_top+= to_rescure_reads;
-		assert(to_rescure_read_top < 0x5fffffffffffffffllu);
-		ArrayListPush(rescure_hitting_space, NULL+to_rescure_read_top);
-		ArrayListPush(num_of_frags_per_transcript, NULL+expected_reads);
-		current_total += expected_reads;
-
-		lastv = thisv;
-	}
-
-	// I'm not sure why this is so important but let it be.
-	assert(current_total<=grc->output_sample_size);
-
-	if(grc -> avoid_starvation)for(read_i = current_total; read_i < grc->output_sample_size; read_i++){
-		unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
-		grc_incrand(grc);
-
-		longrand = longrand % to_rescure_read_top;
-		long this_transcript_no = ArrayListFindNextDent(rescure_hitting_space, longrand);
-		unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, this_transcript_no)-NULL;
-		expected_reads++;
-		num_of_frags_per_transcript->elementList[this_transcript_no] = NULL+expected_reads;
-	}
+	convert_hitting_space_to_num_of_reads(grc, num_of_frags_per_transcript, min_seq_len);
 
 	ArrayList * per_transcript_reads_hitting_space = ArrayListCreate(100000);
 	unsigned long long total_read_top =0;
+
 	for(read_i =0; read_i < num_of_frags_per_transcript -> numOfElements; read_i++) {
 		char *seq_name = ArrayListGet(grc->transcript_names, read_i);
 		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
@@ -350,24 +414,19 @@ int grc_gen( genRand_context_t *grc ){
 		total_read_top+=expected_reads;
 		ArrayListPush(per_transcript_reads_hitting_space, NULL+total_read_top);
 	}
-	if(grc->avoid_starvation) assert(total_read_top == grc->output_sample_size);
-	else grc->output_sample_size = total_read_top;
 
-	if(0)
-		for(read_i =0; read_i < num_of_frags_per_transcript -> numOfElements; read_i++) {
-			char * trans_name = ArrayListGet(grc->transcript_names, read_i);
-			unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, read_i)-NULL;
-			long long int xx;
-			for(xx =0; xx<expected_reads; xx++) SUBREADprintf("TESTGEN\t%s\n", trans_name);
-		}
-	else{
-		unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
-		grc_incrand(grc);
 
-		unsigned long long mod_class = longrand % grc->output_sample_size; // an arbitratry starting point.
-		for(read_i =0; read_i < grc->output_sample_size; read_i++) {
+	if(grc -> floor_strategy == STRATEGY_RANDOM_ASSIGN) assert(total_read_top == grc->applied_M);
+	else grc->applied_M = total_read_top;
+
+	unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
+	grc_incrand(grc);
+
+	if(grc->no_actual_reads == 0){
+		unsigned long long mod_class = longrand % grc->applied_M; // an arbitratry starting point.
+		for(read_i =0; read_i < grc->applied_M; read_i++) {
 			mod_class += A_LARGE_PRIME_FOR_MOD;
-			mod_class = mod_class % grc->output_sample_size;
+			mod_class = mod_class % grc->applied_M;
 			long this_transcript_no = ArrayListFindNextDent(per_transcript_reads_hitting_space, mod_class);
 			//char * trans_name = ArrayListGet(grc->transcript_names, this_transcript_no);
 			//SUBREADprintf("TESTGEN\t%s\n", trans_name);
@@ -376,7 +435,6 @@ int grc_gen( genRand_context_t *grc ){
 	}
 
 	ArrayListDestroy(num_of_frags_per_transcript);
-	ArrayListDestroy(rescure_hitting_space);
 	ArrayListDestroy(per_transcript_reads_hitting_space);
 	return ret;
 }
@@ -392,6 +450,7 @@ int grc_finalize(genRand_context_t *grc){
 	if(grc->out_fps[1]) gzclose(grc->out_fps[1]);
 	fclose(grc->counts_out_fp);
 	free(grc->cmd_line);
+	SUBREADprintf("Finished. Actual sample size : %llu\n", grc->applied_M);
 	return 0;
 }
 
@@ -819,14 +878,22 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	grc.insertion_length_mean = 160.;
 	grc.read_length = 100;
 
-	grc.avoid_starvation = 1;
+	grc.floor_strategy = STRATEGY_RANDOM_ASSIGN;
 
 	long long seed = -1;
 
-	while ((c = getopt_long (argc, argv, "OTCS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
+	while ((c = getopt_long (argc, argv, "O:TCxS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){
+			case 'x':
+				grc.no_actual_reads = 1;
+				break;
 			case 'O':
-				grc.avoid_starvation = 0;
+				if(strcmp(optarg,"FLOOR")==0)
+					grc.floor_strategy = STRATEGY_LESS_THAN_N;
+				if(strcmp(optarg,"ITERATIVE")==0)
+					grc.floor_strategy = STRATEGY_ITERATIVE_M;
+				if(strcmp(optarg,"RANDOM")==0)
+					grc.floor_strategy = STRATEGY_RANDOM_ASSIGN;
 				break;
 			case 'M':
 				do_fasta_summary = 1;

@@ -1325,7 +1325,10 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	}
 
 	rrtv = fread(magic_chars,1,8,fp);
-	if(rrtv < 8) return -1;
+	if(rrtv !=8){
+		SUBREADprintf("Error: the index magic string cannot be found. It may contain format errors or file '%s' may be truncated.\n", fname);
+		assert(rrtv==8);
+	}
 
 	if(memcmp(magic_chars, "2subindx",8)!=0)
 	{
@@ -1349,11 +1352,18 @@ int gehash_load(gehash_t * the_table, const char fname [])
 				short option_key, option_length;
 
 				rrtv = fread(&option_key, 2, 1, fp);
-				if(rrtv < 1) return -1;
+				if(rrtv <1){
+					SUBREADprintf("Error: the index header cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+					assert(rrtv>0);
+				}
 				if(!option_key) break;
 
 				rrtv = fread(&option_length, 2, 1, fp);
-				if(rrtv < 1) return -1;
+				if(rrtv <1){
+					SUBREADprintf("Error: the index header cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+					assert(rrtv>0);
+				}
+
 				rrtv = 999;
 				if(option_key == SUBREAD_INDEX_OPTION_INDEX_GAP)
 					rrtv = fread(&(the_table -> index_gap),2,1,fp);
@@ -1361,7 +1371,10 @@ int gehash_load(gehash_t * the_table, const char fname [])
 					rrtv = fread(&(the_table -> padding),2,1,fp);
 				else
 					fseek(fp, option_length, SEEK_CUR);
-				if(rrtv <1) return -1;
+				if(rrtv <1){
+					SUBREADprintf("Error: the index header cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+					assert(rrtv>0);
+				}
 			}
 			assert(the_table -> index_gap);
 		}
@@ -1371,7 +1384,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		the_table -> current_items = load_int64(fp);
 		if(the_table -> current_items < 1 || the_table -> current_items > 0xffffffffllu){
 			SUBREADputs("ERROR: the index format is unrecognizable.");
-			return 1;
+			assert(the_table -> current_items >0 && the_table -> current_items <=0xffffffffllu);
 		}
 		the_table -> buckets_number = load_int32(fp);
 		the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
@@ -1394,7 +1407,14 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 		size_t rdbytes = fread(the_table -> malloc_ptr, 1, rem_len, fp);
 		fclose(fp);
-		if(rdbytes != rem_len) assert(rdbytes == rem_len);
+		if(rdbytes != rem_len){
+			SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+			assert(rdbytes == rem_len);
+		}
+		if(rdbytes<1) {
+			SUBREADprintf("Error: the index seem to contain no data at all. It may contain format errors or file '%s' may be truncated.\n", fname);
+			assert(rdbytes >0);
+		}
 
 		char * curr_ptr = the_table -> malloc_ptr;
 		for (i=0; i<the_table -> buckets_number; i++)
@@ -1410,9 +1430,16 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			curr_ptr += sizeof(short)*current_bucket -> current_items;
 			current_bucket -> item_values = (gehash_data_t*)curr_ptr;
 			curr_ptr += sizeof(gehash_data_t)*current_bucket -> current_items;
+			if( curr_ptr > the_table -> malloc_ptr + rdbytes){
+				SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+				assert( curr_ptr <= the_table -> malloc_ptr + rdbytes );
+			}
 		}
 		the_table -> is_small_table = *curr_ptr;
 		curr_ptr ++;
+		if( curr_ptr != the_table -> malloc_ptr + rdbytes ){
+			SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+		}
 		assert( curr_ptr == the_table -> malloc_ptr + rdbytes );
 		return 0;
 
