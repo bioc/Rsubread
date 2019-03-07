@@ -20,7 +20,9 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include <stdarg.h>
 #include <math.h>
+//#include <zutil.h>
 
 
 #ifdef MACOS
@@ -673,29 +675,28 @@ void hpl_test1_func()
 	display_sections("3M1663N61M1045N36M3D20M66N10M2D10M77N3M1663N61M1045N36M3D20M66N103M1663N61M1045N36M3D20M66N9M");
 }
 
-
 void test_bam_reader(){
-	SamBam_FILE * bamfp = SamBam_fopen("../../../testsuit/SEQC2011-A-FE.bam.NoDup.bam", SAMBAM_FILE_BAM);
+	SamBam_FILE * bamfp = SamBam_fopen("/usr/local/work/liao/arena/Rsubread_Paper_OCT2016/RNAseq-SimHG38/Runs-100/STAR/STAR-Simulation-15M-DXC.bamAligned.out.bam", SAMBAM_FILE_BAM);
+	assert(bamfp);
 
 	while(1){
 		char linebuf[2000];
 		char * ret = SamBam_fgets(bamfp, linebuf, 1999, 1);
 		if(!ret) break;
-		printf("%s", linebuf); // linebuf has "\n" in the end.
+		SUBREADprintf("%s", linebuf); // linebuf has "\n" in the end.
 	}
-	SamBam_writer_close(bamfp);
+	SamBam_fclose(bamfp);
 }
 
 
-#ifdef RSUBREAD_TEST_HELPER_FUNCTIONS
-void main()
-#else
-void testi_helper_1_main()
-#endif
-{
+
+#ifdef HELPER_TEST_SAMBAM_READER
+main() {
 	//hpl_test1_func();
 	test_bam_reader();
+//	hpl_test1_func();
 }
+#endif
 
 char *str_replace(char *orig, char *rep, char *with) {
     char *result; // the return string
@@ -1942,3 +1943,708 @@ void msgqu_printf(const char * fmt, ...){
 	#endif
 }
 
+#ifdef MAKE_TEST_MYRAND_TEST
+
+int main(){
+	myrand_srand(time(NULL));
+	int x;
+	for(x = 0; x<100000; x++){
+		int mv = myrand_rand();
+		SUBREADprintf("%d\n", mv);
+	}
+	return 0;
+}
+
+#endif
+
+
+
+
+// retrieved from https://github.com/kokke/tiny-TNbignum-c/
+// The original code was in public domain
+
+/* Functions for shifting number in-place. */
+static void _lshift_one_bit(struct bn* a);
+static void _rshift_one_bit(struct bn* a);
+static void _lshift_word(struct bn* a, int nwords);
+static void _rshift_word(struct bn* a, int nwords);
+
+
+
+/* Public / Exported functions. */
+void TNbignum_init(struct bn* n)
+{
+  require(n, "n is null");
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    n->array[i] = 0;
+  }
+}
+
+
+void TNbignum_from_int(struct bn* n, DTYPE_TMP i)
+{
+  require(n, "n is null");
+
+  TNbignum_init(n);
+
+  /* Endianness issue if machine is not little-endian? */
+#ifdef WORD_SIZE
+ #if (WORD_SIZE == 1)
+  n->array[0] = (i & 0x000000ff);
+  n->array[1] = (i & 0x0000ff00) >> 8;
+  n->array[2] = (i & 0x00ff0000) >> 16;
+  n->array[3] = (i & 0xff000000) >> 24;
+ #elif (WORD_SIZE == 2)
+  n->array[0] = (i & 0x0000ffff);
+  n->array[1] = (i & 0xffff0000) >> 16;
+ #elif (WORD_SIZE == 4)
+  n->array[0] = i;
+  DTYPE_TMP num_32 = 32;
+  DTYPE_TMP tmp = i >> num_32; /* bit-shift with U64 operands to force 64-bit results */
+  n->array[1] = tmp;
+ #endif
+#endif
+}
+
+
+int TNbignum_to_int(struct bn* n)
+{
+  require(n, "n is null");
+
+  int ret = 0;
+
+  /* Endianness issue if machine is not little-endian? */
+#if (WORD_SIZE == 1)
+  ret += n->array[0];
+  ret += n->array[1] << 8;
+  ret += n->array[2] << 16;
+  ret += n->array[3] << 24;  
+#elif (WORD_SIZE == 2)
+  ret += n->array[0];
+  ret += n->array[1] << 16;
+#elif (WORD_SIZE == 4)
+  ret += n->array[0];
+#endif
+
+  return ret;
+}
+
+
+void TNbignum_from_string(struct bn* n, char* str, int nbytes)
+{
+  require(n, "n is null");
+  require(str, "str is null");
+  require(nbytes > 0, "nbytes must be positive");
+  require((nbytes & 1) == 0, "string format must be in hex -> equal number of bytes");
+
+  TNbignum_init(n);
+
+  DTYPE tmp;                        /* DTYPE is defined in bn.h - uint{8,16,32,64}_t */
+  int i = nbytes - (2 * WORD_SIZE); /* index into string */
+  int j = 0;                        /* index into array */
+
+  /* reading last hex-byte "MSB" from string first -> big endian */
+  /* MSB ~= most significant byte / block ? :) */
+  while (i >= 0)
+  {
+    tmp = 0;
+    sscanf(&str[i], SSCANF_FORMAT_STR, &tmp);
+    //printf("SCAN_IN %d : v=%u\n", i, tmp);
+    n->array[j] = tmp;
+    i -= (2 * WORD_SIZE); /* step WORD_SIZE hex-byte(s) back in the string. */
+    j += 1;               /* step one element forward in the array. */
+  }
+}
+
+
+void TNbignum_to_string(struct bn* n, char* str, int nbytes)
+{
+  require(n, "n is null");
+  require(str, "str is null");
+  require(nbytes > 0, "nbytes must be positive");
+  require((nbytes & 1) == 0, "string format must be in hex -> equal number of bytes");
+
+  int j = BN_ARRAY_SIZE - 1; /* index into array - reading "MSB" first -> big-endian */
+  int i = 0;                 /* index into string representation. */
+
+  /* reading last array-element "MSB" first -> big endian */
+  while ((j >= 0) && (nbytes > (i + 1)))
+  {
+    sprintf(&str[i], SPRINTF_FORMAT_STR, n->array[j]);
+    //printf("WRITE:%d %s\n" , i, str+i);
+    i += (2 * WORD_SIZE); /* step WORD_SIZE hex-byte(s) forward in the string. */
+    j -= 1;               /* step one element back in the array. */
+  }
+
+  /* Count leading zeros: */
+  j = 0;
+  while (str[j] == '0')
+  {
+    j += 1;
+  }
+ 
+  /* Move string j places ahead, effectively skipping leading zeros */ 
+  for (i = 0; i < (nbytes - j); ++i)
+  {
+    str[i] = str[i + j];
+  }
+
+  /* Zero-terminate string */
+  str[i] = 0;
+}
+
+
+void TNbignum_dec(struct bn* n)
+{
+  require(n, "n is null");
+
+  DTYPE tmp; /* copy of n */
+  DTYPE res;
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    tmp = n->array[i];
+    res = tmp - 1;
+    n->array[i] = res;
+
+    if (!(res > tmp))
+    {
+      break;
+    }
+  }
+}
+
+
+void TNbignum_inc(struct bn* n)
+{
+  require(n, "n is null");
+
+  DTYPE res;
+  DTYPE_TMP tmp; /* copy of n */
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    tmp = n->array[i];
+    res = tmp + 1;
+    n->array[i] = res;
+
+    if (res > tmp)
+    {
+      break;
+    }
+  }
+}
+
+
+void TNbignum_add(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  DTYPE_TMP tmp;
+  int carry = 0;
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    tmp = (DTYPE_TMP)a->array[i] + b->array[i] + carry;
+    carry = (tmp > MAX_VAL);
+    c->array[i] = (tmp & MAX_VAL);
+  }
+}
+
+
+void TNbignum_sub(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  DTYPE_TMP res;
+  DTYPE_TMP tmp1;
+  DTYPE_TMP tmp2;
+  int borrow = 0;
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    tmp1 = (DTYPE_TMP)a->array[i] + (MAX_VAL + 1); /* + number_base */
+    tmp2 = (DTYPE_TMP)b->array[i] + borrow;;
+    res = (tmp1 - tmp2);
+    c->array[i] = (DTYPE)(res & MAX_VAL); /* "modulo number_base" == "% (number_base - 1)" if number_base is 2^N */
+    borrow = (res <= MAX_VAL);
+  }
+}
+
+
+void TNbignum_mul(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  struct bn row;
+  struct bn tmp;
+  int i, j;
+
+  TNbignum_init(c);
+
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    TNbignum_init(&row);
+
+    for (j = 0; j < BN_ARRAY_SIZE; ++j)
+    {
+      if (i + j < BN_ARRAY_SIZE)
+      {
+        TNbignum_init(&tmp);
+        DTYPE_TMP intermediate = ((DTYPE_TMP)a->array[i] * (DTYPE_TMP)b->array[j]);
+        TNbignum_from_int(&tmp, intermediate);
+        _lshift_word(&tmp, i + j);
+        TNbignum_add(&tmp, &row, &row);
+      }
+    }
+    TNbignum_add(c, &row, c);
+  }
+}
+
+
+void TNbignum_div(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  struct bn current;
+  struct bn denom;
+  struct bn tmp;
+
+  TNbignum_from_int(&current, 1);               // int current = 1;
+  TNbignum_assign(&denom, b);                   // denom = b
+  TNbignum_assign(&tmp, a);                     // tmp   = a
+
+  const DTYPE_TMP half_max = 1 + (DTYPE_TMP)(MAX_VAL / 2);
+  int overflow = 0;
+  while (TNbignum_cmp(&denom, a) != LARGER)     // while (denom <= a) {
+  {
+    if (denom.array[BN_ARRAY_SIZE - 1] >= half_max)
+    {
+      overflow = 1;
+      break;
+    }
+    _lshift_one_bit(&current);                //   current <<= 1;
+    _lshift_one_bit(&denom);                  //   denom <<= 1;
+  }
+  if (!overflow)
+  {
+    _rshift_one_bit(&denom);                  // denom >>= 1;
+    _rshift_one_bit(&current);                // current >>= 1;
+  }
+  TNbignum_init(c);                             // int answer = 0;
+
+  while (!TNbignum_is_zero(&current))           // while (current != 0)
+  {
+    if (TNbignum_cmp(&tmp, &denom) != SMALLER)  //   if (dividend >= denom)
+    {
+      TNbignum_sub(&tmp, &denom, &tmp);         //     dividend -= denom;
+      TNbignum_or(c, &current, c);              //     answer |= current;
+    }
+    _rshift_one_bit(&current);                //   current >>= 1;
+    _rshift_one_bit(&denom);                  //   denom >>= 1;
+  }                                           // return answer;
+}
+
+
+void TNbignum_lshift(struct bn* a, struct bn* b, int nbits)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(nbits >= 0, "no negative shifts");
+
+  TNbignum_assign(b, a);
+  /* Handle shift in multiples of word-size */
+  const int nbits_pr_word = (WORD_SIZE * 8);
+  int nwords = nbits / nbits_pr_word;
+  if (nwords != 0)
+  {
+    _lshift_word(b, nwords);
+    nbits -= (nwords * nbits_pr_word);
+  }
+
+  if (nbits != 0)
+  {
+    int i;
+    for (i = (BN_ARRAY_SIZE - 1); i > 0; --i)
+    {
+      b->array[i] = (b->array[i] << nbits) | (b->array[i - 1] >> ((8 * WORD_SIZE) - nbits));
+    }
+    b->array[i] <<= nbits;
+  }
+}
+
+
+void TNbignum_rshift(struct bn* a, struct bn* b, int nbits)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(nbits >= 0, "no negative shifts");
+  
+  TNbignum_assign(b, a);
+  /* Handle shift in multiples of word-size */
+  const int nbits_pr_word = (WORD_SIZE * 8);
+  int nwords = nbits / nbits_pr_word;
+  if (nwords != 0)
+  {
+    _rshift_word(b, nwords);
+    nbits -= (nwords * nbits_pr_word);
+  }
+
+  if (nbits != 0)
+  {
+    int i;
+    for (i = 0; i < (BN_ARRAY_SIZE - 1); ++i)
+    {
+      b->array[i] = (b->array[i] >> nbits) | (b->array[i + 1] << ((8 * WORD_SIZE) - nbits));
+    }
+    b->array[i] >>= nbits;
+  }
+  
+}
+
+
+void TNbignum_mod(struct bn* a, struct bn* b, struct bn* c)
+{
+  /*
+ *     Take divmod and throw away div part
+ *       */
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  struct bn tmp;
+
+  TNbignum_divmod(a,b,&tmp,c);
+}
+
+void TNbignum_divmod(struct bn* a, struct bn* b, struct bn* c, struct bn* d)
+{
+  /*
+ *     Puts a%b in d
+ *         and a/b in c
+ *
+ *             mod(a,b) = a - ((a / b) * b)
+ *
+ *                 example:
+ *                       mod(8, 3) = 8 - ((8 / 3) * 3) = 2
+ *                         */
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  struct bn tmp;
+
+  /* c = (a / b) */
+  TNbignum_div(a, b, c);
+
+  /* tmp = (c * b) */
+  TNbignum_mul(c, b, &tmp);
+
+  /* c = a - tmp */
+  TNbignum_sub(a, &tmp, d);
+}
+
+
+void TNbignum_and(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    c->array[i] = (a->array[i] & b->array[i]);
+  }
+}
+
+
+void TNbignum_or(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    c->array[i] = (a->array[i] | b->array[i]);
+  }
+}
+
+
+void TNbignum_xor(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    c->array[i] = (a->array[i] ^ b->array[i]);
+  }
+}
+
+
+int TNbignum_cmp(struct bn* a, struct bn* b)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+
+  int i = BN_ARRAY_SIZE;
+  do
+  {
+    i -= 1; /* Decrement first, to start with last array element */
+    if (a->array[i] > b->array[i])
+    {
+      return LARGER;
+    }
+    else if (a->array[i] < b->array[i])
+    {
+      return SMALLER;
+    }
+  }
+  while (i != 0);
+
+  return EQUAL;
+}
+
+
+int TNbignum_is_zero(struct bn* n)
+{
+  require(n, "n is null");
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    if (n->array[i])
+    {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+
+void TNbignum_pow(struct bn* a, struct bn* b, struct bn* c)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+  require(c, "c is null");
+
+  struct bn tmp;
+
+  TNbignum_init(c);
+
+  if (TNbignum_cmp(b, c) == EQUAL)
+  {
+    /* Return 1 when exponent is 0 -- n^0 = 1 */
+    TNbignum_inc(c);
+  }
+  else
+  {
+    /* Copy a -> tmp */
+    TNbignum_assign(&tmp, a);
+
+    TNbignum_dec(b);
+ 
+    /* Begin summing products: */
+    while (!TNbignum_is_zero(b))
+    {
+
+      /* c = tmp * tmp */
+      TNbignum_mul(&tmp, a, c);
+      /* Decrement b by one */
+      TNbignum_dec(b);
+
+      TNbignum_assign(&tmp, c);
+    }
+
+    /* c = tmp */
+    TNbignum_assign(c, &tmp);
+  }
+}
+
+void TNbignum_isqrt(struct bn *a, struct bn* b)
+{
+  require(a, "a is null");
+  require(b, "b is null");
+
+  struct bn low, high, mid, tmp;
+
+  TNbignum_init(&low);
+  TNbignum_assign(&high, a);
+  TNbignum_rshift(&high, &mid, 1);
+  TNbignum_inc(&mid);
+
+  while (TNbignum_cmp(&high, &low) > 0) 
+  {
+    TNbignum_mul(&mid, &mid, &tmp);
+    if (TNbignum_cmp(&tmp, a) > 0) 
+    {
+      TNbignum_assign(&high, &mid);
+      TNbignum_dec(&high);
+    }
+    else 
+    {
+      TNbignum_assign(&low, &mid);
+    }
+    TNbignum_sub(&high,&low,&mid);
+    _rshift_one_bit(&mid);
+    TNbignum_add(&low,&mid,&mid);
+    TNbignum_inc(&mid);
+  }
+  TNbignum_assign(b,&low);
+}
+
+
+void TNbignum_assign(struct bn* dst, struct bn* src)
+{
+  require(dst, "dst is null");
+  require(src, "src is null");
+
+  int i;
+  for (i = 0; i < BN_ARRAY_SIZE; ++i)
+  {
+    dst->array[i] = src->array[i];
+  }
+}
+
+
+/* Private / Static functions. */
+static void _rshift_word(struct bn* a, int nwords)
+{
+  /* Naive method: */
+  require(a, "a is null");
+  require(nwords >= 0, "no negative shifts");
+
+  int i;
+  if (nwords >= BN_ARRAY_SIZE)
+  {
+    for (i = 0; i < BN_ARRAY_SIZE; ++i)
+    {
+      a->array[i] = 0;
+    }
+    return;
+  }
+
+  for (i = 0; i < BN_ARRAY_SIZE - nwords; ++i)
+  {
+    a->array[i] = a->array[i + nwords];
+  }
+  for (; i < BN_ARRAY_SIZE; ++i)
+  {
+    a->array[i] = 0;
+  }
+}
+
+
+static void _lshift_word(struct bn* a, int nwords)
+{
+  require(a, "a is null");
+  require(nwords >= 0, "no negative shifts");
+
+  int i;
+  /* Shift whole words */
+  for (i = (BN_ARRAY_SIZE - 1); i >= nwords; --i)
+  {
+    a->array[i] = a->array[i - nwords];
+  }
+  /* Zero pad shifted words. */
+  for (; i >= 0; --i)
+  {
+    a->array[i] = 0;
+  }  
+}
+
+
+static void _lshift_one_bit(struct bn* a)
+{
+  require(a, "a is null");
+
+  int i;
+  for (i = (BN_ARRAY_SIZE - 1); i > 0; --i)
+  {
+    a->array[i] = (a->array[i] << 1) | (a->array[i - 1] >> ((8 * WORD_SIZE) - 1));
+  }
+  a->array[0] <<= 1;
+}
+
+
+static void _rshift_one_bit(struct bn* a)
+{
+  require(a, "a is null");
+
+  int i;
+  for (i = 0; i < (BN_ARRAY_SIZE - 1); ++i)
+  {
+    a->array[i] = (a->array[i] >> 1) | (a->array[i + 1] << ((8 * WORD_SIZE) - 1));
+  }
+  a->array[BN_ARRAY_SIZE - 1] >>= 1;
+}
+
+/*
+void TNbignum_pow_then_mod( struct bn * m, int e, struct bn * modulus, struct bn * res ){
+  int xx;
+  struct bn res, remove_times, remove_value, tmpv;
+  TNbignum_from_string(&res, "01", 2);
+  for(xx = 0; xx < 31; xx++){
+    TNbignum_mul( m, m, tmpv ); 
+    TNbignum_div( tmpv, modulus, remove_times);
+    TNbignum_mul( remove_times, modulus, remove_value);
+    TNbignum_sub( tmpv , remove_value, m);
+    e = e >> 1;
+  }
+
+}
+*/
+
+#ifdef HELPER_TEST_BIGNUM
+void main(){
+  char restxt[1030];
+  struct bn n,e,res;
+  int exponent = 35;
+  restxt[0]=0;
+
+  char * modulus = "AC97941B27989F9DFAC7FB03A951BF8D39CE60248D8FB5A2C4CDAFAE2431667DD5EBB46B6FF9BBEF5DE2B587CF6B06B5D63BB6B71B35C43FA5141F156A1AC77231FD5D916053CA3E5FEAD3AFB10877D1A5440119C6420A6C205758D01B5B75F5B420F9E99815820B389F0BFBA00B60C0A18612C268C0ED9B263B02DF526EED851581E0BDE4D46227DAA2EAA8D13EDF3476C20B30C3188FA3D0FBC1636C5477A744D0A042BA27C77E52CEFAE0B4005BF2E22001BA0C40A5898F3C8FE664969E72F208FDF8D7DC3D039690911E32DF6B4948280EAF67952D231907CAA1A3D1433D5A8E5325E3B849721871458E8EA5860E4EFFCCC61D82BE5EED6EAF9C6A292A2B";
+
+  TNbignum_from_string(&n, modulus,strlen(modulus) );
+  TNbignum_pow_then_mod(&m, exponent, &n, &res); // (m ^ e) mod N. E doesn't need to be a BIG NUMBER.
+  TNbignum_to_string(&res, restxt, 1030);
+  printf("RES=%s\n", restxt);
+  
+
+}
+
+#endif
+
+#ifdef HELPER_TEST_CRC32
+void main(){
+  long c32=0;
+  c32 = crc32(c32, "Hello!",6);
+  printf("CRC = %08lX\n", c32);
+
+  c32=0;
+  c32 = crc32(c32, "Hel",3);
+  c32 = crc32(c32, "lo",2);
+  c32 = crc32(c32, "!",1);
+  c32 = crc32(c32, "",0);
+  printf("CRC = %08lX\n", c32);
+}
+
+#endif

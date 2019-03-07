@@ -127,4 +127,113 @@ unsigned long long plain_txt_to_long_rand(char * plain_txt, int plain_len);
 
 // give me a p, I give you the value such that Pr( x < value ) == p in a 0/1 normal distribution.
 double inverse_sample_normal(double p);
+
+
+// big number functions
+// retrived from https://github.com/kokke/tiny-TNbignum-c
+// "This is free and unencumbered software released into the public domain."
+
+
+
+
+#include <stdint.h>
+#include <assert.h>
+
+
+/* This macro defines the word size in bytes of the array that constitues the big-number data structure. */
+#ifndef WORD_SIZE
+  #define WORD_SIZE 4
+#endif
+
+/* Size of big-numbers in bytes */
+#define BN_MAXIMUM_BITS  4096
+#define BN_ARRAY_SIZE    ( BN_MAXIMUM_BITS / 8 / WORD_SIZE )
+
+
+/* Here comes the compile-time specialization for how large the underlying array size should be. */
+/* The choices are 1, 2 and 4 bytes in size with uint32, uint64 for WORD_SIZE==4, as temporary. */
+#ifndef WORD_SIZE
+  #error Must define WORD_SIZE to be 1, 2, 4
+#elif (WORD_SIZE == 1)
+  /* Data type of array in structure */
+  #define DTYPE                    uint8_t
+  /* bitmask for getting MSB */
+  #define DTYPE_MSB                ((DTYPE_TMP)(0x80))
+  /* Data-type larger than DTYPE, for holding intermediate results of calculations */
+  #define DTYPE_TMP                uint32_t
+  /* sprintf format string */
+  #define SPRINTF_FORMAT_STR       "%.02x"
+  #define SSCANF_FORMAT_STR        "%2hhx"
+  /* Max value of integer type */
+  #define MAX_VAL                  ((DTYPE_TMP)0xFF)
+#elif (WORD_SIZE == 2)
+  #define DTYPE                    uint16_t
+  #define DTYPE_TMP                uint32_t
+  #define DTYPE_MSB                ((DTYPE_TMP)(0x8000))
+  #define SPRINTF_FORMAT_STR       "%.04x"
+  #define SSCANF_FORMAT_STR        "%4hx"
+  #define MAX_VAL                  ((DTYPE_TMP)0xFFFF)
+#elif (WORD_SIZE == 4)
+  #define DTYPE                    uint32_t
+  #define DTYPE_TMP                uint64_t
+  #define DTYPE_MSB                ((DTYPE_TMP)(0x80000000))
+  #define SPRINTF_FORMAT_STR       "%.08x"
+  #define SSCANF_FORMAT_STR        "%8x"
+  #define MAX_VAL                  ((DTYPE_TMP)0xFFFFFFFF)
+#endif
+#ifndef DTYPE
+  #error DTYPE must be defined to uint8_t, uint16_t uint32_t or whatever
+#endif
+
+
+/* Custom assert macro - easy to disable */
+#define require(p, msg) assert(p && #msg)
+
+
+/* Data-holding structure: array of DTYPEs */
+struct bn
+{
+  DTYPE array[BN_ARRAY_SIZE];
+};
+
+
+
+/* Tokens returned by TNbignum_cmp() for value comparison */
+enum { SMALLER = -1, EQUAL = 0, LARGER = 1 };
+
+
+
+/* Initialization functions: */
+void TNbignum_init(struct bn* n);
+void TNbignum_from_int(struct bn* n, DTYPE_TMP i);
+int  TNbignum_to_int(struct bn* n);
+void TNbignum_from_string(struct bn* n, char* str, int nbytes);
+
+// warning: maxsize MUST >= 1026
+void TNbignum_to_string(struct bn* n, char* str, int maxsize);
+
+/* Basic arithmetic operations: */
+void TNbignum_add(struct bn* a, struct bn* b, struct bn* c); /* c = a + b */
+void TNbignum_sub(struct bn* a, struct bn* b, struct bn* c); /* c = a - b */
+void TNbignum_mul(struct bn* a, struct bn* b, struct bn* c); /* c = a * b */
+void TNbignum_div(struct bn* a, struct bn* b, struct bn* c); /* c = a / b */
+void TNbignum_mod(struct bn* a, struct bn* b, struct bn* c); /* c = a % b */
+void TNbignum_divmod(struct bn* a, struct bn* b, struct bn* c, struct bn* d); /* c = a/b, d = a%b */
+
+/* Bitwise operations: */
+void TNbignum_and(struct bn* a, struct bn* b, struct bn* c); /* c = a & b */
+void TNbignum_or(struct bn* a, struct bn* b, struct bn* c);  /* c = a | b */
+void TNbignum_xor(struct bn* a, struct bn* b, struct bn* c); /* c = a ^ b */
+void TNbignum_lshift(struct bn* a, struct bn* b, int nbits); /* b = a << nbits */
+void TNbignum_rshift(struct bn* a, struct bn* b, int nbits); /* b = a >> nbits */
+
+/* Special operators and comparison */
+int  TNbignum_cmp(struct bn* a, struct bn* b);               /* Compare: returns LARGER, EQUAL or SMALLER */
+int  TNbignum_is_zero(struct bn* n);                         /* For comparison with zero */
+void TNbignum_inc(struct bn* n);                             /* Increment: add one to n */
+void TNbignum_dec(struct bn* n);                             /* Decrement: subtract one from n */
+void TNbignum_pow(struct bn* a, struct bn* b, struct bn* c); /* Calculate a^b -- e.g. 2^10 => 1024 */
+void TNbignum_isqrt(struct bn* a, struct bn* b);             /* Integer square root -- e.g. isqrt(5) => 2*/
+void TNbignum_assign(struct bn* dst, struct bn* src);        /* Copy src into dst -- dst := src */
+
 #endif
