@@ -2401,6 +2401,7 @@ int calc_junctions_from_cigarInts(fc_thread_global_context_t * global_context, i
 	int x1, ret = 0;
 	unsigned int last_base_pos = Starting_Chro_Points_1BASE[0] + Section_Lengths[0] - 1;
 	for(x1 = 1; x1 < cigar_sections; x1++){
+		if(!ChroNames[x1]) continue; // NULL chro name for https://groups.google.com/forum/#!topic/subread/QDT6npjAZuE
 		if(Event_After_Section[x1-1] == 'N'){
 			unsigned int first_base_pos = Starting_Chro_Points_1BASE[x1];
 			junctions_current[ret].last_exon_base_left = last_base_pos;
@@ -3094,6 +3095,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			for(cigar_section_id = 0; cigar_section_id<cigar_sections; cigar_section_id++)
 			{
+				
+				if(!ChroNames[ cigar_section_id ]) continue; // NULL chro name for https://groups.google.com/forum/#!topic/subread/QDT6npjAZuE
 				long section_begin_pos = Starting_Chro_Points_1BASE[cigar_section_id];
 				long section_end_pos = Section_Read_Lengths[cigar_section_id] + section_begin_pos - 1;
 
@@ -3101,8 +3104,12 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				int start_reverse_table_index = section_begin_pos / REVERSE_TABLE_BUCKET_LENGTH;
 				int end_reverse_table_index = (1+section_end_pos) / REVERSE_TABLE_BUCKET_LENGTH;
 
-				/*if(ChroNames[cigar_section_id] < (char *)NULL + 0xfffff)
-					SUBREADprintf("DANGEROUS! RNAME=%s,  CNAME=%p,  LEN_P=%d,  SECID=%d\n", read_name, ChroNames[cigar_section_id], Section_Read_Lengths[cigar_section_id], cigar_section_id);*/
+				/*if(ChroNames[cigar_section_id] < (char *)NULL + 0xfffff){
+					unsigned char * tbbin = is_second_read?bin2:bin1;
+					int * refid = (int*)(tbbin);
+					
+					SUBREADprintf("DANGEROUS! RNAME=%s, REC_LEN=%d,  CNAME=[%d]%p,  LEN_P=%d,  SECID=%d\n", read_name, refid[0], refid[1], ChroNames[cigar_section_id], Section_Read_Lengths[cigar_section_id], cigar_section_id);
+				}*/
 
 				fc_chromosome_index_info * this_chro_info = HashTableGet(global_context -> exontable_chro_table, ChroNames[cigar_section_id]);
 				if(this_chro_info == NULL)
@@ -4417,7 +4424,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 {
 	int assign_ret = SAM_pairer_run(&global_context -> read_pairer);
-	if(assign_ret){
+	if(0 && assign_ret){
 		print_in_box(80,0,0,"");
 		print_in_box(80,0,0,"   format error found in this file!");
 	}

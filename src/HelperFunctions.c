@@ -673,13 +673,28 @@ void hpl_test1_func()
 	display_sections("3M1663N61M1045N36M3D20M66N10M2D10M77N3M1663N61M1045N36M3D20M66N103M1663N61M1045N36M3D20M66N9M");
 }
 
+
+void test_bam_reader(){
+	SamBam_FILE * bamfp = SamBam_fopen("../../../testsuit/SEQC2011-A-FE.bam.NoDup.bam", SAMBAM_FILE_BAM);
+
+	while(1){
+		char linebuf[2000];
+		char * ret = SamBam_fgets(bamfp, linebuf, 1999, 1);
+		if(!ret) break;
+		printf("%s", linebuf); // linebuf has "\n" in the end.
+	}
+	SamBam_writer_close(bamfp);
+}
+
+
 #ifdef RSUBREAD_TEST_HELPER_FUNCTIONS
 void main()
 #else
 void testi_helper_1_main()
 #endif
 {
-	hpl_test1_func();
+	//hpl_test1_func();
+	test_bam_reader();
 }
 
 char *str_replace(char *orig, char *rep, char *with) {
