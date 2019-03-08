@@ -1,3 +1,6 @@
+9 Mar 2019 - 1.33.18
+(1) Add a strategy in simReads() to iteratively find the best value of N based on the wanted sample size.
+
 8 Mar 2019 - 1.33.17
 (1) Change featureCounts() to allow RNAME = "*" for reads reported as mapped and having non-empty CIGAR strings in the SAM or BAM input.
 (2) Check the integrity of the index in align() and subjunc().

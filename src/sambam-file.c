@@ -151,6 +151,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 		if(first_ch!=31 || second_ch!=139)
 		{
 			free(ret);
+			SUBREADprintf("Not a BAM file! %d %d\n", first_ch, second_ch);
 			return NULL;
 		}
 
@@ -1659,7 +1660,7 @@ int SamBam_writer_add_read(SamBam_Writer * writer, int thread_no, char * read_na
 	int cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, FC_MAX_CIGAR_SECTIONS);
 	int read_name_len = 1+strlen(read_name) ;
 	int additional_bin_len = 0;
-	if(additional_columns) SamBam_compress_additional(additional_columns, additional_bin);
+	if(additional_columns) additional_bin_len = SamBam_compress_additional(additional_columns, additional_bin);
 	int record_length = 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len + additional_bin_len;
 
 
