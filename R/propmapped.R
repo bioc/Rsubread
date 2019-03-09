@@ -20,9 +20,9 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FA
     C_args <- .C("R_propmapped_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
   }
 
-  x1 <- read.delim(fout,header=FALSE,stringsAsFactors=FALSE,sep=",")
+  x1 <- read.csv(fout,header=FALSE,row.names=1,stringsAsFactors=FALSE)
   file.remove(fout)
 
-  colnames(x1) <- c("Samples","NumTotal","NumMapped","PropMapped")
+  colnames(x1) <- c("NumTotal","NumMapped","PropMapped")
   x1
 }
