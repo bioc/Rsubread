@@ -10,69 +10,69 @@ index,
 
 # input reads and output
 readfile1,
-readfile2=NULL,
-type="rna",
-input_format="gzFASTQ",
-output_format="BAM",
-output_file=paste(as.character(readfile1),"subread",output_format,sep="."),
+readfile2 = NULL,
+type = "rna",
+input_format = "gzFASTQ",
+output_format = "BAM",
+output_file = paste(readfile1,"subread",output_format,sep="."),
 
 # offset value added to Phred quality scores of read bases
-phredOffset=33,
+phredOffset = 33,
 
 # thresholds for mapping
-nsubreads=10,
-TH1=3,
-TH2=1,
-maxMismatches=3,
+nsubreads = 10,
+TH1 = 3,
+TH2 = 1,
+maxMismatches = 3,
 
 # unique mapping and multi-mapping
-unique=FALSE,
-nBestLocations=1,
+unique = FALSE,
+nBestLocations = 1,
 
 # indel detection
-indels=5,
-complexIndels=FALSE,
+indels = 5,
+complexIndels = FALSE,
 
 # read trimming
-nTrim5=0,
-nTrim3=0,
+nTrim5 = 0,
+nTrim3 = 0,
 
 # distance and orientation of paired end reads
-minFragLength=50,
-maxFragLength=600,
-PE_orientation="fr",
+minFragLength = 50,
+maxFragLength = 600,
+PE_orientation = "fr",
 
 # number of CPU threads
-nthreads=1,
+nthreads = 1,
 
 # read group
-readGroupID=NULL,
-readGroup=NULL,
+readGroupID = NULL,
+readGroup = NULL,
 
 # read order
-keepReadOrder=FALSE,
-sortReadsByCoordinates=FALSE,
+keepReadOrder = FALSE,
+sortReadsByCoordinates = FALSE,
 
 # color space reads
-color2base=FALSE,
+color2base = FALSE,
 
 # dynamic programming
-DP_GapOpenPenalty=-1,
-DP_GapExtPenalty=0,
-DP_MismatchPenalty=0,
-DP_MatchScore=2,
+DP_GapOpenPenalty = -1,
+DP_GapExtPenalty = 0,
+DP_MismatchPenalty = 0,
+DP_MatchScore = 2,
 
 # detect structural variants
-detectSV=FALSE,
+detectSV = FALSE,
 
 # gene annotation
-useAnnotation=FALSE,
-annot.inbuilt="mm10",
-annot.ext=NULL,
-isGTF=FALSE,
-GTF.featureType="exon",
-GTF.attrType="gene_id",
-chrAliases=NULL)
+useAnnotation = FALSE,
+annot.inbuilt = "mm10",
+annot.ext = NULL,
+isGTF = FALSE,
+GTF.featureType = "exon",
+GTF.attrType = "gene_id",
+chrAliases = NULL)
 
 subjunc(
 # index for reference sequences
@@ -80,68 +80,68 @@ index,
 
 # input reads and output
 readfile1,
-readfile2=NULL,
-input_format="gzFASTQ",
-output_format="BAM",
-output_file=paste(as.character(readfile1),"subjunc",output_format,sep="."),
+readfile2 = NULL,
+input_format = "gzFASTQ",
+output_format = "BAM",
+output_file = paste(readfile1,"subjunc",output_format,sep = "."),
 
 # offset value added to Phred quality scores of read bases
-phredOffset=33,
+phredOffset = 33,
 
 # thresholds for mapping
-nsubreads=14,
-TH1=1,
-TH2=1,
-maxMismatches=3,
+nsubreads = 14,
+TH1 = 1,
+TH2 = 1,
+maxMismatches = 3,
 
 # unique mapping and multi-mapping
-unique=FALSE,
-nBestLocations=1,
+unique = FALSE,
+nBestLocations = 1,
 
 # indel detection
-indels=5,
-complexIndels=FALSE,
+indels = 5,
+complexIndels = FALSE,
 
 # read trimming
-nTrim5=0,
-nTrim3=0,
+nTrim5 = 0,
+nTrim3 = 0,
 
 # distance and orientation of paired end reads
-minFragLength=50,
-maxFragLength=600,
-PE_orientation="fr",
+minFragLength = 50,
+maxFragLength = 600,
+PE_orientation = "fr",
 
 # number of CPU threads
-nthreads=1,
+nthreads = 1,
 
 # read group
-readGroupID=NULL,
-readGroup=NULL,
+readGroupID = NULL,
+readGroup = NULL,
 
 # read order
-keepReadOrder=FALSE,
-sortReadsByCoordinates=FALSE,
+keepReadOrder = FALSE,
+sortReadsByCoordinates = FALSE,
 
 # color space reads
-color2base=FALSE,
+color2base = FALSE,
 
 # dynamic programming
-DP_GapOpenPenalty=-1,
-DP_GapExtPenalty=0,
-DP_MismatchPenalty=0,
-DP_MatchScore=2,
+DP_GapOpenPenalty = -1,
+DP_GapExtPenalty = 0,
+DP_MismatchPenalty = 0,
+DP_MatchScore = 2,
 
 # detect all junctions including gene fusions
-reportAllJunctions=FALSE,
+reportAllJunctions = FALSE,
 
 # gene annotation
-useAnnotation=FALSE,
-annot.inbuilt="mm10",
-annot.ext=NULL,
-isGTF=FALSE,
-GTF.featureType="exon",
-GTF.attrType="gene_id",
-chrAliases=NULL)
+useAnnotation = FALSE,
+annot.inbuilt = "mm10",
+annot.ext = NULL,
+isGTF = FALSE,
+GTF.featureType = "exon",
+GTF.attrType = "gene_id",
+chrAliases = NULL)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -210,7 +210,7 @@ Note that each breakpoint-containing read occupies only one row in BAM/SAM outpu
 Return a \code{data.frame} object that includes mapping statistics for each library. Read mapping results are saved to BAM or SAM files in the current working directory. Short indels detected during mapping are saved to BED files. \code{subjunc} also outputs discovered exon-exon junctions to BED files (separate BED files).
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research, doi: 10.1093/nar/gkz114. [Epub ahead of print].
+Yang Liao, Gordon K Smyth and Wei Shi (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research, doi: 10.1093/nar/gkz114.
 \url{http://www.ncbi.nlm.nih.gov/pubmed/30783653}
 
 Yang Liao, Gordon K Smyth and Wei Shi (2013). The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108.

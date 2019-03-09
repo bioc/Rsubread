@@ -9,10 +9,11 @@
   return(tmp.frame)
 }
 
-align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(as.character(readfile1),"subread",output_format,sep="."),phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
+align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
-  readfile1 <- .check_and_NormPath(as.character(readfile1), mustWork=T, opt="readfile1")
-  output_file <- .check_and_NormPath(as.character(output_file), mustWork=F, opt="output_file")
+  readfile1 <- as.character(readfile1)
+  readfile1 <- .check_and_NormPath(readfile1, mustWork=T, opt="readfile1")
+  output_file <- .check_and_NormPath(output_file, mustWork=F, opt="output_file")
   index <- .check_and_NormPath(index, mustWork=F, opt="index")
   if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=T, "annot.ext")
   if(!is.null(chrAliases)) chrAliases = .check_and_NormPath(chrAliases, mustWork=T, "chrAliases")
@@ -21,7 +22,8 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     stop("The number of input file names is different from the number of output file names.")
 
   if(!is.null(readfile2)){
-    readfile2 <- .check_and_NormPath(as.character(readfile2), mustWork=T, "readfile2")
+    readfile2 <- as.character(readfile2)
+    readfile2 <- .check_and_NormPath(readfile2, mustWork=T, "readfile2")
     if(length(readfile1) != length(readfile2))
       stop("The number of file names for the first reads is different from the number of file names for the second reads.")
   }
