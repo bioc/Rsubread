@@ -1,18 +1,18 @@
 subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
   readfile1 <- as.character(readfile1)
-  readfile1 <- .check_and_NormPath(readfile1, mustWork=T, opt="readfile1")
-  output_file <- .check_and_NormPath(output_file, mustWork=F, opt="output_file")
-  index <- .check_and_NormPath(index, mustWork=F, opt="index")
-  if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
-  if(!is.null(chrAliases)) chrAliases = .check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
-  
+  readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
+  output_file <- .check_and_NormPath(output_file, mustWork=FALSE, opt="output_file")
+  index <- .check_and_NormPath(index, mustWork=FALSE, opt="index")
+  if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=TRUE, opt="annot.ext")
+  if(!is.null(chrAliases)) chrAliases = .check_and_NormPath(chrAliases, mustWork=TRUE, opt="chrAliases")
+
   if(length(readfile1) != length(output_file))
     stop("The number of input file names is different from the number of output file names.")
 
   if(!is.null(readfile2)){
     readfile2 <- as.character(readfile2)
-    readfile2 <- .check_and_NormPath(readfile2, mustWork=T, "readfile2")
+    readfile2 <- .check_and_NormPath(readfile2, mustWork=TRUE, "readfile2")
     if(length(readfile1) != length(readfile2))
       stop("The number of file names for the first reads is different from the number of file names for the second reads.")
   }
@@ -28,17 +28,17 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(!all(file.exists(dirname(output_file))))
     stop("Invalid path was found in output file name(s).")
 
-  opt <- paste("-i",index,sep=",")  
+  opt <- paste("-i",index,sep=",")
 
   if(tolower(input_format) == "sam")
     opt <- paste(opt,"--SAMinput",sep=",")
   if(tolower(input_format) == "bam")
     opt <- paste(opt,"--BAMinput",sep=",")
-  
+
   if(tolower(output_format) == "sam")
     opt <- paste(opt,"--SAMoutput",sep=",")
 
-  opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")  
+  opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")
 
   if(complexIndels)
     opt <- paste(opt,"--complexIndels",sep=",")
@@ -112,7 +112,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
     }
 
     opt <- paste(opt,"-a",ann,sep=",")
-    
+
     if(isGTF)
       opt <- paste(opt,"-F","GTF","--gtfFeature",GTF.featureType,"--gtfAttr",GTF.attrType,sep=",")
     else
@@ -127,7 +127,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(phredOffset == 33)
     opt <- paste(opt,"-P",3,sep=",")
   else
-    opt <- paste(opt,"-P",6,sep=",")  
+    opt <- paste(opt,"-P",6,sep=",")
 
   return.summary <- data.frame()
   for(i in 1:length(readfile1)){

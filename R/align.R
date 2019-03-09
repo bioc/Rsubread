@@ -1,10 +1,10 @@
 .load.delete.summary <- function(bam.name){
   sumfile <- paste0(bam.name,".summary")
   if(!file.exists(sumfile)){
-  stop(paste("ERROR: Summary file",sumfile,"was not generated! The program terminated wrongly!"))
+    stop(paste("ERROR: Summary file",sumfile,"was not generated! The program terminated wrongly!"))
   } 
 
-  tmp.frame <- read.delim(sumfile, header=F, stringsAsFactors=F)
+  tmp.frame <- read.delim(sumfile, header=FALSE, stringsAsFactors=FALSE)
   file.remove(sumfile)
   return(tmp.frame)
 }
@@ -12,18 +12,18 @@
 align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
   readfile1 <- as.character(readfile1)
-  readfile1 <- .check_and_NormPath(readfile1, mustWork=T, opt="readfile1")
-  output_file <- .check_and_NormPath(output_file, mustWork=F, opt="output_file")
-  index <- .check_and_NormPath(index, mustWork=F, opt="index")
-  if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=T, "annot.ext")
-  if(!is.null(chrAliases)) chrAliases = .check_and_NormPath(chrAliases, mustWork=T, "chrAliases")
-  
+  readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
+  output_file <- .check_and_NormPath(output_file, mustWork=FALSE, opt="output_file")
+  index <- .check_and_NormPath(index, mustWork=FALSE, opt="index")
+  if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=TRUE, opt="annot.ext")
+  if(!is.null(chrAliases)) chrAliases = .check_and_NormPath(chrAliases, mustWork=TRUE, opt="chrAliases")
+
   if(length(readfile1) != length(output_file))
     stop("The number of input file names is different from the number of output file names.")
 
   if(!is.null(readfile2)){
     readfile2 <- as.character(readfile2)
-    readfile2 <- .check_and_NormPath(readfile2, mustWork=T, "readfile2")
+    readfile2 <- .check_and_NormPath(readfile2, mustWork=TRUE, "readfile2")
     if(length(readfile1) != length(readfile2))
       stop("The number of file names for the first reads is different from the number of file names for the second reads.")
   }
@@ -62,7 +62,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     opt <- paste(opt,"--SAMoutput",sep=",")    
 
   opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")
-  
+
   if(complexIndels)
     opt <- paste(opt,"--complexIndels",sep=",")
 
@@ -133,18 +133,18 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
         flag <- TRUE
       }
     }
-  
+
     opt <- paste(opt,"-a",ann,sep=",")
-  
+
     if(isGTF)
       opt <- paste(opt,"-F","GTF","--gtfFeature",GTF.featureType,"--gtfAttr",GTF.attrType,sep=",")
     else
       opt <- paste(opt,"-F","SAF",sep=",")
-  
+
     if(!is.null(chrAliases))
       opt <- paste(opt,"-A",chrAliases,sep=",")
+
     opt <- paste(opt, "--exonAnnotationScreenOut", annot.display, sep=",")
-  
   }
 
   if(phredOffset == 33)
