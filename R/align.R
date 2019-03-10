@@ -59,7 +59,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     opt <- paste(opt,"--BAMinput",sep=",")
 
   if(tolower(output_format) == "sam")
-    opt <- paste(opt,"--SAMoutput",sep=",")    
+    opt <- paste(opt,"--SAMoutput",sep=",")
 
   opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")
 
@@ -151,13 +151,12 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     opt <- paste(opt,"-P",3,sep=",")
   else
     opt <- paste(opt,"-P",6,sep=",")
-  
-  return.summary <- data.frame()
+
   for(i in 1:length(readfile1)){
     opt_files <- paste("-r",readfile1[i],sep=",")
     if(!is.null(readfile2)) 
       opt_files <- paste(opt_files,"-R",readfile2[i],sep=",")
-      opt_files <- paste(opt_files,"-o",output_file[i],sep=",")
+    opt_files <- paste(opt_files,"-o",output_file[i],sep=",")
 
     cmd <- paste("subread-align",opt_files,opt,sep=",")
     n <- length(unlist(strsplit(cmd,",")))

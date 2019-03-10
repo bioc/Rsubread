@@ -46,7 +46,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(!unique)
     opt <- paste(opt,"--multiMapping",sep=",")
 
-  opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")  
+  opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")
 
   if(!is.null(readGroupID))
     opt <- paste(opt,"--rg-id",readGroupID,sep=",")
@@ -129,7 +129,6 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   else
     opt <- paste(opt,"-P",6,sep=",")
 
-  return.summary <- data.frame()
   for(i in 1:length(readfile1)){
     opt_files <- paste("-r",readfile1[i],sep=",")
     if(!is.null(readfile2)) 

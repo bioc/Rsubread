@@ -1,6 +1,6 @@
 Package: Rsubread
-Version: 1.33.18
-Date: 2019-03-08
+Version: 1.33.19
+Date: 2019-03-10
 Title: Subread Sequence Alignment and Counting for R
 Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
 Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.edu.au>
