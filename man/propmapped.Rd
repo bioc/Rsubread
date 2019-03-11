@@ -3,7 +3,7 @@
 \title{Calculate the proportion of mapped reads/fragments in SAM/BAM files}
 \description{Number of mapped reads/fragments will be counted and fraction of such reads/fragments will be calculated.}
 \usage{
-propmapped(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
+propmapped(files, countFragments = TRUE, properlyPaired = FALSE, verbose = FALSE)
 }
 \arguments{
   \item{files}{ a character vector giving the names of SAM/BAM format files. Format of input files is automatically determined by the function.}
@@ -15,7 +15,9 @@ propmapped(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
 This function uses the \code{FLAG} field in the SAM/BAM to look for mapped reads and count them.
 Reads/fragments, which have more than one reported location, will be reported only once.
 
-When counting single end reads, counting reads has the same meaning with counting fragments (the results are identical). 
+When counting single end reads, counting reads has the same meaning as counting fragments (the results are identical).
+
+Note that \code{align} and \code{subjunc} return the same mapping statistics as \code{propmapped} as a by-product of the alignment process, so saving the output from \code{align} or \code{subjunc} will be faster and more informative than running \code{propmapped} separately.
 }
 \value{ 
 A data frame containing the total number of reads, number of mapped reads and proportion of mapped reads for each library.
@@ -31,10 +33,11 @@ A data frame containing the total number of reads, number of mapped reads and pr
 ref <- system.file("extdata","reference.fa",package="Rsubread")
 buildindex(basename="./reference_index",reference=ref)
 
-# align the sample read data provided in this packge to the sample reference
+# align the sample read data provided in this package to the sample reference
 # and save the mapping results to the current directory
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
-align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM")
+stat <- align(index="./reference_index",readfile1=reads,output_file="./Rsubread_alignment.BAM")
+stat
 
 # get the percentage of successfully mapped reads
 propmapped("./Rsubread_alignment.BAM")

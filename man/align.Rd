@@ -207,7 +207,13 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in BAM/SAM output.
 }
 \value{
-Return a \code{data.frame} object that includes mapping statistics for each library. Read mapping results are saved to BAM or SAM files in the current working directory. Short indels detected during mapping are saved to BED files. \code{subjunc} also outputs discovered exon-exon junctions to BED files (separate BED files).
+Returns a \code{data.frame} of mapping statistics and writes files of aligned reads.
+The \code{data.frame} summarizes the number of reads, mapped reads, uniquely mapped reads, indels and junctions for each sample.
+
+\code{align} writes a BAM or SAM file for each sample containing aligned reads to the file paths specified by \code{output_file}.
+It also writes Variant Call Format files containing short indels to the same file paths but with \code{.indel.vcf} added to the file names.
+
+\code{subjunc} writes all the same files as \code{align} and also writes BED format files (with \code{.junction.bed} added to the output file names) containing discovered exon-exon junctions.
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research, doi: 10.1093/nar/gkz114.
@@ -228,6 +234,7 @@ buildindex(basename="./reference_index",reference=ref)
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
 align.stat <- align(index = "./reference_index", readfile1 = reads,
                     output_file = "./Rsubread_alignment.BAM", phredOffset = 64)
+align.stat
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
