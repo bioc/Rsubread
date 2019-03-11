@@ -142,13 +142,13 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
     if(i ==1){
       return.summary <- summary.data
     }else{
-      return.summary <- cbind(return.summary, summary.data[,2] )
-      colnames(return.summary)[ncol(return.summary)] <- output_file[i]
+      return.summary <- data.frame(return.summary, summary.data)
     }
   }
 
   if(flag)
     file.remove(fout_annot)
 
+  names(return.summary) <- basename(output_file)
   return.summary
 }

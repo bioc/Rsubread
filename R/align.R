@@ -162,16 +162,16 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     n <- length(unlist(strsplit(cmd,",")))
     C_args <- .C("R_align_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
     summary.data <- .load.delete.summary(output_file[i])
-    if(i ==1){
+    if(i == 1){
       return.summary <- summary.data
     }else{
-      return.summary <- cbind(return.summary, summary.data[,2] )
-      colnames(return.summary)[ncol(return.summary)] <- output_file[i]
+      return.summary <- data.frame(return.summary, summary.data)
     }
   }
 
   if(flag)
     file.remove(fout_annot)
 
+  names(return.summary) <- basename(output_file)
   return.summary
 }
