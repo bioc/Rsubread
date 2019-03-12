@@ -3,8 +3,8 @@
 \title{Build index for a reference genome}
 \description{An index needs to be built before read mapping can be performed. This function creates a hash table index for the reference genome, which can then be used by Subread and Subjunc aligners for read alignment.}
 \usage{
-buildindex(basename,reference,gappedIndex=FALSE,indexSplit=FALSE,memory=8000,
-TH_subread=100,colorspace=FALSE)
+buildindex(basename, reference, gappedIndex = FALSE, indexSplit = FALSE,
+           memory = 8000, TH_subread = 100, colorspace = FALSE)
 }
 \arguments{
   \item{basename}{ character string giving the basename of created index files.}
@@ -40,13 +40,19 @@ For instance, primary assembly of human genome GRCh38/hg38 or mouse genome GRCm3
 No value is produced but index files are written to the current working directory.
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.  Nucleic Acids Research, 41(10):e108, 2013.
+Yang Liao, Gordon K Smyth and Wei Shi (2019).
+The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads.
+\emph{Nucleic Acids Research}, doi: 10.1093/nar/gkz114.
+\url{http://www.ncbi.nlm.nih.gov/pubmed/30783653}
 
-Yang Liao, Gordon K Smyth and Wei Shi. The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. bioRxiv 26 July 2018. \url{https://doi.org/10.1101/377762}
+Yang Liao, Gordon K Smyth and Wei Shi (2013).
+The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.
+\emph{Nucleic Acids Research}, 41(10):e108.
+\url{http://www.ncbi.nlm.nih.gov/pubmed/23558742}
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
-%\seealso{}
+\seealso{\code{\link{align}}}
 \examples{
 # Build an index for the artifical sequence included in file 'reference.fa'
 ref <- system.file("extdata","reference.fa",package="Rsubread")
