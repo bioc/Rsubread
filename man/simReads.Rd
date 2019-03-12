@@ -13,30 +13,30 @@ simReads(
   output.prefix,
 
   # options on the output
-  out.sample.size=1000000,
-  read.length=75,
-  truth.in.read.names=FALSE,
+  out.sample.size = 1000000,
+  read.length = 75,
+  truth.in.read.names = FALSE,
 
   # simulating sequencing errors
-  simulate.sequencing.error=TRUE,
-  quality.reference=NULL,
+  simulate.sequencing.error = TRUE,
+  quality.reference = NULL,
 
   # consider lowly expressed transcripts
-  low.transcripts=TRUE,
-  iterative.find.N=FALSE,
+  low.transcripts = TRUE,
+  iterative.find.N = FALSE,
 
   # parameters for generating paired-end reads.
-  paired.end=FALSE,
-  insertion.length.min=100,
-  insertion.length.max=500,
-  insertion.length.mean=150,
-  insertion.length.sigma=25,
+  paired.end = FALSE,
+  insertion.length.min = 100,
+  insertion.length.max = 500,
+  insertion.length.mean = 150,
+  insertion.length.sigma = 25,
 
   # manipulating transcript names
-  simplify.transcript.names=FALSE,
+  simplify.transcript.names = FALSE,
 
   # miscellaneous options 
-  gen.reads=TRUE
+  gen.reads = TRUE
 )
 
 scanFasta(
@@ -44,7 +44,7 @@ scanFasta(
   transcript.file,
 
   # manipulating transcript names
-  simplify.transcript.names=FALSE
+  simplify.transcript.names = FALSE
 )
 }
 \arguments{
