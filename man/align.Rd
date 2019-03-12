@@ -168,7 +168,7 @@ chrAliases = NULL)
   \item{nthreads}{ numeric value giving the number of threads used for mapping. \code{1} by default.}
   \item{readGroupID}{ a character string giving the read group ID. The specified string is added to the read group header field and also be added to each read in the mapping output. \code{NULL} by default.}
   \item{readGroup}{ a character string in the format of \code{tag:value}. This string will be added to the read group (RG) header in the mapping output. \code{NULL} by default.}
-  \item{keepReadOrder}{ logical indicating if the order of reads in the BAM output is kept the same as that in the input file. Reads from the same pair are always placed next to each other no matter this option is specified or not.}
+  \item{keepReadOrder}{ logical indicating if the order of reads in the BAM output is kept the same as that in the input file. (Reads from the same pair are always placed next to each other regardless of this option).}
   \item{sortReadsByCoordinates}{ logical indicating if reads will be sorted by their mapping locations in the mapping output. This option is applicable for BAM output only. A BAI index file will also be generated for each BAM file so the generated BAM files can be directly loaded into a genome browser such as IGB or IGV. \code{FALSE} by default.}
   \item{color2base}{ logical. If \code{TRUE}, color-space read bases will be converted to base-space bases in the mapping output. Note that the mapping itself will still be performed at color-space. \code{FALSE} by default.}
   \item{DP_GapOpenPenalty}{ a numeric value giving the penalty for opening a gap when using the Smith-Waterman dynamic programming algorithm to detect insertions and deletions. The Smith-Waterman algorithm is only applied for those reads which are found to contain insertions or deletions. \code{-1} by default.}
@@ -203,7 +203,7 @@ The \code{detectSV} argument of \code{align} can be used to detect structural va
 The \code{reportAllJunctions} argument of \code{subjunc} function can be used for the detection of SVs in RNA-seq data, as well as the detection of non-canonical junctions that do not have the canonical donor/receptor sites.
 For each library, breakpoints detected from SV events are saved to a file with suffix name `.breakpoints.txt', which includes chromosomal coordinates of SV breakpoints and numbers of supporting reads.
 The BAM/SAM output includes extra fields to describe the complete alignments of breakpoint-containing reads.
-For a breakpoint-containing read, mapping of its major sequence segment is described in the main fields of BAM/SAM ouptut whereas mapping of its minor sequence segment, which does not map along with the major segment due to the presence of a breakpoint, is described in the extra fields including 'CC'(Chr), 'CP'(Position),'CG'(CIGAR) and 'CT'(strand).
+For a breakpoint-containing read, mapping of its major sequence segment is described in the main fields of BAM/SAM output whereas mapping of its minor sequence segment, which does not map along with the major segment due to the presence of a breakpoint, is described in the extra fields including 'CC'(Chr), 'CP'(Position),'CG'(CIGAR) and 'CT'(strand).
 Note that each breakpoint-containing read occupies only one row in the BAM/SAM output.
 }
 \value{
@@ -214,8 +214,11 @@ The primary purpose of the functions however is that they write read alignments 
 \code{align} and \code{subjunc} both write BAM or SAM files containing aligned reads.
 If \code{sortReadsByCoordinates=TRUE} and \code{output_format="BAM"} then an index file (with extension \code{.bai} added to the file paths) is also generated for each BAM file.
 
-Both functions also write Variant Call Format files (with extension \code{.indel.vcf} containing short indels.
+Both functions also write Variant Call Format files (with extension \code{.indel.vcf}) containing short indels.
+
 \code{subjunc} also writes BED format files (with extension \code{.junction.bed}) containing discovered exon-exon junctions.
+
+If the \code{detectSV} or \code{reportAllJunctions} arguments are \code{TRUE}, then files with extension \code{.breakpoints.txt} are written containing chromosomal coordinates of the breakpoints and the number of supporting reads.
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi (2019).
