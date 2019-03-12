@@ -199,6 +199,9 @@ It can detect up to four junction locations in a junction read.
 \code{align} and \code{subjunc} can be run with either a full index or a gapped index (see \code{\link{buildindex}} for more details).
 Maximum mapping speed is achieved when a one-block full index is used for mapping.
 
+By default, alignments are written to the SAM/BAM files with read mates together but otherwise in an unpredictable order.
+The default is the fastest option, but \code{keepReadOrder=TRUE} will force alignments to be returned in the same order as is in the input file (with mates still together) and \code{sortReadsByCoordinates=TRUE} will return sorted BAM files, which is useful for viewing the BAM files using tools such as IGV or IGB.
+
 The \code{detectSV} argument of \code{align} can be used to detect structural variants (SVs) in genomic DNA sequencing data.
 The \code{reportAllJunctions} argument of \code{subjunc} function can be used for the detection of SVs in RNA-seq data, as well as the detection of non-canonical junctions that do not have the canonical donor/receptor sites.
 For each library, breakpoints detected from SV events are saved to a file with suffix name `.breakpoints.txt', which includes chromosomal coordinates of SV breakpoints and numbers of supporting reads.
@@ -207,8 +210,8 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in the BAM/SAM output.
 }
 \value{
-Both functions return a \code{data.frame} of mapping statistics.
-The \code{data.frame} has a column for each library and returns the number of reads, mapped reads, uniquely mapped reads, indels and junctions (subjunc only) for each library.
+Both functions return a \code{data.frame} of summary mapping statistics, one column for each library.
+The \code{data.frame} returns the number of reads, mapped reads, uniquely mapped reads, indels and junctions (subjunc only) for each library.
 
 The primary purpose of the functions however is that they write read alignments to the file paths specified by \code{output_file}.
 \code{align} and \code{subjunc} both write BAM or SAM files containing aligned reads.
