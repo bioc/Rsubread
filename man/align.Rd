@@ -207,8 +207,8 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in the BAM/SAM output.
 }
 \value{
-Both functions return a \code{data.frame} of mapping statistics and writes files of aligned reads.
-The \code{data.frame} summarizes the number of reads, mapped reads, uniquely mapped reads, indels and junctions (subjunc only) for each library.
+Both functions return a \code{data.frame} of mapping statistics.
+The \code{data.frame} has a column for each library and returns the number of reads, mapped reads, uniquely mapped reads, indels and junctions (subjunc only) for each library.
 
 The primary purpose of the functions however is that they write read alignments to the file paths specified by \code{output_file}.
 \code{align} and \code{subjunc} both write BAM or SAM files containing aligned reads.
