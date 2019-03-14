@@ -27,10 +27,10 @@ simReads(
 
   # parameters for generating paired-end reads.
   paired.end = FALSE,
-  insertion.length.min = 100,
-  insertion.length.max = 500,
-  insertion.length.mean = 150,
-  insertion.length.sigma = 25,
+  fragment.length.min = 100,
+  fragment.length.max = 500,
+  fragment.length.mean = 150,
+  fragment.length.sigma = 25,
 
   # manipulating transcript names
   simplify.transcript.names = FALSE,
@@ -59,17 +59,17 @@ scanFasta(
   \item{low.transcripts}{logical indicating if the transcripts that have expected read numbers less than one should be used for generating reads. Giving \code{FALSE} to this option can result in less reads/read-pairs generated than the wanted read/read-pair number. \code{TRUE} by default.}
   \item{iterative.find.N}{logical indicating if the iterative algorithm should be used to find the best sample size for calculating the read numbers. When \code{TRUE} is given to this option, \code{low.transcripts} must be set to \code{FALSE}. \code{FALSE} by default.}
   \item{paired.end}{logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
-  \item{insertion.length.min}{numeric value giving the minimum insertion length. The minimum insertion length must be equal to or greater than the output read length. 100 by default.}
-  \item{insertion.length.max}{numeric value giving the maximum insertion length. 500 by default.}
-  \item{insertion.length.mean}{numeric value giving the mean of insertion lengths. 150 by default.}
-  \item{insertion.length.sigma}{numeric value giving the standard deviation of insertion lengths. The insertion lengths are drawn for a truncated normal distribution that is defined by \code{insertion.length.min}, \code{insertion.length.max}, \code{insertion.length.mean} and \code{insertion.length.sigma}. 25 by default.}
+  \item{fragment.length.min}{numeric value giving the minimum fragment length. The minimum fragment length must be equal to or greater than the output read length. 100 by default.}
+  \item{fragment.length.max}{numeric value giving the maximum fragment length. 500 by default.}
+  \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 150 by default.}
+  \item{fragment.length.sigma}{numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated normal distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sigma}. 25 by default.}
   \item{simplify.transcript.names}{logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
   \item{gen.reads}{logical indicating if reads should be actually generated. If \code{FALSE}, the function generates empty fastq.gz file(s). \code{TRUE} by default.}
 }
 \details{
-  The \code{simReads} function is for generating simulated reads from a set of transcript sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a transcript file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each transcript. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all transcripts can have reads generated from them. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum insertion length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 
+  The \code{simReads} function is for generating simulated reads from a set of transcript sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a transcript file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each transcript. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all transcripts can have reads generated from them. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 
 
-  When generating paired-end reads, the insertion lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{insertion.length.mean} and \code{insertion.length.sigma}; the minimum and maximum insertion lengths are specified in \code{insertion.length.min} and \code{insertion.length.max}. The insertion lengths that are greater than the actually transcript length are truncated to the transcript length.
+  When generating paired-end reads, the fragment lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{fragment.length.mean} and \code{fragment.length.sigma}; the minimum and maximum fragment lengths are specified in \code{fragment.length.min} and \code{fragment.length.max}. The fragment lengths that are greater than the actually transcript length are truncated to the transcript length.
 
   Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error} is \code{TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
 

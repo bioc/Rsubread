@@ -76,9 +76,9 @@ int print_usage_gen_reads(char * pgname) {
 	SUBREADputs("");
 	SUBREADputs(" --pairedEnd                Generate paired-end reads.");
 	SUBREADputs("");
-	SUBREADputs(" --insertionLenMean <float>,--insertionLenSigma <float>,--insertionLenMin <int>,");
-	SUBREADputs(" --insertionLenMax <int>    Parameters of a truncated normal distribution for");
-	SUBREADputs("                            deciding insertion lengths of paired-end reads.");
+	SUBREADputs(" --fragmentLenMean <float>,--fragmentLenSigma <float>,--fragmentLenMin <int>,");
+	SUBREADputs(" --fragmentLenMax <int>    Parameters of a truncated normal distribution for");
+	SUBREADputs("                            deciding fragment lengths of paired-end reads.");
 	SUBREADputs("                            Default values: mean=160, sigma=30, min=110, max=400");
 	SUBREADputs("");
 	SUBREADputs(" --simpleTranscriptId       Truncate transcript names to the first '|' or space.");
@@ -105,10 +105,10 @@ static struct option long_options[] =
 	{"readLen",  required_argument, 0, 'L'},
 	{"floorStrategy",  required_argument, 0, 'O'},
 	{"noActualReads",  no_argument, 0, 'x'},
-	{"insertionLenMean",  required_argument, 0, 'F'},
-	{"insertionLenMin",  required_argument, 0, 'N'},
-	{"insertionLenMax",  required_argument, 0, 'X'},
-	{"insertionLenSigma",  required_argument, 0, 'V'},
+	{"fragmentLenMean",  required_argument, 0, 'F'},
+	{"fragmentLenMin",  required_argument, 0, 'N'},
+	{"fragmentLenMax",  required_argument, 0, 'X'},
+	{"fragmentLenSigma",  required_argument, 0, 'V'},
 	{0, 0, 0, 0}
 };
 
@@ -125,10 +125,10 @@ typedef struct {
 	int is_paired_end;
 	int simple_transcript_names;
 	int truth_in_read_names;
-	float insertion_length_mean;
-	int insertion_length_max;
-	int insertion_length_min;
-	float insertion_length_sigma;
+	float fragment_length_mean;
+	int fragment_length_max;
+	int fragment_length_min;
+	float fragment_length_sigma;
 	int read_length;
 	int no_actual_reads;
 
@@ -200,15 +200,15 @@ void gen_a_read_from_one_transcript(genRand_context_t * grc, long this_transcrip
 	char * trans_name = ArrayListGet(grc->transcript_names, this_transcript_no);
 	char * trans_seq = HashTableGet(grc->transcript_sequences, trans_name);
 	int actual_transcript_len = HashTableGet(grc->transcript_lengths, trans_name) - NULL;
-	int applied_insertion_maxlen = min(grc -> insertion_length_max, actual_transcript_len);
+	int applied_fragment_maxlen = min(grc -> fragment_length_max, actual_transcript_len);
 	double rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 	int rand_01_int = (int)(rand_01*901267351);
 	myrand_srand(rand_01_int); // for generating sequencing errors. NOTE: the argument is unused in R. MYRAND module uses R's RNG for seeding.
 	grc_incrand(grc);
 
 	if(grc -> is_paired_end){
-		float insertion_len = inverse_sample_normal(rand_01) * grc-> insertion_length_sigma + grc -> insertion_length_mean;
-		int fraglen = (int)(min(max(insertion_len, grc -> insertion_length_min), applied_insertion_maxlen));
+		float fragment_len = inverse_sample_normal(rand_01) * grc-> fragment_length_sigma + grc -> fragment_length_mean;
+		int fraglen = (int)(min(max(fragment_len, grc -> fragment_length_min), applied_fragment_maxlen));
 		rand_01 = plain_txt_to_long_rand(grc->random_seeds, 16)*1./0xffffffffffffffffllu;
 		grc_incrand(grc);
 		int start_pos = (actual_transcript_len - fraglen) * rand_01;
@@ -235,18 +235,18 @@ int grc_check_parameters(genRand_context_t * grc){
 		ret=1;
 	}
 	if(grc->is_paired_end){
-		if(grc->insertion_length_min>grc->insertion_length_max){
-			SUBREADprintf("Error: the minimum insertion length must be equal or higher than the maximum insertion length!\n");
+		if(grc->fragment_length_min>grc->fragment_length_max){
+			SUBREADprintf("Error: the minimum fragment length must be equal or higher than the maximum fragment length!\n");
 			ret=1;
 		}
-	
-		if(grc->insertion_length_min<grc->read_length){
-			SUBREADprintf("Error: the minimum insertion length must be equal or higher than read length!\n");
+
+		if(grc->fragment_length_min<grc->read_length){
+			SUBREADprintf("Error: the minimum fragment length must be equal or higher than read length!\n");
 			ret=1;
 		}
-	
-		if(grc->insertion_length_max<1){
-			SUBREADprintf("Error: the maximum insertion length must be a positive number!\n");
+
+		if(grc->fragment_length_max<1){
+			SUBREADprintf("Error: the maximum fragment length must be a positive number!\n");
 			ret=1;
 		}
 	}
@@ -311,7 +311,7 @@ unsigned long long itr_find_M(genRand_context_t *grc){
 
 	unsigned long long LL = wanted_reads, HH = wanted_reads + transcripts;
 	unsigned long long MM = 0;
-	
+
 	while(1){
 		MM = (LL+HH)/2;
 		unsigned long long thisN_at_M = calc_N_from_M(grc, MM);
@@ -345,13 +345,13 @@ unsigned long long convert_hitting_space_to_num_of_reads(genRand_context_t *grc 
 			int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
 			unsigned long long thisv = ArrayListGet(grc->transcript_hitting_space, read_i) - NULL;
 			unsigned long long this_space_span = thisv - lastv;
-	
+
 			// the many 9's is to aovid the sum of read numbers larger than wanted.
 			double floor_chopping = grc -> floor_strategy ==   STRATEGY_RANDOM_ASSIGN ?0.999999999:1;
 			unsigned long long expected_reads =(unsigned long long )((this_space_span *1.0/space_end) * grc->applied_M*floor_chopping);
 			unsigned long long to_rescure_reads = 0;
 			if(grc -> floor_strategy == STRATEGY_RANDOM_ASSIGN) to_rescure_reads = (unsigned long long)((this_space_span *1.0/space_end * grc->applied_M- 1.*expected_reads)*100000.);
-	
+
 			if(this_space_span < 1) to_rescure_reads=0;
 			if( seq_len < min_seq_len ){
 				to_rescure_reads = 0;
@@ -362,17 +362,17 @@ unsigned long long convert_hitting_space_to_num_of_reads(genRand_context_t *grc 
 			ArrayListPush(rescure_hitting_space, NULL+to_rescure_read_top);
 			ArrayListPush(num_of_frags_per_transcript, NULL+expected_reads);
 			current_total += expected_reads;
-	
+
 			lastv = thisv;
 		}
-	
+
 		// I'm not sure why this is so important but let it be.
 		assert(current_total<=grc->applied_M);
-	
+
 		if(grc -> floor_strategy == STRATEGY_RANDOM_ASSIGN)for(read_i = current_total; read_i < grc->applied_M; read_i++){
 			unsigned long long longrand = plain_txt_to_long_rand(grc->random_seeds, 16);
 			grc_incrand(grc);
-	
+
 			longrand = longrand % to_rescure_read_top;
 			long this_transcript_no = ArrayListFindNextDent(rescure_hitting_space, longrand);
 			unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, this_transcript_no)-NULL;
@@ -396,7 +396,7 @@ int grc_gen( genRand_context_t *grc ){
 	unsigned long long read_i = 0;
 
 	ArrayList * num_of_frags_per_transcript = ArrayListCreate(100000);
-	int min_seq_len = grc->is_paired_end?grc->insertion_length_min:grc->read_length;
+	int min_seq_len = grc->is_paired_end?grc->fragment_length_min:grc->read_length;
 
 	convert_hitting_space_to_num_of_reads(grc, num_of_frags_per_transcript, min_seq_len);
 
@@ -670,7 +670,7 @@ int grc_load_env(genRand_context_t *grc){
 		if(seqexp > TRANSCRIPT_MAX_EXPRESSION_LEVEL){
 			SUBREADprintf("Error: The transcript expression level shouldn't excess %.0f\n", TRANSCRIPT_MAX_EXPRESSION_LEVEL);
 		}
-		
+
 		unsigned long long seqexp_int = (unsigned long long )(seqexp*10000.);
 		total_tpm += seqexp_int;
 		char * seqname_buf = malloc(strlen(seqname)+1);
@@ -730,7 +730,7 @@ int grc_load_env(genRand_context_t *grc){
 		SUBREADprintf("Error: unable to open the transcript file!\n");
 	} else ret = 0;
 	if(ret) return ret;
-	
+
 
 	HelpFuncMD5_CTX md5ctx;
 	HelpFuncMD5_Init(&md5ctx);
@@ -741,7 +741,7 @@ int grc_load_env(genRand_context_t *grc){
 	char * lbuf = NULL, * seq_name = NULL;
 	unsigned int lbuf_cap = 0, lbuf_used = 0, this_seq_len = 0, total_dup=0;
 	while(1){
-		
+
 		char clinebuf[TRANSCRIPT_FASTA_LINE_WIDTH];
 		int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
 		if(rlength < 1)break;
@@ -758,7 +758,7 @@ int grc_load_env(genRand_context_t *grc){
 				char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
 				long seq_exp = HashTableGet(grc->expression_levels, seq_name)-NULL;
 				if(had_tab && seq_exp>1) total_dup++;//SUBREADprintf("Warning: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
-				if(seq_exp>1)HashTablePut(seq_duplicate_tab, md5mem, 1+NULL);	
+				if(seq_exp>1)HashTablePut(seq_duplicate_tab, md5mem, 1+NULL);
 				else free(md5mem);
 
 				had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
@@ -827,7 +827,7 @@ int grc_load_env(genRand_context_t *grc){
 
 		grc_put_new_trans(grc, seq_name, lbuf, this_seq_len, &linear_space_top);
 	}
-	
+
 	if(total_dup)SUBREADprintf("Warning: there are %d transcripts that have replicate sequences and the wanted expression levels are non-zero. You may use scanFasta() to find their names.\n", total_dup);
 	autozip_close(&auto_FP);
 	HashTableDestroy(seq_duplicate_tab);
@@ -871,11 +871,11 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	optopt = 63;
 
 	rebuild_command_line(&grc.cmd_line, argc, argv);
-	// default settings of the read/insertion length: 100bp, a general illumina feeling 
-	grc.insertion_length_sigma = 30.;
-	grc.insertion_length_min = 110;
-	grc.insertion_length_max = 400;
-	grc.insertion_length_mean = 160.;
+	// default settings of the read/fragment length: 100bp, a general illumina feeling
+	grc.fragment_length_sigma = 30.;
+	grc.fragment_length_min = 110;
+	grc.fragment_length_max = 400;
+	grc.fragment_length_mean = 160.;
 	grc.read_length = 100;
 
 	grc.floor_strategy = STRATEGY_RANDOM_ASSIGN;
@@ -899,16 +899,16 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				do_fasta_summary = 1;
 				break;
 			case 'V':
-				grc.insertion_length_sigma = atof(optarg);
+				grc.fragment_length_sigma = atof(optarg);
 				break;
 			case 'N':
-				grc.insertion_length_min = atoi(optarg);
+				grc.fragment_length_min = atoi(optarg);
 				break;
 			case 'X':
-				grc.insertion_length_max = atoi(optarg);
+				grc.fragment_length_max = atoi(optarg);
 				break;
 			case 'F':
-				grc.insertion_length_mean = atof(optarg);
+				grc.fragment_length_mean = atof(optarg);
 				break;
 			case 'L':
 				grc.read_length = atoi(optarg);
@@ -946,7 +946,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 				print_usage_gen_reads(argv[0]);
 				return 0;
 		}
-	} 
+	}
 
 	#ifdef MAKE_STANDALONE
 	if(seed<0){
