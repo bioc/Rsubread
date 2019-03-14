@@ -16,4 +16,5 @@ Imports: grDevices, stats, utils
 biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq,
         GeneExpression, GeneRegulation, Genetics, ImmunoOncology, SNP,
         GeneticVariability, Preprocessing, QualityControl,
-        GenomeAnnotation
+        GenomeAnnotation, GeneFusionDetection, IndelDetection,
+        VariantAnnotation, VariantDetection, MultipleSequenceAlignment
