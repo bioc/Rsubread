@@ -1,3 +1,29 @@
+14 Mar 2019 - 1.33.24
+(1) Shorten package Description slightly.
+(2) Add 5 BiocViews suggested by BiocCheck.
+(3) Use "fragment" instead of "insertion" in simReads arguments, code and documentation.
+
+13 Mar 2019 - 1.33.23
+(1) Some code polishing for simReads.
+(2) Simplify error messages from simReads.
+(3) Add comments about read order to Details section of align.Rd
+
+12 Mar 2019 - 1.33.22
+(1) Edit Value and Details sections of align.Rd.
+(2) Update references in buildindex.Rd and add a 'see also' to align.Rd.
+(3) Add packages mentioned in NAMESPACE to Import field of DESCRIPTION.
+
+11 Mar 2019 - 1.33.21
+(1) Add comments to Details section of propmapped.Rd to alert users that align and subjunc return the same statistics.
+
+11 Mar 2019 - 1.33.20
+(1) The summary data.frames returned by align and subjunc now have the field names as row.names instead of a first column. The column names are now the basenames of the bam files instead of full paths.
+
+10 Mar 2019 - 1.33.19
+(1) propmapped now returns file names as row.names instead of as column.
+(2) Remove unnecessary as.character() in default arguments for align() and subjunc().
+(3) Use doi link as page numbers and Epub date as volume in CITATION
+
 9 Mar 2019 - 1.33.18
 (1) Add a strategy in simReads() to iteratively find the best value of N based on the wanted sample size.
 
