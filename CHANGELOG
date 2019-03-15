@@ -1,3 +1,6 @@
+15 Mar 2019 - 1.33.25
+(1) Add hidden file .Rbuildignore in package folder to tell R not to include the .BBSoptions file in package builds.
+
 14 Mar 2019 - 1.33.24
 (1) Shorten package Description slightly.
 (2) Add 5 BiocViews suggested by BiocCheck.
