@@ -88,6 +88,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
   rets <- data.frame(fasta.meta[,1:2], Count=as.vector(rets)[match( fasta.meta[,1] , names(rets))])
   rets[is.na(rets[,'Count']) ,'Count']<-0
   write.table(rets, paste0(output.prefix,".truthCounts"), quote=F, sep="\t", row.names=F)
+  rets
 }
 
 scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
