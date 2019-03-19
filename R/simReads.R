@@ -68,7 +68,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
-  expression.levels.MetaOrder<-expression.levels$ExpressionLevel[ match( fasta.meta$TranscriptID, expression.levels$TranscriptID ) ]
+  expression.levels.MetaOrder<-expression.levels[ match( fasta.meta$TranscriptID, expression.levels[,1] ),2 ]
 
   read.positions <- simFragments(fasta.meta$Length,expression.levels.MetaOrder, out.sample.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sigma )
   if(simulate.sequencing.error){
