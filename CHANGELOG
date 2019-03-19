@@ -1,3 +1,6 @@
+20 Mar 2019 - 1.33.26
+(1) Change simReads() to draw the numbers of read-pairs generated from transcripts from a multinomial distribution.
+
 15 Mar 2019 - 1.33.25
 (1) Add hidden file .Rbuildignore in package folder to tell R not to include the .BBSoptions file in package builds.
 
