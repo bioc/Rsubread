@@ -83,6 +83,7 @@ extern int longread_mapping_R(int argc, char *argv[]);
 extern int TxUniqueMain(int argc, char *argv[]);
 extern int R_flattenAnnotations(int argc, char *argv[]);
 extern int gen_rnaseq_reads_main(int argc, char *argv[]);
+extern int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int all_transcripts, char ** trans_names_unique, int *trans_ids, int *start_poses, int *fra_lens, int read_length, int total_reads, int simplify_names, int truth_in_rnames,int do_paired_reads );
 
 void R_txUnique_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
@@ -479,6 +480,11 @@ void R_flattenGTF_wrapper(int * nargs, char ** argv){
 	free(r_argv);
 }
 
+void R_genSimReads_at_poses(char ** fasta_name, char ** output_name, char ** qualstr_name, char ** transcript_names, int * trans_ids, int * start_poses,  int* fra_lens, int *read_length, int * total_reads, int *total_transcripts, int * simplify_names, int * truth_in_name, int * PE_reads){
+//  Rprintf("PTS  %p %p %p %p %p \n", fasta_name, output_name, qualstr_name, total_transcripts, total_reads);
+  simRead_at_main(*fasta_name, *output_name, (qualstr_name)?*qualstr_name:NULL, *total_transcripts, transcript_names, trans_ids, start_poses, fra_lens, *read_length, *total_reads,* simplify_names, *truth_in_name, *PE_reads );
+}
+
 static const R_CMethodDef CEntries[] = {
   {"R_txUnique_wrapper",             (DL_FUNC) &R_txUnique_wrapper,             2},
   {"R_mergeVCF",                     (DL_FUNC) &R_mergeVCF,                     2},
@@ -495,6 +501,7 @@ static const R_CMethodDef CEntries[] = {
   {"R_qualityScores_wrapper",        (DL_FUNC) &R_qualityScores_wrapper,        2},
   {"R_generate_random_RNAseq_reads", (DL_FUNC) &R_generate_random_RNAseq_reads, 2},
   {"R_flattenGTF_wrapper",           (DL_FUNC) &R_flattenGTF_wrapper,           2},
+  {"R_genSimReads_at_poses",         (DL_FUNC) &R_genSimReads_at_poses,         13},
   {NULL, NULL, 0}
 };
 
