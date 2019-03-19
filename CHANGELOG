@@ -1,3 +1,6 @@
+20 Mar 2019 - 1.33.27
+(1) Fix simReads() to correctly treat the coordinates as "1-based" coordinates.
+
 20 Mar 2019 - 1.33.26
 (1) Change simReads() to draw the numbers of read-pairs generated from transcripts from a multinomial distribution.
 

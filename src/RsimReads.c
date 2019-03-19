@@ -25,10 +25,15 @@
 #define MAX_SIMULATION_READ_LEN 250
 #define TRANSCRIPT_FASTA_LINE_INIT 3000
 
+#define warn_if_untrue(exp) if(!(exp)){\
+  Rprintf("ERROR: unsatisfied assertion in %s at %d\n",__FILE__, __LINE__);\
+}
+
 typedef struct {
   int read_length;
   ArrayList * quality_strings;
   ArrayList * transcript_names;
+  HashTable * transcript_lengths;
   HashTable * transcript_sequences;
   HashTable * expression_levels;
   char fake_quality_string[MAX_SIMULATION_READ_LEN+3];
@@ -56,14 +61,21 @@ void Rgrc_sequencing_error_read(char * seq, int qlen, char * qua){
 
 
 void Rgen_one_read_here(RsimReads_context_t * grc, int seq_no, int seq_start_pos, int is_PE_second, int trans_negative, unsigned long long rno, int mate_pos){
-  assert(seq_no>0);
-  assert(seq_no<=grc -> transcript_names -> numOfElements);
+  warn_if_untrue(seq_no>0);
+  warn_if_untrue(seq_no<=grc -> transcript_names -> numOfElements);
 
   char * seq, *seq_name = ArrayListGet(grc -> transcript_names, seq_no-1);
   char read_seq [grc -> read_length+1];
+  int trans_len = HashTableGet(grc->transcript_lengths, seq_name)-NULL-1;
+
+  warn_if_untrue(trans_len>0);
+  warn_if_untrue(seq_start_pos + grc -> read_length <= trans_len);
+  if(seq_start_pos + grc -> read_length>trans_len){
+    Rprintf("ERROR: seq %s has %d bases; wanted %d\n", seq_name, trans_len, seq_start_pos + grc -> read_length );
+  }
 
   seq = HashTableGet( grc -> transcript_sequences, seq_name);
-  assert(seq);
+  warn_if_untrue(seq);
  // Rprintf("Extract: chro=%s; pos=%d; seq=%.8s; rseq=%.8s\n" , seq_name , seq_start_pos , seq, seq+seq_start_pos);
   memcpy(read_seq, seq + seq_start_pos, grc -> read_length);
   read_seq[grc -> read_length]=0;
@@ -95,7 +107,9 @@ void Rgen_one_read_here(RsimReads_context_t * grc, int seq_no, int seq_start_pos
 
 void Rgrc_put_new_trans(RsimReads_context_t *grc, char * seq_name, char * lbuf, int lbuf_len){
  // Rprintf("Putting: chro=%s ; seq=%.8s\n", seq_name, lbuf);
+  warn_if_untrue(lbuf_len>0);
   HashTablePut( grc->transcript_sequences , seq_name, lbuf );
+  HashTablePut( grc->transcript_lengths, strdup(seq_name) , NULL+lbuf_len +1);
 }
 
 int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_name, char *qualstr_name, char ** input_order_transcript_names, int * input_order_transcript_per_read, int input_transcripts, int read_length, int all_reads, int simplify_names, int truth_in_rnames, int do_PE_reads){
@@ -106,6 +120,8 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   grc -> expression_levels = StringTableCreate(100000);
   HashTableSetDeallocationFunctions(grc->expression_levels, free, NULL);
 
+  grc -> transcript_lengths = StringTableCreate(100000);
+  HashTableSetDeallocationFunctions(grc -> transcript_lengths ,free, NULL);
   grc -> transcript_names = ArrayListCreate(100000);
   ArrayListSetDeallocationFunction(grc -> transcript_names,free);
 
@@ -128,14 +144,14 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   }
 
   for(xk1 = 0; xk1 < all_reads; xk1++){
-    assert(input_order_transcript_per_read[xk1]>0);
-    assert(input_order_transcript_per_read[xk1] <= input_transcripts);
+    warn_if_untrue(input_order_transcript_per_read[xk1]>0);
+    warn_if_untrue(input_order_transcript_per_read[xk1] <= input_transcripts);
 
     int to_display = 0;
     //if(input_order_transcript_per_read[xk1] > 206650) to_display = 1;
     if(to_display)  Rprintf("Inp %d . Req %d . StrP %p =%s ; xk1=%d/%d\n", input_transcripts , input_order_transcript_per_read[xk1], input_order_transcript_names[input_order_transcript_per_read[xk1]-1], input_order_transcript_names[input_order_transcript_per_read[xk1]-1], xk1, all_reads);
     int ov = HashTableGet( grc -> expression_levels, input_order_transcript_names[input_order_transcript_per_read[xk1]-1] ) -NULL;
-    assert(ov>0);
+    warn_if_untrue(ov>0);
     ov++;
     HashTablePutReplace(grc -> expression_levels, input_order_transcript_names[input_order_transcript_per_read[xk1]-1], NULL+ov, 0);
   }
@@ -285,6 +301,7 @@ int destroy_Rsim_context(RsimReads_context_t *grc){
 
   HashTableDestroy(grc->transcript_sequences);
   HashTableDestroy(grc->expression_levels);
+  HashTableDestroy(grc->transcript_lengths);
   ArrayListDestroy(grc->transcript_names);
   ArrayListDestroy(grc->quality_strings);
   return 0;
@@ -293,9 +310,9 @@ int destroy_Rsim_context(RsimReads_context_t *grc){
 #define A_LARGE_PRIME_FOR_MOD 24537224085139llu
 
 int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int all_transcripts, char ** trans_names_unique, int *trans_ids, int *start_poses, int *fra_lens, int read_length, int total_reads, int simplify_names, int truth_in_rnames,int do_paired_reads ){
-  assert(read_length<=MAX_SIMULATION_READ_LEN);
-  assert(total_reads>0);
-  assert(all_transcripts>0);
+  warn_if_untrue(read_length<=MAX_SIMULATION_READ_LEN);
+  warn_if_untrue(total_reads>0);
+  warn_if_untrue(all_transcripts>0);
 
   RsimReads_context_t grc;
 
@@ -311,7 +328,8 @@ int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int
     for(read_i = 0 ; read_i < total_reads; read_i ++){
       read_pick_i %= 1llu * total_reads;
 
-      int start_offset = start_poses[read_pick_i];
+      warn_if_untrue(start_poses[read_pick_i] >0);
+      int start_offset = start_poses[read_pick_i] -1; // it is 1-based from R!
       int end_offset = start_offset + fra_lens[read_pick_i];
       int is_R1_at_3End = myrand_rand() % 2;
 
