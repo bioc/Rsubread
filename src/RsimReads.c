@@ -117,7 +117,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   grc -> truth_in_read_names = truth_in_rnames;
   grc -> is_paired_end = do_PE_reads;
   autozip_fp auto_FP;
-  int xk1, lbuf_cap=0, lbuf_used=0, this_seq_len, total_dup=0;
+  int xk1, lbuf_cap=0, lbuf_used=0, this_seq_len=-1, total_dup=0;
   char * lbuf=NULL, * seq_name = NULL;
 
   for(xk1 = 0; xk1 < input_transcripts ; xk1++){
@@ -301,9 +301,9 @@ int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int
 
   myrand_srand(0); // in R, the seed doesn't matter.
   unsigned long long read_pick_i = myrand_rand()&0xffff;
-  read_pick_i = 0x10000llu * read_pick_i + myrand_rand()&0xffff;
-  read_pick_i = 0x10000llu * read_pick_i + myrand_rand()&0xffff;
-  read_pick_i = 0x10000llu * read_pick_i + myrand_rand()&0xffff;
+  read_pick_i = (0x10000llu * read_pick_i) +(myrand_rand()&0xffff);
+  read_pick_i = (0x10000llu * read_pick_i) +(myrand_rand()&0xffff);
+  read_pick_i = (0x10000llu * read_pick_i) +(myrand_rand()&0xffff);
 
   int retv = init_grc_by_file(&grc, fasta_name, output_name, qualstr_name, trans_names_unique, trans_ids, all_transcripts, read_length, total_reads, simplify_names, truth_in_rnames, do_paired_reads);
   if(retv==0){
@@ -311,23 +311,21 @@ int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int
     for(read_i = 0 ; read_i < total_reads; read_i ++){
       read_pick_i %= 1llu * total_reads;
 
-      int trans_id = trans_ids[read_pick_i];
       int start_offset = start_poses[read_pick_i];
       int end_offset = start_offset + fra_lens[read_pick_i];
-      int is_PE_second = -1;
-      int trans_negative = myrand_rand()%2;
+      int is_R1_at_3End = myrand_rand() % 2;
 
-      if(grc.is_paired_end)
-         is_PE_second = myrand_rand() % 2;
-
-      Rgen_one_read_here(&grc, trans_ids[read_pick_i], start_offset, is_PE_second, trans_negative, read_i, grc.is_paired_end?end_offset - read_length:0);
-      if(grc.is_paired_end)Rgen_one_read_here(&grc, trans_ids[read_pick_i], end_offset - read_length, is_PE_second?0:1,!trans_negative, read_i, start_offset);
+      int pos_small = start_offset;
+      int pos_large = end_offset - read_length;
+      Rgen_one_read_here(&grc, trans_ids[read_pick_i], is_R1_at_3End?pos_large:pos_small, 0, is_R1_at_3End, read_i, is_R1_at_3End?pos_small:pos_large);
+      if(grc.is_paired_end)Rgen_one_read_here(&grc, trans_ids[read_pick_i], is_R1_at_3End?pos_small:pos_large, 1,!is_R1_at_3End, read_i, is_R1_at_3End?pos_large:pos_small);
 
       read_pick_i += A_LARGE_PRIME_FOR_MOD;
     }
   }
 
   retv = retv || destroy_Rsim_context(&grc);
+  return 0;
 }
 
 
