@@ -64,6 +64,8 @@ simFragments <- function(transcript.lengths, transcript.expressions=NULL, librar
 
 simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, iterative.find.N=FALSE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE,gen.reads=TRUE){
   if(!paired.end) stop("current temp version does not support SE")
+  transcript.file <- .check_and_NormPath(paired.end, mustWork=T, opt="transcript.file")
+  output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
   expression.levels.MetaOrder<-expression.levels$ExpressionLevel[ match( fasta.meta$TranscriptID, expression.levels$TranscriptID ) ]
