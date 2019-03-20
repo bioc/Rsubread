@@ -62,10 +62,10 @@ simFragments <- function(transcript.lengths, transcript.expressions=NULL, librar
 }
 
 
-simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, iterative.find.N=FALSE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE,gen.reads=TRUE){
+simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE){
   if(!paired.end) stop("current temp version does not support SE")
   if(out.sample.size>100*1000*1000) stop("The current version cannot generate more than 100 million reads/fragments in a single run")
-  transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
+  transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
@@ -73,12 +73,12 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
 
   read.positions <- simFragments(fasta.meta$Length,expression.levels.MetaOrder, out.sample.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sigma )
   if(simulate.sequencing.error){
-    if( is.null(quality.reference)){
+    if(is.null(quality.reference)){
       if(read.length==75) quality.reference<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
       if(read.length==100) quality.reference <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
       if(is.null(quality.reference)) stop("When you want to simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings that have the length as the output reads.")
     }else{
-      quality.reference <- .check_and_NormPath( quality.reference,  mustWork=T, opt="quality.reference" )
+      quality.reference <- .check_and_NormPath( quality.reference,  mustWork=TRUE, opt="quality.reference")
     }
   }else{
     quality.reference <- NULL
@@ -88,7 +88,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
   rets <- table(fasta.meta$TranscriptID[read.positions[,"Transcript"]])
   rets <- data.frame(fasta.meta[,1:2], Count=as.vector(rets)[match( fasta.meta[,1] , names(rets))])
   rets[is.na(rets[,'Count']) ,'Count']<-0
-  write.table(rets, paste0(output.prefix,".truthCounts"), quote=F, sep="\t", row.names=F)
+  write.table(rets, paste0(output.prefix,".truthCounts"), quote=FALSE, sep="\t", row.names=FALSE)
   rets
 }
 
