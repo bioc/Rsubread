@@ -481,7 +481,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 		SUBREADprintf("Error: cannot open the putput file\n");
 		return -1;
 	}
-	fprintf(sumfp, "TranscriptID\tLength\tMD5\tUnique\tOccurance\tDuplicated\n");
+	fprintf(sumfp, "TranscriptID\tLength\tMD5\tUnique\tOccurrence\tDuplicated\n");
 
 	char * seq_name = NULL;
 	unsigned char md5res[16];
