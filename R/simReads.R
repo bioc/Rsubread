@@ -68,12 +68,14 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
-  expression.levels.MetaOrder <- expression.levels[ match( fasta.meta$TranscriptID, expression.levels[,1] ),2 ]
+  expression.levels.MetaOrder <- rep_len(0, nrow(fasta.meta))
+  m <- match(expression.levels[,1], fasta.meta$TranscriptID, nomatch=0)
+  expression.levels.MetaOrder[m] <- expression.levels[,2]
 
   read.positions <- .simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
   if(simulate.sequencing.error){
     if(is.null(quality.reference)){
-      if(read.length==75) quality.reference<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
+      if(read.length==75) quality.reference <- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
       if(read.length==100) quality.reference <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
       if(is.null(quality.reference)) stop("To simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings of the same length as the output reads.")
     }else{
