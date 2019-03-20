@@ -61,7 +61,7 @@ simFragments <- function(transcript.lengths, transcript.expressions=NULL, librar
   out
 }
 
-simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE){
+simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE){
   if(!paired.end) stop("current temp version does not support SE")
   if(library.size>100*1000*1000) stop("The current version cannot generate more than 100 million reads/fragments in a single run")
   transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
@@ -75,15 +75,15 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
     if(is.null(quality.reference)){
       if(read.length==75) quality.reference<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
       if(read.length==100) quality.reference <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
-      if(is.null(quality.reference)) stop("When you want to simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings that have the length as the output reads.")
+      if(is.null(quality.reference)) stop("To simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings of the same length as the output reads.")
     }else{
-      quality.reference <- .check_and_NormPath( quality.reference,  mustWork=TRUE, opt="quality.reference")
+      quality.reference <- .check_and_NormPath(quality.reference,  mustWork=TRUE, opt="quality.reference")
     }
   }else{
     quality.reference <- NULL
   }
   
-  C_args <- .C("R_genSimReads_at_poses",transcript.file, output.prefix,as.character( quality.reference), fasta.meta$TranscriptID , read.positions[,'Transcript'] , read.positions[,'StartPosition'],  read.positions[,'FragmentLength'], as.integer(read.length) , as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), PACKAGE="Rsubread")
+  C_args <- .C("R_genSimReads_at_poses", transcript.file, output.prefix, as.character(quality.reference), fasta.meta$TranscriptID , read.positions[,'Transcript'] , read.positions[,'StartPosition'],  read.positions[,'FragmentLength'], as.integer(read.length), as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), PACKAGE="Rsubread")
   rets <- table(fasta.meta$TranscriptID[read.positions[,"Transcript"]])
   rets <- data.frame(fasta.meta[,1:2], Count=as.vector(rets)[match( fasta.meta[,1] , names(rets))])
   rets[is.na(rets[,'Count']) ,'Count']<-0
