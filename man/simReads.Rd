@@ -13,7 +13,7 @@ simReads(
   output.prefix,
 
   # options on the output
-  out.sample.size = 1000000,
+  library.size = 1000000,
   read.length = 75,
   truth.in.read.names = FALSE,
 
@@ -21,22 +21,15 @@ simReads(
   simulate.sequencing.error = TRUE,
   quality.reference = NULL,
 
-  # consider lowly expressed transcripts
-  low.transcripts = TRUE,
-  iterative.find.N = FALSE,
-
   # parameters for generating paired-end reads.
   paired.end = FALSE,
   fragment.length.min = 100,
   fragment.length.max = 500,
-  fragment.length.mean = 150,
-  fragment.length.sigma = 25,
+  fragment.length.mean = 180,
+  fragment.length.sd = 40,
 
   # manipulating transcript names
-  simplify.transcript.names = FALSE,
-
-  # miscellaneous options 
-  gen.reads = TRUE
+  simplify.transcript.names = FALSE
 )
 
 scanFasta(
@@ -49,22 +42,19 @@ scanFasta(
 }
 \arguments{
   \item{transcript.file}{character string giving the name of a file that contains the transcript names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
-  \item{expression.levels}{data frame with two columns specifying the transcript IDs (first column) and relative expression levels (second column). Transcript IDs must be unique and expression levels much not be negative.}
+  \item{expression.levels}{data frame with two columns specifying the transcript IDs (first column) and relative expression levels (second column). Transcript IDs must be unique and expression levels must be non-negative.}
   \item{output.prefix}{character string giving the basename of all the output files.}
-  \item{out.sample.size}{numeric value giving the number of reads or read-pairs to be generated. One million by default.}
+  \item{library.size}{numeric value giving the number of reads or read-pairs to be generated. One million by default.}
   \item{read.length}{numeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
   \item{truth.in.read.names}{logical indicating if the true mapping location of reads or read-pairs should be encoded into the read names. \code{FALSE} by default.}
   \item{simulate.sequencing.error}{logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
   \item{quality.reference}{character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
-  \item{low.transcripts}{logical indicating if the transcripts that have expected read numbers less than one should be used for generating reads. Giving \code{FALSE} to this option can result in less reads/read-pairs generated than the wanted read/read-pair number. \code{TRUE} by default.}
-  \item{iterative.find.N}{logical indicating if the iterative algorithm should be used to find the best sample size for calculating the read numbers. When \code{TRUE} is given to this option, \code{low.transcripts} must be set to \code{FALSE}. \code{FALSE} by default.}
   \item{paired.end}{logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
   \item{fragment.length.min}{numeric value giving the minimum fragment length. The minimum fragment length must be equal to or greater than the output read length. 100 by default.}
   \item{fragment.length.max}{numeric value giving the maximum fragment length. 500 by default.}
-  \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 150 by default.}
-  \item{fragment.length.sigma}{numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated normal distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sigma}. 25 by default.}
+  \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 180 by default.}
+  \item{fragment.length.sd}{numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
   \item{simplify.transcript.names}{logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
-  \item{gen.reads}{logical indicating if reads should be actually generated. If \code{FALSE}, the function generates empty fastq.gz file(s). \code{TRUE} by default.}
 }
 \details{
   The \code{simReads} function is for generating simulated reads from a set of transcript sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a transcript file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each transcript. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all transcripts can have reads generated from them. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 

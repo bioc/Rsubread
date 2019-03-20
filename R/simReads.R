@@ -1,4 +1,4 @@
-simFragments <- function(transcript.lengths, transcript.expressions=NULL, library.size=1e6, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40)
+.simFragments <- function(transcript.lengths, transcript.expressions=NULL, library.size=1e6, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40)
 #  Randomly generate fragment lengths and starting positions for RNA-seq simulation.
 #  Assume gamma distribution for fragment lengths.
 #  Gordon Smyth
@@ -70,7 +70,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
   expression.levels.MetaOrder <- expression.levels[ match( fasta.meta$TranscriptID, expression.levels[,1] ),2 ]
 
-  read.positions <- simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
+  read.positions <- .simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
   if(simulate.sequencing.error){
     if(is.null(quality.reference)){
       if(read.length==75) quality.reference<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
@@ -106,7 +106,7 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
 	summ
 }
 
-fix_simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, iterative.find.N=FALSE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE,gen.reads=TRUE){
+.fix_simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, iterative.find.N=FALSE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE,gen.reads=TRUE){
 	transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
 	output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 	if(read.length > 250) stop("The current version can generate reads at most 250bp long.")
