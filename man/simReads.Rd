@@ -53,15 +53,15 @@ scanFasta(
   \item{fragment.length.min}{numeric value giving the minimum fragment length. The minimum fragment length must be equal to or greater than the output read length. 100 by default.}
   \item{fragment.length.max}{numeric value giving the maximum fragment length. 500 by default.}
   \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 180 by default.}
-  \item{fragment.length.sd}{numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
+  \item{fragment.length.sd}{numeric valuqe giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
   \item{simplify.transcript.names}{logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
 }
 \details{
-  The \code{simReads} function is for generating simulated reads from a set of transcript sequences (for example, all the transcript sequences of human) at predefined abundances. The input to this function includes a transcript file in the FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actually counts of reads or read-pairs generated from each transcript. The output reads usually do not have exactly the same abundances as wanted due to round-off errors and randomness. It is also remarked that not all transcripts can have reads generated from them. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 
+  \code{simReads} generates simulated reads from a set of transcript sequences at specified abundances. The input includes a transcript file in FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actual number of reads or read-pairs generated from each transcript. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 
 
   When generating paired-end reads, the fragment lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{fragment.length.mean} and \code{fragment.length.sigma}; the minimum and maximum fragment lengths are specified in \code{fragment.length.min} and \code{fragment.length.max}. The fragment lengths that are greater than the actually transcript length are truncated to the transcript length.
 
-  Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error} is \code{TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
+  Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error = TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
 
   The \code{scanFasta} function checks and processes the FASTA file.
   It scans through the FASTA file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths.
@@ -88,7 +88,8 @@ scanFasta(
   Note that selecting transcripts with \code{Duplicate == FALSE} will ensure unique sequences, i.e., any sequence that was observed multiple times in the FASTQ file will be only included only once in the selection.
 }
 %\references{
-%Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote. #%%\emph{Nucleic Acids Research}, 41(10):e108, 2013.
+%Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.
+%\emph{Nucleic Acids Research}, 41(10):e108, 2013.
 %}
 \author{Wei Shi and Yang Liao}
 \examples{
