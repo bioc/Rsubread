@@ -3,7 +3,8 @@ useDynLib(Rsubread)
 exportPattern("^[^\\.]")
 
 importFrom("grDevices", "dev.off", "pdf")
-importFrom("stats", "approxfun", "density", "dpois", "end", "lowess",
-           "ppois", "runif", "start")
+importFrom("stats", "approxfun", "density", "dgamma", "dpois", "lowess",
+           "ppois", "runif", "rmultinom")
+
 importFrom("utils", "download.file", "read.csv", "read.delim",
            "write.table")
