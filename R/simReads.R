@@ -58,7 +58,7 @@
 # Generate start position
   out[,"StartPosition"] <- 1L + as.integer( runif(library.size) * (TraLen - out[,"FragmentLength"]) + 0.5 )
 
-  out
+  list(n.fragments=n.fragments, read.positions=out)
 }
 
 simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE){
@@ -72,7 +72,6 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   m <- match(expression.levels[,1], fasta.meta$TranscriptID, nomatch=0)
   expression.levels.MetaOrder[m] <- expression.levels[,2]
 
-  read.positions <- .simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
   if(simulate.sequencing.error){
     if(is.null(quality.reference)){
       if(read.length==75) quality.reference <- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
@@ -84,13 +83,10 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   }else{
     quality.reference <- NULL
   }
-  
-  C_args <- .C("R_genSimReads_at_poses", transcript.file, output.prefix, as.character(quality.reference), fasta.meta$TranscriptID , read.positions[,'Transcript'] , read.positions[,'StartPosition'],  read.positions[,'FragmentLength'], as.integer(read.length), as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), PACKAGE="Rsubread")
-  rets <- table(fasta.meta$TranscriptID[read.positions[,"Transcript"]])
-  rets <- data.frame(fasta.meta[,1:2], Count=as.vector(rets)[match( fasta.meta[,1] , names(rets))])
-  rets[is.na(rets[,'Count']) ,'Count']<-0
-  write.table(rets, paste0(output.prefix,".truthCounts"), quote=FALSE, sep="\t", row.names=FALSE)
-  rets
+
+  sf <- .simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
+  C_args <- .C("R_genSimReads_at_poses", transcript.file, output.prefix, as.character(quality.reference), fasta.meta$TranscriptID, sf$read.positions[,'Transcript'], sf$read.positions[,'StartPosition'], sf$read.positions[,'FragmentLength'], as.integer(read.length), as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), PACKAGE="Rsubread")
+  data.frame(fasta.meta[,1:2], NReads=sf$n.fragments)
 }
 
 scanFasta <- function(transcript.file, simplify.transcript.names=FALSE){
