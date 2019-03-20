@@ -61,17 +61,16 @@ simFragments <- function(transcript.lengths, transcript.expressions=NULL, librar
   out
 }
 
-
-simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE){
+simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE){
   if(!paired.end) stop("current temp version does not support SE")
-  if(out.sample.size>100*1000*1000) stop("The current version cannot generate more than 100 million reads/fragments in a single run")
+  if(library.size>100*1000*1000) stop("The current version cannot generate more than 100 million reads/fragments in a single run")
   transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
-  expression.levels.MetaOrder<-expression.levels[ match( fasta.meta$TranscriptID, expression.levels[,1] ),2 ]
+  expression.levels.MetaOrder <- expression.levels[ match( fasta.meta$TranscriptID, expression.levels[,1] ),2 ]
 
-  read.positions <- simFragments(fasta.meta$Length,expression.levels.MetaOrder, out.sample.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sigma )
+  read.positions <- simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
   if(simulate.sequencing.error){
     if(is.null(quality.reference)){
       if(read.length==75) quality.reference<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
@@ -84,7 +83,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, out.samp
     quality.reference <- NULL
   }
   
-  C_args <- .C("R_genSimReads_at_poses",transcript.file, output.prefix,as.character( quality.reference), fasta.meta$TranscriptID , read.positions[,'Transcript'] , read.positions[,'StartPosition'],  read.positions[,'FragmentLength'], as.integer(read.length) , as.integer(out.sample.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end),PACKAGE="Rsubread")
+  C_args <- .C("R_genSimReads_at_poses",transcript.file, output.prefix,as.character( quality.reference), fasta.meta$TranscriptID , read.positions[,'Transcript'] , read.positions[,'StartPosition'],  read.positions[,'FragmentLength'], as.integer(read.length) , as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), PACKAGE="Rsubread")
   rets <- table(fasta.meta$TranscriptID[read.positions[,"Transcript"]])
   rets <- data.frame(fasta.meta[,1:2], Count=as.vector(rets)[match( fasta.meta[,1] , names(rets))])
   rets[is.na(rets[,'Count']) ,'Count']<-0
