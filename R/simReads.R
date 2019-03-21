@@ -62,15 +62,17 @@
 }
 
 simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE){
+  expression.levels[ is.na(expression.levels) ]<-0
+  if(any(expression.levels<0))stop("No negative expression values are allowed.")
+  if(sum(expression.levels)==0)stop("The wanted expression levels are all zero.")
+
   if(!paired.end) stop("current temp version does not support SE")
   if(library.size>100*1000*1000) stop("The current version cannot generate more than 100 million reads/fragments in a single run")
   transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
   fasta.meta <- scanFasta(transcript.file, simplify.transcript.names)
-  expression.levels.MetaOrder <- rep_len(0, nrow(fasta.meta))
-  m <- match(expression.levels[,1], fasta.meta$TranscriptID, nomatch=0)
-  expression.levels.MetaOrder[m] <- expression.levels[,2]
+  if(length(expression.levels)!=nrow(fasta.meta))stop("The wanted expression levels do not match the transcripts in the input fasta file.")
 
   if(simulate.sequencing.error){
     if(is.null(quality.reference)){
@@ -84,7 +86,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
     quality.reference <- NULL
   }
 
-  sf <- .simFragments(fasta.meta$Length, expression.levels.MetaOrder, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
+  sf <- .simFragments(fasta.meta$Length, expression.levels, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
   C_args <- .C("R_genSimReads_at_poses", transcript.file, output.prefix, as.character(quality.reference), fasta.meta$TranscriptID, sf$read.positions[,'Transcript'], sf$read.positions[,'StartPosition'], sf$read.positions[,'FragmentLength'], as.integer(read.length), as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), PACKAGE="Rsubread")
   data.frame(fasta.meta[,1:2], NReads=sf$n.fragments)
 }

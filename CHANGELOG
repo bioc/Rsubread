@@ -1,3 +1,6 @@
+21 Mar 2019 - 1.33.28
+(1) Change the type of "expression.levels" in simReads() from data.frame to vector.
+
 20 Mar 2019 - 1.33.27
 (1) Fix simReads() to correctly treat the coordinates as "1-based" coordinates.
 
