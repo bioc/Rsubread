@@ -257,7 +257,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   if(qualstr_name && qualstr_name[0]){
     ret = autozip_open(qualstr_name, &auto_FP);
     if(ret){
-      SUBREADprintf("Error: cannot open reference qquality file '%s'\n", qualstr_name);
+      SUBREADprintf("Error: cannot open reference quality file '%s'\n", qualstr_name);
       return -1;
     }
     while(1){
