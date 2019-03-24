@@ -1,3 +1,6 @@
+25 Mar 2019
+(1) Amend the document of simReads() and scanFasta() to remove a warning message.
+
 21 Mar 2019 - 1.33.28
 (1) Change the type of "expression.levels" in simReads() from data.frame to vector.
 

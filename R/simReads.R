@@ -74,7 +74,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
 
-  fasta.meta <- scanFasta(transcript.file, simplify.transcript.names, quite=T)
+  fasta.meta <- scanFasta(transcript.file, simplify.transcript.names, quiet=T)
   if(length(expression.levels)!=nrow(fasta.meta))stop("The wanted expression levels do not match the transcripts in the input fasta file.")
 
   if(simulate.sequencing.error){
@@ -94,11 +94,11 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   data.frame(fasta.meta[,1:2], NReads=sf$n.fragments)
 }
 
-scanFasta <- function(transcript.file, simplify.transcript.names=FALSE, quite=FALSE){
+scanFasta <- function(transcript.file, simplify.transcript.names=FALSE, quiet=FALSE){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
 	transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
 	cmd <- paste("RscanFasta,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=",")
-    if(quite) cmd<-paste(cmd, "--quite", sep=",")
+    if(quiet) cmd<-paste(cmd, "--quiet", sep=",")
     if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=",")
 
 	n <- length(unlist(strsplit(cmd,",")))

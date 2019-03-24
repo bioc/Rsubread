@@ -37,7 +37,10 @@ scanFasta(
   transcript.file,
 
   # manipulating transcript names
-  simplify.transcript.names = FALSE
+  simplify.transcript.names = FALSE,
+
+  # miscellaneous options
+  quiet = FALSE
 )
 }
 \arguments{
@@ -55,6 +58,7 @@ scanFasta(
   \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 180 by default.}
   \item{fragment.length.sd}{numeric valuqe giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
   \item{simplify.transcript.names}{logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
+  \item{quiet}{logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function.}
 }
 \details{
   \code{simReads} generates simulated reads from a set of transcript sequences at specified abundances. The input includes a transcript file in FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actual number of reads or read-pairs generated from each transcript. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 

@@ -92,7 +92,7 @@ int print_usage_gen_reads(char * pgname) {
 
 static struct option long_options[] =
 {
-	{"quite", no_argument, 0, 'Q'},
+	{"quiet", no_argument, 0, 'Q'},
 	{"truthInReadNames", no_argument, 0, 'T'},
 	{"simpleTranscriptId", no_argument, 0, 'C'},
 	{"summarizeFasta",  no_argument, 0, 'M'},
@@ -130,7 +130,7 @@ typedef struct {
 	int insertion_length_max;
 	int insertion_length_min;
 	float insertion_length_sigma;
-	int quite;
+	int quiet;
 	int read_length;
 	int no_actual_reads;
 
@@ -597,7 +597,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 	}
 	HashTableDestroy(reprs_tab);
 
-	if(total_rep_seq && grc->quite==0)SUBREADprintf("Warning: %d duplicate sequences were found in the input. Please check the summary table.\n",total_rep_seq);
+	if(total_rep_seq && grc->quiet==0)SUBREADprintf("Warning: %d duplicate sequences were found in the input. Please check the summary table.\n",total_rep_seq);
 
 	ArrayListDestroy(seq_name_list);
 	HashTableDestroy(seq_length_tab);
@@ -887,7 +887,7 @@ int gen_rnaseq_reads_main(int argc, char ** argv)
 	while ((c = getopt_long (argc, argv, "QO:TCxS:V:N:X:F:L:q:r:t:e:o:pM?", long_options, &option_index)) != -1) {
 		switch(c){
 			case 'Q':
-				grc.quite=1;
+				grc.quiet=1;
 				break;
 			case 'x':
 				grc.no_actual_reads = 1;
