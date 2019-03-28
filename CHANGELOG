@@ -1,4 +1,7 @@
-25 Mar 2019
+28 Mar 2019 - 1.33.30
+(1) Enable single-end read simulation in simReads().
+
+25 Mar 2019 - 1.33.29
 (1) Amend the document of simReads() and scanFasta() to remove a warning message.
 
 21 Mar 2019 - 1.33.28

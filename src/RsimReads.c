@@ -335,7 +335,7 @@ int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int
 
       int pos_small = start_offset;
       int pos_large = end_offset - read_length;
-      Rgen_one_read_here(&grc, trans_ids[read_pick_i], is_R1_at_3End?pos_large:pos_small, 0, is_R1_at_3End, read_i, is_R1_at_3End?pos_small:pos_large);
+      Rgen_one_read_here(&grc, trans_ids[read_pick_i], is_R1_at_3End?pos_large:pos_small, grc.is_paired_end?0:-1, is_R1_at_3End, read_i, is_R1_at_3End?pos_small:pos_large);
       if(grc.is_paired_end)Rgen_one_read_here(&grc, trans_ids[read_pick_i], is_R1_at_3End?pos_small:pos_large, 1,!is_R1_at_3End, read_i, is_R1_at_3End?pos_large:pos_small);
 
       read_pick_i += A_LARGE_PRIME_FOR_MOD;

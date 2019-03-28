@@ -69,7 +69,6 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
   if(any(expression.levels<0))stop("No negative expression values are allowed.")
   if(sum(expression.levels)==0)stop("The wanted expression levels are all zero.")
 
-  if(!paired.end) stop("current temp version does not support SE")
   if(library.size>100*1000*1000) stop("The current version cannot generate more than 100 million reads/fragments in a single run")
   transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
   output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
@@ -107,72 +106,5 @@ scanFasta <- function(transcript.file, simplify.transcript.names=FALSE, quiet=FA
 	fout_sum <-paste0(fout_sum,".faSummary")
 	summ <- read.delim(fout_sum, stringsAsFactors=FALSE, header=T)
 	file.remove(fout_sum)
-	summ
-}
-
-.fix_simReads <- function(transcript.file, expression.levels, output.prefix, out.sample.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, low.transcripts=TRUE, iterative.find.N=FALSE, paired.end=FALSE, fragment.length.min=100, fragment.length.max=500, fragment.length.mean=150, fragment.length.sigma=25, simplify.transcript.names=FALSE,gen.reads=TRUE){
-	transcript.file <- .check_and_NormPath(transcript.file, mustWork=TRUE, opt="transcript.file")
-	output.prefix <- .check_and_NormPath(output.prefix, mustWork=FALSE, opt="output.prefix")
-	if(read.length > 250) stop("The current version can generate reads at most 250bp long.")
-	if(read.length <1) stop("Read length must be a positive integer")
-	if(iterative.find.N && low.transcripts) stop("When using the iterative algorithm to find the best sample size, the lowly expressed transcripts have to be excluded (ie low.transcripts=FALSE)")
-
-	qualfile <- NULL
-	if(simulate.sequencing.error){
-		if(is.null(quality.reference)){
-			if(read.length==75) qualfile<- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
-			if(read.length==100) qualfile <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
-			if(is.null(qualfile)) stop("When you want to simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings that have the length as the output reads.")
-		}else{
-			qualfile <- .check_and_NormPath(quality.reference, mustWork=TRUE, opt="qualfile")
-		}
-	}
-
-	if( paired.end ){
-		if(fragment.length.min < read.length) stop("The minimum fragment length must be higher than the read length")
-		if(fragment.length.min > fragment.length.max) stop("The minimum fragment length must be equal or lower than the maximum length")
-		if(fragment.length.mean < fragment.length.min || fragment.length.mean >fragment.length.max) stop("Error: the mean fragment length must be between the minimum and maximum fragment lengths")
-	}
-	if(out.sample.size<1) stop("The output sample size must be a positive integer")
-	if(out.sample.size>1000*1000*1000) stop("The current version cannot generate more than one billion reads/fragments in a single run")
-
-	fin_TPMtab <- file.path(".",paste(".Rsubread_genReadTPM_pid",Sys.getpid(),sep=""))
-	transcript.TPM <- as.data.frame(expression.levels)
-	if( "TranscriptID" %in% colnames(transcript.TPM) && "TPM" %in% colnames(transcript.TPM) ){
-		transcript.TPM <- data.frame(TranscriptID=transcript.TPM$TranscriptID, TPM=as.numeric(as.character(transcript.TPM$TPM)))
-	}else{
-		if(ncol(transcript.TPM)!=2) stop("The 'expression.levels' parameter must be a two-column data.frame. The first column contains the transcript names and the second column contains the relative expression levels")
-		transcript.TPM[,2] <- as.numeric(as.character(transcript.TPM[,2]))
-	}
-	colnames( transcript.TPM ) <- c("TranscriptID","TPM")
-
-	# we allow any ratio values for the expression values.
-	# however, the C code only allows the sum of one million.
-	# hence, there is a conversion in R.
-
-	rangeTPM <- range(transcript.TPM$TPM)
-	if( is.na(rangeTPM[1]) ) stop("NA expression levels not allowed")
-	if( rangeTPM[1] < 0 ) stop("Negative expression levels not allowed")
-	if( rangeTPM[2] <= 0 ) stop("At least some expression levels must be positive")
-	transcript.TPM$TPM <- transcript.TPM$TPM / sum(transcript.TPM$TPM) * 1e6
-	write.table(transcript.TPM, file=fin_TPMtab, sep="\t", row.names=FALSE, quote=FALSE)
-
-	cmd <- paste("RgenerateRNAseqReads,--transcriptFasta",transcript.file,"--expressionLevels",fin_TPMtab,"--outputPrefix",output.prefix, "--totalReads",sprintf("%d",out.sample.size), "--readLen",read.length, sep=",")
-	if(paired.end) cmd <- paste(cmd, "--pairedEnd,--fragmentLenMean",fragment.length.mean, "--fragmentLenMax",fragment.length.max,"--fragmentLenMin",fragment.length.min,"--fragmentLenSigma",fragment.length.sigma, sep=",")
-	if(simplify.transcript.names) cmd <- paste(cmd, "--simpleTranscriptId", sep=",")
-	if(truth.in.read.names) cmd <- paste(cmd, "--truthInReadNames", sep=",")
-
-	if(iterative.find.N) cmd <- paste(cmd, "--floorStrategy","ITERATIVE", sep=",")
-	if(!(low.transcripts || iterative.find.N )) cmd <- paste(cmd, "--floorStrategy","FLOOR", sep=",")
-
-	if(!gen.reads) cmd <- paste(cmd, "--noActualReads" ,sep=",")
-	if(!is.null(qualfile)) cmd <- paste(cmd, "--qualityRefFile", qualfile, sep=",")
-
-	#print(substr(cmd,1,2000))
-	n <- length(unlist(strsplit(cmd,",")))
-	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
-
-	summ <- read.delim(paste0(output.prefix,".truthCounts"), stringsAsFactors=FALSE, header=T, comment.char="#", colClasses=c("character", "numeric", "numeric"))
-	file.remove(fin_TPMtab)
 	summ
 }
