@@ -1,7 +1,7 @@
 .load.delete.summary <- function(bam.name){
   sumfile <- paste0(bam.name,".summary")
   if(!file.exists(sumfile)){
-    stop(paste("ERROR: Summary file",sumfile,"was not generated! The program terminated wrongly!"))
+    stop("Summary file ",sumfile," was not generated! The program terminated wrongly!")
   } 
 
   tmp.frame <- read.delim(sumfile, header=FALSE, row.names=1, stringsAsFactors=FALSE)
