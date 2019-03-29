@@ -5,7 +5,7 @@
   } 
 
   tmp.frame <- read.delim(sumfile, header=FALSE, row.names=1, stringsAsFactors=FALSE)
-  file.remove(sumfile)
+#  file.remove(sumfile)
   return(tmp.frame)
 }
 
