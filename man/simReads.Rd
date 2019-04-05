@@ -45,7 +45,7 @@ scanFasta(
 }
 \arguments{
   \item{transcript.file}{character string giving the name of a file that contains the transcript names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
-  \item{expression.levels}{data frame with two columns specifying the transcript IDs (first column) and relative expression levels (second column). Transcript IDs must be unique and expression levels must be non-negative.}
+  \item{expression.levels}{numeric vector giving the relative expression levels of the transcripts, in the order of transcripts in \code{transcript.file}. The sum of the values must be positive, and no negative value is allowed.}
   \item{output.prefix}{character string giving the basename of all the output files.}
   \item{library.size}{numeric value giving the number of reads or read-pairs to be generated. One million by default.}
   \item{read.length}{numeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
@@ -58,18 +58,16 @@ scanFasta(
   \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 180 by default.}
   \item{fragment.length.sd}{numeric valuqe giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
   \item{simplify.transcript.names}{logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
-  \item{quiet}{logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function.}
+  \item{quiet}{logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function. \code{FALSE} by default.}
 }
 \details{
-  \code{simReads} generates simulated reads from a set of transcript sequences at specified abundances. The input includes a transcript file in FASTA or gzipped-FASTA format, and a data frame that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs, and a truth file giving the actual number of reads or read-pairs generated from each transcript. To have reads generated from it, a transcript has to have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads. The transcripts that are too short for read generation have \code{NA} read numbers in the output truth file. 
+  \code{simReads} generates simulated reads from a set of transcript sequences at specified abundances. The input includes a transcript file in FASTA or gzipped-FASTA format, and a numeric vector that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs. To have reads generated from it, a transcript must have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads.
 
-  When generating paired-end reads, the fragment lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{fragment.length.mean} and \code{fragment.length.sigma}; the minimum and maximum fragment lengths are specified in \code{fragment.length.min} and \code{fragment.length.max}. The fragment lengths that are greater than the actually transcript length are truncated to the transcript length.
+  When generating paired-end reads, the fragment lengths are drawn from a truncated normal distribution with the mean and standard deviation specified in \code{fragment.length.mean} and \code{fragment.length.sd}; the minimum and maximum fragment lengths are specified in \code{fragment.length.min} and \code{fragment.length.max}.
 
   Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error = TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, it randomly chooses a quality string for each output read, and substitutes the read bases with random base values at the probabilities described in the quality string. This function has inbuilt quality strings for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
 
-  The \code{scanFasta} function checks and processes the FASTA file.
-  It scans through the FASTA file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths.
-  It additionally checks the transcript sequences for uniqueness.
+  The \code{scanFasta} function checks and processes the FASTA or gzipped-FASTA file. It scans through the file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths. It additionally checks the transcript sequences for uniqueness.
 }
 \value{
   \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{paired.end}, containing the simulated reads.
@@ -103,13 +101,12 @@ transcripts <- scanFasta("GENCODE-Human-transcripts.fa.gz")
 nsequences <- nrow(transcripts) - sum(transcripts$Duplicate)
 
 # Assign a random TPM value to each non-duplicated transcript sequence
-TPMs <- data.frame(TranscriptID = transcripts$TranscriptID, TPM = 0)
-TPMs$TPM[!transcripts$Duplicate] <- rexp(nsequences)
-TPMs$TPM <- TPMs$TPM / sum(TPMs$TPM) * 1e6
+TPMs <- rep(0, nrow(transcripts))
+TPMs[!transcripts$Duplicate] <- rexp(nsequences)
 
 # Generate actual reads.
 # The output read file is my-simulated-sample_R1.fastq.gz 
-# The true read counts are returned, and also in file my-simulated-sample.trueCounts
+# The true read counts are returned.
 true.counts <- simReads("GENCODE-Human-transcripts.fa.gz", TPMs, "my-simulated-sample")
 print(true.counts[1:10,])
 }

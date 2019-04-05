@@ -1,3 +1,6 @@
+5 Apr 2019 - 1.33.32
+(1) Amend documents for simReads() and scanFasta() to reflect the latest changes.
+
 29 Mar 2019 - 1.33.31
 (1) align() and subjunc() now write the summary mapping statistics for each sample to a file (as well as returning the same statistics, combined over samples in a data.frame).
 
