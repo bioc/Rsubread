@@ -45,6 +45,7 @@ int IS_COLOR_SPACE = 0;
 int VALUE_ARRAY_INDEX = 1;
 int MARK_NONINFORMATIVE_SUBREADS = 0;
 int IS_FORCED_ONE_BLOCK = 0;
+int ignore_bar_in_seqnames = 0;
 
 #define NEXT_READ 1
 #define NEXT_FILE 2
@@ -214,7 +215,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				//printf("TTTXT FN=%s\n",fn);
 
-				for(i=0;(fn[i+1] != ' ' && fn[i+1] != '\0' && fn[i+1] != '\t' && i<MAX_CHROMOSOME_NAME_LEN - 1); i++)
+				for(i=0;(fn[i+1] != ' ' && fn[i+1] != '\0' && fn[i+1] != '\t' && i<MAX_CHROMOSOME_NAME_LEN - 1 && ( fn[i+1] != '|'  || !ignore_bar_in_seqnames )); i++)
 					*(read_names + MAX_READ_NAME_LEN*read_no + i) = fn[i+1];
 
 				*(read_names + MAX_READ_NAME_LEN*read_no + i) = 0;
@@ -1039,9 +1040,12 @@ int main_buildindex(int argc,char ** argv)
 
 	optind = 0;
 	
-	while ((c = getopt_long (argc, argv, "kvcBFM:o:f:D?", ib_long_options, &optindex)) != -1)
+	while ((c = getopt_long (argc, argv, "kvcBFM:o:f:Db?", ib_long_options, &optindex)) != -1)
 		switch(c)
 		{
+			case 'b':
+				ignore_bar_in_seqnames= 1;
+				break;
 			case 'B':
 				IS_FORCED_ONE_BLOCK =1;
 				break;

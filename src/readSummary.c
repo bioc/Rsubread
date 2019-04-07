@@ -4863,9 +4863,10 @@ void print_usage()
 	SUBREADputs("                      (SAF format) is available in 'annotation' directory of the");
 	SUBREADputs("                      package. Gzipped file is also accepted.");
 	SUBREADputs("");
-	SUBREADputs("  -o <string>         Name of the output file including read counts. A separate"); 
-	SUBREADputs("                      file including summary statistics of counting results is");
-	SUBREADputs("                      also included in the output ('<string>.summary')");
+	SUBREADputs("  -o <string>         Name of output file including read counts. A separate file");
+	SUBREADputs("                      including summary statistics of counting results is also");
+	SUBREADputs("                      included in the output ('<string>.summary'). Both files");
+	SUBREADputs("                      are in tab delimited format."); 
 	SUBREADputs("");
 	SUBREADputs("  input_file1 [input_file2] ...   A list of SAM or BAM format files. They can be");
 	SUBREADputs("                      either name or location sorted. If no files provided,");

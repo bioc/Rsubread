@@ -1929,11 +1929,19 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 	voting_position = current_result -> selected_position; 
 
 
-	//SUBREADprintf("NR=%d\n", indel_recorder[0]);
 	if(!indel_recorder[0])
 		return 0;
 
 	gene_value_index_t * current_value_index = thread_context?thread_context->current_value_index:global_context->current_value_index; 
+
+	if(0){ // test "shifting indels" -- not needed when "NEW" go_Q used
+		int last_offset = 0;
+		for(i=0; indel_recorder[i]  && (i<MAX_INDEL_SECTIONS); i+=3){
+			last_offset = indel_recorder[i+2];
+		}
+
+		if(0==last_offset) return 0;
+	}
 
 	for(i=0; indel_recorder[i]  && (i<MAX_INDEL_SECTIONS); i+=3)
 	{
@@ -2035,8 +2043,8 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								{
 									int  old_event_id = -1;
 
-									if(0)if(indel_left_boundary >= 44438630 + 1210 - 200 && indel_left_boundary  <= 44438630 + 1210 + 200 && current_indel_len == 6){
-										SUBREADprintf("ADD AN INDEL: %s : %u ; len = %u\n", read_name, indel_left_boundary, current_indel_len);
+									if(0)if(indel_left_boundary >= 46481340 + 1210 - 200 && indel_left_boundary  <= 46481340 + 1210 + 200 && abs(current_indel_len )==4){
+										SUBREADprintf("ADD AN INDEL: %s : %u ; len = %d\n", read_name, indel_left_boundary, current_indel_len);
 									}
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0, &old_event_id);
 									mark_gapped_read(current_result);
@@ -2324,7 +2332,7 @@ int write_indel_final_results(global_context_t * global_context)
 		chromosome_event_t * event_body = indel_context -> event_space_dynamic +xk1;
 
 
-		//#warning " ================= REMOVE '- 1' from the next LINE!!! ========================="
+//		#warning " ================= REMOVE '- 1' from the next LINE!!! ========================="
 		if((event_body -> event_type != CHRO_EVENT_TYPE_INDEL && event_body->event_type != CHRO_EVENT_TYPE_LONG_INDEL  && event_body -> event_type != CHRO_EVENT_TYPE_POTENTIAL_INDEL)|| (event_body -> final_counted_reads < 1  && event_body -> event_type == CHRO_EVENT_TYPE_INDEL) )
 			continue;
 

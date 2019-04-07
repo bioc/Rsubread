@@ -29,7 +29,7 @@
 #define LRMDYNAMIC_MAXIMUM_GAP_LENGTH (15000)
 
 // " * 250" is for RNA-seq mapping -- a much larger dynamic programming space.
-#define LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE (150 * 250 )
+#define LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE (150 * 250 / 250 )
 
 
 #define LRMSUBREAD_INDEX_OPTION_INDEX_GAP 0x0101

@@ -296,13 +296,14 @@ typedef struct {
 	short max_mask;
 	gene_vote_number_t noninformative_subreads;
 
-        unsigned short items[GENE_VOTE_TABLE_SIZE];
-        unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-        gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-        gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	unsigned short items[GENE_VOTE_TABLE_SIZE];
+	unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t last_subread_cluster [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
+	unsigned char section_subreads [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 

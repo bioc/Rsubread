@@ -425,6 +425,11 @@ int show_summary(global_context_t * global_context)
 	}
 	print_in_box(80, 0,1,"      ");
 	print_in_box(80, 0,0,"               Running time : %.1f minutes", (miltime()-global_context->start_time)*1./60);
+
+	if( global_context->input_reads.is_paired_end_reads && global_context -> config.reported_multi_best_reads<2 && global_context -> expected_TLEN_read_numbers < READPAIRS_FOR_CALC_EXPT_TLEN){
+	    print_in_box(80, 0,1,"      ");
+		print_in_box(80,0,0,"  NOTE : No enough read-pairs to derive expected fragment length.");
+	}
 /*
 	print_in_box(80, 0,0,"    Running time 0 : %.2f minutes", global_context->timecost_load_index/60);
 	print_in_box(80, 0,0,"    Running time 1 : %.2f minutes", global_context->timecost_voting/60);
@@ -2336,7 +2341,7 @@ void add_realignment_event_support(global_context_t * global_context , realignme
 }
 
 unsigned int calc_end_pos(unsigned int p, char * cigar, unsigned int * all_skipped_len, int * is_exonic_regions, global_context_t * global_context);
-void test_PE_and_same_chro_align(global_context_t * global_context , realignment_result_t * res1, realignment_result_t * res2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * rname);
+void test_PE_and_same_chro_align(global_context_t * global_context , realignment_result_t * res1, realignment_result_t * res2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * rname, int * res_tlen);
 void write_realignments_for_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_context_t * out_context, unsigned int read_number, realignment_result_t * res1, realignment_result_t * res2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2 , int rlen1 , int rlen2, int multi_mapping_number, int this_multi_mapping_i, int non_informative_subreads_r1, int non_informative_subreads_r2){
 
 
@@ -2462,6 +2467,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	int * final_realignment_index1, *final_realignment_index2;
 	unsigned int *final_realignment_number;
 	unsigned long long * final_SCORE_buffer;
+	unsigned int * final_TLEN_buffer;
+
 	realignment_result_t * final_realignments;
 	subread_output_context_t out_context;
 
@@ -2481,6 +2488,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	final_realignment_index2 = malloc(sizeof(int) * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 
 	final_SCORE_buffer = malloc(sizeof(long long) * global_context -> config.multi_best_reads * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR*MAX_ALIGNMENT_PER_ANCHOR);
+	final_TLEN_buffer = malloc(sizeof(int) * global_context -> config.multi_best_reads * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR*MAX_ALIGNMENT_PER_ANCHOR);
+
 	final_realignments = malloc(sizeof(realignment_result_t) * global_context -> config.multi_best_reads * 2 * MAX_ALIGNMENT_PER_ANCHOR);
 	final_realignment_number = malloc(sizeof(int) * global_context -> config.multi_best_reads * 2);
 
@@ -2650,6 +2659,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 		//if(161430 <= current_read_number) SUBREADprintf("LOC1=%d, LOC2=%d\n", r1_candidate_locations, r2_candidate_locations);
 
+		int need_expect_TLEN = r2_candidate_locations && r1_candidate_locations && global_context -> config.reported_multi_best_reads<2 && global_context -> expected_TLEN_read_numbers < READPAIRS_FOR_CALC_EXPT_TLEN;
 		int output_cursor = 0;
 		if(r2_candidate_locations == 0 || r1_candidate_locations == 0) {
 			int is_second_read, highest_score_occurence =0;
@@ -2743,7 +2753,13 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			}
 		} else {
 			int r1_best_id, r2_best_id, highest_score_occurence = 0;
+			int expected_TLEN;
+			if(global_context -> expected_TLEN_read_numbers >= READPAIRS_FOR_CALC_EXPT_TLEN)
+				expected_TLEN = global_context -> expected_TLEN_sum / global_context -> expected_TLEN_read_numbers;
+			else expected_TLEN = (global_context -> config.minimum_pair_distance + global_context -> config.maximum_pair_distance)/2;
+
 			unsigned long long highest_score = 0;
+			if(need_expect_TLEN) memset(final_TLEN_buffer, 0 , sizeof(int)  * global_context -> config.multi_best_reads * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR*MAX_ALIGNMENT_PER_ANCHOR );
 			memset(final_SCORE_buffer, 0 , sizeof(long long)  * global_context -> config.multi_best_reads * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR*MAX_ALIGNMENT_PER_ANCHOR );
 			for(r1_best_id = 0; r1_best_id < r1_candidate_locations; r1_best_id ++) {
 				int r1_matched = final_MATCH_buffer1[r1_best_id];
@@ -2759,11 +2775,11 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 					realignment_result_t * realignment_result_R2 = final_realignments + final_realignment_index2[r2_best_id];
 					if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0)
 						SUBREADprintf("R2 MA=%d, MISMA=%d  %u  %s\n", realignment_result_R2->final_matched_bases, realignment_result_R2 -> final_mismatched_bases, realignment_result_R2 -> first_base_position, realignment_result_R2 -> cigar_string);
-					int is_PE = 0;
+					int is_PE = 0, tlen=0;
 					int is_same_chro = 0, is_exonic_regions = 0;
 					unsigned long long final_SCORE = 0;
 
-					test_PE_and_same_chro_align(global_context , realignment_result_R1 , realignment_result_R2, &is_exonic_regions, &is_PE, &is_same_chro , read_len_1, read_len_2, read_name_1);
+					test_PE_and_same_chro_align(global_context , realignment_result_R1 , realignment_result_R2, &is_exonic_regions, &is_PE, &is_same_chro , read_len_1, read_len_2, read_name_1, &tlen);
 					if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0) {
 						char outpos1[100];
 						char outpos2[100];
@@ -2774,7 +2790,12 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						SUBREADprintf("READ %s : %s %s     %s %s  : %s\n", read_name_1, outpos1, realignment_result_R1 -> cigar_string, outpos2,  realignment_result_R2 -> cigar_string, is_exonic_regions?  "YES":"NO");
 					}
 
-
+					unsigned long long TLEN_exp_score = 0;
+					if(is_PE && global_context -> config.reported_multi_best_reads<2){
+						TLEN_exp_score = (tlen > expected_TLEN)?(tlen - expected_TLEN):(expected_TLEN - tlen);
+						if(TLEN_exp_score>999) TLEN_exp_score=0;
+						else TLEN_exp_score = 999-TLEN_exp_score;
+					}
 					if(global_context -> config.experiment_type == CORE_EXPERIMENT_DNASEQ){
 						int weight;
 						
@@ -2789,8 +2810,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 							//weight = 30;
 						final_SCORE = weight * (final_MATCH_buffer1[r1_best_id] + final_MATCH_buffer2[r2_best_id]);
 						//#warning "=========== ADD BY YANG LIAO FOR MORE MAPPED READS WITH '-u' OPTION ================"
-						final_SCORE = final_SCORE * 1000llu + (final_MISMATCH_buffer1[r1_best_id] + final_MISMATCH_buffer2[r2_best_id]);
-
+						final_SCORE = final_SCORE * 10 *1000llu*1000llu + (final_MISMATCH_buffer1[r1_best_id] + final_MISMATCH_buffer2[r2_best_id]) * 1000llu + TLEN_exp_score;
+						if(is_PE && need_expect_TLEN) final_TLEN_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] = tlen;
 
 					} else if (global_context -> config.experiment_type == CORE_EXPERIMENT_RNASEQ) {
 						int weight;
@@ -2815,15 +2836,16 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						}
 
 						//#warning "=========== ADD BY YANG LIAO  ' + 2' ===================="
-						final_SCORE = 100000llu * weight / (final_MISMATCH_buffer1[r1_best_id] + final_MISMATCH_buffer2[r2_best_id] + 1 + 2);
+						final_SCORE = weight / (final_MISMATCH_buffer1[r1_best_id] + final_MISMATCH_buffer2[r2_best_id] + 1 + 2);
 
 						//#warning "=========== ADD BY YANG LIAO FOR MORE MAPPED READS WITH '-u' OPTION ================"
-						final_SCORE = final_SCORE * 100llu + (final_MATCH_buffer1[r1_best_id] + final_MATCH_buffer2[r2_best_id]);
+						final_SCORE = final_SCORE * 3000llu + (final_MATCH_buffer1[r1_best_id] + final_MATCH_buffer2[r2_best_id]);
 						final_SCORE = final_SCORE * 20 + realignment_result_R2 -> known_junction_supp + realignment_result_R1 -> known_junction_supp;
+						final_SCORE = final_SCORE * 1000 + TLEN_exp_score;
 
 						//#warning ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> REMOVE THIS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
 						//printf("OCT27-STEPMSM-FNSC %s M=%d,%d MM=%d,%d  CHROSAME=%d FSCR=%llu\n", read_name_1, final_MATCH_buffer1[r1_best_id], final_MATCH_buffer2[r2_best_id], final_MISMATCH_buffer1[r1_best_id] , final_MISMATCH_buffer2[r2_best_id], is_same_chro, final_SCORE );
-
+						if(is_PE && need_expect_TLEN) final_TLEN_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] = tlen;
 					} else assert(0);
 
 					assert(final_SCORE > 0);
@@ -2881,6 +2903,17 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 						if(final_SCORE_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] == highest_score && 
 							output_cursor < global_context -> config.reported_multi_best_reads){
+								if(need_expect_TLEN){
+									int this_tlen = final_TLEN_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id];
+									if(this_tlen>0){
+										subread_lock_occupy(&global_context -> output_lock);
+										global_context -> expected_TLEN_read_numbers++;
+										global_context -> expected_TLEN_sum += this_tlen;
+										if(global_context -> expected_TLEN_read_numbers == READPAIRS_FOR_CALC_EXPT_TLEN)
+											print_in_box(80,0,0,"  Estimated fragment length : %llu bp\n",  global_context -> expected_TLEN_sum / global_context -> expected_TLEN_read_numbers );
+										subread_lock_release(&global_context -> output_lock);
+									}
+								}
 								realignment_result_t * r1_realign = final_realignments + final_realignment_index1[r1_best_id];
 								realignment_result_t * r2_realign = final_realignments + final_realignment_index2[r2_best_id];
 
@@ -2940,6 +2973,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	free(final_realignment_index2);
 
 	free(final_SCORE_buffer);
+	free(final_TLEN_buffer);
 
 	free(r1_align_result_buffer);
 	free(r1_subjunc_result_buffer);
@@ -3152,7 +3186,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
-				if(0 && strcmp("R000000005", read_name_1)==0){
+				if(0 && FIXLENstrcmp("simulated.6891609", read_name_1)==0){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
@@ -4620,7 +4654,7 @@ unsigned int calc_end_pos(unsigned int p, char * cigar, unsigned int * all_skipp
 
 }
 
-void test_PE_and_same_chro_cigars(global_context_t * global_context , unsigned int pos1, unsigned int pos2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * cigar1, char * cigar2, char *read_name){
+void test_PE_and_same_chro_cigars(global_context_t * global_context , unsigned int pos1, unsigned int pos2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * cigar1, char * cigar2, char *read_name, int * res_tlen){
  	char * r1_chr = NULL, * r2_chr = NULL;
 	int r1_pos, r2_pos;
 
@@ -4645,11 +4679,12 @@ void test_PE_and_same_chro_cigars(global_context_t * global_context , unsigned i
 
 		if(tlen >= global_context -> config.minimum_pair_distance && tlen <= global_context -> config.maximum_pair_distance)
 			(* is_PE_distance) = 1;
-	}
+		*res_tlen = tlen;
+	}else *res_tlen = 0x7fffffff;
 }
 
-void test_PE_and_same_chro_align(global_context_t * global_context , realignment_result_t * res1, realignment_result_t * res2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * read_name){
-	return test_PE_and_same_chro_cigars(global_context, res1 -> first_base_position, res2 -> first_base_position, is_exonic_regions, is_PE_distance, is_same_chromosome , read_len_1 , read_len_2, res1 -> cigar_string, res2 -> cigar_string, read_name);
+void test_PE_and_same_chro_align(global_context_t * global_context , realignment_result_t * res1, realignment_result_t * res2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * read_name, int *res_tlen){
+	return test_PE_and_same_chro_cigars(global_context, res1 -> first_base_position, res2 -> first_base_position, is_exonic_regions, is_PE_distance, is_same_chromosome , read_len_1 , read_len_2, res1 -> cigar_string, res2 -> cigar_string, read_name, res_tlen);
 }
 
 

@@ -1,3 +1,6 @@
+8 Apr 2019 - 1.33.33
+(1) Improve mapping algorithm in align() and subjunc() by preferring no-indel alignments, learning mean TLEN from the first 1000 read-pairs and removing symmetric indels in the voting table.
+
 5 Apr 2019 - 1.33.32
 (1) Amend documents for simReads() and scanFasta() to reflect the latest changes.
 

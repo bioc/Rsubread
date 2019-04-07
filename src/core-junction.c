@@ -335,8 +335,13 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 {
 	int is_better_result = 0, is_same_best = 0;
 
+	#define EVENT_SCORE_FACTOR 1
 
-	if(explain_context -> best_matching_bases < explain_context-> tmp_total_matched_bases)
+	if(0 && FIXLENstrcmp("simulated.11420793", explain_context->read_name)==0){
+		SUBREADprintf("TRY_REPLACE : %s has best=%d, b_evn=%d, tscore=%d, t_evn=%d\n", explain_context->read_name, explain_context -> best_matching_bases ,  explain_context -> best_is_complex , explain_context-> tmp_total_matched_bases,  explain_context -> tmp_search_sections );
+	}
+
+	if(explain_context -> best_matching_bases - explain_context -> best_is_complex *EVENT_SCORE_FACTOR < explain_context-> tmp_total_matched_bases - explain_context -> tmp_search_sections *EVENT_SCORE_FACTOR)
 	{
 		is_better_result = 1;
 		explain_context -> best_is_complex = explain_context -> tmp_search_sections ;
@@ -349,7 +354,7 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 		explain_context -> best_matching_bases = explain_context-> tmp_total_matched_bases ;
 
 	}
-	else if(explain_context -> best_matching_bases == explain_context-> tmp_total_matched_bases)
+	else if(explain_context -> best_matching_bases - explain_context -> best_is_complex*EVENT_SCORE_FACTOR  == explain_context-> tmp_total_matched_bases - explain_context -> tmp_search_sections *EVENT_SCORE_FACTOR)
 	{
 		// only gapped explainations are complex counted.
 		explain_context -> best_is_complex +=  explain_context -> tmp_search_sections;
@@ -2665,6 +2670,8 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	explain_context.best_read_id = best_read_id;
 	explain_context.total_tries = 0;
 
+	if(0 && FIXLENstrcmp("simulated.24700032", explain_context.read_name)==0)SUBREADprintf("BBFINAL %s SEL_POS=%u COV=%d - %d\n",  explain_context.read_name, current_result -> selected_position, current_result -> confident_coverage_start, current_result -> confident_coverage_end);
+
 	unsigned int back_search_tail_position,front_search_start_position; 
 	unsigned short back_search_read_tail, front_search_read_start;
 
@@ -3209,6 +3216,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 		for(xk1=0; xk1<explain_context -> result_back_junction_numbers[back_i]; xk1++)
 		{
 			int section_length = explain_context -> result_back_junctions[back_i][xk1].read_pos_end - explain_context -> result_back_junctions[back_i][xk1].read_pos_start; 
+			if(0 && FIXLENstrcmp("simulated.11420793", explain_context->read_name)==0)SUBREADprintf("FINAL_EXPLAIN %s BACK_%d SEC_%d OLD_START=%d SEC_LENG=%d\n", explain_context->read_name, back_i, xk1,  explain_context -> result_back_junctions[back_i][xk1].abs_offset_for_start, section_length);
 			unsigned int new_start_pos;
 
 			if(explain_context -> result_back_junctions[back_i][xk1].is_strand_jumped)
@@ -3337,8 +3345,11 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 			unsigned int final_position;
 
-			if(  explain_context -> result_back_junction_numbers[back_i] + explain_context -> result_front_junction_numbers[front_i] <= 2) final_position = result -> selected_position;
+//			#warning "'0 &&' is because there could be indels in the high-confident region but this indel is finally disused."
+			if( 0 && explain_context -> result_back_junction_numbers[back_i] + explain_context -> result_front_junction_numbers[front_i] <= 2) final_position = result -> selected_position;
 			else final_position = explain_context -> result_back_junctions[back_i][0].abs_offset_for_start;
+
+			if(0 && FIXLENstrcmp("simulated.11420793", explain_context->read_name)==0)SUBREADprintf("FFFINAL %s : POS=%u, ABS=%u\n", explain_context->read_name, final_position, explain_context -> result_back_junctions[back_i][0].abs_offset_for_start);
 
 			int is_exonic_read_fraction_OK = 1;
 
@@ -3372,7 +3383,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			
 			// ACDB PVDB TTTS
 			//#warning " ========== COMMENT THIS LINE !! ========="
-			if(0 && FIXLENstrcmp("R000404427", explain_context -> read_name) ==0){
+			if(0 && FIXLENstrcmp("simulated.11420793", explain_context -> read_name) ==0){
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp);

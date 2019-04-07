@@ -266,7 +266,7 @@ int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file
 	mac_or_rand_str(mac_rand);
 	sprintf(temp_file_prefix, "%s/temp-delrep-%06u-%s-", temp_location==NULL?".":temp_location, getpid(), mac_rand);
 
-	if(break_SAM_file(in_SAM_file, input_file_type == FILE_TYPE_BAM, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL, NULL, &total_mapped_reads, 0,1)){
+	if(break_SAM_file(in_SAM_file, input_file_type == FILE_TYPE_BAM, temp_file_prefix, &real_read_count, NULL, known_chromosomes, 0 /* This 0 means that the sequence/quality/cigar fields are not needed in the temp files*/, 0, NULL, NULL, NULL, NULL, NULL, &total_mapped_reads, 0,1, 0)){
 		SUBREADprintf("ERROR: cannot parse the input file.\n");
 		return -1;
 	}else SUBREADprintf("The input file contains %llu mapped reads.\n", total_mapped_reads);

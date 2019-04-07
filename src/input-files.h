@@ -261,7 +261,7 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 
 int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
 
-int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head);
+int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head, int use_soft_clipped_bases);
 
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes);
 

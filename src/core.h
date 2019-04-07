@@ -62,7 +62,7 @@
 
 #define CORE_MAX_CIGAR_STR_LEN 110
 #define CORE_ADDITIONAL_INFO_LENGTH 400
-
+#define READPAIRS_FOR_CALC_EXPT_TLEN 1000
 
 typedef struct{
 	subread_read_number_t fragments;
@@ -541,6 +541,8 @@ typedef struct{
 	double timecost_before_realign;
 	double timecost_for_realign;
 
+	unsigned long long expected_TLEN_sum;
+	unsigned int expected_TLEN_read_numbers;
 	unsigned long long all_processed_reads;
 	unsigned long long all_correct_PE_reads;
 	unsigned int all_junctions;

@@ -63,6 +63,7 @@ struct SNP_Calling_Parameters{
 	int is_BAM_file_input;
 	int is_paired_end_data;
 	int is_coverage_calculation;
+	int use_soft_clipping_bases;
 
 	int fisher_exact_testlen;
 
@@ -1487,7 +1488,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
 			one_fn[fpos-fpos0]=0;
 
-			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table, parameters->known_SNP_vcf, NULL, 1,0)) return -1;
+			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table, parameters->known_SNP_vcf, NULL, 1,0, parameters -> use_soft_clipping_bases)) return -1;
 			if(!in_SAM_file[fpos]) break;
 			fpos++;
 		}
@@ -1495,7 +1496,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		{
 			char temp_file_prefix2[350];
 			sprintf(temp_file_prefix2, "%sBGC-", temp_file_prefix);
-			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 1,0)) return -1;
+			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 1,0, parameters -> use_soft_clipping_bases)) return -1;
 		}
 
 
@@ -1685,10 +1686,13 @@ int main_snp_calling_test(int argc,char ** argv)
 		print_usage_snp(argv[0]);
 		return 0;
 	}
-	while ((c = getopt_long (argc, argv, "7:N:C:a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
+	while ((c = getopt_long (argc, argv, "S7:N:C:a:i:g:o:bQ:p:f:n:r:x:w:s:t:T:v4",snp_long_options, &optindex))!=-1)
 	{
 		switch (c)
 		{
+			case 'S':
+				parameters.use_soft_clipping_bases = 1;
+				break;
 			case 'N':
 				strcpy(parameters.background_input_file, optarg);
 				break;

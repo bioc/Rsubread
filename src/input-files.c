@@ -1801,7 +1801,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 	autozip_close(&vzfp);
 }
 
-int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_mapped_bases, HashTable * event_table, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head)
+int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_mapped_bases, HashTable * event_table, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head, int use_softclipped_bases )
 {
 	int i, is_first_read=1, is_error = 0;
 	HashTable * fp_table;
@@ -1977,17 +1977,18 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 					{
 						if(cc == 'M') is_first_S = 0;
 
-						if(cc == 'M')
+						if(cc == 'M' || use_softclipped_bases)
 						{
-							unsigned int insertion_cursor = chromosome_cursor;
+							unsigned int insertion_cursor = chromosome_cursor - ((cc=='S' && is_first_S)?tmpv:0);
+							unsigned int insertion_end = chromosome_cursor + ((cc=='S' && is_first_S)?0:tmpv);
 							// DO INSERTION
-							while(insertion_cursor < (chromosome_cursor + tmpv) && read_cursor < (rl - base_ignored_head_tail))
+							while(insertion_cursor < insertion_end && read_cursor < (rl - base_ignored_head_tail))
 							{
 								unsigned int max_section_pos, insert_length;
 								int need_write = 1;
 
 								if(get_read_block(chro, insertion_cursor , temp_file_suffix, known_chromosomes, &max_section_pos))break;
-								insert_length = min(max_section_pos + 1, chromosome_cursor + tmpv) - insertion_cursor;
+								insert_length = min(max_section_pos + 1, insertion_end) - insertion_cursor;
 								if(insert_length<1) break;
 
 								if(base_ignored_head_tail)

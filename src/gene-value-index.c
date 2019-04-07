@@ -193,7 +193,7 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 	int read_length;
 	read_length = fread(&index->start_point,4,1, fp);
 	if(read_length<1){
-		SUBREADprintf("ERROR: the array index is incomplete : %d", read_length );
+		SUBREADprintf("ERROR: the array index is incomplete : %d\n", read_length );
 		return 1;
 	}
 	read_length = fread(&index->length,4,1, fp);
@@ -217,7 +217,7 @@ int gvindex_load(gene_value_index_t * index, const char filename [])
 
 	read_length =fread(index->values, 1, useful_bytes+1, fp);
 	if(read_length < useful_bytes){
-		SUBREADprintf("ERROR: the array index is incomplete : %d < %d.", read_length, useful_bytes+1 );
+		SUBREADprintf("ERROR: the array index is incomplete : %d < %d.\n", read_length, useful_bytes+1 );
 		return 1;
 	}
 
