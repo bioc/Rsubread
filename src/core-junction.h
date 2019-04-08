@@ -79,7 +79,9 @@ typedef struct{
 	int best_matching_bases;
 	int best_second_match_diff;
 	int second_best_matching_bases;
+	int best_indel_penalty;
 	int tmp_total_matched_bases;
+	int tmp_indel_penalty;
 	int is_currently_tie;
 	int best_is_complex;
 	int best_support_as_simple;

@@ -727,12 +727,15 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 
 						if(toli >0 && dist0 ==0 ){
 							int tt;
-							int redo_max = vote -> votes[offsetX][i] == vote->max_vote;
+							int redo_max = 0;
 
 		//					int vv0 = vote -> votes[offsetX][i] ;
 //		#warning "=== here the shifted votes are not removed from total votes === "
-							if(1)for(tt =3; tt<=toli; tt+=3)
+							if(0){
+								redo_max = vote -> votes[offsetX][i] == vote->max_vote;
+								for(tt =3; tt<=toli; tt+=3)
 								vote -> votes[offsetX][i] -= vote -> section_subreads[offsetX][i][toli/3];
+							}
 		//					SUBREADprintf("REVERSE VOTE: at %u, VVchanges : %d -> %d, STRAND=%d ; TOLI=%d\n", dat[i], vv0, vote -> votes[offsetX][i],is_reversed ,toli );
 							vote -> toli[offsetX][i] = toli = 0;
 							vote -> last_subread_cluster[offsetX][i] = subread_number_P1-1;

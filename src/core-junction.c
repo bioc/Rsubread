@@ -294,23 +294,20 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_min_support_as_complex = min((tested_event -> is_donor_found_or_annotation & 64)?0x7fffffff:tested_event -> supporting_reads,explain_context -> tmp_min_support_as_complex);
 						explain_context -> tmp_min_unsupport = min(tested_event -> anti_supporting_reads,explain_context -> tmp_min_unsupport);
 						explain_context -> tmp_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain && tested_event -> is_donor_found_or_annotation;
+						explain_context -> tmp_indel_penalty += ( tested_event -> event_type == CHRO_EVENT_TYPE_INDEL );
 
 						if(tested_event -> event_type == CHRO_EVENT_TYPE_FUSION && tested_event -> is_strand_jumped)
 							explain_context -> current_is_strand_jumped = !explain_context -> current_is_strand_jumped;
 
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].is_strand_jumped = explain_context -> current_is_strand_jumped;
-
 						explain_context -> tmp_search_sections ++;
-
-
-						if(0 && FIXLENstrcmp("R000404427", explain_context -> read_name) == 0)
-							SUBREADprintf("FRONT_ADD_EVENT : %s , %u ~ %u , INDELLEN=%d, TEST_READ_POS=%u, RPED=%u, ABSSTART=%u\n", explain_context -> read_name, tested_event -> event_small_side, tested_event -> event_large_side, tested_event -> indel_length, tested_read_pos, explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end, new_read_head_abs_offset);
 
 						explain_context -> total_tries ++;
 						search_events_to_front(global_context, thread_context, explain_context, read_text + tested_event -> indel_at_junction + tested_read_pos -  min(0, tested_event->indel_length), qual_text + tested_read_pos -  min(0, tested_event->indel_length), new_read_head_abs_offset, new_remainder_len, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_next_event_distance, 0);
 						explain_context -> tmp_search_sections --;
 
 						explain_context -> current_is_strand_jumped = current_is_jumped;
+						explain_context -> tmp_indel_penalty -= ( tested_event -> event_type == CHRO_EVENT_TYPE_INDEL );
 						explain_context -> tmp_min_support_as_complex = current_sup_as_complex;
 						explain_context -> tmp_support_as_simple = current_sup_as_simple;
 						//explain_context -> tmp_min_unsupport = current_unsup_as_simple;
@@ -335,13 +332,11 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 {
 	int is_better_result = 0, is_same_best = 0;
 
-	#define EVENT_SCORE_FACTOR 1
-
 	if(0 && FIXLENstrcmp("simulated.11420793", explain_context->read_name)==0){
 		SUBREADprintf("TRY_REPLACE : %s has best=%d, b_evn=%d, tscore=%d, t_evn=%d\n", explain_context->read_name, explain_context -> best_matching_bases ,  explain_context -> best_is_complex , explain_context-> tmp_total_matched_bases,  explain_context -> tmp_search_sections );
 	}
 
-	if(explain_context -> best_matching_bases - explain_context -> best_is_complex *EVENT_SCORE_FACTOR < explain_context-> tmp_total_matched_bases - explain_context -> tmp_search_sections *EVENT_SCORE_FACTOR)
+	if(explain_context -> best_matching_bases - explain_context -> best_indel_penalty < explain_context-> tmp_total_matched_bases - explain_context -> tmp_indel_penalty)
 	{
 		is_better_result = 1;
 		explain_context -> best_is_complex = explain_context -> tmp_search_sections ;
@@ -352,13 +347,14 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 		explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
 		explain_context -> second_best_matching_bases = max(explain_context -> second_best_matching_bases, explain_context -> best_matching_bases); 
 		explain_context -> best_matching_bases = explain_context-> tmp_total_matched_bases ;
-
+		explain_context -> best_indel_penalty = explain_context -> tmp_indel_penalty;
 	}
-	else if(explain_context -> best_matching_bases - explain_context -> best_is_complex*EVENT_SCORE_FACTOR  == explain_context-> tmp_total_matched_bases - explain_context -> tmp_search_sections *EVENT_SCORE_FACTOR)
+	else if(explain_context -> best_matching_bases - explain_context -> best_indel_penalty == explain_context-> tmp_total_matched_bases - explain_context -> tmp_indel_penalty)
 	{
 		// only gapped explainations are complex counted.
 		explain_context -> best_is_complex +=  explain_context -> tmp_search_sections;
 		explain_context -> second_best_matching_bases = explain_context -> best_matching_bases;
+		explain_context -> best_indel_penalty = explain_context -> tmp_indel_penalty;
 
 		if(0 && FIXLENstrcmp("R010442852", explain_context -> read_name) == 0){
 			SUBREADprintf("complexity: curr=%d, new=%d   ;   sections=%d\n", explain_context->best_min_support_as_complex, explain_context -> tmp_min_support_as_complex, explain_context -> tmp_search_sections );
@@ -749,32 +745,21 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_min_support_as_complex = min((tested_event -> is_donor_found_or_annotation & 64)?0x7fffffff:tested_event -> supporting_reads,explain_context -> tmp_min_support_as_complex);
 						explain_context -> tmp_min_unsupport = min(tested_event -> anti_supporting_reads,explain_context -> tmp_min_unsupport);
 						explain_context -> tmp_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain && tested_event -> is_donor_found_or_annotation;
+						explain_context -> tmp_indel_penalty += ( tested_event -> event_type == CHRO_EVENT_TYPE_INDEL );
 
 						if(tested_event -> event_type == CHRO_EVENT_TYPE_FUSION && tested_event -> is_strand_jumped)
 							explain_context -> current_is_strand_jumped = !explain_context -> current_is_strand_jumped;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].is_strand_jumped = explain_context -> current_is_strand_jumped;
-
-						//if(explain_context->pair_number == 999999)
-						//	SUBREADprintf(" === %d ; js=%d ===>>>\n", explain_context -> tmp_search_sections, is_junction_scanned);
-
 						explain_context -> tmp_search_sections ++;
-						//printf("SUGGEST_PREV at %u = %d (! %d)\n", tested_event -> event_small_side, tested_event -> connected_previous_event_distance, tested_event -> connected_next_event_distance);
-						//#warning ">>>>>>>>>>>>>>>> REMOVE IT <<<<<<<<<<<<<<<<<<<<<<"
-						//printf("OCT27-STEPSB-JB-%s: %u IN -> %u; NEW_TAIL=%d; ENV_CONN=%d; LEV=%d\n", explain_context -> read_name, potential_event_pos, new_read_tail_abs_offset, new_read_tail_pos, tested_event -> connected_previous_event_distance, explain_context -> tmp_search_sections);
-					
 						explain_context -> total_tries ++;
+
 						search_events_to_back(global_context, thread_context, explain_context, read_text , qual_text, new_read_tail_abs_offset , new_read_tail_pos, sofar_matched + matched_bases_to_site - jump_penalty, tested_event -> connected_previous_event_distance, 0);
-						//#warning ">>>>>>>>>>>>>>>> REMOVE IT <<<<<<<<<<<<<<<<<<<<<<"
-						//printf("OCT27-STEPSB-JB-%s: %u OUT <- %u; LEN=%d\n", explain_context -> read_name, potential_event_pos, new_read_tail_abs_offset, explain_context -> tmp_search_sections);
+
 						explain_context -> tmp_search_sections --;
-
-						//if(explain_context->pair_number == 999999)
-						//	SUBREADprintf(" === %d ===<<<\n", explain_context -> tmp_search_sections);
-
+						explain_context -> tmp_indel_penalty -= ( tested_event -> event_type == CHRO_EVENT_TYPE_INDEL );
 						explain_context -> current_is_strand_jumped = current_is_jumped;
 						explain_context -> tmp_min_support_as_complex = current_sup_as_complex;
 						explain_context -> tmp_support_as_simple = current_sup_as_simple;
-						//explain_context -> tmp_min_unsupport = current_unsup_as_simple;
 						explain_context -> tmp_is_pure_donor_found_explain = current_pure_donor_found;
 					}
 					//if(global_context ->config.limited_tree_scan) break;
@@ -2689,6 +2674,8 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	explain_context.tmp_search_sections = 0;
 	explain_context.best_matching_bases = -9999;
 	explain_context.second_best_matching_bases = -9999;
+	explain_context.best_indel_penalty = 0;
+	explain_context.tmp_indel_penalty = 0;
 	explain_context.tmp_total_matched_bases = 0;
 	explain_context.is_currently_tie = 0;
 	explain_context.best_is_complex = 0;
@@ -2750,9 +2737,12 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	*/
 	explain_context.all_front_alignments = 0;
 	explain_context.tmp_search_sections = 0;
+	explain_context.best_indel_penalty = 0;
 	explain_context.best_matching_bases = -9999;
 	explain_context.second_best_matching_bases = -9999;
 	explain_context.tmp_total_matched_bases = 0;
+	explain_context.tmp_indel_penalty = 0;
+
 	explain_context.is_currently_tie = 0;
 	explain_context.best_is_complex = 0;
 	explain_context.best_support_as_simple = 0;
