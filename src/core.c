@@ -2678,8 +2678,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 					for(read_record_i = 0; read_record_i < current_candidate_locations; read_record_i++){
 						realignment_result_t * current_realignment_result = final_realignments + current_realignment_index[read_record_i];
-						//mapping_result_t *current_result = current_realignment_result -> mapping_result; 
-						//assert(current_result -> result_flags & CORE_IS_FULLY_EXPLAINED);
 
 						unsigned int this_MATCH = current_MATCH_buffer[read_record_i];
 						unsigned int this_MISMATCH = current_MISMATCH_buffer[read_record_i];
@@ -2693,11 +2691,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 							this_SCORE = (100000llu * (10000 - this_MISMATCH) + this_MATCH)*50llu + current_realignment_result -> known_junction_supp;
 						}
 
-
-					//	if(0 && FIXLENstrcmp("R:chrX:52790377:100M:J0", read_name_1)==0)
-					//		SUBREADprintf("%s, %d-th read [%d] : MAT=%d, MISMA=%d, SCORE=%u, BEST_SCORE=%u\n", read_name_1, is_second_read+1, read_record_i , this_MATCH, this_MISMATCH, this_SCORE, best_score_highest );
-
-
 						best_score_highest = max(best_score_highest, this_SCORE);
 						scores_array[read_record_i] = this_SCORE;
 					}
@@ -2710,15 +2703,10 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 							is_repeated = add_repeated_buffer(global_context, repeated_buffer_pos, repeated_buffer_cigars, &repeated_count, is_second_read?NULL:current_realignment_result , is_second_read?current_realignment_result:NULL);
 							if(is_repeated)
 								scores_array[read_record_i] = 0;
-							else{
+							else
 								highest_score_occurence ++;
-								//if(161436 == current_read_number)SUBREADprintf("ADD_HIGH for %d (%p)\n",read_record_i, current_realignment_result);
-							}
 						}
 					}
-
-					//#warning ">>>>>>> COMMENT THIS <<<<<<<"
-					//printf("OCT27-WRITESINGLEMAP-%s-THRE %d ; occu=%d ; end=%d\n", read_name_1, thread_context -> thread_id, highest_score_occurence , is_second_read+1);
 
 					if(highest_score_occurence<2 ||  global_context -> config.report_multi_mapping_reads){
 						int is_break_even = 0;
@@ -2738,8 +2726,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
 								current_realignment_result -> MAPQ_adjustment = current_MISMATCH_buffer [read_record_i] + ( is_second_read?(r2_step2_locations): (r1_step2_locations));
 
-								//if(161430 <= current_read_number) SUBREADprintf("ALL_SE=%d, THIS_HIT=%d\n", highest_score_occurence, output_cursor);
-								//if(161436 == current_read_number)SUBREADprintf("DOUBLE_ADD_SE for %d (%p): %u      %d/%d, BEST=%d\n", scores_array[read_record_i] , current_realignment_result, current_read_number, output_cursor , highest_score_occurence, best_score_highest);
 								if(is_second_read)
 									write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, NULL, current_realignment_result, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
 								else write_realignments_for_fragment(global_context, thread_context, &out_context , current_read_number, current_realignment_result, NULL, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
@@ -3086,12 +3072,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		for(is_reversed = 0; is_reversed<2; is_reversed++)
 		{
 			//printf("MAP_REA = %s / %s\n", read_text_1, read_text_2);
-			if(is_reversed==0 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
-			{
-				init_gene_vote(vote_1);
-				if(global_context -> input_reads.is_paired_end_reads) init_gene_vote(vote_2);
-			}
-
 
 			for (is_second_read = 0; is_second_read < has_second_read; is_second_read ++)
 			{
@@ -3133,33 +3113,45 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						noninformative_subreads_for_each_gap[xk1]=0;
 				}
 
-				for(subread_no=0; subread_no < applied_subreads ; subread_no++)
-				{
-					for(xk1=0; xk1<GENE_SLIDING_STEP ; xk1++)
-					{
+				int allow_indel_i;
 
-						if(global_context->config.SAM_extra_columns)
-						{
-							current_vote -> noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
-						}
-
-						int subread_offset = ((subread_step * subread_no) >> 16);
-						if(GENE_SLIDING_STEP > 1)
-							subread_offset -= subread_offset%(GENE_SLIDING_STEP) - xk1; 
-
-						char * subread_string = current_read + subread_offset;
-
-						gehash_key_t subread_integer = genekey2int(subread_string, global_context->config.space_type);
-
-						if(global_context->config.is_methylation_reads)
-							gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
-						else
-							gehash_go_q(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,voting_max_indel_length, subread_no,  low_index_border, current_high_border);
-
-						if(global_context->config.SAM_extra_columns)
-							noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
+				for(allow_indel_i = 0; allow_indel_i<2; allow_indel_i++){
+					if(is_reversed==0 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)){
+						if(is_second_read == 0)init_gene_vote(vote_1);
+						if(is_second_read == 1)init_gene_vote(vote_2);
 					}
-					//SUBREADprintf(",");
+
+					int voteretv = -1;
+					for(subread_no=0; subread_no < applied_subreads ; subread_no++)
+					{
+						for(xk1=0; xk1<GENE_SLIDING_STEP ; xk1++)
+						{
+	
+							if(global_context->config.SAM_extra_columns)
+							{
+								current_vote -> noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
+							}
+	
+							int subread_offset = ((subread_step * subread_no) >> 16);
+							if(GENE_SLIDING_STEP > 1)
+								subread_offset -= subread_offset%(GENE_SLIDING_STEP) - xk1; 
+	
+							char * subread_string = current_read + subread_offset;
+	
+							gehash_key_t subread_integer = genekey2int(subread_string, global_context->config.space_type);
+	
+							if(global_context->config.is_methylation_reads)
+								voteretv = gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, allow_indel_i?0:voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
+							else
+								voteretv = gehash_go_q(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,  allow_indel_i?0:voting_max_indel_length, subread_no,  low_index_border, current_high_border);
+							if(voteretv==-123)break;
+	
+							if(global_context->config.SAM_extra_columns)
+								noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
+						}
+						if(voteretv==-123)break;
+					}
+					if(voteretv>=0 || global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)break;
 				}
 	//			SUBREADprintf("\n");
 

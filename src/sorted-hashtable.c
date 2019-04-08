@@ -588,8 +588,12 @@ size_t gehash_go_q_CtoT(gehash_t * the_table, gehash_key_t key, int offset, int 
 							mutation_stack[j] = 0;
 						is_end2 = 0;
 
-						if(key != mutation_key)
-							ret+=gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, indel_tolerance, subread_number, low_border, high_border);
+						if(key != mutation_key){
+							int retone;
+							retone = gehash_go_q(the_table, mutation_key, offset, read_len, is_reversed, vote, indel_tolerance, subread_number, low_border, high_border);
+							if(-123 == retone) return -123;
+							ret+=retone;
+						}
 						mutation_stack[i] ++;
 						break;
 					}
@@ -725,28 +729,8 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 					{
 						int toli =  vote -> toli[offsetX][i];
 
-						if(toli >0 && dist0 ==0 ){
-							int tt;
-							int redo_max = 0;
-
-		//					int vv0 = vote -> votes[offsetX][i] ;
-//		#warning "=== here the shifted votes are not removed from total votes === "
-							if(0){
-								redo_max = vote -> votes[offsetX][i] == vote->max_vote;
-								for(tt =3; tt<=toli; tt+=3)
-								vote -> votes[offsetX][i] -= vote -> section_subreads[offsetX][i][toli/3];
-							}
-		//					SUBREADprintf("REVERSE VOTE: at %u, VVchanges : %d -> %d, STRAND=%d ; TOLI=%d\n", dat[i], vv0, vote -> votes[offsetX][i],is_reversed ,toli );
-							vote -> toli[offsetX][i] = toli = 0;
-							vote -> last_subread_cluster[offsetX][i] = subread_number_P1-1;
-							if(redo_max){
-								vote->max_vote = 0;
-								int ii,jj;
-								for(ii =0; ii < GENE_VOTE_TABLE_SIZE; ii++)
-									for(jj =0; jj< vote->items[ii]; jj++)
-										vote->max_vote = max(vote->max_vote, vote -> votes[ii][jj] );
-							}
-						}
+						if(toli >0 && dist0 ==0)
+							return -123;
 
 						if( subread_number_P1 == vote -> last_subread_cluster[offsetX][i]  && toli >0){
 							int move_dist = 0;
@@ -792,8 +776,8 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 
 						vote -> last_subread_cluster[offsetX][i] = subread_number_P1;
 						if(vote->max_vote < test_max)vote->max_vote = test_max;
-						//i = 9999999;
-						//break;
+						i = 9999999;
+						break;
 					}
 				}
 				if (i==9999999){
