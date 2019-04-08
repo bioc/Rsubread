@@ -2672,9 +2672,9 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 
 	explain_context.all_back_alignments = 0;
 	explain_context.tmp_search_sections = 0;
+	explain_context.best_indel_penalty =0;
 	explain_context.best_matching_bases = -9999;
 	explain_context.second_best_matching_bases = -9999;
-	explain_context.best_indel_penalty = 0;
 	explain_context.tmp_indel_penalty = 0;
 	explain_context.tmp_total_matched_bases = 0;
 	explain_context.is_currently_tie = 0;
@@ -2699,6 +2699,7 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	}
 
 	search_events_to_back(global_context, thread_context, &explain_context, read_text , qual_text, back_search_tail_position , back_search_read_tail, 0, 0, 1);
+	int back_penalty = explain_context.best_indel_penalty;
 
 	//int is_backsearch_tie = explain_context.is_currently_tie;
 	int back_search_matches_diff = -9999;
@@ -2771,6 +2772,7 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	if(0 && FIXLENstrcmp("R_chr901_932716_91M1D9M",explain_context.read_name ) == 0)
 		 SUBREADprintf("F_SEARCH has found %d result sets\n", explain_context.all_front_alignments);
 
+	explain_context.best_indel_penalty += back_penalty;
 	//int is_frontsearch_tie = explain_context.is_currently_tie;
 
 	//SUBREADprintf("DFI:%d - %d;\n", explain_context.best_matching_bases , explain_context.second_best_matching_bases);
@@ -3373,10 +3375,10 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			
 			// ACDB PVDB TTTS
 			//#warning " ========== COMMENT THIS LINE !! ========="
-			if(0 && FIXLENstrcmp("simulated.11420793", explain_context -> read_name) ==0){
+			if(1 || FIXLENstrcmp("simulated.11420793", explain_context -> read_name) ==0){
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
-				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp);
+				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
 			}
 
 
