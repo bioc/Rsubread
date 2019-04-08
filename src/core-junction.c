@@ -3389,6 +3389,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 				realign_res -> mapping_result = result;
 				realign_res -> chromosomal_length = chromosomal_length;
 				realign_res -> known_junction_supp = known_junction_supp;
+				realign_res -> final_penalty = explain_context -> best_indel_penalty;
 
 				if(mismatch_bases >  applied_mismatch ) realign_res -> realign_flags |= CORE_TOO_MANY_MISMATCHES;
 				else realign_res -> realign_flags &= ~CORE_TOO_MANY_MISMATCHES;

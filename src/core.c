@@ -2462,8 +2462,8 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	int read_len_1=0, read_len_2=0;
 	int sqr_interval, sqr_read_number=0;
 
-	int * final_MATCH_buffer1, *final_MISMATCH_buffer1;
-	int * final_MATCH_buffer2, *final_MISMATCH_buffer2, non_informative_subreads_r1=0, non_informative_subreads_r2=0;
+	int * final_MATCH_buffer1, *final_MISMATCH_buffer1, *final_PENALTY_buffer1;
+	int * final_MATCH_buffer2, *final_MISMATCH_buffer2, *final_PENALTY_buffer2, non_informative_subreads_r1=0, non_informative_subreads_r2=0;
 	int * final_realignment_index1, *final_realignment_index2;
 	unsigned int *final_realignment_number;
 	unsigned long long * final_SCORE_buffer;
@@ -2481,10 +2481,12 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 	final_MATCH_buffer1 = malloc(sizeof(int) * 2 * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 	final_MISMATCH_buffer1 = malloc(sizeof(int) * 2 * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
+	final_PENALTY_buffer1 = malloc(sizeof(int) * 2 * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 	final_realignment_index1 = malloc(sizeof(int) * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 
 	final_MATCH_buffer2 = malloc(sizeof(int) * 2 * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 	final_MISMATCH_buffer2 = malloc(sizeof(int) * 2 * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
+	final_PENALTY_buffer2 = malloc(sizeof(int) * 2 * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 	final_realignment_index2 = malloc(sizeof(int) * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR);
 
 	final_SCORE_buffer = malloc(sizeof(long long) * global_context -> config.multi_best_reads * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR*MAX_ALIGNMENT_PER_ANCHOR);
@@ -2580,6 +2582,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 			int * current_MATCH_buffer = is_second_read?final_MATCH_buffer2:final_MATCH_buffer1;
 			int * current_MISMATCH_buffer = is_second_read?final_MISMATCH_buffer2:final_MISMATCH_buffer1;
+			int * current_PENALTY_buffer = is_second_read?final_PENALTY_buffer2:final_PENALTY_buffer1;
 			int * current_realignment_index = is_second_read?final_realignment_index2:final_realignment_index1;
 
 	
@@ -2640,12 +2643,14 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 					int realign_index = (is_second_read + 2 * best_read_id)* MAX_ALIGNMENT_PER_ANCHOR + realignment_i;
 					int final_MATCH = final_realignments[realign_index].final_matched_bases;
+					int final_PENALTY = final_realignments[realign_index].final_penalty;
 
 					if((current_result -> result_flags & CORE_IS_FULLY_EXPLAINED) && final_MATCH>0) {
 						int final_MISMATCH = final_realignments[realign_index].final_mismatched_bases;
 						//#warning ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> REMOVE THIS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
 						//printf("OCT27-STEPMSM-MMM %s M=%d MM=%d\n", read_name_1, final_MATCH ,final_MISMATCH);
 
+						current_PENALTY_buffer[*current_candidate_locations] = final_PENALTY;
 						current_MATCH_buffer[*current_candidate_locations] = final_MATCH;
 						current_MISMATCH_buffer[*current_candidate_locations] = final_MISMATCH;
 						current_realignment_index[*current_candidate_locations] = realign_index;
@@ -2669,6 +2674,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				if(current_candidate_locations > 0){
 
 					int * current_MATCH_buffer = is_second_read?final_MATCH_buffer2:final_MATCH_buffer1;
+					int * current_PENALTY_buffer = is_second_read?final_PENALTY_buffer2:final_PENALTY_buffer1;
 					int * current_MISMATCH_buffer = is_second_read?final_MISMATCH_buffer2:final_MISMATCH_buffer1;
 					int * current_realignment_index = is_second_read?final_realignment_index2:final_realignment_index1;
 
@@ -2681,6 +2687,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 						unsigned int this_MATCH = current_MATCH_buffer[read_record_i];
 						unsigned int this_MISMATCH = current_MISMATCH_buffer[read_record_i];
+						unsigned int this_PENALTY = current_PENALTY_buffer[read_record_i];
 						unsigned long long this_SCORE;
 
 						if(global_context -> config.experiment_type == CORE_EXPERIMENT_DNASEQ){
@@ -2688,7 +2695,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						}else{
 							unsigned int skip = 0; int is_exonic_regions = 1;
 							if(global_context -> exonic_region_bitmap)calc_end_pos(current_realignment_result -> first_base_position, current_realignment_result -> cigar_string, &skip, &is_exonic_regions, global_context  );
-							this_SCORE = (100000llu * (10000 - this_MISMATCH) + this_MATCH)*50llu + current_realignment_result -> known_junction_supp;
+							this_SCORE =((100000llu * (10000 - this_MISMATCH) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
 						}
 
 						best_score_highest = max(best_score_highest, this_SCORE);
@@ -2796,7 +2803,9 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 							//weight = 30;
 						final_SCORE = weight * (final_MATCH_buffer1[r1_best_id] + final_MATCH_buffer2[r2_best_id]);
 						//#warning "=========== ADD BY YANG LIAO FOR MORE MAPPED READS WITH '-u' OPTION ================"
-						final_SCORE = final_SCORE * 10 *1000llu*1000llu + (final_MISMATCH_buffer1[r1_best_id] + final_MISMATCH_buffer2[r2_best_id]) * 1000llu + TLEN_exp_score;
+						final_SCORE = final_SCORE * 1000llu - final_MISMATCH_buffer1[r1_best_id] - final_MISMATCH_buffer2[r2_best_id];
+						final_SCORE = final_SCORE * 20llu - final_PENALTY_buffer1[r1_best_id] - final_PENALTY_buffer2[r2_best_id];
+						final_SCORE = final_SCORE * 1000llu + TLEN_exp_score;
 						if(is_PE && need_expect_TLEN) final_TLEN_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] = tlen;
 
 					} else if (global_context -> config.experiment_type == CORE_EXPERIMENT_RNASEQ) {
@@ -2827,6 +2836,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						//#warning "=========== ADD BY YANG LIAO FOR MORE MAPPED READS WITH '-u' OPTION ================"
 						final_SCORE = final_SCORE * 3000llu + (final_MATCH_buffer1[r1_best_id] + final_MATCH_buffer2[r2_best_id]);
 						final_SCORE = final_SCORE * 20 + realignment_result_R2 -> known_junction_supp + realignment_result_R1 -> known_junction_supp;
+						final_SCORE = final_SCORE * 20 - final_PENALTY_buffer1[r1_best_id] - final_PENALTY_buffer2[r2_best_id];
 						final_SCORE = final_SCORE * 1000 + TLEN_exp_score;
 
 						//#warning ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> REMOVE THIS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
@@ -2952,10 +2962,12 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	free(final_realignments);
 	free(final_MATCH_buffer1);
 	free(final_MISMATCH_buffer1);
+	free(final_PENALTY_buffer1);
 	free(final_realignment_index1);
 
 	free(final_MATCH_buffer2);
 	free(final_MISMATCH_buffer2);
+	free(final_PENALTY_buffer2);
 	free(final_realignment_index2);
 
 	free(final_SCORE_buffer);

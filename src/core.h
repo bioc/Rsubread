@@ -384,6 +384,7 @@ typedef struct{
 	short chromosomal_length;
 	short MAPQ_adjustment;
 	int known_junction_supp;
+	int final_penalty;
 } realignment_result_t;
 
 #define BUCKETED_TABLE_INIT_ITEMS 3
