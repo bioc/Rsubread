@@ -298,6 +298,7 @@ typedef struct {
 
 	unsigned short items[GENE_VOTE_TABLE_SIZE];
 	unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	int marked_shift_indel[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];

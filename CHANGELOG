@@ -1,3 +1,6 @@
+9 Apr 2019 - 1.33.35
+(1) Change the shifting-indel read voting algorithm to only disable indel detection at locations where the shifting-indel events are found.
+
 9 Apr 2019 - 1.33.34
 (1) Improve mapping algorithm in align() and subjunc() by treating junctions and indels in different ways, and detect shifting-indel reads then disallowing indels in them.
 (2) Fix a bug in align() on DNA-seq mode.

@@ -2807,7 +2807,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						final_SCORE = final_SCORE * 20llu - final_PENALTY_buffer1[r1_best_id] - final_PENALTY_buffer2[r2_best_id];
 						final_SCORE = final_SCORE * 1000llu + TLEN_exp_score;
 						if(is_PE && need_expect_TLEN) final_TLEN_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] = tlen;
-
+						//SUBREADprintf("%s FINAL_SCORE=%llu  TLEN_SCORE=%llu    DIST=%d    EXP_TLEN=%d\n", read_name_1, final_SCORE, TLEN_exp_score, tlen, expected_TLEN);
 					} else if (global_context -> config.experiment_type == CORE_EXPERIMENT_RNASEQ) {
 						int weight;
 
@@ -3126,14 +3126,14 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				}
 
 				int allow_indel_i;
-
+				unsigned int shift_indel_locs[ GENE_VOTE_TABLE_SIZE * GENE_VOTE_SPACE ];
+				unsigned int shift_indel_NO = 0;
 				for(allow_indel_i = 0; allow_indel_i<2; allow_indel_i++){
 					if(is_reversed==0 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)){
 						if(is_second_read == 0)init_gene_vote(vote_1);
 						if(is_second_read == 1)init_gene_vote(vote_2);
 					}
 
-					int voteretv = -1;
 					for(subread_no=0; subread_no < applied_subreads ; subread_no++)
 					{
 						for(xk1=0; xk1<GENE_SLIDING_STEP ; xk1++)
@@ -3153,17 +3153,24 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 							gehash_key_t subread_integer = genekey2int(subread_string, global_context->config.space_type);
 	
 							if(global_context->config.is_methylation_reads)
-								voteretv = gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, allow_indel_i?0:voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
+								 gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
 							else
-								voteretv = gehash_go_q(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,  allow_indel_i?0:voting_max_indel_length, subread_no,  low_index_border, current_high_border);
-							if(voteretv==-123)break;
+								 gehash_go_X(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,  voting_max_indel_length, subread_no,  low_index_border, current_high_border, allow_indel_i, shift_indel_locs, &shift_indel_NO);
 	
 							if(global_context->config.SAM_extra_columns)
 								noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
 						}
-						if(voteretv==-123)break;
+
 					}
-					if(voteretv>=0 || global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)break;
+					//SUBREADprintf("SSSRRRFFF=%d\n", shift_indel_NO);
+					if(shift_indel_NO == 0 || global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)break;
+
+					if(0){
+						SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
+						SUBREADprintf("BEFORE_RE_TRY ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
+						print_votes(vote_1, global_context -> config.index_prefix);
+						print_votes(vote_2, global_context -> config.index_prefix);
+					}
 				}
 	//			SUBREADprintf("\n");
 
