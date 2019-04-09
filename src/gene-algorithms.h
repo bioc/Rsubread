@@ -39,7 +39,7 @@ unsigned int linear_gene_position(const gene_offset_t* offsets , char *chro_name
 
 int remove_repeated_reads(gehash_t * table, gehash_t * huge_table,int index_threshold);
 
-#define init_gene_vote(a) {memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof( *((a)->items))); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;  (a) -> noninformative_subreads = 0; }
+#define init_gene_vote(a) {memset((a)->items, 0, GENE_VOTE_TABLE_SIZE*sizeof( *((a)->items))); (a)->max_vote = 0; (a) -> max_indel_recorder[0]=0; (a)->max_tmp_indel_recorder = NULL; (a)->max_mask = 0;  (a) -> noninformative_subreads = 0;}
 // return current votes for a given position
 // if create_new_pos == 0 then do not take this position if it does not exist in the vote array
 //void add_gene_vote(gene_vote_t* vote, int position, int create_new_pos);

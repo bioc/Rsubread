@@ -3162,12 +3162,16 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 						}
 
 					}
-					//SUBREADprintf("SSSRRRFFF=%d\n", shift_indel_NO);
+					if(0)SUBREADprintf("SSSRRRFFF=%d\n", shift_indel_NO);
 					if(shift_indel_NO == 0 || global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)break;
 
 					if(0){
 						SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 						SUBREADprintf("BEFORE_RE_TRY ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
+						int jj;
+						for(jj=0; jj<shift_indel_NO; jj++){
+							SUBREADprintf("SHIFT_LIST %s R_%d [%d] at %u\n", read_name_1, is_second_read+1, jj+1, shift_indel_locs[jj]);
+						}
 						print_votes(vote_1, global_context -> config.index_prefix);
 						print_votes(vote_2, global_context -> config.index_prefix);
 					}

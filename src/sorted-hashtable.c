@@ -745,7 +745,7 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 								vote -> votes[offsetX][i] --;
 							}
 						}
-
+	
 						if(subread_number_P1 <= vote -> last_subread_cluster[offsetX][i]) continue;
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
 						test_max += 1;
@@ -753,8 +753,8 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 						if (offset +16 > vote->coverage_end [offsetX][i])
 							vote->coverage_end [offsetX][i] = of_p_16;
-
-
+	
+	
 						if (dist0 ==  vote->current_indel_cursor[offsetX][i]){
 							vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
 						} else {
@@ -774,8 +774,8 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						vote -> last_subread_cluster[offsetX][i] = subread_number_P1;
 						if(vote->max_vote < test_max)vote->max_vote = test_max;
 						i = 9999999;
-						break;
 					}
+					break;
 				}
 				if (i==9999999){
 					break;
