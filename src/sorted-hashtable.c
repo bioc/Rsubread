@@ -743,7 +743,6 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 								vote -> toli[offsetX][i] = toli;
 								vote -> last_subread_cluster[offsetX][i]--;
 								vote -> votes[offsetX][i] --;
-								vote -> section_subreads[offsetX][i][toli/3] --;
 							}
 						}
 
@@ -758,7 +757,6 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 
 						if (dist0 ==  vote->current_indel_cursor[offsetX][i]){
 							vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
-							vote -> section_subreads[offsetX][i][toli/3]++;
 						} else {
 							toli +=3;
 							if (toli < MAX_INDEL_SECTIONS*3)
@@ -767,7 +765,6 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 								vote -> indel_recorder[offsetX][i][toli] = subread_number_P1; 
 								vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
 								vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-								vote -> section_subreads[offsetX][i][toli/3] = 1;
 									
 								if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
 							}
@@ -806,7 +803,6 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 					vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number_P1;
 					vote -> indel_recorder[offsetX2][datalen2][2] = 0;
 					vote -> indel_recorder[offsetX2][datalen2][3] = 0;
-					vote -> section_subreads[offsetX2][datalen2][0] = 1;
 					vote->current_indel_cursor [offsetX2][datalen2] = 0;
 					vote->coverage_start [offsetX2][datalen2] = offset;
 					vote->coverage_end [offsetX2][datalen2] = of_p_16;
