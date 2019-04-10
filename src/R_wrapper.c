@@ -30,8 +30,6 @@
 #endif 
 #include "HelperFunctions.h"
 
-#define R_ARG_LENGTH_DEF 10240
-
 // ========== This part of code is to run everything in child threads; the main thread is only for screen output ============
 struct R_child_thread_run_opt{
   int (*func)(int , char * []);
@@ -92,8 +90,7 @@ void R_txUnique_wrapper(int * nargs, char ** argv){
 	int i,n;
 
 	n = *nargs;
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 
 	c_argv = (char **) calloc(n+1,sizeof(char *));
 	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
@@ -112,8 +109,7 @@ void R_mergeVCF(int * nargs, char ** argv)
 	int i,n;
 
 	n = *nargs;
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 
 //	printf("N=%d; V=%s\n", n, r_argv);
 	c_argv = (char **) calloc(n+1,sizeof(char *));
@@ -140,8 +136,7 @@ void R_sublong_wrapper(int * nargs, char ** argv){
 	R_CStackLimit =(uintptr_t)-1;
 	#endif
 
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
@@ -166,8 +161,7 @@ void R_repair_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
 
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
@@ -188,8 +182,7 @@ void R_buildindex_wrapper(int * nargs, char ** argv)
 	char * r_argv, ** c_argv;
 	int i,n;
 	
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
@@ -211,24 +204,23 @@ void R_align_wrapper(int * nargs, char ** argv)
 	uintptr_t old_cstack_limit = R_CStackLimit;
 	R_CStackLimit =(uintptr_t)-1;
 	#endif
-	
-        char * r_argv, ** c_argv;
-        int i,n;
-    
-        r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-        strcpy(r_argv,*argv);
-    	
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-		R_child_thread_run(main_align,n,c_argv, 1);
+	char * r_argv, ** c_argv;
+	int i,n;
 
-        for(i=0;i<n;i++) free(c_argv[i]);
-        free(c_argv);
-        free(r_argv);
+	r_argv = strdup(*argv);
+
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+
+	R_child_thread_run(main_align,n,c_argv, 1);
+
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
 
 	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
@@ -242,23 +234,21 @@ void R_junction_wrapper(int * nargs, char ** argv)
 	R_CStackLimit =(uintptr_t)-1;
 	#endif
 
-        char * r_argv, ** c_argv;
-        int i,n;
+	char * r_argv, ** c_argv;
+	int i,n;
     
-        r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-        strcpy(r_argv,*argv);
-    
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	r_argv = strdup(*argv);
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
 		R_child_thread_run(main_junction,n,c_argv, 1);
 
-        for(i=0;i<n;i++) free(c_argv[i]);
-        free(c_argv);
-        free(r_argv);
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
 
 	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
@@ -268,49 +258,43 @@ void R_junction_wrapper(int * nargs, char ** argv)
 
 void R_sam2bed_wrapper(int * nargs, char ** argv)
 {
+	char * r_argv, ** c_argv;
+	int i,n;
 
-        char * r_argv, ** c_argv;
-        int i,n;
+	r_argv = strdup(*argv);
 
-        r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-        strcpy(r_argv,*argv);
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	R_child_thread_run(sam2bed,n,c_argv, 0);
 
-        R_child_thread_run(sam2bed,n,c_argv, 0);
-
-        for(i=0;i<n;i++) free(c_argv[i]);
-        free(c_argv);
-        free(r_argv);
-
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
 }
 
 
 void R_propmapped_wrapper(int * nargs, char ** argv)
 {
+	char * r_argv, ** c_argv;
+	int i,n;
 
-        char * r_argv, ** c_argv;
-        int i,n;
+	r_argv = strdup(*argv);
 
-        r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-        strcpy(r_argv,*argv);
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	R_child_thread_run(propmapped,n,c_argv, 0);
 
-        R_child_thread_run(propmapped,n,c_argv, 0);
-
-        for(i=0;i<n;i++) free(c_argv[i]);
-        free(c_argv);
-        free(r_argv);
-
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
 }
 
 
@@ -368,23 +352,22 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 	R_CStackLimit =(uintptr_t)-1;
 	#endif
 
-        char * r_argv, ** c_argv;
-        int i,n;
+	char * r_argv, ** c_argv;
+	int i,n;
 
-        r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-        strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
     	R_child_thread_run(main_snp_calling_test,n,c_argv,1 );
 
-        for(i=0;i<n;i++) free(c_argv[i]);
-        free(c_argv);
-        free(r_argv);
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
 
 	#ifdef SAVE_R_CS_STACK
 	R_CStackLimit = old_cstack_limit;
@@ -395,23 +378,22 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 void R_removeDupReads_wrapper(int * nargs, char ** argv)
 {
 
-        char * r_argv, ** c_argv;
-        int i,n;
+	char * r_argv, ** c_argv;
+	int i,n;
 
-        r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-        strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 
-        n = *nargs;
-        c_argv = (char **) calloc(n,sizeof(char *));
-        for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-        strcpy(c_argv[0],strtok(r_argv,","));
-        for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	n = *nargs;
+	c_argv = (char **) calloc(n,sizeof(char *));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
 
-        R_child_thread_run(main_repeated_test,n,c_argv, 0);
+	R_child_thread_run(main_repeated_test,n,c_argv, 0);
 
-        for(i=0;i<n;i++) free(c_argv[i]);
-        free(c_argv);
-        free(r_argv);
+	for(i=0;i<n;i++) free(c_argv[i]);
+	free(c_argv);
+	free(r_argv);
 
 }
 
@@ -422,8 +404,7 @@ void R_qualityScores_wrapper(int * nargs, char ** argv)
 	char * r_argv, ** c_argv;
 	int i,n;
 	
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
@@ -443,8 +424,7 @@ void R_generate_random_RNAseq_reads(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
 	
-	r_argv = (char *)calloc(1500, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 	//fprintf(stderr, "ARGSSS=%s\n", r_argv);
 	
 	n = *nargs;
@@ -466,8 +446,7 @@ void R_flattenGTF_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
 	
-	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
-	strcpy(r_argv,*argv);
+	r_argv = strdup(*argv);
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
