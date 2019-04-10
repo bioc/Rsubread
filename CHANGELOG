@@ -1,3 +1,6 @@
+11 Apr 2019 - 1.33.38
+(1) Fix a bug in the new voting algorithm that can lead to infinit loop.
+
 11 Apr 2019 - 1.33.37
 (1) Change the total length of parameters for many functions from 1000 bytes to 10240 bytes.
 

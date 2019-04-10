@@ -678,15 +678,10 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 	}
 
 
-	if(0)while(last_accepted_index){
-		if(current_keys[last_accepted_index-1] == key) last_accepted_index-=1;
-		else break;
-	}
-
 	int subread_number_P1 =  subread_number + 1;
 	int of_p_16 = offset + 16;
 	is_reversed = is_reversed?IS_NEGATIVE_STRAND:0;
-	int start_scan_idx = last_accepted_index, scan_step = 0;
+	//int start_scan_idx = last_accepted_index, scan_step = 0;
 
 	{
 		int ii_end = INDEL_SEGMENT_SIZE;
@@ -704,10 +699,9 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 			//SUBREADprintf("You can find KV at %u\n", kv);
 
-			for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
-			{
-				if(iix)
-				{
+			for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)) {
+
+				if(iix) {
 					offsetX = _index_vote_tol(kv+iix);
 					datalen = vote -> items[offsetX];
 					dat = vote -> pos[offsetX];
@@ -723,7 +717,7 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 					if( dist0 >= -applied_indel_tol && dist0 <= applied_indel_tol && is_reversed == vote->masks[offsetX][i]){
 						int toli =  vote -> toli[offsetX][i];
 
-						if(toli >0 && dist0 ==0 && run_round == 0 && ! vote -> marked_shift_indel[offsetX][i]){
+						if(run_round == 0 && toli >0 && dist0 ==0 && ! vote -> marked_shift_indel[offsetX][i]){
 							vote -> marked_shift_indel[offsetX][i] = 1;
 							shift_indel_locs[(* shift_indel_NO)++] = dat[i];
 						}
@@ -777,18 +771,14 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 			}
 
 			if (!found_some) {
-				if (kv < low_border || kv > high_border)
-					continue;
-
-				if (datalen2<GENE_VOTE_SPACE)
-				{
+				if (kv >=low_border && kv <= high_border && datalen2<GENE_VOTE_SPACE) {
 					vote -> items[offsetX2] ++;
 					dat2[datalen2] = kv;
 					vote -> masks[offsetX2][datalen2] = is_reversed;
 					vote -> votes[offsetX2][datalen2] = 1;
 					vote -> toli[offsetX2][datalen2] = 0;
 					vote -> marked_shift_indel[offsetX2][datalen2] = 0;
-					if(run_round){
+					if(run_round>0){
 						int kk;
 						for(kk = 0; kk < * shift_indel_NO ; kk++){
 							if( kv >= shift_indel_locs[kk] - indel_tolerance && kv <= shift_indel_locs[kk] + indel_tolerance ){
@@ -797,7 +787,7 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 							}
 						}
 					}
-
+	
 					// data structure of recorder:
 					// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
 					// All subread numbers are added with 1 for not being 0.
@@ -809,7 +799,7 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 					vote->coverage_start [offsetX2][datalen2] = offset;
 					vote->coverage_end [offsetX2][datalen2] = of_p_16;
 					vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
-
+	
 					if (vote->max_vote==0)
 						vote->max_vote = 1;
 				}
