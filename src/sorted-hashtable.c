@@ -632,7 +632,7 @@ void assign_best_vote(gene_vote_t * vote, int i, int j)
 #define NEWgehash_go_q gehash_go_q
 
 size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border, int run_round, unsigned int * shift_indel_locs, unsigned int * shift_indel_NO){
-	if(the_table->version_number == SUBINDEX_VER0){
+	if(0)if(the_table->version_number == SUBINDEX_VER0){
 		SUBREADprintf("ERROR: the version of the index is too old.\n");
 		assert(the_table->version_number != SUBINDEX_VER0);
 		return -1;
@@ -824,7 +824,7 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 
 size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border){
-	if(the_table->version_number == SUBINDEX_VER0){
+	if(0)if(the_table->version_number == SUBINDEX_VER0){
 		SUBREADprintf("ERROR: the version of the index is too old.\n");
 		assert(the_table->version_number != SUBINDEX_VER0);
 		return -1;
