@@ -677,34 +677,30 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 		
 	}
 
-	while(last_accepted_index){
+
+	if(0)while(last_accepted_index){
 		if(current_keys[last_accepted_index-1] == key) last_accepted_index-=1;
 		else break;
 	}
 
-
-	/*if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
-	{
-		// assumed to be non-informative subread.
-		vote -> noninformative_subreads++;
-		return 0;
-	}*/
-
 	int subread_number_P1 =  subread_number + 1;
 	int of_p_16 = offset + 16;
+	is_reversed = is_reversed?IS_NEGATIVE_STRAND:0;
+	int start_scan_idx = last_accepted_index, scan_step = 0;
 
 	{
 		int ii_end = INDEL_SEGMENT_SIZE;
 		if(indel_tolerance>5) ii_end=(indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
 
-		for (;  last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
-		{
+		//for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++){
+		while(1){
 			unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
 			int iix, offsetX2, offsetX, datalen, datalen2;
 			offsetX2 = offsetX = _index_vote_tol(kv);
 			datalen = datalen2 = vote -> items[offsetX2];
 			unsigned int * dat2, *dat;
 			dat = dat2 = vote -> pos[offsetX2];
+			int found_some = 0;
 
 			//SUBREADprintf("You can find KV at %u\n", kv);
 
@@ -724,10 +720,10 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 				{
 					int dist0 = kv-dat[i];
 					int applied_indel_tol = ( run_round>0 && vote -> marked_shift_indel[offsetX][i])? 0: indel_tolerance ;
-					if( dist0 >= -applied_indel_tol && dist0 <= applied_indel_tol && is_reversed  == (0!= vote->masks[offsetX][i])){
+					if( dist0 >= -applied_indel_tol && dist0 <= applied_indel_tol && is_reversed == vote->masks[offsetX][i]){
 						int toli =  vote -> toli[offsetX][i];
 
-						if(toli >0 && dist0 ==0 && ! vote -> marked_shift_indel[offsetX][i]){
+						if(toli >0 && dist0 ==0 && run_round == 0 && ! vote -> marked_shift_indel[offsetX][i]){
 							vote -> marked_shift_indel[offsetX][i] = 1;
 							shift_indel_locs[(* shift_indel_NO)++] = dat[i];
 						}
@@ -773,18 +769,14 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 						vote -> last_subread_cluster[offsetX][i] = subread_number_P1;
 						if(vote->max_vote < test_max)vote->max_vote = test_max;
-						i = 9999999;
+						found_some = 1;
+						break;
 					}
-					break;
 				}
-				if (i==9999999){
-					break;
-				}
-
+				if(found_some) break;
 			}
 
-			if (i < 9999999)
-			{
+			if (!found_some) {
 				if (kv < low_border || kv > high_border)
 					continue;
 
@@ -792,11 +784,11 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 				{
 					vote -> items[offsetX2] ++;
 					dat2[datalen2] = kv;
-					vote -> masks[offsetX2][datalen2] = (is_reversed?IS_NEGATIVE_STRAND:0);
+					vote -> masks[offsetX2][datalen2] = is_reversed;
 					vote -> votes[offsetX2][datalen2] = 1;
 					vote -> toli[offsetX2][datalen2] = 0;
 					vote -> marked_shift_indel[offsetX2][datalen2] = 0;
-					if(run_round>0){
+					if(run_round){
 						int kk;
 						for(kk = 0; kk < * shift_indel_NO ; kk++){
 							if( kv >= shift_indel_locs[kk] - indel_tolerance && kv <= shift_indel_locs[kk] + indel_tolerance ){
@@ -822,7 +814,18 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						vote->max_vote = 1;
 				}
 			}
-			else i=0;
+
+			if(! scan_step){
+				last_accepted_index++;
+				if(last_accepted_index == items || current_keys[last_accepted_index]!= key){
+					scan_step = 1;
+					last_accepted_index = start_scan_idx;
+				}
+			}
+			if(scan_step){
+				last_accepted_index --;
+				if(last_accepted_index <0 || current_keys[last_accepted_index]!= key) break;
+			}
 		}
 	}	
 	return 1;
@@ -861,13 +864,9 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 		last_accepted_index=(imin+imax)/2;
 		short current_key = current_keys[last_accepted_index];
 		if(current_key>key)
-		{
 			imax = last_accepted_index - 1;
-		}
 		else if(current_key<key)
-		{
 			imin = last_accepted_index + 1;
-		}
 		else
 			break;
 
@@ -876,28 +875,17 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 		
 	}
 
-	while(last_accepted_index){
-		if(current_keys[last_accepted_index-1] == key) last_accepted_index-=1;
-		else break;
-	}
-
-
-	/*if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
-	{
-		// assumed to be non-informative subread.
-		vote -> noninformative_subreads++;
-		return 0;
-	}*/
-
 	int subread_number_P1 =  subread_number + 1;
 	int of_p_16 = offset + 16;
+	is_reversed = is_reversed? IS_NEGATIVE_STRAND:0;
 
 	{
 		int ii_end = INDEL_SEGMENT_SIZE;
 		if(indel_tolerance>5) ii_end=(indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
 
-		for (;  last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
-		{
+		//for (;  last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
+		int start_scan_idx = last_accepted_index, scan_step = 0;
+		while(1){
 			unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
 			int iix, offsetX2, offsetX, datalen, datalen2;
 			offsetX2 = offsetX = _index_vote_tol(kv);
@@ -923,7 +911,7 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 				{
 					int dist0 = kv-dat[i];
 
-					if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance && is_reversed  == (0!= vote->masks[offsetX][i]))
+					if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance && is_reversed  == vote->masks[offsetX][i])
 					{
 						int toli =  vote -> toli[offsetX][i];
 
@@ -981,16 +969,14 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 
 			}
 
-			if (i < 9999999)
-			{
+			if (i < 9999999) {
 				if (kv < low_border || kv > high_border)
 					continue;
 
-				if (datalen2<GENE_VOTE_SPACE)
-				{
+				if (datalen2<GENE_VOTE_SPACE) {
 					vote -> items[offsetX2] ++;
 					dat2[datalen2] = kv;
-					vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
+					vote -> masks[offsetX2][datalen2]=is_reversed;
 					vote -> votes[offsetX2][datalen2]=1;
 					vote -> toli[offsetX2][datalen2]=0;
 
@@ -1001,9 +987,9 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 					vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number_P1;
 					vote -> indel_recorder[offsetX2][datalen2][2] = 0;
 					vote -> indel_recorder[offsetX2][datalen2][3] = 0;
-					vote->current_indel_cursor [offsetX2][datalen2] = 0;
-					vote->coverage_start [offsetX2][datalen2] = offset;
-					vote->coverage_end [offsetX2][datalen2] = of_p_16;
+					vote -> current_indel_cursor [offsetX2][datalen2] = 0;
+					vote -> coverage_start [offsetX2][datalen2] = offset;
+					vote -> coverage_end [offsetX2][datalen2] = of_p_16;
 					vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
 
 					if (vote->max_vote==0)
@@ -1011,429 +997,25 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 				}
 			}
 			else i=0;
+
+			if(! scan_step){
+				last_accepted_index++;
+				if(last_accepted_index == items || current_keys[last_accepted_index]!= key){
+					scan_step = 1;
+					last_accepted_index = start_scan_idx;
+				}
+			}
+			if(scan_step){
+				last_accepted_index --;
+				if(last_accepted_index <0 || current_keys[last_accepted_index]!= key) break;
+			}
+
+
 		}
 	}	
 	return 1;
 }
-size_t OLDgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int read_len, int is_reversed, gene_vote_t * vote, int indel_tolerance, int subread_number, unsigned int low_border, unsigned int high_border)
-{
-	//SUBREADprintf("Q=%u, OFFSET=%d, B=%u ~ %u\n", raw_key, offset, low_border, high_border);
 
-	if(the_table->version_number == SUBINDEX_VER0)
-	{
-		gehash_key_t key = raw_key;
-		struct gehash_bucket * current_bucket;
-		int i=0, items;
-
-		gehash_key_t  *current_keys;//, *endp12;
-
-		current_bucket = _gehash_get_bucket (the_table, key);
-		items = current_bucket -> current_items;
-		current_keys = current_bucket -> item_keys;
-		
-		if(!items) return 0;
-
-		#define SPEED_UP_DENOMINAOR 3
-		int jump_step = items / SPEED_UP_DENOMINAOR;
-		int last_accepted_index = 0;
-
-		if(jump_step<1) jump_step=1;
-
-		if(key > current_keys[0])
-		{
-			while(1)
-			{
-				while(1)
-				{
-					int next_p = last_accepted_index + jump_step;
-					if(next_p >= items) break;
-					if(current_keys[next_p]>=key) break; 
-					last_accepted_index = next_p;
-				}
-				if(jump_step>SPEED_UP_DENOMINAOR)
-					jump_step /= SPEED_UP_DENOMINAOR;
-				else if(jump_step>1)
-					jump_step = 1;
-				else
-					break;
-			}
-			last_accepted_index++;
-		}
-
-		if(current_keys[last_accepted_index]!=key) return 0;
-
-		short offset_from_5 = offset;
-		//short offset_from_5 = is_reversed?(read_len - offset - 16):offset ; 
-
-		if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
-		{
-			// assumed to be non-informative subread.
-			vote -> noninformative_subreads++;
-			return 0;
-		}
-
-		if (indel_tolerance <1)
-			for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
-			{
-				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
-				int offsetX = _index_vote(kv);
-				int datalen = vote -> items[offsetX];
-				unsigned int * dat = vote -> pos[offsetX];
-
-				if (kv > 0xffff0000)
-					continue;
-				for (i=0;i<datalen;i++)
-				{
-					if (dat[i] == kv && (subread_number + 1 > vote -> last_subread_cluster[offsetX][i]))
-					{
-						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-						test_max += 1;
-						vote->votes[offsetX][i] = test_max;
-						if (offset_from_5 <  vote->coverage_start [offsetX][i])
-							vote->coverage_start [offsetX][i] = offset_from_5;
-						if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
-							vote->coverage_end [offsetX][i] = offset_from_5+16;
-
-						vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
-
-						vote->max_vote = max(vote->max_vote , test_max);
-						i = 9999999;
-					}
-				}
-
-				if (i < 9999999 && datalen<GENE_VOTE_SPACE)
-				{
-
-					if (kv < low_border || kv > high_border)
-						continue;
-
-
-					vote -> items[offsetX] ++;
-					dat[i] = kv;
-					vote->votes[offsetX][i]=1;
-					vote->masks[offsetX][i]= (is_reversed?IS_NEGATIVE_STRAND:0);
-					vote->coverage_start [offsetX][i] = offset_from_5;
-					vote->coverage_end [offsetX][i] = offset_from_5+16;
-					vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
-
-					if(vote->max_vote==0)
-						vote->max_vote = 1;
-				}
-			}
-		else
-		{
-			// We duplicated all codes for indel_tolerance >= 1 for the minimal impact to performance.
-			//int ii_end = (indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
-
-			for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
-			{
-				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
-				int ii_end = (indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
-				int iix;
-				i=0;
-
-				for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
-				{
-					int offsetX = _index_vote_tol(kv+iix);
-					int datalen = vote -> items[offsetX];
-					if(!datalen)continue;
-
-					unsigned int * dat = vote -> pos[offsetX];
-
-					for (i=0;i<datalen;i++)
-					{
-						int di = dat[i];
-						int dist0 = kv-di;
-						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance && is_reversed  == (0!=(vote -> masks[offsetX][i]&IS_NEGATIVE_STRAND))) {
-							int toli =  vote -> toli[offsetX][i];
-	
-							if(di >= 46494104 && di <= 46496104 ){
-								SUBREADprintf("VOTES: at %u, subread_no = %d , last_cluster = %d , toli = %d\n", di, subread_number , vote -> last_subread_cluster[offsetX][i] , toli);
-							}
-
-							if( toli > 0 && subread_number + 1 == vote -> last_subread_cluster[offsetX][i] ){
-								int move_dist = 0;
-								if( toli >=3 ) move_dist = vote -> indel_recorder[offsetX][i][toli-3+2];
-								int new_dist = move_dist;
-								move_dist -= vote -> indel_recorder[offsetX][i][toli+2];
-								new_dist -= dist0;
-								if(abs(move_dist) > abs(new_dist)){
-									toli -= 3;
-									vote -> toli[offsetX][i] = toli;
-									vote -> last_subread_cluster[offsetX][i]--;
-									vote -> votes[offsetX][i] --;
-								}
-							}
-							if(subread_number + 1 <= vote -> last_subread_cluster[offsetX][i])
-								continue;
-
-
-							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-							test_max += 1;
-							vote -> votes[offsetX][i] = test_max;
-
-							/*
-							if (offset_from_5 <  vote->coverage_start [offsetX][i])
-							{
-								vote->coverage_start [offsetX][i] = offset_from_5;
-							}*/
-							if (offset_from_5 +16 > vote->coverage_end [offsetX][i])
-							{
-								vote->coverage_end [offsetX][i] = offset_from_5+16;
-							}
-
-
-							if (dist0 !=  vote->current_indel_cursor[offsetX][i])
-							{
-								toli +=3;
-								if (toli < indel_tolerance*3)
-								{
-									vote -> toli[offsetX][i] = toli;
-									vote -> indel_recorder[offsetX][i][toli] = subread_number+1; 
-									vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-										
-									if(toli < indel_tolerance*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-								}
-								vote->current_indel_cursor [offsetX][i] = (char)dist0;
-							}
-							else
-								vote -> indel_recorder[offsetX][i][toli+1] = subread_number+1;
-
-							vote -> last_subread_cluster[offsetX][i] = subread_number + 1;
-
-							vote->max_vote = max(vote->max_vote , test_max);
-							i = 9999999;
-						}
-					}
-					if (i==9999999){
-						break;
-					}
-				}
-
-				if (i < 9999999)
-				{
-					if (kv < low_border || kv > high_border)
-						continue;
-
-					int offsetX2 = _index_vote_tol(kv);
-					int datalen2 = vote -> items[offsetX2];
-					unsigned int * dat2 = vote -> pos[offsetX2];
-
-					if (datalen2<GENE_VOTE_SPACE)
-					{
-						vote -> items[offsetX2] ++;
-						dat2[datalen2] = kv;
-						vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
-						vote -> votes[offsetX2][datalen2]=1;
-						vote -> toli[offsetX2][datalen2]=0;
-						vote -> last_subread_cluster[offsetX2][datalen2] = subread_number + 1;
-
-						// data structure of recorder:
-						// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
-						// All subread numbers are added with 1 for not being 0.
-
-						vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number+1;
-						vote -> indel_recorder[offsetX2][datalen2][2] = 0;
-						vote -> indel_recorder[offsetX2][datalen2][3] = 0;
-						vote->current_indel_cursor [offsetX2][datalen2] = 0;
-						vote->coverage_start [offsetX2][datalen2] = offset_from_5;
-						vote->coverage_end [offsetX2][datalen2] = offset_from_5+16;
-
-						if (vote->max_vote==0)
-							vote->max_vote = 1;
-					}
-				}
-			}
-		}	
-			
-		return 1;
-		//return match_end-match_start;
-	}
-	else
-	{
-
-		// VER_1
-		// VER_2
-
-		struct gehash_bucket * current_bucket;
-		int i = 0, items;
-
-		short *current_keys;//, *endp12;
-		short key = raw_key / the_table->buckets_number;
-
-		current_bucket = _gehash_get_bucket (the_table, raw_key);
-		items = current_bucket -> current_items;
-		current_keys = current_bucket -> new_item_keys;
-		
-		if(!items) return 0;
-
-//#warning "======== MAKE SURE THAT '-1' IS CORRECT ============"
-		int imin=0, imax=items - 1;
-		int last_accepted_index;
-
-		while(1)
-		{
-			last_accepted_index=(imin+imax)/2;
-			short current_key = current_keys[last_accepted_index];
-			if(current_key>key)
-			{
-				imax = last_accepted_index - 1;
-			}
-			else if(current_key<key)
-			{
-				imin = last_accepted_index + 1;
-			}
-			else
-				break;
-
-			if(imax<imin)
-				return 0;
-			
-		}
-
-		while(last_accepted_index){
-			if(current_keys[last_accepted_index-1] == key) last_accepted_index-=1;
-			else break;
-		}
-
-
-		/*if(*(current_bucket -> item_values+last_accepted_index) > 0xffff0000)	// no position should be greater than this.
-		{
-			// assumed to be non-informative subread.
-			vote -> noninformative_subreads++;
-			return 0;
-		}*/
-
-		int subread_number_P1 =  subread_number + 1;
-		int of_p_16 = offset + 16;
-
-		{
-			int ii_end = INDEL_SEGMENT_SIZE;
-			if(indel_tolerance>5) ii_end=(indel_tolerance % INDEL_SEGMENT_SIZE)?(indel_tolerance - indel_tolerance%INDEL_SEGMENT_SIZE+INDEL_SEGMENT_SIZE):indel_tolerance;
-
-			for (;  last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
-			{
-				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
-				int iix, offsetX2, offsetX, datalen, datalen2;
-				offsetX2 = offsetX = _index_vote_tol(kv);
-				datalen = datalen2 = vote -> items[offsetX2];
-				unsigned int * dat2, *dat;
-				dat = dat2 = vote -> pos[offsetX2];
-
-				//SUBREADprintf("You can find KV at %u\n", kv);
-
-				for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE))
-				{
-					if(iix)
-					{
-						offsetX = _index_vote_tol(kv+iix);
-						datalen = vote -> items[offsetX];
-						dat = vote -> pos[offsetX];
-					}
-
-
-					if(!datalen)continue;
-
-					for (i=0;i<datalen;i++)
-					{
-						int dist0 = kv-dat[i];
-
-	
-						if( dist0 >= -indel_tolerance && dist0 <= indel_tolerance && is_reversed  == (0!= vote->masks[offsetX][i]))
-						{
-
-//							if(di >= 46494104 && di <= 46496104 ){
-//								SUBREADprintf("VOTES: at %u, subread_no = %d , last_cluster = %d , toli = %d\n", di, subread_number , vote -> last_subread_cluster[offsetX][i] , toli);
-//							}
-
-							int toli =  vote -> toli[offsetX][i];
-							if( subread_number_P1 == vote -> last_subread_cluster[offsetX][i]  && toli >0){
-								int move_dist = 0;
-								if( toli >=3 ) move_dist = vote -> indel_recorder[offsetX][i][toli-3+2];
-								int new_dist = move_dist;
-								move_dist -= vote -> indel_recorder[offsetX][i][toli+2];
-								new_dist -= dist0;
-								if(abs(move_dist) > abs(new_dist)){
-									toli -= 3;
-									vote -> toli[offsetX][i] = toli;
-									vote -> last_subread_cluster[offsetX][i]--;
-									vote -> votes[offsetX][i] --;
-								}
-							}
-
-							if(subread_number_P1 <= vote -> last_subread_cluster[offsetX][i]) continue;
-							gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-							test_max += 1;
-							vote -> votes[offsetX][i] = test_max;
-
-							if (offset +16 > vote->coverage_end [offsetX][i])
-								vote->coverage_end [offsetX][i] = of_p_16;
-
-
-							if (dist0 ==  vote->current_indel_cursor[offsetX][i])
-								vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
-							else {
-								toli +=3;
-								if (toli < MAX_INDEL_SECTIONS*3)
-								{
-									vote -> toli[offsetX][i] = toli;
-									vote -> indel_recorder[offsetX][i][toli] = subread_number_P1; 
-									vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
-									vote -> indel_recorder[offsetX][i][toli+2] = dist0; 
-										
-									if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
-								}
-								vote->current_indel_cursor [offsetX][i] = (char)dist0;
-							}
-
-							vote -> last_subread_cluster[offsetX][i] = subread_number_P1;
-							if(vote->max_vote < test_max)vote->max_vote = test_max;
-							i = 9999999;
-							break;
-						}
-					}
-					if (i==9999999){
-						break;
-					}
-
-				}
-
-				if (i < 9999999)
-				{
-					if (kv < low_border || kv > high_border)
-						continue;
-
-					if (datalen2<GENE_VOTE_SPACE)
-					{
-						vote -> items[offsetX2] ++;
-						dat2[datalen2] = kv;
-						vote -> masks[offsetX2][datalen2]=(is_reversed?IS_NEGATIVE_STRAND:0);
-						vote -> votes[offsetX2][datalen2]=1;
-						vote -> toli[offsetX2][datalen2]=0;
-
-						// data structure of recorder:
-						// {unsigned char subread_start; unsigned char subread_end, char indel_offset_from_start}
-						// All subread numbers are added with 1 for not being 0.
-
-						vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number_P1;
-						vote -> indel_recorder[offsetX2][datalen2][2] = 0;
-						vote -> indel_recorder[offsetX2][datalen2][3] = 0;
-						vote->current_indel_cursor [offsetX2][datalen2] = 0;
-						vote->coverage_start [offsetX2][datalen2] = offset;
-						vote->coverage_end [offsetX2][datalen2] = of_p_16;
-						vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
-
-						if (vote->max_vote==0)
-							vote->max_vote = 1;
-					}
-				}
-				else i=0;
-			}
-		}	
-		return 1;
-	}
-}
 
 void select_best_vote(gene_vote_t * vote)
 {

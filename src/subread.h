@@ -293,15 +293,15 @@ typedef struct {
 	gene_quality_score_t max_quality;
 	gene_vote_number_t max_indel_recorder[MAX_INDEL_TOLERANCE*3];
 	gene_vote_number_t * max_tmp_indel_recorder;
-	short max_mask;
+	int max_mask;
 	gene_vote_number_t noninformative_subreads;
 
 	unsigned short items[GENE_VOTE_TABLE_SIZE];
 	unsigned int pos [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	int masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	int marked_shift_indel[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t votes [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-	short masks [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t last_subread_cluster [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
