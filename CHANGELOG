@@ -1,3 +1,6 @@
+11 Apr 2019 - 1.33.37
+(1) Change the total length of parameters for many functions from 1000 bytes to 10240 bytes.
+
 10 Apr 2019 - 1.33.36
 (1) Improve the speed of voting by removing the backward scanning and minor changes.
 
