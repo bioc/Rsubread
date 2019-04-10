@@ -92,7 +92,7 @@ void R_txUnique_wrapper(int * nargs, char ** argv){
 	int i,n;
 
 	n = *nargs;
-	r_argv = (char *)calloc(1R_ARG_LENGTH_DEF, sizeof(char));
+	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
 	strcpy(r_argv,*argv);
 
 	c_argv = (char **) calloc(n+1,sizeof(char *));
@@ -112,7 +112,7 @@ void R_mergeVCF(int * nargs, char ** argv)
 	int i,n;
 
 	n = *nargs;
-	r_argv = (char *)calloc(1R_ARG_LENGTH_DEF, sizeof(char));
+	r_argv = (char *)calloc(R_ARG_LENGTH_DEF, sizeof(char));
 	strcpy(r_argv,*argv);
 
 //	printf("N=%d; V=%s\n", n, r_argv);
