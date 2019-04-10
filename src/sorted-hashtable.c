@@ -681,7 +681,7 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 	int subread_number_P1 =  subread_number + 1;
 	int of_p_16 = offset + 16;
 	is_reversed = is_reversed?IS_NEGATIVE_STRAND:0;
-	//int start_scan_idx = last_accepted_index, scan_step = 0;
+	int start_scan_idx = last_accepted_index, scan_step = 0;
 
 	{
 		int ii_end = INDEL_SEGMENT_SIZE;
