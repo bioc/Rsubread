@@ -953,17 +953,13 @@ size_t NEWgehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, in
 						break;
 					}
 				}
-				if (i==9999999){
+				if (i==9999999)
 					break;
-				}
 
 			}
 
 			if (i < 9999999) {
-				if (kv < low_border || kv > high_border)
-					continue;
-
-				if (datalen2<GENE_VOTE_SPACE) {
+				if (kv >= low_border && kv <= high_border && datalen2<GENE_VOTE_SPACE) {
 					vote -> items[offsetX2] ++;
 					dat2[datalen2] = kv;
 					vote -> masks[offsetX2][datalen2]=is_reversed;
