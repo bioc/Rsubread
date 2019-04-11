@@ -2,6 +2,32 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+\section{Version 1.34.0}{\itemize{
+\item
+New functions: simReads() and scanFasta(). simReads() generates simulation RNA-seq reads for transcripts.
+
+\item
+align() and subjunc() estimate fragment length from mapped read pairs and use the estimated length to assist reporting the best alignment.
+
+\item
+align() and subjunc() prefer alignments with no indels included over indel-containing alignments when same number of matched bases are found.
+
+\item
+align() and subjunc() check if index files were successfully loaded before starting read mapping.
+
+\item
+align() and subjunc() detect indels arising from incorrect shifting of seed sequence when being mapped to low-complexity region and exclude such indels from read re-alignment and indel reporting.
+
+\item
+buildindex(), align() and subjunc() support gzipped FASTA format.
+
+\item
+featureCounts() allows mapped reads to have ‘*’ as their chromosome name.
+
+\item
+removeDupReads() supports BAM-format input and output.
+}}
+
 
 \section{Version 1.32.0}{\itemize{
 \item
