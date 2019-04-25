@@ -5,8 +5,8 @@ citEntry(
   journal = "Nucleic Acids Research",
   year = 2019,
   volume = "20 February",
-  number = "gkz114",
-  pages = "https://doi.org/10.1093/nar/gkz114",
+  pages = "gkz114",
+  doi = "10.1093/nar/gkz114",
 
   textVersion = "Liao Y, Smyth GK and Shi W (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research, https://doi.org/10.1093/nar/gkz114."
 )
