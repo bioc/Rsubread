@@ -1089,7 +1089,7 @@ int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, 
 	{
 		writer -> bam_fp = f_subr_open(BAM_fname, "wb");
 		if(keep_in_memory){
-			char tname[350];
+			char tname[MAX_FILE_NAME_LENGTH];
 			sprintf(tname, "%s.bai", BAM_fname);
 			writer -> BAI_fp = f_subr_open(tname, "wb");
 		}
@@ -1820,7 +1820,7 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	memcpy(bin, nbin, binlen);
 	ArrayListDestroy(sort_linear_pos);
 
-	char tmpfname[350];
+	char tmpfname[MAX_FILE_NAME_LENGTH+20];
 	if(writer -> threads>1) subread_lock_occupy(&writer -> thread_bam_lock);
 	sprintf(tmpfname, "%s-%06d.sortedbin", writer -> tmpf_prefix, writer -> sorted_batch_id++);
 	if(writer -> threads>1) subread_lock_release(&writer -> thread_bam_lock);
@@ -1968,7 +1968,7 @@ void SamBam_writer_one_thread_merge_sortedbins(SamBam_Writer * writer){
 	if(writer -> sorted_batch_id > SAMBAM_MERGE_MAX_FPS){
 		int merge_i;
 		for(merge_i = 0; merge_i < writer -> sorted_batch_id; merge_i+= SAMBAM_MERGE_MAX_FPS){
-			char tfp[360];
+			char tfp[MAX_FILE_NAME_LENGTH+32];
 			int this_size = min(SAMBAM_MERGE_MAX_FPS, writer -> sorted_batch_id - merge_i);
 			if(this_size < 2) break;
 
@@ -1982,7 +1982,7 @@ void SamBam_writer_one_thread_merge_sortedbins(SamBam_Writer * writer){
 			int current_min_batch = -1, bii;
 
 			for(bii = 0; bii < this_size; bii++){
-				char tfp[360];
+				char tfp[MAX_FILE_NAME_LENGTH+20];
 				current_min_fps[bii] = SUBREAD_MAX_ULONGLONG;
 
 				sprintf(tfp , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii + merge_i);
@@ -2183,7 +2183,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 	writer -> chunk_buffer_used = 0;
 
 	for(bii = 0; bii < writer -> sorted_batch_id; bii++){
-		char tfp[360];
+		char tfp[MAX_FILE_NAME_LENGTH+32];
 		current_min_fps[bii] = SUBREAD_MAX_ULONGLONG;
 
 		sprintf(tfp , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii);
@@ -2279,7 +2279,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 	for(bii = 0; bii < writer -> sorted_batch_id; bii++){
 		if(!sb_fps[bii]) continue;
 
-		char tfp[360];
+		char tfp[MAX_FILE_NAME_LENGTH+32];
 		sprintf(tfp , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii);
 		fclose(sb_fps[bii]);
 		unlink(tfp);

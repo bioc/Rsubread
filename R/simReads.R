@@ -96,11 +96,11 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
 scanFasta <- function(transcript.file, simplify.transcript.names=FALSE, quiet=FALSE){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
 	transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
-	cmd <- paste("RscanFasta,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=",")
-    if(quiet) cmd<-paste(cmd, "--quiet", sep=",")
-    if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=",")
+	cmd <- paste("RscanFasta,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=.R_param_splitor)
+    if(quiet) cmd<-paste(cmd, "--quiet", sep=.R_param_splitor)
+    if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=.R_param_splitor)
 
-	n <- length(unlist(strsplit(cmd,",")))
+	n <- length(unlist(strsplit(cmd,.R_param_splitor)))
 	C_args <- .C("R_generate_random_RNAseq_reads",as.integer(n), as.character(cmd),PACKAGE="Rsubread")
 
 	fout_sum <-paste0(fout_sum,".faSummary")

@@ -1,6 +1,6 @@
 processExons <- function(filename = "human_seq_gene.md", species="hg")
-
 {
+    .check_string_param(species,'species')
 	if (species == "mm"){
 			filename <- "mouse_seq_gene.md"
 	}

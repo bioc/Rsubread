@@ -1523,7 +1523,7 @@ int my_strcmp(const void * s1, const void * s2)
 	return ret;
 }
 
-int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len, unsigned short mapped_seg)
+int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len, unsigned short mapped_seg, int is_indel_before, int is_indel_after)
 {
 	base_block_temp_read_t datum;
 	memset(&datum,0,sizeof(datum));
@@ -1534,6 +1534,7 @@ int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_n
 	datum.strand = strand;
 	datum.read_pos = read_pos;
 	datum.read_len = read_len;
+	datum.indel_around = (is_indel_before?1:0) + (is_indel_after?3:0);
 	datum.mapping_quality = mapping_quality;
 	datum.mapped_segment_in_read = mapped_seg;
 
@@ -1737,7 +1738,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 	}
 
 	char * linebuf = malloc(3000);
-	char * tmpfname = malloc(400);
+	char * tmpfname = malloc(MAX_FILE_NAME_LENGTH);
 
 	while(1)
 	{
@@ -1901,8 +1902,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 			int flags = 0, mapping_quality = 0, rl=0;
 			char is_negative_strand = 0;
 			unsigned int pos = 0, pairdist = 0;
-			char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
-			char temp_file_name[MAX_CHROMOSOME_NAME_LEN+20+300];
+			char temp_file_suffix[MAX_FILE_NAME_LENGTH];
+			char temp_file_name[MAX_FILE_NAME_LENGTH];
 			FILE * temp_fp;
 			int repeated = -1, close_now = 0;
 
@@ -1967,6 +1968,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 				unsigned int chromosome_cursor = pos;
 				int j, tmpv=0;
 				char cc;
+				int is_indel_before = 0;
+				int is_indel_after = 0;
 				unsigned short M_parts=0;
 
 				for(j=0; cigar[j]; j++)
@@ -2021,13 +2024,21 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 
 								if(need_write  && insert_length >= 5 && sequence[0]!='*')
 								{
+									int j2 = 0;
+									for(j2 = j+1; cigar[j2]; j2++){
+										int jcc = cigar[j2];
+										if(isalpha(jcc)){
+											is_indel_after = jcc=='D'||jcc=='I';
+											break;
+										}
+									}
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
 									if(!temp_fp) return -1;
 									if(all_mapped_bases)
 										(*all_mapped_bases) += insert_length;
 
-									is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl, M_parts);
+									is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, insertion_cursor, cigar, mapping_quality, sequence + read_cursor , quality_string + read_cursor, insert_length , 1, is_negative_strand, read_cursor, rl, M_parts, is_indel_before, is_indel_after);
 									if(close_now) fclose(temp_fp);
 								}
 								insertion_cursor += insert_length;
@@ -2052,6 +2063,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 							add_cigar_indel_event(event_table, chro, chromosome_cursor-1, tmpv, NULL);
 						chromosome_cursor += tmpv;
 						tmpv = 0;
+						is_indel_before = cc == 'D';
 					}
 					else if(cc == 'I' )
 					{
@@ -2061,6 +2073,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 						if(event_table &&  sequence[0]!='*')
 							add_cigar_indel_event(event_table, chro, chromosome_cursor-1, -tmpv, sequence + read_cursor);
 						read_cursor += tmpv;
+						is_indel_before = 1;
 						tmpv = 0;
 					}
 					else	tmpv = 0;
@@ -2090,7 +2103,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 				sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 	
 				temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
-				is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand, 0,rl, 0);
+				is_error |= write_read_block_file(temp_fp , read_number, read_name, flags, chro, pos, cigar, mapping_quality, sequence , quality_string, rl , is_sequence_needed, is_negative_strand, 0,rl, 0, 0, 0 );
 				if(close_now)fclose(temp_fp);
 			}
 			read_number ++;
@@ -2156,18 +2169,18 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 	(*output_genes)[0].start_offset = 0xffffffff;
 	while(gene_number < MAX_ANNOTATION_EXONS)
 	{
-		char buff[200], this_gene_name[MAX_GENE_NAME_LEN], chromosome_name[MAX_CHROMOSOME_NAME_LEN];
+		char buff[1200], this_gene_name[MAX_GENE_NAME_LEN], chromosome_name[MAX_CHROMOSOME_NAME_LEN];
 		int i = 0, j=0;
 		unsigned int exon_location;
 
-		line_len = read_line(200, fp, buff, 0);	
+		line_len = read_line(1200, fp, buff, 0);	
 
 		if(line_len>0)	//Not EOF
 		{
 			if(!isdigit(buff[0]))	// it is a title line or something else
 				continue;
 		
-			for(i=0; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+			for(i=0; buff[i] != '\t' &&  buff[i] != '\n' && i < 1200; i++)
 				this_gene_name[i] = buff[i];
 			this_gene_name[i] = 0;
 		}
@@ -2186,13 +2199,13 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 
 	
 		// copy chromosome name
-		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 1200; i++)
 			chromosome_name[j++] = buff[i];
 		chromosome_name[j] = 0;
 
 		// start location
 		exon_location = 0;
-		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 1200; i++)
 			if(isdigit(buff[i]))
 				exon_location = exon_location*10 + buff[i] - '0';
 
@@ -2205,7 +2218,7 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 
 		// end location
 		exon_location = 0;
-		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && buff[i] && i < 200; i++)
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && buff[i] && i < 1200; i++)
 			if(isdigit(buff[i]))
 				exon_location = exon_location*10 + buff[i] - '0';
 
@@ -2266,7 +2279,7 @@ void delete_with_prefix(char * prefix){
 	if(prefix != NULL)
 	{
 		int xk1, last_slash = -1;
-		char del2[300], del_suffix[200], del_name[400];
+		char del2[MAX_FILE_NAME_LENGTH], del_suffix[MAX_FILE_NAME_LENGTH], del_name[MAX_FILE_NAME_LENGTH];
 		for(xk1=0; prefix[xk1]; xk1++)
 		{
 			if(prefix[xk1]=='/') last_slash = xk1;
@@ -4797,7 +4810,7 @@ int  fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	FILE * old_fp = pairer -> input_fp;
 	fseek(old_fp, 0, SEEK_SET);
-	char tmpfname [330], readname[256];
+	char tmpfname [MAX_FILE_NAME_LENGTH+10], readname[256];
 
 	sprintf(tmpfname, "%s.fixbam", pairer -> tmp_file_prefix);
 
@@ -6671,7 +6684,7 @@ int main(int argc, char ** argv)
 	FILE * ifp;
 	unsigned long long int rno=0;
 	short tmp_flags, is_sorted = 1;
-	char buff[3000], tmp_rname[100];
+	char buff[3000], tmp_rname[MAX_FILE_NAME_LENGTH];
 
 	ifp = f_subr_open(argv[1],"r");
 	while(1)

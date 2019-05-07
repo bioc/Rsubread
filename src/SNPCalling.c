@@ -78,13 +78,13 @@ struct SNP_Calling_Parameters{
 
 	pthread_spinlock_t * output_fp_lock;
 
-	char pile_file_name[300];
+	char pile_file_name[MAX_FILE_NAME_LENGTH];
 	int delete_piles;
 	int disk_is_full;
 
-	char background_input_file[300];
-	char subread_index[300];
-	char known_SNP_vcf[300];
+	char background_input_file[MAX_FILE_NAME_LENGTH];
+	char subread_index[MAX_FILE_NAME_LENGTH];
+	char known_SNP_vcf[MAX_FILE_NAME_LENGTH];
 	unsigned int known_SNPs_number;
 	gene_offset_t * subread_index_offsets;
 	gene_value_index_t * subread_index_array;
@@ -634,7 +634,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference_len, char * referenced_genome, char * chro_name , char * temp_prefix, struct SNP_Calling_Parameters * parameters)
 {
 	int block_no = (offset -1) / BASE_BLOCK_LENGTH, i, disk_is_full = 0;
-	char temp_file_name[300];
+	char temp_file_name[MAX_FILE_NAME_LENGTH];
 	FILE *tmp_fp;
 	unsigned int * snp_voting_piles, *snp_BGC_piles = NULL;	// offset * 4 + "A/C/G/T"[0,1,2,3]
 	char * SNP_bitmap_recorder = NULL;
@@ -1338,7 +1338,7 @@ void EXSNP_SIGINT_hook(int param)
 		int xk1, last_slash = -1;
 		if(_EXSNP_SNP_delete_temp_prefix != NULL)
 		{
-			char del2[300], del_suffix[200], del_name[400];
+			char del2[MAX_FILE_NAME_LENGTH], del_suffix[MAX_FILE_NAME_LENGTH], del_name[MAX_FILE_NAME_LENGTH];
 			#ifdef MAKE_STANDALONE
 			if(param)
 				SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
@@ -1400,7 +1400,7 @@ void EXSNP_SIGINT_hook(int param)
 
 int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, char * temp_location, unsigned int known_read_count, int threads, struct SNP_Calling_Parameters* parameters)
 {
-	char temp_file_prefix[300];
+	char temp_file_prefix[MAX_FILE_NAME_LENGTH];
 	chromosome_t * known_chromosomes;
 	unsigned int real_read_count=0;
 
@@ -1432,7 +1432,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	if(parameters->subread_index[0])
 	{
-		char table_fn[350];
+		char table_fn[MAX_FILE_NAME_LENGTH+15];
 		parameters -> subread_index_offsets = (gene_offset_t*)malloc(sizeof(gene_offset_t));
 		load_offsets (parameters -> subread_index_offsets, parameters->subread_index);
 
@@ -1449,7 +1449,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		while(1)
 		{
 			int fpos0 = fpos;
-			char one_fn [300];
+			char one_fn [MAX_FILE_NAME_LENGTH];
 			while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
 				fpos++;
 			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
@@ -1482,7 +1482,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		while(1)
 		{
 			int fpos0 = fpos;
-			char one_fn [300];
+			char one_fn [MAX_FILE_NAME_LENGTH];
 			while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
 				fpos++;
 			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
@@ -1494,7 +1494,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		}
 		if(parameters -> background_input_file[0])
 		{
-			char temp_file_prefix2[350];
+			char temp_file_prefix2[MAX_FILE_NAME_LENGTH+60];
 			sprintf(temp_file_prefix2, "%sBGC-", temp_file_prefix);
 			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 1,0, parameters -> use_soft_clipping_bases)) return -1;
 		}
@@ -1504,7 +1504,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	parameters -> real_read_count = real_read_count;
 
-	char qfname[330];
+	char qfname[MAX_FILE_NAME_LENGTH+12];
 	sprintf(qfname, "%s.qStatic", temp_file_prefix);
 	parameters -> final_phred_score = 0;
 	if (parameters -> delete_piles)
@@ -1620,9 +1620,9 @@ int main_snp_calling_test(int argc,char ** argv)
 
 	int c;
 	char in_SAM_file[5000];
-	char out_BED_file[300];
-	char temp_path[300];
-	char in_FASTA_file[300];
+	char out_BED_file[MAX_FILE_NAME_LENGTH];
+	char temp_path[MAX_FILE_NAME_LENGTH];
+	char in_FASTA_file[MAX_FILE_NAME_LENGTH];
 	int threads, optindex=0;
 	int t=0, k;
 	struct SNP_Calling_Parameters parameters;
@@ -1744,15 +1744,15 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'g':
-				strncpy(in_FASTA_file, optarg,299);
+				strncpy(in_FASTA_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'i':
-				strncpy(in_SAM_file, optarg,299);
+				strncpy(in_SAM_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'o':
-				strncpy(out_BED_file, optarg,299);
+				strncpy(out_BED_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'T':
@@ -1769,7 +1769,7 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'C':
-				strncpy(temp_path, optarg,299);	
+				strncpy(temp_path, optarg,MAX_FILE_NAME_LENGTH-1);	
 				break;
 
 			case 'r':

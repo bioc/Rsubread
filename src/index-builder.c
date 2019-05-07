@@ -1020,7 +1020,7 @@ int main_buildindex(int argc,char ** argv)
 {
 	int threshold = 100, optindex=0;
 	int memory_limit;	// 8000 MBytes
-	char output_file[330], c, tmp_fa_file[300], log_file_name[350];
+	char output_file[MAX_FILE_NAME_LENGTH], c, tmp_fa_file[MAX_FILE_NAME_LENGTH], log_file_name[MAX_FILE_NAME_LENGTH+10];
 	char *ptr_tmp_fa_file[1];
 	unsigned int * chromosome_lengths;
 
@@ -1065,7 +1065,7 @@ int main_buildindex(int argc,char ** argv)
 				threshold = atoi(optarg);
 				break;
 			case 'o':
-				strncpy(output_file, optarg, 299);
+				strncpy(output_file, optarg, MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'k':
 				if(memcmp(SUBREAD_VERSION , "1.3.",4)==0)

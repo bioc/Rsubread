@@ -155,7 +155,7 @@ void full_scan_read(char * index_name, char * read_str)
 
 int main (int argc , char ** argv)
 {
-	char index_name [1200];
+	char index_name [MAX_FILE_NAME_LENGTH];
 	char read_str [1208];
 	char c;
 	int i;
@@ -166,7 +166,7 @@ int main (int argc , char ** argv)
 		switch(c)
 		{
 			case 'i':
-				strncpy(index_name,  optarg, 1199);
+				strncpy(index_name,  optarg, MAX_FILE_NAME_LENGTH);
 				break;
 			case 'm':
 				MIN_REPORTING_RATIO = atof(optarg);

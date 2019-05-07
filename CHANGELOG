@@ -1,3 +1,7 @@
+7 May 2019 - 1.35.1
+(1) Change the splitor to '\027' for passing arguments to the C functions.
+(2) Change the maximum length of file paths to 1000 bytes.
+
 12 Apr 2019 - 1.33.41
 (1) Update users guide.
 

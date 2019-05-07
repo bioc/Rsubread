@@ -3,13 +3,13 @@ buildindex <- function(basename,reference,gappedIndex=FALSE,indexSplit=FALSE,mem
 	basename <- .check_and_NormPath(basename, mustWork=F, opt="basename")
 	reference <- .check_and_NormPath(reference, mustWork=T, opt="reference")
 
-	opt <- paste("-o",basename,"-f",TH_subread,"-M",memory,reference,sep=",")
+	opt <- paste("-o",basename,"-f",TH_subread,"-M",memory,reference,sep=.R_param_splitor)
 
-	if(gappedIndex == FALSE) opt <- paste("-F",opt,sep=",")
-	if(indexSplit == FALSE) opt <- paste("-B",opt,sep=",")
-	if(colorspace) opt <- paste("-c",opt,sep=",")
+	if(gappedIndex == FALSE) opt <- paste("-F",opt,sep=.R_param_splitor)
+	if(indexSplit == FALSE) opt <- paste("-B",opt,sep=.R_param_splitor)
+	if(colorspace) opt <- paste("-c",opt,sep=.R_param_splitor)
 		
-	cmd <- paste("subread-buildindex",opt,sep=",")
-	n <- length(unlist(strsplit(cmd,",")))
+	cmd <- paste("subread-buildindex",opt,sep=.R_param_splitor)
+	n <- length(unlist(strsplit(cmd,.R_param_splitor)))
 	C_args <- .C("R_buildindex_wrapper",argc=as.integer(n),argv=as.character(cmd),PACKAGE="Rsubread")
 }

@@ -276,7 +276,7 @@ double guess_reads_density_format(char * fname, int is_sam, int * min_phred, int
 
 FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * close_immediately);
 
-int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len, unsigned short M_seg);
+int write_read_block_file(FILE *temp_fp , unsigned int read_number, char *read_name, int flags, char * chro, unsigned int pos, char *cigar, int mapping_quality, char *sequence , char *quality_string, int rl , int is_sequence_needed, char strand, unsigned short read_pos, unsigned short read_len, unsigned short M_seg, int indel_before, int indel_after);
 
 int get_read_block(char *chro, unsigned int pos, char *temp_file_suffix, chromosome_t *known_chromosomes, unsigned int * max_base_position);
 int my_strcmp(const void * s1, const void * s2);

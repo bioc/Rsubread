@@ -501,8 +501,8 @@ int main_qualityScores(int argc, char ** argv)
 	int ret;
 	int c;
 	int option_index = 0 , offset_pt = 33, needed_reads = 10000, sam_end = 0;
-	char in_name[300];
-	char out_name[300];
+	char in_name[MAX_FILE_NAME_LENGTH];
+	char out_name[MAX_FILE_NAME_LENGTH];
 	char * input_format = "FASTQ";
 	char * in_nameptr = in_name;
 	char * out_nameptr = out_name;

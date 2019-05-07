@@ -59,6 +59,7 @@
 #define MAX_FC_READ_LENGTH 10001
 #define MAX_HIT_NUMBER (1000*1000*1000)
 #define MAX_EXTRA_COLS 15
+#define FC_FLIST_SPLITOR "\026"
 
 typedef struct{
 	char gene_name[FEATURE_NAME_LENGTH];
@@ -284,15 +285,15 @@ typedef struct {
 	int RGnames_capacity;
 	int RGnames_ptr;
 
-	char alias_file_name[300];
-	char input_file_name[300];
+	char alias_file_name[MAX_FILE_NAME_LENGTH];
+	char input_file_name[MAX_FILE_NAME_LENGTH];
 	char * input_file_short_name;
-	char raw_input_file_name[300];
-	char output_file_name[300];
-	char output_file_path[300];
-	char temp_file_dir[300];
-	char read_details_path[300];
-	char annotation_file_screen_output[300];
+	char raw_input_file_name[MAX_FILE_NAME_LENGTH];
+	char output_file_name[MAX_FILE_NAME_LENGTH];
+	char output_file_path[MAX_FILE_NAME_LENGTH];
+	char temp_file_dir[MAX_FILE_NAME_LENGTH];
+	char read_details_path[MAX_FILE_NAME_LENGTH];
+	char annotation_file_screen_output[MAX_FILE_NAME_LENGTH];
 	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
 	int input_file_unique;
 
@@ -590,7 +591,7 @@ unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str,
 
 int print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport)
 {
-	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+300), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
+	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+MAX_FILE_NAME_LENGTH), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
 	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
@@ -620,7 +621,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	nfiles = 0;
 	while(1)
 	{
-		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
+		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		nfiles++;
 
@@ -665,7 +666,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 
 	while(1)
 	{
-		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
+		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
 
@@ -4049,7 +4050,7 @@ void fc_thread_init_input_files(fc_thread_global_context_t * global_context, cha
 
 		char MAC_or_random[13];
 
-		(*out_ptr) = malloc(300);
+		(*out_ptr) = malloc(MAX_FILE_NAME_LENGTH);
 		mac_or_rand_str(MAC_or_random);
 		sprintf(*out_ptr, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
 
@@ -4223,7 +4224,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 
 	if(global_context -> is_read_details_out)
 	{
-		char tmp_fname[350], *modified_fname;
+		char tmp_fname[MAX_FILE_NAME_LENGTH+20], *modified_fname;
 		int i=0;
 		char * applied_detail_path = global_context -> output_file_path;
 		if(global_context -> read_details_path[0]) applied_detail_path = global_context -> read_details_path;
@@ -4242,7 +4243,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 				if(modified_fname[i]=='\\' || modified_fname[i]=='/'||modified_fname[i]==' ')modified_fname[i]='.';
 				i++;
 			}
-			char tmp_fname2[350];
+			char tmp_fname2[MAX_FILE_NAME_LENGTH+20];
 			sprintf(tmp_fname2, "%s/%s", applied_detail_path, modified_fname);
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname2, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname2);
@@ -4349,8 +4350,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 	}
 
-	char rand_prefix[360];
-	char new_fn[350];
+	char rand_prefix[MAX_FILE_NAME_LENGTH+100];
+	char new_fn[MAX_FILE_NAME_LENGTH+150];
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 	sprintf(rand_prefix, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
@@ -4712,7 +4713,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 
 void fc_write_final_counts(fc_thread_global_context_t * global_context, const char * out_file, ArrayList * column_names, ArrayList * read_counters, int isCVersion)
 {
-	char fname[300];
+	char fname[MAX_FILE_NAME_LENGTH];
 	int i_files, xk1, disk_is_full = 0;
 
 	sprintf(fname, "%s.summary", out_file);
@@ -5272,7 +5273,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	merge_sort(key_list,  merged_junction_table -> numOfElements , junckey_sort_compare, junckey_sort_exchange, junckey_sort_merge);
 
-	char outfname[300];
+	char outfname[MAX_FILE_NAME_LENGTH];
 	sprintf(outfname, "%s.jcounts", output_file_name);
 
 	int max_junction_genes = 3000;
@@ -5455,7 +5456,7 @@ int Input_Files_And_Strand_Mode_Pair(char * fnames, char * smodes){
 	if(strstr(smodes, ".")==NULL){
 		bad_fmt = smodes[0]<'0' || smodes[0]>'2';
 	}else{
-		while('\0'!=(ch=*(fnames++)))if(ch == ';')ret++;
+		while('\0'!=(ch=*(fnames++)))if(ch == FC_FLIST_SPLITOR[0])ret++;
 		while('\0'!=(ch=*(smodes++))){
 			if(ch == '.'){
 				if(numbs != 1) bad_fmt = 1;
@@ -5856,7 +5857,7 @@ int readSummary(int argc,char *argv[]){
 	char * is_unique = malloc(strlen(file_name_ptr)+1);
 	strcpy(file_list_used, file_name_ptr);
 	for(x1 = 0;;x1++){
-		char * test_fn = strtok_r(x1?NULL:file_list_used,";", &tmp_pntr);
+		char * test_fn = strtok_r(x1?NULL:file_list_used, FC_FLIST_SPLITOR, &tmp_pntr);
 		if(NULL == test_fn) break; 
 		char * short_fname = get_short_fname(test_fn);
 		strcpy(file_list_used2, file_name_ptr);
@@ -5865,7 +5866,7 @@ int readSummary(int argc,char *argv[]){
 		char * loop_ptr = NULL;
 		int x2;
 		for(x2 = 0;;x2++){
-			char * test_loopfn = strtok_r(x2?NULL:file_list_used2, ";", &loop_ptr);
+			char * test_loopfn = strtok_r(x2?NULL:file_list_used2, FC_FLIST_SPLITOR, &loop_ptr);
 			if(NULL == test_loopfn) break;
 			if(x1==x2)continue;
 
@@ -5881,7 +5882,7 @@ int readSummary(int argc,char *argv[]){
 
 	tmp_pntr = NULL;
 	strcpy(file_list_used, file_name_ptr);
-	char * next_fn = strtok_r(file_list_used,";", &tmp_pntr);
+	char * next_fn = strtok_r(file_list_used, FC_FLIST_SPLITOR, &tmp_pntr);
 	char * next_strand_mode = strtok_r(strand_mode_list, ".", &tmp_smode_ptr);
 	int one_single_strand_mode = -1;
 	if(NULL == strstr( global_context.strand_check_mode, "." )){
@@ -6008,7 +6009,7 @@ int readSummary(int argc,char *argv[]){
 			total_written_coulmns ++;
 		}
 		global_context.is_paired_end_mode_assign = orininal_isPE;
-		next_fn = strtok_r(NULL, ";", &tmp_pntr);
+		next_fn = strtok_r(NULL, FC_FLIST_SPLITOR, &tmp_pntr);
 
 		if(strstr( global_context.strand_check_mode, "." )) next_strand_mode = strtok_r(NULL, ".", &tmp_smode_ptr);
 		if(global_context.assign_reads_to_RG) free(global_context.RGnames_set);
@@ -6251,12 +6252,12 @@ int feature_count_main(int argc, char ** argv)
 #endif
 {
 	char * Rargv[56];
-	char annot_name[300];
-	char temp_dir[300];
-	char * out_name = malloc(300);
-	char * fasta_contigs_name = malloc(300);
-	char * alias_file_name = malloc(300);
-	char * Rpath = malloc(300);
+	char annot_name[MAX_FILE_NAME_LENGTH];
+	char temp_dir[MAX_FILE_NAME_LENGTH];
+	char * out_name = malloc(MAX_FILE_NAME_LENGTH);
+	char * fasta_contigs_name = malloc(MAX_FILE_NAME_LENGTH);
+	char * alias_file_name = malloc(MAX_FILE_NAME_LENGTH);
+	char * Rpath = malloc(MAX_FILE_NAME_LENGTH);
 	int cmd_rebuilt_size = 2000;
 	char * cmd_rebuilt = malloc(cmd_rebuilt_size);
 	char max_M_str[8];
@@ -6455,10 +6456,10 @@ int feature_count_main(int argc, char ** argv)
 //				term_strncpy(sam_name, optarg,299);
 //				break;
 			case 'o':
-				term_strncpy(out_name, optarg,299);
+				term_strncpy(out_name, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'a':
-				term_strncpy(annot_name, optarg,299);
+				term_strncpy(annot_name, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'L':
 				long_read_mode = 1;
@@ -6650,7 +6651,7 @@ int feature_count_main(int argc, char ** argv)
 	for(; optind < argc; optind++)
 	{
 		int curr_strlen = strlen(very_long_file_names);
-		if( very_long_file_names_size - curr_strlen <300)
+		if( very_long_file_names_size - curr_strlen < MAX_FILE_NAME_LENGTH+1)
 		{
 			very_long_file_names_size *=2;
 			//printf("CL=%d ; NS=%d\n", curr_strlen , very_long_file_names_size);
@@ -6658,7 +6659,7 @@ int feature_count_main(int argc, char ** argv)
 		}
 
 		strcat(very_long_file_names, argv[optind]);
-		strcat(very_long_file_names, ";");
+		strcat(very_long_file_names, FC_FLIST_SPLITOR);
 	}
 
 	very_long_file_names[strlen(very_long_file_names)-1]=0;
