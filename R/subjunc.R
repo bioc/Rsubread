@@ -37,41 +37,41 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(!all(file.exists(dirname(output_file))))
     stop("Invalid path was found in output file name(s).")
 
-  opt <- paste("-i",index,sep=",")
+  opt <- paste("-i",index,sep=.R_param_splitor)
 
   if(tolower(input_format) == "sam")
-    opt <- paste(opt,"--SAMinput",sep=",")
+    opt <- paste(opt,"--SAMinput",sep=.R_param_splitor)
   if(tolower(input_format) == "bam")
-    opt <- paste(opt,"--BAMinput",sep=",")
+    opt <- paste(opt,"--BAMinput",sep=.R_param_splitor)
 
   if(tolower(output_format) == "sam")
-    opt <- paste(opt,"--SAMoutput",sep=",")
+    opt <- paste(opt,"--SAMoutput",sep=.R_param_splitor)
 
-  opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=",")
+  opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=.R_param_splitor)
 
   if(complexIndels)
-    opt <- paste(opt,"--complexIndels",sep=",")
+    opt <- paste(opt,"--complexIndels",sep=.R_param_splitor)
 
   if(!unique)
-    opt <- paste(opt,"--multiMapping",sep=",")
+    opt <- paste(opt,"--multiMapping",sep=.R_param_splitor)
 
-  opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=",")
+  opt <- paste(opt,"-B",nBestLocations,"-d",minFragLength,"-D",maxFragLength,"-S",PE_orientation,"--trim5",nTrim5,"--trim3",nTrim3,sep=.R_param_splitor)
 
   if(!is.null(readGroupID))
-    opt <- paste(opt,"--rg-id",readGroupID,sep=",")
+    opt <- paste(opt,"--rg-id",readGroupID,sep=.R_param_splitor)
   if(!is.null(readGroup))
-    opt <- paste(opt,"--rg",readGroup,sep=",")
+    opt <- paste(opt,"--rg",readGroup,sep=.R_param_splitor)
   if(color2base)
-    opt <- paste(opt,"-b",sep=",")
+    opt <- paste(opt,"-b",sep=.R_param_splitor)
   if(keepReadOrder)
-    opt <- paste(opt,"--keepReadOrder",sep=",")
+    opt <- paste(opt,"--keepReadOrder",sep=.R_param_splitor)
   if(sortReadsByCoordinates)
-    opt <- paste(opt,"--sortReadsByCoordinates",sep=",")
+    opt <- paste(opt,"--sortReadsByCoordinates",sep=.R_param_splitor)
 
-  opt <- paste(opt,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=",")
+  opt <- paste(opt,"-G",DP_GapOpenPenalty,"-E",DP_GapExtPenalty,"-X",DP_MismatchPenalty,"-Y",DP_MatchScore,sep=.R_param_splitor)
 
   if(reportAllJunctions)
-    opt <- paste(opt,"--allJunctions",sep=",")
+    opt <- paste(opt,"--allJunctions",sep=.R_param_splitor)
 
   flag <- FALSE
   if(useAnnotation){
@@ -120,32 +120,32 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
       }
     }
 
-    opt <- paste(opt,"-a",ann,sep=",")
+    opt <- paste(opt,"-a",ann,sep=.R_param_splitor)
 
     if(isGTF)
-      opt <- paste(opt,"-F","GTF","--gtfFeature",GTF.featureType,"--gtfAttr",GTF.attrType,sep=",")
+      opt <- paste(opt,"-F","GTF","--gtfFeature",GTF.featureType,"--gtfAttr",GTF.attrType,sep=.R_param_splitor)
     else
-      opt <- paste(opt,"-F","SAF",sep=",")
+      opt <- paste(opt,"-F","SAF",sep=.R_param_splitor)
 
     if(!is.null(chrAliases))
-      opt <- paste(opt,"-A",chrAliases,sep=",")
+      opt <- paste(opt,"-A",chrAliases,sep=.R_param_splitor)
 
-    opt <- paste(opt, "--exonAnnotationScreenOut", annot.display, sep=",")
+    opt <- paste(opt, "--exonAnnotationScreenOut", annot.display, sep=.R_param_splitor)
   }
 
   if(phredOffset == 33)
-    opt <- paste(opt,"-P",3,sep=",")
+    opt <- paste(opt,"-P",3,sep=.R_param_splitor)
   else
-    opt <- paste(opt,"-P",6,sep=",")
+    opt <- paste(opt,"-P",6,sep=.R_param_splitor)
 
   for(i in 1:length(readfile1)){
-    opt_files <- paste("-r",readfile1[i],sep=",")
+    opt_files <- paste("-r",readfile1[i],sep=.R_param_splitor)
     if(!is.null(readfile2)) 
-      opt_files <- paste(opt_files,"-R",readfile2[i],sep=",")
-    opt_files <- paste(opt_files,"-o",output_file[i],sep=",")
+      opt_files <- paste(opt_files,"-R",readfile2[i],sep=.R_param_splitor)
+    opt_files <- paste(opt_files,"-o",output_file[i],sep=.R_param_splitor)
 
-    cmd <- paste("subjunc",opt_files,opt,sep=",")
-    n <- length(unlist(strsplit(cmd,",")))
+    cmd <- paste("subjunc",opt_files,opt,sep=.R_param_splitor)
+    n <- length(unlist(strsplit(cmd,.R_param_splitor)))
     C_args <- .C("R_junction_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
     summary.data <- .load.delete.summary(output_file[i])
     if(i ==1){
