@@ -3,7 +3,7 @@
 
 .check_string_param <- function(argu, opt=NULL){
   if(!is.null(argu)){
-    if(grepl(.R_param_splitor,  argu)){
+    if(any(grepl(.R_param_splitor,  argu))){
       stop(paste0("Error: the argument for ",opt," contains the internal splitor of featureCounts (\\027). The \\027 character is unallowd in this parameter."))
     }
   }
@@ -26,11 +26,11 @@
     }
   }
   rv <- normalizePath(files, mustWork = mustWork)
-  if(grepl(.R_param_splitor, rv)){
+  if(any(grepl(.R_param_splitor, rv))){
     stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\027). The \\027 character is unallowd in the file names or in the paths."))
   }
 
-  if(grepl(.R_flist_splitor, rv)){
+  if(any(grepl(.R_flist_splitor, rv))){
     stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\026). The \\026 character is unallowd in the file names or in the paths."))
   }
   return(rv)
