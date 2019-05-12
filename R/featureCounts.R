@@ -1,5 +1,6 @@
 .R_param_splitor="\027"
 .R_flist_splitor="\026"
+.filepath_maximum_len=990
 
 .check_string_param <- function(argu, opt=NULL){
   if(!is.null(argu)){
@@ -32,6 +33,11 @@
 
   if(any(grepl(.R_flist_splitor, rv))){
     stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\026). The \\026 character is unallowd in the file names or in the paths."))
+  }
+
+  if(any(nchar(rv)>=.filepath_maximum_len)){
+    errv <- rv[ nchar(rv)>=.filepath_maximum_len ]
+    stop(paste0("Error: the file name and path of ",opt," is longer than ",.filepath_maximum_len," bytes. Beaware that all the file names are normalized to include the full path to the original file. The value is '", errv[1],"'"))
   }
   return(rv)
 }
