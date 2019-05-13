@@ -2525,7 +2525,7 @@ int write_local_reassembly(global_context_t *global_context, HashTable *pileup_f
 
 		FILE * pileup_fp = get_temp_file_pointer(temp_file_name, pileup_fp_table, &close_now); 
 		//assert(read_len == strlen(read_text) && read_len > 90);
-		write_read_block_file(pileup_fp , 0, read_name, 0, chro_name , chro_offset, NULL, 0, read_text , qual_text, read_len , 1 , is_anchor_certain , anchor_pos, read_len, 0, 0,0);
+		write_read_block_file(pileup_fp , 0, read_name, 0, chro_name , chro_offset, NULL, 0, read_text , qual_text, read_len , 1 , is_anchor_certain , anchor_pos, read_len, 0);
 		if(close_now) fclose(pileup_fp);
 	}
 
@@ -4337,7 +4337,7 @@ int finalise_long_insertions_by_hashtable(global_context_t * global_context)
 	int chro_i;
 	assert(global_context -> index_block_number == 1);
 	unsigned int chro_start_pos = 0;
-	char tmp_fname[MAX_FILE_NAME_LENGTH+30];
+	char tmp_fname[MAX_FILE_NAME_LENGTH+40];
 
 	sprintf(tmp_fname,"%s.reassembly.fa", global_context->config.output_prefix);
 	global_context->long_insertion_FASTA_fp = f_subr_open(tmp_fname ,"wb");

@@ -1,3 +1,8 @@
+13 May 2019 - 1.35.2
+(1) Add the check on the normalised file name lengths.
+(2) Terminate featureCounts() if both single- and paired-end reads are found in the same input file.
+(3) Add a warning message for specifying isPairedEnd=TRUE on single-end input files.
+
 7 May 2019 - 1.35.1
 (1) Change the splitor to '\027' for passing arguments to the C functions.
 (2) Change the maximum length of file paths to 1000 bytes.

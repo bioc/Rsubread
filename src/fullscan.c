@@ -166,7 +166,7 @@ int main (int argc , char ** argv)
 		switch(c)
 		{
 			case 'i':
-				strncpy(index_name,  optarg, MAX_FILE_NAME_LENGTH);
+				strncpy(index_name,  optarg, MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'm':
 				MIN_REPORTING_RATIO = atof(optarg);

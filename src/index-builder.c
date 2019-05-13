@@ -1020,7 +1020,7 @@ int main_buildindex(int argc,char ** argv)
 {
 	int threshold = 100, optindex=0;
 	int memory_limit;	// 8000 MBytes
-	char output_file[MAX_FILE_NAME_LENGTH], c, tmp_fa_file[MAX_FILE_NAME_LENGTH], log_file_name[MAX_FILE_NAME_LENGTH+10];
+	char output_file[MAX_FILE_NAME_LENGTH], c, tmp_fa_file[MAX_FILE_NAME_LENGTH], log_file_name[MAX_FILE_NAME_LENGTH+20];
 	char *ptr_tmp_fa_file[1];
 	unsigned int * chromosome_lengths;
 

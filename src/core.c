@@ -861,7 +861,7 @@ int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_co
 
 int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_bam)
 {
-	char temp_file_name[MAX_FILE_NAME_LENGTH + 100], *fline=malloc(3000), tmp_readname[MAX_READ_NAME_LEN];
+	char temp_file_name[MAX_FILE_NAME_LENGTH+80], *fline=malloc(3000), tmp_readname[MAX_READ_NAME_LEN];
 	short tmp_flags;
 	SamBam_FILE * sambam_reader;
 
@@ -986,7 +986,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n)
 {
 	int is_OK = 0;
-	char temp_file_name[MAX_FILE_NAME_LENGTH+100];
+	char temp_file_name[MAX_FILE_NAME_LENGTH+30];
 	char * linebuff=malloc(3001);
 	gzFile rawfp = gzopen(fname, "r");
 	
@@ -3803,7 +3803,7 @@ void write_sam_headers(global_context_t * context)
 		SamBam_writer_add_header(context -> output_bam_writer, header_buff, 0);
 		int xk1;
 		int last_offset = 0;
-		char * obuf = malloc(20000);
+		char * obuf = malloc(10000+5000);
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
 		{
 			int seq_len = FETCH_SEQ_LEN(x1);
@@ -3815,10 +3815,10 @@ void write_sam_headers(global_context_t * context)
 
 		if(context->config.read_group_id[0])
 		{
-			snprintf(obuf,3000, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
+			snprintf(obuf,10000, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
 			SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		}
-		snprintf(obuf,19999, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
+		snprintf(obuf,9999+4900, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
 		SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		SamBam_writer_finish_header(context -> output_bam_writer);
 		free(obuf);

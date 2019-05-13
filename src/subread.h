@@ -64,7 +64,7 @@
 #define MAX_READ_LENGTH ( 1210 )
 #define MAX_READ_NAME_LEN 200 
 #define MAX_CHROMOSOME_NAME_LEN 200 
-#define MAX_FILE_NAME_LENGTH 1000
+#define MAX_FILE_NAME_LENGTH (1000)
 #define FEATURE_NAME_LENGTH 256 
 
 //#warning "============== REMOVE '*1.2' FROM THE NEXT LINE ================"
@@ -474,7 +474,6 @@ typedef struct{
 	unsigned int read_number;
 	unsigned int pos;
 	unsigned short mapped_segment_in_read;
-	unsigned char indel_around;
 	char strand;	// 0 = positive, 1 = negative
 } base_block_temp_read_t;
 

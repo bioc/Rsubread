@@ -1432,7 +1432,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	if(parameters->subread_index[0])
 	{
-		char table_fn[MAX_FILE_NAME_LENGTH+15];
+		char table_fn[MAX_FILE_NAME_LENGTH+80];
 		parameters -> subread_index_offsets = (gene_offset_t*)malloc(sizeof(gene_offset_t));
 		load_offsets (parameters -> subread_index_offsets, parameters->subread_index);
 
@@ -1494,7 +1494,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		}
 		if(parameters -> background_input_file[0])
 		{
-			char temp_file_prefix2[MAX_FILE_NAME_LENGTH+60];
+			char temp_file_prefix2[MAX_FILE_NAME_LENGTH+80];
 			sprintf(temp_file_prefix2, "%sBGC-", temp_file_prefix);
 			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 1,0, parameters -> use_soft_clipping_bases)) return -1;
 		}
@@ -1504,7 +1504,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	parameters -> real_read_count = real_read_count;
 
-	char qfname[MAX_FILE_NAME_LENGTH+12];
+	char qfname[MAX_FILE_NAME_LENGTH+40];
 	sprintf(qfname, "%s.qStatic", temp_file_prefix);
 	parameters -> final_phred_score = 0;
 	if (parameters -> delete_piles)

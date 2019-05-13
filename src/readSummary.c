@@ -215,7 +215,6 @@ typedef struct {
 	int is_SAM_file;
 	int is_read_details_out;
 	int is_junction_no_chro_shown;
-	int is_SEPEmix_warning_shown;
 	int is_unpaired_warning_shown;
 	int is_stake_warning_shown;
 	int is_read_too_long_to_SAM_BAM_shown;
@@ -2835,12 +2834,11 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
-		if(global_context -> is_paired_end_mode_assign && (!global_context ->is_SEPEmix_warning_shown)){
-			if(((!global_context -> is_paired_end_input_file)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context -> is_paired_end_input_file)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
-				print_in_box(85,0,0,"   %c[31mBoth single-end and paired-end reads were found.", 27);
-				//SUBREADprintf("BAD READ:%s, FLAG=%d\n", read_name, alignment_masks);
-				global_context ->is_SEPEmix_warning_shown = 1;
-			}
+		if(((!global_context -> is_paired_end_input_file)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context -> is_paired_end_input_file)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
+			SUBREADprintf("ERROR: both single-end and paired-end reads were found in the same input file!\n");
+			global_context -> is_input_bad_format = 1;
+			//SUBREADprintf("BAD READ:%s, FLAG=%d\n", read_name, alignment_masks);
+			return;
 		}
 
 		if(global_context -> min_mapping_quality_score>0)
@@ -4243,7 +4241,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 				if(modified_fname[i]=='\\' || modified_fname[i]=='/'||modified_fname[i]==' ')modified_fname[i]='.';
 				i++;
 			}
-			char tmp_fname2[MAX_FILE_NAME_LENGTH+20];
+			char tmp_fname2[MAX_FILE_NAME_LENGTH+100];
 			sprintf(tmp_fname2, "%s/%s", applied_detail_path, modified_fname);
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname2, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname2);
@@ -4351,7 +4349,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	}
 
 	char rand_prefix[MAX_FILE_NAME_LENGTH+100];
-	char new_fn[MAX_FILE_NAME_LENGTH+150];
+	char new_fn[MAX_FILE_NAME_LENGTH+10];
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 	sprintf(rand_prefix, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
@@ -5031,7 +5029,8 @@ void print_usage()
 	SUBREADputs("");
 	SUBREADputs("  -p                  If specified, fragments (or templates) will be counted");
 	SUBREADputs("                      instead of reads. This option is only applicable for");
-	SUBREADputs("                      paired-end reads.");
+	SUBREADputs("                      paired-end reads; single-end reads are always counted as");
+    SUBREADputs("                      reads.");
 	SUBREADputs("");
 	SUBREADputs("  -B                  Only count read pairs that have both ends aligned.");
 	SUBREADputs("");
@@ -6180,8 +6179,6 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 		global_context -> is_paired_end_input_file = is_first_read_PE;
 		// a Singel-end SAM/BAM file cannot be assigned as a PE SAM/BAM file;
 		// but a PE SAM/BAM file may be assigned as a SE file if the user wishes to do so.
-		if(is_first_read_PE==0)
-				global_context -> is_paired_end_mode_assign = 0;
 
 		global_context->is_SAM_file = 1;
 		if(file_probe == 1) global_context->is_SAM_file = 0;
@@ -6202,6 +6199,19 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 			if(global_context->is_strand_checked)
 				print_in_box(80,0,0,"   Strand specific : %s", global_context->is_strand_checked==1?"stranded":"reversely stranded");
 		}
+
+		if(is_first_read_PE==0 && global_context -> is_paired_end_mode_assign){
+			print_in_box(80,0,0, "");
+			#ifdef MAKE_STANDALONE
+			print_in_box(80,0,0, "WARNING: the input is single-end but '-p' is specified!");
+			#else
+			print_in_box(80,0,0, "WARNING value provided for isPairedEnd parameter is ignored because");
+			print_in_box(80,0,0, "        input reads are single-end.");
+			#endif
+			print_in_box(80,0,0, "");
+			global_context -> is_paired_end_mode_assign = 0;
+		}
+
 		
 		FILE * exist_fp = f_subr_open( global_context->input_file_name,"r");
 		if(!exist_fp)

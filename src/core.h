@@ -133,7 +133,7 @@ typedef struct{
 	int is_third_iteration_running;
 	int use_memory_buffer;
 	float memory_use_multiplex;
-	char temp_file_prefix[MAX_FILE_NAME_LENGTH+10];
+	char temp_file_prefix[MAX_FILE_NAME_LENGTH];
 	subread_read_number_t reads_per_chunk;
 	int fast_run;
 

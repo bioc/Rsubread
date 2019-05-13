@@ -354,7 +354,7 @@ int prop_PE(propMapped_context * context)
 	int bini;
 	for(bini = 0; bini < context -> sort_buckets; bini++)
 	{
-		char fname[MAX_FILE_NAME_LENGTH+40];
+		char fname[MAX_FILE_NAME_LENGTH+25];
 		HashTable * rname_table = HashTableCreate(100000);
 		HashTableSetKeyComparisonFunction(rname_table , fc_strcmp_chro);
 		HashTableSetHashFunction(rname_table, fc_chro_hash);
