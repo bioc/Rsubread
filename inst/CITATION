@@ -4,9 +4,10 @@ citEntry(
   author = "Yang Liao and Gordon K. Smyth and Wei Shi",
   journal = "Nucleic Acids Research",
   year = 2019,
-  volume = "20 February",
-  pages = "gkz114",
+  volume = 47,
+  issue = 8,
+  pages = "e47",
   doi = "10.1093/nar/gkz114",
 
-  textVersion = "Liao Y, Smyth GK and Shi W (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research, https://doi.org/10.1093/nar/gkz114."
+  textVersion = "Liao Y, Smyth GK and Shi W (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research 47(8), e47."
 )
