@@ -4,12 +4,13 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FA
 
   out.base.names <- basename(files)
   if(any(duplicated(out.base.names))){
-    out.table.rows <-gsub("[[:punct:]]+", ".", files)
-    out.table.rows <-gsub(" ", ".", out.table.rows)
+    out.table.rows <- files
   }else{
     out.table.rows <- out.base.names
   }
 
+  out.table.rows <-gsub("[[:punct:]]+", ".", out.table.rows)
+  out.table.rows <-gsub(" ", ".", out.table.rows)
 
   files <- .check_and_NormPath(files, mustWork=T, opt="files")
   fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
