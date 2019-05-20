@@ -1,5 +1,16 @@
 propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
 {
+
+
+  out.base.names <- basename(files)
+  if(any(duplicated(out.base.names))){
+    out.table.rows <-gsub("[[:punct:]]+", ".", files)
+    out.table.rows <-gsub(" ", ".", out.table.rows)
+  }else{
+    out.table.rows <- out.base.names
+  }
+
+
   files <- .check_and_NormPath(files, mustWork=T, opt="files")
   fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
@@ -21,6 +32,7 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FA
   }
 
   x1 <- read.csv(fout,header=FALSE,row.names=1,stringsAsFactors=FALSE)
+  rownames(x1) <- out.table.rows
   file.remove(fout)
 
   colnames(x1) <- c("NumTotal","NumMapped","PropMapped")

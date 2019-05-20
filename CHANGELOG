@@ -1,3 +1,6 @@
+19 May 2019 - 1.35.3
+(1) Reduce the lengths of column names in the returned objects from featureCounts(), align(), subjunc() and propmapped().
+
 13 May 2019 - 1.35.2
 (1) Add the check on the normalised file name lengths.
 (2) Terminate featureCounts() if both single- and paired-end reads are found in the same input file.

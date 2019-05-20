@@ -1,6 +1,7 @@
 qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000)
 {
     .check_string_param(input_format,"input_format")
+	if(length(filename)>1) stop("The qualityScores function only allows one input file.")
 	filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
 
 	if (file.exists(filename) == FALSE)

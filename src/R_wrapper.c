@@ -70,6 +70,9 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args, int is_
 }
 // ========== END: main thread screen output ============
 
+extern void retrieve_sequence(char ** input, char ** output_seq);
+extern void atgcContent(char ** input, char ** output, int *basewise);
+extern int detectionCall(int argc, char ** argv);
 extern int main_junction(int argc,char ** argv);
 extern int main_align(int argc,char ** argv);
 extern int main_buildindex(int argc,char ** argv);
@@ -485,6 +488,9 @@ static const R_CMethodDef CEntries[] = {
   {"R_generate_random_RNAseq_reads", (DL_FUNC) &R_generate_random_RNAseq_reads, 2},
   {"R_flattenGTF_wrapper",           (DL_FUNC) &R_flattenGTF_wrapper,           2},
   {"R_genSimReads_at_poses",         (DL_FUNC) &R_genSimReads_at_poses,         13},
+  {"retrieve_sequence",              (DL_FUNC) &retrieve_sequence,              2},
+  {"atgcContent",           	     (DL_FUNC) &atgcContent,             	    3},
+  {"detectionCall",					 (DL_FUNC) &detectionCall,					4},
   {NULL, NULL, 0}
 };
 

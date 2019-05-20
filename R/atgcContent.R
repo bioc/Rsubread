@@ -1,11 +1,6 @@
 atgcContent <- function(filename, basewise=FALSE)
 {
-	filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
-	if (file.exists(filename) == FALSE){
-		print("Souce file specified doesn't exist!")
-	} 
-	else 
-	{
+	  filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
 	  sequence_file <- paste("./.Rsubread_atgcContent_sequence_pid",Sys.getpid(),sep="")
 	  perc_file <- paste("./.Rsubread_atgcContent_percentage_pid",Sys.getpid(),sep="")
 	  .C("retrieve_sequence", as.character(filename), as.character(sequence_file), PACKAGE="Rsubread")
@@ -24,5 +19,4 @@ atgcContent <- function(filename, basewise=FALSE)
 	  {
 		return(data)
 	  }
-	}
 }

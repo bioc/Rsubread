@@ -31,6 +31,10 @@
     stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\027). The \\027 character is unallowd in the file names or in the paths."))
   }
 
+  if(any(grepl("\t", rv))){
+    stop(paste0("Error: the file path to '",opt,"' contains <TAB> character(s). The TAB character is unallowd in the file names or in the paths."))
+  }
+
   if(any(grepl(.R_flist_splitor, rv))){
     stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\026). The \\026 character is unallowd in the file names or in the paths."))
   }
@@ -51,6 +55,13 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     .check_string_param(GTF.attrType.extra, "GTF.attrType.extra")
     .check_string_param(readShiftType, "readShiftType")
 
+    out.base.names <- basename(files)
+    if(any(duplicated(out.base.names))){
+      out.col.names <-gsub("[[:punct:]]+", ".", files)
+      out.col.names <-gsub(" ", ".", out.col.names)
+    }else{
+      out.col.names <- out.base.names
+    }
 	if(!is.character(files)) stop("files must be a character vector of file paths")
 	files <- .check_and_NormPath(files, mustWork=T, opt="files")
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
@@ -175,13 +186,19 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
     if(file.exists(fout)){
-		x <- read.delim(fout,stringsAsFactors=FALSE)
+		add_attr_numb <- 0
+		if(!is.null(GTF.attrType.extra)) add_attr_numb <- length(GTF.attrType.extra)
+
+		x <- read.delim(fout,stringsAsFactors=FALSE, sep="\t")
 		colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
+        colnames(x)[(7 + add_attr_numb ): (add_attr_numb + 6+length(out.col.names)) ] <- out.col.names
+		x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE, sep="\t")
+        colnames(x_summary)[2:ncol(x_summary)] <- out.col.names
 
-		x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
-
-		if(juncCounts)
-			x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
+		if(juncCounts){
+			x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE, sep="\t")
+            colnames(x_jcounts)[-(1:8)]  <- out.col.names
+		}
 
 		file.remove(fout)
 		file.remove(paste(fout,".summary",sep=""))
@@ -192,8 +209,6 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		if(flag) 
 		  file.remove(fout_annot)
 
-		add_attr_numb <- 0
-		if(!is.null(GTF.attrType.extra)) add_attr_numb <- length(GTF.attrType.extra)
 		if(ncol(x) <= (6 + add_attr_numb)){
 		  stop("No count data were generated.")
 		}
@@ -203,9 +218,9 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		rownames(y) <- x$GeneID
 
 		if(juncCounts)
-			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=colnames(y),stat=x_summary)
+			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=out.col.names,stat=x_summary)
 		else
-			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=colnames(y),stat=x_summary)	
+			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=out.col.names,stat=x_summary)	
 		z	
 	}else{
 		stop("No counts were generated.")

@@ -9,6 +9,13 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   .check_string_param(readGroupID,"readGroupID")
   .check_string_param(readGroup,"readGroup")
 
+  out.base.names <- basename(output_file)
+  if(any(duplicated(out.base.names))){
+    out.table.cols <-gsub("[[:punct:]]+", ".", output_file)
+    out.table.cols <-gsub(" ", ".", out.table.cols)
+  }else{
+    out.table.cols <- out.base.names
+  }
   readfile1 <- as.character(readfile1)
   readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
   output_file <- .check_and_NormPath(output_file, mustWork=FALSE, opt="output_file")
@@ -158,6 +165,6 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(flag)
     file.remove(fout_annot)
 
-  names(return.summary) <- basename(output_file)
+  names(return.summary) <- out.table.cols # basename(output_file)
   return.summary
 }
