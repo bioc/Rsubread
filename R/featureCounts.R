@@ -22,6 +22,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 {
 	flag <- FALSE
 
+	if(!is.character(files)) stop("files must be a character vector of file paths")
+
     files.base.names <- basename(files)
     if(any(duplicated(files.base.names))){
 		out.column.names <- files
@@ -31,7 +33,6 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     out.column.names <- gsub(" ",".",out.column.names)
     out.column.names <- gsub("[[:punct:]]+",".",out.column.names)
 
-	if(!is.character(files)) stop("files must be a character vector of file paths")
 	files <- .check_and_NormPath(files, mustWork=T, opt="files")
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
 	if(!is.null(chrAliases))chrAliases <- .check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
