@@ -1,7 +1,5 @@
 propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FALSE)
 {
-
-
   out.base.names <- basename(files)
   if(any(duplicated(out.base.names))){
     out.table.rows <- files
@@ -13,6 +11,7 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FA
   out.table.rows <-gsub(" ", ".", out.table.rows)
 
   files <- .check_and_NormPath(files, mustWork=T, opt="files")
+  if(any(duplicated(files)))stop("Error: duplicated input files are provided. No result is generated.")
   fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
   for(i in 1:length(files)){
