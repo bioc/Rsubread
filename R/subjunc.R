@@ -1,5 +1,14 @@
 subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subjunc",output_format,sep="."),phredOffset=33,nsubreads=14,TH1=1,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,reportAllJunctions=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
+  out.base.names <- basename(output_file)
+  if(any(duplicated(out.base.names))){
+    out.table.cols <- output_file
+  }else{
+    out.table.cols <- out.base.names
+  }
+  out.table.cols <-gsub("[[:punct:]]+", ".", out.table.cols)
+  out.table.cols <-gsub(" ", ".", out.table.cols)
+
   readfile1 <- as.character(readfile1)
   readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
   output_file <- .check_and_NormPath(output_file, mustWork=FALSE, opt="output_file")
@@ -149,6 +158,6 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(flag)
     file.remove(fout_annot)
 
-  names(return.summary) <- basename(output_file)
+  names(return.summary) <- out.table.cols # basename(output_file)
   return.summary
 }

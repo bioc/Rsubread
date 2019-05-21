@@ -21,6 +21,16 @@
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
+
+    files.base.names <- basename(files)
+    if(any(duplicated(files.base.names))){
+		out.column.names <- files
+    }else{
+		out.column.names <- files.base.names
+    }
+    out.column.names <- gsub(" ",".",out.column.names)
+    out.column.names <- gsub("[[:punct:]]+",".",out.column.names)
+
 	if(!is.character(files)) stop("files must be a character vector of file paths")
 	files <- .check_and_NormPath(files, mustWork=T, opt="files")
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
@@ -145,12 +155,20 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 
     if(file.exists(fout)){
 		x <- read.delim(fout,stringsAsFactors=FALSE)
+
+		add_attr_numb <- 0
+		if(!is.null(GTF.attrType.extra)) add_attr_numb <- length(GTF.attrType.extra)
+
 		colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
+		colnames(x)[(7 + add_attr_numb ): (add_attr_numb + 6+length(out.column.names)) ] <- out.column.names
 
 		x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
+		colnames(x_summary)[2:ncol(x_summary)] <- out.column.names
 
-		if(juncCounts)
+		if(juncCounts){
 			x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
+			colnames(x_jcounts)[-(1:8)]  <- out.column.names
+		}
 
 		file.remove(fout)
 		file.remove(paste(fout,".summary",sep=""))
@@ -161,8 +179,6 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		if(flag) 
 		  file.remove(fout_annot)
 
-		add_attr_numb <- 0
-		if(!is.null(GTF.attrType.extra)) add_attr_numb <- length(GTF.attrType.extra)
 		if(ncol(x) <= (6 + add_attr_numb)){
 		  stop("No count data were generated.")
 		}
@@ -172,9 +188,9 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		rownames(y) <- x$GeneID
 
 		if(juncCounts)
-			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=colnames(y),stat=x_summary)
+			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=out.column.names, stat=x_summary)
 		else
-			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=colnames(y),stat=x_summary)	
+			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=out.column.names, stat=x_summary)	
 		z	
 	}else{
 		stop("No counts were generated.")
