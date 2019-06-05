@@ -96,7 +96,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
 scanFasta <- function(transcript.file, simplify.transcript.names=FALSE, quiet=FALSE){
 	fout_sum <- file.path(".",paste(".Rsubread_sumfile_pid",Sys.getpid(),sep=""))
 	transcript.file <- .check_and_NormPath(transcript.file, mustWork=T, opt="transcript.file")
-	cmd <- paste("RscanFasta,--summarizeFasta,--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=.R_param_splitor)
+	cmd <- paste("RscanFasta","--summarizeFasta","--transcriptFasta",transcript.file,"--outputPrefix", fout_sum, sep=.R_param_splitor)
     if(quiet) cmd<-paste(cmd, "--quiet", sep=.R_param_splitor)
     if(simplify.transcript.names) cmd<-paste(cmd, "--simpleTranscriptId", sep=.R_param_splitor)
 
