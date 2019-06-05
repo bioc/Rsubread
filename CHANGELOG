@@ -1,3 +1,6 @@
+6 Jun 2019 - 1.35.5
+(1) Fix a typo in scanFasta(): the "Occurance" column in the returned object has been changed to "Occurrence".
+
 6 Jun 2019 - 1.35.4
 (1) Fix a bug in scanFasta(): the old parameter spliter, comma, was used in a part of the function.
 
