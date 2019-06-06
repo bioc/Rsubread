@@ -27,6 +27,7 @@ qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000
 	C_args <- .C("R_qualityScores_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	
 	scores <- read.csv(score_file,header=FALSE,stringsAsFactors=FALSE)
+    scores <- scores[, colSums( is.na(scores) ) < nrow(scores) ] # remove all-NA columns
 	scores <- as.matrix(scores)
 	colnames(scores) <- 1:ncol(scores)
 	
