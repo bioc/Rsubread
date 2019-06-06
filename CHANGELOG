@@ -1,3 +1,6 @@
+7 Jun 2019 - 1.35.7
+(1) Add nreads=-1 to qualityScores() function for using all the reads in the input file.
+
 6 Jun 2019 - 1.35.6
 (1) Fix a bug in the qualityScores() function that returned fewer columns than the length of the longest read that is sampled.
 

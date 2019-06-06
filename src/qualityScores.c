@@ -37,7 +37,7 @@ typedef struct {
 	char * output_name;
 	int input_file_type;
 	int phred_offset;
-	int needed_reads;
+	long long needed_reads;
 	int sam_end;
 	int max_read_length;
 	char * IO_line_buff;
@@ -345,7 +345,7 @@ int start_qs_context(qualscore_context * qs_context)
 	return ret;
 }
 
-int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend, char **input_file_type, char ** output_sc){
+int retrieve_scores(char ** input, int *offset_pt, long long *size, int * sam_whichend, char **input_file_type, char ** output_sc){
   
 	qualscore_context qs_context;
 	memset(&qs_context, 0, sizeof(qualscore_context));
@@ -410,7 +410,7 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 				double sampling_rate = (read_number-0.1)/qs_context.needed_reads;
 				 
 				double next_sample_number = 0;
-				sampling_rate = max(1.000000000001, sampling_rate);
+				sampling_rate = max(1.0, sampling_rate);
 
 				SUBREADprintf("Totally %llu reads were scanned; the sampling interval is %d.\nNow extract read quality information...\n", read_number, (int)(sampling_rate));
 
@@ -502,7 +502,8 @@ int main_qualityScores(int argc, char ** argv)
 
 	int ret;
 	int c;
-	int option_index = 0 , offset_pt = 33, needed_reads = 10000, sam_end = 0;
+	long long needed_reads = 10000ll;
+	int option_index = 0 , offset_pt = 33, sam_end = 0;
 	char in_name[MAX_FILE_NAME_LENGTH];
 	char out_name[MAX_FILE_NAME_LENGTH];
 	char * input_format = "FASTQ";
@@ -521,7 +522,7 @@ int main_qualityScores(int argc, char ** argv)
 	{
 		switch(c){
 			case 'n':
-				needed_reads = atoi(optarg);
+				needed_reads = atoll(optarg);
 				break;
 			case 'P':
 				offset_pt = optarg[0]=='6'?64:33;

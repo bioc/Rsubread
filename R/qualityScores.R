@@ -20,6 +20,10 @@ qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000
 	if(tolower(input_format) == "bam")
 		opt <- paste(opt,"--BAMinput",sep=.R_param_splitor)
 
+    if(nreads<=0){
+      if(nreads==-1) nreads <- "100000000000" 
+      else stop("ERROR: nreads cannot be zero or negative.")
+    }
 	opt <- paste(opt,"--phred-offset",offset,"--counted-reads",nreads,sep=.R_param_splitor)
 
 	cmd <- paste("qualityScores",opt,sep=.R_param_splitor)
