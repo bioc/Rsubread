@@ -1,3 +1,6 @@
+7 Jun 2019 - 1.34.2
+(1) Change qualityScores() to support input reads with variable lengths, and add "nreads=-1" option for using all the input reads.
+
 21 May 2019 - 1.34.1
 (1) Reduce the lengths of file names in the returned objects from align(), subjunc(), featureCounts() and propmapped().
 

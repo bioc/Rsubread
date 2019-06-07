@@ -1,5 +1,6 @@
 qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000)
 {
+	if(length(filename)>1) stop("The qualityScores function only allows one input file.")
 	filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
 
 	if (file.exists(filename) == FALSE)
@@ -18,6 +19,10 @@ qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000
 	if(tolower(input_format) == "bam")
 		opt <- paste(opt,"--BAMinput",sep=",")
 
+    if(nreads<=0){
+      if(nreads==-1) nreads <- "100000000000" 
+      else stop("ERROR: nreads cannot be zero or negative.")
+    }
 	opt <- paste(opt,"--phred-offset",offset,"--counted-reads",nreads,sep=",")
 
 	cmd <- paste("qualityScores",opt,sep=",")
@@ -25,6 +30,7 @@ qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000
 	C_args <- .C("R_qualityScores_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	
 	scores <- read.csv(score_file,header=FALSE,stringsAsFactors=FALSE)
+    scores <- scores[, colSums( is.na(scores) ) < nrow(scores) ] # remove all-NA columns
 	scores <- as.matrix(scores)
 	colnames(scores) <- 1:ncol(scores)
 	
