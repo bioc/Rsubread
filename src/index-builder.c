@@ -47,6 +47,7 @@ int IS_COLOR_SPACE = 0;
 int MARK_NONINFORMATIVE_SUBREADS = 0;
 int IS_FORCED_ONE_BLOCK = 0;
 int ignore_bar_in_seqnames = 0;
+double begin00_ftime = 0.0;
 
 #define NEXT_READ 1
 #define NEXT_FILE 2
@@ -1027,6 +1028,7 @@ int main_buildindex(int argc,char ** argv)
 	char output_file[MAX_FILE_NAME_LENGTH], c, tmp_fa_file[MAX_FILE_NAME_LENGTH], log_file_name[MAX_FILE_NAME_LENGTH+20];
 	char *ptr_tmp_fa_file[1];
 	unsigned int * chromosome_lengths;
+	begin00_ftime = miltime();
 
 	if(sizeof(char *)>4) memory_limit=8000;
 	else memory_limit=3000;
@@ -1276,7 +1278,7 @@ int main_buildindex(int argc,char ** argv)
 		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, huge_table, chromosome_lengths, actual_bases, 0, &bucket_sizes, expected_hash_items, bucket_no, &total_tables);
 
 		if(!ret){
-			print_in_box(80, 0, 1, "Total running time: %.1f minutes.", (miltime()-begin_ftime)/60);
+			print_in_box(80, 0, 1, "Total running time: %.1f minutes.", (miltime()-begin00_ftime)/60);
 			print_in_box(89, 0, 1, "Index %c[36m%s%c[0m was successfully built!", CHAR_ESC, output_file, CHAR_ESC);
 		}
 		HashTableDestroy(huge_table);
