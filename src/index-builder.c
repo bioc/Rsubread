@@ -26,12 +26,14 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/sysinfo.h>
 #include "hashtable.h"
 #include "gene-value-index.h"
 #include "HelperFunctions.h"
 #include "gene-algorithms.h"
 #include "sorted-hashtable.h"
 #include "seek-zlib.h"
+#include "hashtable.h"
 #include "input-files.h"
 
 #define NO_GENE_DEBUG_
@@ -42,7 +44,6 @@
 #define MAX_KEY_MATCH GENE_VOTE_SPACE 
 int GENE_SLIDING_STEP = 3;
 int IS_COLOR_SPACE = 0;
-int VALUE_ARRAY_INDEX = 1;
 int MARK_NONINFORMATIVE_SUBREADS = 0;
 int IS_FORCED_ONE_BLOCK = 0;
 int ignore_bar_in_seqnames = 0;
@@ -51,41 +52,31 @@ int ignore_bar_in_seqnames = 0;
 #define NEXT_FILE 2
 #define FULL_PARTITION 4
 
+long long estimate_memory_peak(unsigned int * bucket_sizes, unsigned int bucket_no, unsigned int tables ){
+	long long peakuse = 0;
+	int tn;
+	for(tn=0; tn<tables; tn++){
+		long long this_peak = 0;
+		unsigned int bn;
+		for(bn=0; bn<bucket_no; bn++)
+			this_peak += bucket_sizes[bn + tn*bucket_no];
+		peakuse = max(peakuse, this_peak);
+	}
+	//SUBREADprintf("EST MEMORY PEAK=%lld, bucks=%u, tabs=%u\n", peakuse, bucket_no, tables);
+	return peakuse *(sizeof(short)+sizeof(gehash_data_t)) + sizeof(struct gehash_bucket)*bucket_no + sizeof(int) * tables*bucket_no;
+}
 
 void print_build_log(double finished_rate, double read_per_second, double expected_seconds, unsigned long long int total_reads)
 {
 	print_in_box( 81,0,0,"%4d%%%%, %3d mins elapsed, rate=%.1fk bps/s", (int)(finished_rate*100), (int)(miltime()-begin_ftime)/60, read_per_second/1000 );
 }
 
-void copy_non_informative_subread(gehash_t * index_table, gehash_t * noninf_table)
-{
-	int i,j;
-	for (i=0; i< noninf_table -> buckets_number; i++)
-	{
-		struct gehash_bucket * current_bucket = &(noninf_table->buckets[i]);
-
-		if(current_bucket -> current_items>=1)
-		{
-			for (j=0; j<current_bucket -> current_items; j++)
-			{
-				unsigned int noninf_subread = current_bucket -> item_keys[j];
-				// the non-informative subreads in the index are marked as they are at 0xffffffff.
-				gehash_insert(index_table, noninf_subread, 0xffffffffu);
-			}
-		}
-	}
-
-}
-
 
 #define MAX_BASES_IN_INDEX 4294900000.0
 
-int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, unsigned int memory_megabytes, int threshold, gehash_t * huge_table, unsigned int * chro_lens, long long actual_bases)
-{
-	int file_number, table_no;
-	int status = NEXT_FILE;
-	unsigned int offset, read_no;
-	unsigned int segment_size = (unsigned int)(memory_megabytes * 1024.0 / 8.) * 1024 ;
+int build_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, HashTable * huge_table, unsigned int * chro_lens, long long actual_bases, int for_measure_buckets, unsigned int ** bucket_sizes, unsigned int expected_hash_items, unsigned int bucket_no, unsigned int * total_tables){
+	int file_number, table_no, status = NEXT_FILE;
+	unsigned int offset, read_no, current_tab_items;
 	long long int all_bases = guess_gene_bases(chro_files,chro_file_number);
 
 	int chro_table_maxsize=100, dump_res = 0;
@@ -96,8 +87,9 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	gene_value_index_t value_array_index;
 
 	gene_input_t ginp;
+	begin_ftime = miltime();
 
-//	SUBREADprintf ("Index items per partition = %u\n\n", segment_size);
+//	SUBREADprintf ("Index items per partition = %u\n\n", expected_hash_items);
 
 	if (chro_file_number > 199)
 	{
@@ -117,18 +109,20 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		return -1;
 	}
 
+	current_tab_items = 0;
+	table_no = 0;
 	int padding_around_contigs = MAX_READ_LENGTH;
-	if(gehash_create_ex(& table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP, padding_around_contigs)) return 1;
-
-	if(MARK_NONINFORMATIVE_SUBREADS)
-		copy_non_informative_subread(&table, huge_table);
-
-	if(VALUE_ARRAY_INDEX)
-		if(gvindex_init(&value_array_index, 0)) return 1;
+	if(0 == for_measure_buckets){
+		if(gehash_create_ex(& table, expected_hash_items, 0, SUBINDEX_VER2, GENE_SLIDING_STEP, padding_around_contigs)) return 1;
+		if(gvindex_init(&value_array_index, 0, (unsigned int) actual_bases))return 1;
+	}
+	if(1==for_measure_buckets){
+		*bucket_sizes = realloc(*bucket_sizes, sizeof(int) * (table_no+1) * bucket_no);
+		memset((*bucket_sizes) + table_no * bucket_no, 0, sizeof(int) *  bucket_no);
+	}
 
 	file_number = 0;
 	offset = table.padding;
-	table_no = 0;
 	read_no = 0;
 
 	char * fn = malloc(3100);
@@ -138,7 +132,10 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 	status = NEXT_FILE;
 
-	print_in_box(80,0,0,"Build the index...");
+	if(1==for_measure_buckets)
+		print_in_box(80,0,0,"Estimate the index size...");
+	else
+		print_in_box(80,0,0,"Build the index...");
 
 	{
 		char window [16], last_color_base=-1, last_last_color_base=-1;
@@ -162,19 +159,18 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 					//SUBREADprintf ("Processing chromosome files ...\n");
 
-					sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-					SUBREADfflush(stdout);
-
-					if(!dump_res)dump_res |= gehash_dump(&table, fn);
-
-					if(VALUE_ARRAY_INDEX)
-					{
+					if(0==for_measure_buckets){
+						sprintf (fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
+						SUBREADfflush(stdout);
+	
+						if(!dump_res)dump_res |= gehash_dump(&table, fn);
+	
 						sprintf (fn, "%s.%02d.%c.array", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
 						if(!dump_res)dump_res |= gvindex_dump(&value_array_index, fn);
 						gvindex_destory(&value_array_index) ;
+	
+						gehash_destory(&table);
 					}
-
-					gehash_destory(&table);
 
 					read_offsets[read_no-1] = offset + table.padding;
 
@@ -246,8 +242,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				if(IS_COLOR_SPACE)
 				{
 					int_key = genekey2color('A',window);
-					if(VALUE_ARRAY_INDEX)
-						array_int_key = genekey2int(window,GENE_SPACE_BASE);
+					array_int_key = genekey2int(window,GENE_SPACE_BASE);
 					last_last_color_base = -1;
 					last_color_base = window[15];
 				}
@@ -274,21 +269,21 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					offset += 16;
 				}
 
-				sprintf(fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
-				SUBREADfflush(stdout);
+				if(0==for_measure_buckets){
+					sprintf(fn, "%s.%02d.%c.tab", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
+					SUBREADfflush(stdout);
 
-				if(!dump_res)dump_res |= gehash_dump(&table, fn);
-				if(VALUE_ARRAY_INDEX)
-				{
+					if(!dump_res)dump_res |= gehash_dump(&table, fn);
 					sprintf(fn, "%s.%02d.%c.array", index_prefix, table_no, IS_COLOR_SPACE?'c':'b');
 					if(!dump_res)dump_res |= gvindex_dump(&value_array_index, fn);
 				}
 
 				table_no ++;
 
-				gehash_destory(&table);
-				if(VALUE_ARRAY_INDEX)
+				if(0==for_measure_buckets){
+					gehash_destory(&table);
 					gvindex_destory(&value_array_index);
+				}
 
 				read_len -= seek_back_reads;
 				read_len += 16;
@@ -312,19 +307,25 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				if(IS_COLOR_SPACE)
 				{
 					int_key = genekey2color('A',window);
-					if(VALUE_ARRAY_INDEX)
-						array_int_key = genekey2int(window,GENE_SPACE_BASE);
+					array_int_key = genekey2int(window,GENE_SPACE_BASE);
 					last_last_color_base = -1;
 					last_color_base = window[15];
 				}
 				else
 					array_int_key = int_key = genekey2int(window, GENE_SPACE_BASE);
-				
-				if(gehash_create_ex(&table, segment_size, 0, SUBINDEX_VER2, GENE_SLIDING_STEP, padding_around_contigs)) return 1;
-				if(MARK_NONINFORMATIVE_SUBREADS)
-					copy_non_informative_subread(&table, huge_table);
-				if(VALUE_ARRAY_INDEX)
-					if(gvindex_init(&value_array_index, offset)) return 1;
+
+				current_tab_items = 0;
+				if(0==for_measure_buckets){
+					if(gehash_create_ex(&table, expected_hash_items, 0, SUBINDEX_VER2, GENE_SLIDING_STEP, padding_around_contigs)) return 1;
+					if(gvindex_init(&value_array_index, offset, (unsigned int) actual_bases)) return 1;
+				}
+
+				if(1==for_measure_buckets){
+					//unsigned int * tmpp = *bucket_sizes;
+					*bucket_sizes = realloc(*bucket_sizes, sizeof(int) * (table_no+1) * bucket_no);
+					assert(NULL!= *bucket_sizes);
+					memset((*bucket_sizes) + table_no * bucket_no, 0,   sizeof(int) * bucket_no);
+				}
 			}
 	
 			status = 0;
@@ -333,19 +334,19 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				all_skips ++;
 			else
 			{
-				int is_no_info = gehash_exist(huge_table, int_key);
-				if(!is_no_info)
-				{
-					//SUBREADprintf("INSERT KEY=%u AT %u\n", int_key, offset);
-					if(gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0))) return 1;
+				int is_no_info = HashTableGet(huge_table, NULL+1+int_key)-NULL;
+				if(is_no_info){
+					//	SUBREADprintf("NOINFO KEY=%u AT %u\n", int_key, offset);
+				}else {
+					if(0 == for_measure_buckets)if(gehash_insert(&table, int_key, offset - (IS_COLOR_SPACE?1:0), (*bucket_sizes)+ table_no * bucket_no))return 1;
+					if(1 == for_measure_buckets) gehash_try_insert_measure((*bucket_sizes)+ table_no * bucket_no , bucket_no, int_key);
+					current_tab_items++;
 				}
-				if(VALUE_ARRAY_INDEX)
-				{
+				if( 0 == for_measure_buckets )
 					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
-				}
 			}
 
-			if((!IS_FORCED_ONE_BLOCK) && table.current_items >= segment_size && (read_len > MIN_READ_SPLICING || read_len < 32))
+			if((!IS_FORCED_ONE_BLOCK) && current_tab_items >= expected_hash_items && (read_len > MIN_READ_SPLICING || read_len < 32))
 			{
 				status = FULL_PARTITION;
 				continue;
@@ -354,9 +355,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			for (i=0; i<GENE_SLIDING_STEP; i++)
 			{
 				next_char = geinput_next_char(&ginp);
-				if(next_char < 0)
-				{
-					gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
+				if(next_char < 0) {
+					if( 0 == for_measure_buckets ) gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
 
 					if (next_char == -1) status = NEXT_READ;
 					if (next_char == -2) status = NEXT_FILE;
@@ -378,11 +378,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				{
 					if(last_color_base>0)
 						int_key += chars2color(last_color_base, next_char);
-					if(VALUE_ARRAY_INDEX)
-					{
-						array_int_key = array_int_key << 2;
-						array_int_key += base2int (next_char);
-					}
+					array_int_key = array_int_key << 2;
+					array_int_key += base2int (next_char);
 
 					last_last_color_base = last_color_base;
 					last_color_base = next_char;
@@ -438,37 +435,42 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		}
 	}
 	free(fn);
+	*total_tables = table_no+1;
 	return 0;
 }
 
 int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** huge_index)
 {
-	unsigned int times;
-
 	int huge_byte = (subr>>2) &0x3fffffff;
 	int huge_offset = (subr % 4) * 2;
-	unsigned int byte_value = huge_index[ (huge_byte >> 20) & 1023 ][huge_byte&0xfffff] ;
+	int ind_id = (huge_byte >> 20) & 1023;
+
+	if(NULL == huge_index[ind_id])  huge_index[ind_id] = calloc(1024*1024, 1);
+	if(NULL == huge_index[ind_id]){ 
+		SUBREADprintf("ERROR: No memory can be allocated.\nThe program has to terminate\n");
+		return -1;
+	}
+	unsigned int byte_value = huge_index[ ind_id ][huge_byte&0xfffff] ;
 
 	int huge_value = (byte_value>> huge_offset) & 0x3;
-	if(huge_value <3)
-	{
+	if(huge_value <3){
 		huge_value ++;
-		huge_index[ (huge_byte >> 20) & 1023 ][huge_byte&0xfffff] = (byte_value & (~(0x3 << huge_offset))) | (huge_value << huge_offset);
+		huge_index[ ind_id ][huge_byte&0xfffff] = (byte_value & (~(0x3 << huge_offset))) | (huge_value << huge_offset);
 		return 0;
 	}
-
+	unsigned int times = 0;
 	int matched = gehash_get(tab, subr, &times, 1);
 	if(matched)
 	{
 		gehash_update(tab, subr, times+1);
 	}
 	else
-		if(gehash_insert(tab, subr,4)) return 1;
+		if(gehash_insert(tab, subr,4, NULL)) return 1;
+	
 	return 0;
 }
 
-
-int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, gehash_t *huge_table, long long * actual_total_bases_inc_marging)
+int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_file_number, int threshold, HashTable *huge_table, long long * actual_total_bases_inc_marging)
 {
 	int file_number, i ,j;
 	int status = NEXT_FILE;
@@ -477,24 +479,27 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	int padding_around_contigs = MAX_READ_LENGTH;
 	*actual_total_bases_inc_marging = padding_around_contigs;
 
-	gehash_t occurance_table;
+	gehash_t occurrence_table;
 	unsigned char * huge_index[1024];
 
 	for(i=0;i<1024;i++)
 	{
-		huge_index[i] = (unsigned char *)malloc(1024*1024); 
-		if(!huge_index[i])
-		{
-			for(j=0;j<i;j++) free(huge_index[j]);
-			SUBREADprintf("ERROR: You need at least one point five gigabytes of memory for building the index.\n");
-			return -1;
+		huge_index[i] = NULL;
+
+		if(0){//memory is allocated when needed. 
+			huge_index[i] = (unsigned char *)malloc(1024*1024); 
+			
+			if(!huge_index[i])
+			{
+				for(j=0;j<i;j++) free(huge_index[j]);
+				SUBREADprintf("ERROR: You need at least one point five gigabytes of memory for building the index.\n");
+				return -1;
+			}
+			memset(huge_index[i], 0 , 1024*1024);
 		}
-		memset(huge_index[i], 0 , 1024*1024);
 	}
 
-
-	if(gehash_create(&occurance_table , 100000000, 0)) return 1;
-
+	if(gehash_create_ex(&occurrence_table, 150000000, 0, SUBINDEX_VER0, 1, 0)) return 1;
 
 	gene_input_t ginp;
 
@@ -577,8 +582,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				if(IS_COLOR_SPACE)
 				{
 					int_key = genekey2color('A',window);
-					if(VALUE_ARRAY_INDEX)
-						array_int_key = genekey2int(window,GENE_SPACE_BASE);
+					array_int_key = genekey2int(window,GENE_SPACE_BASE);
 					last_last_color_base = -1;
 					last_color_base = window[15];
 				}
@@ -593,7 +597,10 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				all_skips ++;
 			else
 			{
-				add_repeated_subread(&occurance_table, int_key, huge_index);
+				int rv = add_repeated_subread(&occurrence_table, int_key, huge_index);
+				if(rv<0) {
+					return -1;
+				}
 			}
 
 
@@ -616,16 +623,12 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 				int_key = int_key << 2;
 
-
 				if (IS_COLOR_SPACE)
 				{
 					if(last_color_base>0)
 						int_key += chars2color(last_color_base, next_char);
-					if(VALUE_ARRAY_INDEX)
-					{
-						array_int_key = array_int_key << 2;
-						array_int_key += base2int (next_char);
-					}
+					array_int_key = array_int_key << 2;
+					array_int_key += base2int (next_char);
 
 					last_last_color_base = last_color_base;
 					last_color_base = next_char;
@@ -655,9 +658,9 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	free(fn);
 
-	for (i=0; i<occurance_table.buckets_number; i++)
+	for (i=0; i<occurrence_table.buckets_number; i++)
 	{
-		struct gehash_bucket * current_bucket = &(occurance_table.buckets[i]);
+		struct gehash_bucket * current_bucket = &(occurrence_table.buckets[i]);
 
 		if(current_bucket -> current_items>=1)
 		{
@@ -665,20 +668,21 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			{
 				if(current_bucket -> item_values [j] > threshold)
 				{
-					if(gehash_insert(huge_table, current_bucket -> item_keys[j], 1)) return 1;
+					HashTablePut(huge_table,NULL+1+ current_bucket -> item_keys[j], NULL+current_bucket -> item_values [j]);
 				}
 			}
 		}
 	}
 
+
 	for(i=0;i<1024;i++)
-		free(huge_index[i]);
-	gehash_destory(&occurance_table);
+		if(huge_index[i])  free(huge_index[i]);
 
+	gehash_destory(&occurrence_table);
 
-	if(huge_table -> current_items)
+	if(huge_table -> numOfElements)
 	{
-		print_in_box(80,0,0,"%llu uninformative subreads were found.", huge_table -> current_items);
+		print_in_box(80,0,0,"%llu uninformative subreads were found.", huge_table -> numOfElements);
 		print_in_box(80,0,0,"These subreads were excluded from index building.");
 	}
 
@@ -1143,12 +1147,21 @@ int main_buildindex(int argc,char ** argv)
 		return -1 ;
 	}
 
+	if(threshold < 5) {
+		SUBREADprintf("The threshold of non-informative reads cannot be less than 5\nThe program has to terminate.\n");
+		return -1;
+	}
 
 	// **********************************************
 	//	print config summary
 	// **********************************************
 
 	print_subread_logo();
+
+	struct sysinfo sinf;
+	sysinfo(&sinf);
+	long long cached_mem = get_sys_mem_info("Cached:");
+	if(cached_mem<0)cached_mem=0;
 
 	SUBREADputs("");
 	print_in_box(80, 1, 1, "setting");
@@ -1158,7 +1171,7 @@ int main_buildindex(int argc,char ** argv)
 
 	if(IS_FORCED_ONE_BLOCK)
 	{
-	print_in_box(80, 0, 0, "              Index split : ns");
+		print_in_box(80, 0, 0, "              Index split : no-split");
 		memory_limit = GENE_SLIDING_STEP==1?22000:11500;
 	}
 	else
@@ -1174,6 +1187,8 @@ int main_buildindex(int argc,char ** argv)
 	print_in_box(80, 0, 0, "         Repeat threshold : %d repeats", threshold);
 	print_in_box(80, 0, 0, "             Gapped index : %s", GENE_SLIDING_STEP>1?"yes":"no");
 	print_in_box(80, 0, 0, "");
+	print_in_box(80, 0, 0, "            System memory : %.1fGB / %.1fGB", (cached_mem + sinf.bufferram+sinf.freeram)*1./1024ll/1024/1024, sinf.totalram*1./1024ll/1024/1024);
+	print_in_box(80, 0, 0, "");
 	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
 	int x1;
@@ -1188,6 +1203,12 @@ int main_buildindex(int argc,char ** argv)
 		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  get_short_fname(fasta_fn) , CHAR_ESC);
 	}
 	print_in_box(80, 0, 0, "");
+	if(cached_mem + sinf.bufferram+sinf.freeram < 3*1024ll*1024*1024){
+		print_in_box(80, 0, 0, "");
+		print_in_box( 80, 0, 0, "  WARNING: the free memory is lower than 3.0GB." );
+		print_in_box( 80, 0, 0, "           the program may run very slow or crash." );
+		print_in_box(80, 0, 0, "");
+	}
 	print_in_box(80, 2, 1, "");
 	SUBREADputs("");
 
@@ -1203,8 +1224,6 @@ int main_buildindex(int argc,char ** argv)
 			STANDALONE_exit(-1);
 		}
 	}
-
-	begin_ftime = miltime();
 
 	for(x1 = strlen(output_file); x1 >=0; x1--){
 		if(output_file[x1]=='/'){
@@ -1236,17 +1255,33 @@ int main_buildindex(int argc,char ** argv)
 	if(!ret)
 	{
 		long long actual_bases=0;
-		gehash_t huge_table;
-		gehash_create(& huge_table, 50000000 * (GENE_SLIDING_STEP==1?3:1), 0);
-		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, &huge_table, &actual_bases);
-		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1,  memory_limit, threshold, &huge_table, chromosome_lengths, actual_bases);
+		HashTable * huge_table;
+		huge_table = HashTableCreate(5000000);
+		unsigned int expected_hash_items = (unsigned int)(memory_limit * 1024.0 / 8.) * 1024 ;
+		unsigned int * bucket_sizes = NULL, total_tables=0;
+		unsigned int bucket_no = calculate_buckets_by_size(expected_hash_items, SUBINDEX_VER2, 0, GENE_SLIDING_STEP);
+		ret = ret || scan_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, huge_table, &actual_bases);
+		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, huge_table, chromosome_lengths, actual_bases, 1, &bucket_sizes, expected_hash_items, bucket_no, &total_tables);
+
+		long long estm_need_memory = estimate_memory_peak( bucket_sizes, bucket_no, total_tables );
+		long long needed_mem =  estm_need_memory + huge_table->numOfElements * sizeof(KeyValuePair) + 560ll*1024*1024 + actual_bases / ((GENE_SLIDING_STEP > 1 ) ?  7:5);
+		if(cached_mem + sinf.bufferram+sinf.freeram < needed_mem){
+			print_in_box(80, 0, 1, "");
+			print_in_box(80, 0, 1, "WARNING: available memory is lower than %.1f GB." ,needed_mem*1./1024l/1024/1024); 
+			print_in_box(80, 0, 1, "         The program may run very slow.");
+			print_in_box(80, 0, 1, "");
+		}
+
+
+		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, huge_table, chromosome_lengths, actual_bases, 0, &bucket_sizes, expected_hash_items, bucket_no, &total_tables);
+
 		if(!ret){
 			print_in_box(80, 0, 1, "Total running time: %.1f minutes.", (miltime()-begin_ftime)/60);
 			print_in_box(89, 0, 1, "Index %c[36m%s%c[0m was successfully built!", CHAR_ESC, output_file, CHAR_ESC);
 		}
-		gehash_destory(& huge_table);
-		//     ^^^^^^^ should be destroy
+		HashTableDestroy(huge_table);
 		free(chromosome_lengths);
+		free(bucket_sizes);
 	}
 
 	unlink(tmp_fa_file);

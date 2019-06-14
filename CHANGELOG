@@ -1,3 +1,6 @@
+14 Jun 2019 - 1.35.8
+(1) Improve buildindex() to largely reduce peak memory use.
+
 7 Jun 2019 - 1.35.7
 (1) Add nreads=-1 to qualityScores() function for using all the reads in the input file.
 

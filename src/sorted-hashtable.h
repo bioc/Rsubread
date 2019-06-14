@@ -42,7 +42,8 @@ int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_tabl
 int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int GENE_SLIDING_STEP, int padding);
 
 // This function puts a data item into the table. If there is duplication, it insert another copy into the table but do not overlap on the old one.
-int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data);
+int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data, unsigned int * bucket_sizes);
+void gehash_try_insert_measure(unsigned int * bucket_sizes, int bucket_no, gehash_key_t key);
 
 // This function does what gehash_insert does, but insert nothing if the key has occured max_key_occurance times.
 int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t data, int max_key_occurance, int prob_replace);
@@ -95,4 +96,7 @@ void assign_best_vote(gene_vote_t * vote, int i, int j);
 void select_best_vote(gene_vote_t * vote);
 void gehash_sort(gehash_t * the_table);
 int gehash_load_option(const char fname [], int option_no, int * result);
+
+// calculate # of buckets for estimaing their sizes.
+unsigned int calculate_buckets_by_size(size_t exp_size, int version, int is_small_tab, int index_gap);
 #endif

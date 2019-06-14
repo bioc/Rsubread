@@ -2011,7 +2011,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 								}
 //								printf("INST: RL=%d; INSL=%d; READ_CUR=%d; IGNORE=%d\n", rl, insert_length, read_cursor , base_ignored_head_tail);
 
-								if(0 && FIXLENstrcmp("NS500643:166:HNCCHBGXY:4:23507:11772:18798", read_name) == 0)
+//#warning " ======= DEBUG OUT ========="
+								if(0 && FIXLENstrcmp("SRR768163.14829906", read_name) == 0)
 									SUBREADprintf("INST: RL=%d; NEED=%d; INSL=%d; READ_CUR=%d; IGNORE=%d; RN=%s\nWRT AT %u (one-based): %s\n\n", rl, need_write, insert_length, read_cursor , base_ignored_head_tail, read_name, insertion_cursor, sequence + read_cursor);
 
 								if(0 && strcmp(chro, "chr12") == 0 && insertion_cursor <= 114788620  && insertion_cursor + insert_length > 114788620){
@@ -2019,8 +2020,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 									SUBREADprintf("INST_114788620 : %s : val=%c ; NEED=%d\n", read_name, sequence[read_pos0], need_write);
 								}
 
-								if(need_write  && insert_length >= 5 && sequence[0]!='*')
-								{
+								if(need_write && sequence[0]!='*') {
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
 									if(!temp_fp) return -1;

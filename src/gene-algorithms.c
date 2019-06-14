@@ -402,7 +402,7 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 			else if(val_len[j]> index_threshold)
 			{
 				gehash_remove(table, vals[j]);
-				gehash_insert(huge_table, vals[j], 1);
+				gehash_insert(huge_table, vals[j], 1, NULL);
 				all_removed += val_len[j];
 			}
 		}

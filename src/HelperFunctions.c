@@ -53,6 +53,39 @@
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
+long long get_sys_mem_info(char * keyword){
+	FILE * mfp = fopen("/proc/meminfo","r");
+	if(mfp==NULL) return -1;
+	char linebuf[1000];
+	long long ret = -1;
+	while(1){
+		char * rret = fgets(linebuf, 999, mfp);
+		if(memcmp( keyword, linebuf, strlen(keyword) ) == 0 && strstr(linebuf," kB")) {
+			ret=0;
+			int ii ,state=0;
+			for(ii=strlen(keyword);; ii++){
+				//SUBREADprintf("CH[%d] = %d '%c' at state %d\n", ii, linebuf[ii], linebuf[ii], state);
+				if(state == 0 && linebuf[ii]==' ') state = 1;
+				if(state == 1 && linebuf[ii]!=' ') state = 2;
+				if(state == 2 && linebuf[ii]==' ') state = 9999;
+
+				if(state == 2 && !isdigit(linebuf[ii])){
+					SUBREADprintf("WRONG MEMORY INFO '%s'\n", linebuf);
+					ret = -1;
+					break;
+				}
+				if(state == 2) ret = ret*10 + ( linebuf[ii] - '0' );
+				if(state >= 9999) {
+					ret *=1024;
+					break;
+				}
+			}
+		}
+		if(!rret) break;
+	}
+	fclose(mfp);
+	return ret;
+}
 
 char * get_short_fname(char * lname){
 	char * ret = lname;

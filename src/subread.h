@@ -272,6 +272,7 @@ typedef struct {
 	int index_gap;
 	int padding;
 	char * malloc_ptr;
+	int free_item_only;
 } gehash_t;
 
 
