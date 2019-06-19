@@ -26,7 +26,9 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#ifndef MACOS
 #include <sys/sysinfo.h>
+#endif
 #include "hashtable.h"
 #include "gene-value-index.h"
 #include "HelperFunctions.h"
@@ -1160,10 +1162,12 @@ int main_buildindex(int argc,char ** argv)
 
 	print_subread_logo();
 
+#ifndef MACOS
 	struct sysinfo sinf;
 	sysinfo(&sinf);
 	long long cached_mem = get_sys_mem_info("Cached:");
 	if(cached_mem<0)cached_mem=0;
+#endif
 
 	SUBREADputs("");
 	print_in_box(80, 1, 1, "setting");
@@ -1189,7 +1193,9 @@ int main_buildindex(int argc,char ** argv)
 	print_in_box(80, 0, 0, "         Repeat threshold : %d repeats", threshold);
 	print_in_box(80, 0, 0, "             Gapped index : %s", GENE_SLIDING_STEP>1?"yes":"no");
 	print_in_box(80, 0, 0, "");
+#ifndef MACOS
 	print_in_box(80, 0, 0, "            System memory : %.1fGB / %.1fGB", (cached_mem + sinf.bufferram+sinf.freeram)*1./1024ll/1024/1024, sinf.totalram*1./1024ll/1024/1024);
+#endif
 	print_in_box(80, 0, 0, "");
 	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
@@ -1204,6 +1210,7 @@ int main_buildindex(int argc,char ** argv)
 		}
 		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  get_short_fname(fasta_fn) , CHAR_ESC);
 	}
+#ifndef MACOS
 	print_in_box(80, 0, 0, "");
 	if(cached_mem + sinf.bufferram+sinf.freeram < 3*1024ll*1024*1024){
 		print_in_box(80, 0, 0, "");
@@ -1211,6 +1218,7 @@ int main_buildindex(int argc,char ** argv)
 		print_in_box( 80, 0, 0, "           the program may run very slow or crash." );
 		print_in_box(80, 0, 0, "");
 	}
+#endif
 	print_in_box(80, 2, 1, "");
 	SUBREADputs("");
 
@@ -1267,12 +1275,14 @@ int main_buildindex(int argc,char ** argv)
 
 		long long estm_need_memory = estimate_memory_peak( bucket_sizes, bucket_no, total_tables );
 		long long needed_mem =  estm_need_memory + huge_table->numOfElements * sizeof(KeyValuePair) + 560ll*1024*1024 + actual_bases / ((GENE_SLIDING_STEP > 1 ) ?  7:5);
+#ifndef MACOS
 		if(cached_mem + sinf.bufferram+sinf.freeram < needed_mem){
 			print_in_box(80, 0, 1, "");
 			print_in_box(80, 0, 1, "WARNING: available memory is lower than %.1f GB." ,needed_mem*1./1024l/1024/1024); 
 			print_in_box(80, 0, 1, "         The program may run very slow.");
 			print_in_box(80, 0, 1, "");
 		}
+#endif
 
 
 		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, huge_table, chromosome_lengths, actual_bases, 0, &bucket_sizes, expected_hash_items, bucket_no, &total_tables);
