@@ -1188,9 +1188,9 @@ int main_buildindex(int argc,char ** argv)
 	print_in_box(80, 0, 0, "         Repeat threshold : %d repeats", threshold);
 	print_in_box(80, 0, 0, "             Gapped index : %s", GENE_SLIDING_STEP>1?"yes":"no");
 	print_in_box(80, 0, 0, "");
-	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
-	print_in_box(80, 0, 0, "");
 	if(free_mem>0)print_in_box(80, 0, 0, "      Free / total memory : %.1fGB / %.1fGB", free_mem*1./1024/1024/1024, total_mem*1./1024/1024/1024);
+	print_in_box(80, 0, 0, "");
+	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
 	int x1;
 	for(x1=0;x1< argc - optind; x1++)
