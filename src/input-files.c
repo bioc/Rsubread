@@ -2020,7 +2020,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 									SUBREADprintf("INST_114788620 : %s : val=%c ; NEED=%d\n", read_name, sequence[read_pos0], need_write);
 								}
 
-								if(need_write && sequence[0]!='*') {
+								if(need_write  && insert_length > 0 && sequence[0]!='*') {
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
 									if(!temp_fp) return -1;

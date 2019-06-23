@@ -545,7 +545,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				float observed_coverage = (ALLbase_MM + ALLbase_MAT) *1./(1. + 2 * parameters -> fisher_exact_testlen) ;
 				double p_cutoff = pow(10, -(observed_coverage/multiplex_base));
 				p_cutoff = min(parameters -> cutoff_upper_bound, p_cutoff);
-				p_cutoff = max(1E-320, p_cutoff);
+				p_cutoff = max(1E-323, p_cutoff);
 
 				int flanking_unmatched = ALLbase_MM;
 				int flanking_matched = ALLbase_MAT;
@@ -566,7 +566,9 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 					SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n    KNOWN-SNP : %d    A 4 > C : %d\n", chro_name, chro_pos ,POIbase_MM, ALLbase_MM,POIbase_MAT, ALLbase_MAT , flanking_unmatched, flanking_matched, 0, 0, p_middle, p_cutoff,  is_snp_bitmap(SNP_bitmap_recorder,i), (POIbase_MM *4 >= POIbase_MAT));
 				}
 
-				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
+			//	#warning " ===================== If a known SNP is at POI, the Fisher's p-value is only compared with the 'upper bound' of the p-value. ====================="
+			//	#warning " ===================== '1 &&' is the switch ========================"
+				if(all_result_needed || ( 1 &&  Known_SNP_here && p_middle < parameters -> cutoff_upper_bound ) ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
 
