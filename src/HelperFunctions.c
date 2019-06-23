@@ -22,7 +22,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <math.h>
-//#include <zutil.h>
+#include <unistd.h>
 
 
 #ifdef MACOS
@@ -35,6 +35,10 @@
 #include <net/if_dl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
+#include <string.h>
+#include <mach/mach.h>
+#include <mach/vm_statistics.h>
 
 #else
 
@@ -43,7 +47,8 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #endif
-#include <unistd.h>
+#include <sys/types.h>
+#include <sys/sysinfo.h>
 #endif
 
 
@@ -53,11 +58,11 @@
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
-long long get_sys_mem_info(char * keyword){
+size_t get_sys_mem_info(char * keyword){
 	FILE * mfp = fopen("/proc/meminfo","r");
 	if(mfp==NULL) return -1;
 	char linebuf[1000];
-	long long ret = -1;
+	size_t ret = -1;
 	while(1){
 		char * rret = fgets(linebuf, 999, mfp);
 		if(memcmp( keyword, linebuf, strlen(keyword) ) == 0 && strstr(linebuf," kB")) {
@@ -2681,3 +2686,31 @@ void main(){
 }
 
 #endif
+
+int get_free_total_mem(size_t * total, size_t * free_mem){
+
+#ifdef FREEBSD
+    return -1;
+#endif
+
+#ifdef MACOS
+    mach_msg_type_number_t count = HOST_VM_INFO_COUNT;
+    vm_statistics_data_t vmstat;
+    int page_size = getpagesize();
+    if(KERN_SUCCESS != host_statistics(mach_host_self(), HOST_VM_INFO, (host_info_t)&vmstat, &count))
+        return -1;
+    //printf("PSIZE=%d\nACT=%u; INACT=%u; FREE=%u\n", page_size, vmstat.active_count, vmstat.inactive_count, vmstat.free_count);
+	size_t btlen = sizeof(*total);
+    sysctl( (int[]) { CTL_HW, HW_MEMSIZE }, 2, total, &btlen, NULL, 0);
+    *free_mem = (vmstat.free_count + vmstat.inactive_count) * 1llu * page_size;
+    return 0;
+#else
+    struct sysinfo sinf;
+    sysinfo(&sinf);
+    size_t cached_mem = get_sys_mem_info("Cached:");
+    if(cached_mem<0)cached_mem=0;
+    *free_mem = cached_mem + sinf.bufferram+sinf.freeram;
+    *total = sinf.totalram;
+    return 0;
+#endif
+}

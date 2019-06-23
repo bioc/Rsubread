@@ -3201,6 +3201,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
+//#warning "====== CHECK PRINTING !!! =========="
 				if(0 && FIXLENstrcmp("simulated.6891609", read_name_1)==0){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);

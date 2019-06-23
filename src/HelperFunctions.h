@@ -235,5 +235,6 @@ void TNbignum_dec(struct bn* n);                             /* Decrement: subtr
 void TNbignum_pow(struct bn* a, struct bn* b, struct bn* c); /* Calculate a^b -- e.g. 2^10 => 1024 */
 void TNbignum_isqrt(struct bn* a, struct bn* b);             /* Integer square root -- e.g. isqrt(5) => 2*/
 void TNbignum_assign(struct bn* dst, struct bn* src);        /* Copy src into dst -- dst := src */
-long long get_sys_mem_info(char * keyword);
+size_t get_sys_mem_info(char * keyword);
+int get_free_total_mem(size_t * total, size_t * free_mem);
 #endif

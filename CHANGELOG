@@ -1,5 +1,8 @@
+24 Jun 2019 - 1.35.10
+(1) Use proper way to calculate the free memory size on Mac OS.
+
 19 Jun 2019 - 1.35.9
-(1) Disable memory checks on Mac OS
+(1) Disable memory checks on Mac OS.
 
 14 Jun 2019 - 1.35.8
 (1) Improve buildindex() to largely reduce peak memory use.
