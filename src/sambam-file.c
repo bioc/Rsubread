@@ -1784,7 +1784,10 @@ int SamBam_writer_sort_buff_one_compare(void * Lbin, void * Rbin){
 // return total reads in bin.
 int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int binlen, int thread_id){
 	int bin_cursor = 0;
-	//SUBREADprintf("WONE : BINLEN=%d, TH=%d\n", binlen, thread_id);
+	if(binlen<1){
+		SUBREADprintf("WONE : BINLEN=%d, TH=%d\n", binlen, thread_id);
+		assert(binlen >0);
+	}
 
 	ArrayList* sort_linear_pos = ArrayListCreate(1000000);
 	ArrayListSetDeallocationFunction(sort_linear_pos,  free);
@@ -1831,7 +1834,7 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	}
 	free(nbin);
 	if(wlen < 1) {
-		SUBREADprintf("ERROR: no space in the temp directory. The program cannot run properly.\n");
+		SUBREADprintf("ERROR: no space (%d bytes) in the temp directory (%s).\nThe program cannot run properly.\n", binlen, tmpfname);
 		writer ->is_internal_error = 1;
 		return -1;
 	}
@@ -2305,8 +2308,10 @@ void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id){
 void SamBam_writer_finalise_one_thread(SamBam_Writer * writer){
 	if(writer -> threads < 2){
 		if(writer -> keep_in_memory){
-			SamBam_writer_sort_buff_one_write(writer, writer -> chunk_buffer, writer -> chunk_buffer_used, -1);
-			writer -> chunk_buffer_used = 0;
+			if(writer -> chunk_buffer_used>0){
+				SamBam_writer_sort_buff_one_write(writer, writer -> chunk_buffer, writer -> chunk_buffer_used, -1);
+				writer -> chunk_buffer_used = 0;
+			}
 		}else{
 			if(writer -> chunk_buffer_used)
 				SamBam_writer_add_chunk(writer, -1);
