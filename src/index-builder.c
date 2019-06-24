@@ -1274,7 +1274,8 @@ int main_buildindex(int argc,char ** argv)
 			print_in_box(80, 0, 1, "         The program may run very slow.");
 			print_in_box(80, 0, 1, "Build a gapped index and/or split index into blocks to reduce memore use.");
 			print_in_box(80, 0, 1, "");
-		}
+		}else
+			print_in_box(80, 0, 0, "%.1f GB of memory is needed for index building." ,needed_mem*1./1024l/1024/1024); 
 
 
 		ret = ret || build_gene_index(output_file, ptr_tmp_fa_file , 1, threshold, huge_table, chromosome_lengths, actual_bases, 0, &bucket_sizes, expected_hash_items, bucket_no, &total_tables);
