@@ -17,17 +17,23 @@ buildindex(basename, reference, gappedIndex = FALSE, indexSplit = FALSE,
 }
 \details{
 This function generates a hash-table index for a reference genome, in which keys are subreads (16mers) and values are their chromosomal locations in the reference genome.
-The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads(Liao et al. 2013).
+The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads (Liao et al. 2019; Liao et al. 2013).
+Index building is an one-off operation.
 
 Highly repetitive subreads (or uninformative subreads) are excluded from the hash table so as to reduce mapping ambiguity.
 \code{TH_subread} specifies the maximal number of times a subread is allowed to occur in the reference genome to be included in hash table.
 
-When an index index is split into multiple blocks, only one block will be loaded into memory at any time during read mapping.
-Therefore the size of memory used during mapping can be controlled.
-The more memory is used in mapping, the faster the mapping speed.
-Generating a one-block full index (eg. setting both \code{gappedIndex} and \code{indexSplit} to \code{FALSE}) will enable the maximum mapping speed to be achieved.
+Maximum mapping speed can be achieved by building a full index for the reference genome.
+By default \code{buildindex} builds a full index.
+Building a gapped index will significantly reduce the memory use, at a modest cost to read mapping time.
+It is recommended to use a gapped index on a personal computer due to the limited amount of computer memory available.
+Memory use can be further reduced by splitting an index to multiple blocks.
+The amount of memory to be used in read mapping is determined at the index building stage.
 
-Once an index is built, it can be re-used in each mapping.
+To build a full index for human/mouse genome, \code{buildindex} function requires 15GB memory.
+When using a full index to map reads to human/mouse genome, \code{\link{align}} and \code{\link{subjunc}} requires 17.8GB memory.
+To build a gapped index for human/mouse genome, \code{buildindex} function only requires 5.7GB memory.
+When using a gapped index to map reads to human/mouse genome, \code{\link{align}} requires 8.2GB memory and \code{\link{subjunc}} requires 8.8GB memory.
 
 Sequences of reference genomes can be downloaded from public databases.
 For instance, primary assembly of human genome GRCh38/hg38 or mouse genome GRCm38/mm10 can be downloaded from the GENCODE database via the following links:
@@ -42,7 +48,7 @@ No value is produced but index files are written to the current working director
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi (2019).
 The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads.
-\emph{Nucleic Acids Research}, doi: 10.1093/nar/gkz114.
+\emph{Nucleic Acids Research}, 47(8):e47.
 \url{http://www.ncbi.nlm.nih.gov/pubmed/30783653}
 
 Yang Liao, Gordon K Smyth and Wei Shi (2013).
