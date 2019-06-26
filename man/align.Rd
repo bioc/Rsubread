@@ -204,9 +204,6 @@ Both \code{align} and \code{subjunc} require 17.8GB of memory for mapping.
 With a gapped index built for human/mouse genome, \code{align} maps ~9 million reads per minute with 10 threads.
 \code{align} requires 8.2GB of memory for mapping and \code{subjunc} requires 8.8GB of memory.
 
-By default, alignments are written to the SAM/BAM files with read mates together but otherwise in an unpredictable order.
-The default is the fastest option, but \code{keepReadOrder=TRUE} will force alignments to be returned in the same order as is in the input file (with mates still together) and \code{sortReadsByCoordinates=TRUE} will return sorted BAM files, which is useful for viewing the BAM files using tools such as IGV or IGB.
-
 The \code{detectSV} argument of \code{align} can be used to detect structural variants (SVs) in genomic DNA sequencing data.
 The \code{reportAllJunctions} argument of \code{subjunc} function can be used for the detection of SVs in RNA-seq data, as well as the detection of non-canonical junctions that do not have the canonical donor/receptor sites.
 For each library, breakpoints detected from SV events are saved to a file with suffix name `.breakpoints.txt', which includes chromosomal coordinates of SV breakpoints and numbers of supporting reads.
@@ -215,18 +212,12 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in the BAM/SAM output.
 }
 \value{
-Both functions return a \code{data.frame} of summary mapping statistics, one column for each library.
-The \code{data.frame} returns the number of reads, mapped reads, uniquely mapped reads, indels and junctions (subjunc only) for each library.
+For each library, mapping results including both aligned and unaligned reads are saved to a file.
+Indels discovered during mapping are saved to a VCF format file (\code{.indel.vcf}).
+\code{subjunc} also outputs a BED format file that contains list of discovered exon-exon junctions (\code{.junction.bed}).
+If \code{detectSV} or \code{reportAllJunctions} options are set to \code{TRUE}, structural variants discovered during read mapping will be reported and saved to a file (\code{.breakpoints.txt}), which includes chromosomal coordinates of breakpoints and number of supporting reads for each breakpoint.
 
-The primary purpose of the functions however is that they write read alignments to the file paths specified by \code{output_file}.
-\code{align} and \code{subjunc} both write BAM or SAM files containing aligned reads.
-If \code{sortReadsByCoordinates=TRUE} and \code{output_format="BAM"} then an index file (with extension \code{.bai} added to the file paths) is also generated for each BAM file.
-
-Both functions also write Variant Call Format files (with extension \code{.indel.vcf}) containing short indels.
-
-\code{subjunc} also writes BED format files (with extension \code{.junction.bed}) containing discovered exon-exon junctions.
-
-If the \code{detectSV} or \code{reportAllJunctions} arguments are \code{TRUE}, then files with extension \code{.breakpoints.txt} are written containing chromosomal coordinates of the breakpoints and the number of supporting reads.
+Other than outputting data to files, \code{align} and \code{subjunc} also return a \code{data.frame} that includes mapping statistics for each library, such as total number of reads, number of mapped reads, number of uniquely mapped reads, number of indels and number of junctions (\code{subjunc} only).
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi (2019).
