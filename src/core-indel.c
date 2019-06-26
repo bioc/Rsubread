@@ -4337,7 +4337,7 @@ int finalise_long_insertions_by_hashtable(global_context_t * global_context)
 	int chro_i;
 	assert(global_context -> index_block_number == 1);
 	unsigned int chro_start_pos = 0;
-	char tmp_fname[350];
+	char tmp_fname[MAX_FILE_NAME_LENGTH+40];
 
 	sprintf(tmp_fname,"%s.reassembly.fa", global_context->config.output_prefix);
 	global_context->long_insertion_FASTA_fp = f_subr_open(tmp_fname ,"wb");
@@ -4403,7 +4403,7 @@ void COREMAIN_SIGINT_hook(int param)
 	int xk1, last_slash = -1;
 	if(_COREMAIN_delete_temp_prefix != NULL)
 	{
-		char del2[300], del_suffix[200], del_name[400];
+		char del2[MAX_FILE_NAME_LENGTH], del_suffix[MAX_FILE_NAME_LENGTH], del_name[MAX_FILE_NAME_LENGTH];
 		SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
 		for(xk1=0; _COREMAIN_delete_temp_prefix[xk1]; xk1++)
 		{

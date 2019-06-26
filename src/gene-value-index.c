@@ -26,11 +26,11 @@
 #include "input-files.h"
 
 
-int gvindex_init(gene_value_index_t * index, unsigned int start_point)
+int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned int total_bases_estimated)
 {
 	index->start_point = start_point;
-	index->memory_block_size = 100000000;
-	index->values = malloc(index->memory_block_size);
+	index->memory_block_size = total_bases_estimated/4+10;
+	index->values = calloc(index->memory_block_size,1);
 	if(!index->values)
 	{
 		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
@@ -141,6 +141,7 @@ void gvindex_set(gene_value_index_t * index, gehash_data_t offset, gehash_key_t 
 	unsigned int offset_byte_margin = offset_byte + (padding / 8 +1);
 	if(index -> memory_block_size <= offset_byte_margin + 2)
 	{
+		assert(index -> memory_block_size> offset_byte_margin+2);
 		index -> memory_block_size *= 1.5;
 		index->values = realloc(index->values, index -> memory_block_size);
 	}

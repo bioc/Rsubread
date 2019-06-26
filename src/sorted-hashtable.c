@@ -34,34 +34,26 @@
 
 #define _gehash_hash(k) ((unsigned int)(k))
 
-int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table)
-{
+
+int gehash_create(gehash_t * the_table, size_t expected_size, char is_small_table) {
 	return gehash_create_ex(the_table, expected_size, is_small_table, SUBINDEX_VER0, 3, 0);
 }
-int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int index_gap, int padding)
-{
-	int expected_bucket_number;
-	int i;
 
-	memset(the_table, 0, sizeof(gehash_t));
+unsigned int calculate_buckets_by_size( size_t expected_size, int version_number, int is_small_table, int index_gap ){
 	if(expected_size ==0)
 		expected_size = GEHASH_DEFAULT_SIZE;
+	int expected_bucket_number = expected_size / GEHASH_BUCKET_LENGTH; 
 
-	// calculate the number of buckets for creating the data structure
-	expected_bucket_number = expected_size / GEHASH_BUCKET_LENGTH; 
+	if(index_gap >= 3) expected_bucket_number /=3;
 
-	if(SUBINDEX_VER1 > version_number)
-	{
+	if(SUBINDEX_VER1 > version_number) {
 		if(expected_bucket_number < 10111 && !is_small_table)expected_bucket_number = 10111;
 		else if(is_small_table)	expected_bucket_number = 4;
-	}
-	else
-	{
-		if(expected_bucket_number < 140003 )expected_bucket_number = 140003;
-	}
+	} else 
+		if(expected_bucket_number <= 0x3ffff )expected_bucket_number = 0x3ffff+4;
 
-	for (;;expected_bucket_number++)
-	{
+
+	for (;;expected_bucket_number++) {
 		int j, valid_v;
 		
 		valid_v = 1;
@@ -77,12 +69,29 @@ int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_t
 			break;
 	}
 
+	//SUBREADprintf("EXP_BUCKS=%u\n",expected_bucket_number);
+
+	return expected_bucket_number;
+}
+
+int gehash_create_ex(gehash_t * the_table, size_t expected_size, char is_small_table, int version_number, int index_gap, int padding) {
+	int expected_bucket_number;
+	int i;
+
+	memset(the_table, 0, sizeof(gehash_t));
+	if(expected_size ==0)
+		expected_size = GEHASH_DEFAULT_SIZE;
+
+	expected_bucket_number = calculate_buckets_by_size(expected_size, version_number, is_small_table, index_gap);
+
+	// calculate the number of buckets for creating the data structure
+
+
 	the_table -> version_number = version_number;
 	the_table -> current_items = 0;
 	the_table -> is_small_table = is_small_table;
 	the_table -> buckets_number = expected_bucket_number;
-	the_table -> buckets = (struct gehash_bucket *)
-			malloc(
+	the_table -> buckets = (struct gehash_bucket *) malloc(
 			  expected_bucket_number *
   			  sizeof(struct gehash_bucket )
 			);
@@ -374,20 +383,30 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 }
 
 #define _gehash_get_bucket(tab, key)  ( (tab) -> buckets + _gehash_hash( key ) % (tab) -> buckets_number )
+#define _gehash_get_bucketNO(tab, key)  ( _gehash_hash( key ) % (tab) -> buckets_number )
 
-int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
+void gehash_try_insert_measure(unsigned int * bucket_sizes, int bucket_no, gehash_key_t key){
+	unsigned int buck_this = _gehash_hash(key)%bucket_no;
+	//if(buck_this == 16305862)SUBREADprintf("Insert bucket : %u/%u -> %u at PTR=%p\n", buck_this, bucket_no, bucket_sizes[buck_this] , bucket_sizes);
+	bucket_sizes[buck_this]++;
+}
+
+int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data, unsigned int * bucket_sizes)
 {
 	struct gehash_bucket * current_bucket;
 	int is_fault = 0;
 
+	//SUBREADprintf("Insert subread : %u/%u\n",   _gehash_hash(key)% the_table->buckets_number,  the_table->buckets_number);
 	current_bucket = _gehash_get_bucket (the_table, key);
 
 	if(the_table->version_number == SUBINDEX_VER0)
 	{
-		if (current_bucket->current_items >= current_bucket->space_size)
-		{
-
+		if (current_bucket->current_items >= current_bucket->space_size) {
 			int bucket_number;
+			if(bucket_sizes){
+				SUBREADprintf("Bucket size was wrongly calculated!\n");
+				return 1;
+			}
 
 			bucket_number = _gehash_hash(key) % the_table -> buckets_number;
 			is_fault = _gehash_resize_bucket(the_table, bucket_number, the_table->is_small_table);
@@ -399,9 +418,21 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 	else
 	{
 		short step_number = key/the_table -> buckets_number;
+		if(current_bucket-> new_item_keys == NULL && bucket_sizes){
+			unsigned int bkno = _gehash_get_bucketNO(the_table, key) ;
+			unsigned char * mem_block = malloc((sizeof(gehash_data_t) + sizeof(short)) * bucket_sizes[ bkno ] ); 
+			current_bucket->item_values = ( gehash_data_t * )mem_block;
+			current_bucket->new_item_keys = ( short*)(mem_block + sizeof(gehash_data_t) *  bucket_sizes[ bkno ]) ;
+			current_bucket->current_items = 0;
+			current_bucket->space_size = bucket_sizes[ bkno ];
+			the_table -> free_item_only = 1;
+		}
 
-		if (current_bucket->current_items >= current_bucket->space_size)
-		{
+		if (current_bucket->current_items >= current_bucket->space_size) {
+			if(bucket_sizes){
+				SUBREADprintf("Bucket [%d] size was wrongly calculated : %d >= %u!\n",  _gehash_get_bucketNO (the_table, key), current_bucket->current_items,  current_bucket->space_size);
+				return 1;
+			}
 
 			int bucket_number;
 			bucket_number = _gehash_hash(key) % the_table -> buckets_number;
@@ -411,8 +442,8 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data)
 				return 1;
 		}
 		current_bucket->new_item_keys[current_bucket->current_items] = step_number;
-
 	}
+
 	current_bucket->item_values[current_bucket->current_items] = data;
 	current_bucket->current_items ++;
 	the_table ->current_items ++;
@@ -451,7 +482,7 @@ int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 
 	}
 
-	gehash_insert(the_table, key, data);
+	gehash_insert(the_table, key, data, NULL);
 	return 0;
 }
 	
@@ -1987,11 +2018,10 @@ void gehash_destory(gehash_t * the_table)
 		struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
 		if (current_bucket -> space_size > 0)
 		{
-			free (current_bucket -> item_keys);
+			if(0==the_table->free_item_only)free (current_bucket -> item_keys);
 			free (current_bucket -> item_values);
 		}
 	}
-
 	free (the_table -> buckets);
 
 	the_table -> current_items = 0;

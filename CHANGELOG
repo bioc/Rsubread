@@ -1,3 +1,8 @@
+26 Jun 2019 - 1.34.4
+(1) Largely reduce memory use in buildindex() by pre-scanning the reference genome and allocating memory accordingly.
+(2) Check the size of free memory and give warning messages in buildindex() if the free memory is insufficient for building the index.
+(3) Improve the voting algorithm in align() and subjunc() to avoid shifted indels.
+
 26 Jun 2019 - 1.34.3
 (1) Update documentation regarding memory use and running time.
 

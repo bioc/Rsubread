@@ -64,7 +64,7 @@
 #define MAX_READ_LENGTH ( 1210 )
 #define MAX_READ_NAME_LEN 200 
 #define MAX_CHROMOSOME_NAME_LEN 200 
-#define MAX_FILE_NAME_LENGTH 300
+#define MAX_FILE_NAME_LENGTH (1000)
 #define FEATURE_NAME_LENGTH 256 
 
 //#warning "============== REMOVE '*1.2' FROM THE NEXT LINE ================"
@@ -272,6 +272,7 @@ typedef struct {
 	int index_gap;
 	int padding;
 	char * malloc_ptr;
+	int free_item_only;
 } gehash_t;
 
 

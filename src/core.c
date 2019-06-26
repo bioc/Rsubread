@@ -861,7 +861,7 @@ int core_main(int argc , char ** argv, int (parse_opts (int , char **, global_co
 
 int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_bam)
 {
-	char temp_file_name[350], *fline=malloc(3000), tmp_readname[MAX_READ_NAME_LEN+1];
+	char temp_file_name[MAX_FILE_NAME_LENGTH+80], *fline=malloc(3000), tmp_readname[MAX_READ_NAME_LEN];
 	short tmp_flags;
 	SamBam_FILE * sambam_reader;
 
@@ -986,7 +986,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n)
 {
 	int is_OK = 0;
-	char temp_file_name[350];
+	char temp_file_name[MAX_FILE_NAME_LENGTH+30];
 	char * linebuff=malloc(3001);
 	gzFile rawfp = gzopen(fname, "r");
 	
@@ -3201,6 +3201,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
+//#warning "====== CHECK PRINTING !!! =========="
 				if(0 && FIXLENstrcmp("simulated.6891609", read_name_1)==0){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
@@ -3803,7 +3804,7 @@ void write_sam_headers(global_context_t * context)
 		SamBam_writer_add_header(context -> output_bam_writer, header_buff, 0);
 		int xk1;
 		int last_offset = 0;
-		char * obuf = malloc(1000+5000);
+		char * obuf = malloc(10000+5000);
 		for(xk1=0; xk1< context->chromosome_table.total_offsets; xk1++)
 		{
 			int seq_len = FETCH_SEQ_LEN(x1);
@@ -3815,10 +3816,10 @@ void write_sam_headers(global_context_t * context)
 
 		if(context->config.read_group_id[0])
 		{
-			snprintf(obuf,620, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
+			snprintf(obuf,10000, "@RG\tID:%s%s",context->config.read_group_id, context->config.read_group_txt);
 			SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		}
-		snprintf(obuf,299+4900, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
+		snprintf(obuf,9999+4900, "@PG\tID:subread\tPN:subread\tVN:%s\tCL:%s", SUBREAD_VERSION, context->rebuilt_command_line);
 		SamBam_writer_add_header(context -> output_bam_writer,obuf, 0);
 		SamBam_writer_finish_header(context -> output_bam_writer);
 		free(obuf);

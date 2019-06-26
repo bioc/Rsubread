@@ -402,7 +402,7 @@ int remove_repeated_reads(gehash_t * table, gehash_t * huge_table, int index_thr
 			else if(val_len[j]> index_threshold)
 			{
 				gehash_remove(table, vals[j]);
-				gehash_insert(huge_table, vals[j], 1);
+				gehash_insert(huge_table, vals[j], 1, NULL);
 				all_removed += val_len[j];
 			}
 		}
@@ -1131,7 +1131,7 @@ void explain_indel_in_middle(gene_allvote_t* allvote, int qid , int pos, char * 
 
 int evaluate_piece(char * piece_str, int chron, int offset, int is_counterpart, int start_pos, int end_pos)
 {
-	char fname[300];
+	char fname[MAX_FILE_NAME_LENGTH];
 	int inner_pos = 0, i;
 	FILE * fp;
 	char next_char=0;
@@ -1474,7 +1474,7 @@ void destroy_offsets(gene_offset_t* offsets)
 
 int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 {
-	char fn[300];
+	char fn[MAX_FILE_NAME_LENGTH];
 	FILE * fp;
 	int n=0;
 	int padding = 0;
@@ -1509,7 +1509,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	{
 		int i=0, step = 0, j=0;
 
-		read_line(299,fp, fn, 0);
+		read_line(MAX_FILE_NAME_LENGTH-1,fp, fn, 0);
 		if (strlen(fn)<2)continue;
 		while (fn[i])
 		{

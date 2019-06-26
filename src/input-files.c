@@ -1737,7 +1737,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 	}
 
 	char * linebuf = malloc(3000);
-	char * tmpfname = malloc(400);
+	char * tmpfname = malloc(MAX_FILE_NAME_LENGTH);
 
 	while(1)
 	{
@@ -1901,8 +1901,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 			int flags = 0, mapping_quality = 0, rl=0;
 			char is_negative_strand = 0;
 			unsigned int pos = 0, pairdist = 0;
-			char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
-			char temp_file_name[MAX_CHROMOSOME_NAME_LEN+20+300];
+			char temp_file_suffix[MAX_FILE_NAME_LENGTH];
+			char temp_file_name[MAX_FILE_NAME_LENGTH];
 			FILE * temp_fp;
 			int repeated = -1, close_now = 0;
 
@@ -2011,7 +2011,8 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 								}
 //								printf("INST: RL=%d; INSL=%d; READ_CUR=%d; IGNORE=%d\n", rl, insert_length, read_cursor , base_ignored_head_tail);
 
-								if(0 && FIXLENstrcmp("NS500643:166:HNCCHBGXY:4:23507:11772:18798", read_name) == 0)
+//#warning " ======= DEBUG OUT ========="
+								if(0 && FIXLENstrcmp("SRR768163.14829906", read_name) == 0)
 									SUBREADprintf("INST: RL=%d; NEED=%d; INSL=%d; READ_CUR=%d; IGNORE=%d; RN=%s\nWRT AT %u (one-based): %s\n\n", rl, need_write, insert_length, read_cursor , base_ignored_head_tail, read_name, insertion_cursor, sequence + read_cursor);
 
 								if(0 && strcmp(chro, "chr12") == 0 && insertion_cursor <= 114788620  && insertion_cursor + insert_length > 114788620){
@@ -2019,8 +2020,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 									SUBREADprintf("INST_114788620 : %s : val=%c ; NEED=%d\n", read_name, sequence[read_pos0], need_write);
 								}
 
-								if(need_write  && insert_length >= 5 && sequence[0]!='*')
-								{
+								if(need_write  && insert_length > 0 && sequence[0]!='*') {
 									sprintf(temp_file_name, "%s%s", temp_file_prefix , temp_file_suffix);
 									temp_fp = get_temp_file_pointer(temp_file_name, fp_table, &close_now);
 									if(!temp_fp) return -1;
@@ -2156,18 +2156,18 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 	(*output_genes)[0].start_offset = 0xffffffff;
 	while(gene_number < MAX_ANNOTATION_EXONS)
 	{
-		char buff[200], this_gene_name[MAX_GENE_NAME_LEN], chromosome_name[MAX_CHROMOSOME_NAME_LEN];
+		char buff[1200], this_gene_name[MAX_GENE_NAME_LEN], chromosome_name[MAX_CHROMOSOME_NAME_LEN];
 		int i = 0, j=0;
 		unsigned int exon_location;
 
-		line_len = read_line(200, fp, buff, 0);	
+		line_len = read_line(1200, fp, buff, 0);	
 
 		if(line_len>0)	//Not EOF
 		{
 			if(!isdigit(buff[0]))	// it is a title line or something else
 				continue;
 		
-			for(i=0; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+			for(i=0; buff[i] != '\t' &&  buff[i] != '\n' && i < 1200; i++)
 				this_gene_name[i] = buff[i];
 			this_gene_name[i] = 0;
 		}
@@ -2186,13 +2186,13 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 
 	
 		// copy chromosome name
-		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 1200; i++)
 			chromosome_name[j++] = buff[i];
 		chromosome_name[j] = 0;
 
 		// start location
 		exon_location = 0;
-		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 200; i++)
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && i < 1200; i++)
 			if(isdigit(buff[i]))
 				exon_location = exon_location*10 + buff[i] - '0';
 
@@ -2205,7 +2205,7 @@ int load_exon_annotation(char * annotation_file_name, gene_t ** output_genes, ge
 
 		// end location
 		exon_location = 0;
-		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && buff[i] && i < 200; i++)
+		for(i++; buff[i] != '\t' &&  buff[i] != '\n' && buff[i] && i < 1200; i++)
 			if(isdigit(buff[i]))
 				exon_location = exon_location*10 + buff[i] - '0';
 
@@ -2266,7 +2266,7 @@ void delete_with_prefix(char * prefix){
 	if(prefix != NULL)
 	{
 		int xk1, last_slash = -1;
-		char del2[300], del_suffix[200], del_name[400];
+		char del2[MAX_FILE_NAME_LENGTH], del_suffix[MAX_FILE_NAME_LENGTH], del_name[MAX_FILE_NAME_LENGTH];
 		for(xk1=0; prefix[xk1]; xk1++)
 		{
 			if(prefix[xk1]=='/') last_slash = xk1;
@@ -4797,7 +4797,7 @@ int  fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	FILE * old_fp = pairer -> input_fp;
 	fseek(old_fp, 0, SEEK_SET);
-	char tmpfname [330], readname[256];
+	char tmpfname [MAX_FILE_NAME_LENGTH+14], readname[256];
 
 	sprintf(tmpfname, "%s.fixbam", pairer -> tmp_file_prefix);
 
@@ -6671,7 +6671,7 @@ int main(int argc, char ** argv)
 	FILE * ifp;
 	unsigned long long int rno=0;
 	short tmp_flags, is_sorted = 1;
-	char buff[3000], tmp_rname[100];
+	char buff[3000], tmp_rname[MAX_FILE_NAME_LENGTH];
 
 	ifp = f_subr_open(argv[1],"r");
 	while(1)

@@ -22,7 +22,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <math.h>
-//#include <zutil.h>
+#include <unistd.h>
 
 
 #ifdef MACOS
@@ -35,6 +35,10 @@
 #include <net/if_dl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
+#include <string.h>
+#include <mach/mach.h>
+#include <mach/vm_statistics.h>
 
 #else
 
@@ -43,7 +47,8 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #endif
-#include <unistd.h>
+#include <sys/types.h>
+#include <sys/sysinfo.h>
 #endif
 
 
@@ -53,6 +58,39 @@
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
+size_t get_sys_mem_info(char * keyword){
+	FILE * mfp = fopen("/proc/meminfo","r");
+	if(mfp==NULL) return -1;
+	char linebuf[1000];
+	size_t ret = -1;
+	while(1){
+		char * rret = fgets(linebuf, 999, mfp);
+		if(memcmp( keyword, linebuf, strlen(keyword) ) == 0 && strstr(linebuf," kB")) {
+			ret=0;
+			int ii ,state=0;
+			for(ii=strlen(keyword);; ii++){
+				//SUBREADprintf("CH[%d] = %d '%c' at state %d\n", ii, linebuf[ii], linebuf[ii], state);
+				if(state == 0 && linebuf[ii]==' ') state = 1;
+				if(state == 1 && linebuf[ii]!=' ') state = 2;
+				if(state == 2 && linebuf[ii]==' ') state = 9999;
+
+				if(state == 2 && !isdigit(linebuf[ii])){
+					SUBREADprintf("WRONG MEMORY INFO '%s'\n", linebuf);
+					ret = -1;
+					break;
+				}
+				if(state == 2) ret = ret*10 + ( linebuf[ii] - '0' );
+				if(state >= 9999) {
+					ret *=1024;
+					break;
+				}
+			}
+		}
+		if(!rret) break;
+	}
+	fclose(mfp);
+	return ret;
+}
 
 char * get_short_fname(char * lname){
 	char * ret = lname;
@@ -2648,3 +2686,31 @@ void main(){
 }
 
 #endif
+
+int get_free_total_mem(size_t * total, size_t * free_mem){
+
+#ifdef FREEBSD
+    return -1;
+#endif
+
+#ifdef MACOS
+    mach_msg_type_number_t count = HOST_VM_INFO_COUNT;
+    vm_statistics_data_t vmstat;
+    int page_size = getpagesize();
+    if(KERN_SUCCESS != host_statistics(mach_host_self(), HOST_VM_INFO, (host_info_t)&vmstat, &count))
+        return -1;
+    //printf("PSIZE=%d\nACT=%u; INACT=%u; FREE=%u\n", page_size, vmstat.active_count, vmstat.inactive_count, vmstat.free_count);
+	size_t btlen = sizeof(*total);
+    sysctl( (int[]) { CTL_HW, HW_MEMSIZE }, 2, total, &btlen, NULL, 0);
+    *free_mem = (vmstat.free_count + vmstat.inactive_count) * 1llu * page_size;
+    return 0;
+#else
+    struct sysinfo sinf;
+    sysinfo(&sinf);
+    size_t cached_mem = get_sys_mem_info("Cached:");
+    if(cached_mem<0)cached_mem=0;
+    *free_mem = cached_mem + sinf.bufferram+sinf.freeram;
+    *total = sinf.totalram;
+    return 0;
+#endif
+}
