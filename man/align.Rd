@@ -186,7 +186,7 @@ chrAliases = NULL)
   \item{chrAliases}{ a character string providing the name of a comma-delimited text file that includes aliases of chromosome names. This file should contain two columns. First column contains names of chromosomes included in the SAF or GTF annotation and second column contains corresponding names of chromosomes in the reference genome. No column headers should be provided. Also note that chromosome names are case sensitive. This file can be used to match chromosome names between the annotation and the reference genome.}
 }
 \details{
-\code{align} and \code{subjunc} are R versions of programs in the Subread suite of programs (\url{http://subread.sourceforge.net}) that implement fast, accurate sequence read alignment based on the "seed-and-vote" mapping paradigm (Liao et al., 2013).
+\code{align} and \code{subjunc} are R versions of programs in the Subread suite of programs (\url{http://subread.sourceforge.net}) that implement fast, accurate sequence read alignment based on the "seed-and-vote" mapping paradigm (Liao et al., 2013; Liao et al., 2019).
 \code{align} is the R version of the command-line program \code{subread-align} and \code{subjunc} is the R version of the command-line program \code{subjunc}.
 
 \code{align} is a general-purpose aligner that can be used to align both genomic DNA-seq reads and RNA-seq reads.
@@ -197,10 +197,12 @@ The main difference between \code{subjunc} and \code{align} for RNA-seq alignmen
 It can detect up to four junction locations in a junction read.
 
 \code{align} and \code{subjunc} can be run with either a full index or a gapped index (see \code{\link{buildindex}} for more details).
-Maximum mapping speed is achieved when a one-block full index is used for mapping.
-
-By default, alignments are written to the SAM/BAM files with read mates together but otherwise in an unpredictable order.
-The default is the fastest option, but \code{keepReadOrder=TRUE} will force alignments to be returned in the same order as is in the input file (with mates still together) and \code{sortReadsByCoordinates=TRUE} will return sorted BAM files, which is useful for viewing the BAM files using tools such as IGV or IGB.
+Maximum mapping speed is achieved when the full index is used.
+With a full index built for human/mouse genome, \code{align} maps ~14 million reads per minute with 10 threads.
+\code{subjunc} is slightly slower than \code{align}.
+Both \code{align} and \code{subjunc} require 17.8GB of memory for mapping.
+With a gapped index built for human/mouse genome, \code{align} maps ~9 million reads per minute with 10 threads.
+\code{align} requires 8.2GB of memory for mapping and \code{subjunc} requires 8.8GB of memory.
 
 The \code{detectSV} argument of \code{align} can be used to detect structural variants (SVs) in genomic DNA sequencing data.
 The \code{reportAllJunctions} argument of \code{subjunc} function can be used for the detection of SVs in RNA-seq data, as well as the detection of non-canonical junctions that do not have the canonical donor/receptor sites.
@@ -210,23 +212,17 @@ For a breakpoint-containing read, mapping of its major sequence segment is descr
 Note that each breakpoint-containing read occupies only one row in the BAM/SAM output.
 }
 \value{
-Both functions return a \code{data.frame} of summary mapping statistics, one column for each library.
-The \code{data.frame} returns the number of reads, mapped reads, uniquely mapped reads, indels and junctions (subjunc only) for each library.
+For each library, mapping results including both aligned and unaligned reads are saved to a file.
+Indels discovered during mapping are saved to a VCF format file (\code{.indel.vcf}).
+\code{subjunc} also outputs a BED format file that contains list of discovered exon-exon junctions (\code{.junction.bed}).
+If \code{detectSV} or \code{reportAllJunctions} options are set to \code{TRUE}, structural variants discovered during read mapping will be reported and saved to a file (\code{.breakpoints.txt}), which includes chromosomal coordinates of breakpoints and number of supporting reads for each breakpoint.
 
-The primary purpose of the functions however is that they write read alignments to the file paths specified by \code{output_file}.
-\code{align} and \code{subjunc} both write BAM or SAM files containing aligned reads.
-If \code{sortReadsByCoordinates=TRUE} and \code{output_format="BAM"} then an index file (with extension \code{.bai} added to the file paths) is also generated for each BAM file.
-
-Both functions also write Variant Call Format files (with extension \code{.indel.vcf}) containing short indels.
-
-\code{subjunc} also writes BED format files (with extension \code{.junction.bed}) containing discovered exon-exon junctions.
-
-If the \code{detectSV} or \code{reportAllJunctions} arguments are \code{TRUE}, then files with extension \code{.breakpoints.txt} are written containing chromosomal coordinates of the breakpoints and the number of supporting reads.
+Other than outputting data to files, \code{align} and \code{subjunc} also return a \code{data.frame} that includes mapping statistics for each library, such as total number of reads, number of mapped reads, number of uniquely mapped reads, number of indels and number of junctions (\code{subjunc} only).
 }
 \references{
 Yang Liao, Gordon K Smyth and Wei Shi (2019).
 The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads.
-\emph{Nucleic Acids Research}, doi: 10.1093/nar/gkz114.
+\emph{Nucleic Acids Research}, 47(8):e47.
 \url{http://www.ncbi.nlm.nih.gov/pubmed/30783653}
 
 Yang Liao, Gordon K Smyth and Wei Shi (2013).

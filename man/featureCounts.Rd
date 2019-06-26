@@ -210,10 +210,14 @@ A list with the following components:
 \item{stat}{ a data frame giving numbers of unassigned reads and the reasons why they are not assigned (eg. ambiguity, multi-mapping, secondary alignment, mapping quality, fragment length, chimera, read duplicate, non-junction and so on), in addition to the number of successfully assigned reads for each library.}
 }
 \references{
-Yang Liao, Gordon K Smyth and Wei Shi (2019). The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads. Nucleic Acids Research, doi: 10.1093/nar/gkz114. [Epub ahead of print].
+Yang Liao, Gordon K Smyth and Wei Shi (2019).
+The R package Rsubread is easier, faster, cheaper and better for alignment and quantification of RNA sequencing reads.
+\emph{Nucleic Acids Research}, 47(8):e47.
 \url{http://www.ncbi.nlm.nih.gov/pubmed/30783653}
 
-Yang Liao, Gordon K Smyth and Wei Shi (2014). featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features. Bioinformatics, 30(7):923-30.
+Yang Liao, Gordon K Smyth and Wei Shi (2014).
+featureCounts: an efficient general-purpose program for assigning sequence reads to genomic features.
+\emph{Bioinformatics}, 30(7):923-30.
 \url{http://www.ncbi.nlm.nih.gov/pubmed/24227677}
 }
 \author{Wei Shi and Yang Liao}
