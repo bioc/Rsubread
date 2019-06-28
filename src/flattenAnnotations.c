@@ -2,23 +2,23 @@
 
    The Subread and Rsubread software packages are free
    software packages:
- 
+
    you can redistribute it and/or modify it under the terms
-   of the GNU General Public License as published by the 
+   of the GNU General Public License as published by the
    Free Software Foundation, either version 3 of the License,
    or (at your option) any later version.
 
    Subread is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty
    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-   
+
    See the GNU General Public License for more details.
 
    Authors: Drs Yang Liao and Wei Shi
 
   ***************************************************************/
-  
-  
+
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,14 +105,14 @@ int flatAnno_do_anno_1R(char * gene_name, char * transcript_name, char * chro_na
 	if(NULL == chro_strand_list_for_gene){
 		char * mem_gene = malloc(strlen(gene_name)+1);
 		strcpy(mem_gene, gene_name);
-	
-		chro_strand_list_for_gene = ArrayListCreate(3);	
+
+		chro_strand_list_for_gene = ArrayListCreate(3);
 		ArrayListSetDeallocationFunction(chro_strand_list_for_gene, free);
 		HashTablePut(context -> gene_to_chro_strand_table, mem_gene, chro_strand_list_for_gene);
 	}
 	int i, found = 0;
 	char chro_strand[MAX_CHROMOSOME_NAME_LEN+10+FEATURE_NAME_LENGTH];
-	sprintf( chro_strand, "%s\t%s\t%c", gene_name,chro_name,is_negative_strand?'-':'+'); 
+	sprintf( chro_strand, "%s\t%s\t%c", gene_name,chro_name,is_negative_strand?'-':'+');
 	for(i=0; i<chro_strand_list_for_gene->numOfElements; i++){
 		char * old_ch_st = ArrayListGet(chro_strand_list_for_gene,i);
 		if(strcmp(old_ch_st, chro_strand) == 0){
@@ -222,7 +222,7 @@ int flatAnno_start(flatAnno_context_t * context){
 		SUBREADprintf("Error: no output file is specified.\n");
 		return -1;
 	}
-	SUBREADprintf("Flatting GTF file: %s\n", context -> GTF_file_name);
+	SUBREADprintf("Flattening GTF file: %s\n", context -> GTF_file_name);
 	SUBREADprintf("Output SAF file: %s\n", context -> output_file_name);
 	context -> output_FP = fopen(context -> output_file_name, "w");
 	if(NULL == context -> output_FP ){
@@ -249,7 +249,7 @@ int R_flattenAnnotations(int argc, char ** argv)
 	strcpy(context.GTF_gene_id_column, "gene_id");
 	strcpy(context.GTF_wanted_feature_type, "exon");
 
-	int option_index = 0,c;	
+	int option_index = 0,c;
 	optind=0;
 	opterr=1;
 	optopt=63;

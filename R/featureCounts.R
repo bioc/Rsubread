@@ -1,6 +1,6 @@
-.R_param_splitor="\027"
-.R_flist_splitor="\026"
-.filepath_maximum_len=990
+.R_param_splitor <- "\027"
+.R_flist_splitor <- "\026"
+.filepath_maximum_len <- 990L
 
 .check_string_param <- function(argu, opt=NULL){
   if(!is.null(argu)){
