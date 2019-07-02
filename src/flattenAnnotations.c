@@ -48,12 +48,16 @@
 #include "seek-zlib.h"
 #include "HelperFunctions.h"
 
+#define MERGING_MODE_CHOPPING 100   // keep all the edges : [100,199] + [150,249] = [100,149], [150,199], [200,249] 
+#define MERGING_MODE_MERGING 0    // just merge into one: [100,199] + [150,249] = [100, 249]
+
 typedef struct{
 	char GTF_gene_id_column[MAX_READ_NAME_LEN];
 	char GTF_wanted_feature_type[MAX_READ_NAME_LEN];
 	char GTF_file_name[MAX_FILE_NAME_LENGTH];
 	char output_file_name[MAX_FILE_NAME_LENGTH];
 	FILE * output_FP;
+	int merging_mode;
 
 	HashTable * gene_to_chro_strand_table;
 	HashTable * gene_chro_strand_to_exons_table;
@@ -88,6 +92,9 @@ void flatAnno_print_usage(){
 	SUBREADputs("  -g <string>    Specify attribute type in GTF annotation. 'gene_id' by default.");
 	SUBREADputs("                 This attribute type is used to group features into meta-");
 	SUBREADputs("                 features.");
+	SUBREADputs("");
+	SUBREADputs("  -C             Merging overlapping exons into multiple non-overlapping exons but");
+	SUBREADputs("                 all the edgs are kept.");
 	SUBREADputs("");
 }
 
@@ -145,6 +152,77 @@ int flatAnno_do_anno_merge_one_array_compare(void * vL, void * vR){
 	return 0;
 }
 
+void flatAnno_do_anno_chop_one_array(void * key, void * hashed_obj, HashTable * tab){
+	ArrayList * this_list = hashed_obj; // each element is a pair of integers defining start and end of an exon.
+	ArrayList * edge_before_me_List = ArrayListCreate( this_list->numOfElements * 2 );
+	int i;
+	for(i=0; i<this_list -> numOfElements; i++){
+		int * curr_2i = this_list -> elementList[ i ];
+		int findi, endi;
+		for(endi = 0; endi < 2; endi++){
+			assert(curr_2i[endi]>0);
+			int search_tag = curr_2i[endi] + endi, found=0;
+
+			for(findi = 0; findi < edge_before_me_List->numOfElements; findi++){
+				if(ArrayListGet(edge_before_me_List,findi)-NULL == search_tag){
+					found = 1;
+					break;
+				}
+			}
+			if(0==found) ArrayListPush(edge_before_me_List, NULL+search_tag);
+		}
+	}
+	ArrayListSort(edge_before_me_List, NULL); 
+	char * continue_after_an_edge = malloc(edge_before_me_List -> numOfElements -1);
+	memset(continue_after_an_edge,0, edge_before_me_List -> numOfElements -1);
+	int missed_gaps = edge_before_me_List->numOfElements -1;
+    for(i=0; i<edge_before_me_List->numOfElements -1; i++){
+		int an_edge_before_me = edge_before_me_List-> elementList[i]-NULL;
+		int j;
+		for(j=0; j<this_list->numOfElements; j++){
+			int * curr_2i = this_list -> elementList[ j ];
+			if( curr_2i[0] <= an_edge_before_me && curr_2i[1] >= an_edge_before_me ) {
+				continue_after_an_edge[i]=1;
+				missed_gaps --;
+				break;
+			}
+		}
+	}
+
+	long old_capacity = this_list -> capacityOfElements, old_items = this_list -> numOfElements;
+	if(edge_before_me_List->numOfElements -1 - missed_gaps > old_capacity){
+		this_list -> elementList = realloc( this_list -> elementList, sizeof(void*) * edge_before_me_List->numOfElements -1 -missed_gaps );
+		this_list -> capacityOfElements = edge_before_me_List->numOfElements -1 -missed_gaps ;
+	}
+
+	int written_i = 0;
+    for(i=0; i<edge_before_me_List->numOfElements -1; i++){
+		int * curr_2i = NULL;
+		//if(edge_before_me_List->elementList[i] - NULL == 108395906)SUBREADprintf("CV_I %d = %ld ~ %ld ; CTN=%d\n", i, edge_before_me_List->elementList[i] - NULL,  edge_before_me_List -> elementList[i+1] -NULL-1, continue_after_an_edge[i]);
+		if(0==continue_after_an_edge[i]){
+		//	SUBREADprintf("NC_I %d ~ [ 0 , %ld ]\n", i, edge_before_me_List->numOfElements -2);
+			assert(i>0 && i<edge_before_me_List->numOfElements -2);
+			assert(continue_after_an_edge[i+1] && continue_after_an_edge[i-1] ); // otherwise it is a singleton edge.
+			continue;
+		}
+
+		if(written_i < old_items){
+			curr_2i = this_list -> elementList[ written_i ];
+		}else{
+			curr_2i = malloc(sizeof(int)*2);
+			this_list -> elementList[ written_i ] = curr_2i;
+		}
+		curr_2i[0] = edge_before_me_List -> elementList[i] -NULL;
+		curr_2i[1] = edge_before_me_List -> elementList[i+1] -NULL-1;
+		written_i++;
+	}
+	assert(written_i == edge_before_me_List->numOfElements -1 - missed_gaps );
+	for(i=written_i; i<old_items; i++) free( this_list -> elementList[i]);
+	this_list -> numOfElements = written_i;
+	ArrayListDestroy(edge_before_me_List);
+	free(continue_after_an_edge);
+}
+
 void flatAnno_do_anno_merge_one_array(void * key, void * hashed_obj, HashTable * tab){
 	ArrayList * this_list = hashed_obj;
 	ArrayListSort(this_list, flatAnno_do_anno_merge_one_array_compare);
@@ -171,7 +249,7 @@ void flatAnno_do_anno_merge_one_array(void * key, void * hashed_obj, HashTable *
 int flatAnno_do_anno_merge_and_write(flatAnno_context_t * context){
 	context -> gene_chro_strand_to_exons_table -> appendix1 = context;
 
-	HashTableIteration(context -> gene_chro_strand_to_exons_table, flatAnno_do_anno_merge_one_array);
+	HashTableIteration(context -> gene_chro_strand_to_exons_table, context -> merging_mode == MERGING_MODE_CHOPPING? flatAnno_do_anno_chop_one_array :flatAnno_do_anno_merge_one_array);
 	ArrayList * all_chro_st_list = HashTableKeyArray(context -> gene_chro_strand_to_exons_table);
 	ArrayListSort(all_chro_st_list, (int(*)(void * , void*))strcmp);
 
@@ -253,8 +331,11 @@ int R_flattenAnnotations(int argc, char ** argv)
 	optind=0;
 	opterr=1;
 	optopt=63;
-	while ((c = getopt_long (argc, argv, "t:g:a:o:v?", long_options, &option_index)) != -1)
+	while ((c = getopt_long (argc, argv, "Ct:g:a:o:v?", long_options, &option_index)) != -1)
 		switch(c) {
+			case 'C':
+				context.merging_mode = MERGING_MODE_CHOPPING;
+				break;
 			case 'o':
 				strcpy(context.output_file_name,  optarg);
 				break;
