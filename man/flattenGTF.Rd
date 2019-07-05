@@ -1,7 +1,7 @@
 \name{flattenGTF}
 \alias{flattenGTF}
 \title{Flatten features provided in a GTF annotation}
-\description{Overlapping features in a GTF annotation, such as overlapping exons from the same gene, are collapsed into a single feature that covers all overlapping features.}
+\description{Overlapping features in a GTF annotation, such as overlapping exons from the same gene, are collapsed into a single feature or multiple non-overlapping features that covers all the overlapping features.}
 \usage{
 flattenGTF(GTFfile, GTF.featureType = "exon", GTF.attrType = "gene_id", method = "merge")
 }
