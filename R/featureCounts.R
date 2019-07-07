@@ -80,9 +80,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		stop("The value of the readShiftSize parameter should not be negative.")
 	}
 
-	if(!(readShiftType %in% c("upstream","downstream","left","right"))){
-		stop("The value of the readShiftType parameter should be one of 'upstream', 'downstream', 'left' and 'right'.")
-	}
+    readShiftType <- match.arg(readShiftType, c("upstream","downstream","left","right"))
 
     if(readExtension5 < 0){
 		stop("The value of the readExtension5 parameter should not be negative.")

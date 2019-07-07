@@ -1,3 +1,6 @@
+8 Jul 2019 - 1.35.15
+(1) Use match.arg() to test the arguments to the method parameter in flattenGTF and the to the readShiftType parameter in featureCounts.
+
 3 Jul 2019 - 1.35.14
 (1) Add the method option to the flattenGTF() function.
 

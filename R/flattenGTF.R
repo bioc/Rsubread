@@ -2,8 +2,8 @@ flattenGTF <- function(GTFfile, GTF.featureType="exon",GTF.attrType="gene_id",me
   .check_string_param(GTF.featureType,"GTF.featureType")
   .check_string_param(GTF.attrType,"GTF.attrType")
   .check_string_param(method,"method")
-  if(!( method %in% c("merge","chop") )) stop("The argument to the method parameter can only be 'merge' or 'chop'.")
 
+  method <- match.arg(method, c("merge","chop"))
   GTFfile <- .check_and_NormPath(GTFfile, mustWork=T, opt="GTFfile")
 
   fout <- file.path(".",paste(".Rsubread_flattenGTF_pid",Sys.getpid(),sep=""))
