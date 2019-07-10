@@ -1,3 +1,6 @@
+11 Jul 2019 - 1.35.17
+(1) Add "Read_Type" and "Singleton" categories into the statistics from the featureCounts() function.
+
 8 Jul 2019 - 1.35.15
 (1) Use match.arg() to test the arguments to the method parameter in flattenGTF and the to the readShiftType parameter in featureCounts.
 

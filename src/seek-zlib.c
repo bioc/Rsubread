@@ -498,6 +498,26 @@ int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 	return line_write_ptr;
 }
 
+int seekgz_next_int8(seekable_zfile_t * fp){
+	if(fp -> blocks_in_chain<1){
+		seekgz_load_more_blocks(fp, -1, NULL);
+		if(fp -> blocks_in_chain<1) return -1;
+	}
+	seekable_decompressed_block_t *cblk = fp -> block_rolling_chain+fp -> block_chain_current_no;
+	int ret = cblk->block_txt[fp-> current_block_txt_read_ptr];
+	fp-> current_block_txt_read_ptr++;
+	if(fp-> current_block_txt_read_ptr == cblk -> block_txt_size){
+		free(cblk->block_txt);
+		free(cblk->linebreak_positions);
+		fp-> current_block_txt_read_ptr = 0;
+		fp -> block_chain_current_no++;
+		if(fp -> block_chain_current_no>= SEEKGZ_CHAIN_BLOCKS_NO) fp -> block_chain_current_no=0;
+		fp->blocks_in_chain --;
+	}
+	return ret<0?256+ret:ret;
+}
+
+
 int seekgz_next_char(seekable_zfile_t * fp){ // MUST BE PROTECTED BY read_lock
 	//SUBREADprintf("gen_next_char: block_in_chain=%d\n", fp -> blocks_in_chain);
 	//if(fp -> blocks_in_chain<3)SUBREADprintf("1CH: %d BLK, %d AVI\n", fp -> blocks_in_chain, fp -> stem.avail_in);

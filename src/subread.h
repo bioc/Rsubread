@@ -427,7 +427,19 @@ typedef struct{
 	unsigned int in_block_text_offset;
 } seekable_position_t;
 
+typedef struct {
+	unsigned long long read_number;
+	int lane_id;
 
+	union{
+		seekable_position_t ** pos_of_bclgzs;
+		unsigned long long * pos_of_bcls;
+	};
+	union{
+		seekable_position_t * pos_of_filtergz;
+		unsigned long long * * pos_of_filter;
+	};
+} input_BLC_pos_t;
 
 typedef struct {
 	char filename [300];
@@ -442,6 +454,7 @@ typedef struct{
 	union{
 		unsigned long long simple_file_position;
 		seekable_position_t seekable_gzip_position;
+		input_BLC_pos_t BCL_position;
 	};
 	char gzfa_last_name[MAX_READ_NAME_LEN];
 } gene_inputfile_position_t;
