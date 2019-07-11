@@ -1945,6 +1945,7 @@ int reverse_flag(int mf){
 	int ret = mf & 3;
 	if(mf & 4) ret |= 8;
 	if(mf & 8) ret |= 4;
+	if((mf & 1)==0) ret |= 4;
 
 	if(mf & 0x10) ret |= 0x20;
 	if(mf & 0x20) ret |= 0x10;
@@ -2505,13 +2506,7 @@ int process_pairer_output(void * pairer_vp, int thread_no, char * bin1, char * b
 			global_context->is_read_too_long_to_SAM_BAM_shown = 1;
 		}
 	}
-	//#warning "++++++ REMOVE THIS RETURN ++++++"
-	//return 0;
 
-	/*if(bin1) convert_bin_to_read( bin1, thread_context -> line_buffer1 , global_context -> sambam_chro_table);
-	else    make_dummy(rname, bin2, thread_context -> line_buffer1,  global_context -> sambam_chro_table);
-	if(bin2) convert_bin_to_read( bin2, thread_context -> line_buffer2 , global_context -> sambam_chro_table );
-	else	make_dummy(rname, bin1, thread_context -> line_buffer2,  global_context -> sambam_chro_table);*/
 	process_line_buffer(global_context, thread_context, bin1, bin2);
 	if(global_context -> do_junction_counting){
 		process_line_junctions(global_context, thread_context, bin1, bin2);
@@ -2811,6 +2806,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		RG_ptr = NULL;
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
+
+		if(global_context -> is_paired_end_mode_assign && (alignment_masks&1)==0) alignment_masks|=8;
+
+		//#warning "========= DEBUG OUTPUT =============="
+		if(0 && FIXLENstrcmp("SEV0112_0155:7:1303:14436:74270", read_name)==0){
+			SUBREADprintf("RTEST:%s R_%d   %p, %p    FLAGS %d\n", read_name, 1+is_second_read, bin1, bin2, alignment_masks);
+		}
 
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 
