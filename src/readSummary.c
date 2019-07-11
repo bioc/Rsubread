@@ -4237,17 +4237,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 }
 
 
-void pairer_unsorted_notification(void * pairer_vp, char * bin1, char * bin2){
-	print_in_box(80,0,0,"");
-	print_in_box(80,0,PRINT_BOX_NOCOLOR_FOR_COLON,"   WARNING: reads from the same pair were found not adjacent to each");
-	print_in_box(80,0,0,"            other in the input (due to read sorting by location or");
-	print_in_box(80,0,0,"            reporting of multi-mapping read pairs).");
-	print_in_box(80,0,0,"");
-	print_in_box(80,0,0,"   Pairing up the read pairs.");
-	print_in_box(80,0,0,"");
-}
-
-
 
 int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, long * et_anno_chr_heads, long * et_bk_end_index, long * et_bk_min_start, long * et_bk_max_end, int read_length)
 {
@@ -4397,7 +4386,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 
 	//#warning " ===================== REMOVE ' 0 && ' FROM NEXT LINE !!!!!! =================="
 	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, !( global_context -> is_read_details_out == FILE_TYPE_BAM ||global_context -> is_read_details_out == FILE_TYPE_SAM ) , !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort, global_context -> assign_reads_to_RG ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context,  global_context -> long_read_minimum_length);
-	SAM_pairer_set_unsorted_notification(&global_context -> read_pairer, pairer_unsorted_notification);
 
 	return 0;
 }
@@ -5633,9 +5621,9 @@ int readSummary(int argc,char *argv[]){
 
 	if(isPEDistChecked && 0==isBothEndRequired){
 		#ifdef MAKE_STANDALONE
-		SUBREADprintf("ERROR: when the '-P' option is specified for checking fragment lengths, the '-B' option must also be specified to require both ends mapped.\n The program terminates without generating results.");
+		SUBREADprintf("ERROR: when the '-P' option is specified for checking fragment lengths, the '-B' option must also be specified to require both ends mapped.\n The program terminates without generating results.\n");
 		#else
-		SUBREADprintf("ERROR: when parameter checkFragLength is set to TRUE, parameter requireBothEndMapped also needs to be set to TRUE.\n The program terminates without generating results.");
+		SUBREADprintf("ERROR: when parameter checkFragLength is set to TRUE, parameter requireBothEndMapped also needs to be set to TRUE.\n The program terminates without generating results.\n");
 		#endif
 		return -1;
 	}

@@ -437,7 +437,7 @@ typedef struct {
 	};
 	union{
 		seekable_position_t * pos_of_filtergz;
-		unsigned long long * * pos_of_filter;
+		unsigned long long pos_of_filter;
 	};
 } input_BLC_pos_t;
 
