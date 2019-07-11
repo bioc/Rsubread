@@ -2822,10 +2822,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		{
 			//skip the read if unmapped (its mate will be skipped as well if paired-end)
 			if( ((!global_context -> is_paired_end_mode_assign) &&  (alignment_masks & SAM_FLAG_UNMAPPED) ) ||
-			    ((alignment_masks & SAM_FLAG_UNMAPPED)   &&  (alignment_masks & SAM_FLAG_MATE_UNMATCHED) && global_context -> is_paired_end_mode_assign) ||
-			    (((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required)
-			  ){
-				  
+			    ((alignment_masks & SAM_FLAG_UNMAPPED)   &&  (alignment_masks & SAM_FLAG_MATE_UNMATCHED) && global_context -> is_paired_end_mode_assign)) { 
 				if(RG_ptr){
 					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
 					fc_read_counters * sumtab = tab4s[1];
@@ -2839,11 +2836,23 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
+		if(((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required){
+				if(RG_ptr){
+					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
+					fc_read_counters * sumtab = tab4s[1];
+					sumtab -> unassigned_singleton++;
+				}else
+					thread_context->read_counters.unassigned_singleton ++;
+
+				if(global_context -> read_details_out_FP)
+					write_read_details_FP(global_context , thread_context ,"Unassigned_Singleton",0, NULL, bin1, bin2);
+				return;
+		}
 
 		if(this_is_inconsistent_read_type){
 			if(global_context -> is_strand_checked){
 				if(global_context -> read_details_out_FP)
-					write_read_details_FP(global_context, thread_context,"Unassigned_Read_Type",-1, NULL, bin1, bin2);
+					write_read_details_FP(global_context, thread_context,"Unassigned_Read_Type", 0, NULL, bin1, bin2);
 				if(RG_ptr){
                     void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
                     fc_read_counters * sumtab = tab4s[1];
