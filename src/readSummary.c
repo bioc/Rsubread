@@ -4771,7 +4771,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	fprintf(fp_out,"\n");
 	char * keys [] ={ "Assigned" ,  "Unassigned_Unmapped", "Unassigned_Read_Type", "Unassigned_Singleton", "Unassigned_MappingQuality", "Unassigned_Chimera", "Unassigned_FragmentLength", "Unassigned_Duplicate", "Unassigned_MultiMapping" , "Unassigned_Secondary",  (global_context->is_split_or_exonic_only == 2)?"Unassigned_Split":"Unassigned_NonSplit", "Unassigned_NoFeatures", "Unassigned_Overlapping_Length", "Unassigned_Ambiguity"};
 
-	for(xk1=0; xk1<12; xk1++)
+	for(xk1=0; xk1<14; xk1++)
 	{
 		fprintf(fp_out,"%s", keys[xk1]);
 		for(i_files = 0; i_files < column_names->numOfElements; i_files ++)
