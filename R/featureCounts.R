@@ -1,3 +1,15 @@
+.R_param_splitor <- "\027"
+.R_flist_splitor <- "\026"
+.filepath_maximum_len <- 990L
+
+.check_string_param <- function(argu, opt=NULL){
+  if(!is.null(argu)){
+    if(any(grepl(.R_param_splitor,  argu))){
+      stop(paste0("Error: the argument for ",opt," contains the internal splitor of featureCounts (\\027). The \\027 character is unallowd in this parameter."))
+    }
+  }
+}
+
 .check_and_NormPath<- function(files, mustWork=F, opt=NULL){
   if(is.na(files) || is.null(files) || class(files) != "character"){
     if( is.null(opt) ){
@@ -14,25 +26,45 @@
       }
     }
   }
+  rv <- normalizePath(files, mustWork = mustWork)
+  if(any(grepl(.R_param_splitor, rv))){
+    stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\027). The \\027 character is unallowd in the file names or in the paths."))
+  }
 
-  normalizePath(files, mustWork = mustWork)
+  if(any(grepl("\t", rv))){
+    stop(paste0("Error: the file path to '",opt,"' contains <TAB> character(s). The TAB character is unallowd in the file names or in the paths."))
+  }
+
+  if(any(grepl(.R_flist_splitor, rv))){
+    stop(paste0("Error: the file path to '",opt,"' contains the internal splitor of featureCounts (\\026). The \\026 character is unallowd in the file names or in the paths."))
+  }
+
+  if(any(nchar(rv)>=.filepath_maximum_len)){
+    errv <- rv[ nchar(rv)>=.filepath_maximum_len ]
+    stop(paste0("Error: the file name and path of ",opt," is longer than ",.filepath_maximum_len," bytes. Beaware that all the file names are normalized to include the full path to the original file. The value is '", errv[1],"'"))
+  }
+  return(rv)
 }
 
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
+    .check_string_param(annot.inbuilt, "annot.inbuilt")
+    .check_string_param(GTF.featureType, "GTF.featureType")
+    .check_string_param(GTF.attrType, "GTF.attrType")
+    .check_string_param(GTF.attrType.extra, "GTF.attrType.extra")
+    .check_string_param(readShiftType, "readShiftType")
+
+    out.base.names <- basename(files)
+    if(any(duplicated(out.base.names))){
+      out.col.names <- files
+    }else{
+      out.col.names <- out.base.names
+    }
+    out.col.names <-gsub("[[:punct:]]+", ".", out.col.names)
+    out.col.names <-gsub(" ", ".", out.col.names)
 
 	if(!is.character(files)) stop("files must be a character vector of file paths")
-
-    files.base.names <- basename(files)
-    if(any(duplicated(files.base.names))){
-		out.column.names <- files
-    }else{
-		out.column.names <- files.base.names
-    }
-    out.column.names <- gsub(" ",".",out.column.names)
-    out.column.names <- gsub("[[:punct:]]+",".",out.column.names)
-
 	files <- .check_and_NormPath(files, mustWork=T, opt="files")
 	if(!is.null(annot.ext) && is.character(annot.ext)) annot.ext <- .check_and_NormPath(annot.ext, mustWork=T, opt="annot.ext")
 	if(!is.null(chrAliases))chrAliases <- .check_and_NormPath(chrAliases, mustWork=T, opt="chrAliases")
@@ -48,9 +80,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		stop("The value of the readShiftSize parameter should not be negative.")
 	}
 
-	if(!(readShiftType %in% c("upstream","downstream","left","right"))){
-		stop("The value of the readShiftType parameter should be one of 'upstream', 'downstream', 'left' and 'right'.")
-	}
+    readShiftType <- match.arg(readShiftType, c("upstream","downstream","left","right"))
 
     if(readExtension5 < 0){
 		stop("The value of the readExtension5 parameter should not be negative.")
@@ -110,7 +140,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 
 	fout <- file.path(".",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
 
-	files_C <- paste(files,collapse=";")
+	files_C <- paste(files,collapse=.R_flist_splitor)
 	
 	if(nchar(files_C) == 0) stop("No read files provided!")
 
@@ -150,25 +180,24 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	if(!is.null(nonOverlapFeature)) max_missing_bases_in_feature <- nonOverlapFeature
 	if(!is.null(GTF.attrType.extra))GTF.attrType.extra_str <- paste(GTF.attrType.extra, collapse="\t")
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize ,sep=",")
-	n <- length(unlist(strsplit(cmd,",")))
+	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize ,sep=.R_param_splitor)
+    #print(cmd)
+	n <- length(unlist(strsplit(cmd, .R_param_splitor )))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
     if(file.exists(fout)){
-		x <- read.delim(fout,stringsAsFactors=FALSE)
-
 		add_attr_numb <- 0
 		if(!is.null(GTF.attrType.extra)) add_attr_numb <- length(GTF.attrType.extra)
 
+		x <- read.delim(fout,stringsAsFactors=FALSE, sep="\t")
 		colnames(x)[1:6] <- c("GeneID","Chr","Start","End","Strand","Length")
-		colnames(x)[(7 + add_attr_numb ): (add_attr_numb + 6+length(out.column.names)) ] <- out.column.names
-
-		x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE)
-		colnames(x_summary)[2:ncol(x_summary)] <- out.column.names
+        colnames(x)[(7 + add_attr_numb ): (add_attr_numb + 6+length(out.col.names)) ] <- out.col.names
+		x_summary <- read.delim(paste(fout,".summary",sep=""), stringsAsFactors=FALSE, sep="\t")
+        colnames(x_summary)[2:ncol(x_summary)] <- out.col.names
 
 		if(juncCounts){
-			x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE)
-			colnames(x_jcounts)[-(1:8)]  <- out.column.names
+			x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE, sep="\t")
+            colnames(x_jcounts)[-(1:8)]  <- out.col.names
 		}
 
 		file.remove(fout)
@@ -189,9 +218,9 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		rownames(y) <- x$GeneID
 
 		if(juncCounts)
-			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=out.column.names, stat=x_summary)
+			z <- list(counts=y,counts_junction=x_jcounts,annotation=x[,1:(6 + add_attr_numb)],targets=out.col.names,stat=x_summary)
 		else
-			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=out.column.names, stat=x_summary)	
+			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=out.col.names,stat=x_summary)	
 		z	
 	}else{
 		stop("No counts were generated.")

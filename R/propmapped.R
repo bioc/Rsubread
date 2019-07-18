@@ -7,24 +7,27 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FA
     out.table.rows <- out.base.names
   }
 
+  out.table.rows <-gsub("[[:punct:]]+", ".", out.table.rows)
+  out.table.rows <-gsub(" ", ".", out.table.rows)
+
   files <- .check_and_NormPath(files, mustWork=T, opt="files")
   if(any(duplicated(files)))stop("Error: duplicated input files are provided. No result is generated.")
   fout <- file.path(".",paste(".Rsubread_propmapped_pid",Sys.getpid(),sep=""))
 
   for(i in 1:length(files)){
-    opt <- paste("-i",files[i],sep=",")
+    opt <- paste("-i",files[i],sep=.R_param_splitor)
 
     if(countFragments)
-    opt <- paste(opt,"-f",sep=",")
+    opt <- paste(opt,"-f",sep=.R_param_splitor)
     if(properlyPaired)
-    opt <- paste(opt,"-p",sep=",")
+    opt <- paste(opt,"-p",sep=.R_param_splitor)
 
     if(verbose)
-    opt <- paste(opt,"-V",sep=",")
+    opt <- paste(opt,"-V",sep=.R_param_splitor)
 
-    opt <- paste(opt,"-o",fout,sep=",")
-    cmd <- paste("propmapped",opt,sep=",")
-    n <- length(unlist(strsplit(cmd,",")))
+    opt <- paste(opt,"-o",fout,sep=.R_param_splitor)
+    cmd <- paste("propmapped",opt,sep=.R_param_splitor)
+    n <- length(unlist(strsplit(cmd,.R_param_splitor)))
     C_args <- .C("R_propmapped_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
   }
 

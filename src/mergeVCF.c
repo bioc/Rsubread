@@ -10,7 +10,7 @@
 #include "gene-algorithms.h" 
 #include "HelperFunctions.h"
 
-char output_file_name[300];
+char output_file_name[MAX_FILE_NAME_LENGTH];
 FILE * output_file_pointer;
 
 static struct option propm_long_options[] =

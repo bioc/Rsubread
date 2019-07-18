@@ -167,13 +167,6 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
     char clinebuf[TRANSCRIPT_FASTA_LINE_WIDTH];
     int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
     if(rlength < 1)break;
-	if(rlength>1 && clinebuf[rlength-2]=='\r'){
-		rlength --;
-		clinebuf[rlength-1]='\n';
-		clinebuf[rlength]=0;
-	}else if(clinebuf[rlength-1]=='\r'){
-		clinebuf[rlength-1]='\n';
-	}
     if(rlength >= TRANSCRIPT_FASTA_LINE_WIDTH -1 || clinebuf[rlength]!='\0' || clinebuf[rlength-1]!='\n'){
       SUBREADprintf("Error: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
       ret = 1;

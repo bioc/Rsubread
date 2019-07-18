@@ -1,5 +1,6 @@
 getInBuiltAnnotation <- function(annotation="mm10")
 {
+     .check_string_param(annotation,"annotation")
 
 	 switch(tolower(as.character(annotation)),
 	    mm9={

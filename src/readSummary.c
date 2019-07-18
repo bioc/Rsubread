@@ -59,6 +59,7 @@
 #define MAX_FC_READ_LENGTH 10001
 #define MAX_HIT_NUMBER (1000*1000*1000)
 #define MAX_EXTRA_COLS 15
+#define FC_FLIST_SPLITOR "\026"
 
 typedef struct{
 	char gene_name[FEATURE_NAME_LENGTH];
@@ -108,6 +109,8 @@ typedef struct {
 	unsigned long long assigned_reads;
 
 	unsigned long long unassigned_unmapped;
+	unsigned long long unassigned_read_type;
+	unsigned long long unassigned_singleton;
 	unsigned long long unassigned_mappingquality;
 	unsigned long long unassigned_chimericreads;
 	unsigned long long unassigned_fragmentlength;
@@ -130,7 +133,6 @@ typedef struct {
 	//unsigned short current_read_length2;
 	unsigned int count_table_size;
 	read_count_type_t * count_table;
-	read_count_type_t unpaired_fragment_no;
 	unsigned int chunk_read_ptr;
 	pthread_t thread_object;
 
@@ -200,7 +202,6 @@ typedef struct {
 
 typedef struct {
 	int is_gene_level;
-	int is_paired_end_input_file;
 	int is_paired_end_mode_assign;
 	int is_multi_overlap_allowed;
 	int restricted_no_multi_overlap;
@@ -214,7 +215,6 @@ typedef struct {
 	int is_SAM_file;
 	int is_read_details_out;
 	int is_junction_no_chro_shown;
-	int is_SEPEmix_warning_shown;
 	int is_unpaired_warning_shown;
 	int is_stake_warning_shown;
 	int is_read_too_long_to_SAM_BAM_shown;
@@ -226,6 +226,7 @@ typedef struct {
 	int long_read_minimum_length;
 	int assign_reads_to_RG;
 	int use_stdin_file;
+	int is_mixed_PE_SE;
 	int disk_is_full;
 	int do_not_sort;
 	int reduce_5_3_ends_to_one;
@@ -284,15 +285,15 @@ typedef struct {
 	int RGnames_capacity;
 	int RGnames_ptr;
 
-	char alias_file_name[300];
-	char input_file_name[300];
+	char alias_file_name[MAX_FILE_NAME_LENGTH];
+	char input_file_name[MAX_FILE_NAME_LENGTH];
 	char * input_file_short_name;
-	char raw_input_file_name[300];
-	char output_file_name[300];
-	char output_file_path[300];
-	char temp_file_dir[300];
-	char read_details_path[300];
-	char annotation_file_screen_output[300];
+	char raw_input_file_name[MAX_FILE_NAME_LENGTH];
+	char output_file_name[MAX_FILE_NAME_LENGTH];
+	char output_file_path[MAX_FILE_NAME_LENGTH];
+	char temp_file_dir[MAX_FILE_NAME_LENGTH];
+	char read_details_path[MAX_FILE_NAME_LENGTH];
+	char annotation_file_screen_output[MAX_FILE_NAME_LENGTH];
 	unsigned char ** gene_name_array;	// gene_internal_number -> gene_name 
 	int input_file_unique;
 
@@ -590,7 +591,7 @@ unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str,
 
 int print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport)
 {
-	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+300), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
+	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+MAX_FILE_NAME_LENGTH), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
 	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
@@ -620,7 +621,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	nfiles = 0;
 	while(1)
 	{
-		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
+		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		nfiles++;
 
@@ -665,13 +666,13 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 
 	while(1)
 	{
-		next_fn = strtok_r(nfiles==0?sam_used:NULL, ";", &tmp_ptr1);
+		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
 
-		char file_chr = 'S';
+		char file_chr = 'o';
 		if(file_probe == -1) file_chr = '?';
-		else if(is_first_read_PE == 1) file_chr = 'P';
+		else if(is_first_read_PE == 1) file_chr = 'o';
 		//file_chr = 'o';
 
 		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
@@ -1704,11 +1705,12 @@ void process_pairer_reset(void * pairer_vp){
 
 		global_context -> thread_contexts[xk1].all_reads = 0;
 		global_context -> thread_contexts[xk1].nreads_mapped_to_exon = 0;
-		global_context -> thread_contexts[xk1].unpaired_fragment_no = 0;
 
 		global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_singleton = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_read_type = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
@@ -1943,6 +1945,7 @@ int reverse_flag(int mf){
 	int ret = mf & 3;
 	if(mf & 4) ret |= 8;
 	if(mf & 8) ret |= 4;
+	if((mf & 1)==0) ret |= 4;
 
 	if(mf & 0x10) ret |= 0x20;
 	if(mf & 0x20) ret |= 0x10;
@@ -2503,13 +2506,7 @@ int process_pairer_output(void * pairer_vp, int thread_no, char * bin1, char * b
 			global_context->is_read_too_long_to_SAM_BAM_shown = 1;
 		}
 	}
-	//#warning "++++++ REMOVE THIS RETURN ++++++"
-	//return 0;
 
-	/*if(bin1) convert_bin_to_read( bin1, thread_context -> line_buffer1 , global_context -> sambam_chro_table);
-	else    make_dummy(rname, bin2, thread_context -> line_buffer1,  global_context -> sambam_chro_table);
-	if(bin2) convert_bin_to_read( bin2, thread_context -> line_buffer2 , global_context -> sambam_chro_table );
-	else	make_dummy(rname, bin1, thread_context -> line_buffer2,  global_context -> sambam_chro_table);*/
 	process_line_buffer(global_context, thread_context, bin1, bin2);
 	if(global_context -> do_junction_counting){
 		process_line_junctions(global_context, thread_context, bin1, bin2);
@@ -2802,7 +2799,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 
 	char * RG_ptr;
-	int me_refID =-1, mate_refID =-1;
+	int me_refID =-1, mate_refID =-1, this_is_inconsistent_read_type = 0;
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++)
 	{
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
@@ -2810,16 +2807,24 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		RG_ptr = NULL;
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
 
+		if(global_context -> is_paired_end_mode_assign && (alignment_masks&1)==0) alignment_masks|=8;
+
+		//#warning "========= DEBUG OUTPUT =============="
+		if(0 && FIXLENstrcmp("SEV0112_0155:7:1303:14436:74270", read_name)==0){
+			SUBREADprintf("RTEST:%s R_%d   %p, %p    FLAGS %d\n", read_name, 1+is_second_read, bin1, bin2, alignment_masks);
+		}
+
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 
+		if(((!global_context -> is_paired_end_mode_assign)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context ->is_paired_end_mode_assign)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
+			if(global_context -> is_mixed_PE_SE == 0) global_context -> is_mixed_PE_SE =1;
+			this_is_inconsistent_read_type = 1;
+		}
 		if(is_second_read == 0)
 		{
 			//skip the read if unmapped (its mate will be skipped as well if paired-end)
 			if( ((!global_context -> is_paired_end_mode_assign) &&  (alignment_masks & SAM_FLAG_UNMAPPED) ) ||
-			    ((alignment_masks & SAM_FLAG_UNMAPPED)   &&  (alignment_masks & SAM_FLAG_MATE_UNMATCHED) && global_context -> is_paired_end_mode_assign) ||
-			    (((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required)
-			  ){
-				  
+			    ((alignment_masks & SAM_FLAG_UNMAPPED)   &&  (alignment_masks & SAM_FLAG_MATE_UNMATCHED) && global_context -> is_paired_end_mode_assign)) { 
 				if(RG_ptr){
 					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
 					fc_read_counters * sumtab = tab4s[1];
@@ -2833,12 +2838,42 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
+		if(((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required){
+				if(RG_ptr){
+					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
+					fc_read_counters * sumtab = tab4s[1];
+					sumtab -> unassigned_singleton++;
+				}else
+					thread_context->read_counters.unassigned_singleton ++;
 
-		if(global_context -> is_paired_end_mode_assign && (!global_context ->is_SEPEmix_warning_shown)){
-			if(((!global_context -> is_paired_end_input_file)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context -> is_paired_end_input_file)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
-				print_in_box(85,0,0,"   %c[31mBoth single-end and paired-end reads were found.", 27);
-				//SUBREADprintf("BAD READ:%s, FLAG=%d\n", read_name, alignment_masks);
-				global_context ->is_SEPEmix_warning_shown = 1;
+				if(global_context -> read_details_out_FP)
+					write_read_details_FP(global_context , thread_context ,"Unassigned_Singleton",0, NULL, bin1, bin2);
+				return;
+		}
+
+		if(this_is_inconsistent_read_type){
+			if(global_context -> is_strand_checked){
+				if(global_context -> read_details_out_FP)
+					write_read_details_FP(global_context, thread_context,"Unassigned_Read_Type", 0, NULL, bin1, bin2);
+				if(RG_ptr){
+                    void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
+                    fc_read_counters * sumtab = tab4s[1];
+					sumtab -> unassigned_read_type++;
+				}else thread_context->read_counters.unassigned_read_type ++;
+		
+				return;	// strand_specific assignment only accept the correct mode of reads.
+			}
+
+			if(global_context -> is_both_end_required && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK )){
+				if(global_context -> read_details_out_FP)
+					write_read_details_FP(global_context , thread_context ,"Unassigned_Singleton",0, NULL, bin1, bin2);
+				if(RG_ptr){
+                    void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
+                    fc_read_counters * sumtab = tab4s[1];
+                    sumtab -> unassigned_singleton++;
+                }else thread_context->read_counters.unassigned_singleton ++;
+
+				return; // when running on PE mode, SE reads are seen as "only one end mapped"
 			}
 		}
 
@@ -2984,7 +3019,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			if(skipped_for_exonic == 1 + global_context -> is_paired_end_mode_assign){
 				if(global_context -> read_details_out_FP)
-					write_read_details_FP(global_context, thread_context, (global_context->is_split_or_exonic_only == 2)?"Unassigned_Hasjunction":"Unassigned_Nonjunction", -1, NULL, bin1, bin2);
+					write_read_details_FP(global_context, thread_context, (global_context->is_split_or_exonic_only == 2)?"Unassigned_Split":"Unassigned_NonSplit", -1, NULL, bin1, bin2);
 
 				if(RG_ptr){
 					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
@@ -2998,7 +3033,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(global_context->is_split_or_exonic_only == 2 && is_junction_read) {
 			if(global_context -> read_details_out_FP)
-				write_read_details_FP(global_context, thread_context,(global_context->is_split_or_exonic_only == 2)?"Unassigned_Hasjunction":"Unassigned_Nonjunction", -1, NULL, bin1, bin2);
+				write_read_details_FP(global_context, thread_context,(global_context->is_split_or_exonic_only == 2)?"Unassigned_Split":"Unassigned_NonSplit", -1, NULL, bin1, bin2);
 			if(RG_ptr){
 				void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
 				fc_read_counters * sumtab = tab4s[1];
@@ -3825,7 +3860,6 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 	int xk1, xk2, ret = 0;
 
 	long long int total_input_reads = 0 ;
-	read_count_type_t unpaired_fragment_no = 0;
 
 	(*nreads_mapped_to_exon)=0;
 
@@ -3880,6 +3914,8 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 					rg_sum_reads->unassigned_nofeatures += rg_thread_sum_reads->unassigned_nofeatures;
 					rg_sum_reads->unassigned_overlapping_length += rg_thread_sum_reads->unassigned_overlapping_length;
 					rg_sum_reads->unassigned_unmapped += rg_thread_sum_reads->unassigned_unmapped;
+					rg_sum_reads->unassigned_singleton += rg_thread_sum_reads->unassigned_singleton;
+					rg_sum_reads->unassigned_read_type += rg_thread_sum_reads->unassigned_read_type;
 					rg_sum_reads->unassigned_mappingquality += rg_thread_sum_reads->unassigned_mappingquality;
 					rg_sum_reads->unassigned_fragmentlength += rg_thread_sum_reads->unassigned_fragmentlength;
 					rg_sum_reads->unassigned_chimericreads += rg_thread_sum_reads->unassigned_chimericreads;
@@ -3934,12 +3970,13 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 
 		total_input_reads += global_context -> thread_contexts[xk1].all_reads;
 		(*nreads_mapped_to_exon) += global_context -> thread_contexts[xk1].nreads_mapped_to_exon;
-		unpaired_fragment_no += global_context -> thread_contexts[xk1].unpaired_fragment_no;
 
 		global_context -> read_counters.unassigned_ambiguous += global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous;
 		global_context -> read_counters.unassigned_nofeatures += global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures;
 		global_context -> read_counters.unassigned_overlapping_length += global_context -> thread_contexts[xk1].read_counters.unassigned_overlapping_length;
 		global_context -> read_counters.unassigned_unmapped += global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped;
+		global_context -> read_counters.unassigned_singleton += global_context -> thread_contexts[xk1].read_counters.unassigned_singleton;
+		global_context -> read_counters.unassigned_read_type += global_context -> thread_contexts[xk1].read_counters.unassigned_read_type;
 		global_context -> read_counters.unassigned_mappingquality += global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality;
 		global_context -> read_counters.unassigned_fragmentlength += global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength;
 		global_context -> read_counters.unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
@@ -3953,6 +3990,8 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		my_read_counter->unassigned_nofeatures += global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures;
 		my_read_counter->unassigned_overlapping_length += global_context -> thread_contexts[xk1].read_counters.unassigned_overlapping_length;
 		my_read_counter->unassigned_unmapped += global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped;
+		my_read_counter->unassigned_singleton += global_context -> thread_contexts[xk1].read_counters.unassigned_singleton;
+		my_read_counter->unassigned_read_type += global_context -> thread_contexts[xk1].read_counters.unassigned_read_type;
 		my_read_counter->unassigned_mappingquality += global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality;
 		my_read_counter->unassigned_fragmentlength += global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength;
 		my_read_counter->unassigned_chimericreads += global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads;
@@ -4004,16 +4043,23 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 
 
 	if(0 == global_context -> is_input_bad_format){
+
+		if(global_context -> is_paired_end_mode_assign){
+			if(global_context -> is_mixed_PE_SE)
+					print_in_box(80,0,0,"   WARNING: Single-end reads were found%s.", global_context -> is_strand_checked?" and excluded":"");
+			else print_in_box(80,0,0,"   Paired-end reads are included.");
+		}
+		if(global_context -> is_paired_end_mode_assign==0){
+			if(global_context -> is_mixed_PE_SE)
+				print_in_box(80,0,0,"   WARNING: Paired-end reads were found%s.", global_context -> is_strand_checked?" and excluded":"");
+			else print_in_box(80,0,0,"   Single-end reads are included.");
+		}
+
 		char pct_str[10];
 		if(total_input_reads>0)
 			sprintf(pct_str,"(%.1f%%%%)", (*nreads_mapped_to_exon)*100./total_input_reads);
 		else	pct_str[0]=0;
 	
-	
-		if(unpaired_fragment_no){
-			print_in_box(80,0,0,"  Not properly paired alignments : %llu", unpaired_fragment_no);
-		}
-
 		int show_summary = 1;
 		if(global_context -> assign_reads_to_RG){
 			if(RGmerged_table -> numOfElements)
@@ -4049,7 +4095,7 @@ void fc_thread_init_input_files(fc_thread_global_context_t * global_context, cha
 
 		char MAC_or_random[13];
 
-		(*out_ptr) = malloc(300);
+		(*out_ptr) = malloc(MAX_FILE_NAME_LENGTH);
 		mac_or_rand_str(MAC_or_random);
 		sprintf(*out_ptr, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
 
@@ -4147,6 +4193,8 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> read_counters.unassigned_nofeatures=0;
 	global_context -> read_counters.unassigned_overlapping_length=0;
 	global_context -> read_counters.unassigned_unmapped=0;
+	global_context -> read_counters.unassigned_read_type=0;
+	global_context -> read_counters.unassigned_singleton=0;
 	global_context -> read_counters.unassigned_mappingquality=0;
 	global_context -> read_counters.unassigned_fragmentlength=0;
 	global_context -> read_counters.unassigned_chimericreads=0;
@@ -4200,17 +4248,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 }
 
 
-void pairer_unsorted_notification(void * pairer_vp, char * bin1, char * bin2){
-	print_in_box(80,0,0,"");
-	print_in_box(80,0,PRINT_BOX_NOCOLOR_FOR_COLON,"   WARNING: reads from the same pair were found not adjacent to each");
-	print_in_box(80,0,0,"            other in the input (due to read sorting by location or");
-	print_in_box(80,0,0,"            reporting of multi-mapping read pairs).");
-	print_in_box(80,0,0,"");
-	print_in_box(80,0,0,"   Pairing up the read pairs.");
-	print_in_box(80,0,0,"");
-}
-
-
 
 int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, long * et_start, long * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, long * et_anno_chr_heads, long * et_bk_end_index, long * et_bk_min_start, long * et_bk_max_end, int read_length)
 {
@@ -4223,7 +4260,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 
 	if(global_context -> is_read_details_out)
 	{
-		char tmp_fname[350], *modified_fname;
+		char tmp_fname[MAX_FILE_NAME_LENGTH+20], *modified_fname;
 		int i=0;
 		char * applied_detail_path = global_context -> output_file_path;
 		if(global_context -> read_details_path[0]) applied_detail_path = global_context -> read_details_path;
@@ -4242,7 +4279,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 				if(modified_fname[i]=='\\' || modified_fname[i]=='/'||modified_fname[i]==' ')modified_fname[i]='.';
 				i++;
 			}
-			char tmp_fname2[350];
+			char tmp_fname2[MAX_FILE_NAME_LENGTH+100];
 			sprintf(tmp_fname2, "%s/%s", applied_detail_path, modified_fname);
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname2, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname2);
@@ -4285,11 +4322,12 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		global_context -> thread_contexts[xk1].all_reads = 0;
 		global_context -> thread_contexts[xk1].chro_name_buff = malloc(CHROMOSOME_NAME_LENGTH);
 
-		global_context -> thread_contexts[xk1].unpaired_fragment_no = 0;
 		global_context -> thread_contexts[xk1].read_counters.assigned_reads = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_ambiguous = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_nofeatures = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_unmapped = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_singleton = 0;
+		global_context -> thread_contexts[xk1].read_counters.unassigned_read_type = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_mappingquality = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_fragmentlength = 0;
 		global_context -> thread_contexts[xk1].read_counters.unassigned_chimericreads = 0;
@@ -4349,8 +4387,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 	}
 
-	char rand_prefix[360];
-	char new_fn[350];
+	char rand_prefix[MAX_FILE_NAME_LENGTH+100];
+	char new_fn[MAX_FILE_NAME_LENGTH+10];
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 	sprintf(rand_prefix, "%s/temp-core-%06u-%s.sam", global_context -> temp_file_dir, getpid(), MAC_or_random);
@@ -4359,7 +4397,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 
 	//#warning " ===================== REMOVE ' 0 && ' FROM NEXT LINE !!!!!! =================="
 	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, !( global_context -> is_read_details_out == FILE_TYPE_BAM ||global_context -> is_read_details_out == FILE_TYPE_SAM ) , !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort, global_context -> assign_reads_to_RG ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context,  global_context -> long_read_minimum_length);
-	SAM_pairer_set_unsorted_notification(&global_context -> read_pairer, pairer_unsorted_notification);
 
 	return 0;
 }
@@ -4712,7 +4749,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 
 void fc_write_final_counts(fc_thread_global_context_t * global_context, const char * out_file, ArrayList * column_names, ArrayList * read_counters, int isCVersion)
 {
-	char fname[300];
+	char fname[MAX_FILE_NAME_LENGTH];
 	int i_files, xk1, disk_is_full = 0;
 
 	sprintf(fname, "%s.summary", out_file);
@@ -4732,9 +4769,9 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 	}
 
 	fprintf(fp_out,"\n");
-	char * keys [] ={ "Assigned" ,  "Unassigned_Unmapped", "Unassigned_MappingQuality", "Unassigned_Chimera", "Unassigned_FragmentLength", "Unassigned_Duplicate", "Unassigned_MultiMapping" , "Unassigned_Secondary",  (global_context->is_split_or_exonic_only == 2)?"Unassigned_Split":"Unassigned_NonSplit", "Unassigned_NoFeatures", "Unassigned_Overlapping_Length", "Unassigned_Ambiguity"};
+	char * keys [] ={ "Assigned" ,  "Unassigned_Unmapped", "Unassigned_Read_Type", "Unassigned_Singleton", "Unassigned_MappingQuality", "Unassigned_Chimera", "Unassigned_FragmentLength", "Unassigned_Duplicate", "Unassigned_MultiMapping" , "Unassigned_Secondary",  (global_context->is_split_or_exonic_only == 2)?"Unassigned_Split":"Unassigned_NonSplit", "Unassigned_NoFeatures", "Unassigned_Overlapping_Length", "Unassigned_Ambiguity"};
 
-	for(xk1=0; xk1<12; xk1++)
+	for(xk1=0; xk1<14; xk1++)
 	{
 		fprintf(fp_out,"%s", keys[xk1]);
 		for(i_files = 0; i_files < column_names->numOfElements; i_files ++)
@@ -5030,7 +5067,8 @@ void print_usage()
 	SUBREADputs("");
 	SUBREADputs("  -p                  If specified, fragments (or templates) will be counted");
 	SUBREADputs("                      instead of reads. This option is only applicable for");
-	SUBREADputs("                      paired-end reads.");
+	SUBREADputs("                      paired-end reads; single-end reads are always counted as");
+    SUBREADputs("                      reads.");
 	SUBREADputs("");
 	SUBREADputs("  -B                  Only count read pairs that have both ends aligned.");
 	SUBREADputs("");
@@ -5272,7 +5310,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	merge_sort(key_list,  merged_junction_table -> numOfElements , junckey_sort_compare, junckey_sort_exchange, junckey_sort_merge);
 
-	char outfname[300];
+	char outfname[MAX_FILE_NAME_LENGTH];
 	sprintf(outfname, "%s.jcounts", output_file_name);
 
 	int max_junction_genes = 3000;
@@ -5455,7 +5493,7 @@ int Input_Files_And_Strand_Mode_Pair(char * fnames, char * smodes){
 	if(strstr(smodes, ".")==NULL){
 		bad_fmt = smodes[0]<'0' || smodes[0]>'2';
 	}else{
-		while('\0'!=(ch=*(fnames++)))if(ch == ';')ret++;
+		while('\0'!=(ch=*(fnames++)))if(ch == FC_FLIST_SPLITOR[0])ret++;
 		while('\0'!=(ch=*(smodes++))){
 			if(ch == '.'){
 				if(numbs != 1) bad_fmt = 1;
@@ -5590,6 +5628,17 @@ int readSummary(int argc,char *argv[]){
 	if(argc > 16)
 		isPEDistChecked = atoi(argv[16]);
 	else	isPEDistChecked = 0;
+
+
+	if(isPEDistChecked && 0==isBothEndRequired){
+		#ifdef MAKE_STANDALONE
+		SUBREADprintf("ERROR: when the '-P' option is specified for checking fragment lengths, the '-B' option must also be specified to require both ends mapped.\n The program terminates without generating results.\n");
+		#else
+		SUBREADprintf("ERROR: when parameter checkFragLength is set to TRUE, parameter requireBothEndMapped also needs to be set to TRUE.\n The program terminates without generating results.\n");
+		#endif
+		return -1;
+	}
+
 	if(argc > 17)
 		nameFeatureTypeColumn = argv[17];
 	else	nameFeatureTypeColumn = "exon";
@@ -5856,7 +5905,7 @@ int readSummary(int argc,char *argv[]){
 	char * is_unique = malloc(strlen(file_name_ptr)+1);
 	strcpy(file_list_used, file_name_ptr);
 	for(x1 = 0;;x1++){
-		char * test_fn = strtok_r(x1?NULL:file_list_used,";", &tmp_pntr);
+		char * test_fn = strtok_r(x1?NULL:file_list_used, FC_FLIST_SPLITOR, &tmp_pntr);
 		if(NULL == test_fn) break; 
 		char * short_fname = get_short_fname(test_fn);
 		strcpy(file_list_used2, file_name_ptr);
@@ -5865,7 +5914,7 @@ int readSummary(int argc,char *argv[]){
 		char * loop_ptr = NULL;
 		int x2;
 		for(x2 = 0;;x2++){
-			char * test_loopfn = strtok_r(x2?NULL:file_list_used2, ";", &loop_ptr);
+			char * test_loopfn = strtok_r(x2?NULL:file_list_used2, FC_FLIST_SPLITOR, &loop_ptr);
 			if(NULL == test_loopfn) break;
 			if(x1==x2)continue;
 
@@ -5881,7 +5930,7 @@ int readSummary(int argc,char *argv[]){
 
 	tmp_pntr = NULL;
 	strcpy(file_list_used, file_name_ptr);
-	char * next_fn = strtok_r(file_list_used,";", &tmp_pntr);
+	char * next_fn = strtok_r(file_list_used, FC_FLIST_SPLITOR, &tmp_pntr);
 	char * next_strand_mode = strtok_r(strand_mode_list, ".", &tmp_smode_ptr);
 	int one_single_strand_mode = -1;
 	if(NULL == strstr( global_context.strand_check_mode, "." )){
@@ -6008,7 +6057,7 @@ int readSummary(int argc,char *argv[]){
 			total_written_coulmns ++;
 		}
 		global_context.is_paired_end_mode_assign = orininal_isPE;
-		next_fn = strtok_r(NULL, ";", &tmp_pntr);
+		next_fn = strtok_r(NULL, FC_FLIST_SPLITOR, &tmp_pntr);
 
 		if(strstr( global_context.strand_check_mode, "." )) next_strand_mode = strtok_r(NULL, ".", &tmp_smode_ptr);
 		if(global_context.assign_reads_to_RG) free(global_context.RGnames_set);
@@ -6174,57 +6223,30 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	char * line = (char*)calloc(MAX_LINE_LENGTH, 1);
 	char * file_str = "";
 
-		int file_probe = is_certainly_bam_file(global_context->input_file_name, &is_first_read_PE, NULL);
+	int file_probe = is_certainly_bam_file(global_context->input_file_name, &is_first_read_PE, NULL);
 		
-		global_context -> is_paired_end_input_file = is_first_read_PE;
 		// a Singel-end SAM/BAM file cannot be assigned as a PE SAM/BAM file;
 		// but a PE SAM/BAM file may be assigned as a SE file if the user wishes to do so.
-		if(is_first_read_PE==0)
-				global_context -> is_paired_end_mode_assign = 0;
 
-		global_context->is_SAM_file = 1;
-		if(file_probe == 1) global_context->is_SAM_file = 0;
+	global_context->is_SAM_file = 1;
+	if(file_probe == 1) global_context->is_SAM_file = 0;
+	global_context->is_mixed_PE_SE = 0;
 
-		global_context -> start_time = miltime();
+	global_context -> start_time = miltime();
 
-		file_str = "SAM";
-		if(file_probe == 1) file_str = "BAM" ;
-		if(file_probe == -1) file_str = "Unknown";
+	file_str = "SAM";
+	if(file_probe == 1) file_str = "BAM" ;
+	if(file_probe == -1) file_str = "Unknown";
 
-		if(!global_context->redo)
-		{
-			print_in_box(80,0,0,"Process %s file %s...", file_str, global_context -> use_stdin_file? "<STDIN>":get_short_fname(global_context->input_file_name));
-			if(is_first_read_PE)
-				print_in_box(80,0,0,"   Paired-end reads are included.");
-			else
-				print_in_box(80,0,0,"   Single-end reads are included.");
-			if(global_context->is_strand_checked)
-				print_in_box(80,0,0,"   Strand specific : %s", global_context->is_strand_checked==1?"stranded":"reversely stranded");
-		}
-		
-		FILE * exist_fp = f_subr_open( global_context->input_file_name,"r");
-		if(!exist_fp)
-		{
-			print_in_box(80,0,0,"Failed to open file %s",  global_context->input_file_name);
-			print_in_box(80,0,0,"No counts were generated for this file.");
-			print_in_box(80,0,0,"");
-			return -1;
-		}
-		fclose(exist_fp);
-	// Open the SAM/BAM file
-	// Nothing is done if the file does not exist.
-
-	// begin to load-in the data.
 	if(!global_context->redo)
 	{
-		if( global_context->is_paired_end_mode_assign)
-		{
-			print_in_box(80,0,0,"   Assign alignments (paired-end) to features...");
-//				print_in_box(80,0,0,"   Each fragment is counted no more than once.");
-		}
-		else
-			print_in_box(80,0,0,"   Assign alignments to features...");
+		print_in_box(80,0,0,"Process %s file %s...", file_str, global_context -> use_stdin_file? "<STDIN>":get_short_fname(global_context->input_file_name));
+		if(global_context->is_strand_checked)
+			print_in_box(80,0,0,"   Strand specific : %s", global_context->is_strand_checked==1?"stranded":"reversely stranded");
 	}
+		
+	// Open the SAM/BAM file
+	// Nothing is done if the file does not exist.
 
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
 
@@ -6251,12 +6273,12 @@ int feature_count_main(int argc, char ** argv)
 #endif
 {
 	char * Rargv[56];
-	char annot_name[300];
-	char temp_dir[300];
-	char * out_name = malloc(300);
-	char * fasta_contigs_name = malloc(300);
-	char * alias_file_name = malloc(300);
-	char * Rpath = malloc(300);
+	char annot_name[MAX_FILE_NAME_LENGTH];
+	char temp_dir[MAX_FILE_NAME_LENGTH];
+	char * out_name = malloc(MAX_FILE_NAME_LENGTH);
+	char * fasta_contigs_name = malloc(MAX_FILE_NAME_LENGTH);
+	char * alias_file_name = malloc(MAX_FILE_NAME_LENGTH);
+	char * Rpath = malloc(MAX_FILE_NAME_LENGTH);
 	int cmd_rebuilt_size = 2000;
 	char * cmd_rebuilt = malloc(cmd_rebuilt_size);
 	char max_M_str[8];
@@ -6412,10 +6434,6 @@ int feature_count_main(int argc, char ** argv)
 			case 'p':
 				is_PE = 1;
 				break;
-			case 'b':
-				SUBREADprintf("The '-b' option has been deprecated.\n FeatureCounts will automatically examine the file format.\n");
-				is_SAM = 0;
-				break;
 			case 'C':
 				is_Chimeric_Disallowed = 1;
 				break;
@@ -6455,10 +6473,10 @@ int feature_count_main(int argc, char ** argv)
 //				term_strncpy(sam_name, optarg,299);
 //				break;
 			case 'o':
-				term_strncpy(out_name, optarg,299);
+				term_strncpy(out_name, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'a':
-				term_strncpy(annot_name, optarg,299);
+				term_strncpy(annot_name, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 			case 'L':
 				long_read_mode = 1;
@@ -6650,7 +6668,7 @@ int feature_count_main(int argc, char ** argv)
 	for(; optind < argc; optind++)
 	{
 		int curr_strlen = strlen(very_long_file_names);
-		if( very_long_file_names_size - curr_strlen <300)
+		if( very_long_file_names_size - curr_strlen < MAX_FILE_NAME_LENGTH+1)
 		{
 			very_long_file_names_size *=2;
 			//printf("CL=%d ; NS=%d\n", curr_strlen , very_long_file_names_size);
@@ -6658,7 +6676,7 @@ int feature_count_main(int argc, char ** argv)
 		}
 
 		strcat(very_long_file_names, argv[optind]);
-		strcat(very_long_file_names, ";");
+		strcat(very_long_file_names, FC_FLIST_SPLITOR);
 	}
 
 	very_long_file_names[strlen(very_long_file_names)-1]=0;

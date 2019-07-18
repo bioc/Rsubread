@@ -3,6 +3,7 @@ promoterRegions <- function(annotation="mm10", upstream=3000L, downstream=2000L)
 #	Gordon Smyth
 #	24 April 2017
 {
+    .check_string_param(annotation,'annotation')
 #	annotation can be a SAF format data.frame or can be the name of a genome with built-in annotation
 	if(is.character(annotation)) annotation <- getInBuiltAnnotation(annotation)
 

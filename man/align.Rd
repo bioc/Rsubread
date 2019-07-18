@@ -186,7 +186,7 @@ chrAliases = NULL)
   \item{chrAliases}{ a character string providing the name of a comma-delimited text file that includes aliases of chromosome names. This file should contain two columns. First column contains names of chromosomes included in the SAF or GTF annotation and second column contains corresponding names of chromosomes in the reference genome. No column headers should be provided. Also note that chromosome names are case sensitive. This file can be used to match chromosome names between the annotation and the reference genome.}
 }
 \details{
-\code{align} and \code{subjunc} are R versions of programs in the Subread suite of programs (\url{http://subread.sourceforge.net}) that implement fast, accurate sequence read alignment based on the "seed-and-vote" mapping paradigm (Liao et al., 2013; Liao et al., 2019).
+\code{align} and \code{subjunc} are R versions of programs in the Subread suite of programs (\url{http://subread.sourceforge.net}) that implement fast, accurate sequence read alignment based on the "seed-and-vote" mapping paradigm (Liao et al. 2013; Liao et al. 2019).
 \code{align} is the R version of the command-line program \code{subread-align} and \code{subjunc} is the R version of the command-line program \code{subjunc}.
 
 \code{align} is a general-purpose aligner that can be used to align both genomic DNA-seq reads and RNA-seq reads.

@@ -89,7 +89,7 @@ int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, int thresh
 
 		for(i=0;i<block_in_chro; i++)
 		{
-			char temp_file[300];
+			char temp_file[MAX_FILE_NAME_LENGTH];
 			unsigned int block_start_base = BASE_BLOCK_LENGTH * i;
 			int rrtv;
 			sprintf(temp_file , "%s%s-%04u.bin",temp_prefix, chromosomes[chromosome_no].chromosome_name, i);
@@ -225,7 +225,7 @@ int report_remainder(char *in_SAM_file, char *out_SAM_file)
 // This function returns 0 if everything is OK and -1 if memory is overused.
 int repeated_read_removal(char * in_SAM_file, int threshold, char * out_SAM_file, char * temp_location, int threads)
 {
-	char temp_file_prefix[300];
+	char temp_file_prefix[MAX_FILE_NAME_LENGTH];
 	unsigned int real_read_count = 0;
 	chromosome_t * known_chromosomes;
 	
@@ -327,9 +327,9 @@ int main_repeated_test(int argc,char ** argv)
 #endif
 {
 	char c;
-	char input_SAM_file[300];
-	char output_SAM_file[300];
-	char temp_path[300];
+	char input_SAM_file[MAX_FILE_NAME_LENGTH];
+	char output_SAM_file[MAX_FILE_NAME_LENGTH];
+	char temp_path[MAX_FILE_NAME_LENGTH];
 	int threshold, optindex = 0;
 	int threads;
 
@@ -368,16 +368,16 @@ int main_repeated_test(int argc,char ** argv)
 				break;
 
 			case 'i':
-				strncpy(input_SAM_file, optarg,299);
+				strncpy(input_SAM_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'o':
-				strncpy(output_SAM_file, optarg,299);
+				strncpy(output_SAM_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 
 			case 't':
-				strncpy(temp_path,  optarg,299);
+				strncpy(temp_path,  optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 

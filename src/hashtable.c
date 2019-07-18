@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.32 2019/01/31 03:15:09 cvs Exp $
+ * $Id: hashtable.c,v 9999.34 2019/07/02 12:03:19 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -116,6 +116,12 @@ void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator
 	list -> elemDeallocator = elem_deallocator;
 }
 
+int ArrayListSort_comp_pntr( void * L_elem, void * R_elem ){
+	if( L_elem > R_elem )return 1;
+	if( L_elem < R_elem )return -1;
+	return 0;
+}
+
 int ArrayListSort_compare(void * sortdata0, int L, int R){
 	void ** sortdata = sortdata0;
 	ArrayList * list = sortdata[0];
@@ -144,12 +150,17 @@ void ArrayListSort_merge(void * sortdata0, int start, int items, int items2){
 	int write_cursor, read1=start, read2=start+items;
 
 	for(write_cursor = 0; write_cursor < items + items2; write_cursor++){
-		void * Elm1 = list -> elementList[read1];
-		void * Elm2 = list -> elementList[read2];
+		void * Elm1 = (read1 == start + items)? NULL:list -> elementList[read1];
+		void * Elm2 = (read2 == start + items + items2)?NULL:list -> elementList[read2];
 
 		int select_1 = (read1 == start + items)?0:( read2 == start + items + items2 || comp_elems(Elm1, Elm2) < 0 );
 		if(select_1) merged[write_cursor] = list -> elementList[read1++];
 		else merged[write_cursor] = list -> elementList[read2++];
+		if(read2 > start + items + items2){
+			SUBREADprintf("R1: %d < %d ; R2: %d < %d\n", read1,  start + items, read2, start + items + items2);
+		}
+		assert(read2 <=start + items + items2);
+		assert(read1 <=start + items);
 	}
 
 	memcpy(list -> elementList + start, merged, sizeof(void *) * (items + items2));
@@ -159,7 +170,7 @@ void ArrayListSort_merge(void * sortdata0, int start, int items, int items2){
 void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem)){
 	void * sortdata[2];	
 	sortdata[0] = list;
-	sortdata[1] = compare_L_minus_R;
+	sortdata[1] = compare_L_minus_R?compare_L_minus_R:ArrayListSort_comp_pntr;
 
 	merge_sort(sortdata, list -> numOfElements, ArrayListSort_compare, ArrayListSort_exchange, ArrayListSort_merge);
 }

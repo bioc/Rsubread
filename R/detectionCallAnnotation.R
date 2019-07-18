@@ -1,6 +1,4 @@
-detectionCallAnnotation <- function(species="hg", binsize=2000)
-
-{
+detectionCallAnnotation <- function(species="hg", binsize=2000) {
 	if (species=="hg"){
 		exonfile <- "hg19_exon.txt"
 		irfile <- "hg19_integenic_region.txt"

@@ -17,7 +17,7 @@ buildindex(basename, reference, gappedIndex = FALSE, indexSplit = FALSE,
 }
 \details{
 This function generates a hash-table index for a reference genome, in which keys are subreads (16mers) and values are their chromosomal locations in the reference genome.
-The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads (Liao et al. 2013; Liao et al. 2019).
+The built index can then be used by Subread (\code{\link{align}}) and \code{\link{subjunc}} aligners to map reads (Liao et al. 2019; Liao et al. 2013).
 Index building is an one-off operation.
 
 Highly repetitive subreads (or uninformative subreads) are excluded from the hash table so as to reduce mapping ambiguity.

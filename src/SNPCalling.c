@@ -78,13 +78,13 @@ struct SNP_Calling_Parameters{
 
 	pthread_spinlock_t * output_fp_lock;
 
-	char pile_file_name[300];
+	char pile_file_name[MAX_FILE_NAME_LENGTH];
 	int delete_piles;
 	int disk_is_full;
 
-	char background_input_file[300];
-	char subread_index[300];
-	char known_SNP_vcf[300];
+	char background_input_file[MAX_FILE_NAME_LENGTH];
+	char subread_index[MAX_FILE_NAME_LENGTH];
+	char known_SNP_vcf[MAX_FILE_NAME_LENGTH];
 	unsigned int known_SNPs_number;
 	gene_offset_t * subread_index_offsets;
 	gene_value_index_t * subread_index_array;
@@ -282,10 +282,12 @@ int read_tmp_block(struct SNP_Calling_Parameters * parameters, FILE * tmp_fp, ch
 			}
 			if(!(*SNP_bitmap_recorder))
 			{
-				(*SNP_bitmap_recorder)=malloc((reference_len/8)+2);
-				memset((*SNP_bitmap_recorder), 0 , (reference_len/8)+2);
+				(*SNP_bitmap_recorder)=malloc((reference_len/8)+200);
+				memset((*SNP_bitmap_recorder), 0 , (reference_len/8)+200);
 			}
-			mask_snp_bitmap((*SNP_bitmap_recorder), SNP_rec.pos - block_no * BASE_BLOCK_LENGTH - 1);
+
+			if(SNP_rec.pos >  block_no * BASE_BLOCK_LENGTH && SNP_rec.pos <= block_no * BASE_BLOCK_LENGTH + reference_len )
+   				mask_snp_bitmap((*SNP_bitmap_recorder), SNP_rec.pos - block_no * BASE_BLOCK_LENGTH - 1);
 			parameters -> known_SNPs_number ++;
 			//printf("SNPat: %u\n", SNP_rec.pos);
 		} 
@@ -479,22 +481,19 @@ void fishers_test_on_POI(struct SNP_Calling_Parameters * parameters, float * snp
 	}
 }
 
-#define KEEP_WINDOW_SAME_SIZE 0
-
 void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * snp_fisher_raw, unsigned int * snp_voting_piles, char * referenced_genome, unsigned int  reference_len, double multiplex_base, char * SNP_bitmap_recorder, unsigned short * snp_filter_background_matched, unsigned short * snp_filter_background_unmatched, int all_result_needed, char * chro_name, unsigned int block_start) {
 
-		int i, j, is_fresh_jumppd, remove_old;
-		int a=0, b=0, c=0, d=0, go_ahead = 0, left_tail = 0;
+		int i, j; // all_SNPs_at_pois=0;
+		int POIbase_MM=0, ALLbase_MM=0, POIbase_MAT=0, ALLbase_MAT=0;
 		long long int reference_len_long = reference_len;
 		/**          | POI  | All_Window (inc. POI)
 		 * ----------+------+-------
 		 * #mismatch |  a   |  b
 		 * #matched  |  c   |  d
 		 **/
-		remove_old = 1;
 		for(i= - parameters -> fisher_exact_testlen;i<reference_len_long; i++)
 		{
-			a=0; c=0; is_fresh_jumppd = 1;
+			POIbase_MM=0; POIbase_MAT=0;
 
 			if(i>=0) {
 				char true_value = referenced_genome[i];
@@ -503,88 +502,81 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				for(j=0;j<4;j++)
 				{
 					if(j == true_value_int)
-						c  =  snp_voting_piles[ i * 4 + j ] ;
+						POIbase_MAT  =  snp_voting_piles[ i * 4 + j ] ;
 					else
-						a +=  snp_voting_piles[ i * 4 + j ] ;
+						POIbase_MM +=  snp_voting_piles[ i * 4 + j ] ;
 				}
 
-
-				// if the POI reached in this step is not fresh (known SNPs with < 80% support)
-				if(KEEP_WINDOW_SAME_SIZE && SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i))
-				{
-					is_fresh_jumppd = 0;
-					go_ahead --;
-				}
 			}
 
-			// if the current POI is fresh, then add a new FRESH base into the right window
-			if(is_fresh_jumppd){
-				while(i+parameters -> fisher_exact_testlen+go_ahead < reference_len_long)
+			if(i+parameters -> fisher_exact_testlen < reference_len_long) {
+				int mm=0, pm=0;
+				char true_value = referenced_genome[i + parameters -> fisher_exact_testlen ];
+				int  true_value_int = (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+
+				for(j=0;j<4;j++)
 				{
-					int mm=0, pm=0, is_added = 0;
-					char true_value = referenced_genome[i + parameters -> fisher_exact_testlen + go_ahead];
-					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
-
-					for(j=0;j<4;j++)
-					{
-						if(j == true_value_int)
-							pm = snp_voting_piles[ (i+parameters -> fisher_exact_testlen + go_ahead) *4 + j ] ;
-						else
-							mm += snp_voting_piles[ (i+parameters -> fisher_exact_testlen + go_ahead) *4 + j ] ;
-					}
+					if(j == true_value_int)
+						pm = snp_voting_piles[ (i+parameters -> fisher_exact_testlen ) *4 + j ] ;
+					else
+						mm += snp_voting_piles[ (i+parameters -> fisher_exact_testlen ) *4 + j ] ;
+				}
 
 
-					unsigned int chro_pos = block_start + i + parameters -> fisher_exact_testlen;
-					if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
-						SUBREADprintf("ADD-BASE-AT-RIGHT : %s : %u : KNOWN-SNP : %d  a b c d : %d %d %d %d  A 4 > C : %d\n" , chro_name, chro_pos,  is_snp_bitmap(SNP_bitmap_recorder,i + parameters -> fisher_exact_testlen), a,b,c,d, (a *4 >= c));
-					}
-					// if this is not POI : add this matched/unmatched into "flanking+PoI" counts.
-					if((!SNP_bitmap_recorder)||(!is_snp_bitmap(SNP_bitmap_recorder, go_ahead + i + parameters -> fisher_exact_testlen)))
-					{
-						d += pm;
-						b += mm;
-						is_added = 1;
-					}
-					if(is_added || (!KEEP_WINDOW_SAME_SIZE)) break;
-					else go_ahead++;
+				unsigned int chro_pos = block_start + i + parameters -> fisher_exact_testlen;
+				if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
+					SUBREADprintf("ADD-BASE-AT-RIGHT : %s : %u : KNOWN-SNP : %d  a b c d : %d %d %d %d  A 4 > C : %d\n" , chro_name, chro_pos,  is_snp_bitmap(SNP_bitmap_recorder,i + parameters -> fisher_exact_testlen), POIbase_MM , ALLbase_MM, POIbase_MAT, ALLbase_MAT, (POIbase_MM *4 >= POIbase_MAT));
+				}
+
+				if((!SNP_bitmap_recorder)||(!is_snp_bitmap(SNP_bitmap_recorder, i + parameters -> fisher_exact_testlen))) {
+					ALLbase_MAT += pm;
+					ALLbase_MM += mm;
 				}
 			}
 
 			// test the middle base
 			// a : mismatched at POI ; c : matched at POI
-			if(i>=0 && a > 0){
+			if(i>=0 && POIbase_MM > 0){
+				int Known_SNP_here = (SNP_bitmap_recorder!=NULL) && is_snp_bitmap(SNP_bitmap_recorder,i);
+				//if(Known_SNP_here)
+				//		SUBREADprintf("SNP known at %s:%d\n" , chro_name,  block_start + i);
+				//all_SNPs_at_pois += (Known_SNP_here)?1:0;
 
-				float observed_coverage = (b+d) *1./(1. + 2 * parameters -> fisher_exact_testlen) ;
+				float observed_coverage = (ALLbase_MM + ALLbase_MAT) *1./(1. + 2 * parameters -> fisher_exact_testlen) ;
 				double p_cutoff = pow(10, -(observed_coverage/multiplex_base));
 				p_cutoff = min(parameters -> cutoff_upper_bound, p_cutoff);
-				p_cutoff = max(1E-320, p_cutoff);
+				p_cutoff = max(1E-323, p_cutoff);
 
-				int flanking_unmatched = b-a;
-				int flanking_matched = d-c;
+				int flanking_unmatched = ALLbase_MM;
+				int flanking_matched = ALLbase_MAT;
+				if(SNP_bitmap_recorder == NULL || ! Known_SNP_here){
+					flanking_unmatched -= POIbase_MM;
+					flanking_matched -= POIbase_MAT;
+				}
 
 
 				unsigned int chro_pos = block_start + i;
-				if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
-					SUBREADprintf("KNOWN-SNP-AT-PoI at %s : %u : KNOWN-SNP : %d  a b c d : %d %d %d %d  A 4 > C : %d\n" , chro_name, chro_pos,  is_snp_bitmap(SNP_bitmap_recorder,i), a,b,c,d, (a *4 >= c));
+				if(0 && strcmp("8", chro_name)==0 && chro_pos < 144762490 + 12 && chro_pos > 144762490-12){
+					SUBREADprintf("KNOWN-SNP-AT-PoI at %s : %u : KNOWN-SNP : %d  a b c d : %d %d %d %d  A 4 > C : %d\n" , chro_name, chro_pos,  is_snp_bitmap(SNP_bitmap_recorder,i), POIbase_MM, ALLbase_MM , POIbase_MAT, ALLbase_MAT, (POIbase_MM *4 >= POIbase_MAT));
 				}
 
-				if(0 && SNP_bitmap_recorder && is_snp_bitmap(SNP_bitmap_recorder,i) && (a *4 >= c)) // no reason to include the current POI into the flanking window, even if it is a SNP.
-				{
-					flanking_unmatched = b;
-					flanking_matched = d;
-				}
-
-				float p_middle = fisher_exact_test(a, flanking_unmatched, c, flanking_matched);
+				float p_middle = fisher_exact_test(POIbase_MM, flanking_unmatched, POIbase_MAT, flanking_matched);
 
 				if(0 && chro_pos < 16084550+12 && chro_pos > 16084550-12){
-					SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n    KNOWN-SNP : %d    A 4 > C : %d\n", chro_name, chro_pos ,a,b,c,d, flanking_unmatched, flanking_matched, go_ahead, left_tail, p_middle, p_cutoff,  is_snp_bitmap(SNP_bitmap_recorder,i), (a *4 >= c));
+					SUBREADprintf("TEST: %s : %u  a,b,c,d=%d %d %d %d; FU=%d FM=%d; Goahead=%d; Tailleft=%d; p=%G; p-cut=%G\n    KNOWN-SNP : %d    A 4 > C : %d\n", chro_name, chro_pos ,POIbase_MM, ALLbase_MM,POIbase_MAT, ALLbase_MAT , flanking_unmatched, flanking_matched, 0, 0, p_middle, p_cutoff,  is_snp_bitmap(SNP_bitmap_recorder,i), (POIbase_MM *4 >= POIbase_MAT));
 				}
 
-				if(all_result_needed ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
+				//#warning " ===================== If a known SNP is at POI, the Fisher's p-value is only compared with the 'upper bound' of the p-value. ====================="
+				//#warning " ===================== '1 &&' is the switch ========================"
+				if(all_result_needed || ( 1 &&  Known_SNP_here && p_middle < parameters -> cutoff_upper_bound ) ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
 
 
+				if(flanking_unmatched <0) 
+					SUBREADprintf("ERROR_AB: A=%d, B=%d, C=%d, D=%d, flanking_unmatched=%d\n", POIbase_MM, ALLbase_MM , POIbase_MAT,  ALLbase_MAT,flanking_unmatched);
+				assert(flanking_unmatched>=0);
+				assert(flanking_matched>=0);
 				//if(strcmp(chro_name, "chr20")==0 && block_no  == 3 && i == 57566366-1-3*15000000)
 
 				if(snp_filter_background_unmatched){
@@ -594,47 +586,30 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 				fisher_test_size ++;
 			}else if(i>=0 && all_result_needed) snp_fisher_raw[i]=1.1;
 
-			if(remove_old)
-			{
-				while(i >= parameters -> fisher_exact_testlen + left_tail)
+			if(i >= parameters -> fisher_exact_testlen) {
+				int mm=0, pm=0;
+				char true_value = referenced_genome[i - parameters -> fisher_exact_testlen];
+				int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
+				for(j=0;j<4;j++)
 				{
-					int mm=0, pm=0, is_removed = 0;
-					char true_value = referenced_genome[i - parameters -> fisher_exact_testlen-left_tail];
-					int  true_value_int =  (true_value=='A'?0:(true_value=='C'?1:(true_value=='G'?2:3)));
-					for(j=0;j<4;j++)
-					{
-						if(j == true_value_int)
-							pm = snp_voting_piles[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] ;
-						else
-							mm += snp_voting_piles[ (i-parameters -> fisher_exact_testlen-left_tail) *4 + j ] ;
-					}
-					if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen-left_tail))
-					{
-						d-=pm;
-						b-=mm;
-						is_removed =1;
-					}
-
-					if(is_removed || !KEEP_WINDOW_SAME_SIZE) break;
-					else if(KEEP_WINDOW_SAME_SIZE)	left_tail--;
+					if(j == true_value_int)
+						pm = snp_voting_piles[ (i-parameters -> fisher_exact_testlen) *4 + j ] ;
+					else
+						mm += snp_voting_piles[ (i-parameters -> fisher_exact_testlen) *4 + j ] ;
+				}
+				if((!SNP_bitmap_recorder)||!is_snp_bitmap(SNP_bitmap_recorder, i - parameters -> fisher_exact_testlen)) {
+					ALLbase_MAT-=pm;
+					ALLbase_MM-=mm;
 				}
 			}
-
-			// if a fresh base is at POI, the tail is removed in next step.
-			if(is_fresh_jumppd || !KEEP_WINDOW_SAME_SIZE)
-				remove_old = 1;
-			else{
-				left_tail ++;
-				remove_old = 0; 
-			}
 		}
-
+//		SUBREADprintf("BLOCK_FINISH; SNP found = %d\n", all_SNPs_at_pois);
 }
 
 int process_snp_votes(FILE *out_fp, unsigned int offset , unsigned int reference_len, char * referenced_genome, char * chro_name , char * temp_prefix, struct SNP_Calling_Parameters * parameters)
 {
 	int block_no = (offset -1) / BASE_BLOCK_LENGTH, i, disk_is_full = 0;
-	char temp_file_name[300];
+	char temp_file_name[MAX_FILE_NAME_LENGTH];
 	FILE *tmp_fp;
 	unsigned int * snp_voting_piles, *snp_BGC_piles = NULL;	// offset * 4 + "A/C/G/T"[0,1,2,3]
 	char * SNP_bitmap_recorder = NULL;
@@ -1338,7 +1313,7 @@ void EXSNP_SIGINT_hook(int param)
 		int xk1, last_slash = -1;
 		if(_EXSNP_SNP_delete_temp_prefix != NULL)
 		{
-			char del2[300], del_suffix[200], del_name[400];
+			char del2[MAX_FILE_NAME_LENGTH], del_suffix[MAX_FILE_NAME_LENGTH], del_name[MAX_FILE_NAME_LENGTH];
 			#ifdef MAKE_STANDALONE
 			if(param)
 				SUBREADprintf("\n\nReceived a terminal signal. The temporary files were removed.\n");
@@ -1400,7 +1375,7 @@ void EXSNP_SIGINT_hook(int param)
 
 int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, char * temp_location, unsigned int known_read_count, int threads, struct SNP_Calling_Parameters* parameters)
 {
-	char temp_file_prefix[300];
+	char temp_file_prefix[MAX_FILE_NAME_LENGTH];
 	chromosome_t * known_chromosomes;
 	unsigned int real_read_count=0;
 
@@ -1432,7 +1407,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	if(parameters->subread_index[0])
 	{
-		char table_fn[350];
+		char table_fn[MAX_FILE_NAME_LENGTH+80];
 		parameters -> subread_index_offsets = (gene_offset_t*)malloc(sizeof(gene_offset_t));
 		load_offsets (parameters -> subread_index_offsets, parameters->subread_index);
 
@@ -1449,7 +1424,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		while(1)
 		{
 			int fpos0 = fpos;
-			char one_fn [300];
+			char one_fn [MAX_FILE_NAME_LENGTH];
 			while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
 				fpos++;
 			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
@@ -1482,21 +1457,21 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 		while(1)
 		{
 			int fpos0 = fpos;
-			char one_fn [300];
+			char one_fn [MAX_FILE_NAME_LENGTH];
 			while(in_SAM_file[fpos]!=',' && in_SAM_file[fpos]!=0)
 				fpos++;
 			strncpy(one_fn, in_SAM_file+fpos0, fpos-fpos0);
 			one_fn[fpos-fpos0]=0;
 
-			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table, parameters->known_SNP_vcf, NULL, 1,0, parameters -> use_soft_clipping_bases)) return -1;
+			if(break_SAM_file(one_fn, parameters -> is_BAM_file_input, temp_file_prefix, &real_read_count, &parameters->all_blocks, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, &parameters -> all_mapped_bases, parameters-> cigar_event_table, parameters->known_SNP_vcf, NULL, 0,0, parameters -> use_soft_clipping_bases)) return -1;
 			if(!in_SAM_file[fpos]) break;
 			fpos++;
 		}
 		if(parameters -> background_input_file[0])
 		{
-			char temp_file_prefix2[350];
+			char temp_file_prefix2[MAX_FILE_NAME_LENGTH+80];
 			sprintf(temp_file_prefix2, "%sBGC-", temp_file_prefix);
-			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 1,0, parameters -> use_soft_clipping_bases)) return -1;
+			if(break_SAM_file(parameters -> background_input_file, parameters -> is_BAM_file_input, temp_file_prefix2, NULL, NULL, known_chromosomes, 1, parameters -> bases_ignored_head_tail, parameters->subread_index_array, parameters->subread_index_offsets, NULL, NULL, NULL, NULL, 0,0, parameters -> use_soft_clipping_bases)) return -1;
 		}
 
 
@@ -1504,7 +1479,7 @@ int SNP_calling(char * in_SAM_file, char * out_BED_file, char * in_FASTA_file, c
 
 	parameters -> real_read_count = real_read_count;
 
-	char qfname[330];
+	char qfname[MAX_FILE_NAME_LENGTH+40];
 	sprintf(qfname, "%s.qStatic", temp_file_prefix);
 	parameters -> final_phred_score = 0;
 	if (parameters -> delete_piles)
@@ -1620,9 +1595,9 @@ int main_snp_calling_test(int argc,char ** argv)
 
 	int c;
 	char in_SAM_file[5000];
-	char out_BED_file[300];
-	char temp_path[300];
-	char in_FASTA_file[300];
+	char out_BED_file[MAX_FILE_NAME_LENGTH];
+	char temp_path[MAX_FILE_NAME_LENGTH];
+	char in_FASTA_file[MAX_FILE_NAME_LENGTH];
 	int threads, optindex=0;
 	int t=0, k;
 	struct SNP_Calling_Parameters parameters;
@@ -1744,15 +1719,15 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'g':
-				strncpy(in_FASTA_file, optarg,299);
+				strncpy(in_FASTA_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'i':
-				strncpy(in_SAM_file, optarg,299);
+				strncpy(in_SAM_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'o':
-				strncpy(out_BED_file, optarg,299);
+				strncpy(out_BED_file, optarg,MAX_FILE_NAME_LENGTH-1);
 				break;
 
 			case 'T':
@@ -1769,7 +1744,7 @@ int main_snp_calling_test(int argc,char ** argv)
 				break;
 
 			case 'C':
-				strncpy(temp_path, optarg,299);	
+				strncpy(temp_path, optarg,MAX_FILE_NAME_LENGTH-1);	
 				break;
 
 			case 'r':

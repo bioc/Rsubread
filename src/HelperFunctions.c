@@ -2701,7 +2701,7 @@ int get_free_total_mem(size_t * total, size_t * free_mem){
         return -1;
     //printf("PSIZE=%d\nACT=%u; INACT=%u; FREE=%u\n", page_size, vmstat.active_count, vmstat.inactive_count, vmstat.free_count);
 	size_t btlen = sizeof(*total);
-    sysctl( (int[]) { CTL_HW, HW_MEMSIZE }, 2, total, &btlen, NULL, 0);
+    if(sysctl( (int[]) { CTL_HW, HW_MEMSIZE }, 2, total, &btlen, NULL, 0)) return -1;
     *free_mem = (vmstat.free_count + vmstat.inactive_count) * 1llu * page_size;
     return 0;
 #else

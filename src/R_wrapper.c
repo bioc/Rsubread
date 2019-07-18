@@ -30,6 +30,8 @@
 #endif 
 #include "HelperFunctions.h"
 
+#define PARAM_SPLITTOR "\027"
+
 // ========== This part of code is to run everything in child threads; the main thread is only for screen output ============
 struct R_child_thread_run_opt{
   int (*func)(int , char * []);
@@ -68,6 +70,9 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args, int is_
 }
 // ========== END: main thread screen output ============
 
+extern void retrieve_sequence(char ** input, char ** output_seq);
+extern void atgcContent(char ** input, char ** output, int *basewise);
+extern int detectionCall(int argc, char ** argv);
 extern int main_junction(int argc,char ** argv);
 extern int main_align(int argc,char ** argv);
 extern int main_buildindex(int argc,char ** argv);
@@ -93,10 +98,10 @@ void R_txUnique_wrapper(int * nargs, char ** argv){
 	r_argv = strdup(*argv);
 
 	c_argv = (char **) calloc(n+1,sizeof(char *));
-	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
 	strcpy(c_argv[0],"R_txUnique");
-	strcpy(c_argv[1],strtok(r_argv,"\t"));
-	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,"\t"));
+	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 	R_child_thread_run(TxUniqueMain, n+1,c_argv, 0);
 	free(r_argv);
 	for(i=0;i<n+1;i++) free(c_argv[i]);
@@ -113,10 +118,10 @@ void R_mergeVCF(int * nargs, char ** argv)
 
 //	printf("N=%d; V=%s\n", n, r_argv);
 	c_argv = (char **) calloc(n+1,sizeof(char *));
-	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
+	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
 	strcpy(c_argv[0],"R_mergeVCF");
-	strcpy(c_argv[1],strtok(r_argv,";"));
-	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,";"));
+	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(findCommonVariants, n,c_argv, 0);
 
@@ -140,9 +145,9 @@ void R_sublong_wrapper(int * nargs, char ** argv){
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	longread_mapping_R(n,c_argv);
 
@@ -165,9 +170,9 @@ void R_repair_wrapper(int * nargs, char ** argv){
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(main_read_repair, n,c_argv, 1);
 
@@ -186,9 +191,9 @@ void R_buildindex_wrapper(int * nargs, char ** argv)
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(main_buildindex,n,c_argv, 0);
 
@@ -212,9 +217,9 @@ void R_align_wrapper(int * nargs, char ** argv)
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(main_align,n,c_argv, 1);
 
@@ -240,11 +245,11 @@ void R_junction_wrapper(int * nargs, char ** argv)
 	r_argv = strdup(*argv);
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
-		R_child_thread_run(main_junction,n,c_argv, 1);
+	R_child_thread_run(main_junction,n,c_argv, 1);
 
 	for(i=0;i<n;i++) free(c_argv[i]);
 	free(c_argv);
@@ -265,9 +270,9 @@ void R_sam2bed_wrapper(int * nargs, char ** argv)
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(sam2bed,n,c_argv, 0);
 
@@ -286,9 +291,9 @@ void R_propmapped_wrapper(int * nargs, char ** argv)
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(propmapped,n,c_argv, 0);
 
@@ -317,11 +322,11 @@ void R_readSummary_wrapper(int * nargs, char ** argv)
   n = *nargs;
   c_argv = (char **) calloc(n,sizeof(char *));
 
-  if(strstr(r_argv, ",,")==NULL )
+  if(strstr(r_argv, PARAM_SPLITTOR PARAM_SPLITTOR)==NULL )
   {
     for(i=0; i<n; i++)
     {
-      char * current_arg = strtok(i?NULL:r_argv,",");
+      char * current_arg = strtok(i?NULL:r_argv,PARAM_SPLITTOR);
       if(current_arg == NULL)
         break;
       arg_len = strlen(current_arg);
@@ -359,11 +364,11 @@ void R_SNPcalling_wrapper(int * nargs, char ** argv)
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
-    	R_child_thread_run(main_snp_calling_test,n,c_argv,1 );
+   	R_child_thread_run(main_snp_calling_test,n,c_argv,1 );
 
 	for(i=0;i<n;i++) free(c_argv[i]);
 	free(c_argv);
@@ -385,9 +390,9 @@ void R_removeDupReads_wrapper(int * nargs, char ** argv)
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(main_repeated_test,n,c_argv, 0);
 
@@ -408,9 +413,9 @@ void R_qualityScores_wrapper(int * nargs, char ** argv)
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(main_qualityScores,n,c_argv,0);
 
@@ -429,10 +434,10 @@ void R_generate_random_RNAseq_reads(int * nargs, char ** argv){
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
 	for(i=1;i<n;i++){
-		strcpy(c_argv[i],strtok(NULL,","));
+		strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 		//fprintf(stderr, "ARG_%d=%s\n",i,c_argv[i]);
 	}
 
@@ -450,9 +455,9 @@ void R_flattenGTF_wrapper(int * nargs, char ** argv){
 	
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(300,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,","));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,","));
+	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(R_flattenAnnotations,n,c_argv,0);
 
@@ -483,6 +488,9 @@ static const R_CMethodDef CEntries[] = {
   {"R_generate_random_RNAseq_reads", (DL_FUNC) &R_generate_random_RNAseq_reads, 2},
   {"R_flattenGTF_wrapper",           (DL_FUNC) &R_flattenGTF_wrapper,           2},
   {"R_genSimReads_at_poses",         (DL_FUNC) &R_genSimReads_at_poses,         13},
+  {"retrieve_sequence",              (DL_FUNC) &retrieve_sequence,              2},
+  {"atgcContent",           	     (DL_FUNC) &atgcContent,             	    3},
+  {"detectionCall",					 (DL_FUNC) &detectionCall,					4},
   {NULL, NULL, 0}
 };
 

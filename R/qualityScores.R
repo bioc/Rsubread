@@ -1,5 +1,6 @@
 qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000)
 {
+    .check_string_param(input_format,"input_format")
 	if(length(filename)>1) stop("The qualityScores function only allows one input file.")
 	filename <- .check_and_NormPath(filename, mustWork=T, opt="filename")
 
@@ -8,25 +9,25 @@ qualityScores <- function(filename,input_format="gzFASTQ",offset=33,nreads=10000
 	
 	score_file = paste(".Rsubread_qualityScores_score_pid",Sys.getpid(),sep="")
 	
-	opt <- paste("-i",filename,"-o",score_file,sep=",")
+	opt <- paste("-i",filename,"-o",score_file,sep=.R_param_splitor)
 
 	if(tolower(input_format) == "gzfastq")
-		opt <- paste(opt,"--gzFASTQinput",sep=",")
+		opt <- paste(opt,"--gzFASTQinput",sep=.R_param_splitor)
 	  	
 	if(tolower(input_format) == "sam")
-		opt <- paste(opt,"--SAMinput",sep=",")
+		opt <- paste(opt,"--SAMinput",sep=.R_param_splitor)
 
 	if(tolower(input_format) == "bam")
-		opt <- paste(opt,"--BAMinput",sep=",")
+		opt <- paste(opt,"--BAMinput",sep=.R_param_splitor)
 
     if(nreads<=0){
       if(nreads==-1) nreads <- "100000000000" 
       else stop("ERROR: nreads cannot be zero or negative.")
     }
-	opt <- paste(opt,"--phred-offset",offset,"--counted-reads",nreads,sep=",")
+	opt <- paste(opt,"--phred-offset",offset,"--counted-reads",nreads,sep=.R_param_splitor)
 
-	cmd <- paste("qualityScores",opt,sep=",")
-	n <- length(unlist(strsplit(cmd,",")))
+	cmd <- paste("qualityScores",opt,sep=.R_param_splitor)
+	n <- length(unlist(strsplit(cmd,.R_param_splitor)))
 	C_args <- .C("R_qualityScores_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	
 	scores <- read.csv(score_file,header=FALSE,stringsAsFactors=FALSE)

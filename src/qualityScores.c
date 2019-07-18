@@ -37,7 +37,7 @@ typedef struct {
 	char * output_name;
 	int input_file_type;
 	int phred_offset;
-	int needed_reads;
+	long long needed_reads;
 	int sam_end;
 	int max_read_length;
 	char * IO_line_buff;
@@ -97,33 +97,31 @@ int finalise_qs_context(qualscore_context * qs_context, int prev_ret)
 	return 0;
 }
 
-int add_read_scores(qualscore_context * qs_context, char * qual_text)
-{
-	int xk1, nch, out_cursor = 0;
+int add_read_scores(qualscore_context * qs_context, char * qual_text, unsigned int total_cols) {
+	int xk1, nch, out_cursor = 0, aval = 1;
 
 	qs_context -> IO_line_buff[0]=0;
-	for(xk1=0; 0<(nch = qual_text[xk1]); xk1++){
-		nch -= qs_context -> phred_offset;
-		if(nch <=0 || nch >= 65)
-		{
-			if(!qs_context-> quality_offset_warning_shown)
-			{
-				SUBREADprintf("Warning: the Phred score offset (%d) seems wrong : %d.\n",  qs_context -> phred_offset, nch);
-				qs_context-> quality_offset_warning_shown=1;
-			}
+	for(xk1=0; xk1 < total_cols; xk1++){
+		nch = -1;
+		if(aval) nch = qual_text[xk1];	
+		if(nch == 0){
+			aval = 0;
+			nch=-1;
 		}
 
-		if(nch <=0 || nch>0)
-		{
-		//	int error_prob_100t = 0;
-
-		//	if(nch>0)
-		//		error_prob_100t = ERROR_PROB_INT_TABLE[nch];
+		if(nch>0){
+			nch -= qs_context -> phred_offset;
+			if(nch <=0 || nch >= 65)
+			{
+				if(!qs_context-> quality_offset_warning_shown)
+				{
+					SUBREADprintf("Warning: the Phred score offset (%d) seems wrong : it ended up with a phred score of %d.\n",  qs_context -> phred_offset, nch);
+					qs_context-> quality_offset_warning_shown=1;
+				}
+			}
 			out_cursor+=sprintf(qs_context->IO_line_buff+out_cursor,"%d,", nch);
-
-		//	qs_context -> total_errorprob_sum += error_prob_100t;
-		//	qs_context -> total_phred_sum += nch;
-		//	qs_context -> scored_bases ++;
+		} else {
+			out_cursor+=sprintf(qs_context->IO_line_buff+out_cursor,"NA,");
 		}
 	}
 	if(out_cursor>0)
@@ -347,7 +345,7 @@ int start_qs_context(qualscore_context * qs_context)
 	return ret;
 }
 
-int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend, char **input_file_type, char ** output_sc){
+int retrieve_scores(char ** input, int *offset_pt, long long *size, int * sam_whichend, char **input_file_type, char ** output_sc){
   
 	qualscore_context qs_context;
 	memset(&qs_context, 0, sizeof(qualscore_context));
@@ -383,6 +381,7 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 	{
 
 		unsigned long long read_number = 0;
+		unsigned int all_read_max_len = 0;
 
 		char *linebuff = malloc(3000);
 
@@ -392,6 +391,9 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 			if(reti<0) ret = 1; 
 			if(reti) break;
 			read_number++;
+			int rlen = strlen(linebuff);
+			if(linebuff[rlen-1]=='\n') rlen--;
+			all_read_max_len = max(all_read_max_len, rlen);
 			if(read_number % 1000000 == 0)
 				SUBREADprintf("  %llu reads have been scanned in %.1f seconds.\n", read_number, miltime() -  start_time);
 		}
@@ -408,7 +410,7 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 				double sampling_rate = (read_number-0.1)/qs_context.needed_reads;
 				 
 				double next_sample_number = 0;
-				sampling_rate = max(1.000000000001, sampling_rate);
+				sampling_rate = max(1.0, sampling_rate);
 
 				SUBREADprintf("Totally %llu reads were scanned; the sampling interval is %d.\nNow extract read quality information...\n", read_number, (int)(sampling_rate));
 
@@ -420,7 +422,7 @@ int retrieve_scores(char ** input, int *offset_pt, int *size, int * sam_whichend
 					if(reti) break;
 					if(read_number >= next_sample_number - 0.0000000001)
 					{
-						add_read_scores(&qs_context, linebuff);
+						add_read_scores(&qs_context, linebuff, all_read_max_len);
 						next_sample_number += sampling_rate;
 					}
 					read_number++;
@@ -500,9 +502,10 @@ int main_qualityScores(int argc, char ** argv)
 
 	int ret;
 	int c;
-	int option_index = 0 , offset_pt = 33, needed_reads = 10000, sam_end = 0;
-	char in_name[300];
-	char out_name[300];
+	long long needed_reads = 10000ll;
+	int option_index = 0 , offset_pt = 33, sam_end = 0;
+	char in_name[MAX_FILE_NAME_LENGTH];
+	char out_name[MAX_FILE_NAME_LENGTH];
 	char * input_format = "FASTQ";
 	char * in_nameptr = in_name;
 	char * out_nameptr = out_name;
@@ -519,7 +522,7 @@ int main_qualityScores(int argc, char ** argv)
 	{
 		switch(c){
 			case 'n':
-				needed_reads = atoi(optarg);
+				needed_reads = atoll(optarg);
 				break;
 			case 'P':
 				offset_pt = optarg[0]=='6'?64:33;

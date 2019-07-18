@@ -17,7 +17,9 @@ void seekgz_tell(seekable_zfile_t * fp, seekable_position_t * pos);
 
 void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos);
 
+// Diff: seekgz_next_char returns EOF for EOF but seekgz_next_int8 returns -1 for EOF
 int seekgz_next_char(seekable_zfile_t * fp);
+int seekgz_next_int8(seekable_zfile_t * fp);
 
 void seekgz_close(seekable_zfile_t * fp);
 

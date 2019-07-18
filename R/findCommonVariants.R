@@ -3,9 +3,9 @@ findCommonVariants <- function(VCF_files)
 	VCF_files <- .check_and_NormPath(VCF_files, mustWork=T, opt="VCF_files")
 	fout <- file.path(".",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
 
-	files_C <- paste(VCF_files,collapse=";")
+	files_C <- paste(VCF_files,collapse=.R_param_splitor)
 
-	cmd <- paste('-o', fout, files_C, sep=';')
+	cmd <- paste('-o', fout, files_C, sep=.R_param_splitor)
 
 	n <- 2 + length(VCF_files)
 
@@ -25,6 +25,7 @@ findCommonVariants <- function(VCF_files)
 
 .findCommonVariants_inner <- function(VCF_files)
 {
+    stop("Unused function, to be removed.")
 	
 	for(vcf_file in VCF_files)
 	{

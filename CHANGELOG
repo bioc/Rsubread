@@ -1,3 +1,10 @@
+18 Jul 2019 - 1.34.5
+(1) Change the parameter delimiting character to '\027'.
+(2) Allow longer file names in the arguments to the functions.
+(3) Add the "chop" mode to flattenGTF().
+(4) Allow mixed paired-end ansd single-end reads in the inpit SAM or BAM files to featureCounts().
+(5) Fix bugs.
+
 26 Jun 2019 - 1.34.4
 (1) Largely reduce memory use in buildindex() by pre-scanning the reference genome and allocating memory accordingly.
 (2) Check the size of free memory and give warning messages in buildindex() if the free memory is insufficient for building the index.
