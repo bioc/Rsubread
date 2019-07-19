@@ -1,3 +1,6 @@
+19 Jul 2019 - 1.35.18
+(1) Synchronize with the 1.34.5 version in the release branch.
+
 11 Jul 2019 - 1.35.17
 (1) Add "Read_Type" and "Singleton" categories into the statistics from the featureCounts() function.
 
