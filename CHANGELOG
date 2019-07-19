@@ -1,3 +1,7 @@
+19 Jul 2019 - 1.34.6
+(1) Update users guide.
+(2) Update help pages for featureCounts and flattenGTF.
+
 18 Jul 2019 - 1.34.5
 (1) Change the parameter delimiting character to '\027'.
 (2) Allow longer file names in the arguments to the functions.
