@@ -1452,7 +1452,7 @@ int process_voting_junction_PE_juncs( global_context_t * global_context, thread_
 			int this_ii_path[ MAX_CLUSTER_ELEMENTS ], this_jj_path[ MAX_CLUSTER_ELEMENTS ], this_masks [ MAX_CLUSTER_ELEMENTS ];
 			align_cluster(global_context, thread_context, cluster_buffer + x1, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_negative_strand, vote_1, vote_2, &this_score, this_ii_path, this_jj_path, this_masks, &path_len, &R1R2_mapped);
 
-			if(0 && FIXLENstrcmp("V0112_0155:7:1101:7309:2770", read_name_1)==0)
+			if(0 && FIXLENstrcmp("R00000003493", read_name_1)==0)
 				SUBREADprintf("REAE_TEST : R12MAP=%d, PATHLEN=%d, SCORE=%d\n", R1R2_mapped, path_len, this_score);
 
 			if(this_score > 0){
@@ -2259,7 +2259,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				update_top_three(global_context, top_three_buff, current_vote -> votes[i][j]);
 		}
 
-		//SUBREADprintf("3N [R %d] =%d,%d,%d\n", 1+is_second_read, top_three_buff[0], top_three_buff[1], top_three_buff[2]);
+		if(0 && FIXLENstrcmp("R00000003493",read_name_1)==0)SUBREADprintf("3N [R %d] =%d,%d,%d\n", 1+is_second_read, top_three_buff[0], top_three_buff[1], top_three_buff[2]);
 
 		for(i = 0; i < global_context -> config.multi_best_reads; i++)
 		{
@@ -2269,7 +2269,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				update_top_three(global_context, top_three_buff, old_result -> selected_votes);
 			}
 		}
-		//SUBREADprintf("3Q [R %d] =%d,%d,%d\n", 1+is_second_read, top_three_buff[0], top_three_buff[1], top_three_buff[2]);
+		if(0 && FIXLENstrcmp("R00000003493",read_name_1)==0)SUBREADprintf("3Q [R %d] =%d,%d,%d\n", 1+is_second_read, top_three_buff[0], top_three_buff[1], top_three_buff[2]);
 	}
 	
 
@@ -3371,14 +3371,12 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			}
 
 
-			//if(explain_context -> pair_number == 999999)
-			
-			// ACDB PVDB TTTS
 			//#warning " ========== COMMENT THIS LINE !! ========="
-			if(0 && FIXLENstrcmp("simulated.11420793", explain_context -> read_name) ==0){
+			if(0 && FIXLENstrcmp("R00000110641", explain_context -> read_name) ==0){
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
+				exit(0);
 			}
 
 

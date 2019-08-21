@@ -96,7 +96,7 @@ char * get_short_fname(char * lname){
 	char * ret = lname;
 
 	int x1;
-	for(x1 = strlen(lname)-1; x1>=0; x1--){
+	for(x1 = strlen(lname)-2; x1>=0; x1--){
 		if(lname [x1] == '/'){
 			ret = lname + x1 + 1;
 			break;

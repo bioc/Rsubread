@@ -23,18 +23,12 @@ int seekgz_next_int8(seekable_zfile_t * fp);
 
 void seekgz_close(seekable_zfile_t * fp);
 
-typedef struct {
-	char filename[MAX_FILE_NAME_LENGTH+1];
-
-	int is_plain;
-	FILE * plain_fp;
-	seekable_zfile_t gz_fp;
-	int is_first_chars;
-	char first_chars[2];
-} autozip_fp;
-
 // returns length in bytes if OK (length includes the line break at the end); returns 0 if EOF
 int autozip_gets(autozip_fp * fp, char * buf, int buf_size);
+
+
+// return -1 for EOF
+int autozip_getch(autozip_fp * fp);
 
 void autozip_close(autozip_fp * fp);
 
@@ -45,5 +39,6 @@ void autozip_rewind(autozip_fp * fp);
 
 int seekgz_preload_buffer( seekable_zfile_t * fp , subread_lock_t * read_lock);
 
+// returns length in bytes if OK (length includes the line break at the end); returns 0 if EOF
 int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len);
 #endif

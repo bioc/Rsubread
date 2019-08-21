@@ -66,6 +66,8 @@
 #define MAX_CHROMOSOME_NAME_LEN 200 
 #define MAX_FILE_NAME_LENGTH (1000)
 #define FEATURE_NAME_LENGTH 256 
+#define INPUT_BLC_MAX_READS 20
+#define MAX_BARCODE_LEN 32
 
 //#warning "============== REMOVE '*1.2' FROM THE NEXT LINE ================"
 #define MULTI_THREAD_OUTPUT_ITEMS  (4096 * 3/5 *3)
@@ -220,7 +222,7 @@ typedef short gene_vote_number_t;
 #define int2base(c) (1413695297 >> (8*(c))&0xff)
 #define color2int(c) ((c) - '0')
 #define int2color(c) ("0123"[(c)])
-#define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} }
+#define remove_backslash(str) { int xxxa=0; while(str[xxxa]){ if(str[xxxa]=='/'){str[xxxa]='\0'; break;} xxxa++;} /* SUBREADprintf("BSRRR %s\n", str);*/ }
 
 /*
 #define get_base_error_prob64(a) ((a) < '@'-1?1:pow(10., -0.1*((a)-'@')))
@@ -439,7 +441,66 @@ typedef struct {
 		seekable_position_t * pos_of_filtergz;
 		unsigned long long pos_of_filter;
 	};
+	int is_EOF;
 } input_BLC_pos_t;
+
+typedef struct {
+	unsigned long long read_number;
+	int total_bases_in_each_cluster;
+	int single_read_lengths[INPUT_BLC_MAX_READS+1];
+	int single_read_is_index[INPUT_BLC_MAX_READS];
+	int current_lane, bcl_is_gzipped, filter_is_gzipped;
+	char bcl_format_string[MAX_FILE_NAME_LENGTH];
+	char filter_format_string[MAX_FILE_NAME_LENGTH];
+	union{
+		seekable_zfile_t ** bcl_gzip_fps; 
+		FILE ** bcl_fps; 
+	};
+	union{
+		seekable_zfile_t *  filter_gzip_fp;
+		FILE *  filter_fp;
+	};
+	subread_lock_t read_lock;
+	int is_EOF;
+} input_BLC_t;
+
+typedef struct {
+	char filename[MAX_FILE_NAME_LENGTH+1];
+
+	int is_plain;
+	FILE * plain_fp;
+	seekable_zfile_t gz_fp;
+	int is_first_chars;
+	unsigned char first_chars[2];
+} autozip_fp;
+
+typedef struct {
+	int read_no_in_chunk;
+	int reads_available_in_chunk; // -1 : EOF of all input reads : no next chunk available.
+								  // This can be set to -1 only when calling cacheBCL_netx_chunk().
+	int chunk_no;
+	int chunk_start_lane;
+	int chunk_end_lane;
+	int reads_per_chunk;
+	int last_chunk_in_cache;
+	int total_bases_in_each_cluster;
+	int single_read_lengths[INPUT_BLC_MAX_READS+1];
+	int single_read_is_index[INPUT_BLC_MAX_READS];
+	int current_lane, bcl_is_gzipped, filter_is_gzipped;
+	int all_threads;
+	char bcl_format_string[MAX_FILE_NAME_LENGTH];
+	char filter_format_string[MAX_FILE_NAME_LENGTH];
+	int bcl_no_is_used[MAX_READ_LENGTH];
+	autozip_fp * bcl_gzip_fps; 
+	autozip_fp   filter_fp; 
+	subread_lock_t read_lock;
+	char ** bcl_bin_cache;
+	int  flt_bin_cache_size;
+	char *  flt_bin_cache;
+	char * lane_no_in_chunk;
+	int is_EOF;
+} cache_BCL_t;
+
 
 typedef struct {
 	char filename [300];
@@ -448,6 +509,7 @@ typedef struct {
 	void * input_fp;   // can be system (FILE * sam or fastq or fasta), (seekable_zfile_t *)
 	char gzfa_last_name[MAX_READ_NAME_LEN];
 	unsigned long long read_chunk_start;
+	cache_BCL_t bcl_input;
 } gene_input_t;
 
 typedef struct{

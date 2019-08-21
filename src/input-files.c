@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "input-files.h"
+#include "input-blc.h"
 #include "sambam-file.h"
 #include "HelperFunctions.h"
 #include "hashtable.h"
@@ -361,6 +362,15 @@ int is_read(char * in_buff)
 	return space_type;
 }
 
+int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_per_chunk, int threads){
+	int rv = cacheBCL_init(&input -> bcl_input , (char*) dir_name, reads_per_chunk, threads );
+	strcpy(input->filename, dir_name);
+	if(rv) return -1;
+	input -> file_type = GENE_INPUT_BCL;
+	input -> space_type = GENE_SPACE_BASE;
+	return 0;
+}
+
 int geinput_open_sam(const char * filename, gene_input_t * input, int half_number)
 {
 	input->input_fp = f_subr_open(filename, "rb");
@@ -668,7 +678,9 @@ unsigned int read_numbers(gene_input_t * input)
 }
 
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
+	if(input -> file_type == GENE_INPUT_BCL){
+		assert(input -> file_type != GENE_INPUT_BCL);
+	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
 		if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
 		else pos -> gzfa_last_name[0]=0;
@@ -678,7 +690,9 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
 }
 
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
+	if(input -> file_type == GENE_INPUT_BCL){
+		assert(input -> file_type != GENE_INPUT_BCL);
+	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
 		if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
 		else input -> gzfa_last_name[0]=0;
@@ -747,7 +761,12 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 // returns read length if OK 
 int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary)
 {
-	if(input -> file_type == GENE_INPUT_PLAIN) {
+	if(input -> file_type == GENE_INPUT_BCL) {
+		int rv = cacheBCL_next_read(&input -> bcl_input, read_name, read_string, quality_string, NULL);
+		if(rv<=0) return -1;
+		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
+		return rv;
+	} else if(input -> file_type == GENE_INPUT_PLAIN) {
 		int ret = read_line(MAX_READ_LENGTH, input->input_fp, read_string, 0);
 		if(quality_string) *quality_string=0;
 
@@ -1032,9 +1051,12 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		
 	}else return -1;
 }
+
 void geinput_close(gene_input_t * input)
 {
-	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA)
+	if(input -> file_type == GENE_INPUT_BCL)
+		cacheBCL_close(&input -> bcl_input);
+	else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA)
 		seekgz_close((seekable_zfile_t * ) input->input_fp);
 	else
 		fclose((FILE*)input->input_fp);

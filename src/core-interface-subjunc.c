@@ -37,6 +37,7 @@ static struct option long_options[] =
 	{"exonFormat", required_argument, 0, 'F'},
 	{"gtfAttr", required_argument, 0, 0},
 	{"gtfFeature", required_argument, 0, 0},
+	{"BCLinput",  no_argument, 0, 0},
 	{"rg",  required_argument, 0, 0},
 	{"rg-id",  required_argument, 0, 0},
 	{"gzFASTQinput",  no_argument, 0, 0},
@@ -500,6 +501,10 @@ int parse_opts_subjunc(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("ignoreUnmapped", long_options[option_index].name)==0) 
 				{
 					global_context->config.ignore_unmapped_reads = 1;
+				}
+				else if(strcmp("BCLinput", long_options[option_index].name)==0) 
+				{
+					global_context->config.is_BCL_input=1;
 				}
 				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{

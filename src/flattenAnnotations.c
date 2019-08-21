@@ -94,7 +94,7 @@ void flatAnno_print_usage(){
 	SUBREADputs("                 features.");
 	SUBREADputs("");
 	SUBREADputs("  -C             Merging overlapping exons into multiple non-overlapping exons but");
-	SUBREADputs("                 all the edgs are kept.");
+	SUBREADputs("                 all the edges are kept.");
 	SUBREADputs("");
 }
 

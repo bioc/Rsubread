@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.22 2019/01/31 03:15:09 cvs Exp $
+ * $Id: hashtable.h,v 9999.24 2019/08/14 23:46:01 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -46,6 +46,7 @@ typedef struct {
 	long numOfElements;
 	long capacityOfElements;
 	void (*elemDeallocator)(void *elem);
+	void * appendix1;
 } ArrayList;
 
 ArrayList * ArrayListCreate(int init_capacity);
@@ -77,7 +78,7 @@ int ArrayListLLUComparison(void * L_elem, void * R_elem);
 //
 long ArrayListFindNextDent(ArrayList * list, unsigned long long value_less_than_dent);
 
-
+ArrayList * HashTableKeys(HashTable * tab);
 void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
 ArrayList * HashTableKeyArray(HashTable * tab);
 

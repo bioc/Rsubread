@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.34 2019/07/02 12:03:19 cvs Exp $
+ * $Id: hashtable.c,v 9999.35 2019/08/14 23:46:00 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -236,6 +236,20 @@ HashTable * StringTableCreate(long numOfBuckets){
 	HashTable * ret = HashTableCreate(numOfBuckets);
 	HashTableSetHashFunction(ret, HashTableStringHashFunction);
 	HashTableSetKeyComparisonFunction(ret , my_strcmp);
+	return ret;
+}
+
+ArrayList * HashTableKeys(HashTable * tab){
+	int i;
+	ArrayList * ret = ArrayListCreate(tab -> numOfElements);
+	for (i=0; i< tab ->numOfBuckets; i++) {
+		KeyValuePair *pair = tab ->bucketArray[i];
+		while (pair != NULL) {
+			ArrayListPush(ret, pair -> key);
+			KeyValuePair *nextPair = pair->next;
+			pair = nextPair;
+		}
+	}
 	return ret;
 }
 
