@@ -4753,7 +4753,7 @@ void scRNA_make_barcode_HT_table( fc_thread_global_context_t * global_context ){
 		int bcl =strlen(bc);
 		if(global_context -> known_cell_barcode_length==0) global_context -> known_cell_barcode_length=bcl;
 		if(bcl!=global_context -> known_cell_barcode_length){
-			SUBREADprintf("The cell barcodes have variable lengths. This may be a new protocol and we don't support it yet.\n");
+//			SUBREADprintf("The cell barcodes have variable lengths. This may be a new protocol and we don't support it yet.\n");
 			assert(bcl==global_context -> known_cell_barcode_length);
 		}
 		char bctmp[20];
@@ -6520,10 +6520,10 @@ int readSummary(int argc,char *argv[]){
 	if(argc>55) read_shift_size = atoi(argv[55]);
 	else read_shift_size = 0;
 
-	if(argc>56 && strlen(argv[56])>0) scRNA_sample_sheet = argv[56];
+	if(argc>56 && strlen(argv[56])>0 && argv[56][0]!=' ') scRNA_sample_sheet = argv[56];
 	else scRNA_sample_sheet = NULL;
 
-	if(argc>57 && strlen(argv[57]) > 0) scRNA_cell_barcode_list = argv[57];
+	if(argc>57 && strlen(argv[57])>0 && argv[57][0]!=' ') scRNA_cell_barcode_list = argv[57];
 	else scRNA_cell_barcode_list = NULL;
 
 	if(read_shift_size<0){

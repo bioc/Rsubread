@@ -2,6 +2,8 @@ cellCounts <- function(input.directory, index, output.BAM, sample.sheet, cell.ba
 
   fc <- list()
 
+  if(length(input.directory) != length(output.BAM) || length(input.directory) != length( sample.sheet ))stop("The arguments to the input.directory, output.BAM and sample.sheet options must have the same length.")
+
   for(ii in 1:length(input.directory)){
 	  input.1 <- input.directory[ii]
 	  output.1 <- output.BAM[ii]

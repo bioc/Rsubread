@@ -1,3 +1,6 @@
+21 Aug 2019 - 1.35.21
+(1) Fix a bug in featureCounts() that was introduced in the 1.35.20 version
+
 21 Aug 2019 - 1.35.20
 (1) Add "cellCounts" function for scRNA read mapping and counting.
 
