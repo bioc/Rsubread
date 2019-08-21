@@ -6520,10 +6520,10 @@ int readSummary(int argc,char *argv[]){
 	if(argc>55) read_shift_size = atoi(argv[55]);
 	else read_shift_size = 0;
 
-	if(argc>56 && strlen(argv[56])>0) scRNA_sample_sheet = argv[56];
+	if(argc>56 && strlen(argv[56])>0 && argv[56][0]!=' ') scRNA_sample_sheet = argv[56];
 	else scRNA_sample_sheet = NULL;
 
-	if(argc>57 && strlen(argv[57]) > 0) scRNA_cell_barcode_list = argv[57];
+	if(argc>57 && strlen(argv[57])>0 && argv[57][0]!=' ') scRNA_cell_barcode_list = argv[57];
 	else scRNA_cell_barcode_list = NULL;
 
 	if(read_shift_size<0){

@@ -183,6 +183,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	if(!is.null(nonOverlap)) max_missing_bases_in_read <- nonOverlap
 	if(!is.null(nonOverlapFeature)) max_missing_bases_in_feature <- nonOverlapFeature
 	if(!is.null(GTF.attrType.extra))GTF.attrType.extra_str <- paste(GTF.attrType.extra, collapse="\t")
+    if(is.null(sampleSheet)) sampleSheet<-' '
+    if(is.null(cellBarcodeList)) cellBarcodeList<-' '
 	  
 	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize, sampleSheet, cellBarcodeList ,sep=.R_param_splitor)
     #print(cmd)
