@@ -4851,7 +4851,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 			strcpy(global_context->scRNA_cell_barcode_list,scRNA_cell_barcode_list);
 			global_context-> scRNA_cell_barcodes_array = input_BLC_parse_CellBarcodes( global_context->scRNA_cell_barcode_list );
 			scRNA_make_barcode_HT_table( global_context );
-			print_in_box(80,0,0,"Loaded %ld cell barcodes from the list.", global_context-> scRNA_cell_barcodes_array -> numOfElements);
+			//print_in_box(80,0,0,"Loaded %ld cell barcodes from the list.", global_context-> scRNA_cell_barcodes_array -> numOfElements);
 		}
 
 	}else{
