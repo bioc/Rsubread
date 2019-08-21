@@ -4753,7 +4753,7 @@ void scRNA_make_barcode_HT_table( fc_thread_global_context_t * global_context ){
 		int bcl =strlen(bc);
 		if(global_context -> known_cell_barcode_length==0) global_context -> known_cell_barcode_length=bcl;
 		if(bcl!=global_context -> known_cell_barcode_length){
-			SUBREADprintf("The cell barcodes have variable lengths. This may be a new protocol and we don't support it yet.\n");
+//			SUBREADprintf("The cell barcodes have variable lengths. This may be a new protocol and we don't support it yet.\n");
 			assert(bcl==global_context -> known_cell_barcode_length);
 		}
 		char bctmp[20];
