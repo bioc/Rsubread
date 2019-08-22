@@ -15,14 +15,46 @@
 	return(c(tested_reads, good_sample, good_cell))
 }
 
-.find_best_cellbarcode <- function( input.directory, sample.sheet){
+.dataURL <- function(uri){
+	sprintf("http://bioinf.wehi.edu.au/Rsubread/%s",uri)
 }
 
-cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list, input.mode="BCL", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
+.find_best_cellbarcode <- function( input.directory, sample.sheet){
+	barcode.database.file <- path.expand("~/.Rsubread/cellCounts/known_barcode_sets.txt")
+	if(!file.exists(barcode.database.file)){
+		dir.create("~/.Rsubread/cellCounts", recursive=TRUE)
+		rr <- download.file(.dataURL("cellCounts/known_barcode_sets.txt"), barcode.database.file)
+		if(rr!=0)stop("ERROR: the barcode database cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
+	}
+	bcb.sets <- read.delim(barcode.database.file, stringsAsFactors=F, header=T)
+	max.cell.good <- -1
+	for(libf in bcb.sets$File){
+		listfile <- path.expand(paste0("~/.Rsubread/cellCounts/",libf))
+		if(!file.exists(listfile)){
+			rr <- download.file(.dataURL(paste0("cellCounts/", libf)), listfile)
+			if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
+			barcode_res <- .cellCounts_try_cellbarcode(input.directory, sample.sheet, listfile, 30000)
+			if(is.na(barcode_res))stop("ERROR: the input sample cannot be processed.")
+			sample.good.rate <- barcode_res[2]/barcode_res[1]
+			cell.good.rate <- barcode_res[3]/barcode_res[1]
+			max.cell.good <- max(max.cell.good, cell.good.rate)
+			if(sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
+			if(cell.good.rate > 0.6){
+				cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
+				return(listfile)
+			}
+		}
+	}
+
+	stop(sprintf("ERROR: no known cell barcode set was found for the data set. The highest percentage of cell-barcode matched reads is %.1f%%\n", max.cell.good*100.))
+}
+
+cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
 
   fc <- list()
 
   if(length(input.directory) != length(output.BAM) || length(input.directory) != length( sample.sheet ))stop("The arguments to the input.directory, output.BAM and sample.sheet options must have the same length.")
+  if(is.null(cell.barcode.list)) cell.barcode.list <- .find_best_cellbarcode(input.directory, sample.sheet)
 
   for(ii in 1:length(input.directory)){
 	  input.1 <- input.directory[ii]
