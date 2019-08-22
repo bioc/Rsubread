@@ -1,7 +1,4 @@
 .cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing ){ # the three parameters can only be one string, not strings!
-    input.directory <- .check_and_NormPath(input.directory)
-	sample.sheet <- .check_and_NormPath(sample.sheet)
-	cell.barcode.list <- .check_and_NormPath(cell.barcode.list)
 	cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing)), collapse=.R_param_splitor)
 	rvs <- as.integer(rep(0,5))
 	C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(4),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
@@ -50,11 +47,17 @@
 }
 
 cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
+  input.directory <- .check_and_NormPath(input.directory,  mustWork=T, opt="input.directory")
+  sample.sheet <- .check_and_NormPath(sample.sheet,  mustWork=T, opt="sample.sheet")
 
   fc <- list()
 
   if(length(input.directory) != length(output.BAM) || length(input.directory) != length( sample.sheet ))stop("The arguments to the input.directory, output.BAM and sample.sheet options must have the same length.")
-  if(is.null(cell.barcode.list)) cell.barcode.list <- .find_best_cellbarcode(input.directory, sample.sheet)
+  if(is.null(cell.barcode.list)){
+    cell.barcode.list <- .find_best_cellbarcode(input.directory, sample.sheet)
+  }else{
+    cell.barcode.list <- .check_and_NormPath(cell.barcode.list, mustWork=T, opt="cell.barcode.list")
+  }
 
   for(ii in 1:length(input.directory)){
 	  input.1 <- input.directory[ii]
