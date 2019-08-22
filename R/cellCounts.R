@@ -1,3 +1,20 @@
+.cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing ){ # the three parameters can only be one string, not strings!
+    input.directory <- .check_and_NormPath(input.directory)
+	sample.sheet <- .check_and_NormPath(sample.sheet)
+	cell.barcode.list <- .check_and_NormPath(cell.barcode.list)
+	cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing)), collapse=.R_param_splitor)
+	rvs <- as.integer(rep(0,5))
+	C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(4),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
+	return_val <- ifelse(C_args$retv[1]==0,"FINISHED","ERROR")
+	tested_reads <- C_args$retv[2]
+	good_sample <- C_args$retv[3]
+	good_cell <- C_args$retv[4]
+	if(return_val=="ERROR"){
+		return(NA)
+	}
+	return(c(tested_reads, good_sample, good_cell))
+}
+
 cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list, input.mode="BCL", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
 
   fc <- list()

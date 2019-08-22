@@ -30,4 +30,8 @@ HashTable * input_BLC_parse_SampleSheet(char * fname);
 // It returns NULL if no list is found
 // The arraylist can be simply destroyed and all contents are deallocated automatically
 ArrayList * input_BLC_parse_CellBarcodes(char * fname);
+int hamming_dist_ATGC_max2(char* s1, char* s2 );
+
+// returns -1 if error, or 0 if no error.
+int cacheBCL_quality_test(char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode);
 #endif

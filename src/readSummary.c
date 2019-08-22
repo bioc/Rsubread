@@ -179,6 +179,9 @@ typedef struct {
 	HashTable * splicing_point_table;
 	HashTable * RG_table;	// rg_name -> [ count_table, sum_fc_read_counters, junction_counting_table,  splicing_point_table]
 				// NOTE: some reads have no RG tag. These reads are put into the tables in this object but not in the RG_table -> tables.
+	long scRNA_pooled_reads;
+	long scRNA_has_valid_sample_index;
+	long scRNA_has_valid_cell_barcode;
 	fc_read_counters read_counters;
 } fc_thread_thread_context_t;
 
@@ -3428,22 +3431,6 @@ void overlap_exchange(void * arr, int L, int R){
 	pos[R*2+1] = tt;
 }
 
-int is_ATGC(char c){
-	return c=='A'||c=='C'||c=='G'||c=='T'||c=='N';
-}
-int hamming_dist_ATGC_max2(char* s1, char* s2 ){
-	int xx,ret=0;
-	for(xx=0;;xx++){
-		char nch1 = s1[xx];
-		char nch2 = s2[xx];
-		if(is_ATGC(nch1) && is_ATGC(nch2)){
-			ret += nch1==nch2;
-			if(xx -ret >2) return 999;
-		}else break;
-	}
-	return xx-ret;
-}
-
 int scRNA_get_sample_id(fc_thread_global_context_t *global_context, char * sbc, int read_laneno){
 	int x1;
 
@@ -3581,6 +3568,16 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 	int umi_id = scRNA_register_umi_id( global_context, thread_context, umi_barcode);
 	//SUBREADprintf("Rname=%s, Lane=%d ==> sample %d  cell %d  UMI %d\n", read_name, laneno, sample_id , cell_id, umi_id);
 
+	thread_context -> scRNA_pooled_reads ++;
+	if(sample_id >0)thread_context -> scRNA_has_valid_sample_index ++;
+	if(cell_id >0)thread_context -> scRNA_has_valid_cell_barcode ++;
+
+	if(thread_context -> thread_id == 0 && thread_context -> scRNA_pooled_reads == 20000){
+		print_in_box(80,0,0,"   scRNA quality control in first 20,000 reads:");
+		print_in_box(80,0,0,"     %.1f%% reads have valid sample indices.", thread_context->scRNA_has_valid_sample_index*100./thread_context -> scRNA_pooled_reads);
+		print_in_box(80,0,0,"     %.1f%% reads have valid cell barcodes.", thread_context->scRNA_has_valid_cell_barcode*100./thread_context -> scRNA_pooled_reads);
+		print_in_box(80,0,0,"");
+	}
 	//if(sample_id>1)SUBREADprintf("Sample=%s, Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", sample_barcode, cell_barcode, umi_barcode, laneno, sample_id);
 	if(sample_id >0 && cell_id >=0 && umi_id >=0){
 		assert(sample_id<= global_context -> scRNA_sample_sheet_table -> numOfElements );
@@ -5066,6 +5063,9 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 				//SUBREADprintf("PUSH ARR for THR %d XK2 %d\n", xk1, xk2);
 				global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2] = al;
 			}
+			global_context -> thread_contexts[xk1].scRNA_pooled_reads=0;
+			global_context -> thread_contexts[xk1].scRNA_has_valid_sample_index  =0;
+			global_context -> thread_contexts[xk1].scRNA_has_valid_cell_barcode  =0;
 		}
 
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;

@@ -88,7 +88,36 @@ extern int longread_mapping_R(int argc, char *argv[]);
 extern int TxUniqueMain(int argc, char *argv[]);
 extern int R_flattenAnnotations(int argc, char *argv[]);
 extern int gen_rnaseq_reads_main(int argc, char *argv[]);
+extern int do_R_try_cell_barcode_files(int argc, char ** argv);
 extern int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int all_transcripts, char ** trans_names_unique, int *trans_ids, int *start_poses, int *fra_lens, int read_length, int total_reads, int simplify_names, int truth_in_rnames,int do_paired_reads );
+
+void R_try_cell_barcode_wrapper(int * nargs, char ** argv, int * retv){
+	int i,n = *nargs;
+	if(n!=4) {
+		SUBREADprintf("ERROR: must be 4 arguments, not %d.\n" ,n);
+		retv[0]=-1;
+		return;
+	}
+	char * r_argv = strdup(*argv);
+	char ** c_argv = (char **) calloc(n+1+4,sizeof(char *)); // 4 for return variables.
+
+	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],"R_txUnique");
+	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
+	R_child_thread_run(do_R_try_cell_barcode_files, 9, c_argv, 0);
+	free(r_argv);
+	for(i=0;i<n+1;i++) free(c_argv[i]);
+	int rv = (void*)c_argv[5]-NULL;
+	int tested_reads = (void*)c_argv[6]-NULL;
+	int sample_good_reads = (void*)c_argv[7]-NULL;
+	int cell_good_reads = (void*)c_argv[8]-NULL;
+	retv[0] = rv;
+	retv[1] = tested_reads;
+	retv[2] = sample_good_reads;
+	retv[3] = cell_good_reads;
+	free(c_argv);
+}
 
 void R_txUnique_wrapper(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
@@ -491,6 +520,7 @@ static const R_CMethodDef CEntries[] = {
   {"retrieve_sequence",              (DL_FUNC) &retrieve_sequence,              2},
   {"atgcContent",           	     (DL_FUNC) &atgcContent,             	    3},
   {"detectionCall",					 (DL_FUNC) &detectionCall,					4},
+  {"R_try_cell_barcode_wrapper",     (DL_FUNC) &R_try_cell_barcode_wrapper,     3},
   {NULL, NULL, 0}
 };
 
