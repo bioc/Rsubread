@@ -5,8 +5,8 @@
 \usage{
 cellCounts(
   # the mandatory arguments
-  input.directory,
   index,
+  input.directory,
   output.BAM,
   sample.sheet,
   cell.barcode.list,
@@ -31,12 +31,12 @@ cellCounts(
 
 
 \arguments{
-  \item{input.directory}{character strings giving one or many directories containing the input data sets. Each data set should be put into an individual directory.}
   \item{index}{character string giving the subread index built by the {buildindex} function.}
+  \item{input.directory}{character strings giving one or many directories containing the input data sets. Each data set should be put into an individual directory.}
   \item{output.BAM}{character strings giving one or many output file names, each corrsponding to an input directory. The output files are in the BAM format.}
   \item{sample.sheet}{character strings giving one or many sample sheet files in the CSV format. See the Illumina bcl2fastq manual for details.}
   \item{cell.barcode.list}{character string giving the name of a textual file containing the list of cell barcodes used in sample preparation. The file may be gzipped.}
-  \item{input.mode}{character string giving the input mode. Currently only the BCL-format input is supported.}
+  \item{input.mode}{character string giving the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
   \item{nthreads}{numeric value giving the number of threads used for read mapping and counting. 16 by default.}
   \item{annot.inbuilt, annot.ext, isGTFAnnotationFile, GTF.featureType, GTF.attrType, GTF.attrType.extra, chrAliases, useMetaFeatures, allowMultiOverlap, countMultiMappingReads}{options for counting the mapping results. The options have the same meanings as \code{featureCounts}}
 }
