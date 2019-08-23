@@ -4216,7 +4216,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 		if(cellbc_no != old_bcno || x1 == cellno_umino_p1_list -> numOfElements-1){
 			int cell_umi = 0;
 			long sec_end = x1 + ((cellbc_no == old_bcno)?1:0);
-			if(sec_end - cell_sec_start > 40000) SUBREADprintf("BIGSEC: %ld\n", sec_end - cell_sec_start);
+			if(0 && sec_end - cell_sec_start > 40000) SUBREADprintf("BIGSEC: %ld\n", sec_end - cell_sec_start);
 			if(sec_end - cell_sec_start > 70){
 				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret );
 			}else{
