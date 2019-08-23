@@ -30,16 +30,16 @@
 		if(!file.exists(listfile)){
 			rr <- download.file(.dataURL(paste0("cellCounts/", libf)), listfile)
 			if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
-			barcode_res <- .cellCounts_try_cellbarcode(input.directory, sample.sheet, listfile, 30000)
-			if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
-			sample.good.rate <- barcode_res[2]/barcode_res[1]
-			cell.good.rate <- barcode_res[3]/barcode_res[1]
-			max.cell.good <- max(max.cell.good, cell.good.rate)
-			if(sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
-			if(cell.good.rate > 0.6){
-				cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
-				return(listfile)
-			}
+		}
+		barcode_res <- .cellCounts_try_cellbarcode(input.directory, sample.sheet, listfile, 30000)
+		if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
+		sample.good.rate <- barcode_res[2]/barcode_res[1]
+		cell.good.rate <- barcode_res[3]/barcode_res[1]
+		max.cell.good <- max(max.cell.good, cell.good.rate)
+		if(sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
+		if(cell.good.rate > 0.6){
+			cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
+			return(listfile)
 		}
 	}
 
@@ -49,6 +49,7 @@
 cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
   input.directory <- .check_and_NormPath(input.directory,  mustWork=T, opt="input.directory")
   sample.sheet <- .check_and_NormPath(sample.sheet,  mustWork=T, opt="sample.sheet")
+  output.BAM <- .check_and_NormPath(output.BAM,  mustWork=F, opt="output.BAM")
 
   fc <- list()
 
