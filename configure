@@ -21,6 +21,9 @@ then
 elif test $UNAME = "FreeBSD"
 then
 	cat src/Makevars.FreeBSD >> src/Makevars
+elif test 1 = ` echo $UNAME |grep "MSYS_NT" |wc -l `
+then
+	cat src/Makevars.Windows >> src/Makevars
 elif test $UNAME = "SunOS"
 then
 	cat src/Makevars.SunOS >> src/Makevars

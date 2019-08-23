@@ -24,17 +24,26 @@ struct iBLC_scan_t{
 
 int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 	DIR * this_level = opendir(data_dir);
+	if(this_level == NULL) return -1;
 	struct dirent *dp;
 	int filter_found = 0, bcl_found = 0;
 	char testfile_name[MAX_FILE_NAME_LENGTH];
 	while ((dp = readdir (this_level)) != NULL) {
+		#ifdef __MINGW32__
+		if(1){
+		#else
 		if(dp -> d_type == DT_DIR && dp->d_name[0]!='.'){
+		#endif
 			strcpy(testfile_name,data_dir);
 			strcat(testfile_name, "/");
 			strcat(testfile_name, dp->d_name);
 			//SUBREADprintf("DIG: %s\n", testfile_name);
+		#ifdef __MINGW32__
+			if(0==iBLC_guess_scan( scancon, testfile_name)) continue;
+		#else
 			if(iBLC_guess_scan( scancon, testfile_name))return -1;
 		}else if(dp -> d_type == DT_REG){
+		#endif
 			//SUBREADprintf( "%s  %s  %p  %p\n" , data_dir, dp->d_name , strstr( dp->d_name , "0001.bcl." ) , strstr( dp->d_name , ".bci") );
 			if(0==strcmp(dp->d_name, "RunInfo.xml")){
 				if(scancon->reads_per_cluster > 0){

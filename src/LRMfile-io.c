@@ -5,7 +5,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
+
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
+
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zlib.h>

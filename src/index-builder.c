@@ -1236,12 +1236,16 @@ int main_buildindex(int argc,char ** argv)
 	}
 	if(tmp_fa_file[0]==0)strcpy(tmp_fa_file, "./");
 
+	#ifdef __MINGW32__
+	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-%06d", getpid(),rand());
+	#else
 	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-XXXXXX", getpid());
 	int tmpfdd = mkstemp(tmp_fa_file);
 	if(tmpfdd == -1){
 		SUBREADprintf("ERROR: cannot create temp file\n");
 		return -1;
 	}
+	#endif
 
 	sprintf(log_file_name, "%s.log", output_file);
 	FILE * log_fp = f_subr_open(log_file_name,"w");

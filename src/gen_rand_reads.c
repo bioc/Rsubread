@@ -7,9 +7,11 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#ifndef __MINGW32__
+#include <sys/resource.h>
+#endif
 #include <locale.h>
 #include <ctype.h>
 #include <math.h>

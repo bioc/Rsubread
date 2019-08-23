@@ -25,7 +25,11 @@
 #if (R_VERSION >= R_Version(2,3,0))
 #define R_INTERFACE_PTRS 1
 #define CSTACK_DEFNS 1
+
+#ifndef __MINGW32__
 #include <Rinterface.h>
+#endif
+
 #include <R_ext/Rdynload.h>
 #endif 
 #include "HelperFunctions.h"

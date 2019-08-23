@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -1499,21 +1501,6 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * cl
 		strcpy(key_name, temp_file_name);
 		temp_file_pointer = f_subr_open(key_name,"ab");
 
-		if(0&&!temp_file_pointer)
-		{
-			struct rlimit limit_st;
-			getrlimit(RLIMIT_NOFILE, & limit_st);
-			if(limit_st.rlim_max>0 && limit_st.rlim_max <= 3000)
-				limit_st.rlim_cur = min(limit_st.rlim_max, fp_table->numOfElements + 10);
-			else
-				limit_st.rlim_cur = max(limit_st.rlim_cur, fp_table->numOfElements + 10);
-			setrlimit(RLIMIT_NOFILE, & limit_st);
-			//if(rl==-1)
-			//	SUBREADprintf("Cannot set limit: %d!\n", limit_st.rlim_cur);
-			temp_file_pointer = f_subr_open(key_name,"wb");
-		}
-
-
 		if(!temp_file_pointer){
 			SUBREADprintf("File cannot be opened: '%s' !!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
 			return NULL;
@@ -2501,7 +2488,7 @@ void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (*
 
 
 int SAM_pairer_warning_file_open_limit(){
-
+#ifndef __MINGW32__
 	struct rlimit limit_st;
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
@@ -2509,6 +2496,7 @@ int SAM_pairer_warning_file_open_limit(){
 		SUBREADprintf(" ERROR: the maximum file open number (%d) is too low. Please increase this number to a number larger than 50 by using the 'ulimit -n' command. This program has to terminate now.\n\n",(int)(min(limit_st.rlim_cur, limit_st.rlim_max)));
 		return 1;
 	}
+#endif
 	return 0;
 }
 

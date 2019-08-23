@@ -26,7 +26,9 @@
 #include <dirent.h>
 #include <getopt.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
 #include <unistd.h>
 #include <sys/stat.h>
 #include "subread.h" 
@@ -433,6 +435,7 @@ int prop_PE(propMapped_context * context)
 
 void ppm_warning_file_limit()
 {
+#ifndef __MINGW32__
 	struct rlimit limit_st;
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
@@ -441,6 +444,7 @@ void ppm_warning_file_limit()
 			SUBREADprintf("Your operation system does not allow a single process to open more then 400 files. You may need to change this setting by using a 'ulimit -n 500' command, or the program may crash.\n");
 		}
 	}
+#endif
 }
 
 

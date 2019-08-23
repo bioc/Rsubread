@@ -32,7 +32,9 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
 #include <unistd.h>
 #include <sys/stat.h>
 #include <locale.h>
@@ -116,6 +118,7 @@ int is_valid_digit_range(char * optarg, char * optname, int min, int max_inc){
 
 void warning_file_limit()
 {
+	#ifndef __MINGW32__
 	struct rlimit limit_st;
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
@@ -129,6 +132,7 @@ void warning_file_limit()
 			print_in_box(80,0,0,"");
 		}
 	}
+	#endif
 }
 
 int exec_cmd(char * cmd, char * outstr, int out_limit){

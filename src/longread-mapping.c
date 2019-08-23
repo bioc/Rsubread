@@ -27,7 +27,9 @@
 #include <getopt.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
 #include <sys/timeb.h>
 #include <sys/stat.h>
 #include <locale.h>
