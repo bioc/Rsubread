@@ -697,6 +697,7 @@ ArrayList * input_BLC_parse_CellBarcodes(char * fname){
 		char tmp_fl[MAX_BARCODE_LEN+1];
 		int skr = autozip_gets(&fp, tmp_fl, MAX_BARCODE_LEN);
 		if(skr<1) break;
+		//if(ret -> numOfElements <40) SUBREADprintf("LOAD_CELL_BAR : %s , %d\n", tmp_fl, skr);
 		int x1;
 		if(tmp_fl[skr-1]=='\n') tmp_fl[skr-1]=0;
 		for(x1=0; tmp_fl[x1]; x1++) if(!isalpha(tmp_fl[x1])){

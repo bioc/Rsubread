@@ -1,4 +1,5 @@
 .cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing ){ # the three parameters can only be one string, not strings!
+
 	cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing)), collapse=.R_param_splitor)
 	rvs <- as.integer(rep(0,5))
 	C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(4),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
@@ -24,6 +25,7 @@
 		if(rr!=0)stop("ERROR: the barcode database cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
 	}
 	bcb.sets <- read.delim(barcode.database.file, stringsAsFactors=F, header=T)
+	cat(sprintf("Found %d known cell barcode sets.\n", nrow(bcb.sets)))
 	max.cell.good <- -1
 	for(libf in bcb.sets$File){
 		listfile <- path.expand(paste0("~/.Rsubread/cellCounts/",libf))
@@ -31,11 +33,13 @@
 			rr <- download.file(.dataURL(paste0("cellCounts/", libf)), listfile)
 			if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
 		}
-		barcode_res <- .cellCounts_try_cellbarcode(input.directory, sample.sheet, listfile, 30000)
+		cat(sprintf("Testing the cell barcodes in %s.\n", listfile))
+		barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, 30000)
 		if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
 		sample.good.rate <- barcode_res[2]/barcode_res[1]
 		cell.good.rate <- barcode_res[3]/barcode_res[1]
 		max.cell.good <- max(max.cell.good, cell.good.rate)
+		#cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
 		if(sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
 		if(cell.good.rate > 0.6){
 			cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
