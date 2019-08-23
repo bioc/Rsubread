@@ -1,0 +1,33 @@
+#!/bin/sh
+
+#cp src/Makevars.in src/Makevars
+
+UNAME=`uname`
+IS_CYG=`uname |grep -i cygwin |wc -l`
+
+echo @@@@@ The operating system is $UNAME.
+
+version_no=`cat DESCRIPTION |grep Version|cut -f2 -d' '`
+
+echo SUBREAD_VER = \"\\\"Rsubread $version_no\\\"\" > src/Makevars
+
+if test  $IS_CYG = 1 
+then
+	cat src/Makevars.Linux >> src/Makevars
+elif test  $UNAME = "Linux" 
+then
+	# This is a Linux machine! 
+	cat src/Makevars.Linux >> src/Makevars
+elif test $UNAME = "FreeBSD"
+then
+	cat src/Makevars.FreeBSD >> src/Makevars
+elif test 1 = ` echo $UNAME |grep "MSYS_NT" |wc -l `
+then
+	cat src/Makevars.Windows >> src/Makevars
+elif test $UNAME = "SunOS"
+then
+	cat src/Makevars.SunOS >> src/Makevars
+else
+	cat src/Makevars.MacOS >> src/Makevars
+fi
+
