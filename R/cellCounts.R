@@ -33,7 +33,7 @@
 			rr <- download.file(.dataURL(paste0("cellCounts/", libf)), listfile)
 			if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
 		}
-		cat(sprintf("Testing the cell barcodes in %s.\n", listfile))
+		cat(sprintf("Testing the cell barcodes in %s.\n", libf))
 		barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, 30000)
 		if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
 		sample.good.rate <- barcode_res[2]/barcode_res[1]
