@@ -390,6 +390,39 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 1,1,"  Summary");
 	print_in_box(80, 0,1,"  ");
 
+	#ifdef __MINGW32__
+    if(global_context->input_reads.is_paired_end_reads)
+		print_in_box(80, 0,0,"            Total fragments : %llu" , global_context -> all_processed_reads);
+    else
+		print_in_box(80, 0,0,"                Total reads : %llu" , global_context -> all_processed_reads);
+
+	print_in_box(81, 0,0,"                     Mapped : %u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
+	print_in_box(80, 0,0,"            Uniquely mapped : %u",  global_context -> all_uniquely_mapped_reads);
+	print_in_box(80, 0,0,"              Multi-mapping : %u",  global_context -> all_multimapping_reads);
+	print_in_box(80, 0,1,"      ");
+	print_in_box(80, 0,0,"                   Unmapped : %u",  global_context -> all_unmapped_reads);
+	if(global_context->input_reads.is_paired_end_reads){
+		print_in_box(80, 0,1,"      ");
+		print_in_box(80, 0,0,"            Properly paired : %llu", global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"        Not properly paired : %llu", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"                  Singleton : %u", global_context -> not_properly_pairs_only_one_end_mapped);
+		print_in_box(80, 0,0,"                   Chimeric : %u", global_context -> not_properly_pairs_different_chro);
+		print_in_box(80, 0,0,"      Unexpected strandness : %u", global_context -> not_properly_different_strands);
+	 	print_in_box(80, 0,0," Unexpected fragment length : %u", global_context -> not_properly_pairs_TLEN_wrong);
+	 	print_in_box(80, 0,0,"      Unexpected read order : %u", global_context -> not_properly_pairs_wrong_arrangement);
+	}
+
+	print_in_box(80, 0,1,"      ");
+
+	if(global_context->config.output_prefix[0])
+	{
+	        if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !(global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)))
+	                print_in_box(80, 0,0,"                  Junctions : %u", global_context -> all_junctions);
+	        if((global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
+	                print_in_box(80, 0,0,"                    Fusions : %u", global_context -> all_fusions);
+	        print_in_box(80, 0,0,"                     Indels : %u", global_context -> all_indels);
+	}
+	#else
     if(global_context->input_reads.is_paired_end_reads)
 		print_in_box(80, 0,0,"            Total fragments : %'llu" , global_context -> all_processed_reads);
     else
@@ -421,7 +454,8 @@ int show_summary(global_context_t * global_context)
 	                print_in_box(80, 0,0,"                    Fusions : %'u", global_context -> all_fusions);
 	        print_in_box(80, 0,0,"                     Indels : %'u", global_context -> all_indels);
 	}
-	
+
+	#endif
 
 	if(global_context -> is_phred_warning)
 	{
