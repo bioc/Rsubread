@@ -4272,7 +4272,7 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 		#ifdef __MINGW32__
 		linebuf_ptr = sprintf(linebuf, "%I64d", line_number);
 		#else
-		linebuf_ptr = sprintf(linebuf, "%lld", line_number);
+		linebuf_ptr = sprintf(linebuf, "%lu", line_number);
 		#endif
 	//SUBREADprintf("DOING_ROW %ld\n", line_number);
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
@@ -5414,7 +5414,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 				#ifdef __MINGW32__
 				fprintf(fp_out,"\t%I64u", (size_t)longlong_res);
 				#else
-				fprintf(fp_out,"\t%lld", (size_t)longlong_res);
+				fprintf(fp_out,"\t%lu", (size_t)longlong_res);
 				#endif
 			}
 		}
@@ -5481,7 +5481,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 			#ifdef __MINGW32__
 			fprintf(fp_out,"\t%I64u", (size_t)*cntr);
 			#else
-			fprintf(fp_out,"\t%llu", (size_t)*cntr);
+			fprintf(fp_out,"\t%lu", (size_t)*cntr);
 			#endif
 		}
 		int wlen = fprintf(fp_out,"\n");
@@ -5547,7 +5547,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 				#ifdef __MINGW32__
 				fprintf(fp_out,"\t%I64d", (size_t)longlong_res);
 				#else
-				fprintf(fp_out,"\t%lld", (size_t)longlong_res);
+				fprintf(fp_out,"\t%lu", (size_t)longlong_res);
 				#endif
 			}
 		}
@@ -6172,7 +6172,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			#ifdef __MINGW32__
 			fprintf(ofp,"\t%I64d", count);
 			#else
-			fprintf(ofp,"\t%lld", count);
+			fprintf(ofp,"\t%lu", count);
 			#endif
 		}
 		int wlen = fprintf(ofp, "\n");
