@@ -116,7 +116,7 @@ typedef pthread_mutex_t subread_lock_t;
 typedef pthread_spinlock_t subread_lock_t;
 #endif
 
-#ifdef WINDOWS
+#ifdef __MINGW32__
 #define ftello ftello64
 #define fseeko fseeko64
 

@@ -45,11 +45,14 @@ unsigned int BASE_BLOCK_LENGTH = 15000000;
 
 FILE * f_subr_open(const char * fname, const char * mode)
 {
-
-#if defined(__LP64__) || defined(_LP64) || defined(MACOS)
+#ifdef __MINGW32__
+		return fopen64(fname, mode);
+#else
+#if defined(__LP64__) || defined(_LP64) || defined(MACOS) 
 		return fopen(fname, mode);
 #else
 		return fopen64(fname, mode);
+#endif
 #endif
 
 }
