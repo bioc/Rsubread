@@ -528,7 +528,7 @@ int geinput_next_char(gene_input_t * input)
 			}
 			if (nch == ' ' || nch == '\t')
 				continue;
-			if(1){
+			if(0){
 				long int fpos = ftello(input->input_fp);
 				if(fpos >= 3052545143u - 20 && fpos <= 20+ 3052545143  )SUBREADprintf("NCH AT %ld is %c but LASTBR is %d\n", fpos, nch, last_br);
 			}	

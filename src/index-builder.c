@@ -544,7 +544,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		{
 			//Subread Cycle
 			char next_char;
-			if(status > 0)SUBREADprintf("BDSSTATUS = %d\n", status);
+			//if(status > 0)SUBREADprintf("BDSSTATUS = %d\n", status);
 
 			if (status == NEXT_FILE)
 			{
