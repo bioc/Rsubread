@@ -568,6 +568,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				(*actual_total_bases_inc_marging)+=2*padding_around_contigs;
 
 				geinput_readline(&ginp, fn, 0);
+				//SUBREADprintf("HEADER_SCAN '''%s'''\n", fn);
 
 				for (i=0; i<16; i++)
 				{
@@ -860,11 +861,11 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 						is_R_warnned=1;
 						fcc.byte_in_line = line_buf_len-1;
 						check_and_convert_warn(&fcc ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.", log_fp);
-					}	
+					}
 				}
 				line_buf[line_buf_len-1] =0;
 			}
-
+//			if(strchr(line_buf,'>') || strchr(line_buf,'\r') || strchr(line_buf,'\n'))SUBREADprintf("ERROR: string contains '''%s'''\n", line_buf);
 
 			if(line_buf_len<1)
 			{

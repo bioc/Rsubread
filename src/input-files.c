@@ -458,7 +458,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 	}else{
 		input->file_type = GENE_INPUT_FASTQ;
 		input->input_fp = TMP_FP;
-		fseek(input->input_fp, 0, SEEK_SET);
+		fseeko(input->input_fp, 0, SEEK_SET);
 		while (1){
 			long long int last_pos = ftello(input->input_fp);
 			int rlen = read_line_noempty(MAX_READ_LENGTH, input, in_buff, 0);
@@ -470,7 +470,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 				{
 					input->file_type = GENE_INPUT_PLAIN;
 					input->space_type = is_read(in_buff);
-					fseek(input->input_fp,last_pos,SEEK_SET);
+					fseeko(input->input_fp,last_pos,SEEK_SET);
 					break;
 				}
 				if(in_buff[0]=='>')
@@ -480,7 +480,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 					rlen += read_line(MAX_READ_LENGTH, input->input_fp, in_buff, 0);
 					input->space_type = is_read(in_buff);
 					
-					fseek(input->input_fp,last_pos,SEEK_SET);
+					fseeko(input->input_fp,last_pos,SEEK_SET);
 					break;
 				}
 				if(in_buff[0]=='@')
@@ -488,7 +488,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 					input->file_type = GENE_INPUT_FASTQ;
 					rlen += read_line_noempty(MAX_READ_LENGTH, input, in_buff, 0);
 					input->space_type = is_read(in_buff);
-					fseek(input->input_fp, last_pos,SEEK_SET);
+					fseeko(input->input_fp, last_pos,SEEK_SET);
 					break;
 				}		
 				line_no++;
@@ -500,7 +500,6 @@ int geinput_open(const char * filename, gene_input_t * input)
 	if(0 == input->space_type)input->space_type = GENE_SPACE_BASE;
 	return ret;
 }
-
 
 int geinput_next_char(gene_input_t * input)
 {
@@ -519,24 +518,22 @@ int geinput_next_char(gene_input_t * input)
 				#ifndef __MINGW32__
 				SUBREADprintf("The input FASTA file contains \\r characters. This should not result in any problem but we suggest to use UNIX-style line breaks.\n");
 				#endif
+				last_br ++;
 				continue;
 			}
 			if (nch == '\n')
 			{
-				last_br = 1;
+				last_br ++;
 				continue;
 			}
 			if (nch == ' ' || nch == '\t')
 				continue;
-			if(0){
-				long int fpos = ftello(input->input_fp);
-				if(fpos >= 3052545143u - 20 && fpos <= 20+ 3052545143  )SUBREADprintf("NCH AT %ld is %c but LASTBR is %d\n", fpos, nch, last_br);
-			}	
+
 			if (nch == '>' && last_br)
 			{
 				// if this is a new segment
 
-				fseek(input->input_fp, -1 , SEEK_CUR);
+				fseeko(input->input_fp, -last_br , SEEK_CUR);
 				return -1;
 			}
 
@@ -614,50 +611,6 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer_3000)
 #define SKIP_LINE_NOEMPTY {int content_line_l = 0; nch=' '; while(nch != EOF && (nch != '\n' ||! content_line_l)){nch = geinput_getc(input); content_line_l += (nch != '\n');} }
 
 //#define SKIP_LINE { nch=' '; while(nch != EOF && nch != '\n') nch = geinput_getc(input); }
-
-void geinput_jump_read(gene_input_t * input)
-{
-	char nch=' ';
-	if(input->file_type == GENE_INPUT_PLAIN)
-		SKIP_LINE
-	else if(input->file_type >= GENE_INPUT_SAM_SINGLE)
-	{
-		while(1)
-		{
-			nch = fgetc(input->input_fp); 
-			if(nch=='@')
-				SKIP_LINE
-			else break;
-		}
-		
-		SKIP_LINE
-		if(input->file_type != GENE_INPUT_SAM_SINGLE)
-			SKIP_LINE
-	}
-	else if(input->file_type == GENE_INPUT_FASTA)
-	{
-		SKIP_LINE
-		while(1)
-		{
-			SKIP_LINE
-			nch = fgetc(input->input_fp); 
-			if(nch == EOF)
-				break;
-			if(nch=='>')
-			{
-				fseek(input->input_fp, -1, SEEK_CUR);
-				break;
-			}
-		}
-	}
-	else if(input->file_type == GENE_INPUT_FASTQ)
-	{
-		SKIP_LINE_NOEMPTY
-		SKIP_LINE_NOEMPTY
-		SKIP_LINE_NOEMPTY
-		SKIP_LINE_NOEMPTY
-	}
-}
 
 unsigned int read_numbers(gene_input_t * input)
 {
@@ -899,7 +852,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 	} else if(input->file_type == GENE_INPUT_FASTA) {
 		int ret;
 		if(quality_string) (*quality_string)=0;
-
+		#ifdef __MINGW32__
+		assert(0);
+		#endif
 		while(1) // fetch read name
 		{
 			ret = read_line(MAX_READ_LENGTH, input->input_fp, read_string, 0);
@@ -937,7 +892,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			nch = fgetc(input->input_fp);
 
 			if(nch!=EOF)
-				fseek(input->input_fp, -1, SEEK_CUR);
+				fseeko(input->input_fp, -1, SEEK_CUR);
 		
 			if(nch == '>'||nch<1 || nch == EOF)
 				break;
@@ -2681,7 +2636,7 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 				return -1;
 			}
 		}else{
-			fseek(fp, slen, SEEK_CUR);
+			fseeko(fp, slen, SEEK_CUR);
 		}
 		xlen_read += slen;
 	}
@@ -2693,7 +2648,7 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 	//SUBREADprintf("ABBO : GOOD GZ , LEN=%d , POS=%llu\n", read_len, ftello(fp));
 
 	// seek over CRC and ISIZE
-	fseek(fp, 8, SEEK_CUR);
+	fseeko(fp, 8, SEEK_CUR);
 	if(read_len < bsize - xlen - 19) return -1;
 	return read_len;
 }
@@ -2963,7 +2918,11 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 						int margin_size = thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr;
 						memcpy(margin_data, &margin_size, 4);
 						memcpy(margin_data+4,  thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr, thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr);
-						sprintf(margin_key,"E%lu", thread_context -> input_buff_SBAM_file_end);
+						#ifdef __MINGW32__
+						sprintf(margin_key,"E%lu",  (unsigned long)thread_context -> input_buff_SBAM_file_end);
+						#else
+						sprintf(margin_key,"E%llu", thread_context -> input_buff_SBAM_file_end);
+						#endif
 						subread_lock_occupy(&pairer -> SAM_BAM_table_lock);
 
 						HashTablePut(pairer -> bam_margin_table, margin_key, margin_data);
@@ -3957,13 +3916,13 @@ int SAM_pairer_osr_next_name(FILE * fp , char * name, int thread_no, int all_thr
 		name[rlen]=0;
 		if(all_threads < 0 || SAM_pairer_osr_hash(name)% all_threads == thread_no  )
 		{
-			fseek(fp, -2-rlen, SEEK_CUR);
+			fseeko(fp, -2-rlen, SEEK_CUR);
 			return 1;
 		}
 		retv = fread(&rlen, 1, 4, fp);
 		if(retv!=4) return -1;
 		rlen +=4;
-		fseek(fp, rlen, SEEK_CUR);
+		fseeko(fp, rlen, SEEK_CUR);
 	}
 	return 0;
 }
@@ -3974,7 +3933,7 @@ void SAM_pairer_osr_next_bin(FILE * fp, char * bin){
 	if(retv <2) *((int*)bin)=0;
 
 	assert(rlen < 1024);
-	fseek(fp, rlen, SEEK_CUR);
+	fseeko(fp, rlen, SEEK_CUR);
 	rlen =0;
 	retv = fread(&rlen, 1, 4, fp);
 	if(retv <4) *((int*)bin)=0;
@@ -4498,7 +4457,11 @@ int SAM_pairer_find_start(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * 
 				char * margin_data = malloc(start_pos+4);
 				memcpy(margin_data, &start_pos, 4);
 				memcpy(margin_data+4,  thread_context -> input_buff_BIN, start_pos);
+				#ifdef __MINGW32__
+				sprintf(margin_key,"S%lu", (unsigned long) thread_context -> input_buff_SBAM_file_start);
+				#else
 				sprintf(margin_key,"S%llu", thread_context -> input_buff_SBAM_file_start);
+				#endif
 				subread_lock_occupy(&pairer -> SAM_BAM_table_lock);
 				HashTablePut(pairer -> bam_margin_table, margin_key, margin_data);
 				subread_lock_release(&pairer -> SAM_BAM_table_lock);
@@ -4708,7 +4671,7 @@ int fix_load_next_block(FILE * in, char * binbuf, z_stream * strm){
 				bsize = fgetc(in);
 				bsize += 256*fgetc(in);
 			}else{
-				fseek(in , slen, SEEK_CUR);
+				fseeko(in , slen, SEEK_CUR);
 			}
 			xlen_ptr += 4 + slen;
 		}
@@ -4716,7 +4679,7 @@ int fix_load_next_block(FILE * in, char * binbuf, z_stream * strm){
 			int rlenv = fread(bam_buf, 1, bsize - xlen - 19, in);
 			if(rlenv < bsize - xlen - 19) return -1;
 		}
-		fseek(in, 8, SEEK_CUR);
+		fseeko(in, 8, SEEK_CUR);
 
 		strm -> avail_in = bsize - xlen - 19;
 		strm -> next_in = (unsigned char*)bam_buf;
@@ -4814,7 +4777,7 @@ int  fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 
 int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	FILE * old_fp = pairer -> input_fp;
-	fseek(old_fp, 0, SEEK_SET);
+	fseeko(old_fp, 0, SEEK_SET);
 	char tmpfname [MAX_FILE_NAME_LENGTH+14], readname[256];
 
 	sprintf(tmpfname, "%s.fixbam", pairer -> tmp_file_prefix);
@@ -5376,7 +5339,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 			}
 		}
 
-		fseek(pairer -> input_fp, 0 , SEEK_SET);
+		fseeko(pairer -> input_fp, 0 , SEEK_SET);
 		int header_bin_ptr = 0, header_contigs = 0;
 		char * header_bin = malloc(header_buffer_safe_size);
 		
@@ -5439,7 +5402,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 
 
 
-		fseek(pairer -> input_fp, passed_read_SBAM_ptr, SEEK_SET);
+		fseeko(pairer -> input_fp, passed_read_SBAM_ptr, SEEK_SET);
 
 		line_ptr = SBAM_buff;
 
@@ -5519,7 +5482,7 @@ int SAM_pairer_long_cigar_run(SAM_pairer_context_t * pairer){
 	
 	inflateInit2(&in_strm, PAIRER_GZIP_WINDOW_BITS);
 
-	fseek(old_fp, 0, SEEK_SET);
+	fseeko(old_fp, 0, SEEK_SET);
 
 	if(1){
 		int disk_is_full = 0;
@@ -5762,7 +5725,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 				if(ret<1) break;
 
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
-					fseek(bbfp, read_name_len, SEEK_CUR); 
+					fseeko(bbfp, read_name_len, SEEK_CUR); 
 				else
 				{
 					read_name = malloc(read_name_len+1);
@@ -5774,7 +5737,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 				if(ret<1) break;
 
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
-					fseek(bbfp, read_len, SEEK_CUR); 
+					fseeko(bbfp, read_len, SEEK_CUR); 
 				else
 				{
 					char * new_line_mem = malloc(read_len+1);
@@ -5844,7 +5807,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 					if(ret < read_name_len) break;
 
 					read_name_buf[read_name_len] = 0;
-				} else fseek(bbfp, read_name_len, SEEK_CUR);
+				} else fseeko(bbfp, read_name_len, SEEK_CUR);
 				ret = fread(&read_len, 2,1 , bbfp);
 				if(ret < 1) break;
 
@@ -5854,7 +5817,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 					if(ret < 1) break;
 					read_line_buf[read_len] = 0;
 				}
-				else	fseek(bbfp, read_len, SEEK_CUR);
+				else	fseeko(bbfp, read_len, SEEK_CUR);
 
 
 				if(flags & SAM_FLAG_SECOND_READ_IN_PAIR)
@@ -6281,7 +6244,7 @@ int is_pipe_file(char * fname)
 	FILE * fp = fopen(fname,"r");
 	if(!fp) return 0;
 
-	int seeked = fseek(fp, 0, SEEK_SET);
+	int seeked = fseeko(fp, 0, SEEK_SET);
 	fclose(fp);
 
 	return (seeked != 0);
