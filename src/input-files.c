@@ -42,7 +42,6 @@
 #include "sublog.h"
 
 unsigned int BASE_BLOCK_LENGTH = 15000000;
-int is_R_warnned = 0;
 
 FILE * f_subr_open(const char * fname, const char * mode)
 {
@@ -517,8 +516,9 @@ int geinput_next_char(gene_input_t * input)
 
 			if (nch == '\r')
 			{
-				is_R_warnned = 1; 
+				#ifndef __MINGW32__
 				SUBREADprintf("The input FASTA file contains \\r characters. This should not result in any problem but we suggest to use UNIX-style line breaks.\n");
+				#endif
 				continue;
 			}
 			if (nch == '\n')
@@ -528,7 +528,10 @@ int geinput_next_char(gene_input_t * input)
 			}
 			if (nch == ' ' || nch == '\t')
 				continue;
-
+			if(1){
+				long int fpos = ftello(input->input_fp);
+				if(fpos >= 3052545143u - 20 && fpos <= 20+ 3052545143  )SUBREADprintf("NCH AT %ld is %c but LASTBR is %d\n", fpos, nch, last_br);
+			}	
 			if (nch == '>' && last_br)
 			{
 				// if this is a new segment
@@ -549,6 +552,7 @@ int geinput_next_char(gene_input_t * input)
 				{
 					fseeko(input->input_fp, fpos - back_search_len, SEEK_SET);
 					int bc_nch = fgetc(input->input_fp);
+					//SUBREADprintf("SEEKINGBACK : %d : ch=%d '%c' ; bch=%d '%c'\n", back_search_len, nch, nch, bc_nch, bc_nch);
 					if(bc_nch=='\n')
 					{
 						if(nch == '>' && back_search_len==2) is_empty_seq=1;
@@ -570,7 +574,11 @@ int geinput_next_char(gene_input_t * input)
 				}
 				else
 				{
+					#ifdef __MINGW32__
+					SUBREADprintf ("\nUnknown character in the chromosome data: '%c' (ASCII:%02X), ignored. The file offset is %lu\n", nch, nch, fpos);
+					#else
 					SUBREADprintf ("\nUnknown character in the chromosome data: '%c' (ASCII:%02X), ignored. The file offset is %llu\n", nch, nch, fpos);
+					#endif
 					SUBREADprintf("%s", out_buf);
 					for(; back_search_len>2; back_search_len--)
 						SUBREADprintf(" ");
@@ -580,8 +588,8 @@ int geinput_next_char(gene_input_t * input)
 					free(out_buf);
 					return 'N';
 				}
-			}		
-			last_br = 0;
+			}
+			if(nch !='\r' && nch != '\n')last_br = 0;
 		}
 	}
 	else
@@ -2955,7 +2963,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 						int margin_size = thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr;
 						memcpy(margin_data, &margin_size, 4);
 						memcpy(margin_data+4,  thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr, thread_context -> input_buff_BIN_used - thread_context -> input_buff_BIN_ptr);
-						sprintf(margin_key,"E%llu", thread_context -> input_buff_SBAM_file_end);
+						sprintf(margin_key,"E%lu", thread_context -> input_buff_SBAM_file_end);
 						subread_lock_occupy(&pairer -> SAM_BAM_table_lock);
 
 						HashTablePut(pairer -> bam_margin_table, margin_key, margin_data);
