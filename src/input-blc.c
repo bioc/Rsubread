@@ -54,7 +54,7 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 				strcpy(testfile_name, data_dir);    
 				strcat(testfile_name, "/");
 				strcat(testfile_name, dp->d_name);
-				FILE *fp = fopen(testfile_name,"r");
+				FILE *fp = fopen(testfile_name,"rb");
 				if(NULL == fp){
 					SUBREADprintf("ERROR: cannot open the run info file: %s\n", testfile_name);
 				}
@@ -220,7 +220,7 @@ int iBLC_open_batch(input_BLC_t * blc_input ){
 			}
 			for(xx = 0; xx < 4; xx++) seekgz_next_int8(blc_input -> bcl_gzip_fps[fii]); // skip the first 32-b integer
 		}else{
-			blc_input -> bcl_fps[fii] = fopen(fname, "r");
+			blc_input -> bcl_fps[fii] = fopen(fname, "rb");
 			 if(NULL == blc_input -> bcl_fps[fii]){
 				SUBREADprintf("ERROR: Unable to open %s\n", fname);
 				return -1;
@@ -239,7 +239,7 @@ int iBLC_open_batch(input_BLC_t * blc_input ){
 		}
 		for(xx = 0; xx < 12; xx++) seekgz_next_int8(blc_input -> filter_gzip_fp); // skip the 12-byte header
 	}else{
-		blc_input -> filter_fp = fopen(fname, "r");
+		blc_input -> filter_fp = fopen(fname, "rb");
 		if(NULL == blc_input -> filter_fp){
 			SUBREADprintf("ERROR: Unable to open %s\n", fname);
 			return -1;
@@ -655,7 +655,7 @@ void iBLC_free_3tp(void * t){
 HashTable * input_BLC_parse_SampleSheet(char * fname){
 	HashTable * ret = StringTableCreate(30);
 	HashTableSetDeallocationFunctions(ret, free, iBLC_free_sample_items);
-	FILE * fp = fopen(fname, "r");
+	FILE * fp = fopen(fname, "rb");
 	if(fp==NULL) return NULL;
 	char linebuf[MAX_FILE_NAME_LENGTH];
 	int state = -1;

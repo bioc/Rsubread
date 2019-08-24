@@ -559,7 +559,7 @@ int autozip_open(const char * fname, autozip_fp * fp){
 	memset(fp, 0, sizeof(autozip_fp));
 	strcpy(fp -> filename, fname);
 
-	FILE * tstfp = fopen(fname,"r");
+	FILE * tstfp = fopen(fname,"rb");
 	if(!tstfp) return ret;
 
 	int cc1, cc2;

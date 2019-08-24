@@ -461,7 +461,6 @@ void R_qualityScores_wrapper(int * nargs, char ** argv)
 void R_generate_random_RNAseq_reads(int * nargs, char ** argv){
 	char * r_argv, ** c_argv;
 	int i,n;
-	
 	r_argv = strdup(*argv);
 	//fprintf(stderr, "ARGSSS=%s\n", r_argv);
 	

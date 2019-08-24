@@ -225,7 +225,7 @@ int read_line_noempty(int max_read_len, gene_input_t * input, char * buff, int m
 		while(1)
 		{
 			char ch = geinput_getc(input);
-			#ifdef WINDOWS
+			#ifdef __MINGW32__
 			if(ch == '\r') continue;
 			#endif
 			if(ch == EOF) break;
@@ -242,7 +242,7 @@ int read_line_noempty(int max_read_len, gene_input_t * input, char * buff, int m
 		while(1)
 		{
 			char ch = geinput_getc(input);
-			#ifdef WINDOWS
+			#ifdef __MINGW32__
 			if(ch == '\r') continue;
 			#endif
 			if (ch == EOF) break;
@@ -268,7 +268,7 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 		while(1)
 		{
 			char ch = fgetc(fp);
-			#ifdef WINDOWS
+			#ifdef __MINGW32__
 			if(ch == '\r') continue;
 			#endif
 			if(ch == '\n' || ch == EOF) break;
@@ -281,7 +281,7 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 		while(1)
 		{
 			char ch = fgetc(fp);
-			#ifdef WINDOWS
+			#ifdef __MINGW32__
 			if(ch == '\r') continue;
 			#endif
 			if (ch == '\n' || ch == EOF) break;
