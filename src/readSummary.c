@@ -3789,7 +3789,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						}
 						//#warning "DEBUG OUT 1"
 						if(0 && FIXLENstrcmp("V0112_0155:7:1102:10036:21940#ACTTGA", read_name) == 0)
-							SUBREADprintf("OVERLAP TO %ld : %lu >= %lu ; EXON_SPAN=%ld ( %ld ~ %ld)\n", tested_exon_id, tested_exon_overlap_any_read, applied_overlapping_threshold, exon_span, global_context -> exontable_start[tested_exon_id], global_context -> exontable_stop[tested_exon_id]);
+							SUBREADprintf("OVERLAP TO %lld : %lld >= %lld ; EXON_SPAN=%ld ( %ld ~ %ld)\n", tested_exon_id, tested_exon_overlap_any_read, applied_overlapping_threshold, exon_span, global_context -> exontable_start[tested_exon_id], global_context -> exontable_stop[tested_exon_id]);
 					}
 				}
 			}
@@ -4216,7 +4216,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 		if(cellbc_no != old_bcno || x1 == cellno_umino_p1_list -> numOfElements-1){
 			int cell_umi = 0;
 			srInt_64 sec_end = x1 + ((cellbc_no == old_bcno)?1:0);
-			if(0 && sec_end - cell_sec_start > 40000) SUBREADprintf("BIGSEC: %ld\n", sec_end - cell_sec_start);
+			if(0 && sec_end - cell_sec_start > 40000) SUBREADprintf("BIGSEC: %lld\n", sec_end - cell_sec_start);
 			if(sec_end - cell_sec_start > 70){
 				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret );
 			}else{
@@ -4272,7 +4272,7 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 		#ifdef __MINGW32__
 		linebuf_ptr = sprintf(linebuf, "%I64d", line_number);
 		#else
-		linebuf_ptr = sprintf(linebuf, "%lu", line_number);
+		linebuf_ptr = sprintf(linebuf, "%lld", line_number);
 		#endif
 	//SUBREADprintf("DOING_ROW %ld\n", line_number);
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
@@ -5414,7 +5414,7 @@ void fc_write_final_gene_results(fc_thread_global_context_t * global_context, in
 				#ifdef __MINGW32__
 				fprintf(fp_out,"\t%I64u", (srInt_64)longlong_res);
 				#else
-				fprintf(fp_out,"\t%lu", (srInt_64)longlong_res);
+				fprintf(fp_out,"\t%lld", (srInt_64)longlong_res);
 				#endif
 			}
 		}
@@ -5481,7 +5481,7 @@ void fc_write_final_counts(fc_thread_global_context_t * global_context, const ch
 			#ifdef __MINGW32__
 			fprintf(fp_out,"\t%I64u", (srInt_64)*cntr);
 			#else
-			fprintf(fp_out,"\t%lu", (srInt_64)*cntr);
+			fprintf(fp_out,"\t%lld", (srInt_64)*cntr);
 			#endif
 		}
 		int wlen = fprintf(fp_out,"\n");
@@ -5547,7 +5547,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 				#ifdef __MINGW32__
 				fprintf(fp_out,"\t%I64d", (srInt_64)longlong_res);
 				#else
-				fprintf(fp_out,"\t%lu", (srInt_64)longlong_res);
+				fprintf(fp_out,"\t%lld", (srInt_64)longlong_res);
 				#endif
 			}
 		}
@@ -6172,7 +6172,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			#ifdef __MINGW32__
 			fprintf(ofp,"\t%I64d", count);
 			#else
-			fprintf(ofp,"\t%lu", count);
+			fprintf(ofp,"\t%lld", count);
 			#endif
 		}
 		int wlen = fprintf(ofp, "\n");
