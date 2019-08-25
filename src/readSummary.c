@@ -3789,7 +3789,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						}
 						//#warning "DEBUG OUT 1"
 						if(0 && FIXLENstrcmp("V0112_0155:7:1102:10036:21940#ACTTGA", read_name) == 0)
-							SUBREADprintf("OVERLAP TO %lld : %lld >= %lld ; EXON_SPAN=%ld ( %ld ~ %ld)\n", tested_exon_id, tested_exon_overlap_any_read, applied_overlapping_threshold, exon_span, global_context -> exontable_start[tested_exon_id], global_context -> exontable_stop[tested_exon_id]);
+							SUBREADprintf("OVERLAP TO %lld : %lld >= %lld ; EXON_SPAN=%lld ( %lld ~ %lld)\n", tested_exon_id, tested_exon_overlap_any_read, applied_overlapping_threshold, exon_span, global_context -> exontable_start[tested_exon_id], global_context -> exontable_stop[tested_exon_id]);
 					}
 				}
 			}
