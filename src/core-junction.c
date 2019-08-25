@@ -6467,10 +6467,10 @@ void build_breakpoint_tables(global_context_t  * global_context){
 }
 
 void finalise_structural_variances(global_context_t * global_context){
-	SUBREADprintf("Funky Tables: A:%u, BC:%u, DE:%u\n", global_context -> funky_list_A.fragments, global_context -> funky_table_BC.fragments / 2, global_context -> funky_list_DE.fragments);
+	SUBREADprintf("Funky Tables: A:%u, BC:%u, DE:%u\n", (unsigned int) global_context -> funky_list_A.fragments, (unsigned int)global_context -> funky_table_BC.fragments / 2, (unsigned int)global_context -> funky_list_DE.fragments);
 
 	build_breakpoint_tables(global_context);
-	SUBREADprintf("Breakpoint Tables: P:%u, QR:%u, YZ:%u\n", global_context -> breakpoint_table_P.fragments, global_context -> breakpoint_table_QR.fragments, global_context -> breakpoint_table_YZ.fragments);
+	SUBREADprintf("Breakpoint Tables: P:%u, QR:%u, YZ:%u\n", (unsigned int)global_context -> breakpoint_table_P.fragments, (unsigned int)global_context -> breakpoint_table_QR.fragments, (unsigned int)global_context -> breakpoint_table_YZ.fragments);
 	finalise_translocations(global_context);
 	finalise_inversions(global_context);
 }
