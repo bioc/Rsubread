@@ -392,9 +392,9 @@ int show_summary(global_context_t * global_context)
 
 	#ifdef __MINGW32__
     if(global_context->input_reads.is_paired_end_reads)
-		print_in_box(80, 0,0,"            Total fragments : %llu" , global_context -> all_processed_reads);
+		print_in_box(80, 0,0,"            Total fragments : %I64d" , global_context -> all_processed_reads);
     else
-		print_in_box(80, 0,0,"                Total reads : %llu" , global_context -> all_processed_reads);
+		print_in_box(80, 0,0,"                Total reads : %I64d" , global_context -> all_processed_reads);
 
 	print_in_box(81, 0,0,"                     Mapped : %u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
 	print_in_box(80, 0,0,"            Uniquely mapped : %u",  global_context -> all_uniquely_mapped_reads);
@@ -403,8 +403,8 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 0,0,"                   Unmapped : %u",  global_context -> all_unmapped_reads);
 	if(global_context->input_reads.is_paired_end_reads){
 		print_in_box(80, 0,1,"      ");
-		print_in_box(80, 0,0,"            Properly paired : %llu", global_context -> all_correct_PE_reads);
-		print_in_box(80, 0,0,"        Not properly paired : %llu", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"            Properly paired : %I64d", global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"        Not properly paired : %I64d", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
 		print_in_box(80, 0,0,"                  Singleton : %u", global_context -> not_properly_pairs_only_one_end_mapped);
 		print_in_box(80, 0,0,"                   Chimeric : %u", global_context -> not_properly_pairs_different_chro);
 		print_in_box(80, 0,0,"      Unexpected strandness : %u", global_context -> not_properly_different_strands);
@@ -1020,7 +1020,11 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 		else{
 			int ret = sort_SAM_finalise(&writer);
 			if(writer.unpaired_reads)
-				print_in_box(80,0,0,"%llu single-end mapped reads in reordering.", writer.unpaired_reads);
+				#ifdef __MINGW32__
+				print_in_box(80,0,0,"%I64d single-end mapped reads in reordering.", writer.unpaired_reads);
+				#else
+				print_in_box(80,0,0,"%lld single-end mapped reads in reordering.", writer.unpaired_reads);
+				#endif
 			if(ret) {
 				disk_is_full = 1;
 				SUBREADprintf("ERROR: unable to create the temporary file. Please check the disk space in the output directory.\n");
@@ -2169,9 +2173,18 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 		else
 		{
-			int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			int write_len_2 = 100, 
+			#ifdef __MINGW32__
+			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%I64d\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			#else
+			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			#endif
 			if(global_context->input_reads.is_paired_end_reads)
+			#ifdef __MINGW32__
+				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%I64d\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
+			#else
 				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
+			#endif
 
 			if( write_len < 10 || write_len_2 < 10 ){
 				global_context -> output_sam_is_full = 1;
@@ -2939,7 +2952,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 										global_context -> expected_TLEN_read_numbers++;
 										global_context -> expected_TLEN_sum += this_tlen;
 										if(global_context -> expected_TLEN_read_numbers == READPAIRS_FOR_CALC_EXPT_TLEN)
-											print_in_box(80,0,0,"  Estimated fragment length : %llu bp\n",  global_context -> expected_TLEN_sum / global_context -> expected_TLEN_read_numbers );
+											print_in_box(80,0,0,"  Estimated fragment length : %d bp\n",  (int)(global_context -> expected_TLEN_sum / global_context -> expected_TLEN_read_numbers ));
 										subread_lock_release(&global_context -> output_lock);
 									}
 								}
