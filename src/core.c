@@ -349,14 +349,22 @@ int show_summary(global_context_t * global_context)
 	char sumname[MAX_FILE_NAME_LENGTH+30];
 	sprintf(sumname, "%s.summary", global_context->config.output_prefix);
 	FILE * sumfp = fopen(sumname,"w");
+	#ifdef __MINGW32__
+	fprintf(sumfp, "Total_%s\t%I64u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
+	#else
 	fprintf(sumfp, "Total_%s\t%llu\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
+	#endif
 	fprintf(sumfp, "Mapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_mapped_reads);
 	fprintf(sumfp, "Uniquely_mapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_uniquely_mapped_reads);
 	fprintf(sumfp, "Multi_mapping_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_multimapping_reads);
 	fprintf(sumfp, "Unmapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_unmapped_reads);
 
 	if(global_context->input_reads.is_paired_end_reads){
+		#ifdef __MINGW32__
+		fprintf(sumfp, "Properly_paired_fragments\t%I64u\n",global_context -> all_correct_PE_reads);
+		#else
 		fprintf(sumfp, "Properly_paired_fragments\t%llu\n",global_context -> all_correct_PE_reads);
+		#endif
 		fprintf(sumfp, "Singleton_fragments\t%u\n", global_context -> not_properly_pairs_only_one_end_mapped);
 		fprintf(sumfp, "More_than_one_chr_fragments\t%u\n", global_context -> not_properly_pairs_different_chro);
 		fprintf(sumfp, "Unexpected_strandness_fragments\t%u\n", global_context -> not_properly_different_strands);

@@ -1,6 +1,13 @@
 #ifndef __LRMconfig_h_
 #define __LRMconfig_h_
 
+
+#ifndef SRINT_64_DEFINED
+#define SRINT_64_DEFINED
+typedef long long srInt_64;
+typedef unsigned long long srUInt_64;
+#endif
+
 #include <pthread.h>
 #include <zlib.h>
 #include "LRMseek-zlib.h"
