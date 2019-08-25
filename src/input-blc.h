@@ -16,7 +16,7 @@ void input_BLC_close (input_BLC_t * blc_input);
 
 // "cached BCL" maintains a chunk of reads; it decompresses 
 int cacheBCL_init( cache_BCL_t * cache_input, char * data_dir, int reads_in_chunk, int all_threads );
-int cacheBCL_next_read(  cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, long long * read_number_in_all);
+int cacheBCL_next_read(  cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, srInt_64 * read_number_in_all);
 int cacheBCL_go_chunk_start( cache_BCL_t * blc_input );
 int cacheBCL_go_chunk_end( cache_BCL_t * blc_input );
 void cacheBCL_close ( cache_BCL_t * blc_input );

@@ -413,11 +413,15 @@ int cacheBCL_next_chunk(cache_BCL_t * cache_input){
 }
 
 
-int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, long long rno){
+int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, srInt_64 rno){
 	int bii, idx_offset, base_offset;
 	int * srii = cache_input -> single_read_lengths;
 
+	#ifdef __MINGW32__
+	sprintf(read_name, "R%011I64u:", rno);
+	#else
 	sprintf(read_name, "R%011llu:", rno);
+	#endif
 	idx_offset  = srii[0];
 	base_offset = srii[1] + idx_offset;
 
@@ -458,7 +462,7 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 
 
 
-int cacheBCL_next_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, long long * read_number_in_all){
+int cacheBCL_next_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, srInt_64 * read_number_in_all){
 	if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk){
 		if(cache_input -> last_chunk_in_cache) return 0;
 		cacheBCL_next_chunk(cache_input);
@@ -466,7 +470,7 @@ int cacheBCL_next_read(cache_BCL_t * cache_input, char * read_name, char * seq, 
 			return 0;
 	}
 
-	long long rnumb =(cache_input -> chunk_no -1)*1ll * cache_input -> reads_per_chunk +(cache_input -> read_no_in_chunk);
+	srInt_64 rnumb =(cache_input -> chunk_no -1)*1ll * cache_input -> reads_per_chunk +(cache_input -> read_no_in_chunk);
 	if(read_number_in_all) *read_number_in_all = rnumb;
 	return iCache_copy_read(cache_input, read_name, seq, qual, rnumb);
 }
@@ -487,7 +491,11 @@ int input_BLC_init( input_BLC_t * blc_input , char * data_dir ){
 int iBLC_current_lane_next_read(input_BLC_t * blc_input, char * readname , char * read, char * qual){
 	int bii, idx_offset, base_offset;
 
+	#ifdef __MINGW32__
+	sprintf(readname, "R%011I64u:", blc_input -> read_number +1);
+	#else
 	sprintf(readname, "R%011llu:", blc_input -> read_number +1);
+	#endif
 
 	{
 		idx_offset = blc_input -> single_read_lengths[0];
@@ -589,7 +597,7 @@ int input_BLC_tell ( input_BLC_t * blc_input , input_BLC_pos_t * pos ){
 			seekgz_tell(blc_input->bcl_gzip_fps[xx1], pos -> pos_of_bclgzs[xx1]);
 		}
 	}else{
-		pos -> pos_of_bcls = calloc(sizeof(long long) , blc_input -> total_bases_in_each_cluster);
+		pos -> pos_of_bcls = calloc(sizeof(srInt_64) , blc_input -> total_bases_in_each_cluster);
 		for(xx1=0; xx1<blc_input -> total_bases_in_each_cluster; xx1++)
 			pos -> pos_of_bcls[xx1] = ftello(blc_input->bcl_fps[xx1]);
 	}
@@ -758,11 +766,11 @@ void iCache_copy_sample_table_2_list(void* ky, void* va, HashTable* tab){
 	ArrayList * cbclist = tab -> appendix1;
 	ArrayList * hashed_arr = va ;
 
-	long xx1;
+	srInt_64 xx1;
 	for(xx1 =0; xx1< hashed_arr -> numOfElements; xx1++){
 		char ** push_arr = malloc(sizeof(char*)*3);
 		char ** sbc_lane_sample = ArrayListGet(hashed_arr, xx1);
-		long long lane_sample_int = sbc_lane_sample[0]-(char*)NULL;
+		srInt_64 lane_sample_int = sbc_lane_sample[0]-(char*)NULL;
 
 		ArrayListPush(cbclist, push_arr);
 		push_arr[0] = NULL + lane_sample_int; 
@@ -797,7 +805,7 @@ int iCache_get_cell_no(HashTable * cell_barcode_table, ArrayList * cell_barcode_
 
 		if(xx1 == 0){
 			//if(xrawarr) SUBREADprintf("CAFE ? %p\n", xrawarr);
-			unsigned long long xint = xrawarr - NULL;
+			srInt_64 xint = xrawarr - NULL;
 			if(( xint & 0xFFFFFFFFF0000000llu)== IMPOSSIBLE_MEMORY_ADDRESS){
 				int only_cell_id = xint - IMPOSSIBLE_MEMORY_ADDRESS;
 				// no memory was allocated.
@@ -918,7 +926,7 @@ int cacheBCL_quality_test(char * datadir, HashTable * sample_sheet_table, ArrayL
 	if(orv)return -1;
 	while(1){
 		char base[MAX_READ_LENGTH], qual[MAX_READ_LENGTH], rname[MAX_READ_NAME_LEN];
-		long long readno = 0;
+		srInt_64 readno = 0;
 		base[0]=qual[0]=rname[0]=0;
 		orv = cacheBCL_next_read(&blc_input, rname, base, qual, &readno);
 		if(0==orv) break;
@@ -977,7 +985,7 @@ int main(int argc, char ** argv){
 
 	while(1){
 		char base[1000], qual[1000], rname[200];
-		long long readno = 0;
+		srInt_64 readno = 0;
 		base[0]=qual[0]=rname[0]=0;
 		orv = cacheBCL_next_read(&blc_input, rname, base, qual, &readno);
 		assert(orv>=0);
@@ -1013,7 +1021,7 @@ int main(int argc, char ** argv){
 
 	int ii;
 	for(ii = 0; ii < total_poses; ii++){
-		long long jj;
+		srInt_64 jj;
 		printf("\n\n========== SEEKING %d OF %d ================\n", ii,total_poses);
 		input_BLC_seek( &blc_input, poses+ii );
 		input_BLC_destroy_pos( &blc_input, poses+ii );

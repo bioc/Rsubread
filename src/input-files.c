@@ -91,7 +91,7 @@ double guess_reads_density(char * fname, int is_sam)
 	return guess_reads_density_format(fname, is_sam, NULL, NULL, NULL);
 }
 
-unsigned long long geinput_file_offset( gene_input_t * input){
+srInt_64 geinput_file_offset( gene_input_t * input){
 	if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		if(((seekable_zfile_t*)input -> input_fp) -> blocks_in_chain<1)return 0;
 		seekable_decompressed_block_t * ct = ((seekable_zfile_t*)input -> input_fp) -> block_rolling_chain+((seekable_zfile_t*)input -> input_fp) -> block_chain_current_no;
@@ -104,7 +104,7 @@ unsigned long long geinput_file_offset( gene_input_t * input){
 double guess_reads_density_format(char * fname, int is_sam, int * min_phred_score, int * max_phred_score, int * tested_reads)
 {
 	gene_input_t *ginp = malloc(sizeof(gene_input_t));
-	long long int fpos =0, fpos2 = 0;
+	srInt_64 fpos =0, fpos2 = 0;
 	int i;
 	int max_qual_chr = -1, min_qual_chr = 127;
 	char buff[MAX_READ_LENGTH] , qbuf[MAX_READ_LENGTH];
@@ -171,10 +171,10 @@ int is_gene_char(char c)
 	return 0;
 }
 
-long long int guess_gene_bases(char ** files, int file_number)
+srInt_64 guess_gene_bases(char ** files, int file_number)
 {
 	int i;
-	long long int ret = 0;
+	srInt_64 ret = 0;
 
 	for(i=0; i<file_number; i++)
 	{
@@ -386,7 +386,7 @@ int geinput_open_sam(const char * filename, gene_input_t * input, int half_numbe
 	input -> file_type = half_number + GENE_INPUT_SAM_SINGLE;
 	while(1){
 		char in_buff[3001];
-		long long int current_pos = ftello(input -> input_fp);
+		srInt_64 current_pos = ftello(input -> input_fp);
 		int rlen = read_line(3000, input->input_fp, in_buff, 0);
 		if(rlen < 1) return 1;
 
@@ -463,7 +463,7 @@ int geinput_open(const char * filename, gene_input_t * input)
 		input->input_fp = TMP_FP;
 		fseeko(input->input_fp, 0, SEEK_SET);
 		while (1){
-			long long int last_pos = ftello(input->input_fp);
+			srInt_64 last_pos = ftello(input->input_fp);
 			int rlen = read_line_noempty(MAX_READ_LENGTH, input, in_buff, 0);
 			if (rlen<=0){
 				ret = 1;
@@ -543,7 +543,7 @@ int geinput_next_char(gene_input_t * input)
 			if (is_gene_char(nch))
 				return toupper(nch);
 			else {
-				long long int fpos = ftello(input->input_fp);
+				srInt_64 fpos = ftello(input->input_fp);
 				int back_search_len =2;
 				int is_empty_seq = 0;
 				char *out_buf = malloc(2000);
@@ -603,7 +603,7 @@ int geinput_next_char(gene_input_t * input)
 
 int geinput_readline_back(gene_input_t * input, char * linebuffer_3000) 
 {
-	long long int last_pos = ftello(input -> input_fp);
+	srInt_64 last_pos = ftello(input -> input_fp);
 	int ret = read_line(3000, input->input_fp, linebuffer_3000, 0);
 	if(ret<1) return -1;
 	fseeko(input -> input_fp, last_pos, SEEK_SET);
@@ -619,7 +619,7 @@ unsigned int read_numbers(gene_input_t * input)
 {
 	unsigned int ret = 0;
 	char nch;
-	long long int fpos = ftello(input->input_fp);
+	srInt_64 fpos = ftello(input->input_fp);
 	if(input->file_type >= GENE_INPUT_SAM_SINGLE)
 	{
 		while(1)
@@ -702,10 +702,10 @@ int trim_read_inner(char * read_text, char * qual_text, int rlen, short t_5, sho
 	return max(0, rlen - t_5 - t_3);
 }
 
-long long int tell_current_line_no(gene_input_t * input){
-	long long int fpos = ftello(input->input_fp);
+srInt_64 tell_current_line_no(gene_input_t * input){
+	srInt_64 fpos = ftello(input->input_fp);
 	fseeko(input->input_fp,0,SEEK_SET);
-	long long ret = 0, fscanpos = 0;
+	srInt_64 ret = 0, fscanpos = 0;
 	while(1)
 	{
 		char nch = fgetc(input->input_fp);
@@ -926,7 +926,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			
 			if(nch != '@') {
 				if(input->file_type == GENE_INPUT_FASTQ){
-					long long int lineno = tell_current_line_no(input);
+					srInt_64 lineno = tell_current_line_no(input);
 					SUBREADprintf("ERROR: a format issue %d is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
 				} else {
 					SUBREADprintf("ERROR: a format issue %d is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
@@ -967,7 +967,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		} while( nch == '\n' );
 		if(nch != '+'){
 			if(input->file_type == GENE_INPUT_FASTQ){
-				long long int lineno = tell_current_line_no(input);
+				srInt_64 lineno = tell_current_line_no(input);
 				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
 			}else{
 				SUBREADprintf("ERROR: a format issue %d  (should be +) is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
@@ -1610,8 +1610,8 @@ void add_cigar_indel_event(HashTable * event_table_ptr, char * chro, unsigned in
 		for(x1 = 0; x1< exist_indel_count; x1++)
 		{
 			snprintf(event_token, 99,"%s\t%u\t%d", chro, chro_pos, x1);
-			long long int t64v =  (HashTableGet(event_table_ptr, event_token)-NULL);
-			long long int indel_len = (t64v&0xff) - 0x80;
+			srInt_64 t64v =  (HashTableGet(event_table_ptr, event_token)-NULL);
+			srInt_64 indel_len = (t64v&0xff) - 0x80;
 			if(indel_len == indels){
 				indel_event_id = 0xffffff&(t64v >> 8) ;
 				if(app2_ptr[indel_event_id]<65000)
@@ -1650,7 +1650,7 @@ void add_cigar_indel_event(HashTable * event_table_ptr, char * chro, unsigned in
 		token_len=snprintf(event_token, 99,"%s\t%u\t%d", chro, chro_pos, exist_indel_count);
 		char * token_2 = malloc(token_len+1);
 		strcpy(token_2, event_token);
-		long long int indel_event_id_long = indel_event_id;
+		srInt_64 indel_event_id_long = indel_event_id;
 		app2_ptr[indel_event_id] +=1;
 
 		HashTablePut(event_table_ptr, token_2, NULL + ((0xff & (0x80 + indels)) | ((indel_event_id_long&0xffffff) << 8)));
@@ -1680,7 +1680,7 @@ void destroy_cigar_event_table(HashTable * event_table)
 			tabs = 0;
 			for(xk1=0; token[xk1]; xk1++) 
 				if(token[xk1]=='\t') tabs++;
-			long long int tmpv = cursor -> value - NULL;
+			srInt_64 tmpv = cursor -> value - NULL;
 			//printf("%s\t%lld\n", token, tmpv);
 
 			if(tabs==3)
@@ -1776,7 +1776,7 @@ void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_pref
 	autozip_close(&vzfp);
 }
 
-int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_mapped_bases, HashTable * event_table, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head, int use_softclipped_bases )
+int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix, unsigned int * real_read_count, int * block_count, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, srInt_64 * all_mapped_bases, HashTable * event_table, char * VCF_file, srInt_64 * all_mapped_reads, int do_fragment_filtering, int push_to_read_head, int use_softclipped_bases )
 {
 	int i, is_first_read=1, is_error = 0;
 	HashTable * fp_table;
@@ -1820,7 +1820,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 
 	while(1)
 	{
-		//unsigned long long int file_position = ftello(fp);
+		//srInt_64 file_position = ftello(fp);
 		//int linelen = read_line(2999, fp, line_buffer, 0);
 		char * is_ret = SamBam_fgets(sambam_reader, line_buffer, 2999, 1);
 
@@ -2212,9 +2212,9 @@ int does_file_exist(char * path)
 	return ret;
 }
 
-unsigned long long int sort_SAM_hash(char * str)
+srInt_64 sort_SAM_hash(char * str)
 {
-	unsigned long long int hash = 5381;
+	srInt_64 hash = 5381;
 	int c, xk1=0;
 
 	while (1)
@@ -2574,7 +2574,7 @@ void SAM_pairer_print_keys(void * key, void * hashed_obj, HashTable * tab){
 void SAM_pairer_destroy(SAM_pairer_context_t * pairer){
 
 	int x1;
-	unsigned long long all_orphants = 0;
+	srInt_64 all_orphants = 0;
 	for(x1 = 0; x1 < pairer -> total_threads ; x1++){
 		inflateEnd(&pairer -> threads[x1].strm);
 		free(pairer -> threads[x1].input_buff_BIN);
@@ -4174,7 +4174,7 @@ void * SAM_pairer_rescure_orphants_max_FP(void * params){
 	int thread_no = (int)(param_ptr[1]-NULL);
 	free(params);
 
-	unsigned long long died=0;
+	srInt_64 died=0;
 	int orphant_fp_no=0;
 	int thno, bkno, x1;
 	char tmp_fname[MAX_FILE_NAME_LENGTH+60];
@@ -4872,7 +4872,7 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 
 	// ===== The reads
 	int seq_len = 0, name_len = 0, cigar_opts = 0;
-	unsigned long long reads =0;
+	srInt_64 reads =0;
 	pairer -> is_bad_format = 0;
 
 	while(! is_longcigar){
@@ -5776,7 +5776,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 		}
 
 		//printf("BLK=%d; CKS=%d; READS=%llu\n", x1_block, x1_chunk, first_read_name_table -> numOfElements);
-		unsigned long long int finished_second_reads = 0;
+		srInt_64 finished_second_reads = 0;
 
 		for(x1_chunk = 0; x1_chunk < writer -> current_chunk; x1_chunk++)
 		{
@@ -6144,7 +6144,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		//	printf("RRN=%s\n", read_name);
 		
 		int read_name_len = strlen(read_name);
-		unsigned long long int read_line_hash = sort_SAM_hash(read_name);
+		srInt_64 read_line_hash = sort_SAM_hash(read_name);
 
 		int block_id = read_line_hash % SAM_SORT_BLOCKS;
 		if(!writer -> current_block_fp_array[block_id])
@@ -6184,7 +6184,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 	return is_disk_full;
 }
 
-int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, unsigned long long int read_no)
+int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, srInt_64 read_no)
 {
 	char read_name[MAX_READ_NAME_LEN];
 	int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
@@ -6230,7 +6230,7 @@ int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, uns
 	return 0;
 }
 
-int is_certainly_bam_file(char * fname, int * is_first_read_PE, long long * SAMBAM_header_size)
+int is_certainly_bam_file(char * fname, int * is_first_read_PE, srInt_64 * SAMBAM_header_size)
 {
 
 	int read_type = probe_file_type_EX(fname, is_first_read_PE, SAMBAM_header_size);
@@ -6462,7 +6462,7 @@ int probe_file_type(char * fname, int * is_first_read_PE)
 {
 	return probe_file_type_EX(fname, is_first_read_PE, NULL);
 }
-int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_header_length)
+int probe_file_type_EX(char * fname, int * is_first_read_PE, srInt_64 * SAMBAM_header_length)
 {
 	FILE * fp = f_subr_open(fname, "rb");
 	if(!fp) return FILE_TYPE_NONEXIST;
@@ -6653,7 +6653,7 @@ void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg){
 int main(int argc, char ** argv)
 {
 	FILE * ifp;
-	unsigned long long int rno=0;
+	srInt_64 rno=0;
 	short tmp_flags, is_sorted = 1;
 	char buff[3000], tmp_rname[MAX_FILE_NAME_LENGTH];
 

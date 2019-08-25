@@ -12,6 +12,9 @@
 #ifndef _HASHTABLE_H
 #define _HASHTABLE_H
 
+typedef long long srInt_64;
+typedef unsigned long long srUInt_64;
+
 /* These structs should not be accessed directly from user code.
  * All access should be via the public functions declared below. */
 
@@ -22,29 +25,29 @@ typedef struct KeyValuePair_struct {
 } KeyValuePair;
 
 typedef struct {
-    long numOfBuckets;
-    long numOfElements;
+    srInt_64 numOfBuckets;
+    srInt_64 numOfElements;
     KeyValuePair **bucketArray;
     float idealRatio, lowerRehashThreshold, upperRehashThreshold;
     int (*keycmp)(const void *key1, const void *key2);
     int (*valuecmp)(const void *value1, const void *value2);
-    unsigned long (*hashFunction)(const void *key);
+    srUInt_64 (*hashFunction)(const void *key);
     void (*keyDeallocator)(void *key);
     void (*valueDeallocator)(void *value);
 
     void * appendix1;
     void * appendix2;
     void * appendix3;
-    long long int counter1;
-    long long int counter2;
-    long long int counter3;
+    srInt_64 counter1;
+    srInt_64 counter2;
+    srInt_64 counter3;
 } HashTable;
 
 
 typedef struct {
 	void ** elementList;
-	long numOfElements;
-	long capacityOfElements;
+	srInt_64 numOfElements;
+	srInt_64 capacityOfElements;
 	void (*elemDeallocator)(void *elem);
 	void * appendix1;
 } ArrayList;
@@ -52,7 +55,7 @@ typedef struct {
 ArrayList * ArrayListCreate(int init_capacity);
 ArrayList * ArrayListDuplicate(ArrayList * ori);
 void ArrayListDestroy(ArrayList * list);
-void * ArrayListGet(ArrayList * list, long n);
+void * ArrayListGet(ArrayList * list, srInt_64 n);
 void * ArrayListRandom(ArrayList * list);
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
@@ -76,7 +79,7 @@ int ArrayListLLUComparison(void * L_elem, void * R_elem);
 // If the "value_less_than_dent" is larger than all the values in the list, "-1" is returned;
 // If there are repeated numbers in the list, this function will always return the index of the first of them when this repeated number is the next dent.
 //
-long ArrayListFindNextDent(ArrayList * list, unsigned long long value_less_than_dent);
+srInt_64 ArrayListFindNextDent(ArrayList * list, srUInt_64 value_less_than_dent);
 
 ArrayList * HashTableKeys(HashTable * tab);
 void HashTableIteration(HashTable * tab, void process_item(void * key, void * hashed_obj, HashTable * tab) );
@@ -109,8 +112,8 @@ ArrayList * HashTableKeyArray(HashTable * tab);
  *      HashTable    - a new Hashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
-HashTable * StringTableCreate(long numOfBuckets);
-HashTable *HashTableCreate(long numOfBuckets);
+HashTable * StringTableCreate(srInt_64 numOfBuckets);
+HashTable *HashTableCreate(srInt_64 numOfBuckets);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -277,7 +280,7 @@ int HashTableIsEmpty(const HashTable *hashTable);
  *                     the specified HashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableSize(const HashTable *hashTable);
+srInt_64 HashTableSize(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -295,7 +298,7 @@ long HashTableSize(const HashTable *hashTable);
  *                     HashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableGetNumBuckets(const HashTable *hashTable);
+srInt_64 HashTableGetNumBuckets(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -363,7 +366,7 @@ void HashTableSetValueComparisonFunction(HashTable *hashTable,
 \*--------------------------------------------------------------------------*/
 
 void HashTableSetHashFunction(HashTable *hashTable,
-                              unsigned long (*hashFunction)(const void *key));
+                              srUInt_64 (*hashFunction)(const void *key));
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -391,7 +394,7 @@ void HashTableSetHashFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRehash(HashTable *hashTable, long numOfBuckets);
+void HashTableRehash(HashTable *hashTable, srInt_64 numOfBuckets);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -484,7 +487,7 @@ void HashTableSetDeallocationFunctions(HashTable *hashTable,
  *      long   - the unmodulated hash value of the key
 \*--------------------------------------------------------------------------*/
 
-unsigned long HashTableStringHashFunction(const void *key);
+srUInt_64 HashTableStringHashFunction(const void *key);
 
 void free_values_destroy(HashTable * tab);
 int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, int replace_key, int dealloc_key, int dealloc_value);
