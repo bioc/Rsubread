@@ -225,11 +225,11 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 		}
 
 		if(the_table->version_number == SUBINDEX_VER0)
-			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+			memset(new_item_keys, 0, sizeof(gehash_key_t) * new_bucket_length);
 		else
-			bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+			memset(new_new_item_keys, 0, sizeof(short) * new_bucket_length);
 
-		bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+		memset(new_item_values, 0, sizeof(gehash_data_t) * new_bucket_length);
 
 		if(the_table->version_number == SUBINDEX_VER0)
 			current_bucket->item_keys = new_item_keys;
@@ -347,11 +347,11 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 			}
 
 			if(the_table->version_number == SUBINDEX_VER0)
-				bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+				memset(new_item_keys, 0, sizeof(gehash_key_t) * new_bucket_length);
 			else
-				bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+				memset(new_new_item_keys, 0, sizeof(short) * new_bucket_length);
 
-			bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+			memset(new_item_values, 0, sizeof(gehash_data_t) * new_bucket_length);
 
 			if(the_table->version_number == SUBINDEX_VER0)
 				memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
