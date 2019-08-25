@@ -1,3 +1,6 @@
+26 Aug 2019 - 1.35.21
+(1) Add support to the Windows platform (Rstudio + Rtools)
+
 21 Aug 2019 - 1.35.21
 (1) Fix a bug in featureCounts() that was introduced in the 1.35.20 version
 
