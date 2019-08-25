@@ -116,10 +116,15 @@ typedef pthread_mutex_t subread_lock_t;
 typedef pthread_spinlock_t subread_lock_t;
 #endif
 
+
 #ifdef __MINGW32__
 #define ftello ftello64
 #define fseeko fseeko64
-
+typedef long long srInt_64;
+typedef unsigned long long srUInt_64;
+#else
+typedef long long srInt_64;
+typedef unsigned long long srUInt_64;
 #endif
 
 #if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
