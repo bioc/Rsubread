@@ -1488,11 +1488,11 @@ unsigned int load_int32(FILE * fp)
 	return ret;
 }
 
-long long int load_int64(FILE * fp)
+srInt_64 load_int64(FILE * fp)
 {
-	long long int ret;
+	srInt_64 ret;
 	int read_length;
-	read_length = fread(&ret, sizeof(long long int), 1, fp);
+	read_length = fread(&ret, sizeof(srInt_64), 1, fp);
 	if(read_length<=0)assert(0);
 	return ret;
 }
@@ -1833,9 +1833,9 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		write_options(fp, the_table);
 	}
 
-	assert(sizeof(long long int ) == 8);
+	assert(sizeof(srInt_64 ) == 8);
 	assert(sizeof(int ) == 4);
-	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
+	fwrite(& (the_table -> current_items ), sizeof(srInt_64), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
 	print_in_box(80,0,0,"Save current index block...              ");
@@ -1969,7 +1969,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		if(0) // debug
 		{
 			int inidx=0;
-			long int real_old = -1;
+			srInt_64 real_old = -1;
 			for(xx = 0; xx < current_bucket -> current_items; xx++){
 				unsigned int real_key = 1u * current_bucket -> new_item_keys[xx] *1u * the_table -> buckets_number;
 				real_key += i;
