@@ -267,6 +267,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 
 		while(1){
 			int nch = autozip_getch(&fp);
+			if(nch<0)break;
 			if(status == 0){
 				assert(nch == '>');
 				status = 1;
