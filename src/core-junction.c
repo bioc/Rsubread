@@ -3491,7 +3491,7 @@ void print_big_margin(global_context_t * global_context, subread_read_number_t p
 	unsigned short * big_margin_record = _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read);
 	int x1;
 
-	SUBREADprintf("\n  >>> READ_NO=%u,  SECOND=%d, MEM=%p <<< \n", pair_number, is_second_read, big_margin_record);
+	SUBREADprintf("\n  >>> READ_NO=%u,  SECOND=%d, MEM=%p <<< \n", (unsigned int)pair_number, is_second_read, big_margin_record);
 	for(x1 = 0; x1 < global_context->config.big_margin_record_size/3 ; x1++)
 	{
 		SUBREADprintf("%d %d~%d   ", big_margin_record[x1*3] , big_margin_record[x1*3+1] , big_margin_record[x1*3+2]);
@@ -5764,10 +5764,10 @@ int find_translocation_brk_PQR(global_context_t * global_context, mapping_result
 				unsigned int event_no_R = event_ptr_list_R[candRi] - NULL;
 				chromosome_event_t * event_body_R = indel_context -> event_space_dynamic + event_no_R;
 
-				long long cand_R_dist_to_Q = is_Q_small_side_close_to_P?event_body_Q -> event_large_side:event_body_Q -> event_small_side;
+				srInt_64 cand_R_dist_to_Q = is_Q_small_side_close_to_P?event_body_Q -> event_large_side:event_body_Q -> event_small_side;
 				cand_R_dist_to_Q -= is_Q_small_side_close_to_P?event_body_R -> event_large_side:event_body_R-> event_small_side;
 
-				SUBREADprintf("R: candDist=%ld, DIR = %c %c\n", cand_R_dist_to_Q,  event_body_Q -> small_side_increasing_coordinate?'>':'<', event_body_Q -> large_side_increasing_coordinate?'>':'<');
+				SUBREADprintf("R: candDist=%lld, DIR = %c %c\n", cand_R_dist_to_Q,  event_body_Q -> small_side_increasing_coordinate?'>':'<', event_body_Q -> large_side_increasing_coordinate?'>':'<');
 
 				if(abs(cand_R_dist_to_Q) > BREAK_POINT_MAXIMUM_TOLERANCE) continue;
 				int is_R_small_side_close_to_P = is_Q_small_side_close_to_P;
@@ -6228,7 +6228,7 @@ void finalise_inversions(global_context_t * global_context){
 		}
 
 		int found_INV_frags = 0;
-		unsigned long long guessed_Z_large_abs_sum = 0, guessed_Y_small_abs_sum = 0;
+		srInt_64 guessed_Z_large_abs_sum = 0, guessed_Y_small_abs_sum = 0;
 
 		for(xk1 = 0; xk1 < s1_list_items; xk1++){
 			for(xk2 = 0; xk2 < s2_list_items ; xk2 ++){
@@ -6264,7 +6264,7 @@ void finalise_inversions(global_context_t * global_context){
 
 			guessed_Y_small_abs_sum /= found_INV_frags;
 			guessed_Z_large_abs_sum /= found_INV_frags;
-			SUBREADprintf("INVLOG: GUESSED_YZ=%lu, %lu\n", guessed_Y_small_abs_sum, guessed_Z_large_abs_sum);
+			SUBREADprintf("INVLOG: GUESSED_YZ=%lld, %lld\n", guessed_Y_small_abs_sum, guessed_Z_large_abs_sum);
 
 			locate_gene_position(q_res_1 -> selected_position,  &global_context -> chromosome_table, &q_small_chro, &q_small_pos);
 			int cand_Y, cand_Z;
@@ -6467,10 +6467,10 @@ void build_breakpoint_tables(global_context_t  * global_context){
 }
 
 void finalise_structural_variances(global_context_t * global_context){
-	SUBREADprintf("Funky Tables: A:%lu, BC:%lu, DE:%lu\n", global_context -> funky_list_A.fragments, global_context -> funky_table_BC.fragments / 2, global_context -> funky_list_DE.fragments);
+	SUBREADprintf("Funky Tables: A:%u, BC:%u, DE:%u\n", global_context -> funky_list_A.fragments, global_context -> funky_table_BC.fragments / 2, global_context -> funky_list_DE.fragments);
 
 	build_breakpoint_tables(global_context);
-	SUBREADprintf("Breakpoint Tables: P:%lu, QR:%lu, YZ:%lu\n", global_context -> breakpoint_table_P.fragments, global_context -> breakpoint_table_QR.fragments, global_context -> breakpoint_table_YZ.fragments);
+	SUBREADprintf("Breakpoint Tables: P:%u, QR:%u, YZ:%u\n", global_context -> breakpoint_table_P.fragments, global_context -> breakpoint_table_QR.fragments, global_context -> breakpoint_table_YZ.fragments);
 	finalise_translocations(global_context);
 	finalise_inversions(global_context);
 }
