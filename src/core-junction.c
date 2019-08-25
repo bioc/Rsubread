@@ -44,31 +44,6 @@ unsigned int abs32uint(unsigned int x){
 	return x;
 }
 
-int localPointerCmp_forbed(const void *pointer1, const void *pointer2)
-{
-	paired_exon_key *p1 = (paired_exon_key *)pointer1;
-	paired_exon_key *p2 = (paired_exon_key *)pointer2;
-	return !((p1-> big_key == p2 -> big_key) && (p2-> small_key == p1-> small_key));
-}
-
-unsigned long localPointerHashFunction_forbed(const void *pointer)
-{
-	paired_exon_key *p  = (paired_exon_key *)pointer;
-	return p-> big_key ^ p-> small_key  ^ (p->big_key>> 15);
-}
-
-int localPointerCmp_forpos(const void *pointer1, const void *pointer2)
-{
-	return pointer1 != pointer2;
-}
-
-unsigned long localPointerHashFunction_forpos(const void *pointer)
-{
-
-	return (unsigned long) pointer & 0xffffffff;
-}
-
-
 typedef struct{
 	unsigned int piece_main_abs_offset;
 	unsigned int piece_minor_abs_offset;
