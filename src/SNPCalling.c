@@ -91,7 +91,7 @@ struct SNP_Calling_Parameters{
 	HashTable * cigar_event_table;
 	char * rebuilt_command_line;
 
-	unsigned long long int all_mapped_bases;
+	srInt_64 all_mapped_bases;
 	unsigned int fisher_normalisation_target; 
 
 	double start_time;
