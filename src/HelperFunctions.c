@@ -307,6 +307,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 						unsigned int new_bin_space = current_bin_space / 4 * 5;
 						if(current_bin_space > 0xffff0000 /5 * 4){
 							assert(0);
+							return 1;
 						}
 						bin_block = realloc(bin_block, new_bin_space);
 						memset(bin_block + current_bin_space, 0, new_bin_space - current_bin_space);
