@@ -11,9 +11,11 @@
 
 #ifndef _HASHTABLE_H
 #define _HASHTABLE_H
-
+#ifndef SRINT_64_DEFINED
+#define SRINT_64_DEFINED
 typedef long long srInt_64;
 typedef unsigned long long srUInt_64;
+#endif
 
 /* These structs should not be accessed directly from user code.
  * All access should be via the public functions declared below. */

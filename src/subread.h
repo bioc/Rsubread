@@ -116,8 +116,11 @@ typedef pthread_mutex_t subread_lock_t;
 typedef pthread_spinlock_t subread_lock_t;
 #endif
 
+#ifndef SRINT_64_DEFINED
+#define SRINT_64_DEFINED
 typedef long long srInt_64;
 typedef unsigned long long srUInt_64;
+#endif
 
 #ifdef __MINGW32__
 #define ftello ftello64
