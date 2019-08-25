@@ -244,8 +244,9 @@ void destroy_contig_fasta(fasta_contigs_t * tab){
 	HashTableDestroy( tab -> contig_table );
 }
 int read_contig_fasta(fasta_contigs_t * tab, char * fname){
-	FILE * fp = f_subr_open(fname, "r");
-	if(fp != NULL){
+	autozip_fp fp;
+	int rv = autozip_open(fname, &fp);
+	if(rv>=0){
 		tab -> contig_table = HashTableCreate(3943);
 		tab -> size_table = HashTableCreate(3943);
 
@@ -265,7 +266,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 		chro_name[0]=0;
 
 		while(1){
-			char nch = fgetc(fp);
+			int nch = autozip_getch(&fp);
 			if(status == 0){
 				assert(nch == '>');
 				status = 1;
@@ -316,7 +317,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 			}
 		}
 
-		fclose(fp);
+		autozip_close(&fp);
 		return 0;
 	}
 	return 1;
