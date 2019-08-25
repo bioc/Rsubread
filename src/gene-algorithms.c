@@ -2665,7 +2665,7 @@ int fc_strcmp_chro(const void * s1, const void * s2)
 
 
 
-unsigned long fc_chro_hash(const void *key) {
+srUInt_64 fc_chro_hash(const void *key) {
 	const unsigned char *str = (const unsigned char *) key;
 
 	int xk1;

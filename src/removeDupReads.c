@@ -63,7 +63,7 @@ void unselect_read_in_list(unsigned int read_number)
 	read_selection_list[byte_offset] = old_8values;
 }
 
-unsigned long long total_mapped_reads = 0;
+srInt_64 total_mapped_reads = 0;
 unsigned long long reads_passed_filter = 0;
 
 int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, int threshold, int all_threads, int thread_no)

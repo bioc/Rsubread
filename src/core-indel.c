@@ -678,7 +678,7 @@ int localPointerCmp_forEventEntry(const void *pointer1, const void *pointer2)
 	return v1!=v2;
 }
 
-unsigned long localPointerHashFunction_forEventEntry(const void *pointer)
+srUInt_64 localPointerHashFunction_forEventEntry(const void *pointer)
 {
 	unsigned int v = (pointer-NULL);
 	return (unsigned long) (v << 24) ^ (v>>8);
