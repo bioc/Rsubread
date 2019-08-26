@@ -1,4 +1,7 @@
-26 Aug 2019 - 1.35.21
+26 Aug 2019 - 1.35.23
+(1) Remove "UnsupportedPlatforms" to make the package available for Windows users.
+
+26 Aug 2019 - 1.35.22
 (1) Add support to the Windows platform (Rstudio + Rtools)
 
 21 Aug 2019 - 1.35.21
