@@ -668,7 +668,8 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 	char linebuf[MAX_FILE_NAME_LENGTH];
 	int state = -1;
 	while(!feof(fp)){
-		fgets(linebuf, MAX_FILE_NAME_LENGTH-1, fp);
+		char * gret = fgets(linebuf, MAX_FILE_NAME_LENGTH-1, fp);
+		if(gret == NULL) break;
 		if(strlen(linebuf)<5)continue;
 		if(state < 0 && strstr(linebuf,"EMFileVersion,4")) state = 0;
 		if(state == 1 && linebuf[0]=='[') state = 99999;
