@@ -1273,7 +1273,7 @@ int main_buildindex(int argc,char ** argv)
 	{
 		long long actual_bases=0;
 		HashTable * huge_table;
-		huge_table = HashTableCreate(5000000);
+		huge_table = HashTableCreate(200000);
 		unsigned int expected_hash_items = (unsigned int)(memory_limit * 1024.0 / 8.) * 1024 ;
 		unsigned int * bucket_sizes = NULL, total_tables=0;
 		unsigned int bucket_no = calculate_buckets_by_size(expected_hash_items, SUBINDEX_VER2, 0, GENE_SLIDING_STEP);
