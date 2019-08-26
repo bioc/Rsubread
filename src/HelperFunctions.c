@@ -2694,17 +2694,25 @@ void main(){
 
 #endif
 
-int get_free_total_mem(size_t * total, size_t * free_mem){
-
 #ifdef __MINGW32__
-	return -1;
+#include <windows.h>
 #endif
+
+
+int get_free_total_mem(size_t * total, size_t * free_mem){
 
 #ifdef FREEBSD
     return -1;
 #endif
 
-#ifndef __MINGW32__
+#ifdef __MINGW32__
+	MEMORYSTATUSEX statex;
+	statex.dwLength = sizeof (statex);
+	GlobalMemoryStatusEx (&statex);
+	(*total) = statex.ullTotalPhys;
+	(*free_mem) = statex.ullAvailPhys;
+	return 0;
+#else
 #ifdef MACOS
     mach_msg_type_number_t count = HOST_VM_INFO_COUNT;
     vm_statistics_data_t vmstat;
