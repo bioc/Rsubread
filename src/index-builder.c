@@ -865,7 +865,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 				}
 				line_buf[line_buf_len-1] =0;
 			}
-//			if(strchr(line_buf,'>') || strchr(line_buf,'\r') || strchr(line_buf,'\n'))SUBREADprintf("ERROR: string contains '''%s'''\n", line_buf);
+			//if(strchr(line_buf,'>') || strchr(line_buf,'\r') || strchr(line_buf,'\n'))SUBREADprintf("TESTING: string contains '''%s'''  at %I64u\n", line_buf, ftello(fafp.plain_fp));
 
 			if(line_buf_len<1)
 			{

@@ -166,12 +166,19 @@ int write_result(propMapped_context * context)
 	if(context -> output_file_name[0])
 	{
 		FILE * outfp = f_subr_open(context -> output_file_name, "a");
+		#ifdef __MINGW32__
+		fprintf(outfp, "%s,%I64u,%I64u,%f\n", context -> input_file_name, context -> all_reads, context -> mapped_reads,  context -> mapped_reads*1./context -> all_reads);
+		#else
 		fprintf(outfp, "%s,%llu,%llu,%f\n", context -> input_file_name, context -> all_reads, context -> mapped_reads,  context -> mapped_reads*1./context -> all_reads);
+		#endif
 		fclose(outfp);
 	}
 	char * objname = context -> is_fragments_counted? "fragment":"read";
+	#ifdef __MINGW32__
+	if(context -> verbose) SUBREADprintf("Finished. All records: %I64u; all %ss: %I64u; mapped %ss: %I64u; the mappability is %.2f%%\n", context->all_records, objname, context -> all_reads, objname, context -> mapped_reads, context -> mapped_reads*100./context -> all_reads);
+	#else
 	if(context -> verbose) SUBREADprintf("Finished. All records: %llu; all %ss: %llu; mapped %ss: %llu; the mappability is %.2f%%\n", context->all_records, objname, context -> all_reads, objname, context -> mapped_reads, context -> mapped_reads*100./context -> all_reads);
-
+	#endif
 	return 0;
 }
 
@@ -242,7 +249,11 @@ FILE * get_FP_by_read_name(propMapped_context * context, char * read_name)
 	if(!ret)
 	{
 		char fname [MAX_FILE_NAME_LENGTH+40];
+		#ifdef __MINGW32__
+		sprintf(fname, "%s-%I64u.bin", context->temp_file_prefix, hash_key);
+		#else
 		sprintf(fname, "%s-%llu.bin", context->temp_file_prefix, hash_key);
+		#endif
 		ret = f_subr_open(fname, "wb");
 		HashTablePut(context -> split_fp_table, NULL+1+(int)(hash_key), ret);
 	}
