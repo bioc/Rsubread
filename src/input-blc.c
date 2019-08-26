@@ -10,6 +10,11 @@
 #include "gene-algorithms.h"
 #include "input-blc.h"
 
+#ifdef __MINGW32__
+#define SR_PATH_SPLIT_STR "\\"
+#else
+#define SR_PATH_SPLIT_STR "/"
+#endif
 
 struct iBLC_scan_t{
 	char out_format_string[MAX_FILE_NAME_LENGTH];
@@ -35,11 +40,12 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 		if(dp -> d_type == DT_DIR && dp->d_name[0]!='.'){
 		#endif
 			strcpy(testfile_name,data_dir);
-			strcat(testfile_name, "/");
+			strcat(testfile_name, SR_PATH_SPLIT_STR);
 			strcat(testfile_name, dp->d_name);
 			//SUBREADprintf("DIG: %s\n", testfile_name);
 		#ifdef __MINGW32__
-			if(0==iBLC_guess_scan( scancon, testfile_name)) continue;
+			if(strcmp( dp->d_name, ".") && strcmp( dp->d_name,".."))
+				if(0==iBLC_guess_scan( scancon, testfile_name)) continue;
 		#else
 			if(iBLC_guess_scan( scancon, testfile_name))return -1;
 		}else if(dp -> d_type == DT_REG){
@@ -52,7 +58,7 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 				}
 
 				strcpy(testfile_name, data_dir);    
-				strcat(testfile_name, "/");
+				strcat(testfile_name, SR_PATH_SPLIT_STR);
 				strcat(testfile_name, dp->d_name);
 				FILE *fp = fopen(testfile_name,"rb");
 				if(NULL == fp){
@@ -89,32 +95,32 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 					return -1;
 				}
 			}
-			if(0==memcmp(data_dir+ strlen(data_dir)-5, "/L001",5 ) && strstr( dp->d_name , "s_1.filter")){
+			if(0==memcmp(data_dir+ strlen(data_dir)-5, SR_PATH_SPLIT_STR "L001",5 ) && strstr( dp->d_name , "s_1.filter")){
 				autozip_fp tfp;
 				strcpy(testfile_name, data_dir);    
-				strcat(testfile_name, "/");
+				strcat(testfile_name, SR_PATH_SPLIT_STR);
 				strcat(testfile_name, dp->d_name);
 				int resop = autozip_open(testfile_name, &tfp);
 				if(0 <= resop){
 					autozip_close(&tfp);
 					char * gen_fmt = str_replace(dp->d_name , "s_1.filter", "s_%d.filter");
-					char * gen_fmt2 = str_replace(data_dir , "/L001", "/L%03d");
+					char * gen_fmt2 = str_replace(data_dir , SR_PATH_SPLIT_STR "L001", SR_PATH_SPLIT_STR "L%03d");
 					strcpy(scancon -> filter_format_string, gen_fmt2);
-					strcat(scancon -> filter_format_string, "/");
+					strcat(scancon -> filter_format_string, SR_PATH_SPLIT_STR);
 					strcat(scancon -> filter_format_string, gen_fmt);
 					free(gen_fmt2);
 					free(gen_fmt);
 					filter_found = resop + 1;
 				}
 			}
-			if(0==memcmp(data_dir+ strlen(data_dir)-5, "/L001",5 ) && strstr( dp->d_name , "0001.bcl." ) && !strstr( dp->d_name , ".bci") ){
+			if(0==memcmp(data_dir+ strlen(data_dir)-5, SR_PATH_SPLIT_STR "L001",5 ) && strstr( dp->d_name , "0001.bcl." ) && !strstr( dp->d_name , ".bci") ){
 				int tti;
 				bcl_found = 1;
 				char * gen_fmt = str_replace(dp->d_name , "0001.bcl.", "%04d.bcl.");
 				
 				for(tti = 0; tti<22; tti++){
 					strcpy(testfile_name, data_dir);	
-					strcat(testfile_name, "/");
+					strcat(testfile_name, SR_PATH_SPLIT_STR);
 					sprintf(testfile_name+strlen(testfile_name), gen_fmt, 1, 2+tti);
 					autozip_fp tfp;
 					int resop = autozip_open(testfile_name, &tfp);
@@ -125,10 +131,10 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 					}else bcl_found=0;
 				}
 				if(bcl_found){
-					char * gen_fmt2 = str_replace(data_dir , "/L001", "/L%03d");
+					char * gen_fmt2 = str_replace(data_dir , SR_PATH_SPLIT_STR "L001", SR_PATH_SPLIT_STR "L%03d");
 					strcpy(scancon -> out_format_string, gen_fmt2);	
 					free(gen_fmt2);
-					strcat(scancon -> out_format_string, "/");
+					strcat(scancon -> out_format_string, SR_PATH_SPLIT_STR);
 					strcat(scancon -> out_format_string, gen_fmt);
 				}
 
