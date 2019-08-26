@@ -157,7 +157,7 @@ int DTCwrite_annotations(char * gene_name, char * transcript_name, char * chro_n
 }
 
 void DTCprint_lentab_items(void * key, void * hashed_obj, HashTable * tab){
-	SUBREADprintf("%s => %lld\n", (char*)key, hashed_obj - NULL);
+	SUBREADprintf("%s => %ld\n", (char*)key, (long)(hashed_obj - NULL));
 }
 
 // start and end are 1-based
