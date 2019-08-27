@@ -3574,8 +3574,8 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 
 	if(thread_context -> thread_id == 0 && thread_context -> scRNA_pooled_reads == 20000){
 		print_in_box(80,0,0,"   scRNA quality control in first 20,000 reads:");
-		print_in_box(80,0,0,"     %.1f%% reads have valid sample indices.", thread_context->scRNA_has_valid_sample_index*100./thread_context -> scRNA_pooled_reads);
-		print_in_box(80,0,0,"     %.1f%% reads have valid cell barcodes.", thread_context->scRNA_has_valid_cell_barcode*100./thread_context -> scRNA_pooled_reads);
+		print_in_box(80,0,0,"     %.1f pct reads have valid sample indices.", thread_context->scRNA_has_valid_sample_index*100./thread_context -> scRNA_pooled_reads);
+		print_in_box(80,0,0,"     %.1f pct reads have valid cell barcodes.", thread_context->scRNA_has_valid_cell_barcode*100./thread_context -> scRNA_pooled_reads);
 		print_in_box(80,0,0,"");
 	}
 	//if(sample_id>1)SUBREADprintf("Sample=%s, Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", sample_barcode, cell_barcode, umi_barcode, laneno, sample_id);
