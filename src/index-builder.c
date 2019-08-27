@@ -25,6 +25,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/types.h>
 #include "hashtable.h"
 #include "gene-value-index.h"
@@ -1244,7 +1245,7 @@ int main_buildindex(int argc,char ** argv)
 	if(tmp_fa_file[0]==0)strcpy(tmp_fa_file, "./");
 
 	#ifdef __MINGW32__
-	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-%06d", getpid(),time(NULL) % 1000000);
+	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-%06d", getpid(),(int)(time(NULL) % 1000000));
 	#else
 	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-XXXXXX", getpid());
 	int tmpfdd = mkstemp(tmp_fa_file);
