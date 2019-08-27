@@ -1,6 +1,4 @@
-R_ARCH=/x64
-
-echo @@@@@ The operating system is $UNAME.
+echo @@@@@ The operating system is Windows.
 version_no=`cat DESCRIPTION |grep Version|cut -f2 -d' '`
 echo SUBREAD_VER = \"\\\"Rsubread $version_no\\\"\" > src/Makevars
 cat src/Makevars.Windows >> src/Makevars
