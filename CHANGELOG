@@ -1,3 +1,7 @@
+29 Aug 2019 - 1.35.25
+(1) Remove warning messages when building on 32-bit Windows.
+(2) Issue warning messages in some functions if the system is 32-bit.
+
 28 Aug 2019 - 1.35.24
 (1) Re-submit for the latest changes
 
