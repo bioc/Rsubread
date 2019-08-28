@@ -6613,7 +6613,7 @@ int readSummary(int argc,char *argv[]){
 	}
 
 	if(fasta_contigs_fname){
-		print_in_box(80,0,0,"Loading FASTA contigs : %s", fasta_contigs_fname);
+		print_in_box(80,0,0,"Load FASTA contigs from %s...", get_short_fname(fasta_contigs_fname));
 		global_context.fasta_contigs = malloc(sizeof(fasta_contigs_t));
 		int ret_fq = read_contig_fasta(global_context.fasta_contigs, fasta_contigs_fname);
 		if(ret_fq){
