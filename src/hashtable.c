@@ -915,7 +915,7 @@ static int pointercmp(const void *pointer1, const void *pointer2) {
 }
 
 static srUInt_64 pointerHashFunction(const void *pointer) {
-	return ((srUInt_64) pointer) ;
+	return (srUInt_64)(pointer - NULL);
 }
 
 static int isProbablePrime(srInt_64 oddNumber) {

@@ -734,7 +734,7 @@ static int LRMpointercmp(const void *pointer1, const void *pointer2) {
 }
 
 static srUInt_64 LRMpointerHashFunction(const void *pointer) {
-    return ((srUInt_64) pointer) ;
+    return ((srUInt_64)( pointer - NULL )) ;
 }
 
 static int LRMisProbablePrime(srInt_64 oddNumber) {

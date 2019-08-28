@@ -518,7 +518,7 @@ size_t LRMgehash_go_QQ(LRMcontext_t * context, LRMthread_context_t * thread_cont
 }
 
 size_t LRMgehash_go_tolerance(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, LRMgehash_t * the_table, LRMgehash_key_t key, int offset, int read_len, int is_reversed, LRMgene_vote_t * vote, int indel_tolerance, int subread_number, int max_MM){
-	
+	if(max_MM >= 10) return 0;	
 	int ret = 0;
 
 	ret+=LRMgehash_go_q(the_table, key, offset, read_len, is_reversed, vote, indel_tolerance, subread_number);

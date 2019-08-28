@@ -499,7 +499,7 @@ int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 
 size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, int subread_len, unsigned int low_border, unsigned int high_border)
 {
-	assert(max_error_bases < 5);
+	if(max_error_bases >= 10) return 0;
 	char error_pos_stack[10];	// max error bases = 10;
 
 	gehash_key_t mutation_key;

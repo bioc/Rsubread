@@ -2053,7 +2053,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 					merged_section_lengths[merged_section_count] = overlapping_start - CIGAR_intervals_R2[R2_i].start_pos;
 
 					int indel_i;
-					for(indel_i = 0; indel_i < CIGAR_intervals_R2[R2_i].insertions; indel_i++){
+					for(indel_i = 0; indel_i < min(MAXIMUM_INSERTION_IN_SECTION,CIGAR_intervals_R2[R2_i].insertions); indel_i++){
 						if( CIGAR_intervals_R2[R2_i].insertion_start_pos[indel_i] >= overlapping_start ){
 							if(indel_i>0){
 								int insmov_i, ins_dist_i = 0;
@@ -2079,7 +2079,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 					merged_section_lengths[merged_section_count] = overlapping_start - CIGAR_intervals_R1[R1_i].start_pos;
 
 					int indel_i;
-					for(indel_i = 0; indel_i < CIGAR_intervals_R1[R1_i].insertions; indel_i++){
+					for(indel_i = 0; indel_i < min(MAXIMUM_INSERTION_IN_SECTION,CIGAR_intervals_R1[R1_i].insertions); indel_i++){
 						if( CIGAR_intervals_R1[R1_i].insertion_start_pos[indel_i] >= overlapping_start ){
 							if(indel_i>0){
 								int insmov_i, ins_dist_i = 0;
@@ -2112,7 +2112,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 					if( indel_i_R1 >= CIGAR_intervals_R1[R1_i].insertions ||  indel_i_R2 >= CIGAR_intervals_R2[R2_i].insertions ){
 						if(indel_i_R1 > 0){
 							int insmov_i, ins_dist_i = 0;
-							for(insmov_i = indel_i_R1 ; insmov_i < CIGAR_intervals_R1[R1_i].insertions; insmov_i++){
+							for(insmov_i = indel_i_R1 ; insmov_i < min(MAXIMUM_INSERTION_IN_SECTION,CIGAR_intervals_R1[R1_i].insertions); insmov_i++){
 								assert(MAXIMUM_INSERTION_IN_SECTION > insmov_i);
 								CIGAR_intervals_R1[R1_i].insertion_start_pos[ins_dist_i] = CIGAR_intervals_R1[R1_i].insertion_start_pos[insmov_i];
 								CIGAR_intervals_R1[R1_i].insertion_lengths[ins_dist_i] = CIGAR_intervals_R1[R1_i].insertion_lengths[insmov_i];
@@ -2122,7 +2122,7 @@ int calc_total_frag_len( fc_thread_global_context_t * global_context, fc_thread_
 						}
 						if(indel_i_R2 > 0){
 							int insmov_i, ins_dist_i = 0;
-							for(insmov_i = indel_i_R2 ; insmov_i < CIGAR_intervals_R2[R2_i].insertions; insmov_i++){
+							for(insmov_i = indel_i_R2 ; insmov_i < min(CIGAR_intervals_R2[R2_i].insertions,MAXIMUM_INSERTION_IN_SECTION); insmov_i++){
 								assert(MAXIMUM_INSERTION_IN_SECTION > insmov_i);
 								CIGAR_intervals_R2[R2_i].insertion_start_pos[ins_dist_i] = CIGAR_intervals_R2[R2_i].insertion_start_pos[insmov_i];
 								CIGAR_intervals_R2[R2_i].insertion_lengths[ins_dist_i] = CIGAR_intervals_R2[R2_i].insertion_lengths[insmov_i];
@@ -4209,10 +4209,10 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 	cellno_umino_p1_list -> numOfElements = short_ptr;
 
 	int cell_sec_start = 0;
-	int old_bcno = (ArrayListGet(cellno_umino_p1_list, 0)-NULL-1) >> 32;
+	int old_bcno =((srInt_64)(ArrayListGet(cellno_umino_p1_list, 0)-NULL-1))>> 32;
 	int computational_cost = 0;
 	for(x1 = 1; x1 < cellno_umino_p1_list -> numOfElements;x1++){
-		int cellbc_no = (ArrayListGet(cellno_umino_p1_list, x1)-NULL -1)>>32;
+		int cellbc_no =((srInt_64)(ArrayListGet(cellno_umino_p1_list, x1)-NULL -1))>>32;
 		if(cellbc_no != old_bcno || x1 == cellno_umino_p1_list -> numOfElements-1){
 			int cell_umi = 0;
 			srInt_64 sec_end = x1 + ((cellbc_no == old_bcno)?1:0);
@@ -4287,7 +4287,7 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 
 				int write_cnt=0;
 				if(tab_cell_ptr<cellno_umino_p1_list ->numOfElements)while(1){
-					srInt_64 tab_cell_no = (ArrayListGet(cellno_umino_p1_list, tab_cell_ptr)-NULL-1) >> 32;
+					srInt_64 tab_cell_no =((srInt_64)(ArrayListGet(cellno_umino_p1_list, tab_cell_ptr)-NULL-1))>> 32;
 					if(tab_cell_no > used_cell_no) break;
 					else if( tab_cell_no == used_cell_no ) write_cnt++;
 					tab_cell_ptr++;
@@ -6303,7 +6303,7 @@ int readSummary(int argc,char *argv[]){
 	srInt_64 *start, *stop;
 	int *geneid;
 
-	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr, *strand_check_mode = NULL, *extra_column_names = NULL, *scRNA_sample_sheet = NULL, *scRNA_cell_barcode_list = NULL ;
+	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr =NULL, *strand_check_mode = NULL, *extra_column_names = NULL, *scRNA_sample_sheet = NULL, *scRNA_cell_barcode_list = NULL ;
 	srInt_64 nexons;
 
 
