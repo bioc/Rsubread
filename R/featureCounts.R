@@ -2,6 +2,10 @@
 .R_flist_splitor <- "\026"
 .filepath_maximum_len <- 990L
 
+.is.64bit.system <- function(){
+	return(grepl("[-_]64",Sys.info()[["machine"]]))
+}
+
 .check_string_param <- function(argu, opt=NULL){
   if(!is.null(argu)){
     if(any(grepl(.R_param_splitor,  argu))){
@@ -49,6 +53,8 @@
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,sampleSheet=NULL,cellBarcodeList=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
+	if(!.is.64bit.system()) cat("WARNING: your system seems to be 32-bit. Rsubread supports 32-bit sustems to a very limited extend.\nIt is highly recommended to run Rsubread on a 64-bit system to avoid errors.\n\n")
+
     .check_string_param(annot.inbuilt, "annot.inbuilt")
     .check_string_param(GTF.featureType, "GTF.featureType")
     .check_string_param(GTF.attrType, "GTF.attrType")
