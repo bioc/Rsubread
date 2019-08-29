@@ -1,6 +1,6 @@
 buildindex <- function(basename,reference,gappedIndex=FALSE,indexSplit=FALSE,memory=8000,TH_subread=100,colorspace=FALSE)
 {
-    if(!.is.64bit.system()) cat("WARNING: your system seems to be 32-bit. Rsubread supports 32-bit sustems to a very limited extend.\nIt is highly recommended to run Rsubread on a 64-bit system to avoid errors.\n\n")
+    if(!.is.64bit.system()) cat("WARNING: your system seems to be 32-bit. Rsubread supports 32-bit sustems to a very limited level.\nIt is highly recommended to run Rsubread on a 64-bit system to avoid errors.\n\n")
 
 	basename <- .check_and_NormPath(basename, mustWork=F, opt="basename")
 	reference <- .check_and_NormPath(reference, mustWork=T, opt="reference")
