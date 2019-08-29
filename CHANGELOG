@@ -1,3 +1,6 @@
+29 Aug 2019 - 1.35.26
+(1) Delete .BBSoption file for that it causes a NOTE.
+
 29 Aug 2019 - 1.35.25
 (1) Remove warning messages when building on 32-bit Windows.
 (2) Issue warning messages in some functions if the system is 32-bit.
