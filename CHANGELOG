@@ -1,5 +1,6 @@
-29 Aug 2019 - 1.35.26
+29 Aug 2019 - 1.99.0
 (1) Delete .BBSoption file for that it causes a NOTE.
+(2) Increase version number to 1.99.0 for the next major release.
 
 29 Aug 2019 - 1.35.25
 (1) Remove warning messages when building on 32-bit Windows.
