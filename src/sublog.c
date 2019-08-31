@@ -78,9 +78,11 @@ void sublog_printf(int stage, int level, const char * pattern, ...)
 	if(level<MINIMUM_LOG_LEVEL) return;
 
 	int to_remove_ESC = 1;
+	#ifndef __MINGW32__
 	#if defined(MAKE_STANDALONE) || defined(RUNNING_ENV)
 	to_remove_ESC = is_ESC_removed();
 	#endif
+	#endif	
 
 	if(to_remove_ESC)
 	{

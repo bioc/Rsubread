@@ -1204,7 +1204,7 @@ int main_buildindex(int argc,char ** argv)
 			o_char = 'o';
 		}
 		if(f_type == FILE_TYPE_GZIP_FASTA){
-			o_char = ':';
+			o_char = 'o';
 		}
 		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  get_short_fname(fasta_fn) , CHAR_ESC);
 	}
