@@ -1556,8 +1556,10 @@ int add_event_detected_from_cigar(global_context_t * global_context, unsigned in
 		if(is_indel && this_event -> event_type != CHRO_EVENT_TYPE_INDEL) continue;
 		if((!is_indel) && this_event -> event_type == CHRO_EVENT_TYPE_INDEL) continue;
 
+		#ifndef __MINGW32__
 		if(0 && ( memcmp(read_name, "V0112_0155:7:1104:17648:117432",28)==0 || ( this_event -> event_small_side  > 2613701363 - 200 && this_event -> event_small_side  < 2613701363 + 100) ))
 			SUBREADprintf("EVENT: L=%u, R=%u (TABLE L=%u , R=%u), LEXT=%d, REXT=%d -- %s\n", left_last_base, right_first_base, this_event -> event_small_side, this_event -> event_large_side, left_extend, right_extend, read_name);
+		#endif
 
 		if(this_event -> event_small_side == left_last_base &&  this_event -> event_large_side == right_first_base){
 			if(is_indel && this_event -> indel_length == indel_len){

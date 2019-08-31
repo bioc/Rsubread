@@ -568,7 +568,7 @@ void fishers_test_on_block(struct SNP_Calling_Parameters * parameters, float * s
 
 				//#warning " ===================== If a known SNP is at POI, the Fisher's p-value is only compared with the 'upper bound' of the p-value. ====================="
 				//#warning " ===================== '1 &&' is the switch ========================"
-				if(all_result_needed || ( 1 &&  Known_SNP_here && p_middle < parameters -> cutoff_upper_bound ) ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
+				if(all_result_needed || ( 0 &&  Known_SNP_here && p_middle < parameters -> cutoff_upper_bound ) ||  ( p_middle < p_cutoff && flanking_matched*20>(flanking_matched+ flanking_unmatched )*16)) 
 					snp_fisher_raw [i] = p_middle;
 				else	snp_fisher_raw [i] = -999;
 
