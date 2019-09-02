@@ -2212,9 +2212,9 @@ int does_file_exist(char * path)
 	return ret;
 }
 
-srInt_64 sort_SAM_hash(char * str)
+srUInt_64 sort_SAM_hash(char * str)
 {
-	srInt_64 hash = 5381;
+	srUInt_64 hash = 5381;
 	int c, xk1=0;
 
 	while (1)

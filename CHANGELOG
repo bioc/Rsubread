@@ -1,3 +1,6 @@
+3 Sep 2019 - 1.99.2
+(1) Fixed a bug about sorting the BAM or SAM input files.
+
 2 Sep 2019 - 1.99.1
 (1) Updated users guide.
 (2) Added SingleCell to bioc views.
