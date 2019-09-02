@@ -6144,7 +6144,7 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 		//	printf("RRN=%s\n", read_name);
 		
 		int read_name_len = strlen(read_name);
-		srInt_64 read_line_hash = sort_SAM_hash(read_name);
+		srUInt_64 read_line_hash = sort_SAM_hash(read_name);
 
 		int block_id = read_line_hash % SAM_SORT_BLOCKS;
 		if(!writer -> current_block_fp_array[block_id])
