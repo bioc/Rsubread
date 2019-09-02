@@ -1,3 +1,7 @@
+2 Sep 2019 - 1.99.1
+(1) Updated users guide.
+(2) Added SingleCell to bioc views.
+
 29 Aug 2019 - 1.99.0
 (1) Delete .BBSoption file for that it causes a NOTE.
 (2) Increase version number to 1.99.0 for the next major release.
