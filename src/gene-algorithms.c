@@ -592,9 +592,9 @@ int max_gene_vote(gene_vote_t* vote, int * position_result, int query)
 
 void clear_allvote(gene_allvote_t* allvote)
 {
-	bzero(allvote -> max_votes,  allvote -> max_len* sizeof(*allvote -> max_votes));
-	bzero(allvote -> masks,  allvote -> max_len* sizeof(*allvote -> masks));
-	bzero(allvote -> span_coverage ,  allvote -> max_len* sizeof(char));
+	memset(allvote -> max_votes,0,  allvote -> max_len* sizeof(*allvote -> max_votes));
+	memset(allvote -> masks,0,  allvote -> max_len* sizeof(*allvote -> masks));
+	memset(allvote -> span_coverage ,0,  allvote -> max_len* sizeof(char));
 }
 
 void destory_allvote(gene_allvote_t* allvote)
@@ -663,10 +663,10 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 	cigar[cigar_len]=0;
 
 	int i;
-	long long int tmpv = 0;
+	srInt_64 tmpv = 0;
 
 	char last_operation = 'X';
-	long long int last_tmpv = 0;
+	srInt_64 last_tmpv = 0;
 	int is_first_M = 1;
 	int delta_i = 0;
 	int delta_d = 0;
@@ -711,8 +711,11 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 					}
 					delta_d = 0;
 	
-
+					#ifdef __MINGW32__
+					sprintf(cigar_piece,"%I64d%c", last_tmpv, last_operation); 
+					#else
 					sprintf(cigar_piece,"%lld%c", last_tmpv, last_operation); 
+					#endif
 					strcat(tmp, cigar_piece);
 				}
 
@@ -759,7 +762,11 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 
 		if(last_operation =='M' || last_operation =='S')
 		{
+			#ifdef __MINGW32__
+			sprintf(cigar_piece,"%I64d%c", tmpv+last_tmpv, last_operation); 
+			#else
 			sprintf(cigar_piece,"%lld%c", tmpv+last_tmpv, last_operation); 
+			#endif
 			strcat(tmp, cigar_piece);
 		}
 
@@ -1329,9 +1336,9 @@ int select_positions(gene_vote_t * vote_read1, gene_vote_t * vote_read2, gene_vo
 
 	}
 
-	bzero(minor_votes, ANCHORS_NUMBER*sizeof(gene_vote_number_t));
-	bzero(minor_quality, ANCHORS_NUMBER*sizeof(gene_quality_score_t));
-	bzero(is_minor_breakeven, ANCHORS_NUMBER);
+	memset(minor_votes,0, ANCHORS_NUMBER*sizeof(gene_vote_number_t));
+	memset(minor_quality,0, ANCHORS_NUMBER*sizeof(gene_quality_score_t));
+	memset(is_minor_breakeven,0, ANCHORS_NUMBER);
 	for (k=0; k<2; k++)
 	{
 		gene_vote_t * current_vote = k?vote_read2:vote_read1;
@@ -2457,7 +2464,11 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 					else
 					{
 						if(begin_copy)
+							#ifdef __MINGW32__
+							sprintf(refined_cigar+strlen(refined_cigar), "%I64d%c", x, cigar_txt[cigar_cursor]);
+							#else
 							sprintf(refined_cigar+strlen(refined_cigar), "%lld%c", x, cigar_txt[cigar_cursor]);
+							#endif
 
 						if(cigar_txt[cigar_cursor] == 'D' || cigar_txt[cigar_cursor] == 'N'|| cigar_txt[cigar_cursor] == 'j' || cigar_txt[cigar_cursor] == 'J')
 							chromosome_cursor +=x;
@@ -2543,7 +2554,7 @@ int get_base_error_prob64i(char v)
 void bad_reverse_cigar(char * cigar)
 {
 	int cigar_cursor = 0;
-	long long int tmpv=0;
+	srInt_64 tmpv=0;
 	char ncg[100];
 	ncg[0]=0;
 	while(cigar[cigar_cursor])
@@ -2556,7 +2567,11 @@ void bad_reverse_cigar(char * cigar)
 		else if((cc>='A'&&cc<='Z')||(cc>='a'&&cc<='z')) 
 		{
 			char ncg2[103];
+			#ifdef __MINGW32__
+			sprintf(ncg2, "%I64d%c", tmpv, cc);
+			#else
 			sprintf(ncg2, "%lld%c", tmpv, cc);
+			#endif
 			strncat(ncg2, ncg, 99);
 			strncpy(ncg, ncg2, 99);
 			tmpv=0;
@@ -2665,7 +2680,7 @@ int fc_strcmp_chro(const void * s1, const void * s2)
 
 
 
-unsigned long fc_chro_hash(const void *key) {
+srUInt_64 fc_chro_hash(const void *key) {
 	const unsigned char *str = (const unsigned char *) key;
 
 	int xk1;

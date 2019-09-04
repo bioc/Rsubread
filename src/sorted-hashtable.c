@@ -225,11 +225,11 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 		}
 
 		if(the_table->version_number == SUBINDEX_VER0)
-			bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+			memset(new_item_keys, 0, sizeof(gehash_key_t) * new_bucket_length);
 		else
-			bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+			memset(new_new_item_keys, 0, sizeof(short) * new_bucket_length);
 
-		bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+		memset(new_item_values, 0, sizeof(gehash_data_t) * new_bucket_length);
 
 		if(the_table->version_number == SUBINDEX_VER0)
 			current_bucket->item_keys = new_item_keys;
@@ -347,11 +347,11 @@ int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_smal
 			}
 
 			if(the_table->version_number == SUBINDEX_VER0)
-				bzero(new_item_keys, sizeof(gehash_key_t) * new_bucket_length);
+				memset(new_item_keys, 0, sizeof(gehash_key_t) * new_bucket_length);
 			else
-				bzero(new_new_item_keys, sizeof(short) * new_bucket_length);
+				memset(new_new_item_keys, 0, sizeof(short) * new_bucket_length);
 
-			bzero(new_item_values, sizeof(gehash_data_t) * new_bucket_length);
+			memset(new_item_values, 0, sizeof(gehash_data_t) * new_bucket_length);
 
 			if(the_table->version_number == SUBINDEX_VER0)
 				memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
@@ -499,7 +499,7 @@ int gehash_insert_limited(gehash_t * the_table, gehash_key_t key, gehash_data_t 
 
 size_t gehash_go_q_tolerable(gehash_t * the_table, gehash_key_t key, int offset, int read_len, int is_reversed, gene_vote_t * vote,gene_vote_number_t weight, gene_quality_score_t quality ,int max_match_number, int indel_tolerance, int subread_number, int max_error_bases, int subread_len, unsigned int low_border, unsigned int high_border)
 {
-	assert(max_error_bases < 5);
+	if(max_error_bases >= 10) return 0;
 	char error_pos_stack[10];	// max error bases = 10;
 
 	gehash_key_t mutation_key;
@@ -1488,11 +1488,11 @@ unsigned int load_int32(FILE * fp)
 	return ret;
 }
 
-long long int load_int64(FILE * fp)
+srInt_64 load_int64(FILE * fp)
 {
-	long long int ret;
+	srInt_64 ret;
 	int read_length;
-	read_length = fread(&ret, sizeof(long long int), 1, fp);
+	read_length = fread(&ret, sizeof(srInt_64), 1, fp);
 	if(read_length<=0)assert(0);
 	return ret;
 }
@@ -1543,6 +1543,11 @@ int gehash_load(gehash_t * the_table, const char fname [])
 	char magic_chars[8];
 	magic_chars[7]=0;
 
+	if(0)if(sizeof( size_t ) != 8|| sizeof(long int ) != 8|| sizeof(int ) != 4){
+		SUBREADprintf("LINT: %zd , INT: %zd , SIZD : %zd\n", sizeof(long int ), sizeof(int ), sizeof(size_t));
+		//return -1;
+	}
+	
 	the_table -> malloc_ptr = NULL;
 	the_table -> index_gap = 0;
 
@@ -1583,14 +1588,16 @@ int gehash_load(gehash_t * the_table, const char fname [])
 				rrtv = fread(&option_key, 2, 1, fp);
 				if(rrtv <1){
 					SUBREADprintf("Error: the index header cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
-					assert(rrtv>0);
+					return -1;
 				}
+				//SUBREADprintf("READOPT_TAB = %04X\n", option_key);
+				
 				if(!option_key) break;
 
 				rrtv = fread(&option_length, 2, 1, fp);
 				if(rrtv <1){
 					SUBREADprintf("Error: the index header cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
-					assert(rrtv>0);
+					return -1;
 				}
 
 				rrtv = 999;
@@ -1602,7 +1609,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 					fseek(fp, option_length, SEEK_CUR);
 				if(rrtv <1){
 					SUBREADprintf("Error: the index header cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
-					assert(rrtv>0);
+					return -1;
 				}
 			}
 			assert(the_table -> index_gap);
@@ -1623,28 +1630,35 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			return 1;
 		}
 
-		long long fp_curr = ftello(fp);
-		fseek(fp, 0, SEEK_END);
-		long long fp_end = ftello(fp);
+		size_t fp_curr = ftello(fp), fp_end=fp_curr;
+		 
+		fseeko(fp, 0, SEEK_END);
+		fp_end = ftello(fp); 	
 		fseeko(fp, fp_curr, SEEK_SET);
-		long long rem_len = fp_end - fp_curr;
+//		SUBREADprintf("CACL_SIZE %zd %zd\n", fp_end, fp_curr);
+		
+		size_t rem_len = fp_end - fp_curr;
 		the_table -> malloc_ptr = malloc(rem_len);
 		if(!the_table -> malloc_ptr){
 			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
 		}
 
-		size_t rdbytes = fread(the_table -> malloc_ptr, 1, rem_len, fp);
+		size_t rdbytes = 0;
+		while(!feof(fp) && rdbytes < rem_len){
+			size_t rrr = fread(the_table -> malloc_ptr + rdbytes, 1, rem_len - rdbytes, fp);
+			//SUBREADprintf("LOAD: %zd + %zd ==> %zd\n", rdbytes , rrr, rem_len);
+			rdbytes += rrr;
+		}
 		fclose(fp);
 		if(rdbytes != rem_len){
-			SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
-			assert(rdbytes == rem_len);
+			SUBREADprintf("Error: the index cannot be fully loaded (%ld != %ld). It may contain format errors or file '%s' may be truncated.\n", (long) fp_end, (long) fp_curr, fname);
+			return -1;
 		}
 		if(rdbytes<1) {
 			SUBREADprintf("Error: the index seem to contain no data at all. It may contain format errors or file '%s' may be truncated.\n", fname);
-			assert(rdbytes >0);
+			return -1;
 		}
-
 		char * curr_ptr = the_table -> malloc_ptr;
 		for (i=0; i<the_table -> buckets_number; i++)
 		{
@@ -1660,14 +1674,15 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			current_bucket -> item_values = (gehash_data_t*)curr_ptr;
 			curr_ptr += sizeof(gehash_data_t)*current_bucket -> current_items;
 			if( curr_ptr > the_table -> malloc_ptr + rdbytes){
-				SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
-				assert( curr_ptr <= the_table -> malloc_ptr + rdbytes );
+				SUBREADprintf("Error: the index cannot be fully loaded : %p > %p + %ld. It may contain format errors or file '%s' may be truncated.\n",curr_ptr,  the_table -> malloc_ptr, rdbytes , fname);
+				return -1;
 			}
 		}
 		the_table -> is_small_table = *curr_ptr;
 		curr_ptr ++;
 		if( curr_ptr != the_table -> malloc_ptr + rdbytes ){
 			SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
+			return -1;
 		}
 		assert( curr_ptr == the_table -> malloc_ptr + rdbytes );
 		return 0;
@@ -1818,7 +1833,9 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		write_options(fp, the_table);
 	}
 
-	fwrite(& (the_table -> current_items ), sizeof(long long int), 1, fp);
+	assert(sizeof(srInt_64 ) == 8);
+	assert(sizeof(int ) == 4);
+	fwrite(& (the_table -> current_items ), sizeof(srInt_64), 1, fp);
 	fwrite(& (the_table -> buckets_number), sizeof(int), 1, fp);
 
 	print_in_box(80,0,0,"Save current index block...              ");
@@ -1952,7 +1969,7 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 		if(0) // debug
 		{
 			int inidx=0;
-			long int real_old = -1;
+			srInt_64 real_old = -1;
 			for(xx = 0; xx < current_bucket -> current_items; xx++){
 				unsigned int real_key = 1u * current_bucket -> new_item_keys[xx] *1u * the_table -> buckets_number;
 				real_key += i;

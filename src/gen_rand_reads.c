@@ -7,9 +7,11 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#ifndef __MINGW32__
+#include <sys/resource.h>
+#endif
 #include <locale.h>
 #include <ctype.h>
 #include <math.h>
@@ -410,7 +412,11 @@ int grc_gen( genRand_context_t *grc ){
 		int seq_len = HashTableGet(grc-> transcript_lengths, seq_name)-NULL;
 		unsigned long long expected_reads = ArrayListGet(num_of_frags_per_transcript, read_i)-NULL;
 		if(seq_len >= min_seq_len)
+			#ifdef __MINGW32__
+			fprintf(grc->counts_out_fp, "%s\t%d\t%I64u\n", seq_name, seq_len, expected_reads);
+			#else
 			fprintf(grc->counts_out_fp, "%s\t%d\t%llu\n", seq_name, seq_len, expected_reads);
+			#endif
 		else
 			fprintf(grc->counts_out_fp, "%s\t%d\tNA\n", seq_name, seq_len);
 		total_read_top+=expected_reads;
@@ -452,7 +458,11 @@ int grc_finalize(genRand_context_t *grc){
 	if(grc->out_fps[1]) gzclose(grc->out_fps[1]);
 	fclose(grc->counts_out_fp);
 	free(grc->cmd_line);
+	#ifdef __MINGW32__
+	SUBREADprintf("Finished. Actual sample size : I64u\n", grc->applied_M);
+	#else
 	SUBREADprintf("Finished. Actual sample size : %llu\n", grc->applied_M);
+	#endif
 	return 0;
 }
 

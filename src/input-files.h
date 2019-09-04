@@ -29,6 +29,7 @@
 #define GENE_INPUT_PLAIN 0
 #define GENE_INPUT_FASTQ 1
 #define GENE_INPUT_FASTA 2
+#define GENE_INPUT_BCL   3
 #define GENE_INPUT_GZIP_FASTQ 51
 #define GENE_INPUT_GZIP_FASTA 52
 
@@ -69,11 +70,11 @@
 //#define SAM_SORT_BLOCK_SIZE 11123333LLU
 //
 typedef struct {
-	unsigned long long int output_file_size;
-	unsigned long long int current_chunk_size;
+	srInt_64 output_file_size;
+	srInt_64 current_chunk_size;
 	unsigned int current_chunk;
-	unsigned long long int written_reads;
-	unsigned long long int unpaired_reads;
+	srInt_64 written_reads;
+	srInt_64 unpaired_reads;
 
 	FILE * current_block_fp_array [SAM_SORT_BLOCKS];
 	FILE * all_chunks_header_fp;
@@ -92,8 +93,8 @@ typedef struct {
 	int reads_in_SBAM;
 	subread_lock_t SBAM_lock;
 
-	unsigned long long input_buff_SBAM_file_start;
-	unsigned long long input_buff_SBAM_file_end;
+	srInt_64 input_buff_SBAM_file_start;
+	srInt_64 input_buff_SBAM_file_end;
 
 	unsigned int chunk_number;
 	unsigned int readno_in_chunk;
@@ -103,7 +104,7 @@ typedef struct {
 	int input_buff_BIN_ptr;
 	int orphant_block_no;
 	int need_find_start;
-	unsigned long long orphant_space;
+	srInt_64 orphant_space;
 	z_stream strm;
 
 	char immediate_last_read_bin[FC_LONG_READ_RECORD_HARDLIMIT];
@@ -133,8 +134,8 @@ typedef struct {
 	subread_lock_t SAM_BAM_table_lock;
 	subread_lock_t unsorted_notification_lock;
 
-	unsigned long long total_input_reads;
-	unsigned long long total_orphan_reads;
+	srInt_64 total_input_reads;
+	srInt_64 total_orphan_reads;
 
 	HashTable * unsorted_notification_table;
 	HashTable * sam_contig_number_table;
@@ -245,7 +246,7 @@ double guess_reads_density(char * fname, int is_sam) ;
 
 // guess the size of the chromosome lib
 // return the number of bases, or (-index-1) if the file at the index is not found.
-long long int guess_gene_bases(char ** files, int file_number);
+srInt_64 guess_gene_bases(char ** files, int file_number);
 
 
 void reverse_read(char * ReadString, int Length, int space_type);
@@ -261,7 +262,7 @@ int parse_SAM_line(char * sam_line, char * read_name, int * flags, char * chro, 
 
 int find_subread_end(int len, int  TOTAL_SUBREADS,int subread) ;
 
-int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, unsigned long long int * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file, unsigned long long * all_mapped_reads, int do_fragment_filtering, int push_to_read_head, int use_soft_clipped_bases);
+int break_SAM_file(char * in_SAM_file, int is_BAM, char * temp_file_prefix, unsigned int * real_read_count, int * block_no, chromosome_t * known_chromosomes, int is_sequence_needed, int base_ignored_head_tail, gene_value_index_t *array_index, gene_offset_t * offsets, srInt_64 * all_Mapped_bases , HashTable * event_table_ptr, char * VCF_file, srInt_64 * all_mapped_reads, int do_fragment_filtering, int push_to_read_head, int use_soft_clipped_bases);
 
 int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes);
 
@@ -284,7 +285,7 @@ int my_strcmp(const void * s1, const void * s2);
 void destroy_cigar_event_table(HashTable * event_table);
 
 
-int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, unsigned long long int read_no);
+int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, srInt_64 read_no);
 int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len);
 int sort_SAM_finalise(SAM_sort_writer * writer);
 int sort_SAM_create(SAM_sort_writer * writer, char * output_file, char * tmp_path);
@@ -293,9 +294,9 @@ void colorread2base(char * read_buffer, int read_len);
 int warning_file_type(char * fname, int expected_type);
 char color2char(char clr, char c1);
 
-int is_certainly_bam_file(char * fname, int * is_firstread_PE, long long  * SAMBAM_header_length);
+int is_certainly_bam_file(char * fname, int * is_firstread_PE, srInt_64  * SAMBAM_header_length);
 
-unsigned long long int sort_SAM_hash(char * str);
+srUInt_64 sort_SAM_hash(char * str);
 
 char * fgets_noempty(char * buf, int maxlen, FILE * fp);
 
@@ -304,8 +305,8 @@ int probe_file_type(char * fname, int * is_first_PE);
 int probe_file_type_fast(char * fname);
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos);
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos);
-unsigned long long geinput_file_offset( gene_input_t * input);
-int probe_file_type_EX(char * fname, int * is_first_read_PE, long long * SAMBAM_header_length);
+srInt_64 geinput_file_offset( gene_input_t * input);
+int probe_file_type_EX(char * fname, int * is_first_read_PE, srInt_64 * SAMBAM_header_length);
 
 
 int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_buff_size_per_thread, int BAM_input, int is_Tiny_Mode, int is_single_end_mode, int force_do_not_sort, int need_read_group_tag, int display_progress, char * in_file, void (* reset_output_function) (void * pairer), int (* output_header_function) (void * pairer, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len), int (* output_function) (void * pairer, int thread_no, char * bin1, char * bin2), char * tmp_path, void * appendix1, int long_read_minimum_length) ;
@@ -326,4 +327,5 @@ void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
 int geinput_preload_buffer(gene_input_t * input, subread_lock_t* read_lock);
+int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_in_chunk, int threads );
 #endif

@@ -9,8 +9,7 @@ txUnique <- function(GTF_Annotation_File, Feature_Type = "exon", Gene_ID_Attribu
 	opt <- paste(opt,"-o",fout,sep=.R_param_splitor)
 	opt <- paste(opt,"-g",Gene_ID_Attribute,sep=.R_param_splitor)
 	opt <- paste(opt,"-t",Transcript_ID_Attribute,sep=.R_param_splitor)
-	opt <- paste(opt,"-f",Feature_Type,sep=.R_param_splitor)
-	cmd <- paste("txUnique",opt,sep=.R_param_splitor)
+	cmd <- paste(opt,"-f",Feature_Type,sep=.R_param_splitor)
 	n <- length(unlist(strsplit(cmd,.R_param_splitor)))
 	C_args <- .C("R_txUnique_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	if(file.exists(fout)){

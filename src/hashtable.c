@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.34 2019/07/02 12:03:19 cvs Exp $
+ * $Id: hashtable.c,v 9999.38 2019/08/25 10:12:06 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -19,11 +19,11 @@
 #include "input-files.h"
 
 static int pointercmp(const void *pointer1, const void *pointer2);
-static unsigned long pointerHashFunction(const void *pointer);
-static int isProbablePrime(long number);
-static long calculateIdealNumOfBuckets(HashTable *hashTable);
+static srUInt_64 pointerHashFunction(const void *pointer);
+static int isProbablePrime(srInt_64 number);
+static srInt_64 calculateIdealNumOfBuckets(HashTable *hashTable);
 
-long long_random_val(){
+srInt_64 long_random_val(){
 	long ret = 0;
 	if(RAND_MAX<255){
 		SUBREADprintf("Is this a embedded computer????\n");
@@ -40,7 +40,7 @@ long long_random_val(){
 void * ArrayListShift(ArrayList * list){
 	if(list->numOfElements<1) return NULL;
 	void *ret = list->elementList [0];
-	long xx;
+	srInt_64 xx;
 	list->numOfElements -- ;
 	for(xx=0; xx<list->numOfElements; xx++) list->elementList [ xx ] = list->elementList [ xx+1 ];
 	return ret;
@@ -53,7 +53,7 @@ void * ArrayListPop(ArrayList * list){
 
 
 void * ArrayListRandom(ArrayList * list){
-	long ii = long_random_val() % list -> numOfElements;
+	srInt_64 ii = long_random_val() % list -> numOfElements;
 	return list -> elementList[ii];
 }
 
@@ -78,7 +78,7 @@ ArrayList * ArrayListDuplicate(ArrayList * ori){
 }
 
 void ArrayListDestroy(ArrayList * list){
-	long x1;
+	srInt_64 x1;
 	if(list -> elemDeallocator)
 		for(x1 = 0;x1 < list->numOfElements; x1++)
 			list -> elemDeallocator(list -> elementList[x1]);
@@ -87,13 +87,13 @@ void ArrayListDestroy(ArrayList * list){
 	free(list);
 }
 
-void * ArrayListGet(ArrayList * list, long n){
+void * ArrayListGet(ArrayList * list, srInt_64 n){
 	if(n<0 || n >= list->numOfElements)return NULL;
 	return list -> elementList[n];
 }
 
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem){
-	long ii;
+	srInt_64 ii;
 	for(ii = 0; ii < list->numOfElements; ii++){
 		if(list -> elementList[ii] == new_elem) return -1;
 	}
@@ -176,19 +176,19 @@ void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void *
 }
 
 int ArrayListLLUComparison(void * L_elem, void * R_elem){
-	unsigned long long lint = L_elem-NULL;
-	unsigned long long rint = R_elem-NULL;
+	srUInt_64 lint = L_elem-NULL;
+	srUInt_64 rint = R_elem-NULL;
 	if(lint<rint)return -1;
 	if(lint>rint)return 1;
 	return 0;
 }
 
-long ArrayListFindNextDent(ArrayList * list, unsigned long long value_less_than_dent){
-	long h=list->numOfElements-1,l=0,m=-1l;
+srInt_64 ArrayListFindNextDent(ArrayList * list, srUInt_64 value_less_than_dent){
+	srInt_64 h=list->numOfElements-1,l=0,m=-1l;
 	if( list -> elementList[h]- NULL <= value_less_than_dent )return -1l;
 	while(h>l){
 		m=(h+l)/2;
-		unsigned long long mv = list -> elementList[m] - NULL;
+		srUInt_64 mv = list -> elementList[m] - NULL;
 		if(mv < value_less_than_dent) l=m+1;
 		else if(mv > value_less_than_dent) h=m-1;
 		else break;
@@ -232,14 +232,28 @@ long ArrayListFindNextDent(ArrayList * list, unsigned long long value_less_than_
  *	  HashTable	- a new Hashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
-HashTable * StringTableCreate(long numOfBuckets){
+HashTable * StringTableCreate(srInt_64 numOfBuckets){
 	HashTable * ret = HashTableCreate(numOfBuckets);
 	HashTableSetHashFunction(ret, HashTableStringHashFunction);
 	HashTableSetKeyComparisonFunction(ret , my_strcmp);
 	return ret;
 }
 
-HashTable *HashTableCreate(long numOfBuckets) {
+ArrayList * HashTableKeys(HashTable * tab){
+	int i;
+	ArrayList * ret = ArrayListCreate(tab -> numOfElements);
+	for (i=0; i< tab ->numOfBuckets; i++) {
+		KeyValuePair *pair = tab ->bucketArray[i];
+		while (pair != NULL) {
+			ArrayListPush(ret, pair -> key);
+			KeyValuePair *nextPair = pair->next;
+			pair = nextPair;
+		}
+	}
+	return ret;
+}
+
+HashTable *HashTableCreate(srInt_64 numOfBuckets) {
 	HashTable *hashTable;
 	int i;
 
@@ -402,7 +416,7 @@ int HashTablePut(HashTable *hashTable, const void *key, void *value) {
 }
 
 int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, int replace_key, int dealloc_key, int dealloc_value) {
-	long hashValue;
+	srInt_64 hashValue;
 	KeyValuePair *pair;
 
 	assert(key != NULL);
@@ -475,7 +489,7 @@ int HashTablePutReplace(HashTable *hashTable, const void *key, void *value, int 
 \*--------------------------------------------------------------------------*/
 
 void *HashTableGetKey(const HashTable *hashTable, const void *key) {
-	long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+	srInt_64 hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
 
 	KeyValuePair *pair = hashTable->bucketArray[hashValue];
 
@@ -487,7 +501,7 @@ void *HashTableGetKey(const HashTable *hashTable, const void *key) {
 
 
 void *HashTableGet(const HashTable *hashTable, const void *key) {
-	long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+	srInt_64 hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
 
 	KeyValuePair *pair = hashTable->bucketArray[hashValue];
 
@@ -514,7 +528,7 @@ void *HashTableGet(const HashTable *hashTable, const void *key) {
 \*--------------------------------------------------------------------------*/
 
 void HashTableRemove(HashTable *hashTable, const void *key) {
-	long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+	srInt_64 hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
 
 
 	KeyValuePair *pair = hashTable->bucketArray[hashValue];
@@ -617,7 +631,7 @@ int HashTableIsEmpty(const HashTable *hashTable) {
  *					 the specified HashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableSize(const HashTable *hashTable) {
+srInt_64 HashTableSize(const HashTable *hashTable) {
 	return hashTable->numOfElements;
 }
 
@@ -637,7 +651,7 @@ long HashTableSize(const HashTable *hashTable) {
  *					 HashTable
 \*--------------------------------------------------------------------------*/
 
-long HashTableGetNumBuckets(const HashTable *hashTable) {
+srInt_64 HashTableGetNumBuckets(const HashTable *hashTable) {
 	return hashTable->numOfBuckets;
 }
 
@@ -713,7 +727,7 @@ void HashTableSetValueComparisonFunction(HashTable *hashTable,
 \*--------------------------------------------------------------------------*/
 
 void HashTableSetHashFunction(HashTable *hashTable,
-		unsigned long (*hashFunction)(const void *key))
+		srUInt_64 (*hashFunction)(const void *key))
 {
 	assert(hashFunction != NULL);
 	hashTable->hashFunction = hashFunction;
@@ -745,7 +759,7 @@ void HashTableSetHashFunction(HashTable *hashTable,
  *	  <nothing>
 \*--------------------------------------------------------------------------*/
 
-void HashTableRehash(HashTable *hashTable, long numOfBuckets) {
+void HashTableRehash(HashTable *hashTable, srInt_64 numOfBuckets) {
 	KeyValuePair **newBucketArray;
 	int i;
 
@@ -771,7 +785,7 @@ void HashTableRehash(HashTable *hashTable, long numOfBuckets) {
 		KeyValuePair *pair = hashTable->bucketArray[i];
 		while (pair != NULL) {
 			KeyValuePair *nextPair = pair->next;
-			long hashValue = hashTable->hashFunction(pair->key) % numOfBuckets;
+			srInt_64 hashValue = hashTable->hashFunction(pair->key) % numOfBuckets;
 			pair->next = newBucketArray[hashValue];
 			newBucketArray[hashValue] = pair;
 			pair = nextPair;
@@ -885,9 +899,9 @@ void HashTableSetDeallocationFunctions(HashTable *hashTable,
  *	  unsigned long - the unmodulated hash value of the key
 \*--------------------------------------------------------------------------*/
 
-unsigned long HashTableStringHashFunction(const void *key) {
+srUInt_64 HashTableStringHashFunction(const void *key) {
 	const unsigned char *str = (const unsigned char *) key;
-	unsigned long hashValue = 0;
+	srUInt_64 hashValue = 0;
 	int i;
 
 	for (i=0; str[i] != '\0'; i++)
@@ -900,12 +914,12 @@ static int pointercmp(const void *pointer1, const void *pointer2) {
 	return (pointer1 != pointer2);
 }
 
-static unsigned long pointerHashFunction(const void *pointer) {
-	return ((unsigned long) pointer) ;
+static srUInt_64 pointerHashFunction(const void *pointer) {
+	return (srUInt_64)(pointer - NULL);
 }
 
-static int isProbablePrime(long oddNumber) {
-	long i;
+static int isProbablePrime(srInt_64 oddNumber) {
+	srInt_64 i;
 
 	for (i=3; i<51; i+=2)
 		if (oddNumber == i)
@@ -916,8 +930,8 @@ static int isProbablePrime(long oddNumber) {
 	return 1; /* maybe */
 }
 
-static long calculateIdealNumOfBuckets(HashTable *hashTable) {
-	long idealNumOfBuckets = hashTable->numOfElements / hashTable->idealRatio;
+static srInt_64 calculateIdealNumOfBuckets(HashTable *hashTable) {
+	srInt_64 idealNumOfBuckets = hashTable->numOfElements / hashTable->idealRatio;
 	if (idealNumOfBuckets < 5)
 		idealNumOfBuckets = 5;
 	else

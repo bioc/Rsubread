@@ -18,9 +18,9 @@
 #include "LRMhashtable.h"
 
 static int LRMpointercmp(const void *pointer1, const void *pointer2);
-static unsigned long LRMpointerHashFunction(const void *pointer);
-static int LRMisProbablePrime(long number);
-static long LRMcalculateIdealNumOfBuckets(HashTable *hashTable);
+static srUInt_64 LRMpointerHashFunction(const void *pointer);
+static int LRMisProbablePrime(srInt_64 number);
+static srInt_64 LRMcalculateIdealNumOfBuckets(HashTable *hashTable);
 
 
 ArrayList * LRMArrayListCreate(int init_capacity){
@@ -32,7 +32,7 @@ ArrayList * LRMArrayListCreate(int init_capacity){
 }
 
 void LRMArrayListDestroy(ArrayList * list){
-	long x1;
+	srInt_64 x1;
 	if(list -> elemDeallocator)
 		for(x1 = 0;x1 < list->numOfElements; x1++)
 			list -> elemDeallocator(list -> elementList[x1]);
@@ -41,7 +41,7 @@ void LRMArrayListDestroy(ArrayList * list){
 	free(list);
 }
 
-void * LRMArrayListGet(ArrayList * list, long n){
+void * LRMArrayListGet(ArrayList * list, srInt_64 n){
 	if(n<0 || n >= list->numOfElements)return NULL;
 	return list -> elementList[n];
 }
@@ -88,7 +88,7 @@ void LRMArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_dealloca
 \*--------------------------------------------------------------------------*/
 
 
-HashTable *LRMHashTableCreate(long numOfBuckets) {
+HashTable *LRMHashTableCreate(srInt_64 numOfBuckets) {
     HashTable *hashTable;
     int i;
 
@@ -250,7 +250,7 @@ int LRMHashTablePut(HashTable *hashTable, const void *key, void *value) {
 	return LRMHashTablePutReplace(hashTable, key, value, 1);
 }
 int LRMHashTablePutReplace(HashTable *hashTable, const void *key, void *value, int replace_key) {
-    long hashValue;
+    srInt_64 hashValue;
     KeyValuePair *pair;
 
     assert(key != NULL);
@@ -320,7 +320,7 @@ int LRMHashTablePutReplace(HashTable *hashTable, const void *key, void *value, i
 \*--------------------------------------------------------------------------*/
 
 void *LRMHashTableGet(const HashTable *hashTable, const void *key) {
-    long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+    srInt_64 hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
 
     KeyValuePair *pair = hashTable->bucketArray[hashValue];
 
@@ -347,7 +347,7 @@ void *LRMHashTableGet(const HashTable *hashTable, const void *key) {
 \*--------------------------------------------------------------------------*/
 
 void LRMHashTableRemove(HashTable *hashTable, const void *key) {
-    long hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
+    srInt_64 hashValue = hashTable->hashFunction(key) % hashTable->numOfBuckets;
 
 
     KeyValuePair *pair = hashTable->bucketArray[hashValue];
@@ -450,7 +450,7 @@ int LRMHashTableIsEmpty(const HashTable *hashTable) {
  *                     the specified HashTable
 \*--------------------------------------------------------------------------*/
 
-long LRMHashTableSize(const HashTable *hashTable) {
+srInt_64 LRMHashTableSize(const HashTable *hashTable) {
     return hashTable->numOfElements;
 }
 
@@ -470,7 +470,7 @@ long LRMHashTableSize(const HashTable *hashTable) {
  *                     HashTable
 \*--------------------------------------------------------------------------*/
 
-long LRMHashTableGetNumBuckets(const HashTable *hashTable) {
+srInt_64 LRMHashTableGetNumBuckets(const HashTable *hashTable) {
     return hashTable->numOfBuckets;
 }
 
@@ -546,7 +546,7 @@ void LRMHashTableSetValueComparisonFunction(HashTable *hashTable,
 \*--------------------------------------------------------------------------*/
 
 void LRMHashTableSetHashFunction(HashTable *hashTable,
-        unsigned long (*hashFunction)(const void *key))
+        srUInt_64 (*hashFunction)(const void *key))
 {
     assert(hashFunction != NULL);
     hashTable->hashFunction = hashFunction;
@@ -578,7 +578,7 @@ void LRMHashTableSetHashFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void LRMHashTableRehash(HashTable *hashTable, long numOfBuckets) {
+void LRMHashTableRehash(HashTable *hashTable, srInt_64 numOfBuckets) {
     KeyValuePair **newBucketArray;
     int i;
 
@@ -604,7 +604,7 @@ void LRMHashTableRehash(HashTable *hashTable, long numOfBuckets) {
         KeyValuePair *pair = hashTable->bucketArray[i];
         while (pair != NULL) {
             KeyValuePair *nextPair = pair->next;
-            long hashValue = hashTable->hashFunction(pair->key) % numOfBuckets;
+            srInt_64 hashValue = hashTable->hashFunction(pair->key) % numOfBuckets;
             pair->next = newBucketArray[hashValue];
             newBucketArray[hashValue] = pair;
             pair = nextPair;
@@ -718,9 +718,9 @@ void LRMHashTableSetDeallocationFunctions(HashTable *hashTable,
  *      unsigned long - the unmodulated hash value of the key
 \*--------------------------------------------------------------------------*/
 
-unsigned long LRMHashTableStringHashFunction(const void *key) {
+srUInt_64 LRMHashTableStringHashFunction(const void *key) {
     const unsigned char *str = (const unsigned char *) key;
-    unsigned long hashValue = 0;
+    srUInt_64 hashValue = 0;
     int i;
 
     for (i=0; str[i] != '\0'; i++)
@@ -733,12 +733,12 @@ static int LRMpointercmp(const void *pointer1, const void *pointer2) {
     return (pointer1 != pointer2);
 }
 
-static unsigned long LRMpointerHashFunction(const void *pointer) {
-    return ((unsigned long) pointer) ;
+static srUInt_64 LRMpointerHashFunction(const void *pointer) {
+    return ((srUInt_64)( pointer - NULL )) ;
 }
 
-static int LRMisProbablePrime(long oddNumber) {
-    long i;
+static int LRMisProbablePrime(srInt_64 oddNumber) {
+    srInt_64 i;
 
     for (i=3; i<51; i+=2)
         if (oddNumber == i)
@@ -749,8 +749,8 @@ static int LRMisProbablePrime(long oddNumber) {
     return 1; /* maybe */
 }
 
-static long LRMcalculateIdealNumOfBuckets(HashTable *hashTable) {
-    long idealNumOfBuckets = hashTable->numOfElements / hashTable->idealRatio;
+static srInt_64 LRMcalculateIdealNumOfBuckets(HashTable *hashTable) {
+    srInt_64 idealNumOfBuckets = hashTable->numOfElements / hashTable->idealRatio;
     if (idealNumOfBuckets < 5)
         idealNumOfBuckets = 5;
     else

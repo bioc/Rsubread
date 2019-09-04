@@ -1,3 +1,7 @@
+4 Sep 2019 - 2.0.0
+(1) Add support to Windows
+(2) Add the cellCounts() function for single-cell RNA sequencing data analysis
+
 19 Jul 2019 - 1.34.6
 (1) Update users guide.
 (2) Update help pages for featureCounts and flattenGTF.

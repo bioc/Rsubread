@@ -3,7 +3,9 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#ifndef __MINGW32__
 #include <sys/mman.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

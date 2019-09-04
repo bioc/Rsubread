@@ -195,6 +195,7 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 		int iv = ii + fp -> block_chain_current_no;
 		if(iv >=SEEKGZ_CHAIN_BLOCKS_NO) iv-=SEEKGZ_CHAIN_BLOCKS_NO;
 		free(fp -> block_rolling_chain[iv].block_txt);
+		free(fp -> block_rolling_chain[iv].linebreak_positions);
 	}
 
 	fp -> block_chain_current_no = 0;
@@ -539,8 +540,16 @@ int seekgz_next_char(seekable_zfile_t * fp){ // MUST BE PROTECTED BY read_lock
 }
 
 void seekgz_close(seekable_zfile_t * fp){
+	int ii;
 	fclose(fp -> gz_fp);
 	free(fp -> in_zipped_buffer);
+	for(ii = 0; ii < fp -> blocks_in_chain ; ii++){
+		int iv = ii + fp -> block_chain_current_no;
+		if(iv >=SEEKGZ_CHAIN_BLOCKS_NO) iv-=SEEKGZ_CHAIN_BLOCKS_NO;
+		free(fp -> block_rolling_chain[iv].block_txt);
+		free(fp -> block_rolling_chain[iv].linebreak_positions);
+	}
+
 	inflateEnd(&fp -> stem);
 	subread_destroy_lock(&fp -> write_lock);
 }
@@ -550,7 +559,7 @@ int autozip_open(const char * fname, autozip_fp * fp){
 	memset(fp, 0, sizeof(autozip_fp));
 	strcpy(fp -> filename, fname);
 
-	FILE * tstfp = fopen(fname,"r");
+	FILE * tstfp = fopen(fname,"rb");
 	if(!tstfp) return ret;
 
 	int cc1, cc2;
@@ -567,7 +576,7 @@ int autozip_open(const char * fname, autozip_fp * fp){
 		if(cc1 != EOF && cc2 != EOF){
 			fp -> first_chars[0] = cc1;
 			fp -> first_chars[1] = cc2;
-			fp -> is_first_chars = 1;
+			fp -> is_first_chars = 2;
 		}
 		fp -> plain_fp = tstfp;
 		fp -> is_plain = 1;
@@ -603,6 +612,18 @@ int autozip_gets(autozip_fp * fp, char * buf, int buf_size){
 		ret = seekgz_gets(&fp -> gz_fp, buf, buf_size);
 	}
 	//SUBREADprintf("READBUF '%s'\n", buf);
+	return ret;
+}
+
+int autozip_getch(autozip_fp * fp){
+	int ret = 0;
+	if(fp -> is_plain) {
+		if( fp -> is_first_chars ) return fp -> first_chars[2-( fp -> is_first_chars -- ) ];
+		ret = fgetc(fp -> plain_fp);
+		if(ret==EOF)ret = -1;
+	}else{
+		ret = seekgz_next_int8(&fp -> gz_fp);
+	}
 	return ret;
 }
 

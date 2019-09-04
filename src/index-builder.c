@@ -25,6 +25,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/types.h>
 #include "hashtable.h"
 #include "gene-value-index.h"
@@ -126,7 +127,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	read_no = 0;
 
 	char * fn = malloc(3100);
-	bzero(read_offsets, chro_table_maxsize*sizeof(int));
+	memset(read_offsets,0, chro_table_maxsize*sizeof(int));
 	sprintf(fn, "%s.files", index_prefix);
 	unlink(fn);
 
@@ -148,7 +149,6 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		{
 			//Subread Cycle
 			char next_char;
-
 			if (status == NEXT_FILE)
 			{
 				if(file_number == chro_file_number)
@@ -183,7 +183,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 					}
 
 					sprintf (fn, "%s.reads", index_prefix);
-					fp = f_subr_open(fn, "w");
+					fp = f_subr_open(fn, "wb");
 					for (i=0; i<read_no; i++)
 						fprintf(fp, "%u\t%s\n", read_offsets[i], read_names+i*MAX_READ_NAME_LEN);
 
@@ -545,6 +545,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 		{
 			//Subread Cycle
 			char next_char;
+			//if(status > 0)SUBREADprintf("BDSSTATUS = %d\n", status);
 
 			if (status == NEXT_FILE)
 			{
@@ -568,6 +569,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				(*actual_total_bases_inc_marging)+=2*padding_around_contigs;
 
 				geinput_readline(&ginp, fn, 0);
+				//SUBREADprintf("HEADER_SCAN '''%s'''\n", fn);
 
 				for (i=0; i<16; i++)
 				{
@@ -802,7 +804,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	int chrom_lens_max_len = 100;
 	int chrom_lens_len = 0;
 	ERROR_FOUND_IN_FASTA = 0;
-	FILE * out_fp = f_subr_open(out_fa,"w");
+	FILE * out_fp = f_subr_open(out_fa,"wb");
 	format_check_context_t fcc;
 	memset(&fcc,0,sizeof(fcc));
 
@@ -860,11 +862,11 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 						is_R_warnned=1;
 						fcc.byte_in_line = line_buf_len-1;
 						check_and_convert_warn(&fcc ,"This line ends with '\\r\\n'. It is not a problem for building the index but we suggest to use Unix-styled line breaks.", log_fp);
-					}	
+					}
 				}
 				line_buf[line_buf_len-1] =0;
 			}
-
+			//if(strchr(line_buf,'>') || strchr(line_buf,'\r') || strchr(line_buf,'\n'))SUBREADprintf("TESTING: string contains '''%s'''  at %I64u\n", line_buf, ftello(fafp.plain_fp));
 
 			if(line_buf_len<1)
 			{
@@ -1189,7 +1191,7 @@ int main_buildindex(int argc,char ** argv)
 	print_in_box(80, 0, 0, "             Gapped index : %s", GENE_SLIDING_STEP>1?"yes":"no");
 	print_in_box(80, 0, 0, "");
 	if(free_mem>0)print_in_box(80, 0, 0, "      Free / total memory : %.1fGB / %.1fGB", free_mem*1./1024/1024/1024, total_mem*1./1024/1024/1024);
-	print_in_box(80, 0, 0, "");
+	print_in_box(80, 0, 0, "");	
 	print_in_box(80, 0, 0, "              Input files : %d file%s in total",  argc - optind, (argc - optind>1)?"s":"");
 
 	int x1;
@@ -1197,19 +1199,25 @@ int main_buildindex(int argc,char ** argv)
 	{
 		char * fasta_fn = *(argv+optind+x1);
 		int f_type = probe_file_type_fast(fasta_fn);
-		char o_char = 'o';
-		if(f_type != FILE_TYPE_FASTA){
-			o_char = '?';
+		char o_char = '?';
+		if(f_type == FILE_TYPE_FASTA){
+			o_char = 'o';
+		}
+		if(f_type == FILE_TYPE_GZIP_FASTA){
+			o_char = 'o';
 		}
 		print_in_box(94, 0, 0, "                            %c[32m%c%c[36m %s%c[0m", CHAR_ESC, o_char, CHAR_ESC,  get_short_fname(fasta_fn) , CHAR_ESC);
 	}
 	print_in_box(80, 0, 0, "");
+	
+	#ifndef __MINGW32__
 	if(free_mem>0 && free_mem < 3*1024ll*1024*1024){
 		print_in_box(80, 0, 0, "");
 		print_in_box( 80, 0, 0, "  WARNING: the free memory is lower than 3.0GB." );
 		print_in_box( 80, 0, 0, "           the program may run very slow or crash." );
 		print_in_box(80, 0, 0, "");
 	}
+	#endif
 
 	print_in_box(80, 2, 1, "");
 	SUBREADputs("");
@@ -1236,15 +1244,19 @@ int main_buildindex(int argc,char ** argv)
 	}
 	if(tmp_fa_file[0]==0)strcpy(tmp_fa_file, "./");
 
+	#ifdef __MINGW32__
+	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-%06d", getpid(),(int)(time(NULL) % 1000000));
+	#else
 	sprintf(tmp_fa_file+strlen(tmp_fa_file), "/subread-index-sam-%06u-XXXXXX", getpid());
 	int tmpfdd = mkstemp(tmp_fa_file);
 	if(tmpfdd == -1){
 		SUBREADprintf("ERROR: cannot create temp file\n");
 		return -1;
 	}
+	#endif
 
 	sprintf(log_file_name, "%s.log", output_file);
-	FILE * log_fp = f_subr_open(log_file_name,"w");
+	FILE * log_fp = f_subr_open(log_file_name,"wb");
 
 	signal (SIGTERM, SIGINT_hook);
 	signal (SIGINT, SIGINT_hook);
@@ -1258,7 +1270,7 @@ int main_buildindex(int argc,char ** argv)
 	{
 		long long actual_bases=0;
 		HashTable * huge_table;
-		huge_table = HashTableCreate(5000000);
+		huge_table = HashTableCreate(200000);
 		unsigned int expected_hash_items = (unsigned int)(memory_limit * 1024.0 / 8.) * 1024 ;
 		unsigned int * bucket_sizes = NULL, total_tables=0;
 		unsigned int bucket_no = calculate_buckets_by_size(expected_hash_items, SUBINDEX_VER2, 0, GENE_SLIDING_STEP);

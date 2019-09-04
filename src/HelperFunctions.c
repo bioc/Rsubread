@@ -46,9 +46,9 @@
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <net/if.h>
+#include <sys/sysinfo.h>
 #endif
 #include <sys/types.h>
-#include <sys/sysinfo.h>
 #endif
 
 
@@ -96,8 +96,8 @@ char * get_short_fname(char * lname){
 	char * ret = lname;
 
 	int x1;
-	for(x1 = strlen(lname)-1; x1>=0; x1--){
-		if(lname [x1] == '/'){
+	for(x1 = strlen(lname)-2; x1>=0; x1--){
+		if(lname [x1] == '/'||lname [x1] == '\\'){
 			ret = lname + x1 + 1;
 			break;
 		}
@@ -244,8 +244,9 @@ void destroy_contig_fasta(fasta_contigs_t * tab){
 	HashTableDestroy( tab -> contig_table );
 }
 int read_contig_fasta(fasta_contigs_t * tab, char * fname){
-	FILE * fp = f_subr_open(fname, "r");
-	if(fp != NULL){
+	autozip_fp fp;
+	int rv = autozip_open(fname, &fp);
+	if(rv>=0){
 		tab -> contig_table = HashTableCreate(3943);
 		tab -> size_table = HashTableCreate(3943);
 
@@ -265,7 +266,8 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 		chro_name[0]=0;
 
 		while(1){
-			char nch = fgetc(fp);
+			int nch = autozip_getch(&fp);
+			if(nch<0)break;
 			if(status == 0){
 				assert(nch == '>');
 				status = 1;
@@ -305,6 +307,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 						unsigned int new_bin_space = current_bin_space / 4 * 5;
 						if(current_bin_space > 0xffff0000 /5 * 4){
 							assert(0);
+							return 1;
 						}
 						bin_block = realloc(bin_block, new_bin_space);
 						memset(bin_block + current_bin_space, 0, new_bin_space - current_bin_space);
@@ -316,7 +319,7 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 			}
 		}
 
-		fclose(fp);
+		autozip_close(&fp);
 		return 0;
 	}
 	return 1;
@@ -1531,7 +1534,11 @@ void md5txt(char *s){
 	for(x=0;x<16;x++){
 		SUBREADprintf("%02X", md5v[x]);
 	}
+	#ifdef __MINGW32__
+	SUBREADprintf("\t'%s'\t%016I64X\t%I64u\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
+	#else
 	SUBREADprintf("\t'%s'\t%016llX\t%llu\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
+	#endif
 }
 
 //#define TESTHelpermain main
@@ -2687,12 +2694,25 @@ void main(){
 
 #endif
 
+#ifdef __MINGW32__
+#include <windows.h>
+#endif
+
+
 int get_free_total_mem(size_t * total, size_t * free_mem){
 
 #ifdef FREEBSD
     return -1;
 #endif
 
+#ifdef __MINGW32__
+	MEMORYSTATUSEX statex;
+	statex.dwLength = sizeof (statex);
+	GlobalMemoryStatusEx (&statex);
+	(*total) = statex.ullTotalPhys;
+	(*free_mem) = statex.ullAvailPhys;
+	return 0;
+#else
 #ifdef MACOS
     mach_msg_type_number_t count = HOST_VM_INFO_COUNT;
     vm_statistics_data_t vmstat;
@@ -2712,5 +2732,6 @@ int get_free_total_mem(size_t * total, size_t * free_mem){
     *free_mem = cached_mem + sinf.bufferram+sinf.freeram;
     *total = sinf.totalram;
     return 0;
+#endif
 #endif
 }

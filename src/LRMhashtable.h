@@ -22,35 +22,35 @@ typedef struct KeyValuePair_struct {
 } KeyValuePair;
 
 typedef struct {
-    long numOfBuckets;
-    long numOfElements;
+    srInt_64 numOfBuckets;
+    srInt_64 numOfElements;
     KeyValuePair **bucketArray;
     float idealRatio, lowerRehashThreshold, upperRehashThreshold;
     int (*keycmp)(const void *key1, const void *key2);
     int (*valuecmp)(const void *value1, const void *value2);
-    unsigned long (*hashFunction)(const void *key);
+    srUInt_64 (*hashFunction)(const void *key);
     void (*keyDeallocator)(void *key);
     void (*valueDeallocator)(void *value);
 
     void * appendix1;
     void * appendix2;
     void * appendix3;
-    long long int counter1;
-    long long int counter2;
-    long long int counter3;
+    srInt_64 counter1;
+    srInt_64 counter2;
+    srInt_64 counter3;
 } HashTable;
 
 
 typedef struct {
 	void ** elementList;
-	long numOfElements;
-	long capacityOfElements;
+	srInt_64 numOfElements;
+	srInt_64 capacityOfElements;
 	void (*elemDeallocator)(void *elem);
 } ArrayList;
 
 ArrayList * LRMArrayListCreate(int init_capacity);
 void LRMArrayListDestroy(ArrayList * list);
-void * LRMArrayListGet(ArrayList * list, long n);
+void * LRMArrayListGet(ArrayList * list, srInt_64 n);
 int LRMArrayListPush(ArrayList * list, void * new_elem);
 void LRMArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
 
@@ -84,7 +84,7 @@ void LRMHashTableIteration(HashTable * tab, void process_item(void * key, void *
  *      LRMHashTable    - a new LRMHashtable, or NULL on error
 \*--------------------------------------------------------------------------*/
 
-HashTable *LRMHashTableCreate(long numOfBuckets);
+HashTable *LRMHashTableCreate(srInt_64 numOfBuckets);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -250,7 +250,7 @@ int LRMHashTableIsEmpty(const HashTable *hashTable);
  *                     the specified LRMHashTable
 \*--------------------------------------------------------------------------*/
 
-long LRMHashTableSize(const HashTable *hashTable);
+srInt_64 LRMHashTableSize(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -268,7 +268,7 @@ long LRMHashTableSize(const HashTable *hashTable);
  *                     LRMHashTable
 \*--------------------------------------------------------------------------*/
 
-long LRMHashTableGetNumBuckets(const HashTable *hashTable);
+srInt_64 LRMHashTableGetNumBuckets(const HashTable *hashTable);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -336,7 +336,7 @@ void LRMHashTableSetValueComparisonFunction(HashTable *hashTable,
 \*--------------------------------------------------------------------------*/
 
 void LRMHashTableSetHashFunction(HashTable *hashTable,
-                              unsigned long (*hashFunction)(const void *key));
+                              srUInt_64 (*hashFunction)(const void *key));
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -364,7 +364,7 @@ void LRMHashTableSetHashFunction(HashTable *hashTable,
  *      <nothing>
 \*--------------------------------------------------------------------------*/
 
-void LRMHashTableRehash(HashTable *hashTable, long numOfBuckets);
+void LRMHashTableRehash(HashTable *hashTable, srInt_64 numOfBuckets);
 
 /*--------------------------------------------------------------------------*\
  *  NAME:
@@ -457,7 +457,7 @@ void LRMHashTableSetDeallocationFunctions(HashTable *hashTable,
  *      long   - the unmodulated hash value of the key
 \*--------------------------------------------------------------------------*/
 
-unsigned long LRMHashTableStringHashFunction(const void *key);
+srUInt_64 LRMHashTableStringHashFunction(const void *key);
 
 void LRMfree_values_destroy(HashTable * tab);
 #endif /* _HASHTABLE_H */

@@ -5,7 +5,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
+
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
+
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -361,7 +365,8 @@ int LRMwrite_chunk_compress_bam_block(LRMcontext_t * context,  LRMthread_context
 int LRMhash_strcmp(const void * s1, const void * s2){
 	return strcmp(s1, s2);
 }
-unsigned long LRMhash_strhash(const void * sv){
+
+srUInt_64 LRMhash_strhash(const void * sv){
 	unsigned char *s = (unsigned char *)sv;
 	unsigned long ret = 0;
 	while(*s){

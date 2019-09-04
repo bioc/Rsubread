@@ -32,7 +32,9 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
 #include <unistd.h>
 #include <sys/stat.h>
 #include <locale.h>
@@ -44,6 +46,7 @@
 #include "sublog.h"
 #include "core.h"
 #include "input-files.h"
+#include "input-blc.h"
 #include "sorted-hashtable.h"
 #include "HelperFunctions.h"
 
@@ -115,6 +118,7 @@ int is_valid_digit_range(char * optarg, char * optname, int min, int max_inc){
 
 void warning_file_limit()
 {
+	#ifndef __MINGW32__
 	struct rlimit limit_st;
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
@@ -128,6 +132,7 @@ void warning_file_limit()
 			print_in_box(80,0,0,"");
 		}
 	}
+	#endif
 }
 
 int exec_cmd(char * cmd, char * outstr, int out_limit){
@@ -344,14 +349,22 @@ int show_summary(global_context_t * global_context)
 	char sumname[MAX_FILE_NAME_LENGTH+30];
 	sprintf(sumname, "%s.summary", global_context->config.output_prefix);
 	FILE * sumfp = fopen(sumname,"w");
+	#ifdef __MINGW32__
+	fprintf(sumfp, "Total_%s\t%I64u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
+	#else
 	fprintf(sumfp, "Total_%s\t%llu\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
+	#endif
 	fprintf(sumfp, "Mapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_mapped_reads);
 	fprintf(sumfp, "Uniquely_mapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_uniquely_mapped_reads);
 	fprintf(sumfp, "Multi_mapping_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_multimapping_reads);
 	fprintf(sumfp, "Unmapped_%s\t%u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_unmapped_reads);
 
 	if(global_context->input_reads.is_paired_end_reads){
+		#ifdef __MINGW32__
+		fprintf(sumfp, "Properly_paired_fragments\t%I64u\n",global_context -> all_correct_PE_reads);
+		#else
 		fprintf(sumfp, "Properly_paired_fragments\t%llu\n",global_context -> all_correct_PE_reads);
+		#endif
 		fprintf(sumfp, "Singleton_fragments\t%u\n", global_context -> not_properly_pairs_only_one_end_mapped);
 		fprintf(sumfp, "More_than_one_chr_fragments\t%u\n", global_context -> not_properly_pairs_different_chro);
 		fprintf(sumfp, "Unexpected_strandness_fragments\t%u\n", global_context -> not_properly_different_strands);
@@ -385,6 +398,39 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 1,1,"  Summary");
 	print_in_box(80, 0,1,"  ");
 
+	#ifdef __MINGW32__
+    if(global_context->input_reads.is_paired_end_reads)
+		print_in_box(80, 0,0,"            Total fragments : %I64d" , global_context -> all_processed_reads);
+    else
+		print_in_box(80, 0,0,"                Total reads : %I64d" , global_context -> all_processed_reads);
+
+	print_in_box(81, 0,0,"                     Mapped : %u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
+	print_in_box(80, 0,0,"            Uniquely mapped : %u",  global_context -> all_uniquely_mapped_reads);
+	print_in_box(80, 0,0,"              Multi-mapping : %u",  global_context -> all_multimapping_reads);
+	print_in_box(80, 0,1,"      ");
+	print_in_box(80, 0,0,"                   Unmapped : %u",  global_context -> all_unmapped_reads);
+	if(global_context->input_reads.is_paired_end_reads){
+		print_in_box(80, 0,1,"      ");
+		print_in_box(80, 0,0,"            Properly paired : %I64d", global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"        Not properly paired : %I64d", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"                  Singleton : %u", global_context -> not_properly_pairs_only_one_end_mapped);
+		print_in_box(80, 0,0,"                   Chimeric : %u", global_context -> not_properly_pairs_different_chro);
+		print_in_box(80, 0,0,"      Unexpected strandness : %u", global_context -> not_properly_different_strands);
+	 	print_in_box(80, 0,0," Unexpected fragment length : %u", global_context -> not_properly_pairs_TLEN_wrong);
+	 	print_in_box(80, 0,0,"      Unexpected read order : %u", global_context -> not_properly_pairs_wrong_arrangement);
+	}
+
+	print_in_box(80, 0,1,"      ");
+
+	if(global_context->config.output_prefix[0])
+	{
+	        if(global_context->config.entry_program_name == CORE_PROGRAM_SUBJUNC && ( global_context -> config.prefer_donor_receptor_junctions || !(global_context ->  config.do_fusion_detection || global_context ->  config.do_long_del_detection)))
+	                print_in_box(80, 0,0,"                  Junctions : %u", global_context -> all_junctions);
+	        if((global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
+	                print_in_box(80, 0,0,"                    Fusions : %u", global_context -> all_fusions);
+	        print_in_box(80, 0,0,"                     Indels : %u", global_context -> all_indels);
+	}
+	#else
     if(global_context->input_reads.is_paired_end_reads)
 		print_in_box(80, 0,0,"            Total fragments : %'llu" , global_context -> all_processed_reads);
     else
@@ -416,7 +462,8 @@ int show_summary(global_context_t * global_context)
 	                print_in_box(80, 0,0,"                    Fusions : %'u", global_context -> all_fusions);
 	        print_in_box(80, 0,0,"                     Indels : %'u", global_context -> all_indels);
 	}
-	
+
+	#endif
 
 	if(global_context -> is_phred_warning)
 	{
@@ -451,6 +498,19 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 	// Read_chunk_start is the file_offset of the very first read in the entire file.
 	// current_circle_start_position_file1 is the file_offset of the first read in this 5-million read chunk (or whatever the chunk size is)
 
+
+	if(global_context->config.is_BCL_input){
+		if(task == 10){
+			char minchr[10];
+			float min_value = (miltime() - global_context -> start_time)*1./60;
+			if(min_value < 9.91)
+				sprintf(minchr, "%.01f", min_value);
+			else sprintf(minchr, "% 3d", (int)min_value);
+			print_in_box(80,0,0,"   processed % 3d million input reads in %s minutes", current_read_no/1000000, minchr);
+		}
+		//SUBREADprintf("TASK=%d, RNO=%u\n", task, current_read_no);
+		return;
+	}
 
 	if(thread_context&&thread_context->thread_id)
 	{
@@ -737,7 +797,8 @@ int check_configuration(global_context_t * global_context)
 	if(global_context -> config.max_indel_length > 16)
 		warning_file_limit();
 
-	int wret = warning_file_type(global_context -> config.first_read_file, expected_type), wret2 = 0;
+	int wret = 0, wret2 = 0;
+	if( global_context ->config.is_BCL_input == 0 )  warning_file_type(global_context -> config.first_read_file, expected_type);
 	if(global_context -> config.second_read_file[0])
 	{
 		if(expected_type==FILE_TYPE_FAST_ || expected_type==FILE_TYPE_GZIP_FAST_)
@@ -967,7 +1028,11 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 		else{
 			int ret = sort_SAM_finalise(&writer);
 			if(writer.unpaired_reads)
-				print_in_box(80,0,0,"%llu single-end mapped reads in reordering.", writer.unpaired_reads);
+				#ifdef __MINGW32__
+				print_in_box(80,0,0,"%I64d single-end mapped reads in reordering.", writer.unpaired_reads);
+				#else
+				print_in_box(80,0,0,"%lld single-end mapped reads in reordering.", writer.unpaired_reads);
+				#endif
 			if(ret) {
 				disk_is_full = 1;
 				SUBREADprintf("ERROR: unable to create the temporary file. Please check the disk space in the output directory.\n");
@@ -1022,18 +1087,13 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int half_number, int is_init)
 {
 	char *fname;
-	if(global_context->config.is_SAM_file_input)
-	{
-
+	if(global_context->config.is_SAM_file_input) {
 		fname = is_init?global_context ->config.first_read_file:global_context -> input_reads.first_read_file.filename;
 		if(is_init && half_number == 1)
 			if(convert_BAM_to_SAM(global_context, global_context ->config.first_read_file, global_context ->config.is_BAM_input)) return -1;
 		if(!global_context->input_reads.is_paired_end_reads) half_number=0;
 		return geinput_open_sam(fname, fp, half_number);
-
-	}
-	else
-	{
+	} else {
 		if(is_init)
 		{
 			if(global_context -> config.is_gzip_fastq)
@@ -1042,7 +1102,12 @@ int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int 
 		}
 		else
 			fname = (half_number == 2)?global_context -> input_reads.second_read_file.filename:global_context -> input_reads.first_read_file.filename;
-		return geinput_open(fname, fp);
+		int rv = global_context->config. is_BCL_input?geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads ):geinput_open(fname, fp);
+		if(global_context->input_reads.is_paired_end_reads && global_context->config. is_BCL_input){
+			SUBREADprintf("ERROR: No paired-end input is allowed on scRNA mode.\n");
+			return -1;
+		}
+		return rv;
 	}
 }
 
@@ -1491,8 +1556,10 @@ int add_event_detected_from_cigar(global_context_t * global_context, unsigned in
 		if(is_indel && this_event -> event_type != CHRO_EVENT_TYPE_INDEL) continue;
 		if((!is_indel) && this_event -> event_type == CHRO_EVENT_TYPE_INDEL) continue;
 
+		#ifndef __MINGW32__
 		if(0 && ( memcmp(read_name, "V0112_0155:7:1104:17648:117432",28)==0 || ( this_event -> event_small_side  > 2613701363 - 200 && this_event -> event_small_side  < 2613701363 + 100) ))
 			SUBREADprintf("EVENT: L=%u, R=%u (TABLE L=%u , R=%u), LEXT=%d, REXT=%d -- %s\n", left_last_base, right_first_base, this_event -> event_small_side, this_event -> event_large_side, left_extend, right_extend, read_name);
+		#endif
 
 		if(this_event -> event_small_side == left_last_base &&  this_event -> event_large_side == right_first_base){
 			if(is_indel && this_event -> indel_length == indel_len){
@@ -1853,7 +1920,6 @@ void add_buffered_fragment(global_context_t * global_context, thread_context_t *
 void write_single_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_tmp_t * rec1, realignment_result_t * raw_r1, subread_output_tmp_t * rec2, realignment_result_t * raw_r2, int all_locations , int current_location , char * read_name_1, char * read_name_2, int read_len_1, int read_len_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2, subread_read_number_t pair_number, int non_informative_subread_r1, int non_informative_subread_r2, int is_R1_OK, int is_R2_OK)
 {
 
-
 	//assert(all_locations <= global_context -> config.reported_multi_best_reads);
 	int tlen = 0;
 
@@ -1895,11 +1961,6 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 	}
 
-
-	// rec -> chro is a pointer to the offset table; the pointers can be compared.
-
-
-
 	int applied_reverse_space;
 	applied_reverse_space = global_context->config.space_type;
 	if(global_context -> config.convert_color_to_base)
@@ -1935,7 +1996,7 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 	}
 	remove_backslash(read_name_1);
-	remove_backslash(read_name_2);
+	if(global_context->input_reads.is_paired_end_reads) remove_backslash(read_name_2);
 
 	int display_offset1 = 0, display_tailgate1 = 0;
 	int display_offset2 = 0, display_tailgate2 = 0;
@@ -2122,9 +2183,18 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		}
 		else
 		{
-			int write_len_2 = 100, write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			int write_len_2 = 100, 
+			#ifdef __MINGW32__
+			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%I64d\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			#else
+			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			#endif
 			if(global_context->input_reads.is_paired_end_reads)
+			#ifdef __MINGW32__
+				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%I64d\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
+			#else
 				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
+			#endif
 
 			if( write_len < 10 || write_len_2 < 10 ){
 				global_context -> output_sam_is_full = 1;
@@ -2344,7 +2414,6 @@ unsigned int calc_end_pos(unsigned int p, char * cigar, unsigned int * all_skipp
 void test_PE_and_same_chro_align(global_context_t * global_context , realignment_result_t * res1, realignment_result_t * res2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * rname, int * res_tlen);
 void write_realignments_for_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_output_context_t * out_context, unsigned int read_number, realignment_result_t * res1, realignment_result_t * res2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, char * qual_text_1, char * qual_text_2 , int rlen1 , int rlen2, int multi_mapping_number, int this_multi_mapping_i, int non_informative_subreads_r1, int non_informative_subreads_r2){
 
-
 	int is_2_OK = 0, is_1_OK = 0;
 
 	if(res1){
@@ -2518,9 +2587,10 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 		sqr_read_number++;
 		fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 0, &current_read_number);
-		//SUBREADprintf("THREAD_OPT2_fetch %llu\n", current_read_number);
+		//if(current_read_number%500000==0)SUBREADprintf("THREAD_OPT2_fetch %s  %s ; RNO=%lld\n", read_name_1, read_text_1, current_read_number);
 		strcpy(raw_read_text_1, read_text_1);
 		strcpy(raw_qual_text_1, qual_text_1);
+		//printf("OCT27-STEPB - %s\n", read_name_1);
 
 		if(global_context -> input_reads.is_paired_end_reads){
 			strcpy(raw_read_text_2, read_text_2);
@@ -2564,7 +2634,9 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			max_votes = max(_global_retrieve_alignment_ptr(global_context, current_read_number, 0, 0)->selected_votes, _global_retrieve_alignment_ptr(global_context, current_read_number, 1, 0)->selected_votes);
 		else	max_votes = _global_retrieve_alignment_ptr(global_context, current_read_number, 0, 0)->selected_votes;
 
-
+		//#warning "========== COMMENT DEBUG============="
+		if(0 && FIXLENstrcmp("R00000007859", read_name_1)==0)
+			SUBREADprintf("BSSS2 : %s : %d\n", read_name_1, max_votes);
 
 		int best_read_id=0;
 
@@ -2733,6 +2805,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
 								current_realignment_result -> MAPQ_adjustment = current_MISMATCH_buffer [read_record_i] + ( is_second_read?(r2_step2_locations): (r1_step2_locations));
 
+//		SUBREADprintf("THREAD_OPT1_write %s\n", read_name_1);
 								if(is_second_read)
 									write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, NULL, current_realignment_result, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
 								else write_realignments_for_fragment(global_context, thread_context, &out_context , current_read_number, current_realignment_result, NULL, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
@@ -2758,30 +2831,17 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				int r1_matched = final_MATCH_buffer1[r1_best_id];
 				if(r1_matched < 1) continue;
 				realignment_result_t * realignment_result_R1 = final_realignments + final_realignment_index1[r1_best_id];
-				if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0)
-					SUBREADprintf("R1 MA=%d, MISMA=%d %u  %s \n", realignment_result_R1->final_matched_bases, realignment_result_R1 -> final_mismatched_bases, realignment_result_R1 -> first_base_position, realignment_result_R1 -> cigar_string);
 
 				for(r2_best_id = 0; r2_best_id < r2_candidate_locations; r2_best_id ++) {
 					int r2_matched = final_MATCH_buffer2[r2_best_id];
 					if(r2_matched < 1) continue;
 
 					realignment_result_t * realignment_result_R2 = final_realignments + final_realignment_index2[r2_best_id];
-					if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0)
-						SUBREADprintf("R2 MA=%d, MISMA=%d  %u  %s\n", realignment_result_R2->final_matched_bases, realignment_result_R2 -> final_mismatched_bases, realignment_result_R2 -> first_base_position, realignment_result_R2 -> cigar_string);
 					int is_PE = 0, tlen=0;
 					int is_same_chro = 0, is_exonic_regions = 0;
 					unsigned long long final_SCORE = 0;
 
 					test_PE_and_same_chro_align(global_context , realignment_result_R1 , realignment_result_R2, &is_exonic_regions, &is_PE, &is_same_chro , read_len_1, read_len_2, read_name_1, &tlen);
-					if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0) {
-						char outpos1[100];
-						char outpos2[100];
-
-						absoffset_to_posstr(global_context, realignment_result_R1 -> first_base_position,  outpos1);
-						absoffset_to_posstr(global_context, realignment_result_R2 -> first_base_position,  outpos2);
-
-						SUBREADprintf("READ %s : %s %s     %s %s  : %s\n", read_name_1, outpos1, realignment_result_R1 -> cigar_string, outpos2,  realignment_result_R2 -> cigar_string, is_exonic_regions?  "YES":"NO");
-					}
 
 					unsigned long long TLEN_exp_score = 0;
 					if(is_PE && global_context -> config.reported_multi_best_reads<2){
@@ -2847,10 +2907,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 					assert(final_SCORE > 0);
 					final_SCORE_buffer[r1_best_id * global_context -> config.multi_best_reads * MAX_ALIGNMENT_PER_ANCHOR + r2_best_id] = final_SCORE;
 	
-					if(0 && FIXLENstrcmp("R000404427", read_name_1) ==0){
-						SUBREADprintf("Highest=%llu, This=%llu, Occurance=%d\n", highest_score , final_SCORE , highest_score_occurence);
-					}
-
 					if(final_SCORE > highest_score) {
 						//#warning ">>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<"
 						//printf("OCT27-STEPMSM-REPL %s : SCORE %llu -> %llu, pos=%u,%u\n", read_name_1, final_SCORE, highest_score , realignment_result_R1->mapping_result->selected_position, realignment_result_R2->mapping_result->selected_position );
@@ -2906,7 +2962,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 										global_context -> expected_TLEN_read_numbers++;
 										global_context -> expected_TLEN_sum += this_tlen;
 										if(global_context -> expected_TLEN_read_numbers == READPAIRS_FOR_CALC_EXPT_TLEN)
-											print_in_box(80,0,0,"  Estimated fragment length : %llu bp\n",  global_context -> expected_TLEN_sum / global_context -> expected_TLEN_read_numbers );
+											print_in_box(80,0,0,"  Estimated fragment length : %d bp\n",  (int)(global_context -> expected_TLEN_sum / global_context -> expected_TLEN_read_numbers ));
 										subread_lock_release(&global_context -> output_lock);
 									}
 								}
@@ -2926,7 +2982,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								r1_realign -> MAPQ_adjustment = r1_step2_locations + final_MISMATCH_buffer1[r1_best_id];
 								r2_realign -> MAPQ_adjustment = r2_step2_locations + final_MISMATCH_buffer2[r2_best_id];
 
-								//SUBREADprintf("29NOV2016-WOUT %s [%d / %d : score %llu] LOC = %d,%d\n", read_name_1, output_cursor , highest_score_occurence, highest_score, r1_best_id, r2_best_id);
+//		SUBREADprintf("THREAD_OPT2_write %s\n", read_name_1);
 								write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, r1_realign, r2_realign, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, read_len_1, read_len_2, highest_score_occurence, output_cursor,  non_informative_subreads_r1, non_informative_subreads_r2);
 								output_cursor ++;
 						}
@@ -2943,6 +2999,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			strcpy(read_text_2, raw_read_text_2);
 			strcpy(qual_text_1, raw_qual_text_1);
 			strcpy(qual_text_2, raw_qual_text_2);
+//		SUBREADprintf("THREAD_OPT3_write %s\n", read_name_1);
 			write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, NULL, NULL, read_name_1, read_name_2, read_text_1, read_text_2, raw_qual_text_1, raw_qual_text_2, read_len_1, read_len_2, 0, 0, non_informative_subreads_r1, non_informative_subreads_r2);
 		}
 		
@@ -3022,7 +3079,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 {
 	int xk1;
 	gene_input_t * ginp1 = NULL , * ginp2 = NULL;
-	subread_read_number_t current_read_number=0;
+	subread_read_number_t current_read_number=0, last_shown_curr = 0;
 	char * read_text_1, * read_text_2;
 	char * qual_text_1, * qual_text_2;
 	char read_name_1[MAX_READ_NAME_LEN+1], read_name_2[MAX_READ_NAME_LEN+1];
@@ -3067,19 +3124,13 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		int is_reversed, applied_subreads = 0, v1_all_subreads=0, v2_all_subreads=0;
 
 		fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2,1, &current_read_number);
+		//SUBREADprintf("VOTING READ # %lld: %s %s %d\n", current_read_number, read_name_1, read_text_1, read_len_1);
 
 		if(current_read_number < 0){
 		//	#warning ">>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<"
 		//	printf("OCT27-STEPB-QUIT :T%d\n", thread_context -> thread_id);
 			break;
 		}
-
-		//#warning ">>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<"
-		//printf("OCT27-STEPB - %s :T%d\n", read_name_1, thread_context -> thread_id);
-
-
-
-		//SUBREADprintf("RL=%d,%d\n", read_len_1, read_len_2);
 
 		for(is_reversed = 0; is_reversed<2; is_reversed++)
 		{
@@ -3156,25 +3207,14 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 								 gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
 							else
 								 gehash_go_X(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,  voting_max_indel_length, subread_no,  low_index_border, current_high_border, allow_indel_i, shift_indel_locs, &shift_indel_NO);
+				if(0 && FIXLENstrcmp("R00000110641:", read_name_1)==0)SUBREADprintf("SR %d = %u  %s ; SPC=%d; INDELNO=%u\n", subread_no, subread_integer, subread_string, global_context->config.space_type , shift_indel_NO);
 	
 							if(global_context->config.SAM_extra_columns)
 								noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
 						}
 
 					}
-					if(0)SUBREADprintf("SSSRRRFFF=%d\n", shift_indel_NO);
 					if(shift_indel_NO == 0 || global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)break;
-
-					if(0){
-						SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
-						SUBREADprintf("BEFORE_RE_TRY ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
-						int jj;
-						for(jj=0; jj<shift_indel_NO; jj++){
-							SUBREADprintf("SHIFT_LIST %s R_%d [%d] at %u\n", read_name_1, is_second_read+1, jj+1, shift_indel_locs[jj]);
-						}
-						print_votes(vote_1, global_context -> config.index_prefix);
-						print_votes(vote_2, global_context -> config.index_prefix);
-					}
 				}
 	//			SUBREADprintf("\n");
 
@@ -3202,11 +3242,13 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
 //#warning "====== CHECK PRINTING !!! =========="
-				if(0 && FIXLENstrcmp("simulated.6891609", read_name_1)==0){
-					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2);
+				if(0 && FIXLENstrcmp("R00000110641:", read_name_1)==0){
+//				if(vote_1->max_vote>= 9){
+					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s  VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2, vote_1->max_vote, min_first_read_votes);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
 					print_votes(vote_2, global_context -> config.index_prefix);
+					if(is_reversed==1)exit(0);
 				}
 
 				if(global_context -> input_reads.is_paired_end_reads)
@@ -3271,15 +3313,21 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 					gene_value_index_t * curr_val_index = thread_context? thread_context -> current_value_index: global_context -> current_value_index;
 					locate_current_value_index(global_context, thread_context, current_r, current_rlen);
 
-					//#warning "==== UNCOMMENT THE NEXT THREE LINES ===="
+			//		#warning "==== UNCOMMENT THE NEXT LINE ===="
 
-					if(0 && FIXLENstrcmp("simulated.2467286/2", current_read_name)==0) SUBREADprintf("TEST_BETTER: better_id = %d, votes = %d, has=%d\n", best_read_id, current_r -> selected_votes, has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id));
+					if(0 && FIXLENstrcmp("R00000003493", current_read_name)==0)
+						SUBREADprintf("TEST_BETTER: better_id = %d, votes = %d, has=%d\n", best_read_id, current_r -> selected_votes, has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id));
+
 					if(!has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id))
 						find_new_indels(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
 					if(need_junction_step)
 						find_new_junctions(global_context, thread_context, current_read_number, current_read_name, current_read, current_qual, current_rlen, is_second_read, best_read_id);
 
-					if(0 && FIXLENstrcmp("simulated.2467286/2", current_read_name)==0) SUBREADprintf("TEST_BETTER_END: better_id = %d, votes = %d, has=%d\n", best_read_id, current_r -> selected_votes, has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id));
+			//		#warning "==== UNCOMMENT THE NEXT LINE ===="
+					if(0 && FIXLENstrcmp("R00000003493", current_read_name)==0){
+						SUBREADprintf("TEST_BETTER_END: better_id = %d, votes = %d, has=%d\n", best_read_id, current_r -> selected_votes, has_better_mapping(global_context, thread_context, current_read_number,  is_second_read,best_read_id));
+						exit(1);
+					}
 
 					if(thread_context) thread_context -> current_value_index = curr_val_index;
 					else global_context -> current_value_index = curr_val_index;
@@ -3289,13 +3337,17 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		
 		if(!thread_context || thread_context->thread_id == 0)
 		{
-			if(sqr_read_number > sqr_interval)
+			if(0 == global_context -> config.is_BCL_input  && sqr_read_number > sqr_interval)
 			{
 				show_progress(global_context, thread_context, current_read_number, STEP_VOTING);
 				sqr_read_number = 0;
 				unsigned long long total_file_size = global_context -> input_reads.first_read_file_size;
 				unsigned long long guessed_all_reads = total_file_size / global_context -> input_reads . avg_read_length;// / (1+global_context -> config.is_SAM_file_input);
-				sqr_interval = guessed_all_reads / global_context -> config.all_threads/10;
+				sqr_interval = max(10000,guessed_all_reads / global_context -> config.all_threads/10);
+			}
+			if(global_context -> config.is_BCL_input && current_read_number - last_shown_curr >= 1000000){
+				show_progress(global_context, thread_context, current_read_number + global_context -> all_processed_reads, STEP_VOTING);
+				last_shown_curr = current_read_number;
 			}
 		}
 
@@ -3475,6 +3527,7 @@ void clean_context_after_chunk(global_context_t * context)
 
 void locate_read_files(global_context_t * global_context, int type)
 {
+	if(global_context -> input_reads.first_read_file. file_type == GENE_INPUT_BCL) return;
 	if(type==SEEK_SET)
 	{
 		global_context -> current_circle_start_abs_offset_file1 = geinput_file_offset(&(global_context -> input_reads.first_read_file));
@@ -3490,7 +3543,8 @@ void locate_read_files(global_context_t * global_context, int type)
 	
 	}
 }
-void reward_read_files(global_context_t * global_context, int type)
+
+void rewind_read_files(global_context_t * global_context, int type)
 {
 	if(type==SEEK_SET)
 	{
@@ -3505,9 +3559,23 @@ void reward_read_files(global_context_t * global_context, int type)
 			geinput_seek(&global_context -> input_reads.second_read_file, & global_context -> current_circle_end_position_file2);
 	
 	}
+}
+
+void go_chunk_start( global_context_t * global_context ){
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL)
+		cacheBCL_go_chunk_start(&global_context -> input_reads.first_read_file.bcl_input);
+	else 
+		rewind_read_files(global_context, SEEK_SET);
 	global_context -> running_processed_reads_in_chunk=0;
 }
 
+void go_chunk_nextchunk( global_context_t * global_context ){
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL)
+		cacheBCL_go_chunk_end(&global_context -> input_reads.first_read_file.bcl_input);
+	else
+		rewind_read_files(global_context, SEEK_END);
+	global_context -> running_processed_reads_in_chunk=0;
+}
 
 int read_chunk_circles(global_context_t *global_context)
 {
@@ -3571,7 +3639,8 @@ int read_chunk_circles(global_context_t *global_context)
 			}
 
 			if(global_context->current_index_block_number < global_context->index_block_number -1)
-				reward_read_files(global_context, SEEK_SET);
+				go_chunk_start(global_context);
+			//	rewind_read_files(global_context, SEEK_SET);
 
 			int is_last_chunk = global_context -> processed_reads_in_chunk < global_context->config.reads_per_chunk;
 
@@ -3599,7 +3668,8 @@ int read_chunk_circles(global_context_t *global_context)
 		ret = ret || anti_supporting_read_scan(global_context);
 		remove_neighbour(global_context);
 
-		reward_read_files(global_context, SEEK_SET);
+		go_chunk_start(global_context);
+	//	rewind_read_files(global_context, SEEK_SET);
 		double period_before_realign = miltime() - time_before_realign;
 		global_context -> timecost_before_realign += period_before_realign;
 
@@ -3611,11 +3681,13 @@ int read_chunk_circles(global_context_t *global_context)
 
 		if(global_context -> config.is_third_iteration_running)
 		{
-			reward_read_files(global_context, SEEK_SET);
+			go_chunk_start(global_context);
+			//rewind_read_files(global_context, SEEK_SET);
 			ret = ret || do_iteration_three(global_context, NULL);
 		}
 
-		reward_read_files(global_context, SEEK_END);
+		go_chunk_nextchunk(global_context);
+		//rewind_read_files(global_context, SEEK_END);
 
 		global_context -> all_processed_reads+= global_context ->processed_reads_in_chunk;
 
@@ -3696,7 +3768,7 @@ int print_configuration(global_context_t * context)
 	        print_in_box(80, 0, 0, "Input file 2  : %s", get_short_fname(context->config.second_read_file));
 	}
 	else
-	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):"");
+	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):(context->config.is_BCL_input?" (BCL)":""));
 
 	if(context->config.output_prefix [0])
 	        print_in_box(80, 0, 0, "Output file   : %s (%s)%s", get_short_fname(context->config.output_prefix), context->config.is_BAM_output?"BAM":"SAM", context->config.is_input_read_order_required?", Keep Order":(context->config.sort_reads_by_coordinates?", Sorted":""));
@@ -3943,6 +4015,12 @@ int load_global_context(global_context_t * context)
 		context->config.report_multi_mapping_reads = 1;
 	}
 
+	if(context->config.is_BCL_input){
+		// opening a BCL input needs the exact chunk size. 
+		context -> config.multi_best_reads = 3;
+		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
+		if(context->config.multi_best_reads>1) context -> config.reads_per_chunk /= context->config.multi_best_reads;
+	}
 	subread_init_lock(&context->input_reads.input_lock);
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1)) {
 		//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
@@ -3983,12 +4061,14 @@ int load_global_context(global_context_t * context)
 		context -> config.max_vote_number_cutoff = 2;
 	}
 
-	context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
 	context -> config.max_vote_simples = max(context -> config.max_vote_simples ,  context -> config.reported_multi_best_reads);
 	context -> config.max_vote_combinations = max(context -> config.max_vote_combinations ,  context -> config.reported_multi_best_reads);
 
-	if(context->input_reads.is_paired_end_reads) context->config.reads_per_chunk /= 2;
-	if(context->config.multi_best_reads>1) context->config.reads_per_chunk /= context->config.multi_best_reads;
+	if(!context->config.is_BCL_input){
+		// if it is BCL input then these two parameters have been decided .
+		if(context->config.multi_best_reads>1) context->config.reads_per_chunk /= context->config.multi_best_reads;
+		if(context->input_reads.is_paired_end_reads) context->config.reads_per_chunk /= 2;
+	}
 
 	struct stat ginp1_stat;
 	int guess_tested_reads = 0;

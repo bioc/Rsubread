@@ -8,7 +8,7 @@
 #include "LRMconfig.h"
 
 int LRMhash_strcmp(const void * s1, const void * s2);
-unsigned long LRMhash_strhash(const void * sv);
+srUInt_64 LRMhash_strhash(const void * sv);
 
 int LRMgenekey2int(char key []);
 

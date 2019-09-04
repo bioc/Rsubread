@@ -27,7 +27,9 @@
 #include <getopt.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/resource.h>
+#endif
 #include <sys/timeb.h>
 #include <sys/stat.h>
 #include <locale.h>
@@ -592,7 +594,9 @@ void LRMprint_longvote( LRMcontext_t * context, LRMthread_context_t * thread_con
 		to_prev_delta -=  iteration_context -> chain_chro_at_cov_start[ii];
 		if(ii < 1) to_prev_delta = 0;
 		LRMpos2txt(context,  iteration_context -> chain_chro_at_cov_start[ii], postxt);
+		#ifndef __MINGW32__
 		LRMprintf("  >> COV = %d ~ %d  : Pos = %u (%s)  DELTA_PREV=%lld\n", iteration_context -> chain_cov_start[ii], iteration_context -> chain_cov_end[ii], iteration_context -> chain_chro_at_cov_start[ii], postxt, to_prev_delta);
+		#endif
 		prev_end_chro = iteration_context -> chain_chro_at_cov_start[ii] + (iteration_context -> chain_cov_end[ii] - iteration_context -> chain_cov_start[ii]);
 		prev_end_read = iteration_context -> chain_cov_end[ii];
 	}

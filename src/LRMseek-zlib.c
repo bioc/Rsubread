@@ -217,7 +217,11 @@ int LRMseekgz_decompress_next_chunk(seekable_zfile_t * fp){
 		//#warning "COMMENT NEXT LINE!!!!!!"
 		//fprintf(stderr,"INFLATING: INLEN=%d , OLEN=%d, POS=%lld, RET=%d, TOOL=%s\n", inlen , have, LRMseekgz_ftello(fp), ret, zlibVersion());
 		if(ret != Z_OK && ret != Z_STREAM_END){ //any error
+			#ifdef __MINGW32__
+			SEEKZLIBprintf("FATAL: INFLATE-ERROR=%d   POS=%I64d\n", ret, LRMseekgz_ftello(fp));
+			#else
 			SEEKZLIBprintf("FATAL: INFLATE-ERROR=%d   POS=%lld\n", ret, LRMseekgz_ftello(fp));
+			#endif
 			fp -> internal_error = 1;
 			return -1;
 		}

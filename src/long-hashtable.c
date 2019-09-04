@@ -40,7 +40,10 @@ int lnhash_create(lnhash_t * the_table, unsigned int num_buckets)
 	the_table -> subread_repeat_max = 25600;
 
 	the_table -> buckets = malloc(num_buckets * sizeof(lnhash_buckct_t));
-	the_table -> key_repeated_numbers = malloc(sizeof(short) * 0x100000000llu);
+	if(sizeof(void*) == 4)
+		the_table -> key_repeated_numbers = malloc(sizeof(short) * 0xfffffff);
+	else
+		the_table -> key_repeated_numbers = malloc(sizeof(short) * 0x100000000llu);
 	for(x1=0; x1<num_buckets; x1++)
 	{
 		the_table -> buckets[x1].num_elements = 0;

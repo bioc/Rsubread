@@ -140,7 +140,7 @@ float match_base_quality_cs(gene_value_index_t *array_index, char * read_txt,  u
 void print_version_info();
 
 int fc_strcmp_chro(const void * s1, const void * s2);
-unsigned long fc_chro_hash(const void *key) ;
+srUInt_64 fc_chro_hash(const void *key) ;
 
 #endif
 

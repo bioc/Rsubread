@@ -136,7 +136,7 @@ void DTCload_fasta(DTCcontext_t * context){
 		HashTablePut(context -> chro_length_table, curr_chro_mem , NULL + base_current_chro_len);
 		HashTablePut(context -> chro_4bit_table, curr_chro_mem , base_2bits);
 	}
-	SUBREADprintf("%ld items loaded from FASTA.\n", context -> chro_4bit_table -> numOfElements);
+	SUBREADprintf("%lld items loaded from FASTA.\n", context -> chro_4bit_table -> numOfElements);
 	fclose(fp);
 }
 
@@ -157,7 +157,7 @@ int DTCwrite_annotations(char * gene_name, char * transcript_name, char * chro_n
 }
 
 void DTCprint_lentab_items(void * key, void * hashed_obj, HashTable * tab){
-	SUBREADprintf("%s => %ld\n", (char*)key, hashed_obj - NULL);
+	SUBREADprintf("%s => %ld\n", (char*)key, (long)(hashed_obj - NULL));
 }
 
 // start and end are 1-based
@@ -235,7 +235,7 @@ int DTCparse_GTF_and_Genome(DTCcontext_t * context){
 
 	load_features_annotation(context -> anno_file_name, context -> anno_file_format, context -> gene_id_column_name,
 		context -> transcript_id_column_name, context -> used_feature_type, context, DTCdo_add_feature);
-	SUBREADprintf("%ld items loaded from annotation file.\n", context -> exon_table -> numOfElements);
+	SUBREADprintf("%lld items loaded from annotation file.\n", context -> exon_table -> numOfElements);
 
 	long chri, ii;
 
@@ -280,7 +280,7 @@ int DTCparse_GTF_and_Genome(DTCcontext_t * context){
 
 		ArrayListSort(in_chro_exons, DTCcompare_exons);
 		assert(in_chro_exons -> numOfElements > 0);
-		SUBREADprintf("Annotations for %s (%ld) were sorted.\n", current_chro, in_chro_exons -> numOfElements);
+		SUBREADprintf("Annotations for %s (%lld) were sorted.\n", current_chro, in_chro_exons -> numOfElements);
 	
 		unsigned int gene_number = 1;
 	
@@ -393,7 +393,7 @@ int DTCparse_GTF_and_Genome(DTCcontext_t * context){
 			HashTableIteration(genename_to_3int_table ,DTCprocess_gene_tab);
 			ArrayListSort(merged_gene_list, DTCcompare_merge_genes);
 
-			SUBREADprintf("%s has %ld merged genes from %ld item hashtable\n", current_chro, merged_gene_list -> numOfElements, genename_to_3int_table -> numOfElements);
+			SUBREADprintf("%s has %lld merged genes from %lld item hashtable\n", current_chro, merged_gene_list -> numOfElements, genename_to_3int_table -> numOfElements);
 			assert(merged_gene_list -> numOfElements>0);
 
 			unsigned int * geneints = ArrayListGet(merged_gene_list, 0);
