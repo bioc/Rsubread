@@ -14,14 +14,14 @@
 }
 
 .dataURL <- function(uri){
-	sprintf("http://bioinf.wehi.edu.au/Rsubread/%s",uri)
+	sprintf("http://bioinf.wehi.edu.au/cellCounts/cell-barcodes/%s",uri)
 }
 
 .find_best_cellbarcode <- function( input.directory, sample.sheet){
 	barcode.database.file <- path.expand("~/.Rsubread/cellCounts/known_barcode_sets.txt")
 	if(!file.exists(barcode.database.file)){
 		dir.create("~/.Rsubread/cellCounts", recursive=TRUE)
-		rr <- download.file(.dataURL("cellCounts/known_barcode_sets.txt"), barcode.database.file)
+		rr <- download.file(.dataURL("known_barcode_sets.txt"), barcode.database.file)
 		if(rr!=0)stop("ERROR: the barcode database cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
 	}
 	bcb.sets <- read.delim(barcode.database.file, stringsAsFactors=F, header=T)
@@ -30,7 +30,7 @@
 	for(libf in bcb.sets$File){
 		listfile <- path.expand(paste0("~/.Rsubread/cellCounts/",libf))
 		if(!file.exists(listfile)){
-			rr <- download.file(.dataURL(paste0("cellCounts/", libf)), listfile)
+			rr <- download.file(.dataURL(libf), listfile)
 			if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
 		}
 		cat(sprintf("Testing the cell barcodes in %s.\n", libf))
