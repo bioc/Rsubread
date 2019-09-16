@@ -34,4 +34,5 @@ repair <- function(inFiles,inFormat="BAM",outFiles=paste(inFiles,"repair",sep=".
 		n <- length(unlist(strsplit(cmd,.R_param_splitor)))
 		C_args <- .C("R_repair_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 	}
+	invisible()
 }

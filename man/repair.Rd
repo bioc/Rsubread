@@ -1,10 +1,10 @@
 \name{repair}
 \alias{repair}
 \title{Re-order paired-end reads to place reads from the same pair next to each other}
-\description{Fast re-odering of paired-end reads using read names and mapping locations.}
+\description{Fast re-ordering of paired-end reads using read names and mapping locations.}
 \usage{
-repair(inFiles,inFormat="BAM",outFiles=paste(inFiles,"repair",sep="."),
-addDummy=TRUE,fullData=TRUE,compress=FALSE,nthreads=8)
+repair(inFiles, inFormat = "BAM", outFiles = paste(inFiles,"repair",sep="."),
+       addDummy = TRUE, fullData = TRUE, compress = FALSE, nthreads = 8)
 }
 \arguments{
   \item{inFiles}{ a character vector giving names of input files. These files are typically location-sorted BAM files.}
@@ -16,12 +16,12 @@ addDummy=TRUE,fullData=TRUE,compress=FALSE,nthreads=8)
   \item{nthreads}{ a numeric value giving number of CPU threads. 8 by default.}
 }
 \details{
-This function takes as input paired-end BAM or SAM files, re-orders reads to make reads from the same pair be adajacent to each other and then outputs the re-ordered reads into BAM files.
+This function takes as input paired-end BAM or SAM files, re-orders reads to make reads from the same pair be adjacent to each other and outputs the re-ordered reads into new BAM files.
 
 The function makes use of both read names and mapping information of reads (eg. mapping coordinates) to identify reads belonging to the same pair.
 This makes sure that all paired-end reads are correctly re-ordered, especially those multi-mapping read pairs that include more than one reported alignment in the input.
 
-The BAM files produced by this function are comptible with \code{\link{featureCounts}}, meaning that no read re-ordering will be performed when providing these files to \code{\link{featureCounts}}.
+The BAM files produced by this function are compatible with \code{\link{featureCounts}}, meaning that no further re-ordering needs to be performed by \code{\link{featureCounts}}.
 }
 \value{
 No value is produced but BAM files with re-ordered reads are written to the current working directory.
