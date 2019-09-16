@@ -6806,6 +6806,7 @@ int readSummary(int argc,char *argv[]){
 	if(global_context.is_input_bad_format){
 		SUBREADprintf("\nFATAL Error: The program has to terminate and no counting file is generated.\n\n");
 	}else if(!global_context.disk_is_full){
+		print_in_box(80,0,0,"Write the final count table.");
 		if(isGeneLevel){
 			char ** sorted_extra_columns = NULL;
 			if(global_context.reported_extra_columns != NULL){
@@ -6823,11 +6824,15 @@ int readSummary(int argc,char *argv[]){
 		} else
 			fc_write_final_results(&global_context, argv[3], nexons, table_columns, table_column_names, loaded_features, isCVersion);
 	}
-	if(global_context.do_junction_counting && !global_context.disk_is_full)
+	if(global_context.do_junction_counting && !global_context.disk_is_full){
+		print_in_box(80,0,0,"Write the junction count table.");
 		fc_write_final_junctions(&global_context, argv[3], table_column_names, junction_global_table_list, splicing_global_table_list);
+	}
 
-	if(!global_context.disk_is_full)
+	if(!global_context.disk_is_full){
+		print_in_box(80,0,0,"Write the read assignment summary.");
 		fc_write_final_counts(&global_context, argv[3], table_column_names,  read_counters, isCVersion);
+	}
 
 	ArrayListDestroy(table_columns);
 	ArrayListDestroy(table_column_names);

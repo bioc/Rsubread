@@ -2844,7 +2844,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 					test_PE_and_same_chro_align(global_context , realignment_result_R1 , realignment_result_R2, &is_exonic_regions, &is_PE, &is_same_chro , read_len_1, read_len_2, read_name_1, &tlen);
 
 					unsigned long long TLEN_exp_score = 0;
-					if(is_PE && global_context -> config.reported_multi_best_reads<2){
+					if(is_PE && global_context -> config.no_TLEN_preference == 0 && global_context -> config.reported_multi_best_reads<2){
 						TLEN_exp_score = (tlen > expected_TLEN)?(tlen - expected_TLEN):(expected_TLEN - tlen);
 						if(TLEN_exp_score>999) TLEN_exp_score=0;
 						else TLEN_exp_score = 999-TLEN_exp_score;
@@ -3615,6 +3615,7 @@ int read_chunk_circles(global_context_t *global_context)
 				print_in_box(80,0,0, "Load the %d-th index block...",1+ global_context->current_index_block_number);
 
 				if(gehash_load(global_context -> current_index, tmp_fname)) return -1;
+				print_in_box(80,0,0, "The index block has been loaded.");
 				sprintf(tmp_fname, "%s.%02d.%c.array", global_context->config.index_prefix, global_context->current_index_block_number, global_context->config.space_type == GENE_SPACE_COLOR?'c':'b');
 			}
 			period_load_index = miltime() - time_load_index;
@@ -3628,6 +3629,7 @@ int read_chunk_circles(global_context_t *global_context)
 				global_context -> is_final_voting_run = 1;
 			else	global_context -> is_final_voting_run = 0;
 
+			print_in_box(80,0,0, "Start read mapping in chunk.");
 			double time_start_voting = miltime();
 			ret = run_maybe_threads(global_context, STEP_VOTING);
 			double period_voting = miltime() - time_start_voting;
@@ -3980,12 +3982,46 @@ int do_anno_bitmap_add_feature(char * gene_name, char * tracnscript_id, char * c
 	return 0;
 }
 
-void warning_anno_vs_index(HashTable * anno_chros_tab, gene_offset_t * index_chros_offset){
-	HashTable *  index_chros_tab = index_chros_offset -> read_name_to_index;
-	warning_hash_hash(anno_chros_tab, index_chros_tab, "Chromosomes/contigs in annotation but not in index :");
-	warning_hash_hash(index_chros_tab, anno_chros_tab, "Chromosomes/contigs in index but not in annotation :");
+void convert_table_key_to_alias(void * ky ,void * va, HashTable * tab){
+	HashTable * alias_index_to_annot = tab -> appendix2;
+	HashTable * result_annot_chros = tab -> appendix1;
+
+	char * index_name = ky;
+	char * annot_name = HashTableGet(alias_index_to_annot, index_name);
+	if(annot_name==NULL) annot_name = index_name;
+	HashTablePut( result_annot_chros, annot_name, va ); 
 }
 
+void warning_anno_vs_index(HashTable * anno_chros_tab, gene_offset_t * index_chros_offset, HashTable * alias_index_to_annot){
+
+	HashTable * index_chros_tab = index_chros_offset -> read_name_to_index;
+	HashTable * chros_in_annot_using_index_names = anno_chros_tab ;
+	HashTable * chros_in_index_using_annot_names = index_chros_tab ;
+	HashTable * alias_annot_to_index = NULL;
+
+	if(alias_index_to_annot){
+		chros_in_annot_using_index_names = StringTableCreate(1000);
+		chros_in_index_using_annot_names = StringTableCreate(1000);
+	
+		alias_annot_to_index = StringTableReverse(alias_index_to_annot);
+		anno_chros_tab -> appendix1 = chros_in_annot_using_index_names;
+		anno_chros_tab -> appendix2 = alias_annot_to_index;
+		HashTableIteration(anno_chros_tab, convert_table_key_to_alias);
+	
+		index_chros_tab -> appendix1 = chros_in_index_using_annot_names;
+		index_chros_tab -> appendix2 = alias_index_to_annot;
+		HashTableIteration(index_chros_tab, convert_table_key_to_alias);
+	}
+
+	warning_hash_hash(anno_chros_tab, chros_in_index_using_annot_names, "Chromosomes/contigs in annotation but not in index :");
+	warning_hash_hash(index_chros_tab, chros_in_annot_using_index_names, "Chromosomes/contigs in index but not in annotation :");
+
+	if(alias_index_to_annot){
+		HashTableDestroy(alias_annot_to_index);
+		HashTableDestroy(chros_in_annot_using_index_names);
+		HashTableDestroy(chros_in_index_using_annot_names);
+	}
+}
 
 int load_annotated_exon_regions(global_context_t * global_context){
 	int bitmap_size = (4096 / EXONIC_REGION_RESOLUTION / 8)*1024*1024;
@@ -3999,8 +4035,6 @@ int load_annotated_exon_regions(global_context_t * global_context){
 	int loaded_features = load_features_annotation(global_context->config.exon_annotation_file, global_context->config.exon_annotation_file_type, global_context->config.exon_annotation_gene_id_column, NULL, global_context->config.exon_annotation_feature_name_column, global_context, do_anno_bitmap_add_feature);
 	if(loaded_features < 0)return -1;
 	else print_in_box(80,0,0,"%d annotation records were loaded.\n", loaded_features);
-	warning_anno_vs_index(global_context -> annotation_chro_table, &global_context -> chromosome_table);
-	HashTableDestroy(global_context -> annotation_chro_table);
 	return 0;
 }
 
@@ -4021,6 +4055,7 @@ int load_global_context(global_context_t * context)
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
 		if(context->config.multi_best_reads>1) context -> config.reads_per_chunk /= context->config.multi_best_reads;
 	}
+	print_in_box(80,0,0,"Check the input reads.");
 	subread_init_lock(&context->input_reads.input_lock);
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1)) {
 		//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
@@ -4061,6 +4096,7 @@ int load_global_context(global_context_t * context)
 		context -> config.max_vote_number_cutoff = 2;
 	}
 
+	print_in_box(80,0,0,"Initialise the memory objects.");
 	context -> config.max_vote_simples = max(context -> config.max_vote_simples ,  context -> config.reported_multi_best_reads);
 	context -> config.max_vote_combinations = max(context -> config.max_vote_combinations ,  context -> config.reported_multi_best_reads);
 
@@ -4075,6 +4111,7 @@ int load_global_context(global_context_t * context)
 	stat(context->config.first_read_file , &ginp1_stat);
 	context->input_reads.first_read_file_size = ginp1_stat.st_size;
 
+	print_in_box(80,0,0,"Estimate the mean read length.");
 	context -> input_reads.avg_read_length = guess_reads_density_format(context->config.first_read_file , context->config.is_SAM_file_input?1:0, &min_phred_score, &max_phred_score , &guess_tested_reads);
 	if(context -> input_reads.avg_read_length<0 )context -> input_reads.avg_read_length = 250;
 //	SUBREADprintf("QR=[%d,%d]; ALEN=%f\n",  min_phred_score, max_phred_score, context -> input_reads.avg_read_length);
@@ -4110,6 +4147,7 @@ int load_global_context(global_context_t * context)
 		// Only the sam file is opened here; other files like bed, indel and etc are opened in init_modules()
 		sprintf(tmp_fname,"%s", context->config.output_prefix);
 
+		print_in_box(80,0,0,"Create the output %s file.", context -> config.is_BAM_output?"BAM":"SAM");
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
@@ -4140,6 +4178,7 @@ int load_global_context(global_context_t * context)
 	}
 	
 	// ====== check index files, count blocks and load chro table ======
+	print_in_box(80,0,0,"Check the index.");
 	sprintf(tmp_fname, "%s.reads", context->config.index_prefix);
 	if(!does_file_exist(tmp_fname))
 	{
@@ -4163,7 +4202,6 @@ int load_global_context(global_context_t * context)
 		return -1;
 	}
 
-
 	context->index_block_number = 0; 
 	while(1)
 	{
@@ -4181,6 +4219,7 @@ int load_global_context(global_context_t * context)
 	if(context->config.report_sam_file)
 		write_sam_headers(context);
 
+	print_in_box(80,0,0,"Init the voting space.");
 	// ====== init other variables ======
 	if(context -> config.all_threads>1)
 		subread_init_lock(&context -> thread_initial_lock);
@@ -4197,10 +4236,14 @@ int load_global_context(global_context_t * context)
 
 	context -> sam_chro_to_anno_chr_alias = NULL;
 	if(context->config.exon_annotation_file[0]){ 
+		print_in_box(80,0,0,"Load the annotation file.");
 		if( load_annotated_exon_regions( context ) ) return -1;
 		if(context->config.exon_annotation_alias_file[0])
 			 context -> sam_chro_to_anno_chr_alias = load_alias_table(context->config.exon_annotation_alias_file);
+		warning_anno_vs_index(context -> annotation_chro_table, &context -> chromosome_table, context -> sam_chro_to_anno_chr_alias);
+		HashTableDestroy(context -> annotation_chro_table);
 	} else context -> exonic_region_bitmap = NULL;
+	print_in_box(80,0,0,"Global environment is initialised.");
 	return 0;
 }
 

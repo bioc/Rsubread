@@ -1,3 +1,6 @@
+16 Sep 2019 - 1.99.3
+(1) Fixed a bug of showing misleading chromosome names that are unique in the index or unique in the annotation file in subjunc() and align() when an alias file is provided.
+
 3 Sep 2019 - 1.99.2
 (1) Fixed a bug about sorting the BAM or SAM input files.
 

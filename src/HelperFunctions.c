@@ -1239,6 +1239,7 @@ HashTable * load_alias_table(char * fname) {
 		strcpy(anno_chr_buf, anno_chr);
 		char * sam_chr_buf = malloc(strlen(sam_chr)+1);
 		strcpy(sam_chr_buf, sam_chr);
+//		SUBREADprintf("ALIAS_LOAD : '%s' => '%s'\n", sam_chr_buf, anno_chr_buf);
 		HashTablePut(ret, sam_chr_buf, anno_chr_buf);
 	}
 
