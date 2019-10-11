@@ -1,3 +1,6 @@
+11 Oct 2019 - 1.99.5
+(1) Fixed bug in long read assignment when the input format is BAM.
+
 8 Oct 2019 - 1.99.4
 (1) Disabled the error message in featureCounts about the long read-record lengths but automatically switch into the "safe mode".
 

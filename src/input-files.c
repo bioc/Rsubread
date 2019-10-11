@@ -2616,7 +2616,7 @@ int SAM_pairer_read_BAM_block(FILE * fp, int max_read_len, char * inbuff) {
 		return -1;
 	}
 	if(gz_header_12[0]!=31 || gz_header_12[1]!=139){
-		SUBREADprintf("Unrecognized Gzip headers: %u, %u\nPlease make sure if the input file is in the BAM format.\n", gz_header_12[0], gz_header_12[1]);
+		//SUBREADprintf("Unrecognized Gzip headers: %u, %u\nPlease make sure if the input file is in the BAM format.\n", gz_header_12[0], gz_header_12[1]);
 		return -1;
 	}
 	unsigned short xlen = 0, bsize = 0;
@@ -2809,8 +2809,13 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
 		}
 		//SUBREADprintf("FETCHED BLOCK DECOMP=%d FROM COMP=%d\n", have, used_BAM);
 	} else {
-		SUBREADprintf("GZIP ERROR:%d\n", ret);
-		if(ret == -5) SUBREADprintf("  Z_BUF_ERROR: in %d and out %d\n", lin, lout);
+		if(ret == -5){
+			SUBREADprintf("Cannot parse the input BAM file. If the BAM file contains long reads, please run featureCounts on the long-read mode.\n");
+		}else{
+			SUBREADprintf("GZIP ERROR:%d\n", ret);
+		}
+		pairer -> is_bad_format = 1;
+		pairer -> is_internal_error = 1;
 		return 1;
 	}
 
