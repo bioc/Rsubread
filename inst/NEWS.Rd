@@ -2,6 +2,36 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+\section{Version 2.0.0}{\itemize{
+\item
+Rsubread package is ported to Windows OS.
+
+\item
+New function cellCounts(): generate UMI counts for Chromium 10X single-cell RNA-seq data.
+
+\item
+flattenGTF() function can merge or chop overlap features.
+
+\item
+Check and display the amount of memory available on the computer before starting read mapping.
+
+\item
+Optimize the data structure used in buildindex() function to reduce its memory use.
+
+\item
+qualityScores() function can optionally retrieve quality scores from all the reads.
+
+\item
+File paths included in column names of objects returned by featureCounts(), align(), subjunc() and propmapped() functions are removed or shortened where appropriate.
+
+\item
+featureCounts() will be terminated if both single-end and paired-end reads are found in the same input file.
+
+\item
+Limit on the length of input file names is increased to 1000 bytes for all functions.
+}}
+
+
 \section{Version 1.34.0}{\itemize{
 \item
 New functions: simReads() and scanFasta(). simReads() generates simulation RNA-seq reads for transcripts.
