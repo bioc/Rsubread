@@ -1,7 +1,7 @@
 \name{simReads}
 \alias{simReads}
 \alias{scanFasta}
-\title{Generate simulated reads from a set of transcripts}
+\title{Generate Simulated Reads from a Set of Transcripts}
 \description{The \code{simReads} function generates simulated reads from a set of transcripts. Each transcript has a predefined abundance in the output.}
 \usage{
 simReads(
