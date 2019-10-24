@@ -6,42 +6,42 @@
 \usage{
 simReads(
 
-  # the transcript database and the wanted abundances
-  transcript.file,
-  expression.levels,
-
-  # the name of the output
-  output.prefix,
-
-  # options on the output
-  library.size = 1000000,
-  read.length = 75,
-  truth.in.read.names = FALSE,
-
-  # simulating sequencing errors
-  simulate.sequencing.error = TRUE,
-  quality.reference = NULL,
-
-  # parameters for generating paired-end reads.
-  paired.end = FALSE,
-  fragment.length.min = 100,
-  fragment.length.max = 500,
-  fragment.length.mean = 180,
-  fragment.length.sd = 40,
-
-  # manipulating transcript names
-  simplify.transcript.names = FALSE)
+    # the transcript database and the wanted abundances
+    transcript.file,
+    expression.levels,
+  
+    # the name of the output
+    output.prefix,
+  
+    # options on the output
+    library.size = 1000000,
+    read.length = 75,
+    truth.in.read.names = FALSE,
+  
+    # simulating sequencing errors
+    simulate.sequencing.error = TRUE,
+    quality.reference = NULL,
+  
+    # parameters for generating paired-end reads.
+    paired.end = FALSE,
+    fragment.length.min = 100,
+    fragment.length.max = 500,
+    fragment.length.mean = 180,
+    fragment.length.sd = 40,
+  
+    # manipulating transcript names
+    simplify.transcript.names = FALSE)
 
 scanFasta(
-
-  # the file containing the transcript database
-  transcript.file,
-
-  # manipulating transcript names
-  simplify.transcript.names = FALSE,
-
-  # miscellaneous options
-  quiet = FALSE)
+  
+    # the file containing the transcript database
+    transcript.file,
+  
+    # manipulating transcript names
+    simplify.transcript.names = FALSE,
+  
+    # miscellaneous options
+    quiet = FALSE)
 }
 \arguments{
   \item{transcript.file}{ a character string giving the name of a file that contains the transcript names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
