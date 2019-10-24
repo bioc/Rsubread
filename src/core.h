@@ -204,6 +204,7 @@ typedef struct{
 	int use_quality_score_break_ties;
 	int big_margin_record_size;
 	int PE_predominant_weight;
+	int no_TLEN_preference;
 
 	// subjunc
 	int entry_program_name;

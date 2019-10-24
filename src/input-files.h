@@ -102,6 +102,7 @@ typedef struct {
 	unsigned char * input_buff_BIN;
 	int input_buff_BIN_used;
 	int input_buff_BIN_ptr;
+	int input_buff_BIN_capacity;
 	int orphant_block_no;
 	int need_find_start;
 	srInt_64 orphant_space;

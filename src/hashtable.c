@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.38 2019/08/25 10:12:06 cvs Exp $
+ * $Id: hashtable.c,v 9999.40 2019/09/16 04:19:37 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -237,6 +237,21 @@ HashTable * StringTableCreate(srInt_64 numOfBuckets){
 	HashTableSetHashFunction(ret, HashTableStringHashFunction);
 	HashTableSetKeyComparisonFunction(ret , my_strcmp);
 	return ret;
+}
+
+void StringTableReverse_Run(void * ky, void * va, HashTable * tab){
+	HashTable * res = tab -> appendix1;
+	HashTablePut(res, va, ky);
+}
+
+HashTable * StringTableReverse(HashTable * ori){
+	HashTable * res = StringTableCreate(ori -> numOfBuckets);
+	void * oriap1 = ori -> appendix1;
+	ori -> appendix1 = res;
+
+	HashTableIteration(ori, StringTableReverse_Run);
+	ori -> appendix1 = oriap1;
+	return res;
 }
 
 ArrayList * HashTableKeys(HashTable * tab){

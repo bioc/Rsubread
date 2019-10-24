@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.27 2019/08/25 10:12:06 cvs Exp $
+ * $Id: hashtable.h,v 9999.28 2019/09/16 04:19:37 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -115,6 +115,7 @@ ArrayList * HashTableKeyArray(HashTable * tab);
 \*--------------------------------------------------------------------------*/
 
 HashTable * StringTableCreate(srInt_64 numOfBuckets);
+HashTable * StringTableReverse(HashTable * ori);
 HashTable *HashTableCreate(srInt_64 numOfBuckets);
 
 /*--------------------------------------------------------------------------*\

@@ -68,6 +68,7 @@ static struct option long_options[] =
 	{"multiMapping", no_argument, 0, 0},
 	{"keepReadOrder", no_argument, 0, 0},
 	{"sortReadsByCoordinates", no_argument, 0, 0},
+	{"noTLENpreference",  no_argument, 0, 0},
 	{0, 0, 0, 0}
 };
 
@@ -582,6 +583,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 					global_context -> config.do_structural_variance_detection = 1;
 					global_context -> config.use_memory_buffer = 1;
 					global_context -> config.reads_per_chunk = 600llu*1024*1024;
+				}
+				else if(strcmp("noTLENpreference", long_options[option_index].name) == 0)
+				{
+					global_context -> config.no_TLEN_preference = 1;
 				}
 				else if(strcmp("gtfFeature", long_options[option_index].name) == 0)
 				{
