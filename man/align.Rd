@@ -1,148 +1,150 @@
 \name{align}
 \alias{align}
 \alias{subjunc}
-\title{Align sequence reads to a reference genome via seed-and-vote}
-\description{\code{align} function can align both DNA and RNA sequencing reads. \code{Subjunc} is an RNA-seq aligner and it reports full alignment of each read (\code{align} reports partial alignment for exon spanning reads).}
+\title{Align Sequence Reads to a Reference Genome via Seed-and-Vote}
+\description{The \code{align} function can align both DNA and RNA sequencing reads. \code{Subjunc} is an RNA-seq aligner and it reports full alignment of each read (\code{align} reports partial alignment for exon spanning reads).}
 \usage{
 align(
-# index for reference sequences
-index,
 
-# input reads and output
-readfile1,
-readfile2 = NULL,
-type = "rna",
-input_format = "gzFASTQ",
-output_format = "BAM",
-output_file = paste(readfile1,"subread",output_format,sep="."),
-isBCLinput = FALSE,
-
-# offset value added to Phred quality scores of read bases
-phredOffset = 33,
-
-# thresholds for mapping
-nsubreads = 10,
-TH1 = 3,
-TH2 = 1,
-maxMismatches = 3,
-
-# unique mapping and multi-mapping
-unique = FALSE,
-nBestLocations = 1,
-
-# indel detection
-indels = 5,
-complexIndels = FALSE,
-
-# read trimming
-nTrim5 = 0,
-nTrim3 = 0,
-
-# distance and orientation of paired end reads
-minFragLength = 50,
-maxFragLength = 600,
-PE_orientation = "fr",
-
-# number of CPU threads
-nthreads = 1,
-
-# read group
-readGroupID = NULL,
-readGroup = NULL,
-
-# read order
-keepReadOrder = FALSE,
-sortReadsByCoordinates = FALSE,
-
-# color space reads
-color2base = FALSE,
-
-# dynamic programming
-DP_GapOpenPenalty = -1,
-DP_GapExtPenalty = 0,
-DP_MismatchPenalty = 0,
-DP_MatchScore = 2,
-
-# detect structural variants
-detectSV = FALSE,
-
-# gene annotation
-useAnnotation = FALSE,
-annot.inbuilt = "mm10",
-annot.ext = NULL,
-isGTF = FALSE,
-GTF.featureType = "exon",
-GTF.attrType = "gene_id",
-chrAliases = NULL)
-
+    # index for reference sequences
+    index,
+    
+    # input reads and output
+    readfile1,
+    readfile2 = NULL,
+    type = "rna",
+    input_format = "gzFASTQ",
+    output_format = "BAM",
+    output_file = paste(readfile1,"subread",output_format,sep="."),
+    isBCLinput = FALSE,
+    
+    # offset value added to Phred quality scores of read bases
+    phredOffset = 33,
+    
+    # thresholds for mapping
+    nsubreads = 10,
+    TH1 = 3,
+    TH2 = 1,
+    maxMismatches = 3,
+    
+    # unique mapping and multi-mapping
+    unique = FALSE,
+    nBestLocations = 1,
+    
+    # indel detection
+    indels = 5,
+    complexIndels = FALSE,
+    
+    # read trimming
+    nTrim5 = 0,
+    nTrim3 = 0,
+    
+    # distance and orientation of paired end reads
+    minFragLength = 50,
+    maxFragLength = 600,
+    PE_orientation = "fr",
+    
+    # number of CPU threads
+    nthreads = 1,
+    
+    # read group
+    readGroupID = NULL,
+    readGroup = NULL,
+    
+    # read order
+    keepReadOrder = FALSE,
+    sortReadsByCoordinates = FALSE,
+    
+    # color space reads
+    color2base = FALSE,
+    
+    # dynamic programming
+    DP_GapOpenPenalty = -1,
+    DP_GapExtPenalty = 0,
+    DP_MismatchPenalty = 0,
+    DP_MatchScore = 2,
+    
+    # detect structural variants
+    detectSV = FALSE,
+    
+    # gene annotation
+    useAnnotation = FALSE,
+    annot.inbuilt = "mm10",
+    annot.ext = NULL,
+    isGTF = FALSE,
+    GTF.featureType = "exon",
+    GTF.attrType = "gene_id",
+    chrAliases = NULL)
+    
 subjunc(
-# index for reference sequences
-index,
 
-# input reads and output
-readfile1,
-readfile2 = NULL,
-input_format = "gzFASTQ",
-output_format = "BAM",
-output_file = paste(readfile1,"subjunc",output_format,sep = "."),
-
-# offset value added to Phred quality scores of read bases
-phredOffset = 33,
-
-# thresholds for mapping
-nsubreads = 14,
-TH1 = 1,
-TH2 = 1,
-maxMismatches = 3,
-
-# unique mapping and multi-mapping
-unique = FALSE,
-nBestLocations = 1,
-
-# indel detection
-indels = 5,
-complexIndels = FALSE,
-
-# read trimming
-nTrim5 = 0,
-nTrim3 = 0,
-
-# distance and orientation of paired end reads
-minFragLength = 50,
-maxFragLength = 600,
-PE_orientation = "fr",
-
-# number of CPU threads
-nthreads = 1,
-
-# read group
-readGroupID = NULL,
-readGroup = NULL,
-
-# read order
-keepReadOrder = FALSE,
-sortReadsByCoordinates = FALSE,
-
-# color space reads
-color2base = FALSE,
-
-# dynamic programming
-DP_GapOpenPenalty = -1,
-DP_GapExtPenalty = 0,
-DP_MismatchPenalty = 0,
-DP_MatchScore = 2,
-
-# detect all junctions including gene fusions
-reportAllJunctions = FALSE,
-
-# gene annotation
-useAnnotation = FALSE,
-annot.inbuilt = "mm10",
-annot.ext = NULL,
-isGTF = FALSE,
-GTF.featureType = "exon",
-GTF.attrType = "gene_id",
-chrAliases = NULL)
+    # index for reference sequences
+    index,
+    
+    # input reads and output
+    readfile1,
+    readfile2 = NULL,
+    input_format = "gzFASTQ",
+    output_format = "BAM",
+    output_file = paste(readfile1,"subjunc",output_format,sep = "."),
+    
+    # offset value added to Phred quality scores of read bases
+    phredOffset = 33,
+    
+    # thresholds for mapping
+    nsubreads = 14,
+    TH1 = 1,
+    TH2 = 1,
+    maxMismatches = 3,
+    
+    # unique mapping and multi-mapping
+    unique = FALSE,
+    nBestLocations = 1,
+    
+    # indel detection
+    indels = 5,
+    complexIndels = FALSE,
+    
+    # read trimming
+    nTrim5 = 0,
+    nTrim3 = 0,
+    
+    # distance and orientation of paired end reads
+    minFragLength = 50,
+    maxFragLength = 600,
+    PE_orientation = "fr",
+    
+    # number of CPU threads
+    nthreads = 1,
+    
+    # read group
+    readGroupID = NULL,
+    readGroup = NULL,
+    
+    # read order
+    keepReadOrder = FALSE,
+    sortReadsByCoordinates = FALSE,
+    
+    # color space reads
+    color2base = FALSE,
+    
+    # dynamic programming
+    DP_GapOpenPenalty = -1,
+    DP_GapExtPenalty = 0,
+    DP_MismatchPenalty = 0,
+    DP_MatchScore = 2,
+    
+    # detect all junctions including gene fusions
+    reportAllJunctions = FALSE,
+    
+    # gene annotation
+    useAnnotation = FALSE,
+    annot.inbuilt = "mm10",
+    annot.ext = NULL,
+    isGTF = FALSE,
+    GTF.featureType = "exon",
+    GTF.attrType = "gene_id",
+    chrAliases = NULL)
 }
 \arguments{
   \item{index}{ character string giving the basename of index file. Index files should be located in the current directory.}
@@ -234,16 +236,21 @@ The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.
 }
 \author{Wei Shi and Yang Liao}
 %\note{}
-\seealso{\code{\link{buildindex}}}
+\seealso{
+\code{\link{buildindex}}
+}
 \examples{
 # Build an index for the artificial sequence included in file 'reference.fa'.
 ref <- system.file("extdata","reference.fa",package="Rsubread")
+
 buildindex(basename="./reference_index",reference=ref)
 
 # align a sample read dataset ('reads.txt') to the sample reference
 reads <- system.file("extdata","reads.txt.gz",package="Rsubread")
+
 align.stat <- align(index = "./reference_index", readfile1 = reads,
-                    output_file = "./Rsubread_alignment.BAM", phredOffset = 64)
+output_file = "./Rsubread_alignment.BAM", phredOffset = 64)
+
 align.stat
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

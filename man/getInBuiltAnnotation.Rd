@@ -1,9 +1,9 @@
 \name{getInBuiltAnnotation}
 \alias{getInBuiltAnnotation}
-\title{Retrieve in-built annotations provided by featureCounts function}
-\description{Retrieve an in-built annotation and save it to a data frame}
+\title{Retrieve In-Built Annotations}
+\description{Retrieve an in-built annotation and save it to a data frame.}
 \usage{
-getInBuiltAnnotation(annotation="mm10")
+getInBuiltAnnotation(annotation = "mm10")
 }
 \arguments{
   \item{annotation}{ a character string specifying the in-built annotation to be retrieved. It has four possible values including \code{mm10}, \code{mm9}, \code{hg38} and \code{hg19}, corresponding to the NCBI RefSeq annotations for genomes `mm10', `mm9', `hg38' and `hg19', respectively. \code{mm10} by default.}

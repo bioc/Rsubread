@@ -5,6 +5,7 @@
 \description{The \code{simReads} function generates simulated reads from a set of transcripts. Each transcript has a predefined abundance in the output.}
 \usage{
 simReads(
+
   # the transcript database and the wanted abundances
   transcript.file,
   expression.levels,
@@ -29,10 +30,10 @@ simReads(
   fragment.length.sd = 40,
 
   # manipulating transcript names
-  simplify.transcript.names = FALSE
-)
+  simplify.transcript.names = FALSE)
 
 scanFasta(
+
   # the file containing the transcript database
   transcript.file,
 
@@ -40,25 +41,24 @@ scanFasta(
   simplify.transcript.names = FALSE,
 
   # miscellaneous options
-  quiet = FALSE
-)
+  quiet = FALSE)
 }
 \arguments{
-  \item{transcript.file}{character string giving the name of a file that contains the transcript names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
-  \item{expression.levels}{numeric vector giving the relative expression levels of the transcripts, in the order of transcripts in \code{transcript.file}. The sum of the values must be positive, and no negative value is allowed.}
-  \item{output.prefix}{character string giving the basename of all the output files.}
-  \item{library.size}{numeric value giving the number of reads or read-pairs to be generated. One million by default.}
-  \item{read.length}{numeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
-  \item{truth.in.read.names}{logical indicating if the true mapping location of reads or read-pairs should be encoded into the read names. \code{FALSE} by default.}
-  \item{simulate.sequencing.error}{logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
-  \item{quality.reference}{character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
-  \item{paired.end}{logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
-  \item{fragment.length.min}{numeric value giving the minimum fragment length. The minimum fragment length must be equal to or greater than the output read length. 100 by default.}
-  \item{fragment.length.max}{numeric value giving the maximum fragment length. 500 by default.}
-  \item{fragment.length.mean}{numeric value giving the mean of fragment lengths. 180 by default.}
-  \item{fragment.length.sd}{numeric valuqe giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
-  \item{simplify.transcript.names}{logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
-  \item{quiet}{logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function. \code{FALSE} by default.}
+  \item{transcript.file}{ a character string giving the name of a file that contains the transcript names and sequences. The format can be FASTA or gzipped-FASTA. No duplicate sequence name is allowed in the file, and duplicate sequences will trigger warning messages.}
+  \item{expression.levels}{ a numeric vector giving the relative expression levels of the transcripts, in the order of transcripts in \code{transcript.file}. The sum of the values must be positive, and no negative value is allowed.}
+  \item{output.prefix}{ a character string giving the basename of all the output files.}
+  \item{library.size}{ a numeric value giving the number of reads or read-pairs to be generated. One million by default.}
+  \item{read.length}{a anumeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
+  \item{truth.in.read.names}{ logical indicating if the true mapping location of reads or read-pairs should be encoded into the read names. \code{FALSE} by default.}
+  \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
+  \item{quality.reference}{ a character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The sequencing quality strings must have the same length as \code{read.length}.}
+  \item{paired.end}{ logical indicating if paired-end reads should be generated. \code{FALSE} by default.}
+  \item{fragment.length.min}{ a numeric value giving the minimum fragment length. The minimum fragment length must be equal to or greater than the output read length. 100 by default.}
+  \item{fragment.length.max}{ a numeric value giving the maximum fragment length. 500 by default.}
+  \item{fragment.length.mean}{ a numeric value giving the mean of fragment lengths. 180 by default.}
+  \item{fragment.length.sd}{ a numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn for a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
+  \item{simplify.transcript.names}{ logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
+  \item{quiet}{ logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function. \code{FALSE} by default.}
 }
 \details{
   \code{simReads} generates simulated reads from a set of transcript sequences at specified abundances. The input includes a transcript file in FASTA or gzipped-FASTA format, and a numeric vector that describes the wanted abundance for each transcript. The output of this function is one or two gzipped FASTQ files that contain the simulated reads or read-pairs. To have reads generated from it, a transcript must have a length equal to or greater than the output read length, and also equal to or greater than the minimum fragment length in case of paired-end reads.

@@ -1,22 +1,26 @@
 \name{exactSNP}
 \alias{exactSNP}
-\title{exactSNP - an accurate and efficient SNP caller}
+\title{Accurately and Efficiently call SNPs}
 \description{Measure background noises and perform Fisher's Exact tests to detect SNPs.}
 \usage{
 exactSNP(
-  readFile,
-  isBAM = FALSE,
-  refGenomeFile,
-  SNPAnnotationFile = NULL,
-  outputFile = paste0(readFile, ".exactSNP.VCF"),
-  qvalueCutoff = 12,
-  minAllelicFraction = 0,
-  minAllelicBases = 1,
-  minReads = 1,
-  maxReads = 1000000,
-  minBaseQuality = 13,
-  nTrimmedBases = 3,
-  nthreads = 1)
+
+    # basic input/output options
+    readFile,
+    isBAM = FALSE,
+    refGenomeFile,
+    SNPAnnotationFile = NULL,
+    outputFile = paste0(readFile, ".exactSNP.VCF"),
+
+    # fine tuning parameters 
+    qvalueCutoff = 12,
+    minAllelicFraction = 0,
+    minAllelicBases = 1,
+    minReads = 1,
+    maxReads = 1000000,
+    minBaseQuality = 13,
+    nTrimmedBases = 3,
+    nthreads = 1)
 }
 \arguments{
   \item{readFile}{ a character string giving the name of a file including read mapping results. This function takes as input a SAM file by default. If a BAM file is provided, the \code{isBAM} argument should be set to \code{TRUE}. }

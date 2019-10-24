@@ -1,13 +1,16 @@
 \name{processExons}
 \alias{processExons}
-\title{Obtain chromosomal coordiates of each exon using NCBI annotation}
-\description{This is for internal use.}
+\title{Obtain Chromosomal Coordiates of Each Exon Using NCBI Annotation}
+\description{This is for internal use. It converts the NCBI exon annotations into data files for use in the \code{detectionCall} function.}
 \usage{
-processExons(filename="human_seq_gene.md", species="hg")
+processExons(
+
+    filename = "human_seq_gene.md",
+    species = "hg")
 }
 \arguments{
-  \item{filename}{a character string giving the name of input .md file (NCBI annotation file)}
-  \item{species}{a character string specifying the species}
+  \item{filename}{ a character string giving the name of input .md file (NCBI annotation file)}
+  \item{species}{ a character string specifying the species}
 }
 \details{
 This is an internal function and should not be called by users directly.

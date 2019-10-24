@@ -1,9 +1,17 @@
 \name{flattenGTF}
 \alias{flattenGTF}
-\title{Flatten features provided in a GTF/GFF annotation}
+\title{Flatten Features in GTF or GFF Annotation Files}
 \description{Convert a GTF/GFF annotation to SAF format and flatten overlapping features.}
 \usage{
-flattenGTF(GTFfile, GTF.featureType = "exon", GTF.attrType = "gene_id", method = "merge")
+flattenGTF(
+
+    # basic input/output options
+    GTFfile,
+    GTF.featureType = "exon",
+    GTF.attrType = "gene_id",
+
+    # the option specifying the merging algorithm
+    method = "merge")
 }
 \arguments{
   \item{GTFfile}{ a character string giving the name of a GTF file as input.}

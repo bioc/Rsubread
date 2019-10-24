@@ -1,14 +1,16 @@
 \name{atgcContent}
 \alias{atgcContent}
-\title{Calculate percentages of nucleotides A, T, G and C in a sequencing read datafile}
-\description{Calculate percentages of nucleotides A, T, G and C
-}
+\title{Calculate Percentages of Nucleotides in Reads}
+\description{Calculate percentages of nucleotides A, T, G and C in the input FASTQ or FASTQ file.  }
 \usage{
-atgcContent(filename, basewise=FALSE)
+atgcContent(
+
+    filename,
+    basewise = FALSE)
 }
 \arguments{
-  \item{filename}{ character string giving the name of input FASTQ/FASTA file}
-  \item{basewise}{ logical. If \code{TRUE}, nucleotide percentages will be calculated for each base position in the read across all the reads. By default, percentages are calculated for the entire dataset.}
+  \item{filename}{ a character string giving the name of input FASTQ/FASTA file}
+  \item{basewise}{ logical specifying how the percentages are calculated. If \code{TRUE}, nucleotide percentages will be calculated for each base position in the read across all the reads. By default, percentages are calculated for the entire dataset.}
 }
 \details{
 Sequencing reads could contain letter "N" besides "A", "T", "G" and "C".

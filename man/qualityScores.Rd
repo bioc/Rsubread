@@ -1,16 +1,22 @@
 \name{qualityScores}
 \alias{qualityScores}
-\title{Extract quality score data in a sequencing read dataset}
-\description{Extract quality strings and convert them to Phred scores
+\title{Extract Quality Score Data in a Sequencing Read Dataset}
+\description{Extract quality strings and convert them to Phred scores for generating boxplots.
 }
 \usage{
-qualityScores(filename, input_format="gzFASTQ", offset=33, nreads=10000)
+qualityScores(
+
+    # basic input/output options
+    filename,
+    input_format = "gzFASTQ",
+    offset = 33,
+    nreads = 10000)
 }
 \arguments{
-  \item{filename}{ character string giving the name of an input file containing sequence reads.}
-  \item{input_format}{ character string specifying format of the input file. \code{gzFASTQ} (gzipped FASTQ) by default. Acceptable formats include \code{gzFASTQ}, \code{FASTQ}, \code{SAM} and \code{BAM}. Character string is case insensitive.}
-  \item{offset}{ numeric value giving the offset added to the base-calling Phred scores. Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
-  \item{nreads}{ numeric value giving the number of reads from which quality scores are extracted. \code{10000} by default. A value of \code{-1} indicates that quality scores will be extracted from all the reads.}
+  \item{filename}{ a character string giving the name of an input file containing sequence reads.}
+  \item{input_format}{ a character string specifying format of the input file. \code{gzFASTQ} (gzipped FASTQ) by default. Acceptable formats include \code{gzFASTQ}, \code{FASTQ}, \code{SAM} and \code{BAM}. Character string is case insensitive.}
+  \item{offset}{ a numeric value giving the offset added to the base-calling Phred scores. Possible values include \code{33} and \code{64}. By default, \code{33} is used.}
+  \item{nreads}{ a numeric value giving the number of reads from which quality scores are extracted. \code{10000} by default. A value of \code{-1} indicates that quality scores will be extracted from all the reads.}
 }
 \details{
 Quality scores of read bases are represented by ASCII characters in next-gen sequencing data.

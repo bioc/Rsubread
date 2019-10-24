@@ -1,10 +1,17 @@
 \name{repair}
 \alias{repair}
-\title{Re-order paired-end reads to place reads from the same pair next to each other}
+\title{Re-Order Paired-End Reads to Place Reads}
 \description{Fast re-ordering of paired-end reads using read names and mapping locations.}
 \usage{
-repair(inFiles, inFormat = "BAM", outFiles = paste(inFiles,"repair",sep="."),
-       addDummy = TRUE, fullData = TRUE, compress = FALSE, nthreads = 8)
+repair(
+
+    inFiles,
+    inFormat = "BAM",
+    outFiles = paste(inFiles,"repair",sep="."),
+    addDummy = TRUE,
+    fullData = TRUE,
+    compress = FALSE,
+    nthreads = 8)
 }
 \arguments{
   \item{inFiles}{ a character vector giving names of input files. These files are typically location-sorted BAM files.}

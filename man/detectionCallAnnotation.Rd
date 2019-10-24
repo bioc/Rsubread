@@ -1,13 +1,16 @@
 \name{detectionCallAnnotation}
 \alias{detectionCallAnnotation}
-\title{Generate annotation data used for calculating detection p values}
-\description{This is for internal use only.}
+\title{Generate Annotation Data Used for Calculating Detection P Values}
+\description{This is for internal use only. This function generates the annotation files for calculating p values in the \code{detectionCall} function.}
 \usage{
-detectionCallAnnotation(species="hg", binsize=2000)
+detectionCallAnnotation(
+
+    species = "hg",
+    binsize = 2000)
 }
 \arguments{
-  \item{species}{character string specifying the species to analyase}
-  \item{binsize}{binsize of integenic region}
+  \item{species}{ a character string specifying the species to analyase}
+  \item{binsize}{ an integer value specifying the bin-size of integenic region}
 }
 \details{
 This is an internal function and should not be called by users directly.
