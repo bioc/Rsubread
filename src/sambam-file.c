@@ -1782,7 +1782,7 @@ int SamBam_unzip(char * out , char * in , int inlen)
 }
 
 
-int SamBam_writer_sort_buff_one_compare(void * Lbin, void * Rbin){
+int SamBam_writer_sort_buff_one_compare(void * Lbin, void * Rbin, ArrayList * me){
 	unsigned long long * Lv = Lbin, *Rv = Rbin;
 	if(*Lv > *Rv) return 1;
 	else if(*Lv < *Rv) return -1;
@@ -2052,7 +2052,7 @@ void SamBam_writer_one_thread_merge_sortedbins(SamBam_Writer * writer){
 
 int level_min_binno[] = {0, 1, 9, 73, 585, 4681};
 
-int SamBam_writer_merge_chunks_compare(void * vL, void * vR){
+int SamBam_writer_merge_chunks_compare(void * vL, void * vR, ArrayList * me){
 	long long * lL = vL;
 	long long * lR = vR;
 	if( (*lL) > (*lR)) return 1;

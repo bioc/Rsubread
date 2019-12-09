@@ -59,13 +59,13 @@ int DTCdo_add_feature(char * gene_name, char * transcript_name, char * chro_name
 	return 0;
 }
 
-int DTCcompare_merge_genes(void * L_elem, void * R_elem){
+int DTCcompare_merge_genes(void * L_elem, void * R_elem, ArrayList *me){
 	unsigned int * le = L_elem, * re = R_elem;
 	if(le[1] > re[1]) return 1;
 	if(le[1] < re[1]) return -1;
 	return 0;
 }
-int DTCcompare_exons(void * L_elem, void * R_elem){
+int DTCcompare_exons(void * L_elem, void * R_elem, ArrayList *me){
 	DTCexon_t * le = L_elem, * re = R_elem;
 	int chname_cmp = strcmp(le -> chro_name, re -> chro_name);
 	if(chname_cmp) return chname_cmp;

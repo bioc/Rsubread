@@ -2676,7 +2676,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				if(current_result->selected_votes < global_context->config.minimum_subread_for_second_read || max_votes < global_context->config.minimum_subread_for_first_read)
 				{
 				//	if(current_read_number == 111 || current_read_number == 112)
-				//	SUBREADprintf("RESET0 [%d] R_%d SEL=%d MAX=%d\n", current_read_number, is_second_read + 1, current_result->selected_votes, max_votes);
+					//SUBREADprintf("RESET0 [%lld] R_%d SEL=%d MAX=%d\n", current_read_number, is_second_read + 1, current_result->selected_votes, max_votes);
 					current_result -> selected_votes = 0;
 					continue;
 				}
@@ -2688,7 +2688,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 				}
 
 				//#warning ">>>>>>> COMMENT THIS <<<<<<<"
-				//printf("OCT27-STEP21-%s:%d-ALN%02d-THRE %d\n", current_read_name, is_second_read + 1, best_read_id, thread_context -> thread_id);
+				//printf("OCT27-STEP21-%s:%d-ALN%02d-THRE %d in MM=%d\n", current_read_name, is_second_read + 1, best_read_id, thread_context -> thread_id, global_context -> config.multi_best_reads);
 
 				int is_negative_strand = (current_result  -> result_flags & CORE_IS_NEGATIVE_STRAND)?1:0;
 
@@ -3017,6 +3017,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 	}
 
 	free(final_realignments);
+	free(final_realignment_number);
 	free(final_MATCH_buffer1);
 	free(final_MISMATCH_buffer1);
 	free(final_PENALTY_buffer1);
@@ -3248,7 +3249,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
 					print_votes(vote_2, global_context -> config.index_prefix);
-					if(is_reversed==1)exit(0);
+					//if(is_reversed==1)exit(0);
 				}
 
 				if(global_context -> input_reads.is_paired_end_reads)
@@ -4058,7 +4059,7 @@ int load_global_context(global_context_t * context)
 	print_in_box(80,0,0,"Check the input reads.");
 	subread_init_lock(&context->input_reads.input_lock);
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1)) {
-		//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
+	//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
 		return -1;
 	}
 

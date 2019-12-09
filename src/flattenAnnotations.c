@@ -145,7 +145,7 @@ int flatAnno_do_anno_1R(char * gene_name, char * transcript_name, char * chro_na
 	return 0;
 }
 
-int flatAnno_do_anno_merge_one_array_compare(void * vL, void * vR){
+int flatAnno_do_anno_merge_one_array_compare(void * vL, void * vR, ArrayList *me){
 	int * iL = vL, *iR = vR;
 	if((*iL)>(*iR))return 1;
 	if((*iL)<(*iR))return -1;
@@ -246,12 +246,16 @@ void flatAnno_do_anno_merge_one_array(void * key, void * hashed_obj, HashTable *
 	this_list -> numOfElements = n1_items+1;
 }
 
+int flatme_strcmp(void * L, void * R, ArrayList * me){
+	return strcmp(L, R);
+}
+
 int flatAnno_do_anno_merge_and_write(flatAnno_context_t * context){
 	context -> gene_chro_strand_to_exons_table -> appendix1 = context;
 
 	HashTableIteration(context -> gene_chro_strand_to_exons_table, context -> merging_mode == MERGING_MODE_CHOPPING? flatAnno_do_anno_chop_one_array :flatAnno_do_anno_merge_one_array);
 	ArrayList * all_chro_st_list = HashTableKeyArray(context -> gene_chro_strand_to_exons_table);
-	ArrayListSort(all_chro_st_list, (int(*)(void * , void*))strcmp);
+	ArrayListSort(all_chro_st_list, flatme_strcmp);
 
 	fprintf( context -> output_FP , "GeneID\tChr\tStart\tEnd\tStrand\n");
 	int i,j;

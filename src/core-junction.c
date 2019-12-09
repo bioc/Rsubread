@@ -1106,7 +1106,7 @@ void copy_vote_to_alignment_res(global_context_t * global_context, thread_contex
 					// if the covered region has a wrong arrangement to their relative positions.
 					int test_minor_res = test_junction_minor(global_context, thread_context, current_vote, vote_i, vote_j, i, j, dist);
 //#warning " ============ DEBUG 1 ==================== "
-					if(0 &&  FIXLENstrcmp("R002403247", read_name) == 0) {
+					if(0 && FIXLENstrcmp("R002403247", read_name) == 0) {
 						char posout2[100];
 						char posout1[100];
 						absoffset_to_posstr(global_context, current_vote -> pos[vote_i][vote_j], posout1);
@@ -2402,7 +2402,6 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 				simple_mapping_t * current_loc = is_second_read?comb_buffer[i].r2_loc:comb_buffer[i].r1_loc;
 				assert(current_loc);
 				unsigned int current_pos = current_loc->mapping_position;
-				//SUBREADprintf("CLLL BUF %d R_%d : %u\n", i, 1+is_second_read,  current_loc->mapping_position);
 
 				int is_exist = 0;
 				for(j = 0; j < *current_r_cursor; j++)
@@ -2412,6 +2411,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 						break;
 					}
 				}
+				//SUBREADprintf("CLLL BUF %d R_%d : %u ; EXIST %d. Written into the %d-th best location\n", i, 1+is_second_read,  current_loc->mapping_position, is_exist, *current_r_cursor);
 
 				if(!is_exist){
 					if(current_loc -> is_vote_t_item)
@@ -3351,7 +3351,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
-				exit(0);
+				//exit(0);
 			}
 
 

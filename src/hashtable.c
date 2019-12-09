@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.c,v 9999.40 2019/09/16 04:19:37 cvs Exp $
+ * $Id: hashtable.c,v 9999.42 2019/12/05 03:05:37 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -24,7 +24,7 @@ static int isProbablePrime(srInt_64 number);
 static srInt_64 calculateIdealNumOfBuckets(HashTable *hashTable);
 
 srInt_64 long_random_val(){
-	long ret = 0;
+	srInt_64 ret = 0;
 	if(RAND_MAX<255){
 		SUBREADprintf("Is this a embedded computer????\n");
 		return -1;
@@ -34,6 +34,13 @@ srInt_64 long_random_val(){
 		if(i>0)ret = (ret << 8) ^ (myrand_rand() & 0xff);
 		else ret = (ret << 8) ^ (myrand_rand() & 0x7f);
 	}
+	return ret;
+}
+
+HashTable * ArrayListToLookupTable_Int(ArrayList * arr){
+	srInt_64 x1;
+	HashTable * ret = HashTableCreate( max(1,arr -> numOfElements / 6) );
+	for(x1 = 0; x1 < arr->numOfElements; x1++) HashTablePut(ret, ArrayListGet(arr, x1)+1, NULL+1);
 	return ret;
 }
 
@@ -116,7 +123,7 @@ void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator
 	list -> elemDeallocator = elem_deallocator;
 }
 
-int ArrayListSort_comp_pntr( void * L_elem, void * R_elem ){
+int ArrayListSort_comp_pntr( void * L_elem, void * R_elem, ArrayList * me ){
 	if( L_elem > R_elem )return 1;
 	if( L_elem < R_elem )return -1;
 	return 0;
@@ -125,11 +132,11 @@ int ArrayListSort_comp_pntr( void * L_elem, void * R_elem ){
 int ArrayListSort_compare(void * sortdata0, int L, int R){
 	void ** sortdata = sortdata0;
 	ArrayList * list = sortdata[0];
-	int (*comp_elems)(void * L_elem, void * R_elem) = sortdata[1];
+	int (*comp_elems)(void * L_elem, void * R_elem, ArrayList * me) = sortdata[1];
 
 	void * L_elem = list -> elementList[L];
 	void * R_elem = list -> elementList[R];
-	return comp_elems(L_elem, R_elem);
+	return comp_elems(L_elem, R_elem, list);
 }
 
 void ArrayListSort_exchange(void * sortdata0, int L, int R){
@@ -144,7 +151,7 @@ void ArrayListSort_exchange(void * sortdata0, int L, int R){
 void ArrayListSort_merge(void * sortdata0, int start, int items, int items2){
 	void ** sortdata = sortdata0;
 	ArrayList * list = sortdata[0];
-	int (*comp_elems)(void * L_elem, void * R_elem) = sortdata[1];
+	int (*comp_elems)(void * L_elem, void * R_elem, ArrayList * me) = sortdata[1];
 
 	void ** merged = malloc(sizeof(void *)*(items + items2));
 	int write_cursor, read1=start, read2=start+items;
@@ -153,7 +160,7 @@ void ArrayListSort_merge(void * sortdata0, int start, int items, int items2){
 		void * Elm1 = (read1 == start + items)? NULL:list -> elementList[read1];
 		void * Elm2 = (read2 == start + items + items2)?NULL:list -> elementList[read2];
 
-		int select_1 = (read1 == start + items)?0:( read2 == start + items + items2 || comp_elems(Elm1, Elm2) < 0 );
+		int select_1 = (read1 == start + items)?0:( read2 == start + items + items2 || comp_elems(Elm1, Elm2, list) < 0 );
 		if(select_1) merged[write_cursor] = list -> elementList[read1++];
 		else merged[write_cursor] = list -> elementList[read2++];
 		if(read2 > start + items + items2){
@@ -167,7 +174,7 @@ void ArrayListSort_merge(void * sortdata0, int start, int items, int items2){
 	free(merged);
 }
 
-void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem)){
+void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem, ArrayList * me)){
 	void * sortdata[2];	
 	sortdata[0] = list;
 	sortdata[1] = compare_L_minus_R?compare_L_minus_R:ArrayListSort_comp_pntr;
@@ -1004,4 +1011,35 @@ void HashTableIteration(HashTable * tab, void process_item(void * key, void * ha
 			pair = nextPair;
 		}
 	}
+}
+
+void HashTableSortedIndexes_copy_idx( void *k, void *v, HashTable * k2int_tab ){
+	ArrayList * dsta = k2int_tab -> appendix1;
+	ArrayListPush(dsta, k);
+}
+
+int HashTableSortedIndexes_cmp_idx( void * Lv, void * Rv, ArrayList * me ){
+	void ** appdx = me -> appendix1;
+	HashTable * k2int_tab = appdx[0];
+	void * Lhash = HashTableGet(k2int_tab, Lv);
+	void * Rhash = HashTableGet(k2int_tab, Rv);
+	void * large_first = appdx[1];
+	if(large_first){
+		if(Lhash > Rhash) return -1;
+		if(Lhash < Rhash) return 1;
+	}else{
+		if(Lhash > Rhash) return 1;
+		if(Lhash < Rhash) return -1;
+	}
+	return 0;
+}
+
+ArrayList * HashTableSortedIndexes(HashTable * k2int_tab, int larger_value_first){
+	ArrayList *ret = HashTableKeys(k2int_tab);
+	void * appx[2];
+	ret -> appendix1 = appx;
+	appx[0]=k2int_tab;
+	appx[1]=NULL+larger_value_first;
+	ArrayListSort(ret, HashTableSortedIndexes_cmp_idx);
+	return ret;
 }

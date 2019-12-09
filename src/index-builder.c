@@ -441,31 +441,25 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 int add_repeated_subread(gehash_t * tab , unsigned int subr, unsigned char ** huge_index)
 {
-	int huge_byte = (subr>>2) &0x3fffffff;
-	int huge_offset = (subr % 4) * 2;
-	int ind_id = (huge_byte >> 20) & 1023;
+	int huge_byte = (subr>>1);
+	int huge_offset = (subr % 2) * 4;
+	int ind_id = (huge_byte >> 24) & 127;
 
-	if(NULL == huge_index[ind_id])  huge_index[ind_id] = calloc(1024*1024, 1);
-	if(NULL == huge_index[ind_id]){ 
-		SUBREADprintf("ERROR: No memory can be allocated.\nThe program has to terminate\n");
-		return -1;
-	}
-	unsigned int byte_value = huge_index[ ind_id ][huge_byte&0xfffff] ;
+	unsigned int byte_value = huge_index[ ind_id ][huge_byte&0xffffff] ;
 
-	int huge_value = (byte_value>> huge_offset) & 0x3;
-	if(huge_value <3){
+	int huge_value = (byte_value>> huge_offset) & 0xf;
+	if(huge_value <15){
 		huge_value ++;
-		huge_index[ ind_id ][huge_byte&0xfffff] = (byte_value & (~(0x3 << huge_offset))) | (huge_value << huge_offset);
+		byte_value = (byte_value & (~(0xf << huge_offset))) | (huge_value << huge_offset);
+		huge_index[ ind_id ][huge_byte&0xffffff] = (unsigned char)(byte_value&0xff);
 		return 0;
 	}
 	unsigned int times = 0;
 	int matched = gehash_get(tab, subr, &times, 1);
 	if(matched)
-	{
 		gehash_update(tab, subr, times+1);
-	}
 	else
-		if(gehash_insert(tab, subr,4, NULL)) return 1;
+		if(gehash_insert(tab, subr, 16, NULL)) return 1;
 	
 	return 0;
 }
@@ -480,26 +474,17 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	*actual_total_bases_inc_marging = padding_around_contigs;
 
 	gehash_t occurrence_table;
-	unsigned char * huge_index[1024];
+	unsigned char * huge_index[128];
 
-	for(i=0;i<1024;i++)
-	{
-		huge_index[i] = NULL;
-
-		if(0){//memory is allocated when needed. 
-			huge_index[i] = (unsigned char *)malloc(1024*1024); 
-			
-			if(!huge_index[i])
-			{
-				for(j=0;j<i;j++) free(huge_index[j]);
-				SUBREADprintf("ERROR: You need at least one point five gigabytes of memory for building the index.\n");
-				return -1;
-			}
-			memset(huge_index[i], 0 , 1024*1024);
+	for(i=0;i<128;i++) {
+		huge_index[i] = calloc(1024*1024*16,1);
+		if(NULL == huge_index[i]){ 
+			SUBREADprintf("ERROR: No memory can be allocated.\nThe program has to terminate\n");
+			return -1;
 		}
 	}
 
-	if(gehash_create_ex(&occurrence_table, 150000000, 0, SUBINDEX_VER0, 1, 0)) return 1;
+	if(gehash_create_ex(&occurrence_table, 500000, 0, SUBINDEX_VER0, 1, 0)) return 1;
 
 	gene_input_t ginp;
 
@@ -677,7 +662,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	}
 
 
-	for(i=0;i<1024;i++)
+	for(i=0;i<128;i++)
 		if(huge_index[i])  free(huge_index[i]);
 
 	gehash_destory(&occurrence_table);

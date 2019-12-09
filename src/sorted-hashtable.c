@@ -125,9 +125,9 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 	if (current_bucket->space_size<1)
 	{
 		if(is_small_table)
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*1.5);
+			new_bucket_length = 5 ;
 		else
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH);
+			new_bucket_length = 2 ;
 
 		if(the_table->version_number == SUBINDEX_VER0)
 			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
@@ -167,7 +167,7 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 			//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
 			new_bucket_length = (int)(current_bucket->space_size*5);
 		else
-			new_bucket_length = (int)(current_bucket->space_size*1.5);
+			new_bucket_length = max((int)(current_bucket->space_size*1.5), (int)(current_bucket->space_size+4));	
 
 		if(the_table->version_number == SUBINDEX_VER0)
 			current_bucket->item_keys = (gehash_key_t *) realloc(current_bucket->item_keys ,  sizeof(gehash_key_t) * new_bucket_length);
@@ -186,200 +186,6 @@ int _gehash_resize_bucket(gehash_t * the_table , int bucket_no, char is_small_ta
 		current_bucket->space_size = new_bucket_length;
 	}
 	return 0;
-}
-
-int _gehash_resize_bucket_old(gehash_t * the_table , int bucket_no, char is_small_table)
-{
-	int new_bucket_length;
-	struct gehash_bucket * current_bucket = &(the_table -> buckets [bucket_no]);
-	gehash_key_t * new_item_keys = NULL;
-	short * new_new_item_keys = NULL;
-	gehash_data_t * new_item_values;
-
-	if (current_bucket->space_size<1)
-	{
-		int randv = myrand_rand();
-		if(is_small_table)
-			//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1.5+3.*pow(randv * 1./RAND_MAX,30)));
-		else
-			new_bucket_length = (int)(GEHASH_BUCKET_LENGTH*(1. +3.*pow(randv * 1./RAND_MAX,30)));
-
-
-	//	printf("NS1=%d\nNS2=%d\n", new_bucket_length, new_bucket_length);
-		if(the_table->version_number == SUBINDEX_VER0)
-		{
-			new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
-		}
-		else
-		{
-			new_new_item_keys = (short *) malloc(sizeof(short)*new_bucket_length);
-		}
-
-		new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
-
-		if(!((new_item_keys|| new_new_item_keys) && new_item_values))
-		{
-			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
-			return 1;
-		}
-
-		if(the_table->version_number == SUBINDEX_VER0)
-			memset(new_item_keys, 0, sizeof(gehash_key_t) * new_bucket_length);
-		else
-			memset(new_new_item_keys, 0, sizeof(short) * new_bucket_length);
-
-		memset(new_item_values, 0, sizeof(gehash_data_t) * new_bucket_length);
-
-		if(the_table->version_number == SUBINDEX_VER0)
-			current_bucket->item_keys = new_item_keys;
-		else
-			current_bucket->new_item_keys = new_new_item_keys;
-
-		current_bucket->item_values = new_item_values;
-		current_bucket->space_size = new_bucket_length;
-
-	}
-	else
-	{
-		int test_start = myrand_rand() % the_table-> buckets_number;
-		int i;
-		int need_allowc = 1;
-		for (i =test_start; i<test_start+10000; i++)
-		{
-			if (i==bucket_no)continue;
-			if (i>=the_table-> buckets_number)
-			{
-				test_start = myrand_rand() % the_table-> buckets_number;
-				i = test_start;
-				continue;
-			} 
-
-			if(the_table-> buckets[i].space_size > current_bucket->current_items+1 && current_bucket->space_size > the_table-> buckets[i].current_items+1 && current_bucket->current_items > the_table-> buckets[i].current_items)
-			{
-				int j;
-				gehash_data_t t_d;
-
-				for (j=0; j<current_bucket->current_items; j++)
-				{
-					if (j< the_table -> buckets[i].current_items)
-					{
-						if(the_table->version_number == SUBINDEX_VER0)
-						{
-							gehash_key_t t_key;
-							t_key = current_bucket->item_keys[j];
-							current_bucket->item_keys[j] = the_table-> buckets[i].item_keys[j];
-							the_table-> buckets[i].item_keys[j] = t_key;
-						}
-						else
-						{
-
-							short t_key;
-							t_key = current_bucket->new_item_keys[j];
-							current_bucket->new_item_keys[j] = the_table-> buckets[i].new_item_keys[j];
-							the_table-> buckets[i].new_item_keys[j] = t_key;
-						}
-
-
-						t_d = current_bucket->item_values[j];
-						current_bucket->item_values[j] = the_table-> buckets[i].item_values[j];
-						the_table-> buckets[i].item_values[j] = t_d;
-					}
-					else
-					{
-						if(the_table->version_number == SUBINDEX_VER0)
-							the_table-> buckets[i].item_keys[j] = current_bucket->item_keys[j];
-						else
-							the_table-> buckets[i].new_item_keys[j] = current_bucket->new_item_keys[j];
-						the_table-> buckets[i].item_values[j] = current_bucket->item_values[j];
-					}
-				}
-
-				gehash_key_t * p_key;
-				short * ps_key;
-				gehash_data_t * p_d;
-				int i_size;
-
-				if(the_table->version_number == SUBINDEX_VER0)
-				{
-					p_key = the_table-> buckets[i].item_keys ;
-					the_table-> buckets[i].item_keys = current_bucket->item_keys;
-					current_bucket->item_keys = p_key;
-				}else{
-					ps_key = the_table-> buckets[i].new_item_keys ;
-					the_table-> buckets[i].new_item_keys = current_bucket->new_item_keys;
-					current_bucket->new_item_keys = ps_key;
-				}
-
-				p_d = the_table-> buckets[i].item_values ;
-				the_table-> buckets[i].item_values = current_bucket->item_values;
-				current_bucket->item_values = p_d;
-
-				i_size = the_table-> buckets[i].space_size;
-				the_table-> buckets[i].space_size =current_bucket->space_size;
-				current_bucket->space_size=i_size;
-				
-				need_allowc = 0;
-				break;
-			}
-		} 
-		if(need_allowc)
-		{
-			if(is_small_table)
-				//new_bucket_length = (int)max(15,current_bucket->space_size*1.5+1);
-				new_bucket_length = (int)(current_bucket->space_size*5);
-			else
-				new_bucket_length = (int)(current_bucket->space_size*1.5);
-
-	//		printf("NSS1=%d\nNSS2=%d\n", new_bucket_length, new_bucket_length);
-			if(the_table->version_number == SUBINDEX_VER0)
-				new_item_keys = (gehash_key_t *) malloc(sizeof(gehash_key_t) * new_bucket_length);
-			else
-				new_new_item_keys = (short *) malloc(sizeof(short) * new_bucket_length);
-
-			new_item_values = (gehash_data_t *) malloc(sizeof(gehash_data_t) * new_bucket_length);
-
-
-			if(!((new_item_keys||new_new_item_keys) && new_item_values))
-			{
-				SUBREADputs(MESSAGE_OUT_OF_MEMORY);
-				return 1;
-			}
-
-			if(the_table->version_number == SUBINDEX_VER0)
-				memset(new_item_keys, 0, sizeof(gehash_key_t) * new_bucket_length);
-			else
-				memset(new_new_item_keys, 0, sizeof(short) * new_bucket_length);
-
-			memset(new_item_values, 0, sizeof(gehash_data_t) * new_bucket_length);
-
-			if(the_table->version_number == SUBINDEX_VER0)
-				memcpy(new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(gehash_key_t));
-			else
-				memcpy(new_new_item_keys, current_bucket->item_keys, current_bucket->current_items*sizeof(short));
-
-			memcpy(new_item_values, current_bucket->item_values, current_bucket->current_items*sizeof(gehash_data_t));
-
-			if(the_table->version_number == SUBINDEX_VER0)
-				free(current_bucket->item_keys);
-			else
-				free(current_bucket->new_item_keys);
-
-			free(current_bucket->item_values);
-
-			if(the_table->version_number == SUBINDEX_VER0)
-				current_bucket->item_keys = new_item_keys;
-			else
-				current_bucket->new_item_keys = new_new_item_keys;
-
-			current_bucket->item_values = new_item_values;
-			current_bucket->space_size = new_bucket_length;
-
-
-		}
-	}
-	return 0;
-
 }
 
 #define _gehash_get_bucket(tab, key)  ( (tab) -> buckets + _gehash_hash( key ) % (tab) -> buckets_number )
@@ -419,13 +225,59 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data, un
 	{
 		short step_number = key/the_table -> buckets_number;
 		if(current_bucket-> new_item_keys == NULL && bucket_sizes){
-			unsigned int bkno = _gehash_get_bucketNO(the_table, key) ;
-			unsigned char * mem_block = malloc((sizeof(gehash_data_t) + sizeof(short)) * bucket_sizes[ bkno ] ); 
-			current_bucket->item_values = ( gehash_data_t * )mem_block;
-			current_bucket->new_item_keys = ( short*)(mem_block + sizeof(gehash_data_t) *  bucket_sizes[ bkno ]) ;
-			current_bucket->current_items = 0;
-			current_bucket->space_size = bucket_sizes[ bkno ];
-			the_table -> free_item_only = 1;
+			//this will go only once when all the bucktes are NULL.
+
+			unsigned int * memory_sizes = malloc(sizeof(int) * the_table -> buckets_number);
+			memset(memory_sizes, 0xff, sizeof(int) * the_table -> buckets_number);
+
+			unsigned int grp_bytes = 0, grps = 0, this_grp_bucks = 0, xk1, bucks_per_grp = the_table -> buckets_number / GEHASH_MEM_PTR_NO +2;
+			for(xk1=0; xk1<  the_table -> buckets_number ; xk1++){
+				unsigned int buck_size =(sizeof(short) + sizeof(gehash_data_t)) * bucket_sizes[xk1];
+				grp_bytes += buck_size;
+				this_grp_bucks ++;
+				if(  this_grp_bucks >= bucks_per_grp ){
+					memory_sizes[grps++] = grp_bytes;
+					grp_bytes=0;
+					this_grp_bucks=0;
+				}
+			}
+			if(this_grp_bucks)
+				memory_sizes[grps] = grp_bytes;
+
+			for(xk1=0; xk1 < GEHASH_MEM_PTR_NO; xk1++){
+				unsigned int current_bytes = memory_sizes[xk1];
+				if(current_bytes<0xff000000u){
+					if(the_table -> malloc_ptr[xk1]!=NULL){
+						SUBREADprintf("ERROR : no-NULL ptr : %p\n",the_table -> malloc_ptr[xk1]);
+					}
+					the_table -> malloc_ptr[xk1] = malloc(current_bytes);
+					if(!the_table -> malloc_ptr[xk1]){
+						SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+						return 1;
+					}
+				}
+			}
+
+			grp_bytes = 0; grps = 0; this_grp_bucks = 0;
+			for(xk1=0; xk1<  the_table -> buckets_number ; xk1++){
+				struct gehash_bucket * mem_bucket = the_table -> buckets+xk1;
+				memset(mem_bucket, 0, sizeof(struct gehash_bucket));
+				mem_bucket -> new_item_keys = (short*)((char*)the_table -> malloc_ptr[grps] + grp_bytes);
+				mem_bucket -> item_values = (gehash_data_t*)((char *)mem_bucket -> new_item_keys + sizeof(short) * bucket_sizes[xk1]);
+				mem_bucket -> space_size = bucket_sizes[xk1];
+
+				unsigned int buck_size =(sizeof(short) + sizeof(gehash_data_t)) * bucket_sizes[xk1];
+				grp_bytes += buck_size;
+				this_grp_bucks ++;
+				if(  this_grp_bucks >= bucks_per_grp ){
+					grps++;
+					grp_bytes=0;
+					this_grp_bucks=0;
+				}
+			}
+
+			the_table -> free_item_only = 2;
+			free(memory_sizes);
 		}
 
 		if (current_bucket->current_items >= current_bucket->space_size) {
@@ -1548,7 +1400,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		//return -1;
 	}
 	
-	the_table -> malloc_ptr = NULL;
+	memset(the_table -> malloc_ptr ,0, sizeof(void*) * GEHASH_MEM_PTR_NO);
 	the_table -> index_gap = 0;
 
 	FILE * fp = f_subr_open(fname, "rb");
@@ -1622,6 +1474,9 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			SUBREADputs("ERROR: the index format is unrecognizable.");
 			assert(the_table -> current_items >0 && the_table -> current_items <=0xffffffffllu);
 		}
+
+		unsigned int * bucket_bytes = malloc(sizeof(int) * GEHASH_MEM_PTR_NO);
+		memset(bucket_bytes, 0xff, sizeof(int) * GEHASH_MEM_PTR_NO);
 		the_table -> buckets_number = load_int32(fp);
 		the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
 		if(!the_table -> buckets)
@@ -1630,61 +1485,67 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			return 1;
 		}
 
-		size_t fp_curr = ftello(fp), fp_end=fp_curr;
-		 
-		fseeko(fp, 0, SEEK_END);
-		fp_end = ftello(fp); 	
-		fseeko(fp, fp_curr, SEEK_SET);
-//		SUBREADprintf("CACL_SIZE %zd %zd\n", fp_end, fp_curr);
-		
-		size_t rem_len = fp_end - fp_curr;
-		the_table -> malloc_ptr = malloc(rem_len);
-		if(!the_table -> malloc_ptr){
-			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
-			return 1;
+		srInt_64 fp_curr = ftello(fp);
+		unsigned int accued_bytes = 0, grp_i = 0, curr_bucks = 0, per_group_bucks = the_table -> buckets_number/ GEHASH_MEM_PTR_NO + 2;
+		for(i=0; i<the_table -> buckets_number ; i++){
+			unsigned int current_items = load_int32(fp);
+			load_int32(fp);//useless for loading : space size
+			unsigned int current_bytes = current_items*( sizeof(short) + sizeof(gehash_data_t) );
+			accued_bytes += current_bytes; 
+			curr_bucks ++;
+			if(curr_bucks >= per_group_bucks){
+				bucket_bytes[grp_i++] = accued_bytes;
+				accued_bytes = 0;
+				curr_bucks = 0;
+			}
+			fseek(fp, current_bytes, SEEK_CUR);
 		}
+		if(curr_bucks)
+			bucket_bytes[grp_i++] = accued_bytes;
+		fseeko(fp, (off_t)fp_curr, SEEK_SET);
 
-		size_t rdbytes = 0;
-		while(!feof(fp) && rdbytes < rem_len){
-			size_t rrr = fread(the_table -> malloc_ptr + rdbytes, 1, rem_len - rdbytes, fp);
-			//SUBREADprintf("LOAD: %zd + %zd ==> %zd\n", rdbytes , rrr, rem_len);
-			rdbytes += rrr;
-		}
-		fclose(fp);
-		if(rdbytes != rem_len){
-			SUBREADprintf("Error: the index cannot be fully loaded (%ld != %ld). It may contain format errors or file '%s' may be truncated.\n", (long) fp_end, (long) fp_curr, fname);
-			return -1;
-		}
-		if(rdbytes<1) {
-			SUBREADprintf("Error: the index seem to contain no data at all. It may contain format errors or file '%s' may be truncated.\n", fname);
-			return -1;
-		}
-		char * curr_ptr = the_table -> malloc_ptr;
-		for (i=0; i<the_table -> buckets_number; i++)
-		{
-			struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
-			memcpy(&current_bucket -> current_items, curr_ptr, 4);
-			curr_ptr+=4;
-
-			memcpy(&current_bucket -> space_size, curr_ptr, 4);
-			curr_ptr+=4;
-
-			current_bucket -> new_item_keys = (short*)curr_ptr;
-			curr_ptr += sizeof(short)*current_bucket -> current_items;
-			current_bucket -> item_values = (gehash_data_t*)curr_ptr;
-			curr_ptr += sizeof(gehash_data_t)*current_bucket -> current_items;
-			if( curr_ptr > the_table -> malloc_ptr + rdbytes){
-				SUBREADprintf("Error: the index cannot be fully loaded : %p > %p + %ld. It may contain format errors or file '%s' may be truncated.\n",curr_ptr,  the_table -> malloc_ptr, rdbytes , fname);
-				return -1;
+		for(i=0; i<GEHASH_MEM_PTR_NO ; i++){
+			unsigned int current_bytes = bucket_bytes[i];
+			if(current_bytes<0xff000000u){
+				the_table -> malloc_ptr[i] = malloc(current_bytes);
+				if(!the_table -> malloc_ptr[i]){
+					SUBREADputs(MESSAGE_OUT_OF_MEMORY);
+					return 1;
+				}
 			}
 		}
-		the_table -> is_small_table = *curr_ptr;
-		curr_ptr ++;
-		if( curr_ptr != the_table -> malloc_ptr + rdbytes ){
-			SUBREADprintf("Error: the index cannot be fully loaded. It may contain format errors or file '%s' may be truncated.\n", fname);
-			return -1;
+
+		grp_i = 0;
+		curr_bucks = 0;
+		accued_bytes = 0;
+		for(i=0; i<the_table -> buckets_number ; i++){
+			struct gehash_bucket * current_bucket = the_table -> buckets+i;
+			current_bucket -> current_items = load_int32(fp);
+			load_int32(fp);//useless for lo: space size
+			current_bucket -> space_size =  current_bucket -> current_items;
+			unsigned int current_bytes = current_bucket -> current_items*( sizeof(short) + sizeof(gehash_data_t) );
+
+			current_bucket -> new_item_keys = (short*)(the_table -> malloc_ptr[grp_i] + accued_bytes);
+			current_bucket -> item_values = (gehash_data_t*)(the_table -> malloc_ptr[grp_i] + accued_bytes + current_bucket -> current_items * sizeof(short));
+			read_length = fread(current_bucket -> new_item_keys, sizeof(short), current_bucket -> current_items, fp);
+			read_length += fread(current_bucket -> item_values, sizeof(gehash_data_t), current_bucket -> current_items, fp);
+			if(read_length < 2* current_bucket -> current_items){
+				SUBREADprintf("ERROR: the index is incomplete.\n");
+				return 1;
+			}
+			
+			accued_bytes += current_bytes;
+			curr_bucks ++;
+			if(curr_bucks >= per_group_bucks){
+				curr_bucks=0;
+				accued_bytes=0;
+				grp_i++;
+			}
 		}
-		assert( curr_ptr == the_table -> malloc_ptr + rdbytes );
+
+		fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
+		free(bucket_bytes);
+		fclose(fp);
 		return 0;
 
 	}
@@ -1736,7 +1597,10 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		}
 
 		read_length = fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
-		assert(read_length>0);
+		if(read_length!=1){
+			SUBREADprintf("ERROR: the index is incomplete.\n");
+			return 1;
+		}
 		fclose(fp);
 		return 0;
 	}
@@ -2027,10 +1891,14 @@ int gehash_dump(gehash_t * the_table, const char fname [])
 
 void gehash_destory(gehash_t * the_table)
 {
-	int i;
+	int i, is_ptr = 0;
 
-	if(the_table -> malloc_ptr) free(the_table -> malloc_ptr);
-	else for (i=0; i<the_table -> buckets_number; i++)
+	for(i = 0; i < GEHASH_MEM_PTR_NO; i++) if(the_table -> malloc_ptr[i]){
+		free(the_table -> malloc_ptr[i]);
+		is_ptr=1;
+	}
+
+	if(!is_ptr) for (i=0; i<the_table -> buckets_number; i++)
 	{
 		struct gehash_bucket * current_bucket = &(the_table -> buckets[i]);
 		if (current_bucket -> space_size > 0)
@@ -2039,6 +1907,7 @@ void gehash_destory(gehash_t * the_table)
 			free (current_bucket -> item_values);
 		}
 	}
+
 	free (the_table -> buckets);
 
 	the_table -> current_items = 0;

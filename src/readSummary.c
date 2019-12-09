@@ -906,10 +906,11 @@ int locate_junc_features(fc_thread_global_context_t *global_context, char * chro
 // Memory will be allowcated in this function. The pointer is saved in *loaded_features.
 // The invoker must release the memory itself.
 
+#define MAX_ANNOT_LINE_LENGTH 200000
 int load_feature_info(fc_thread_global_context_t *global_context, const char * annotation_file, int file_type, fc_feature_info_t ** loaded_features)
 {
 	unsigned int features = 0, xk1 = 0, lineno=0;
-	char * file_line = malloc(MAX_LINE_LENGTH+1);
+	char * file_line = malloc(MAX_ANNOT_LINE_LENGTH+1);
 	autozip_fp anno_fp;
 	int apret = autozip_open(annotation_file, &anno_fp);
 	int is_GFF_warned = 0;
@@ -937,8 +938,8 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	// also create chro_name_table : chro_name => fc_chromosome_index_info 
 	while(0)
 	{
-		//char * fgets_ret = fgets(file_line, MAX_LINE_LENGTH, fp);
-		int rchars = autozip_gets(&anno_fp, file_line, MAX_LINE_LENGTH);
+		//char * fgets_ret = fgets(file_line, MAX_ANNOT_LINE_LENGTH, fp);
+		int rchars = autozip_gets(&anno_fp, file_line, MAX_ANNOT_LINE_LENGTH);
 		char * token_temp = NULL, *chro_name;
 		fc_chromosome_index_info * chro_stab;
 		unsigned int feature_pos = 0;
@@ -1004,8 +1005,12 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	while(1)
 	{
 		int is_gene_id_found = 0;
-		int rchars = autozip_gets(&anno_fp, file_line, MAX_LINE_LENGTH);
+		int rchars = autozip_gets(&anno_fp, file_line, MAX_ANNOT_LINE_LENGTH);
 		if(rchars < 1) break;
+		if(rchars >= MAX_ANNOT_LINE_LENGTH - 1){
+			SUBREADprintf("\nERROR: the %u-th line in your GTF file is extremely long (longer than %d bytes).\nThe program cannot parse this line.\n", lineno+1, MAX_ANNOT_LINE_LENGTH-1);
+			return -2;
+		}
 
 		lineno++;
 		char * token_temp = NULL;
@@ -4118,7 +4123,7 @@ void scRNA_merge_thread_umitables(void *ky, void *val, HashTable * tab){
 }
 
 #define MIN_EXPRESSED_UMIS_PER_CELL 100 
-#define MIN_EXPRESSED_UMIS_PER_GENE 3 
+#define MIN_EXPRESSED_UMIS_PER_GENE (3-2) 
 
 void scRNA_merge_write_copy_gene_nos(void * ky, void * va , HashTable *tab){
 	HashTable * used_gene_table = tab -> appendix2;
@@ -4127,10 +4132,10 @@ void scRNA_merge_write_copy_gene_nos(void * ky, void * va , HashTable *tab){
 	srInt_64 UMIs = HashTableGet(used_gene_table, ky)-NULL;
 	HashTablePut(used_gene_table, ky, NULL + UMIs + one_sampl_gene_to_cell_umis -> numOfElements);
 }
-int scRNA_merge_write_zero_gene(fc_thread_global_context_t * global_context, char * linebuf, ArrayList * used_cell_barcode_list){
+int scRNA_merge_write_zero_gene(fc_thread_global_context_t * global_context, char * linebuf, ArrayList * high_confid_barcode_index_list){
 	int ret=0;
 	srInt_64 x1;
-	for(x1=0;x1<used_cell_barcode_list->numOfElements;x1++)ret += sprintf(linebuf + ret,"\t0");
+	for(x1=0;x1<high_confid_barcode_index_list->numOfElements;x1++)ret += sprintf(linebuf + ret,"\t0");
 	return ret;
 }
 
@@ -4259,7 +4264,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 	return ret;
 }
 
-int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  HashTable ** merged_tables_gene_to_cell_umis , HashTable ** used_cell_barcode_tabs , ArrayList ** used_cell_barcode_list , ArrayList * umi_merged_list, ArrayList * gen_no_list,  srInt_64 used_gene_i, char * linebuf){
+int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  HashTable ** merged_tables_gene_to_cell_umis , HashTable ** used_cell_barcode_tabs , ArrayList ** high_confid_barcode_index_list , ArrayList * umi_merged_list, ArrayList * gen_no_list,  srInt_64 used_gene_i, char * linebuf){
 	srInt_64 gene_no = ArrayListGet(gen_no_list, used_gene_i) -NULL -1, x1;
 	srInt_64 line_number = global_context -> is_gene_level? gene_no :  HashTableGet(global_context -> lineno_2_sortedno_tab, NULL+1+gene_no) -NULL -1; // convert line_no to sorted_order
 	int linebuf_ptr = 0;
@@ -4278,12 +4283,12 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
 		ArrayList* cellno_umino_p1_list = HashTableGet(merged_tables_gene_to_cell_umis[x1], NULL + gene_no + 1);
 		if(NULL == cellno_umino_p1_list){
-			linebuf_ptr += scRNA_merge_write_zero_gene(global_context, linebuf+ linebuf_ptr, used_cell_barcode_list[x1]);
+			linebuf_ptr += scRNA_merge_write_zero_gene(global_context, linebuf+ linebuf_ptr, high_confid_barcode_index_list[x1]);
 		}else{
 			int tab_cell_ptr=0, used_cell_bc_ptr ;
 
-			for(used_cell_bc_ptr = 0; used_cell_bc_ptr < used_cell_barcode_list[x1] -> numOfElements; used_cell_bc_ptr++){
-				srInt_64 used_cell_no = ArrayListGet(used_cell_barcode_list[x1], used_cell_bc_ptr) - NULL -1;
+			for(used_cell_bc_ptr = 0; used_cell_bc_ptr < high_confid_barcode_index_list[x1] -> numOfElements; used_cell_bc_ptr++){
+				srInt_64 used_cell_no = ArrayListGet(high_confid_barcode_index_list[x1], used_cell_bc_ptr) - NULL -1;
 
 				int write_cnt=0;
 				if(tab_cell_ptr<cellno_umino_p1_list ->numOfElements)while(1){
@@ -4308,73 +4313,259 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 	return total_count_in_row;
 }
 
+#define SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION 0.01
+void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * this_sample_ambient_rescure_candi, ArrayList * this_sample_45k_90k_barcode_idx, ArrayList * highconf_list){
+	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
+	HashTable * highconf_list_tab = ArrayListToLookupTable_Int(highconf_list);
+	srInt_64 x1;
+	for(x1=0; x1 < sorted_idx -> numOfElements; x1++){
+		void * this_bc_pnt = ArrayListGet(sorted_idx ,  x1);
+		if(!HashTableGet(highconf_list_tab, this_bc_pnt)) break; // assuming that all high-umi barcodes are high-confident, this makes x1 being the # of total high-confidence barcodes.	
+	}
+	if(x1 >0){
+		srInt_64 median_umis = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  (x1-1)/2))-NULL;
+		srInt_64 median_umis_001_cut = (srInt_64)(median_umis *1. *SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION);
+		SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
+		for(x1=0; x1 < sorted_idx -> numOfElements; x1++){
+			void * this_bc_pnt = ArrayListGet(sorted_idx ,  x1);
+			if(HashTableGet(highconf_list_tab, this_bc_pnt)) continue; // it is in high-conf list
+			srInt_64 this_bc_umis = HashTableGet(used_cell_barcode_tab, this_bc_pnt) - NULL;
+			if(this_bc_umis < median_umis_001_cut) break;
+			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt-1);
+		}
+	}
+	for(x1=45000; x1 < sorted_idx -> numOfElements; x1++){
+		if(x1 >= 90000) break;
+		ArrayListPush(this_sample_45k_90k_barcode_idx, ArrayListGet(sorted_idx ,  x1) );
+	}
+	ArrayListDestroy(sorted_idx);
+	SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
+	HashTableDestroy(highconf_list_tab);
+}
+
+
+#define SCRNA_BOOTSTRAP_HIGH_INDEX 30
+#define SCRNA_BOOTSTRAP_SAMPLING_TIMES 100
+
+void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * merged_umi_list, ArrayList * highconf_list){
+	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
+	srInt_64 UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
+
+	if(0){
+		SUBREADprintf("HIGHEST 30 TH UMIs = %lld\n", UMIs_30th_high);
+		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -0 ))-NULL;
+		SUBREADprintf("HIGHEST 31 TH UMIs = %lld\n", UMIs_30th_high);
+		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -2 ))-NULL;
+		SUBREADprintf("HIGHEST 29 TH UMIs = %lld\n", UMIs_30th_high);
+	}
+
+	srInt_64 x2,x1;
+	srInt_64 this_total = 0;
+	for(x1 = 0; x1 < SCRNA_BOOTSTRAP_SAMPLING_TIMES; x1++){
+		for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
+			void * barcode_idx = ArrayListRandom(sorted_idx);
+			srInt_64 this_umis = HashTableGet( used_cell_barcode_tab, barcode_idx )-NULL;
+			if(this_umis >= UMIs_30th_high/10) this_total ++;
+		}
+	}
+	this_total /= SCRNA_BOOTSTRAP_SAMPLING_TIMES;
+	if(0) SUBREADprintf("FINAL SELECTION_IDX =  %lld\n",this_total);
+	for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++) ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) -1 );
+}
+
+int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context, HashTable * merged_tab_gene_to_cell_umis, HashTable * cell_barcode_tab, ArrayList * used_cell_barcodes, int sample_index, char * tabtype){
+	int x1,x2;
+
+	char ofname[MAX_FILE_NAME_LENGTH + 100];
+	sprintf(ofname,"%s.scRNA.%03d.%s.BCtab",global_context->input_file_name, sample_index+1,tabtype);
+	FILE * ofp_bcs = fopen( ofname , "w" );
+	sprintf(ofname,"%s.scRNA.%03d.%s.GENEtab",global_context->input_file_name, sample_index+1,tabtype);
+	FILE * ofp_genes = fopen( ofname , "w" );
+	sprintf(ofname,"%s.scRNA.%03d.%s.spmtx",global_context->input_file_name, sample_index+1,tabtype);
+	FILE * ofp_mtx = fopen( ofname , "w" );
+	fprintf(ofp_mtx,"%%%%MatrixMarket matrix coordinate integer general\n");
+
+	HashTable * used_cell_barcodes_tab = ArrayListToLookupTable_Int( used_cell_barcodes );
+
+	ArrayList * output_gene_idxs = HashTableKeys(merged_tab_gene_to_cell_umis);
+	ArrayListSort(output_gene_idxs, NULL);
+	unsigned int nonzero_items = 0, nonozero_genes = 0;
+	HashTable * bc_no_to_output_no_tab = HashTableCreate( global_context -> scRNA_cell_barcodes_array->numOfElements/8 );
+	ArrayList * output_no_tab_to_bcno_arr = ArrayListCreate( global_context -> scRNA_cell_barcodes_array->numOfElements);
+	for(x1 = 0; x1 < output_gene_idxs -> numOfElements; x1++){
+		srInt_64 gene_index = ArrayListGet(output_gene_idxs, x1)-NULL-1;
+		ArrayList * bc_umi_p1_list = HashTableGet(merged_tab_gene_to_cell_umis, NULL+1+ gene_index );
+		assert(bc_umi_p1_list!=NULL);
+		assert(bc_umi_p1_list -> numOfElements >0);
+
+		int old_bc_no = -1, this_gene_has_bc = 0;
+		for(x2=0; x2 < bc_umi_p1_list -> numOfElements; x2++){
+			srInt_64 bc_umi = ArrayListGet(bc_umi_p1_list, x2) - NULL - 1;
+			int bc_no = (int)(bc_umi >>32);
+			void * this_bc_needed = HashTableGet(used_cell_barcodes_tab, NULL+1+bc_no); 
+			if(!this_bc_needed) continue;
+			int out_bc_no = HashTableGet( bc_no_to_output_no_tab , NULL+1+bc_no ) -NULL;
+			if( out_bc_no <1 ){
+				out_bc_no = bc_no_to_output_no_tab -> numOfElements +1;
+				HashTablePut(  bc_no_to_output_no_tab , NULL+1+bc_no, NULL + out_bc_no );
+				ArrayListPush(output_no_tab_to_bcno_arr, NULL+bc_no);
+				fprintf(ofp_bcs,"%s\n", ArrayListGet(global_context -> scRNA_cell_barcodes_array, bc_no));
+			}
+
+			this_gene_has_bc = 1;
+			if(old_bc_no != bc_no){
+				nonzero_items++;
+				old_bc_no = bc_no;
+			}
+		}
+		if(this_gene_has_bc){
+			nonozero_genes ++;
+		}
+	}
+	fprintf(ofp_mtx, "%u %u %u\n", nonozero_genes, (unsigned int)bc_no_to_output_no_tab->numOfElements, nonzero_items );
+
+	nonozero_genes = 0;
+	for(x1 = 0; x1 < output_gene_idxs -> numOfElements; x1++){
+		srInt_64 gene_index = ArrayListGet(output_gene_idxs, x1)-NULL-1;
+		ArrayList * bc_umi_p1_list = HashTableGet(merged_tab_gene_to_cell_umis, NULL+1+ gene_index );
+		assert(bc_umi_p1_list!=NULL);
+
+		unsigned int mybc_UMIs = 0;
+		int old_bc_no = -1, old_out_bc_no = -1, this_gene_has_bc = 0;
+		for(x2=0; x2 < bc_umi_p1_list -> numOfElements; x2++){
+			srInt_64 bc_umi = ArrayListGet(bc_umi_p1_list, x2) - NULL - 1;
+			int bc_no = (int)(bc_umi >>32);
+			int out_bc_no = HashTableGet( bc_no_to_output_no_tab , NULL+1+bc_no ) -NULL;
+			void * this_bc_needed = HashTableGet(used_cell_barcodes_tab, NULL+1+bc_no); 
+			if(!this_bc_needed) continue;
+
+			this_gene_has_bc = 1;
+			if(old_bc_no == bc_no){
+				mybc_UMIs++;
+			}else{
+				if( old_out_bc_no >=0 )fprintf(ofp_mtx,"%d %d %d\n", nonozero_genes+1, old_out_bc_no, mybc_UMIs);
+				old_bc_no = bc_no;
+				old_out_bc_no = out_bc_no;
+				mybc_UMIs = 1;
+			}
+		}
+		if(mybc_UMIs>0) fprintf(ofp_mtx,"%d %d %d\n", nonozero_genes+1, old_out_bc_no, mybc_UMIs);
+
+		if(this_gene_has_bc){
+			char * gene_name = (char*)global_context -> gene_name_array [gene_index];
+			fprintf(ofp_genes,"%s\n", gene_name);
+			if(x1 < 7) SUBREADprintf("GOT A GENE SMP_%d: [%d]  %s\n", sample_index+1, x1, gene_name);
+		}
+		nonozero_genes += this_gene_has_bc;
+	}
+	HashTableDestroy(bc_no_to_output_no_tab);
+	HashTableDestroy(used_cell_barcodes_tab);
+	ArrayListDestroy(output_gene_idxs);
+	fclose(ofp_bcs);
+	fclose(ofp_genes);
+	fclose(ofp_mtx);
+
+	return 0;
+}
+
+void scRNA_merged_45K_to_90K_sum_SUM(void * kyGeneID, void * Vcb_umi_arr, HashTable * me){
+	HashTable * gene_to_umis  = me -> appendix1;
+	HashTable * bcid_look_tab = me -> appendix2;
+	ArrayList * cb_umi_arr = Vcb_umi_arr;
+
+	srInt_64 x1, this_gene_added = HashTableGet(gene_to_umis, kyGeneID)-NULL;
+	int has_adding = 0;
+	for(x1 = 0; x1< cb_umi_arr -> numOfElements; x1++){
+		srInt_64 cb_umi = ArrayListGet(cb_umi_arr,x1) - NULL-1;
+		srInt_64 cbno = cb_umi >>32;
+		if(!HashTableGet( bcid_look_tab, NULL+1+cbno ))continue;
+		this_gene_added ++;
+		has_adding = 1;
+	}
+	if(has_adding)HashTablePut(gene_to_umis, kyGeneID, NULL+this_gene_added);
+}
+
+void scRNA_merged_45K_to_90K_sum_WRT(void * kyGeneID, void * valUMIs, HashTable * me){
+	srInt_64 sample_no = me -> counter1;
+	fc_thread_global_context_t * global_context = me -> appendix1;
+	FILE * ofp = me -> appendix2;
+
+	char * gene_name = global_context -> gene_name_array[ kyGeneID - NULL-1 ];
+	fprintf(ofp, "%s\t%u\n", gene_name, (unsigned int) (valUMIs-NULL));
+}
+
+void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, HashTable * gene_to_cell_umis_tab, ArrayList * bcid_arr, int sample_no ){
+	HashTable * ret = HashTableCreate( gene_to_cell_umis_tab->numOfElements/6 );
+	HashTable * bcid_look_tab = ArrayListToLookupTable_Int(bcid_arr);
+	gene_to_cell_umis_tab -> appendix1 = ret;
+	gene_to_cell_umis_tab -> appendix2 = bcid_look_tab;
+	srInt_64 x1;
+	HashTableIteration( gene_to_cell_umis_tab, scRNA_merged_45K_to_90K_sum_SUM );
+
+	char ofname[MAX_FILE_NAME_LENGTH + 20];
+	sprintf(ofname,"%s.scRNA.%03d.AmbSum",global_context->input_file_name, sample_no+1);
+	FILE * write_fp = fopen(ofname,"w");
+	fprintf(write_fp,"GeneID\tUMIs\n");
+	ret -> appendix1 = global_context;
+	ret -> appendix2 = write_fp;
+	ret -> counter1 = sample_no;
+	HashTableIteration( ret, scRNA_merged_45K_to_90K_sum_WRT );
+	HashTableDestroy(bcid_look_tab);
+	HashTableDestroy(ret);
+	fclose(write_fp);
+}
+
+void scRNA_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me){
+	FILE * fp = me->appendix1;
+	fc_thread_global_context_t * global_context = me->appendix2;
+	char* gene_symbol = global_context -> gene_name_array [k-NULL-1];
+	fprintf(fp, "%s\n", gene_symbol);
+}
+
+void scRNA_merged_write_nozero_geneids(  fc_thread_global_context_t * global_context, HashTable * gene_to_cell_umis_tab, int samplenno ){
+	char ofname[MAX_FILE_NAME_LENGTH + 20];
+	sprintf(ofname,"%s.scRNA.%03d.no0Genes",global_context->input_file_name, samplenno+1);
+	FILE * fp = fopen( ofname , "w" );
+	srInt_64 x1;
+	gene_to_cell_umis_tab -> appendix1 =fp;
+	gene_to_cell_umis_tab -> appendix2 =global_context;
+	HashTableIteration(gene_to_cell_umis_tab, scRNA_merged_write_nozero_geneids_WRT);
+	fclose(fp);
+}
+
 // this function writes a single count table.
 // Rows: genes
 // Cols: Cell_Barcode +"."+ SampleName
 void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, HashTable ** merged_tables_gene_to_cell_umis , HashTable ** used_cell_barcode_tabs , ArrayList * merged_umi_list){
 	char ofname[MAX_FILE_NAME_LENGTH + 20];
-	sprintf(ofname,"%s.scRNA.table",global_context->input_file_name);
-	FILE * ofp = fopen( ofname , "w" );
+	sprintf(ofname,"%s.scRNA.SampleTable",global_context->input_file_name);
+	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1, cell_items_row = 0;
 	srInt_64 xkk;
-	ArrayList ** used_cell_barcode_list = malloc(sizeof(void*)* global_context -> scRNA_sample_sheet_table -> numOfElements );
 
-	fprintf(ofp, global_context -> is_gene_level?"Geneid":"FeatureNo");
+	fprintf(sample_tab_fp,"SampleName\tIndex\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
-//		SUBREADprintf("CELL BARCODE USED TAB = %ld  ; GENE_TO_CELL&UMI TAB = %ld ; for %d sample\n", used_cell_barcode_tabs[x1]-> numOfElements, merged_tables_gene_to_cell_umis[x1]-> numOfElements, x1);
-		ArrayList * raw_used_cells = HashTableKeys(used_cell_barcode_tabs[x1]);
-		ArrayListSort(raw_used_cells, NULL);
-		used_cell_barcode_list[x1] = ArrayListCreate(raw_used_cells -> numOfElements);
-		for(xkk = 0; xkk < raw_used_cells -> numOfElements; xkk++){
-			srInt_64 cell_no = ArrayListGet(raw_used_cells, xkk) - NULL - 1;
-			srInt_64 umis_of_cell = HashTableGet(used_cell_barcode_tabs[x1], NULL + 1 + cell_no)-NULL;
-			if(umis_of_cell >= MIN_EXPRESSED_UMIS_PER_CELL) ArrayListPush( used_cell_barcode_list[x1], NULL + 1 + cell_no );
-		}
-		ArrayListDestroy(raw_used_cells);
-		char * sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
+		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
+		fprintf(sample_tab_fp,"%s\t%d\n", this_sample_name, 1+x1);
+		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
+		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
+		ArrayList * this_sample_45k_90k_barcode_idx = ArrayListCreate(90000 - 45000 + 100);
+		scRNA_merged_bootstrap_a_sample(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1],merged_umi_list, high_confid_barcode_index_list);
+		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
 
-		for(xkk = 0; xkk < used_cell_barcode_list[x1]->numOfElements; xkk++){
-			srInt_64 cell_bcno = ArrayListGet(used_cell_barcode_list[x1], xkk)-NULL-1;
-			char * cell_name = ArrayListGet( global_context -> scRNA_cell_barcodes_array, cell_bcno );
-			fprintf(ofp, "\t%s.%s", cell_name, sample_name);
-		}
+		SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
+		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], high_confid_barcode_index_list, x1, "HighConf");
+		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, x1, "RescCand");
+		scRNA_merged_45K_to_90K_sum( global_context, merged_tables_gene_to_cell_umis[x1], this_sample_45k_90k_barcode_idx, x1 );
+		scRNA_merged_write_nozero_geneids( global_context, merged_tables_gene_to_cell_umis[x1], x1 );
+
+		ArrayListDestroy(this_sample_ambient_rescure_candi);
+		ArrayListDestroy(this_sample_45k_90k_barcode_idx);
+		ArrayListDestroy(high_confid_barcode_index_list);
 		cell_items_row += xkk;
 	}
-	fprintf(ofp, "\n");
- 
-	HashTable * uniq_gene_nos_in_samples = HashTableCreate(10000);
-	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
-		merged_tables_gene_to_cell_umis[x1]->appendix1 = global_context;
-		merged_tables_gene_to_cell_umis[x1]->appendix2 = uniq_gene_nos_in_samples;
-		HashTableIteration( merged_tables_gene_to_cell_umis[x1], scRNA_merge_write_copy_gene_nos);
-	}
 
-	ArrayList * gen_no_list_raw = HashTableKeys(uniq_gene_nos_in_samples);
-	ArrayList * gen_no_list = ArrayListCreate(gen_no_list_raw -> numOfElements);
-	for(x1 = 0; x1<gen_no_list_raw->numOfElements;x1++){
-		srInt_64 gene_no = ArrayListGet(gen_no_list_raw, x1) - NULL - 1;
-		srInt_64 UMIs = HashTableGet( uniq_gene_nos_in_samples, NULL+ gene_no+1 )-NULL;
-		if(UMIs >= MIN_EXPRESSED_UMIS_PER_GENE) ArrayListPush( gen_no_list, NULL+1+gene_no ); 
-	}
-	ArrayListDestroy(gen_no_list_raw);
-	ArrayListSort(gen_no_list, NULL);
-
-	char * linebuf = malloc(15*cell_items_row+MAX_GENE_NAME_LEN * 6);
-	for(xkk=0; xkk <  gen_no_list -> numOfElements; xkk ++){
-		int should_write = scRNA_merged_write_a_gene( global_context, merged_tables_gene_to_cell_umis, used_cell_barcode_tabs, used_cell_barcode_list, merged_umi_list, gen_no_list, xkk,  linebuf);
-		if(should_write)
-			fprintf(ofp,"%s\n", linebuf);
-
-	}
-	free(linebuf);
-
-	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++)
-		ArrayListDestroy(used_cell_barcode_list[x1]);
-	free(used_cell_barcode_list);	
-
-	HashTableDestroy(uniq_gene_nos_in_samples);
-	ArrayListDestroy(gen_no_list);
-	fclose(ofp);
+	fclose(sample_tab_fp);
 }
 
 void  scRNA_merge_merge_UMIs(void * gno_ky, void * cell_umi_2_reads_list_va , HashTable * tab){

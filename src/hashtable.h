@@ -6,7 +6,7 @@
  * Released to the public domain.
  *
  *--------------------------------------------------------------------------
- * $Id: hashtable.h,v 9999.28 2019/09/16 04:19:37 cvs Exp $
+ * $Id: hashtable.h,v 9999.30 2019/12/05 03:05:37 cvs Exp $
 \*--------------------------------------------------------------------------*/
 
 #ifndef _HASHTABLE_H
@@ -71,7 +71,7 @@ int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
 void * ArrayListShift(ArrayList * list);
 void * ArrayListPop(ArrayList * list);
 void ArrayListSetDeallocationFunction(ArrayList * list,  void (*elem_deallocator)(void *elem));
-void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem));
+void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void * R_elem, ArrayList * me));
 
 // A simple comparison function if you want to sort unsigned long long ints.
 int ArrayListLLUComparison(void * L_elem, void * R_elem);
@@ -494,6 +494,11 @@ srUInt_64 HashTableStringHashFunction(const void *key);
 
 void free_values_destroy(HashTable * tab);
 int HashTablePutReplaceEx(HashTable *hashTable, const void *key, void *value, int replace_key, int dealloc_key, int dealloc_value);
+
+ArrayList * HashTableSortedIndexes(HashTable * k2int_tab, int larger_value_first);
+
+// NOTE: values are all added by 1. 
+HashTable * ArrayListToLookupTable_Int(ArrayList * arr);
 
 #endif /* _HASHTABLE_H */
 

@@ -270,6 +270,8 @@ struct gehash_bucket {
 	gehash_data_t * item_values;
 };
 
+#define GEHASH_MEM_PTR_NO (64*1024) 
+
 typedef struct {
 	int version_number;
 	unsigned long long int current_items;
@@ -278,7 +280,7 @@ typedef struct {
 	struct gehash_bucket * buckets;
 	int index_gap;
 	int padding;
-	char * malloc_ptr;
+	char * malloc_ptr [GEHASH_MEM_PTR_NO];
 	int free_item_only;
 } gehash_t;
 

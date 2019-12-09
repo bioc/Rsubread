@@ -85,7 +85,7 @@ int txunique_load_annotation(txunique_context_t * context){
 	return 0;
 }
 
-int txunique_process_flat_comp( void * ex1p, void * ex2p ){
+int txunique_process_flat_comp( void * ex1p, void * ex2p, ArrayList *me ){
 	txunique_exon_t * ex1 = ex1p;
 	txunique_exon_t * ex2 = ex2p;
 
@@ -150,7 +150,7 @@ void debug_print_edges(ArrayList * exs){
 	}
 }
 
-int txunique_process_gene_edge_comp(void * e1p, void * e2p){
+int txunique_process_gene_edge_comp(void * e1p, void * e2p, ArrayList *me){
 	struct _txunique_tmp_edges * e1 = e1p;
 	struct _txunique_tmp_edges * e2 = e2p;
 	if(e1 -> base_open_end < e2 -> base_open_end) return -1;
