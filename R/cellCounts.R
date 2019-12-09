@@ -165,7 +165,7 @@
 }
 
 .load.all.scSamples <- function( BAM.name, FC.gene.ids){
-  sum.tab <- read.delim(paste0(BAM.name,".SampleTable"), stringsAsFactors=F)
+  sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
     sname <- sum.tab$SampleName
