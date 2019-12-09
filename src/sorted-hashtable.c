@@ -1481,6 +1481,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		the_table -> buckets = (struct gehash_bucket * )malloc(sizeof(struct gehash_bucket) * the_table -> buckets_number);
 		if(!the_table -> buckets)
 		{
+			SUBREADputs("Creating buckets.");
 			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
 		}
@@ -1494,11 +1495,12 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			accued_bytes += current_bytes; 
 			curr_bucks ++;
 			if(curr_bucks >= per_group_bucks){
+				//SUBREADprintf("Allocating %d : %d buckets : %u\n", grp_i, i, accued_bytes);
 				bucket_bytes[grp_i++] = accued_bytes;
 				accued_bytes = 0;
 				curr_bucks = 0;
 			}
-			fseek(fp, current_bytes, SEEK_CUR);
+			fseeko(fp, current_bytes, SEEK_CUR);
 		}
 		if(curr_bucks)
 			bucket_bytes[grp_i++] = accued_bytes;
@@ -1508,6 +1510,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			unsigned int current_bytes = bucket_bytes[i];
 			if(current_bytes<0xff000000u){
 				the_table -> malloc_ptr[i] = malloc(current_bytes);
+				//SUBREADprintf("Allocating %d buckets : %u\n", i, current_bytes);
 				if(!the_table -> malloc_ptr[i]){
 					SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 					return 1;

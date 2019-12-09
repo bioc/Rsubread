@@ -270,8 +270,12 @@ struct gehash_bucket {
 	gehash_data_t * item_values;
 };
 
-#define GEHASH_MEM_PTR_NO (64*1024) 
 
+#ifdef __MINGW32__
+#define GEHASH_MEM_PTR_NO (64) 
+#else
+#define GEHASH_MEM_PTR_NO (64*1024) 
+#endif
 typedef struct {
 	int version_number;
 	unsigned long long int current_items;
