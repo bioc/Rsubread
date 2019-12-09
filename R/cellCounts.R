@@ -52,6 +52,7 @@
 
 .read.sparse.mat <- function (fn){
   library(Matrix)
+  print(fn)
   mtx <- readMM(paste0(fn, ".spmtx"))
   coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
   rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
@@ -161,18 +162,19 @@
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
-  cbind( highconf,rescued )
+  list( HighConf=highconf, Rescued=rescued )
 }
 
 .load.all.scSamples <- function( BAM.name, FC.gene.ids){
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
-    sname <- sum.tab$SampleName
-    sid <- sum.tab$Index
+    sname <- sum.tab$SampleName[roiw]
+    sid <- sum.tab$Index[roiw]
     count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid)
-	ret[[sname]] <- count.tab
+	ret[[sprintf("Sample.%03d",sid)]] <- count.tab
   }
+  ret[["Sample.Table"]] <- sum.tab
 
   ret
 }
