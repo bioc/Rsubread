@@ -198,9 +198,10 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  output.1 <- output.BAM[ii]
 	  sample.1 <- sample.sheet[ii]
 	  align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
-	  fc[[paste0("counts.", output.1)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
-	  fc[[paste0("scRNA.", output.1)]] <- .load.all.scSamples(output.1, fc[[paste0("counts.", output.1)]]$annotation$GeneID)
+	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
+	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, fc[[paste0("counts.", output.1)]]$annotation$GeneID)
   }
+  fc[["Input.Files"]] <- input.directory
 
   fc
 }
