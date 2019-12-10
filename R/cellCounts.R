@@ -112,14 +112,23 @@
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   nozero.anywhere.genes <- read.delim(paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1
   ambient.accumulate <- read.delim(paste0(fname,".AmbSum"), stringsAsFactors=F)
+  #saveRDS(list(BAM.name, FC.gene.ids, sample.no), "del4-debug.RDS")
+  print("TTAAA_00")
+  print(summary(ambient.accumulate))
   ambient.accumulate <- ambient.accumulate[ match(FC.gene.ids , ambient.accumulate$GeneID), ]
   ambient.accumulate$UMIs[is.na(ambient.accumulate$UMIs)] <- 0
+  print("TTAAA_01")
+  print(summary(ambient.accumulate))
   ambient.accumulate <- ambient.accumulate$UMIs
   names(ambient.accumulate) <- FC.gene.ids 
 
   library(edgeR)
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
+  print("TTAAA_02")
+  print(summary(ambient.accumulate))
   gte <- goodTuringProportions (ambient.accumulate)
+  print("TTAAA_09")
+  print(summary(gte))
 
 
   # This function returns "times" log-likelihoods.
@@ -199,7 +208,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  sample.1 <- sample.sheet[ii]
 	  align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
-	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, fc[[paste0("counts.", output.1)]]$annotation$GeneID)
+	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, fc[[paste0("counts.", ii)]]$annotation$GeneID)
   }
   fc[["Input.Files"]] <- input.directory
 
