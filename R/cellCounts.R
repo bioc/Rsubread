@@ -1,3 +1,45 @@
+min_mySGT_input_size <- 5
+
+.smoothed <- function(i,intercept,slope) 2.718281828^(intercept + slope * log(i))
+
+# Simple Good Turing
+.mySGT <- function(obs.per.spe){
+	obs.tab <- sort(table(obs.per.spe[obs.per.spe>0]))
+	sgtr <- .mySGTsorted(as.numeric(names(obs.tab)), obs.tab)
+	res <- obs.per.spe
+	res[obs.per.spe!=0] <- sgtr[match(as.character(obs.per.spe), names(obs.tab))]
+	res[obs.per.spe==0] <- sgtr$p0
+	res
+}
+
+.mySGTsorted<-function( obs, times ){
+	if(any(obs != sort(obs)))stop("Observations have to be sorted.")
+	nobs = length(obs)
+	if(nobs < min_mySGT_input_size) stop("Not enough element in the observation array.")
+	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
+	total_observed <- sum(obs * times)
+	p_zero <- 0
+	if(1 %in% obs) p_zero <- times[which(1==obs)[1]] / total_observed
+	tval <- matrix(0, ncol=2, nrow=nobs)
+	ks <- c(obs[2:nobs], 2*obs[nobs] - obs[nobs-1])
+	tval[,1] <- log(obs)
+	tval[,2] <- log(2*times / (ks - c(0, obs[1:(nobs-1)])))
+	meanX <- mean(tval[,1])
+	meanY <- mean(tval[,2])
+	slope <- sum( (tval[,1]-meanX) * (tval[,2]-meanY) ) / sum((tval[,1]-meanX) ^2)
+	intercept <- meanY - slope * meanX
+
+	y <- (1+obs) * .smoothed(1+obs, intercept, slope ) / .smoothed(obs, intercept, slope)
+	x <- (1+obs) * c((times[2:nobs] / times[1:(nobs-1)]), y[nobs])
+	xy.sim <- abs(x-y) <= 1.96*( (obs+1)^2 * c(times[2:nobs], 0)/ times^2 * (1+ c(times[2:nobs], 0) / times ))^0.5
+	obs.in.next <- (obs+1) %in% obs
+	min.inv <- min(which( xy.sim | !obs.in.next ))
+	r<-x
+	if(min.inv>0)r[min.inv:nobs] <- y[min.inv:nobs]
+	list(p0=p_zero, p=(1-p_zero) * r / sum(r*times))
+}
+
+
 .cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing ){ # the three parameters can only be one string, not strings!
 
 	cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing)), collapse=.R_param_splitor)
@@ -122,11 +164,10 @@
   ambient.accumulate <- ambient.accumulate$UMIs
   names(ambient.accumulate) <- FC.gene.ids 
 
-  library(edgeR)
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
   print("TTAAA_02")
   print(summary(ambient.accumulate))
-  gte <- goodTuringProportions (ambient.accumulate)
+  gte <- .mySGT(ambient.accumulate)$p
   print("TTAAA_09")
   print(summary(gte))
 
@@ -214,3 +255,4 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 
   fc
 }
+
