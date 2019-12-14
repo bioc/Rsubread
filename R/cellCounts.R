@@ -1,5 +1,47 @@
-min_mySGT_input_size <- 5
 
+.rstest <- function(r, coef) r * (1 + 1/r)^(1 + coef)
+
+.averaging_transform <- function(r, nr){
+    d = c(1, r[ 2:length(r) ] - r[1:(length(r)-1)])
+    dr = c( 0.5 * (d[2:length(d)] + d[1:(length(d)-1)]),d[ length(d) ])
+   	nr/dr
+}
+
+
+.simple.Good.Turing.Freq<-function( obs, times ){
+	if(any(obs != sort(obs)))stop("Observations have to be sorted.")
+	nobs = length(obs)
+	if(nobs < min_mySGT_input_size) stop("Not enough element in the observation array.")
+	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
+	total_observed <- sum(obs * times)
+	tval <- matrix(0, ncol=2, nrow=nobs)
+	ks <- c(obs[2:nobs], 2*obs[nobs] - obs[nobs-1])
+	tval[,1] <- log(obs)
+	tval[,2] <- log( .averaging_transform(obs,times))
+	meanx <- mean(tval[,1])
+	meany <- mean(tval[,2])
+	slope <- sum( (tval[,1]-meanx) * (tval[,2]-meany) ) / sum((tval[,1]-meanx) ^2)
+	intercept <- meany - slope * meanx
+
+	obs.in.next <- (obs+1) %in% obs
+	SD <- ( 1+(1:nobs) ) / times *(c(times[2:nobs], 0)* (1+c(times[2:nobs],0) /times))^.5
+	SD [!obs.in.next] <- 1
+
+	GT <- (obs+1)/obs * c(times[2:nobs],0)/times
+	GT [!obs.in.next] <- 0
+	y <- .rstest(obs,slope)
+	LGT <- y / obs
+
+	xy.sim <- ( abs(GT-LGT) * (1:nobs) / SD ) > 1.65
+	min.no.turing = min(which(!xy.sim))
+	r <- GT
+	if(min.no.turing>0)r[min.no.turing:nobs] <- LGT[min.no.turing:nobs]
+	p_zero <- times[1] / total_observed
+	ret <- list(p0=p_zero, p=(1-p_zero) * obs * r / sum(r*times*obs/total_observed))
+	ret
+}
+
+min_mySGT_input_size <- 5
 .smoothed <- function(i,intercept,slope) 2.718281828^(intercept + slope * log(i))
 
 # Simple Good Turing
