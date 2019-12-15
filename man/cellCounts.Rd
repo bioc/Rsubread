@@ -15,6 +15,7 @@ cellCounts(
     # the optional arguments related to read mapping
     input.mode = "BCL",
     nthreads = 16,
+    forced.mapping = TRUE,
   
     # the optional arguments related to counting
     annot.inbuilt = "mm10",
@@ -26,7 +27,7 @@ cellCounts(
     chrAliases = NULL,
     useMetaFeatures = TRUE,
     allowMultiOverlap = FALSE,
-    countMultiMappingReads = FALSE) 
+    countMultiMappingReads = FALSE)
 }
 \arguments{
   \item{index}{ a character string giving the subread index built by the {buildindex} function.}
@@ -36,6 +37,7 @@ cellCounts(
   \item{cell.barcode.list}{ a character string giving the name of a textual file (can be gzipped) containing the set of cell barcodes used in sample preparation. All the input data sets must use the same cell barcode set. If \code{NULL} is given then a best cell barcode set is automatically chosen for the input data. \code{NULL} by default.}
   \item{input.mode}{ a character string giving the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
   \item{nthreads}{ a numeric value giving the number of threads used for read mapping and counting. 16 by default.}
+  \item{forced.mapping}{ logical indicating if read alignment should be redone even the BAM file already exists. This option is useful when read counting should be redone but need not the read alignment step. \code{TRUE} by default.}
   \item{annot.inbuilt, annot.ext, isGTFAnnotationFile, GTF.featureType, GTF.attrType, GTF.attrType.extra, chrAliases, useMetaFeatures, allowMultiOverlap, countMultiMappingReads}{ options for counting the mapping results. The options have the same meanings as them \code{featureCounts}}
 }
 

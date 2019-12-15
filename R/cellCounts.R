@@ -14,7 +14,7 @@
 	times <- times[as.character(obs)]
 
 	nobs = length(obs)
-	if(nobs < min_mySGT_input_size) stop("Not enough element in the observation array.")
+	if(nobs < .min_mySGT_input_size) stop("Not enough element in the observation array.")
 	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
 	total_observed <- sum(obs * times)
 	tval <- matrix(0, ncol=2, nrow=nobs)
@@ -49,7 +49,7 @@
 	ret
 }
 
-min_mySGT_input_size <- 5
+.min_mySGT_input_size <- 5
 .smoothed <- function(i,intercept,slope) 2.718281828^(intercept + slope * log(i))
 
 # Simple Good Turing
@@ -65,7 +65,7 @@ min_mySGT_input_size <- 5
 .mySGTsorted<-function( obs, times ){
 	if(any(obs != sort(obs)))stop("Observations have to be sorted.")
 	nobs = length(obs)
-	if(nobs < min_mySGT_input_size) stop("Not enough element in the observation array.")
+	if(nobs < .min_mySGT_input_size) stop("Not enough element in the observation array.")
 	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
 	total_observed <- sum(obs * times)
 	p_zero <- 0
@@ -142,8 +142,8 @@ min_mySGT_input_size <- 5
 	stop(sprintf("ERROR: no known cell barcode set was found for the data set. The highest percentage of cell-barcode matched reads is %.1f%%\n", max.cell.good*100.))
 }
 
+library(Matrix)
 .read.sparse.mat <- function (fn){
-  library(Matrix)
   print(fn)
   mtx <- readMM(paste0(fn, ".spmtx"))
   coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
@@ -279,7 +279,7 @@ min_mySGT_input_size <- 5
   ret
 }
 
-cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
+cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", nthreads=16, forced.mapping=TRUE, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=FALSE){
   input.directory <- .check_and_NormPath(input.directory,  mustWork=T, opt="input.directory")
   sample.sheet <- .check_and_NormPath(sample.sheet,  mustWork=T, opt="sample.sheet")
   output.BAM <- .check_and_NormPath(output.BAM,  mustWork=F, opt="output.BAM")
@@ -297,7 +297,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  input.1 <- input.directory[ii]
 	  output.1 <- output.BAM[ii]
 	  sample.1 <- sample.sheet[ii]
-	  align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
+	  if(forced.mapping || !file.exists(output.1)) align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
 	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))
   }
