@@ -8,8 +8,11 @@
 }
 
 
-.simple.Good.Turing.Freq<-function( obs, times ){
-	if(any(obs != sort(obs)))stop("Observations have to be sorted.")
+.simple.Good.Turing.Freq<-function( raw.freq ){
+	times <- table(raw.freq[raw.freq>0])
+	obs <- sort(as.numeric(names(times)))
+	times <- times[as.character(obs)]
+
 	nobs = length(obs)
 	if(nobs < min_mySGT_input_size) stop("Not enough element in the observation array.")
 	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
@@ -37,7 +40,12 @@
 	r <- GT
 	if(min.no.turing>0)r[min.no.turing:nobs] <- LGT[min.no.turing:nobs]
 	p_zero <- times[1] / total_observed
-	ret <- list(p0=p_zero, p=(1-p_zero) * obs * r / sum(r*times*obs/total_observed))
+	rs <- (1-p_zero) * obs * r / sum(r*times*obs/total_observed)
+	total_rs <- sum(rs * times)
+	puniq <- (1-p_zero) * rs / total_rs
+	pres <- rep(p_zero, length(raw.freq))
+	pres [raw.freq>0] <- puniq[match( raw.freq[raw.freq>0], obs )]
+	ret <- list(p0=p_zero, p=pres)
 	ret
 }
 
@@ -209,7 +217,7 @@ min_mySGT_input_size <- 5
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
   print("TTAAA_02")
   print(summary(ambient.accumulate))
-  gte <- .mySGT(ambient.accumulate)$p
+  gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
   print("TTAAA_09")
   print(summary(gte))
 
@@ -291,7 +299,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  sample.1 <- sample.sheet[ii]
 	  align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
-	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, fc[[paste0("counts.", ii)]]$annotation$GeneID)
+	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))
   }
   fc[["Input.Files"]] <- input.directory
 
