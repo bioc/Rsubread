@@ -9,6 +9,7 @@
 
 
 .simple.Good.Turing.Freq<-function( raw.freq ){
+	n_zero <- sum(raw.freq == 0)
 	times <- table(raw.freq[raw.freq>0])
 	obs <- sort(as.numeric(names(times)))
 	times <- times[as.character(obs)]
@@ -43,7 +44,7 @@
 	rs <- (1-p_zero) * obs * r / sum(r*times*obs/total_observed)
 	total_rs <- sum(rs * times)
 	puniq <- (1-p_zero) * rs / total_rs
-	pres <- rep(p_zero, length(raw.freq))
+	pres <- rep(p_zero / n_zero, length(raw.freq))
 	pres [raw.freq>0] <- puniq[match( raw.freq[raw.freq>0], obs )]
 	ret <- list(p0=p_zero, p=pres)
 	ret
@@ -63,7 +64,8 @@
 	#saveRDS(sgtr, "del4-sgtr.RDS")
 	res <- obs.per.spe
 	res[obs.per.spe!=0] <- sgtr$p[match(as.character(obs.per.spe[obs.per.spe!=0]), names(obs.tab))]
-	res[obs.per.spe==0] <- sgtr$p0
+	n_zero <- sum(obs.per.spe==0)
+	res[obs.per.spe==0] <- sgtr$p0/n_zero
 	res
 }
 
@@ -224,6 +226,11 @@ library(Matrix)
   print(summary(ambient.accumulate))
   #gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
   gte <- .mySGT(ambient.accumulate)
+  #saveRDS(gte, "del4-mySGT-gte.Rds")
+
+  #library(edgeR)
+  #gte <- goodTuringProportions(ambient.accumulate)
+  #saveRDS(gte, "del4-limmaSGT-gte.Rds")
   print("TTAAA_09")
   print(summary(gte))
 
@@ -261,7 +268,7 @@ library(Matrix)
   # select cells that has FDR < cutoff
   FDR.Cutoff <- 0.01
   Rescured.Barcodes <- names(actual.FDR)[actual.FDR <= FDR.Cutoff]
-  rescue.candidates[,Rescured.Barcodes, , drop=FALSE]
+  rescue.candidates[,Rescured.Barcodes, drop=FALSE]
 }
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no ){
