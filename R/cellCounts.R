@@ -224,16 +224,13 @@ library(Matrix)
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
   print("TTAAA_02")
   print(summary(ambient.accumulate))
-  ambient.accumulate.genes <- names(ambient.accumulate)[ambient.accumulate>0]
-  if(!all(ambient.accumulate.genes %in% nozero.anywhere.genes))stop("NON-zero error!")
 
-  ambient.accumulate.counts <- ambient.accumulate[ambient.accumulate.genes]
-  gte <- .simple.Good.Turing.Freq(ambient.accumulate.counts)$p
-  #gte <- .mySGT(ambient.accumulate.counts)
+  gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
+  #gte <- .mySGT(ambient.accumulate)
   #saveRDS(gte, "del4-mySGT-gte.Rds")
 
   #library(edgeR)
-  #gte <- goodTuringProportions(ambient.accumulate.counts)
+  #gte <- goodTuringProportions(ambient.accumulate)
   #saveRDS(gte, "del4-limmaSGT-gte.Rds")
   print("TTAAA_09")
   print(summary(gte))
@@ -245,23 +242,22 @@ library(Matrix)
   rescue.candidates <- rescue.candidates[ match(names(ambient.accumulate), rownames(rescue.candidates)), ]
   rownames(rescue.candidates) <- names(ambient.accumulate)
   rescue.candidates [is.na(rescue.candidates )] <- 0
-  rescue.candidates.fortest <- rescue.candidates[ambient.accumulate.genes , ]
   # Compute observed log-likelihood of barcodes being generated from ambient RNA
   # Compute the multinomial log PMF for many barcodes -- log-likelihoods
   # Only use the "non-zero anywhere" genes.
-  log.like.cands <- apply(rescue.candidates.fortest, 2, function(x) dmultinom(x, prob=gte, log =T ))
+  log.like.cands <- apply(rescue.candidates, 2, function(x) dmultinom(x, prob=gte, log =T ))
 
   # Simulate log likelihoods
   # This step is to build like 10000 sets of N_GENES vectors from the multinomial distribution of "gte"
   # See what are their log-likelihoods against "gte" -- most should be very small.
 
-  simu.pvalues <- .simu.multinomial( rescue.candidates.fortest, gte )
+  simu.pvalues <- .simu.multinomial( rescue.candidates, gte )
 
   # Compute p-values : the p-value is the chance of a barcode is actually from ambient RNA (ie smaller the p-value, more likely this barcode is for a real cell)
-  actual.pvalues <- rep(0, ncol(rescue.candidates.fortest) )
-  names(actual.pvalues) <- colnames(rescue.candidates.fortest)
+  actual.pvalues <- rep(0, ncol(rescue.candidates) )
+  names(actual.pvalues) <- colnames(rescue.candidates)
   for(candi in names(log.like.cands)){
-    cand_umis <- sum(rescue.candidates.fortest[,candi])
+    cand_umis <- sum(rescue.candidates[,candi])
     cand.simu.pvs <- simu.pvalues[[ cand_umis ]]
     cand.actual.pv <- log.like.cands[candi]
     actual.pvalues[candi] <- sum(cand.simu.pvs > cand.actual.pv) / length(cand.simu.pvs)
