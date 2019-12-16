@@ -54,10 +54,15 @@
 
 # Simple Good Turing
 .mySGT <- function(obs.per.spe){
-	obs.tab <- sort(table(obs.per.spe[obs.per.spe>0]))
+	obs.tab <- table(obs.per.spe[obs.per.spe>0])
+	obs <- sort( as.numeric(names(obs.tab)))
+	obs.tab <- obs.tab[ as.character(obs) ]
+	#saveRDS(obs.tab,"del4-obs.tab.RDS")
+	#saveRDS(obs.per.spe, "del4-obs.per.spe.RDS")
 	sgtr <- .mySGTsorted(as.numeric(names(obs.tab)), obs.tab)
+	#saveRDS(sgtr, "del4-sgtr.RDS")
 	res <- obs.per.spe
-	res[obs.per.spe!=0] <- sgtr[match(as.character(obs.per.spe), names(obs.tab))]
+	res[obs.per.spe!=0] <- sgtr$p[match(as.character(obs.per.spe[obs.per.spe!=0]), names(obs.tab))]
 	res[obs.per.spe==0] <- sgtr$p0
 	res
 }
@@ -217,7 +222,8 @@ library(Matrix)
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
   print("TTAAA_02")
   print(summary(ambient.accumulate))
-  gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
+  #gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
+  gte <- .mySGT(ambient.accumulate)
   print("TTAAA_09")
   print(summary(gte))
 
@@ -255,7 +261,7 @@ library(Matrix)
   # select cells that has FDR < cutoff
   FDR.Cutoff <- 0.01
   Rescured.Barcodes <- names(actual.FDR)[actual.FDR <= FDR.Cutoff]
-  rescue.candidates[,Rescured.Barcodes]
+  rescue.candidates[,Rescured.Barcodes, , drop=FALSE]
 }
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no ){
