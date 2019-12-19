@@ -168,41 +168,41 @@ library(Matrix)
   Old_bs_one <- NA
   log_E_GTE <- log(gene.profile.freq)
   for(bcsize_one in bcsizes){
-  UMI_step_diff <- NA
-  if(!any(is.na(Old_bs_one))) UMI_step_diff <- bcsize_one - Old_bs_one
-
-  if(any(is.na(N10000.LLH))){
-      N10000 <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
-    N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
-  }else if(UMI_step_diff >= 1000){
-    UMI_step_diff_N10000 <- rmultinom(n=times, size=UMI_step_diff, prob=gene.profile.freq )
-    N10000 <- N10000 + UMI_step_diff_N10000
-    N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
-  }else{
-    for(curi in (Old_bs_one+1):bcsize_one){
-    UMI_step_indices_N10000 <- sample(1:nrow(candi.mat), size=times, prob=gene.profile.freq, replace=T)
-    for(idi in 1:times){
-      N10000[ UMI_step_indices_N10000[idi] ,idi ] <- N10000[ UMI_step_indices_N10000[idi] ,idi ]+1
+    UMI_step_diff <- NA
+    if(!any(is.na(Old_bs_one))) UMI_step_diff <- bcsize_one - Old_bs_one
+  
+    if(any(is.na(N10000.LLH))){
+        N10000 <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
+      N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
+    }else if(UMI_step_diff >= 1000){
+      UMI_step_diff_N10000 <- rmultinom(n=times, size=UMI_step_diff, prob=gene.profile.freq )
+      N10000 <- N10000 + UMI_step_diff_N10000
+      N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
+    }else{
+      for(curi in (Old_bs_one+1):bcsize_one){
+      UMI_step_indices_N10000 <- sample(1:nrow(candi.mat), size=times, prob=gene.profile.freq, replace=T)
+      for(idi in 1:times){
+        N10000[ UMI_step_indices_N10000[idi] ,idi ] <- N10000[ UMI_step_indices_N10000[idi] ,idi ]+1
+      }
+      UMI_step_values_N10000 <- rep(0, times)
+      for(idi in 1:times){
+        UMI_step_values_N10000[idi] <- N10000[UMI_step_indices_N10000[idi] ,idi ]
+      }
+      #print(UMI_step_values_N10000)
+      N10000.LLH <- N10000.LLH + log_E_GTE[ UMI_step_indices_N10000 ] + log((curi +1.) / UMI_step_values_N10000)
+      }
     }
-    UMI_step_values_N10000 <- rep(0, times)
-    for(idi in 1:times){
-      UMI_step_values_N10000[idi] <- N10000[UMI_step_indices_N10000[idi] ,idi ]
+  
+    # cat("\n\n ++++++++++ ", bcsize_one," +++++++++ \n")
+    # print(summary(N10000.LLH))
+    do_CTRL <- F
+    if(do_CTRL && 0== bcsize_one %% 15){
+      CTRL <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
+      CTRL.LLH <- apply(CTRL, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
+      print(summary(CTRL.LLH))
     }
-    #print(UMI_step_values_N10000)
-    N10000.LLH <- N10000.LLH + log_E_GTE[ UMI_step_indices_N10000 ] + log((curi +1.) / UMI_step_values_N10000)
-    }
-  }
-
-  # cat("\n\n ++++++++++ ", bcsize_one," +++++++++ \n")
-  # print(summary(N10000.LLH))
-  do_CTRL <- F
-  if(do_CTRL && 0== bcsize_one %% 15){
-    CTRL <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
-    CTRL.LLH <- apply(CTRL, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
-    print(summary(CTRL.LLH))
-  }
-  ret.nUMI.LLH.tab[[ bcsize_one ]] <- N10000.LLH
-  Old_bs_one <- bcsize_one
+    ret.nUMI.LLH.tab[[ bcsize_one ]] <- N10000.LLH
+    Old_bs_one <- bcsize_one
   }
   ret.nUMI.LLH.tab
 }
@@ -232,7 +232,7 @@ library(Matrix)
   #library(edgeR)
   #gte <- goodTuringProportions(ambient.accumulate)
   #saveRDS(gte, "del4-limmaSGT-gte.Rds")
-  print("TTAAA_09")
+  print("Summary of the ambient RNA profile (proportions)")
   print(summary(gte))
 
 
@@ -276,6 +276,7 @@ library(Matrix)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
+  rescued <- rescued[rowSums(rescued)>0,]
   list( HighConf=highconf, Rescued=rescued )
 }
 
