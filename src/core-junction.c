@@ -2984,9 +2984,10 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 					else
 						tail_soft_clipped = find_soft_clipping(global_context, thread_context, current_value_index, read_text + read_cursor, current_perfect_section_abs, tmp_int, 1, adj_coverage_end);
 
-					//SUBREADprintf("SSTAIL:%d\n", tail_soft_clipped);
+					if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
+						SUBREADprintf("SSTAIL:%d\n", tail_soft_clipped);
 
-					if(tail_soft_clipped == tmp_int){
+					if(0 && tail_soft_clipped == tmp_int){
 						tail_soft_clipped = 0;
 						if(full_section_clipped)(*full_section_clipped) = 1;
 					} else has_clipping_this_section_tail = 1;
@@ -3125,6 +3126,8 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 			}
 		}
 
+		if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
+			SUBREADprintf("NEW_CIGAR_2 : %s\n", new_cigar_tmp);
 		strcpy(cigar_string, new_cigar_tmp);
 	}
 
@@ -3347,7 +3350,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 
 			//#warning " ========== COMMENT THIS LINE !! ========="
-			if(0 && FIXLENstrcmp("R00000110641", explain_context -> read_name) ==0){
+			if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", explain_context -> read_name) ==0){
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
