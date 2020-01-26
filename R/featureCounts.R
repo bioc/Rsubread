@@ -53,7 +53,7 @@
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,sampleSheet=NULL,cellBarcodeList=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
-	if(!.is.64bit.system()) cat("WARNING: your system seems to be 32-bit. Rsubread supports 32-bit systems to a limited level only.\nWe recommend that Rsubread be run on 64-bit systems to avoid any possible problems.\n\n")
+	if(!.is.64bit.system()) warning("your system seems to be 32-bit. Rsubread supports 32-bit systems to a limited level only.\nWe recommend that Rsubread be run on 64-bit systems to avoid any possible problems.\n\n",call.=FALSE)
 
     .check_string_param(annot.inbuilt, "annot.inbuilt")
     .check_string_param(GTF.featureType, "GTF.featureType")
