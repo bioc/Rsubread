@@ -1630,23 +1630,26 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			return 1;
 		}
 
-		size_t fp_curr = ftello(fp), fp_end=fp_curr;
+		srInt_64 fp_curr = ftello(fp), fp_end=fp_curr;
 		 
 		fseeko(fp, 0, SEEK_END);
 		fp_end = ftello(fp); 	
 		fseeko(fp, fp_curr, SEEK_SET);
 //		SUBREADprintf("CACL_SIZE %zd %zd\n", fp_end, fp_curr);
 		
-		size_t rem_len = fp_end - fp_curr;
+		srInt_64 rem_len = fp_end - fp_curr;
 		the_table -> malloc_ptr = malloc(rem_len);
 		if(!the_table -> malloc_ptr){
 			SUBREADputs(MESSAGE_OUT_OF_MEMORY);
 			return 1;
 		}
 
-		size_t rdbytes = 0;
+		srInt_64 rdbytes = 0;
 		while(!feof(fp) && rdbytes < rem_len){
-			size_t rrr = fread(the_table -> malloc_ptr + rdbytes, 1, rem_len - rdbytes, fp);
+			srInt_64 read_block_size = rem_len - rdbytes;
+			if(read_block_size > 0x7fff0000) read_block_size = 0x7fff0000;
+			
+			srInt_64 rrr = fread(the_table -> malloc_ptr + rdbytes, 1, read_block_size, fp);
 			//SUBREADprintf("LOAD: %zd + %zd ==> %zd\n", rdbytes , rrr, rem_len);
 			rdbytes += rrr;
 		}
