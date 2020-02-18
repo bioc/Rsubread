@@ -28,8 +28,8 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
   }else{
     out.table.cols <- out.base.names
   }
-  out.table.cols <-gsub("[[:punct:]]+", ".", out.table.cols)
-  out.table.cols <-gsub(" ", ".", out.table.cols)
+  #out.table.cols <-gsub("[[:punct:]]+", ".", out.table.cols)
+  #out.table.cols <-gsub(" ", ".", out.table.cols)
 
   readfile1 <- as.character(readfile1)
   readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")

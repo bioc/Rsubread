@@ -7,8 +7,8 @@ propmapped <- function(files,countFragments=TRUE,properlyPaired=FALSE,verbose=FA
     out.table.rows <- out.base.names
   }
 
-  out.table.rows <-gsub("[[:punct:]]+", ".", out.table.rows)
-  out.table.rows <-gsub(" ", ".", out.table.rows)
+  #out.table.rows <-gsub("[[:punct:]]+", ".", out.table.rows)
+  #out.table.rows <-gsub(" ", ".", out.table.rows)
 
   files <- .check_and_NormPath(files, mustWork=T, opt="files")
   if(any(duplicated(files)))stop("Error: duplicated input files are provided. No result is generated.")

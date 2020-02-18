@@ -69,8 +69,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     }else{
       out.col.names <- out.base.names
     }
-    out.col.names <-gsub("[[:punct:]]+", ".", out.col.names)
-    out.col.names <-gsub(" ", ".", out.col.names)
+    #out.col.names <-gsub("[[:punct:]]+", ".", out.col.names)
+    #out.col.names <-gsub(" ", ".", out.col.names)
 
 	if(!is.character(files)) stop("files must be a character vector of file paths")
 	files <- .check_and_NormPath(files, mustWork=T, opt="files")

@@ -27,7 +27,7 @@ cellCounts(
     chrAliases = NULL,
     useMetaFeatures = TRUE,
     allowMultiOverlap = FALSE,
-    countMultiMappingReads = FALSE)
+    countMultiMappingReads = TRUE)
 }
 \arguments{
   \item{index}{ a character string giving the subread index built by the {buildindex} function.}
