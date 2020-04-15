@@ -64,7 +64,7 @@
 #define FC_FLIST_SPLITOR "\026"
 
 typedef struct{
-	char gene_name[FEATURE_NAME_LENGTH];
+	char * gene_name;
 	unsigned int pos_first_base;
 	unsigned int pos_last_base;
 } fc_junction_gene_t;
@@ -97,7 +97,7 @@ typedef struct {
 } fc_junction_info_t;
 
 typedef struct {
-	unsigned int feature_name_pos;
+	srInt_64 feature_name_pos;
 	unsigned int start;
 	unsigned int end;
 	unsigned int sorted_order;
@@ -280,8 +280,8 @@ typedef struct {
 	char * debug_command;
 	char * unistr_buffer_space;
 	srInt_64 max_BAM_header_size;
-	unsigned int unistr_buffer_size;
-	unsigned int unistr_buffer_used;
+	srInt_64 unistr_buffer_size;
+	srInt_64 unistr_buffer_used;
 	HashTable * scRNA_sample_sheet_table;
 	ArrayList * scRNA_sample_barcode_list;
 	ArrayList * scRNA_cell_barcodes_array;
@@ -581,19 +581,19 @@ int calc_junctions_from_cigar(fc_thread_global_context_t * global_context, int f
 }
 
 
-unsigned int unistr_cpy(fc_thread_global_context_t * global_context, char * str, int strl)
+srInt_64 unistr_cpy(fc_thread_global_context_t * global_context, char * str, int strl)
 {
-	unsigned int ret;
+	srInt_64 ret;
 	if(global_context->unistr_buffer_used + strl >= global_context->unistr_buffer_size-1)
 	{
-		if( global_context->unistr_buffer_size < (1000u*1000u*1000u*2)) // 2GB
+		if( global_context->unistr_buffer_size < (1000llu*1000u*1000u*32)) // 32GB
 		{
 			global_context -> unistr_buffer_size = global_context->unistr_buffer_size /2 *3;
 			global_context -> unistr_buffer_space = realloc(global_context -> unistr_buffer_space, global_context->unistr_buffer_size);
 		}
 		else
 		{
-			SUBREADprintf("Error: exceed memory limit (4GB) for storing annotation data.\n");
+			SUBREADprintf("Error: exceed memory limit (32GB) for storing feature names.\n");
 			return 0xffffffffu;
 		}
 	}
@@ -823,12 +823,18 @@ int fc_strcmp(const void * s1, const void * s2)
 	return strcmp((char*)s1, (char*)s2);
 }
 
+void junc_gene_free(void *vv){
+	fc_junction_gene_t *v = vv;
+	free(v -> gene_name);
+	free(v);
+}
+
 void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * chro, unsigned int start, unsigned int stop){
 	HashTable * gene_table = HashTableGet(global_context -> junction_features_table, chro);
 	//SUBREADprintf("REG %s : %p\n", chro, gene_table);
 	if(NULL == gene_table){
 		gene_table = HashTableCreate(48367);
-		HashTableSetDeallocationFunctions(gene_table, NULL, free);
+		HashTableSetDeallocationFunctions(gene_table, NULL, junc_gene_free);
 		HashTableSetKeyComparisonFunction(gene_table, fc_strcmp);
 		HashTableSetHashFunction(gene_table, fc_chro_hash);
 
@@ -839,7 +845,7 @@ void register_junc_feature(fc_thread_global_context_t *global_context, char * fe
 	fc_junction_gene_t * gene_info = HashTableGet(gene_table, feature_name);
 	if(NULL == gene_info){
 		gene_info = malloc(sizeof(fc_junction_gene_t));
-		strcpy(gene_info -> gene_name, feature_name);
+		gene_info -> gene_name = strdup(feature_name);
 		gene_info -> pos_first_base = start;
 		gene_info -> pos_last_base = stop;
 
@@ -1023,9 +1029,12 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			}
 			char * feature_name = strtok_r(file_line,"\t",&token_temp);
 			int feature_name_len = strlen(feature_name);
-			if(feature_name_len > FEATURE_NAME_LENGTH) feature_name[FEATURE_NAME_LENGTH -1 ] = 0;
+			if(feature_name_len > FEATURE_NAME_LENGTH-2){
+				SUBREADprintf("WARNING: feature name on the %d-th line is longer than %d bytes. The name is truncated\n", lineno, FEATURE_NAME_LENGTH -2);
+				feature_name[FEATURE_NAME_LENGTH -2 ] = 0;
+			}
 
-			unsigned int genename_pos = unistr_cpy(global_context, (char *)feature_name, feature_name_len);
+			srInt_64 genename_pos = unistr_cpy(global_context, (char *)feature_name, feature_name_len);
 			
 	//		SUBREADprintf("REALL: '%s'=%d  [%d] %p  POS=%d\t\tOLD_NAME_POS=%d\n" , feature_name, feature_name_len , xk1, ret_features+xk1, genename_pos, xk1>0?ret_features[xk1-1].feature_name_pos:-1);
 			ret_features[xk1].feature_name_pos = genename_pos;
@@ -1033,7 +1042,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			char * seq_name = strtok_r(NULL,"\t", &token_temp);
 			int chro_name_len = strlen(seq_name);
 			if(chro_name_len > CHROMOSOME_NAME_LENGTH) seq_name[CHROMOSOME_NAME_LENGTH -1 ] = 0;
-			unsigned int chro_name_pos = unistr_cpy(global_context, (char *)seq_name, chro_name_len);
+			srInt_64 chro_name_pos = unistr_cpy(global_context, (char *)seq_name, chro_name_len);
 			global_context -> longest_chro_name = max(chro_name_len, global_context -> longest_chro_name);
 
 
@@ -1226,12 +1235,15 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				}
 
 				int feature_name_len = strlen(feature_name_tmp);
-				if(feature_name_len > FEATURE_NAME_LENGTH) feature_name_tmp[FEATURE_NAME_LENGTH -1 ] = 0;
+				if(feature_name_len > FEATURE_NAME_LENGTH-2){
+					SUBREADprintf("WARNING: feature name on the %d-th line is longer than %d bytes. The name is truncated\n", lineno, FEATURE_NAME_LENGTH-2);
+					feature_name_tmp[FEATURE_NAME_LENGTH -2 ] = 0;
+				}
 				ret_features[xk1].feature_name_pos = unistr_cpy(global_context, (char *)feature_name_tmp, feature_name_len);
 
 				int chro_name_len = strlen(seq_name);
 				if(chro_name_len > CHROMOSOME_NAME_LENGTH) seq_name[CHROMOSOME_NAME_LENGTH -1 ] = 0;
-				unsigned int chro_name_pos = unistr_cpy(global_context, (char *)seq_name, chro_name_len);
+				srInt_64 chro_name_pos = unistr_cpy(global_context, (char *)seq_name, chro_name_len);
 				global_context -> longest_chro_name = max(chro_name_len, global_context -> longest_chro_name);
 
 				ret_features[xk1].chro_name_pos_delta = chro_name_pos - ret_features[xk1].feature_name_pos;
@@ -3996,7 +4008,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name);
 						}
 					}else if(global_context -> is_multi_overlap_allowed) {
-						#define GENE_NAME_LIST_BUFFER_SIZE 5000
+						#define GENE_NAME_LIST_BUFFER_SIZE (FEATURE_NAME_LENGTH * 50) 
 
 						char final_feture_names[GENE_NAME_LIST_BUFFER_SIZE];
 						int assigned_no = 0, xk1;
@@ -4516,7 +4528,7 @@ void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, Ha
 void scRNA_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me){
 	FILE * fp = me->appendix1;
 	fc_thread_global_context_t * global_context = me->appendix2;
-	unsigned char * gene_symbol = global_context -> gene_name_array [k-NULL-1];
+	unsigned char* gene_symbol = global_context -> gene_name_array [k-NULL-1];
 	fprintf(fp, "%s\n", gene_symbol);
 }
 

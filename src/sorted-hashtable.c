@@ -1546,7 +1546,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			}
 		}
 
-		fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
+		int rval = fread(&(the_table -> is_small_table), sizeof(char), 1, fp);
+		if (rval != 1)SUBREADprintf("ERROR: cannot find the table table.\n");
 		free(bucket_bytes);
 		fclose(fp);
 		return 0;
