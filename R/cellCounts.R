@@ -317,7 +317,8 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  }else if(aligner=="align"){
 		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, complexIndels=TRUE, nBestLocations=3, maxMismatches=20)
 	  }else if(aligner=="subjunc"){
-		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, nBestLocations=3, maxMismatches=20)
+		#subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, nBestLocations=3, maxMismatches=20)
+		stop("Using subjunc as the aligner is not yet supported.")
 	  }
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
 	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))

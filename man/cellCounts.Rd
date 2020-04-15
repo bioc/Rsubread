@@ -36,7 +36,7 @@ cellCounts(
   \item{sample.sheet}{ a character strings giving one or many sample sheet files in the CSV format, with each sample sheet corresponding to an input directory. See the Illumina bcl2fastq manual for the file format.}
   \item{cell.barcode.list}{ a character string giving the name of a textual file (can be gzipped) containing the set of cell barcodes used in sample preparation. All the input data sets must use the same cell barcode set. If \code{NULL} is given then a best cell barcode set is automatically chosen for the input data. \code{NULL} by default.}
   \item{input.mode}{ a character string giving the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
-  \item{aligner}{ a character string giving the name of the aligner: \code{"align"} or \code{"subjunc"}. A NULL value indicates the function to skip the mapping step but directly use the BAM file in \code{"output.BAM"} for generating UMI counts. \code{"align"} by default.}
+  \item{aligner}{ a character string giving the name of the aligner: \code{"align"} or \code{"subjunc"} (not yet implemented). A NULL value indicates the function to skip the mapping step but directly use the BAM file in \code{"output.BAM"} for generating UMI counts. \code{"align"} by default.}
   \item{nthreads}{ a numeric value giving the number of threads used for read mapping and counting. 16 by default.}
   \item{annot.inbuilt, annot.ext, isGTFAnnotationFile, GTF.featureType, GTF.attrType, GTF.attrType.extra, chrAliases, useMetaFeatures, allowMultiOverlap, countMultiMappingReads}{ options for counting the mapping results. The options have the same meanings as them \code{featureCounts}}
 }
