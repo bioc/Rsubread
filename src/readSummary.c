@@ -4337,7 +4337,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 	if(x1 >0){
 		srInt_64 median_umis = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  (x1-1)/2))-NULL;
 		srInt_64 median_umis_001_cut = (srInt_64)(median_umis *1. *SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION);
-		SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
+		//SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
 		for(x1=0; x1 < sorted_idx -> numOfElements; x1++){
 			void * this_bc_pnt = ArrayListGet(sorted_idx ,  x1);
 			if(HashTableGet(highconf_list_tab, this_bc_pnt)) continue; // it is in high-conf list
@@ -4351,7 +4351,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 		ArrayListPush(this_sample_45k_90k_barcode_idx, ArrayListGet(sorted_idx ,  x1) );
 	}
 	ArrayListDestroy(sorted_idx);
-	SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
+	//SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
 	HashTableDestroy(highconf_list_tab);
 }
 
@@ -4466,7 +4466,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 		if(this_gene_has_bc){
 			char * gene_name = (char*)global_context -> gene_name_array [gene_index];
 			fprintf(ofp_genes,"%s\n", gene_name);
-			if(x1 < 7) SUBREADprintf("GOT A GENE SMP_%d: [%d]  %s\n", sample_index+1, x1, gene_name);
+			//if(x1 < 7) SUBREADprintf("GOT A GENE SMP_%d: [%d]  %s\n", sample_index+1, x1, gene_name);
 		}
 		nonozero_genes += this_gene_has_bc;
 	}
@@ -4561,7 +4561,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		scRNA_merged_bootstrap_a_sample(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1],merged_umi_list, high_confid_barcode_index_list);
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
 
-		SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
+		//SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], high_confid_barcode_index_list, x1, "HighConf");
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, x1, "RescCand");
 		scRNA_merged_45K_to_90K_sum( global_context, merged_tables_gene_to_cell_umis[x1], this_sample_45k_90k_barcode_idx, x1 );
