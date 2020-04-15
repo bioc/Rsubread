@@ -151,7 +151,7 @@
 
 library(Matrix)
 .read.sparse.mat <- function (fn){
-  print(fn)
+#  print(fn)
   mtx <- readMM(paste0(fn, ".spmtx"))
   coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
   rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
@@ -199,7 +199,7 @@ library(Matrix)
     if(do_CTRL && 0== bcsize_one %% 15){
       CTRL <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
       CTRL.LLH <- apply(CTRL, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
-      print(summary(CTRL.LLH))
+      #print(summary(CTRL.LLH))
     }
     ret.nUMI.LLH.tab[[ bcsize_one ]] <- N10000.LLH
     Old_bs_one <- bcsize_one
@@ -212,18 +212,12 @@ library(Matrix)
   nozero.anywhere.genes <- read.delim(paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1
   ambient.accumulate <- read.delim(paste0(fname,".AmbSum"), stringsAsFactors=F)
   #saveRDS(list(BAM.name, FC.gene.ids, sample.no), "del4-debug.RDS")
-  print("TTAAA_00")
-  print(summary(ambient.accumulate))
   ambient.accumulate <- ambient.accumulate[ match(FC.gene.ids , ambient.accumulate$GeneID), ]
   ambient.accumulate$UMIs[is.na(ambient.accumulate$UMIs)] <- 0
-  print("TTAAA_01")
-  print(summary(ambient.accumulate))
   ambient.accumulate <- ambient.accumulate$UMIs
   names(ambient.accumulate) <- FC.gene.ids 
 
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
-  print("TTAAA_02")
-  print(summary(ambient.accumulate))
 
   gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
   #gte <- .mySGT(ambient.accumulate)
