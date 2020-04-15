@@ -294,11 +294,11 @@ library(Matrix)
   ret
 }
 
-cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", nthreads=16, forced.mapping=TRUE, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=TRUE){
+cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", aligner="align", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=TRUE){
   input.directory <- .check_and_NormPath(input.directory,  mustWork=T, opt="input.directory")
   sample.sheet <- .check_and_NormPath(sample.sheet,  mustWork=T, opt="sample.sheet")
   output.BAM <- .check_and_NormPath(output.BAM,  mustWork=F, opt="output.BAM")
-
+  if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   fc <- list()
 
   if(length(input.directory) != length(output.BAM) || length(input.directory) != length( sample.sheet ))stop("The arguments to the input.directory, output.BAM and sample.sheet options must have the same length.")
@@ -312,7 +312,13 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  input.1 <- input.directory[ii]
 	  output.1 <- output.BAM[ii]
 	  sample.1 <- sample.sheet[ii]
-	  if(forced.mapping || !file.exists(output.1)) align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, complexIndels=TRUE, nBestLocations=3, maxMismatches=20)
+	  if(is.null(aligner)){
+		if(!file.exists(output.1)) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
+	  }else if(aligner=="align"){
+		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, complexIndels=TRUE, nBestLocations=3, maxMismatches=20)
+	  }else if(aligner=="subjunc"){
+		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, nBestLocations=3, maxMismatches=20)
+	  }
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
 	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))
   }
