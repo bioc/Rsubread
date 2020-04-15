@@ -4409,7 +4409,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 				out_bc_no = bc_no_to_output_no_tab -> numOfElements +1;
 				HashTablePut(  bc_no_to_output_no_tab , NULL+1+bc_no, NULL + out_bc_no );
 				ArrayListPush(output_no_tab_to_bcno_arr, NULL+bc_no);
-				fprintf(ofp_bcs,"%s\n", ArrayListGet(global_context -> scRNA_cell_barcodes_array, bc_no));
+				fprintf(ofp_bcs,"%s\n", (char*)ArrayListGet(global_context -> scRNA_cell_barcodes_array, bc_no));
 			}
 
 			this_gene_has_bc = 1;
@@ -4486,11 +4486,10 @@ void scRNA_merged_45K_to_90K_sum_SUM(void * kyGeneID, void * Vcb_umi_arr, HashTa
 }
 
 void scRNA_merged_45K_to_90K_sum_WRT(void * kyGeneID, void * valUMIs, HashTable * me){
-	srInt_64 sample_no = me -> counter1;
 	fc_thread_global_context_t * global_context = me -> appendix1;
 	FILE * ofp = me -> appendix2;
 
-	char * gene_name = global_context -> gene_name_array[ kyGeneID - NULL-1 ];
+	unsigned char * gene_name = global_context -> gene_name_array[ kyGeneID - NULL-1 ];
 	fprintf(ofp, "%s\t%u\n", gene_name, (unsigned int) (valUMIs-NULL));
 }
 
@@ -4499,7 +4498,6 @@ void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, Ha
 	HashTable * bcid_look_tab = ArrayListToLookupTable_Int(bcid_arr);
 	gene_to_cell_umis_tab -> appendix1 = ret;
 	gene_to_cell_umis_tab -> appendix2 = bcid_look_tab;
-	srInt_64 x1;
 	HashTableIteration( gene_to_cell_umis_tab, scRNA_merged_45K_to_90K_sum_SUM );
 
 	char ofname[MAX_FILE_NAME_LENGTH + 20];
@@ -4518,7 +4516,7 @@ void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, Ha
 void scRNA_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me){
 	FILE * fp = me->appendix1;
 	fc_thread_global_context_t * global_context = me->appendix2;
-	char* gene_symbol = global_context -> gene_name_array [k-NULL-1];
+	unsigned char * gene_symbol = global_context -> gene_name_array [k-NULL-1];
 	fprintf(fp, "%s\n", gene_symbol);
 }
 
@@ -4526,7 +4524,6 @@ void scRNA_merged_write_nozero_geneids(  fc_thread_global_context_t * global_con
 	char ofname[MAX_FILE_NAME_LENGTH + 20];
 	sprintf(ofname,"%s.scRNA.%03d.no0Genes",global_context->input_file_name, samplenno+1);
 	FILE * fp = fopen( ofname , "w" );
-	srInt_64 x1;
 	gene_to_cell_umis_tab -> appendix1 =fp;
 	gene_to_cell_umis_tab -> appendix2 =global_context;
 	HashTableIteration(gene_to_cell_umis_tab, scRNA_merged_write_nozero_geneids_WRT);
@@ -4540,8 +4537,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 	char ofname[MAX_FILE_NAME_LENGTH + 20];
 	sprintf(ofname,"%s.scRNA.SampleTable",global_context->input_file_name);
 	FILE * sample_tab_fp = fopen( ofname , "w" );
-	int x1, cell_items_row = 0;
-	srInt_64 xkk;
+	int x1;
 
 	fprintf(sample_tab_fp,"SampleName\tIndex\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
@@ -4562,7 +4558,6 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		ArrayListDestroy(this_sample_ambient_rescure_candi);
 		ArrayListDestroy(this_sample_45k_90k_barcode_idx);
 		ArrayListDestroy(high_confid_barcode_index_list);
-		cell_items_row += xkk;
 	}
 
 	fclose(sample_tab_fp);
