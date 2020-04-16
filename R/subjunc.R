@@ -58,6 +58,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(tolower(output_format) == "sam")
     opt <- paste(opt,"--SAMoutput",sep=.R_param_splitor)
 
+  isBCLinput <- FALSE
   if(isBCLinput)
     opt <- paste(opt,"--BCLinput",sep=.R_param_splitor)
 	
