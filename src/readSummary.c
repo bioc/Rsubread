@@ -4512,7 +4512,7 @@ void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, Ha
 	gene_to_cell_umis_tab -> appendix2 = bcid_look_tab;
 	HashTableIteration( gene_to_cell_umis_tab, scRNA_merged_45K_to_90K_sum_SUM );
 
-	char ofname[MAX_FILE_NAME_LENGTH + 20];
+	char ofname[MAX_FILE_NAME_LENGTH + 100];
 	sprintf(ofname,"%s.scRNA.%03d.AmbSum",global_context->input_file_name, sample_no+1);
 	FILE * write_fp = fopen(ofname,"w");
 	fprintf(write_fp,"GeneID\tUMIs\n");
@@ -4533,7 +4533,7 @@ void scRNA_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me){
 }
 
 void scRNA_merged_write_nozero_geneids(  fc_thread_global_context_t * global_context, HashTable * gene_to_cell_umis_tab, int samplenno ){
-	char ofname[MAX_FILE_NAME_LENGTH + 20];
+	char ofname[MAX_FILE_NAME_LENGTH + 100];
 	sprintf(ofname,"%s.scRNA.%03d.no0Genes",global_context->input_file_name, samplenno+1);
 	FILE * fp = fopen( ofname , "w" );
 	gene_to_cell_umis_tab -> appendix1 =fp;
