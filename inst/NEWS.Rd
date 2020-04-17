@@ -2,6 +2,11 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+\section{Version 2.2.0}{\itemize{
+\item
+Improve cellCounts() on the identification of cell barcodes arising from ambient RNAs.
+}}
+
 \section{Version 2.0.0}{\itemize{
 \item
 Rsubread package is ported to Windows OS.
