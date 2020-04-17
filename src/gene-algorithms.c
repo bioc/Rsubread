@@ -2551,6 +2551,7 @@ int get_base_error_prob64i(char v)
 	return PROB_QUAL_INT_TABLE[v-'@'];
 }
 
+#ifdef SKIP_THIS_PART
 void bad_reverse_cigar(char * cigar)
 {
 	int cigar_cursor = 0;
@@ -2600,6 +2601,7 @@ int debug_main()
 	SUBREADprintf("%s\n",cg);
 	return 0;
 }
+#endif
 
 void remove_indel_neighbours(HashTable * indel_table)
 {

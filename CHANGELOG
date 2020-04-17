@@ -1,5 +1,8 @@
-17 April 2020 - 2.1.4
+17 April 2020 - 2.1.5
 (1) Updated users guide and NEWS.
+
+17 Apr 2020 - 2.1.4
+(1) Fix warnings in Windows Mingw32.
 
 15 Apr 2020 - 2.1.3
 (1) Add the "aligner" option for cellCounts.

@@ -557,7 +557,8 @@ int PBam_chunk_headers(char * chunk, int *chunk_ptr, int chunk_len, SamBam_Refer
 					}
 
 					SamBam_Reference_Info * new_event = (*bam_chro_table) + (* table_items);
-					strncpy(new_event->chro_name, chro_name, BAM_MAX_CHROMOSOME_NAME_LEN);
+					if(strlen(chro_name)>=BAM_MAX_CHROMOSOME_NAME_LEN) chro_name[BAM_MAX_CHROMOSOME_NAME_LEN-1]=0;
+					strcpy(new_event->chro_name, chro_name);
 					new_event -> chro_length = chro_len;
 
 					(* table_items)++;

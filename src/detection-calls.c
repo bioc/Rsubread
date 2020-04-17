@@ -12,8 +12,8 @@
 #include "gene-algorithms.h"
 
 typedef struct{
-	char gene_name[FEATURE_NAME_LENGTH];
-	char chro_name[MAX_CHROMOSOME_NAME_LEN];
+	char gene_name[FEATURE_NAME_LENGTH+2];
+	char chro_name[MAX_CHROMOSOME_NAME_LEN+2];
 	unsigned int start, end;
 	char is_negative_strand;
 } DTCexon_t;
