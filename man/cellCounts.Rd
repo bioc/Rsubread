@@ -14,7 +14,7 @@ cellCounts(
   
     # the optional arguments related to read mapping
     input.mode = "BCL",
-	aligner = "align",
+    aligner = "align",
     nthreads = 16,
   
     # the optional arguments related to counting
