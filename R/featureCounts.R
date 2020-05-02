@@ -63,6 +63,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     .check_string_param(sampleSheet, "sampleSheet")
     .check_string_param(cellBarcodeList, "cellBarcodeList")
 
+	if(length(GTF.featureType)>1) GTF.featureType<-paste(GTF.featureType, collapse=",")
     out.base.names <- basename(files)
     if(any(duplicated(out.base.names))){
       out.col.names <- files

@@ -1235,6 +1235,7 @@ HashTable * load_alias_table(char * fname) {
 		if((!sam_chr)||(!anno_chr)) continue;
 
 		sam_chr[strlen(sam_chr)-1]=0;
+		if(sam_chr[strlen(sam_chr)-1]=='\r') sam_chr[strlen(sam_chr)-1]=0;
 		char * anno_chr_buf = malloc(strlen(anno_chr)+1);
 		strcpy(anno_chr_buf, anno_chr);
 		char * sam_chr_buf = malloc(strlen(sam_chr)+1);

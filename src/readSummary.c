@@ -323,7 +323,7 @@ typedef struct {
 	char ** exontable_chr;
 	srInt_64 * exontable_start;
 	srInt_64 * exontable_stop;
-	char feature_name_column[100];
+	char feature_name_column[2000];
 	char gene_id_column[100];
 
 	srInt_64 * exontable_block_end_index;
@@ -862,6 +862,18 @@ void free_bucket_table_list(void * pv){
 	free(list);
 }
 
+int match_feature_name_column(char * infile, char * needed){
+	char * ptt = NULL;
+	char lneeded[strlen(needed)+1];
+	strcpy(lneeded, needed);
+	char * t1 = strtok_r(lneeded, ",", &ptt);
+	while(t1){
+		if(strcmp(t1, infile)==0) return 1;
+		t1 = strtok_r(NULL,",", &ptt);
+	}
+	return 0;
+}
+
 #define JUNCTION_BUCKET_STEP (128*1024)
 
 int locate_junc_features(fc_thread_global_context_t *global_context, char * chro, unsigned int pos, fc_junction_gene_t ** ret_info, int max_ret_info_size){
@@ -958,7 +970,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			chro_name = strtok_r(file_line,"\t",&token_temp);
 			strtok_r(NULL,"\t", &token_temp); // lib_name (not needed)
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);
-			if(strcmp(feature_type, global_context -> feature_name_column)==0)
+			if(match_feature_name_column(feature_type, global_context -> feature_name_column))
 			{
 				strtok_r(NULL,"\t", &token_temp); // feature_start
 				feature_pos = atoi(strtok_r(NULL,"\t", &token_temp));// feature_end
@@ -1139,7 +1151,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			char * seq_name = strtok_r(file_line,"\t",&token_temp);
 			strtok_r(NULL,"\t", &token_temp);// source
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);// feature_type
-			if(strcmp(feature_type, global_context -> feature_name_column)==0) {
+			if(match_feature_name_column(feature_type, global_context -> feature_name_column)) {
 
 				if(xk1 >= ret_features_size) {
 					ret_features_size *=2;
@@ -7234,7 +7246,7 @@ int feature_count_main(int argc, char ** argv)
 	int cmd_rebuilt_size = 2000;
 	char * cmd_rebuilt = malloc(cmd_rebuilt_size);
 	char max_M_str[8];
-	char nameFeatureTypeColumn[66];
+	char nameFeatureTypeColumn[2000];
 	char nameGeneIDColumn[66];
 	int min_qual_score = 0;
 	int min_dist = 50;
