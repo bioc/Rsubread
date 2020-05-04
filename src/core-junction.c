@@ -2987,7 +2987,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 					if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
 						SUBREADprintf("SSTAIL:%d\n", tail_soft_clipped);
 
-					if(0 && tail_soft_clipped == tmp_int){
+					if(1 && tail_soft_clipped == tmp_int){
 						tail_soft_clipped = 0;
 						if(full_section_clipped)(*full_section_clipped) = 1;
 					} else has_clipping_this_section_tail = 1;
