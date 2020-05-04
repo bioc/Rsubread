@@ -1,5 +1,8 @@
+4 May 2020 - 2.2.1
+(1) Fix a bug of "0M" in CIGAR strings.
+
 17 April 2020 - 2.1.5
-(1) Updated users guide and NEWS.
+(1) Update users guide and NEWS.
 
 17 Apr 2020 - 2.1.4
 (1) Fix warnings in Windows Mingw32.
