@@ -5867,11 +5867,11 @@ void print_usage()
 	SUBREADputs("                      'SAF'. 'GTF' by default.  For SAF format, please refer to");
 	SUBREADputs("                      Users Guide.");
 	SUBREADputs("");
-	SUBREADputs("  -t <string>         Specify feature type or types in GTF annotation. Multiple");
-	SUBREADputs("                      type names are delimited by ',' with no space allowed in");
-	SUBREADputs("                      between. 'exon' by default. Features used for read");
-	SUBREADputs("                      counting will be extracted from annotation using the");
-	SUBREADputs("                      provided value or values.");
+	SUBREADputs("  -t <string>         Specify feature type(s) in a GTF annotation. If multiple");
+	SUBREADputs("                      types are provided, they should be separated by ',' with");
+	SUBREADputs("                      no space in between. 'exon' by default. Rows in the");
+	SUBREADputs("                      annotation with a matched feature will be extracted and");
+	SUBREADputs("                      used for read mapping. ");
 	SUBREADputs("");
 	SUBREADputs("  -g <string>         Specify attribute type in GTF annotation. 'gene_id' by ");
 	SUBREADputs("                      default. Meta-features used for read counting will be ");
