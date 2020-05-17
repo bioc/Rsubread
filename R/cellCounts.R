@@ -9,48 +9,49 @@
 
 
 .simple.Good.Turing.Freq<-function( raw.freq ){
-	n_zero <- sum(raw.freq == 0)
-	times <- table(raw.freq[raw.freq>0])
-	obs <- sort(as.numeric(names(times)))
-	times <- times[as.character(obs)]
+  n_zero <- sum(raw.freq == 0)
+  times <- table(raw.freq[raw.freq>0])
+  obs <- sort(as.numeric(names(times)))
+  times <- times[as.character(obs)]
 
-	nobs = length(obs)
-	if(nobs < .min_mySGT_input_size){
-		cat(sprintf("Warning: not enough element in the observation array : %d < %d.\nThe `Rescued' element in the returned object will be set to NA.",  nobs, .min_mySGT_input_size))
-		return(NA)
-	}
-	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
-	total_observed <- sum(obs * times)
-	tval <- matrix(0, ncol=2, nrow=nobs)
-	ks <- c(obs[2:nobs], 2*obs[nobs] - obs[nobs-1])
-	tval[,1] <- log(obs)
-	tval[,2] <- log( .averaging_transform(obs,times))
-	meanx <- mean(tval[,1])
-	meany <- mean(tval[,2])
-	slope <- sum( (tval[,1]-meanx) * (tval[,2]-meany) ) / sum((tval[,1]-meanx) ^2)
-	intercept <- meany - slope * meanx
-
-	obs.in.next <- (obs+1) %in% obs
-	SD <- ( 1+(1:nobs) ) / times *(c(times[2:nobs], 0)* (1+c(times[2:nobs],0) /times))^.5
-	SD [!obs.in.next] <- 1
-
-	GT <- (obs+1)/obs * c(times[2:nobs],0)/times
-	GT [!obs.in.next] <- 0
-	y <- .rstest(obs,slope)
-	LGT <- y / obs
-
-	xy.sim <- ( abs(GT-LGT) * (1:nobs) / SD ) > 1.65
-	min.no.turing = min(which(!xy.sim))
-	r <- GT
-	if(min.no.turing>0)r[min.no.turing:nobs] <- LGT[min.no.turing:nobs]
-	p_zero <- times[1] / total_observed
-	rs <- (1-p_zero) * obs * r / sum(r*times*obs/total_observed)
-	total_rs <- sum(rs * times)
-	puniq <- (1-p_zero) * rs / total_rs
-	pres <- rep(p_zero / n_zero, length(raw.freq))
-	pres [raw.freq>0] <- puniq[match( raw.freq[raw.freq>0], obs )]
-	ret <- list(p0=p_zero, p=pres)
-	ret
+  nobs = length(obs)
+  if(nobs < .min_mySGT_input_size){
+	cat(sprintf("Warning: not enough element in the observation array : %d < %d.\nThe `Rescued' element in the returned object will be set to NA.\n",  nobs, .min_mySGT_input_size))
+	return(NA)
+  }else{
+  	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
+  	total_observed <- sum(obs * times)
+  	tval <- matrix(0, ncol=2, nrow=nobs)
+  	ks <- c(obs[2:nobs], 2*obs[nobs] - obs[nobs-1])
+  	tval[,1] <- log(obs)
+  	tval[,2] <- log( .averaging_transform(obs,times))
+  	meanx <- mean(tval[,1])
+  	meany <- mean(tval[,2])
+  	slope <- sum( (tval[,1]-meanx) * (tval[,2]-meany) ) / sum((tval[,1]-meanx) ^2)
+  	intercept <- meany - slope * meanx
+  
+  	obs.in.next <- (obs+1) %in% obs
+  	SD <- ( 1+(1:nobs) ) / times *(c(times[2:nobs], 0)* (1+c(times[2:nobs],0) /times))^.5
+  	SD [!obs.in.next] <- 1
+  
+  	GT <- (obs+1)/obs * c(times[2:nobs],0)/times
+  	GT [!obs.in.next] <- 0
+  	y <- .rstest(obs,slope)
+  	LGT <- y / obs
+  
+  	xy.sim <- ( abs(GT-LGT) * (1:nobs) / SD ) > 1.65
+  	min.no.turing = min(which(!xy.sim))
+  	r <- GT
+  	if(min.no.turing>0)r[min.no.turing:nobs] <- LGT[min.no.turing:nobs]
+  	p_zero <- times[1] / total_observed
+  	rs <- (1-p_zero) * obs * r / sum(r*times*obs/total_observed)
+  	total_rs <- sum(rs * times)
+  	puniq <- (1-p_zero) * rs / total_rs
+  	pres <- rep(p_zero / n_zero, length(raw.freq))
+  	pres [raw.freq>0] <- puniq[match( raw.freq[raw.freq>0], obs )]
+  	ret <- list(p0=p_zero, p=pres)
+  	ret
+  }
 }
 
 .min_mySGT_input_size <- 5
@@ -222,10 +223,11 @@ library(Matrix)
 
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
 
-  gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
-  if(is.na(gte)){
-    NA
+  rstfq <- .simple.Good.Turing.Freq(ambient.accumulate)
+  if(any(is.na(rstfq))){
+    return(NA)
   }else{
+    gte <- rstfq$p
     print("Summary of the ambient RNA profile (proportions)")
     print(summary(gte))
     # This function returns "times" log-likelihoods.
@@ -269,7 +271,7 @@ library(Matrix)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
-  if(!is.na(rescued)) rescued <- rescued[rowSums(rescued)>0,]
+  if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
   list( HighConf=highconf, Rescued=rescued )
 }
 
