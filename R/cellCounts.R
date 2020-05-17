@@ -15,7 +15,10 @@
 	times <- times[as.character(obs)]
 
 	nobs = length(obs)
-	if(nobs < .min_mySGT_input_size) stop("Not enough element in the observation array.")
+	if(nobs < .min_mySGT_input_size){
+		cat(sprintf("Warning: not enough element in the observation array : %d < %d.\nThe `Rescued' element in the returned object will be set to NA.",  nobs, .min_mySGT_input_size))
+		return(NA)
+	}
 	if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
 	total_observed <- sum(obs * times)
 	tval <- matrix(0, ncol=2, nrow=nobs)
@@ -220,57 +223,53 @@ library(Matrix)
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
 
   gte <- .simple.Good.Turing.Freq(ambient.accumulate)$p
-  #gte <- .mySGT(ambient.accumulate)
-  #saveRDS(gte, "del4-mySGT-gte.Rds")
-
-  #library(edgeR)
-  #gte <- goodTuringProportions(ambient.accumulate)
-  #saveRDS(gte, "del4-limmaSGT-gte.Rds")
-  print("Summary of the ambient RNA profile (proportions)")
-  print(summary(gte))
-
-
-  # This function returns "times" log-likelihoods.
-
-  rescue.candidates <- as.matrix(.read.sparse.mat(paste0(fname,".RescCand")))
-  rescue.candidates <- rescue.candidates[ match(names(ambient.accumulate), rownames(rescue.candidates)), ]
-  rownames(rescue.candidates) <- names(ambient.accumulate)
-  rescue.candidates [is.na(rescue.candidates )] <- 0
-  # Compute observed log-likelihood of barcodes being generated from ambient RNA
-  # Compute the multinomial log PMF for many barcodes -- log-likelihoods
-  # Only use the "non-zero anywhere" genes.
-  log.like.cands <- apply(rescue.candidates, 2, function(x) dmultinom(x, prob=gte, log =T ))
-
-  # Simulate log likelihoods
-  # This step is to build like 10000 sets of N_GENES vectors from the multinomial distribution of "gte"
-  # See what are their log-likelihoods against "gte" -- most should be very small.
-
-  simu.pvalues <- .simu.multinomial( rescue.candidates, gte )
-
-  # Compute p-values : the p-value is the chance of a barcode is actually from ambient RNA (ie smaller the p-value, more likely this barcode is for a real cell)
-  actual.pvalues <- rep(0, ncol(rescue.candidates) )
-  names(actual.pvalues) <- colnames(rescue.candidates)
-  for(candi in names(log.like.cands)){
-    cand_umis <- sum(rescue.candidates[,candi])
-    cand.simu.pvs <- simu.pvalues[[ cand_umis ]]
-    cand.actual.pv <- log.like.cands[candi]
-    actual.pvalues[candi] <- sum(cand.simu.pvs > cand.actual.pv) / length(cand.simu.pvs)
+  if(is.na(gte)){
+    NA
+  }else{
+    print("Summary of the ambient RNA profile (proportions)")
+    print(summary(gte))
+    # This function returns "times" log-likelihoods.
+  
+    rescue.candidates <- as.matrix(.read.sparse.mat(paste0(fname,".RescCand")))
+    rescue.candidates <- rescue.candidates[ match(names(ambient.accumulate), rownames(rescue.candidates)), ]
+    rownames(rescue.candidates) <- names(ambient.accumulate)
+    rescue.candidates [is.na(rescue.candidates )] <- 0
+    # Compute observed log-likelihood of barcodes being generated from ambient RNA
+    # Compute the multinomial log PMF for many barcodes -- log-likelihoods
+    # Only use the "non-zero anywhere" genes.
+    log.like.cands <- apply(rescue.candidates, 2, function(x) dmultinom(x, prob=gte, log =T ))
+  
+    # Simulate log likelihoods
+    # This step is to build like 10000 sets of N_GENES vectors from the multinomial distribution of "gte"
+    # See what are their log-likelihoods against "gte" -- most should be very small.
+  
+    simu.pvalues <- .simu.multinomial( rescue.candidates, gte )
+  
+    # Compute p-values : the p-value is the chance of a barcode is actually from ambient RNA (ie smaller the p-value, more likely this barcode is for a real cell)
+    actual.pvalues <- rep(0, ncol(rescue.candidates) )
+    names(actual.pvalues) <- colnames(rescue.candidates)
+    for(candi in names(log.like.cands)){
+      cand_umis <- sum(rescue.candidates[,candi])
+      cand.simu.pvs <- simu.pvalues[[ cand_umis ]]
+      cand.actual.pv <- log.like.cands[candi]
+      actual.pvalues[candi] <- sum(cand.simu.pvs > cand.actual.pv) / length(cand.simu.pvs)
+    }
+  
+    # p-value => FDR
+    actual.FDR <- p.adjust(actual.pvalues, method='BH')
+  
+    # select cells that has FDR < cutoff
+    FDR.Cutoff <- 0.01
+    Rescured.Barcodes <- names(actual.FDR)[actual.FDR <= FDR.Cutoff]
+    rescue.candidates[,Rescured.Barcodes, drop=FALSE]
   }
-
-  # p-value => FDR
-  actual.FDR <- p.adjust(actual.pvalues, method='BH')
-
-  # select cells that has FDR < cutoff
-  FDR.Cutoff <- 0.01
-  Rescured.Barcodes <- names(actual.FDR)[actual.FDR <= FDR.Cutoff]
-  rescue.candidates[,Rescured.Barcodes, drop=FALSE]
 }
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no ){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
-  rescued <- rescued[rowSums(rescued)>0,]
+  if(!is.na(rescued)) rescued <- rescued[rowSums(rescued)>0,]
   list( HighConf=highconf, Rescued=rescued )
 }
 

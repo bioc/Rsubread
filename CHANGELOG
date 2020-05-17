@@ -1,3 +1,6 @@
+17 May 2020 - 2.3.2
+(1) Check the ambient-RNA profile in cellCounts and do not do cell-barcode rescue if no ambient-RNA profile can be built.
+
 2 May 2020 - 2.3.1
 (1) Fix the '\r\n' end-of-line issue in the chr alias file.
 (2) Support multiple feature types in GTF annotations.
