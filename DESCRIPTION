@@ -1,6 +1,6 @@
 Package: Rsubread
-Version: 2.3.2
-Date: 2020-05-02
+Version: 2.3.3
+Date: 2020-06-24
 Title: Subread Sequence Alignment and Counting for R
 Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
 Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.edu.au>
@@ -11,7 +11,7 @@ Description: Alignment, quantification and analysis of
         to all major sequencing techologies and to both short and long
         sequence reads.
 URL: http://bioconductor.org/packages/Rsubread
-License: GPL-3
+License: GPL (>=3)
 Imports: grDevices, stats, utils, Matrix
 biocViews: Sequencing, Alignment, SequenceMatching, RNASeq, ChIPSeq, SingleCell,
         GeneExpression, GeneRegulation, Genetics, ImmunoOncology, SNP,

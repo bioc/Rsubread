@@ -1,3 +1,6 @@
+24 June 2020 - 2.3.3
+(1) Update GPL license to GPL (>=3) instead of GPL-3 only.
+
 17 May 2020 - 2.3.2
 (1) Check the ambient-RNA profile in cellCounts and do not do cell-barcode rescue if no ambient-RNA profile can be built.
 
