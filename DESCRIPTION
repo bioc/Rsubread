@@ -1,9 +1,9 @@
 Package: Rsubread
-Version: 2.3.3
-Date: 2020-06-24
+Version: 2.3.4
+Date: 2020-07-02
 Title: Subread Sequence Alignment and Counting for R
 Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
-Maintainer: Wei Shi <shi@wehi.edu.au>, Yang Liao <liao@wehi.edu.au> and Gordon K Smyth <smyth@wehi.edu.au>
+Maintainer: Wei Shi <wei.shi@onjcri.org.au>, Yang Liao <yang.liao@onjcri.org.au> and Gordon K Smyth <smyth@wehi.edu.au>
 Description: Alignment, quantification and analysis of
         second and third generation sequencing data. Includes functionality
         for read mapping, read counting, SNP calling, structural
