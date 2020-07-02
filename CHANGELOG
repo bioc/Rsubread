@@ -1,3 +1,7 @@
+2 July 2020 - 2.2.3
+(1) Change the licence to GPL (>=3).
+(2) Update the Email addresses of two authors.
+
 15 May 2020 - 2.2.2
 (1) Fix a bug that made Rsubread incompatible to GCC10.
 
