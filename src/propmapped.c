@@ -134,7 +134,7 @@ int propMapped(propMapped_context * context)
 	SamBam_FILE * in_fp = SamBam_fopen(context -> input_file_name  ,context -> is_BAM_input?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM); 
 	if(!in_fp)
 	{
-		SUBREADprintf("Unable to open file '%s'!\nProgram terminated.\n", context -> input_file_name);
+		SUBREADprintf("ERROR: unable to open file '%s'.\n\n", context -> input_file_name);
 		return -1;
 	}
 
@@ -329,7 +329,7 @@ int split_PE_sambam(propMapped_context * context)
 	SamBam_FILE * in_fp = SamBam_fopen(context -> input_file_name  ,context -> is_BAM_input?SAMBAM_FILE_BAM:SAMBAM_FILE_SAM); 
 	if(!in_fp)
 	{
-		SUBREADprintf("Unable to open file '%s'!\nProgram terminated.\n", context -> input_file_name);
+		SUBREADprintf("ERROR: unable to open file '%s'.\n\n", context -> input_file_name);
 		return -1;
 	}
 

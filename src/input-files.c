@@ -1555,7 +1555,7 @@ int get_known_chromosomes(char * in_SAM_file, chromosome_t * known_chromosomes)
 			while(known_chromosomes[chro_numb].chromosome_name[0]!=0) chro_numb++;
 			if(chro_numb > XOFFSET_TABLE_SIZE-1)
 			{
-				SUBREADprintf("FATAL ERROR: the number of chromosomes excessed %d\n. Program terminated.\n", XOFFSET_TABLE_SIZE);
+				SUBREADprintf("ERROR: the number of chromosomes excessed %d\n\n", XOFFSET_TABLE_SIZE);
 				return -1;
 			}
 			known_chromosomes[chro_numb].known_length = 0;
@@ -1835,7 +1835,7 @@ int break_SAM_file(char * in_SAM_file, int is_BAM_file, char * temp_file_prefix,
 
 			if(chro_numb > XOFFSET_TABLE_SIZE-1)
 			{
-				SUBREADprintf("FATAL ERROR: the number of chromosomes excessed %d\n. Program terminated.\n", XOFFSET_TABLE_SIZE);
+				SUBREADprintf("ERROR: the number of chromosomes excessed %d\n\n", XOFFSET_TABLE_SIZE);
 				return -1;
 			}
 
@@ -2459,7 +2459,7 @@ int SAM_pairer_warning_file_open_limit(){
 	getrlimit(RLIMIT_NOFILE, & limit_st);
 
 	if(min(limit_st.rlim_cur, limit_st.rlim_max  ) < MIN_FILE_POINTERS_ALLOWED){
-		SUBREADprintf(" ERROR: the maximum file open number (%d) is too low. Please increase this number to a number larger than 50 by using the 'ulimit -n' command. This program has to terminate now.\n\n",(int)(min(limit_st.rlim_cur, limit_st.rlim_max)));
+		SUBREADprintf("ERROR: the maximum file open number (%d) is too low. Please increase this number to a number larger than 50 by using the 'ulimit -n' command.\n\n",(int)(min(limit_st.rlim_cur, limit_st.rlim_max)));
 		return 1;
 	}
 #endif
@@ -5322,7 +5322,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 						NOSORT_BAM_next_u32(record_len);
 						if(record_len < 32 || record_len > 500000){
 							if(record_len!=-1)
-								SUBREADprintf("Unexpected record length: %d, program will terminate now.\n", record_len);
+								SUBREADprintf("ERROR: Unexpected record length: %d\n\n", record_len);
 							pairer -> is_finished = 1;
 							break;
 						}

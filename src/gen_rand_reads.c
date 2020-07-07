@@ -553,7 +553,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 			void * had_tab = HashTableGet(name_duplicate_tab, clinebuf+1);
 			//SUBREADprintf("CHECK PTR: %s => %p\n", clinebuf+1, had_tab);
 			if(had_tab){
-				SUBREADprintf("Error: duplicate sequence name was found : '%s'. The program terminates without output.\n", clinebuf+1);
+				SUBREADprintf("Error: duplicate sequence name was found : '%s'\n", clinebuf+1);
 				return -1;
 			}
 			seq_name=malloc(rlength);
@@ -690,7 +690,7 @@ int grc_load_env(genRand_context_t *grc){
 
 		void * had_tab = HashTableGet(grc->expression_levels, seqname_buf);
 		if(had_tab){
-			SUBREADprintf("Error: duplicate transcript name was found in the TMP table: '%s'. The program terminates without output.\n", seqname_buf);
+			SUBREADprintf("Error: duplicate transcript name was found in the TMP table: '%s'.\n", seqname_buf);
 			return -1;
 		}
 		HashTablePut(grc->expression_levels, seqname_buf, NULL+seqexp_int+1);
@@ -775,7 +775,7 @@ int grc_load_env(genRand_context_t *grc){
 
 				had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
 				if(had_tab){
-					SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+					SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'.\n", seq_name);
 					return -1;
 				}
 
@@ -833,7 +833,7 @@ int grc_load_env(genRand_context_t *grc){
 
 		had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
 		if(had_tab){
-			SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+			SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'.\n", seq_name);
 			return -1;
 		}
 

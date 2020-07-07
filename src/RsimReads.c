@@ -187,7 +187,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
 
         had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
         if(had_tab){
-          SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+          SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'.\n", seq_name);
           return -1;
         }
 
@@ -245,7 +245,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
 
     had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
     if(had_tab){
-      SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+      SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. \n", seq_name);
       return -1;
     }
 

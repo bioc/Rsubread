@@ -1072,7 +1072,7 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 			fclose(outfp);
 		}
 		else{
-			SUBREADprintf("Unable to create temporary file '%s'\nThe program has to terminate.\nPlease run the program in a directory where you have the privilege to create files.\n", temp_file_name);
+			SUBREADprintf("ERROR: Unable to create temporary file '%s'\nPlease run the program in a directory where you have the privilege to create files.\n\n", temp_file_name);
 		}
 
 		gzclose(rawfp);
@@ -1173,7 +1173,7 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 
 	if(ginp2 && rl1 * rl2 <=0 && (rl1>0 || rl2>0)){
 		if(!global_context-> input_reads.is_internal_error)
-			SUBREADprintf("\nERROR: two input files have different amounts of reads!\nThe program has to terminate and no alignment results were generated!\n\n");
+			SUBREADprintf("\nERROR: the two input files were found to contain different number of reads.\n\n");
 		global_context-> input_reads.is_internal_error = 1;
 		*read_no_in_chunk = -1;
 		return 1;

@@ -479,7 +479,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	for(i=0;i<128;i++) {
 		huge_index[i] = calloc(1024*1024*16,1);
 		if(NULL == huge_index[i]){ 
-			SUBREADprintf("ERROR: No memory can be allocated.\nThe program has to terminate\n");
+			SUBREADprintf("ERROR: No memory can be allocated.\n\n");
 			return -1;
 		}
 	}
@@ -1136,7 +1136,7 @@ int main_buildindex(int argc,char ** argv)
 	}
 
 	if(threshold < 5) {
-		SUBREADprintf("The threshold of non-informative reads cannot be less than 5\nThe program has to terminate.\n");
+		SUBREADprintf("The threshold of non-informative reads cannot be less than 5\n\n");
 		return -1;
 	}
 

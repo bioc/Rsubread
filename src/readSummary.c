@@ -1229,7 +1229,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 					{
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nAn example of attributes included in your GTF annotation is '%s' \nThe program has to terminate.\n\n",  global_context -> gene_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nAn example of attributes included in your GTF annotation is '%s'.\n\n",  global_context -> gene_id_column, extra_attrs);
 					}
 					is_GFF_warned++;
 				}
@@ -1298,7 +1298,6 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 		}else{
 			SUBREADprintf("ERROR: no features were loaded in format %s. The annotation format can be specified by the '-F' option%s.\n", file_type == FILE_TYPE_GTF?"GTF":"SAF", file_type == FILE_TYPE_GTF?", and the required feature type can be specified by the '-t' option.":"");
 		}
-		SUBREADprintf("The porgram has to terminate.\n\n");
 		return -2;
 	}
 
@@ -3309,7 +3308,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 										nhits++;
 									} else {
-										SUBREADprintf("ERROR: the read overlapped with more than %d features.\nThe program has to terminate\n", nhits);
+										SUBREADprintf("ERROR: the read overlapped with more than %d features.\n\n", nhits);
 										global_context -> is_input_bad_format = 1;
 										return ;
 									}
@@ -6552,9 +6551,9 @@ int readSummary(int argc,char *argv[]){
 
 	if(isPEDistChecked && 0==isBothEndRequired){
 		#ifdef MAKE_STANDALONE
-		SUBREADprintf("ERROR: when the '-P' option is specified for checking fragment lengths, the '-B' option must also be specified to require both ends mapped.\n The program terminates without generating results.\n");
+		SUBREADprintf("ERROR: when the '-P' option is specified for checking fragment lengths, the '-B' option must also be specified to require both ends mapped.\n\n");
 		#else
-		SUBREADprintf("ERROR: when parameter checkFragLength is set to TRUE, parameter requireBothEndMapped also needs to be set to TRUE.\n The program terminates without generating results.\n");
+		SUBREADprintf("ERROR: when parameter checkFragLength is set to TRUE, parameter requireBothEndMapped also needs to be set to TRUE.\n\n");
 		#endif
 		return -1;
 	}
@@ -7002,7 +7001,7 @@ int readSummary(int argc,char *argv[]){
 	free(is_unique);
 
 	if(global_context.is_input_bad_format){
-		SUBREADprintf("\nFATAL Error: The program has to terminate and no counting file is generated.\n\n");
+		SUBREADprintf("\nERROR: a wrong input format is encountered.\n");
 	}else if(!global_context.disk_is_full){
 		print_in_box(80,0,0,"Write the final count table.");
 		if(isGeneLevel){
