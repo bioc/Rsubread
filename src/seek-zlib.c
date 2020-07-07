@@ -177,7 +177,7 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 	fseeko(fp->gz_fp, pos -> block_gzfile_offset - (pos -> block_gzfile_bits?1:0), SEEK_SET);
 
 	if(Z_OK!=inflateReset(&fp->stem))
-		SUBREADprintf("FATAL: UNABLE TO INIT STREAM!\n\n\n");
+		SUBREADprintf("FATAL: UNABLE TO INIT STREAM.\n\n\n");
 	if(pos -> block_dict_window_size>0){
 		if(pos -> block_gzfile_bits){
 			char nch = fgetc(fp->gz_fp);
@@ -185,7 +185,7 @@ void seekgz_seek(seekable_zfile_t * fp, seekable_position_t * pos){
 			inflatePrime(&fp->stem, pos -> block_gzfile_bits, nch>>(8-pos -> block_gzfile_bits));
 		}
 		if(Z_OK != inflateSetDictionary(&fp->stem, (unsigned char *)pos -> dict_window, pos -> block_dict_window_size))
-			SUBREADprintf("FATAL: UNABLE TO RESET STREAM!\n\n\n");
+			SUBREADprintf("FATAL: UNABLE TO RESET STREAM.\n\n\n");
 	}
 
 	fp -> stem.avail_in = 0;

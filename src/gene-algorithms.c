@@ -207,7 +207,6 @@ gene_quality_score_t get_subread_quality(const char * quality_str, const char * 
 	/*
 	if (ret <0 && !reported_version_error)
 	{
-		SUBREADprintf("\nWARNING: negative Phred quality score! Please verify the version of the Phred scores.\n");
 		reported_version_error=1;
 	}*/
 	

@@ -59,7 +59,7 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 			if(ret > 0)
 				nchunk = SamBam_unzip(fp -> input_binary_stream_buffer + fp->input_binary_stream_write_ptr - fp -> input_binary_stream_read_ptr + have , in_buff , ret);
 			else if(ret == -2){
-				SUBREADputs("ERROR: BAM format is broken!");
+				SUBREADputs("ERROR: BAM format is broken.");
 				return -2;
 			}
 
@@ -151,7 +151,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 		if(first_ch!=31 || second_ch!=139)
 		{
 			free(ret);
-			SUBREADprintf("Not a BAM file! %d %d\n", first_ch, second_ch);
+			SUBREADprintf("Not a BAM file: %d %d\n", first_ch, second_ch);
 			return NULL;
 		}
 
@@ -171,7 +171,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 		{
 			free(ret->input_binary_stream_buffer);
 			free(ret);
-			SUBREADprintf("FEOF 0!\n");
+			SUBREADprintf("FEOF 0.\n");
 			return NULL;
 
 		}
@@ -184,7 +184,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 		{
 			free(ret->input_binary_stream_buffer);
 			free(ret);
-			SUBREADprintf("FEOF 4 == %d!\n", magic_4);
+			SUBREADprintf("FEOF 4 == %d.\n", magic_4);
 			return NULL;
 		}
 
@@ -1007,7 +1007,7 @@ int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab, char * rem
 		if(rlen<0){
 			bam_is_broken = (rlen == -2);
 			if(bam_is_broken){
-				SUBREADprintf("BAM file format error!\n");
+				SUBREADprintf("BAM file format error.\n");
 				free(CDATA);
 				free(PDATA);
 				return -1;
@@ -1043,7 +1043,7 @@ int PBum_load_header(FILE * bam_fp, SamBam_Reference_Info** chro_tab, char * rem
 		memcpy(PDATA , PDATA + have - remainder_byte_len, remainder_byte_len);
 		if(ret<0)
 		{
-			SUBREADprintf("Header error!\n");
+			SUBREADprintf("Header error.\n");
 			free(CDATA);
 			free(PDATA);
 			return -1;

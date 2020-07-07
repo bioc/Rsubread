@@ -1057,12 +1057,12 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 			if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
 				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31.\n", lineno);
 					return -2;
 				}
 
 				if(tv1 >tv2){
-					SUBREADprintf("\nError: Line %d contains a feature that do not have a positive length!\n", lineno);
+					SUBREADprintf("\nError: Line %d contains a feature that do not have a positive length.\n", lineno);
 					return -2;
 				}
 			}else{
@@ -1157,7 +1157,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 				if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
 					if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31.\n", lineno);
 						return -2;
 					}
 				}else{
@@ -3414,7 +3414,7 @@ void add_fragment_supported_junction(	fc_thread_global_context_t * global_contex
 		srInt_64 count_junc = count_ptr - NULL;
 		HashTablePut(junction_counting_table, this_key, NULL+count_junc + 1);
 
-//		#warning "CONTINUE SHOULD BE REMOVED!!!!"
+//		#warning "CONTINUE SHOULD BE REMOVED!!!."
 //			continue;
 
 		char * left_key = malloc(strlen(j_one->chromosome_name_left) + 16);
@@ -5356,7 +5356,7 @@ void fc_thread_wait_threads(fc_thread_global_context_t * global_context)
 	int assign_ret = SAM_pairer_run(&global_context -> read_pairer);
 	if(0 && assign_ret){
 		print_in_box(80,0,0,"");
-		print_in_box(80,0,0,"   format error found in this file!");
+		print_in_box(80,0,0,"   format error found in this file.");
 	}
 	global_context -> is_input_bad_format |= assign_ret;
 }
@@ -6269,7 +6269,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			}else if(!global_context ->is_junction_no_chro_shown){
 				global_context ->is_junction_no_chro_shown = 1;
 				print_in_box(80,0,0, "   WARNING contig '%s' is not found in the", chro_small);
-				print_in_box(80,0,0, "   provided genome file!");
+				print_in_box(80,0,0, "   provided genome file.");
 				print_in_box(80,0,0,"");
 
 			}

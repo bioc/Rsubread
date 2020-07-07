@@ -1586,7 +1586,7 @@ int add_event_detected_from_cigar(global_context_t * global_context, unsigned in
 	}
 
 	if(!is_found){
-		//SUBREADprintf("\nEVENT NOT FOUND!\n\n");
+		//SUBREADprintf("\nEVENT NOT FOUND.\n\n");
 		return 1;
 	}
 	return 0;
@@ -4211,7 +4211,7 @@ int load_global_context(global_context_t * context)
 		context->index_block_number ++;
 		if(context->index_block_number>=2 && context->config.max_indel_length > 16)
 		{
-			print_in_box(80,0,0,"ERROR You cannot use multi-block index for very-long indel detection!");
+			print_in_box(80,0,0,"ERROR You cannot use multi-block index for very-long indel detection.");
 			print_in_box(80,0,0,"Please set the maximum indel length <= 16.");
 			return -1;
 		}
@@ -4283,7 +4283,7 @@ int destroy_global_context(global_context_t * context)
 	if(context->output_sam_fp) {
 		if(context -> output_sam_is_full){
 			unlink(context->config.output_prefix);
-			SUBREADprintf("\nERROR: cannot finish the SAM file! Please check the disk space in the output directory.\nNo output file was generated.\n");
+			SUBREADprintf("\nERROR: cannot finish the SAM file. Please check the disk space in the output directory.\nNo output file was generated.\n");
 			ret = 1;
 		}
 		fclose(context -> output_sam_fp);
@@ -4298,7 +4298,7 @@ int destroy_global_context(global_context_t * context)
 		SamBam_writer_close(context->output_bam_writer);
 		if(context->output_bam_writer -> is_internal_error){
 			unlink(context->config.output_prefix);
-			SUBREADprintf("\nERROR: cannot finish the BAM file! Please check the disk space in the output directory.\nNo output file was generated.\n");
+			SUBREADprintf("\nERROR: cannot finish the BAM file. Please check the disk space in the output directory.\nNo output file was generated.\n");
 			ret = 1;
 		}
 		free(context->output_bam_writer);

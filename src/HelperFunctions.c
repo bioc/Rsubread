@@ -1105,7 +1105,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 
 			if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
 				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31.\n", lineno);
 					return -2;
 				}
 			}else{
@@ -1143,7 +1143,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 				
 				if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
 					if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31.\n", lineno);
 						return -2;
 					}
 				}else{
@@ -2682,13 +2682,13 @@ void main(){
 #ifdef HELPER_TEST_CRC32
 void main(){
   long c32=0;
-  c32 = crc32(c32, "Hello!",6);
+  c32 = crc32(c32, "Hello.",6);
   printf("CRC = %08lX\n", c32);
 
   c32=0;
   c32 = crc32(c32, "Hel",3);
   c32 = crc32(c32, "lo",2);
-  c32 = crc32(c32, "!",1);
+  c32 = crc32(c32, ".",1);
   c32 = crc32(c32, "",0);
   printf("CRC = %08lX\n", c32);
 }

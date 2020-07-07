@@ -927,9 +927,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 			if(nch != '@') {
 				if(input->file_type == GENE_INPUT_FASTQ){
 					srInt_64 lineno = tell_current_line_no(input);
-					SUBREADprintf("ERROR: a format issue %d is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+					SUBREADprintf("ERROR: a format issue %d is found on the %lld-th line in input file '%s'.\nProgram aborted.\n", nch, lineno, input -> filename); 
 				} else {
-					SUBREADprintf("ERROR: a format issue %d is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
+					SUBREADprintf("ERROR: a format issue %d is found on the input file '%s'.\nProgram aborted.\n", nch, input -> filename); 
 					SUBREADprintf("The lines after the error point:\n");
 					read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
 					SUBREADprintf("%s\n", read_string);
@@ -968,9 +968,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		if(nch != '+'){
 			if(input->file_type == GENE_INPUT_FASTQ){
 				srInt_64 lineno = tell_current_line_no(input);
-				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'!\nProgram aborted!\n", nch, lineno, input -> filename); 
+				SUBREADprintf("ERROR: a format issue %c is found on the %lld-th line in input file '%s'.\nProgram aborted.\n", nch, lineno, input -> filename); 
 			}else{
-				SUBREADprintf("ERROR: a format issue %d  (should be +) is found on the input file '%s'!\nProgram aborted!\n", nch, input -> filename); 
+				SUBREADprintf("ERROR: a format issue %d  (should be +) is found on the input file '%s'.\nProgram aborted.\n", nch, input -> filename); 
 				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
 				SUBREADprintf("%s\n", read_string);
 				read_line_noempty(MAX_READ_LENGTH, input, read_string, 0);
@@ -1468,7 +1468,7 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * cl
 		temp_file_pointer = f_subr_open(key_name,"ab");
 
 		if(!temp_file_pointer){
-			SUBREADprintf("File cannot be opened: '%s' !!\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
+			SUBREADprintf("File cannot be opened: '%s'.\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
 			return NULL;
 		}
 
@@ -2993,7 +2993,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 
 				if(NULL == line_ptr){
 					passed_read_SBAM_ptr = line_ptr - thread_context -> input_buff_SBAM;
-					//SUBREADprintf("FATAL: the header is too large to the buffer!\n");
+					//SUBREADprintf("FATAL: the header is too large to the buffer.\n");
 					break;
 				}else{
 					//SUBREADprintf("LINELEN=%d, PTR=%d, FIRST=%c\n", line_len, thread_context -> input_buff_SBAM_ptr , line_ptr[0]);
@@ -3080,7 +3080,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 }
 
 int online_register_contig(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thread_context, char * ref){
-	SUBREADprintf("ERROR: Unable to find chromosome '%s' in the SAM header!\n", ref);
+	SUBREADprintf("ERROR: Unable to find chromosome '%s' in the SAM header.\n", ref);
 	assert(0);
 	int reflen = strlen(ref);
 	char * header_sec = malloc(reflen + 20);
@@ -3744,7 +3744,7 @@ int SAM_pairer_multi_thread_output(void * pairer_vp, int thread_no, char * bin1,
 	}
 
 	if( bin_len1 + bin_len2 >= SAM_PAIRER_WRITE_BUFFER){
-		SUBREADprintf("ERROR: BAM Record larger than a BAM block!\n");
+		SUBREADprintf("ERROR: BAM Record larger than a BAM block.\n");
 		return 1;
 	}
 
@@ -5230,7 +5230,7 @@ int SAM_nosort_decompress_next_block(SAM_pairer_context_t * pairer){
 #define NOSORT_SAM_next_line {NOSORT_SAM_eof  = fgets(line_ptr, NOSORT_SBAM_BUFF_SIZE, pairer -> input_fp);}
 
 #if FEATURECOUNTS_BUFFER_SIZE < ( 12*1024*1024 )
-#error "FEATURECOUNTS_BUFFER_SIZE MUST BE GREATER THAN 12MB!!"
+#error "FEATURECOUNTS_BUFFER_SIZE MUST BE GREATER THAN 12MB!."
 #endif
 
 #define NOSORT_REFILL_LOWBAR ( 3 * 1024 * 1024 ) 
@@ -5356,7 +5356,7 @@ void SAM_nosort_run_once(SAM_pairer_context_t * pairer){
 			if(NULL== header_start && line_ptr[0] == '@') header_start = line_ptr;
 
 			if(NULL == line_ptr){
-				SUBREADprintf("FATAL: the header is too large to the buffer!\n");
+				SUBREADprintf("FATAL: the header is too large to the buffer.\n");
 				break;
 			}else{
 				//SUBREADprintf("LINELEN=%d, PTR=%d, FIRST=%c\n", line_len, thread_context -> input_buff_SBAM_ptr , line_ptr[0]);
@@ -5775,14 +5775,14 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 
 					if(read_len<2)
 					{
-						SUBREADprintf("Cannot determain read length from the tmp file!\n");
+						SUBREADprintf("Cannot determain read length from the tmp file.\n");
 						assert(0);
 					}
 
 
 					if( new_line_mem[0]==0 || new_line_mem[1]==0)
 					{
-						SUBREADprintf("Cannot load read part from the tmp file!\n");
+						SUBREADprintf("Cannot load read part from the tmp file.\n");
 						assert(0);
 					}
 
@@ -5994,7 +5994,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 
 						if((!first_read_text[0])||(!first_read_text[1]))
 						{
-							SUBREADprintf("unable to recover the first read! : '%s' , flags = %d\n", first_read_name, mate_flags);
+							SUBREADprintf("unable to recover the first read : '%s' , flags = %d\n", first_read_name, mate_flags);
 							assert(0);
 						}
 
@@ -6180,13 +6180,13 @@ int sort_SAM_add_line(SAM_sort_writer * writer, char * SAM_line, int line_len)
 
 		if(line_len < 2)
 		{
-			SUBREADprintf("unable to put the first read!\n");
+			SUBREADprintf("unable to put the first read.\n");
 			assert(0);
 		}
 
 		if(second_col_pos[0]==0 || second_col_pos[1]==0)
 		{
-			SUBREADprintf("unable to put the first read TEXT!\n");
+			SUBREADprintf("unable to put the first read TEXT.\n");
 			assert(0);
 		}
 
@@ -6703,7 +6703,7 @@ int main(int argc, char ** argv)
 	ifp = f_subr_open(argv[1],"r");
 	SAM_sort_writer writer;
 	if(sort_SAM_create(&writer, argv[2], ".")){
-		printf("ERROR: unable to create the writer!\n");
+		printf("ERROR: unable to create the writer.\n");
 		return -1;
 	}
 
@@ -6732,7 +6732,7 @@ int main(int argc, char ** argv)
 		case FILE_TYPE_FASTA: printf("Type: FASTA\n"); break;
 		case FILE_TYPE_SAM  : printf("Type: SAM\n"); break;
 		case FILE_TYPE_BAM  : printf("Type: BAM\n"); break;
-		default: printf("Unknown type!\n");
+		default: printf("Unknown type.\n");
 	}
 }
 

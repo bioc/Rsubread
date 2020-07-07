@@ -170,7 +170,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
     int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
     if(rlength < 1)break;
     if(rlength >= TRANSCRIPT_FASTA_LINE_WIDTH -1 || clinebuf[rlength]!='\0' || clinebuf[rlength-1]!='\n'){
-      SUBREADprintf("Error: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
+      SUBREADprintf("Error: The line width of the fasta file excessed %d bytes.\n", TRANSCRIPT_FASTA_LINE_WIDTH);
       ret = 1;
       break;
     }
@@ -200,7 +200,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
 
       seq_name = malloc(strlen(clinebuf));
       if( clinebuf[1]==0 ){
-        SUBREADprintf("Error: Every transcript needs a name!\n");
+        SUBREADprintf("Error: Every transcript needs a name.\n");
         ret = 1;
         break;
       }
@@ -211,7 +211,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
       HelpFuncMD5_Init(&md5ctx);
     }else{
       if(NULL == seq_name){
-        SUBREADprintf("Error: The fasta file did not start correctly! \n");
+        SUBREADprintf("Error: The fasta file did not start correctly.\n");
         ret = 1;
         break;
       }
@@ -231,7 +231,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
     }
   }
   if(lbuf_used<1){
-    SUBREADprintf("Error: The fasta file did not end correctly! \n");
+    SUBREADprintf("Error: The fasta file did not end correctly.\n");
     ret = 1;
   }
   if(NULL != seq_name && lbuf_used >0){

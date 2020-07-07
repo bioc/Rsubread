@@ -162,14 +162,14 @@ void do_find_common(char ** file_names, int files)
 			char * chro = strtok_r(ret,"\t",&tmp_pnt);
 			if(chro == NULL|| tmp_pnt == NULL)
 			{
-				SUBREADprintf("Unknown format in the file! Only the VCF format is allowed for input files.\n");
+				SUBREADprintf("Unknown format in the file. Only the VCF format is allowed for input files.\n");
 				break;
 			}
 
 			char * pos_str = strtok_r(NULL,"\t",&tmp_pnt);
 			if(pos_str == NULL|| strlen(pos_str)>10|| tmp_pnt == NULL)
 			{
-				SUBREADprintf("Unknown format in the file! Only the VCF format is allowed for input files.\n");
+				SUBREADprintf("Unknown format in the file. Only the VCF format is allowed for input files.\n");
 				break;
 			}
 
@@ -183,7 +183,7 @@ void do_find_common(char ** file_names, int files)
 			char * info = strtok_r(NULL,"\t",&tmp_pnt); //addition columns are discarded
 			if(info == NULL)
 			{
-				SUBREADprintf("Unknown format in the file! Only the VCF format is allowed for input files.\n");
+				SUBREADprintf("Unknown format in the file. Only the VCF format is allowed for input files.\n");
 				break;
 			}
 
@@ -226,7 +226,7 @@ void do_find_common(char ** file_names, int files)
 					}
 					else
 					{
-						if(!warning_reported_repeated)SUBREADprintf("Warning: repeated rows are found in the first input file!\n");
+						if(!warning_reported_repeated)SUBREADprintf("Warning: repeated rows are found in the first input file.\n");
 						warning_reported_repeated=1;
 						free(ky);
 					}
