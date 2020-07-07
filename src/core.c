@@ -1072,7 +1072,7 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 			fclose(outfp);
 		}
 		else{
-			SUBREADprintf("Unable to create temporary file '%s'\nThe program has to terminate.\nPlease run the program in a directory where you have the privilege to create files.\n", temp_file_name);
+			SUBREADprintf("Unable to create temporary file '%s'\nPlease run the program in a directory where you have the privilege to create files.\n", temp_file_name);
 		}
 
 		gzclose(rawfp);
@@ -1173,7 +1173,7 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 
 	if(ginp2 && rl1 * rl2 <=0 && (rl1>0 || rl2>0)){
 		if(!global_context-> input_reads.is_internal_error)
-			SUBREADprintf("\nERROR: two input files have different amounts of reads!\nThe program has to terminate and no alignment results were generated!\n\n");
+			SUBREADprintf("\nERROR: two input files have different amounts of reads.\n\n");
 		global_context-> input_reads.is_internal_error = 1;
 		*read_no_in_chunk = -1;
 		return 1;
@@ -1586,7 +1586,7 @@ int add_event_detected_from_cigar(global_context_t * global_context, unsigned in
 	}
 
 	if(!is_found){
-		//SUBREADprintf("\nEVENT NOT FOUND!\n\n");
+		//SUBREADprintf("\nEVENT NOT FOUND.\n\n");
 		return 1;
 	}
 	return 0;
@@ -4211,7 +4211,7 @@ int load_global_context(global_context_t * context)
 		context->index_block_number ++;
 		if(context->index_block_number>=2 && context->config.max_indel_length > 16)
 		{
-			print_in_box(80,0,0,"ERROR You cannot use multi-block index for very-long indel detection!");
+			print_in_box(80,0,0,"ERROR You cannot use multi-block index for very-long indel detection.");
 			print_in_box(80,0,0,"Please set the maximum indel length <= 16.");
 			return -1;
 		}

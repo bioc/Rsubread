@@ -210,7 +210,7 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data, un
 		if (current_bucket->current_items >= current_bucket->space_size) {
 			int bucket_number;
 			if(bucket_sizes){
-				SUBREADprintf("Bucket size was wrongly calculated!\n");
+				SUBREADprintf("Bucket size was wrongly calculated.\n");
 				return 1;
 			}
 
@@ -282,7 +282,7 @@ int gehash_insert(gehash_t * the_table, gehash_key_t key, gehash_data_t data, un
 
 		if (current_bucket->current_items >= current_bucket->space_size) {
 			if(bucket_sizes){
-				SUBREADprintf("Bucket [%d] size was wrongly calculated : %d >= %u!\n",  _gehash_get_bucketNO (the_table, key), current_bucket->current_items,  current_bucket->space_size);
+				SUBREADprintf("Bucket [%d] size was wrongly calculated : %d >= %u.\n",  _gehash_get_bucketNO (the_table, key), current_bucket->current_items,  current_bucket->space_size);
 				return 1;
 			}
 

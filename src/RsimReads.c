@@ -170,7 +170,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
     int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
     if(rlength < 1)break;
     if(rlength >= TRANSCRIPT_FASTA_LINE_WIDTH -1 || clinebuf[rlength]!='\0' || clinebuf[rlength-1]!='\n'){
-      SUBREADprintf("Error: The line width of the fasta file excessed %d bytes!\n", TRANSCRIPT_FASTA_LINE_WIDTH);
+      SUBREADprintf("Error: The line width of the fasta file excessed %d bytes.\n", TRANSCRIPT_FASTA_LINE_WIDTH);
       ret = 1;
       break;
     }
@@ -187,7 +187,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
 
         had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
         if(had_tab){
-          SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+          SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'.n", seq_name);
           return -1;
         }
 
@@ -200,7 +200,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
 
       seq_name = malloc(strlen(clinebuf));
       if( clinebuf[1]==0 ){
-        SUBREADprintf("Error: Every transcript needs a name!\n");
+        SUBREADprintf("Error: Every transcript needs a name.\n");
         ret = 1;
         break;
       }
@@ -245,7 +245,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
 
     had_tab = HashTableGet(grc-> transcript_sequences, seq_name);
     if(had_tab){
-      SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'. The program terminates without output.\n", seq_name);
+      SUBREADprintf("Error: duplicate sequence names were found in the input: '%s'.\n", seq_name);
       return -1;
     }
 

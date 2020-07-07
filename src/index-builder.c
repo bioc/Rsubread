@@ -1279,7 +1279,7 @@ int main_buildindex(int argc,char ** argv)
 
 		if(!ret){
 			print_in_box(80, 0, 1, "Total running time: %.1f minutes.", (miltime()-begin00_ftime)/60);
-			print_in_box(89, 0, 1, "Index %c[36m%s%c[0m was successfully built!", CHAR_ESC, output_file, CHAR_ESC);
+			print_in_box(89, 0, 1, "Index %c[36m%s%c[0m was successfully built.", CHAR_ESC, output_file, CHAR_ESC);
 		}
 		HashTableDestroy(huge_table);
 		free(chromosome_lengths);

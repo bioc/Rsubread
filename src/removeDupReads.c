@@ -110,7 +110,7 @@ int parse_base_blocks(char * temp_prefix, chromosome_t * chromosomes, int thresh
 					break;
 				//printf("Pos=%d\n", read_record.pos);
 				if( ! (read_record.pos>block_start_base && read_record.pos <=block_start_base+BASE_BLOCK_LENGTH )){ // break_SAM subtracted 1 from pos
-					SUBREADprintf("FATAL ERROR: unexpected temp file format : %d not between %d and %d!\n", read_record.pos, block_start_base, block_start_base+BASE_BLOCK_LENGTH);
+					SUBREADprintf("FATAL ERROR: unexpected temp file format : %d not between %d and %d.\n", read_record.pos, block_start_base, block_start_base+BASE_BLOCK_LENGTH);
 					return -1;
 				}
 				if(read_record.mapped_segment_in_read==0)read_voting_table[read_record.pos-block_start_base] ++;

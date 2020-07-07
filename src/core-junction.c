@@ -248,7 +248,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 
 					if(new_remainder_len>0)
 					{
-						//if(explain_context -> pair_number==2074) printf("JUMPPED IN!\n");
+						//if(explain_context -> pair_number==2074) printf("JUMPPED IN.\n");
 
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_end = explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].read_pos_start + tested_read_pos;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections].event_after_section = tested_event;
@@ -2600,7 +2600,7 @@ int is_funky_fragment(global_context_t * global_context, char * rname1, char * c
 int process_voting_junction(global_context_t * global_context, thread_context_t * thread_context, subread_read_number_t pair_number, gene_vote_t * vote_1, gene_vote_t * vote_2, char * read_name_1, char * read_name_2, char * read_text_1, char * read_text_2, int read_len_1, int read_len_2, int is_negative_strand, gene_vote_number_t v1_all_subreads, gene_vote_number_t v2_all_subreads){
 
 
-	//#warning "FOR TESTING CLUSTER_BASED JUNCTION DETECTION ONLY!!!"
+	//#warning "FOR TESTING CLUSTER_BASED JUNCTION DETECTION ONLY!!."
 	//return process_voting_junction_PE_juncs(global_context, thread_context, pair_number, vote_1, vote_2, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_negative_strand, v1_all_subreads, v2_all_subreads);
 		return process_voting_junction_PE_topK(global_context, thread_context, pair_number, vote_1, vote_2, read_name_1, read_name_2, read_text_1, read_text_2, read_len_1, read_len_2, is_negative_strand, v1_all_subreads, v2_all_subreads);
 		
@@ -6344,7 +6344,7 @@ void finalise_inversions(global_context_t * global_context){
 
 			}
 			else is_roughly_called = 1;
-			//SUBREADprintf("\nINVLOG: FINALLY_%sCONFIRMED: %09u  %s:%u (len=%d) INVERSED!\n", is_passed_YZ?"":"NOT ", frag_A_no, brkYchr, brkYsmall, brkYlarge - brkYsmall);
+			//SUBREADprintf("\nINVLOG: FINALLY_%sCONFIRMED: %09u  %s:%u (len=%d) INVERSED.\n", is_passed_YZ?"":"NOT ", frag_A_no, brkYchr, brkYsmall, brkYlarge - brkYsmall);
 		}
 
 		//SUBREADprintf("\nINVLOG: FINALLY_GUESSED: %09u  found_INV_frags=%d, s1_list_items=%d, s2_list_items=%d, cand_YZ_breakpoints=%d\n", frag_A_no, found_INV_frags, s1_list_items, s2_list_items, cand_YZ_breakpoints);
@@ -6359,7 +6359,7 @@ void finalise_inversions(global_context_t * global_context){
 			// guess brkYlarge, brkYsmall, brkZlarge, brkZsmall, brkYabsLarge, brkZabsLarge...
 			locate_gene_position(guessed_Y_small_abs_sum,  &global_context -> chromosome_table, &brkYchr, &brkYsmall);
 			locate_gene_position(guessed_Z_large_abs_sum,  &global_context -> chromosome_table, &brkYchr, &brkYlarge);
-			//SUBREADprintf("\nINVLOG: FINALLY_GUESSED: %09u  %s:%u (len=%llu) INVERSED!\n", frag_A_no, brkYchr, brkYsmall, guessed_Z_large_abs_sum - guessed_Y_small_abs_sum);
+			//SUBREADprintf("\nINVLOG: FINALLY_GUESSED: %09u  %s:%u (len=%llu) INVERSED.\n", frag_A_no, brkYchr, brkYsmall, guessed_Z_large_abs_sum - guessed_Y_small_abs_sum);
 			is_roughly_called = 1;
 		}*/
 

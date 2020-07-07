@@ -1511,7 +1511,7 @@ int search_event(global_context_t * global_context, HashTable * event_table, chr
 		for(xk2=1; xk2< current_size+1 ; xk2++)
 		{
 			if(!res[xk2])break;
-			//if(res[xk2] - 1>= ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ) { SUBREADprintf("FATAL ERROR: Event id out-of-boundary: %u > %u!\n", res[xk2],  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ); continue;}
+			//if(res[xk2] - 1>= ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ) { SUBREADprintf("FATAL ERROR: Event id out-of-boundary: %u > %u.\n", res[xk2],  ((indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]) -> current_max_event_number ); continue;}
 			chromosome_event_t * event_body = &event_space[res[xk2]-1]; 
 
 			if((event_body -> event_type & event_type) == 0)continue;

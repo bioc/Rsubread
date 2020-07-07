@@ -1105,7 +1105,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 
 			if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
 				if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+					SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31.\n", lineno);
 					return -2;
 				}
 			}else{
@@ -1143,7 +1143,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 				
 				if( isdigit(start_ptr[0]) && isdigit(end_ptr[0]) ){
 					if(strlen(start_ptr) > 10 || strlen(end_ptr) > 10 || tv1 > 0x7fffffff || tv2> 0x7fffffff){
-						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31!\n", lineno);
+						SUBREADprintf("\nError: Line %d contains a coordinate greater than 2^31.\n", lineno);
 						return -2;
 					}
 				}else{
@@ -1177,7 +1177,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 					if(!is_GFF_geneid_warned){
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s'.\nAn example of attributes included in your GTF annotation is '%s'.\nThe program has to terminate.\n\n",  gene_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s'.\nAn example of attributes included in your GTF annotation is '%s'.\n\n",  gene_id_column, extra_attrs);
 					}
 					is_GFF_geneid_warned++;
 				}
@@ -1186,7 +1186,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 					if(!is_GFF_txid_warned){
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
-						SUBREADprintf("\nERROR: failed to find the transcript identifier attribute in the 9th column of the provided GTF file.\nThe specified transcript identifier attribute is '%s'.\nAn example of attributes included in your GTF annotation is '%s'.\nThe program has to terminate\n\n", transcript_id_column, extra_attrs);
+						SUBREADprintf("\nERROR: failed to find the transcript identifier attribute in the 9th column of the provided GTF file.\nThe specified transcript identifier attribute is '%s'.\nAn example of attributes included in your GTF annotation is '%s'.\n\n", transcript_id_column, extra_attrs);
 					}
 					is_GFF_txid_warned++;
 				}
@@ -2683,13 +2683,13 @@ void main(){
 #ifdef HELPER_TEST_CRC32
 void main(){
   long c32=0;
-  c32 = crc32(c32, "Hello!",6);
+  c32 = crc32(c32, "Hello.",6);
   printf("CRC = %08lX\n", c32);
 
   c32=0;
   c32 = crc32(c32, "Hel",3);
   c32 = crc32(c32, "lo",2);
-  c32 = crc32(c32, "!",1);
+  c32 = crc32(c32, ".",1);
   c32 = crc32(c32, "",0);
   printf("CRC = %08lX\n", c32);
 }
