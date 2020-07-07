@@ -1468,7 +1468,7 @@ FILE * get_temp_file_pointer(char *temp_file_name, HashTable* fp_table, int * cl
 		temp_file_pointer = f_subr_open(key_name,"ab");
 
 		if(!temp_file_pointer){
-			SUBREADprintf("File cannot be opened: '%s' !.\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
+			SUBREADprintf("File cannot be opened: '%s'.\nPlease increase the maximum open files by command 'ulimit -n'.\nThis number should be set to at least 500 for human genome, and more chromosomes require more opened files.\n\n", key_name);
 			return NULL;
 		}
 
@@ -5994,7 +5994,7 @@ int sort_SAM_finalise(SAM_sort_writer * writer)
 
 						if((!first_read_text[0])||(!first_read_text[1]))
 						{
-							SUBREADprintf("unable to recover the first read! : '%s' , flags = %d\n", first_read_name, mate_flags);
+							SUBREADprintf("unable to recover the first read : '%s' , flags = %d\n", first_read_name, mate_flags);
 							assert(0);
 						}
 

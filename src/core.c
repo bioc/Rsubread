@@ -4283,7 +4283,7 @@ int destroy_global_context(global_context_t * context)
 	if(context->output_sam_fp) {
 		if(context -> output_sam_is_full){
 			unlink(context->config.output_prefix);
-			SUBREADprintf("\nERROR: cannot finish the SAM file! Please check the disk space in the output directory.\nNo output file was generated.\n");
+			SUBREADprintf("\nERROR: cannot finish the SAM file. Please check the disk space in the output directory.\nNo output file was generated.\n");
 			ret = 1;
 		}
 		fclose(context -> output_sam_fp);
@@ -4298,7 +4298,7 @@ int destroy_global_context(global_context_t * context)
 		SamBam_writer_close(context->output_bam_writer);
 		if(context->output_bam_writer -> is_internal_error){
 			unlink(context->config.output_prefix);
-			SUBREADprintf("\nERROR: cannot finish the BAM file! Please check the disk space in the output directory.\nNo output file was generated.\n");
+			SUBREADprintf("\nERROR: cannot finish the BAM file. Please check the disk space in the output directory.\nNo output file was generated.\n");
 			ret = 1;
 		}
 		free(context->output_bam_writer);
