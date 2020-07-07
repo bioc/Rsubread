@@ -1310,7 +1310,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 		}else{
 			SUBREADprintf("ERROR: no features were loaded in format %s. The annotation format can be specified by the '-F' option%s.\n", file_type == FILE_TYPE_GTF?"GTF":"SAF", file_type == FILE_TYPE_GTF?", and the required feature type can be specified by the '-t' option.":"");
 		}
-		SUBREADprintf("The porgram has to terminate.\n\n");
+		SUBREADprintf("\n\n");
 		return -2;
 	}
 
