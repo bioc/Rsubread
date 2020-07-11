@@ -310,7 +310,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  if(is.null(aligner)){
 		if(!file.exists(output.1)) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
 	  }else if(aligner=="align"){
-		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, complexIndels=TRUE, nBestLocations=3, maxMismatches=20)
+		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE) # complexIndels=TRUE, nBestLocations=1, maxMismatches=20)
 	  }else if(aligner=="subjunc"){
 		#subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, nBestLocations=3, maxMismatches=20)
 		stop("Using subjunc as the aligner is not yet supported.")

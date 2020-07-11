@@ -1,3 +1,6 @@
+11 July 2020 - 2.3.6
+(1) Improve cellCounts to be more conservative in mapping reads.
+
 7 July 2020 - 2.3.5
 (1) Improve the screen outputs and removed redundant error messages.
 
