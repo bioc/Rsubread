@@ -211,6 +211,11 @@ library(Matrix)
   ret.nUMI.LLH.tab
 }
 
+.is.no.candBC <- function(fn){
+  info = file.info(fn)
+  return(info$size < 2)
+}
+
 .cellCounts.rescue <- function( BAM.name, FC.gene.ids, sample.no ){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   nozero.anywhere.genes <- read.delim(paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1
@@ -223,8 +228,9 @@ library(Matrix)
 
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
 
+  resc.bc.fn <- paste0(fname,".RescCand")
   rstfq <- .simple.Good.Turing.Freq(ambient.accumulate)
-  if(any(is.na(rstfq))){
+  if(any(is.na(rstfq)) || .is.no.candBC(paste0(resc.bc.fn,".BCtab"))){
     return(NA)
   }else{
     gte <- rstfq$p
@@ -232,7 +238,7 @@ library(Matrix)
     print(summary(gte))
     # This function returns "times" log-likelihoods.
   
-    rescue.candidates <- as.matrix(.read.sparse.mat(paste0(fname,".RescCand")))
+    rescue.candidates <- as.matrix(.read.sparse.mat(resc.bc.fn))
     rescue.candidates <- rescue.candidates[ match(names(ambient.accumulate), rownames(rescue.candidates)), ]
     rownames(rescue.candidates) <- names(ambient.accumulate)
     rescue.candidates [is.na(rescue.candidates )] <- 0
