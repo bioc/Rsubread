@@ -180,6 +180,7 @@ typedef struct {
 	HashTable * RG_table;	// rg_name -> [ count_table, sum_fc_read_counters, junction_counting_table,  splicing_point_table]
 				// NOTE: some reads have no RG tag. These reads are put into the tables in this object but not in the RG_table -> tables.
 	srInt_64 scRNA_pooled_reads;
+	srInt_64 *scRNA_reads_per_sample;
 	srInt_64 scRNA_has_valid_sample_index;
 	srInt_64 scRNA_has_valid_cell_barcode;
 	fc_read_counters read_counters;
@@ -3598,7 +3599,10 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 	//SUBREADprintf("Rname=%s, Lane=%d ==> sample %d  cell %d  UMI %d\n", read_name, laneno, sample_id , cell_id, umi_id);
 
 	thread_context -> scRNA_pooled_reads ++;
-	if(sample_id >0)thread_context -> scRNA_has_valid_sample_index ++;
+	if(sample_id >0){
+		thread_context -> scRNA_has_valid_sample_index ++;
+		thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
+	}
 	if(cell_id >0)thread_context -> scRNA_has_valid_cell_barcode ++;
 
 	if(thread_context -> thread_id == 0 && thread_context -> scRNA_pooled_reads == 20000){
@@ -4407,6 +4411,12 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 	int x1,x2;
 
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
+	sprintf(ofname,"%s.scRNA.%03d.%s.summary",global_context->input_file_name, sample_index+1,tabtype);
+	/*
+	FILE * ofp_bcs = fopen( ofname , "w" );
+	fprintf(ofp_bcs,"MappedReads\t%I64d\n",);
+	fprintf(ofp_bcs,"MappedReads\t%lld\n", );
+	fclose(ofp_bcs);*/
 	sprintf(ofname,"%s.scRNA.%03d.%s.BCtab",global_context->input_file_name, sample_index+1,tabtype);
 	FILE * ofp_bcs = fopen( ofname , "w" );
 	sprintf(ofname,"%s.scRNA.%03d.%s.GENEtab",global_context->input_file_name, sample_index+1,tabtype);
@@ -5296,6 +5306,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		}
 
 		if(global_context -> do_scRNA_table){
+			global_context -> thread_contexts[xk1].scRNA_reads_per_sample = malloc(sizeof(srInt_64)*global_context-> scRNA_sample_sheet_table ->numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_sample_bc_tables = malloc(sizeof(HashTable*) * global_context -> scRNA_sample_id_to_name -> numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_registered_UMI_table = StringTableCreate(100000);
 			HashTableSetDeallocationFunctions(global_context  -> thread_contexts[xk1].scRNA_registered_UMI_table, free, NULL);
@@ -5384,6 +5395,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		if(global_context -> do_scRNA_table){
 			int xk2;
 			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++)HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
+			free(global_context -> thread_contexts[xk1].scRNA_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables);
 			HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_registered_UMI_table);
 		}
