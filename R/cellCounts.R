@@ -316,10 +316,9 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  if(is.null(aligner)){
 		if(!file.exists(output.1)) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
 	  }else if(aligner=="align"){
-		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE) # complexIndels=TRUE, nBestLocations=1, maxMismatches=20)
+		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
 	  }else if(aligner=="subjunc"){
-		#subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, nBestLocations=3, maxMismatches=20)
-		stop("Using subjunc as the aligner is not yet supported.")
+		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
 	  }
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
 	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))

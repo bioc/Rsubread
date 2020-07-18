@@ -212,7 +212,7 @@ typedef struct {
 typedef struct {
 	int is_gene_level;
 	int is_paired_end_mode_assign;
-	int *is_paired_end_reads_expected;
+	int is_paired_end_reads_expected;
 	int is_multi_overlap_allowed;
 	int restricted_no_multi_overlap;
 	char * strand_check_mode;
@@ -274,6 +274,7 @@ typedef struct {
 	int is_all_finished;
 	int sambam_chro_table_items;
 	int is_input_bad_format;
+	int any_reads_are_PE;
 	SamBam_Reference_Info * sambam_chro_table;
 	pthread_spinlock_t sambam_chro_table_lock;
 	pthread_spinlock_t read_details_out_lock;
@@ -2879,8 +2880,14 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 
+		if(  ( alignment_masks & SAM_FLAG_PAIRED_TASK ) && !global_context -> any_reads_are_PE ) global_context -> any_reads_are_PE=1;
 		if(((!global_context -> is_paired_end_mode_assign)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context ->is_paired_end_mode_assign)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
 			if(global_context -> is_mixed_PE_SE == 0) global_context -> is_mixed_PE_SE =1;
+			if(!global_context -> is_paired_end_reads_expected){
+				SUBREADprintf("ERROR: Paired-end reads were detected in single-end read library : %s\n", global_context -> input_file_name);
+				global_context -> is_input_bad_format = 1;
+				return;
+			}
 			this_is_inconsistent_read_type = 1;
 		}
 		if(is_second_read == 0)
@@ -5067,7 +5074,7 @@ void scRNA_make_barcode_HT_table( fc_thread_global_context_t * global_context ){
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length , int is_PE_data, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list) {
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list) {
 	int x1;
 	myrand_srand(time(NULL));
 
@@ -6609,16 +6616,16 @@ int readSummary(int argc,char *argv[]){
 	unsigned char * sorted_strand;
 
 	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
-	char * isPE,  *is_paired_end_reads_expected;
+	char * isPEassign,  *is_paired_end_reads_expected;
 
 	int  isGTF, n_input_files=0;
-	char *  alias_file_name = NULL, * cmd_rebuilt = NULL, * Rpath = NULL;
+	char * alias_file_name = NULL, * cmd_rebuilt = NULL, * Rpath = NULL;
 
 	int isMultiOverlapAllowed, isGeneLevel;
 
 	isCVersion = ((argv[0][0]=='C')?1:0);
 
-	isPE = argv[4];
+	isPEassigne = argv[4];
 	minPEDistance = atoi(argv[5]);
 	maxPEDistance = atoi(argv[6]);
 
@@ -6790,7 +6797,7 @@ int readSummary(int argc,char *argv[]){
 		long_read_minimum_length = atoi(argv[44])?1:1999999999;
 	else  long_read_minimum_length = 1999999999;
 
-	if(long_read_minimum_length < 2 && isPE[0]=='1'){
+	if(long_read_minimum_length < 2 && isPEassigb[0]=='1'){
 		SUBREADputs("ERROR: long read assignment can only be done on single-end mode");
 		return -1;
 	}
@@ -6878,7 +6885,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE[0]=='1', minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -6996,6 +7003,10 @@ int readSummary(int argc,char *argv[]){
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
 		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
+		int this_file_isPEassign = isPEassign[1]?isPEassign[x1] == '1' : isPE[0]=='1';
+		int this_file_isPEexpected = is_paired_end_reads_expected[1]?is_paired_end_reads_expected[x1]=='1' : is_paired_end_reads_expected[0]=='1';
+		global_context.is_paired_end_reads_expected = this_file_isPEexpected;
+		global_context.is_paired_end_mode_assign = this_file_isPEassign;
 
 		read_count_type_t * column_numbers = calloc(nexons, sizeof(read_count_type_t));
 		HashTable * junction_global_table = NULL;
@@ -7282,7 +7293,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	global_context->is_SAM_file = 1;
 	if(file_probe == 1) global_context->is_SAM_file = 0;
 	global_context->is_mixed_PE_SE = 0;
-
+	global_context->any_reads_are_PE = 0;
 	global_context -> start_time = miltime();
 
 	file_str = "SAM";
@@ -7300,6 +7311,10 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	// Nothing is done if the file does not exist.
 
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
+	if(global_context -> is_paired_reads_expected && !global_context -> any_reads_are_PE){
+		SUBREADprintf("ERROR: No paired-end reads were detected in paired-end read library : %s\n", global_context -> input_file_name);
+		return -1;
+	}
 
 	global_context->is_all_finished = 1;
 	fc_thread_wait_threads(global_context);
