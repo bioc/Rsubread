@@ -181,6 +181,7 @@ typedef struct {
 				// NOTE: some reads have no RG tag. These reads are put into the tables in this object but not in the RG_table -> tables.
 	srInt_64 scRNA_pooled_reads;
 	srInt_64 *scRNA_reads_per_sample;
+	srInt_64 *scRNA_mapped_reads_per_sample;
 	srInt_64 scRNA_has_valid_sample_index;
 	srInt_64 scRNA_has_valid_cell_barcode;
 	fc_read_counters read_counters;
@@ -210,7 +211,8 @@ typedef struct {
 
 typedef struct {
 	int is_gene_level;
-	int is_paired_end_mode_assign;
+	int *is_paired_end_mode_assign;
+	int *is_paired_end_reads_expected;
 	int is_multi_overlap_allowed;
 	int restricted_no_multi_overlap;
 	char * strand_check_mode;
@@ -2865,6 +2867,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		RG_ptr = NULL;
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
 
+		if(global_context -> do_scRNA_table) add_scRNA_read_tota1_no(global_context, thread_context, read_name, 0);
 		if(global_context -> is_paired_end_mode_assign && (alignment_masks&1)==0) alignment_masks|=8;
 
 		//#warning "========= DEBUG OUTPUT =============="
@@ -2896,6 +2899,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
+		if(global_context -> do_scRNA_table) add_scRNA_read_tota1_no(global_context, thread_context, read_name, 1);
+
 		if(((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required){
 				if(RG_ptr){
 					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
@@ -3568,6 +3573,34 @@ int scRNA_get_cell_id(fc_thread_global_context_t * global_context, fc_thread_thr
 	return tb1;
 }
 
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step ){
+	char * testi, * sample_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
+	int xx=0, laneno=0;
+	for(testi = read_name +13 +global_context -> known_cell_barcode_length; * testi; testi ++){
+		if( * testi=='|'){
+			xx++;
+			if(xx == 2) {
+				sample_barcode = testi +1;
+			}else if(xx == 4){
+				lane_str = testi+1;
+				break;
+			}
+		}
+	}
+	assert(xx ==4 && (*lane_str)=='L');
+	for(testi = lane_str+1; *testi; testi++){
+		assert(isdigit(*testi));
+		laneno = laneno*10 + (*testi)-'0';
+	}
+	int sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
+	if(sample_id>0){
+		if(mapped_step)
+			thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
+		else
+			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
+	}
+}
+
 void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name ){ // the index of gene or the index of exon
 	// R00000000218:CGTAGNAGTTTAGTCGAATACTCGTAAT|BBB7B#FFFFFF0FFFFFFFFFFFFFFF|GGATGCCG|BBBBBFFB
 	//SUBREADprintf("Assigned %s to %ld\n", read_name, assign_target_number);
@@ -3599,10 +3632,7 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 	//SUBREADprintf("Rname=%s, Lane=%d ==> sample %d  cell %d  UMI %d\n", read_name, laneno, sample_id , cell_id, umi_id);
 
 	thread_context -> scRNA_pooled_reads ++;
-	if(sample_id >0){
-		thread_context -> scRNA_has_valid_sample_index ++;
-		thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
-	}
+	if(sample_id >0)thread_context -> scRNA_has_valid_sample_index ++;
 	if(cell_id >0)thread_context -> scRNA_has_valid_cell_barcode ++;
 
 	if(thread_context -> thread_id == 0 && thread_context -> scRNA_pooled_reads == 20000){
@@ -4601,10 +4631,20 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1;
 
-	fprintf(sample_tab_fp,"SampleName\tIndex\n");
+	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
+		srInt_64 mapped_reads = 0;, all_reads = 0;
+		int thrid;
+		for(thrid=0; thrid<global_context-> thread_number; thrid++){
+			mapped_reads += thread_context -> scRNA_mapped_reads_per_sample[thrid];
+			all_reads += thread_context -> scRNA_reads_per_sample[thrid];
+		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
-		fprintf(sample_tab_fp,"%s\t%d\n", this_sample_name, 1+x1);
+#ifdef __MINGW32__
+		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads);
+#else
+		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads);
+#endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
 		ArrayList * this_sample_45k_90k_barcode_idx = ArrayListCreate(90000 - 45000 + 100);
@@ -5306,7 +5346,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		}
 
 		if(global_context -> do_scRNA_table){
-			global_context -> thread_contexts[xk1].scRNA_reads_per_sample = malloc(sizeof(srInt_64)*global_context-> scRNA_sample_sheet_table ->numOfElements);
+			global_context -> thread_contexts[xk1].scRNA_reads_per_sample = calloc(sizeof(srInt_64),global_context-> scRNA_sample_sheet_table ->numOfElements);
+			global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample = calloc(sizeof(srInt_64),global_context-> scRNA_sample_sheet_table ->numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_sample_bc_tables = malloc(sizeof(HashTable*) * global_context -> scRNA_sample_id_to_name -> numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_registered_UMI_table = StringTableCreate(100000);
 			HashTableSetDeallocationFunctions(global_context  -> thread_contexts[xk1].scRNA_registered_UMI_table, free, NULL);
@@ -5396,6 +5437,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 			int xk2;
 			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++)HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
 			free(global_context -> thread_contexts[xk1].scRNA_reads_per_sample);
+			free(global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables);
 			HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_registered_UMI_table);
 		}
@@ -6565,6 +6607,7 @@ int readSummary(int argc,char *argv[]){
 	unsigned char * sorted_strand;
 
 	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
+	char * isPE,  *is_paired_end_reads_expected;
 
 	int  isGTF, n_input_files=0;
 	char *  alias_file_name = NULL, * cmd_rebuilt = NULL, * Rpath = NULL;
@@ -6573,7 +6616,7 @@ int readSummary(int argc,char *argv[]){
 
 	isCVersion = ((argv[0][0]=='C')?1:0);
 
-	isPE = atoi(argv[4]);
+	isPE = argv[4];
 	minPEDistance = atoi(argv[5]);
 	maxPEDistance = atoi(argv[6]);
 
@@ -6798,6 +6841,9 @@ int readSummary(int argc,char *argv[]){
 
 	if(argc>57 && strlen(argv[57])>0 && argv[57][0]!=' ') scRNA_cell_barcode_list = argv[57];
 	else scRNA_cell_barcode_list = NULL;
+
+	if(argc>58 && strlen(argv[58])>0 && argv[58][0]!=' ') is_paired_end_reads_expected = argv[58];
+	else is_paired_end_reads_expected = "0";
 
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
@@ -7275,7 +7321,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[58];
+	char * Rargv[59];
 	char annot_name[MAX_FILE_NAME_LENGTH];
 	char temp_dir[MAX_FILE_NAME_LENGTH];
 	char * out_name = malloc(MAX_FILE_NAME_LENGTH);
@@ -7309,6 +7355,7 @@ int feature_count_main(int argc, char ** argv)
 	char Pair_Orientations[3];
 	char * extra_column_names = NULL;
 	char * very_long_file_names;
+	char is_paired_end_reads_expected[2];
 	int is_Input_Need_Reorder = 0;
 	int is_PE = 0;
 	int is_SAM = 1;
@@ -7348,6 +7395,8 @@ int feature_count_main(int argc, char ** argv)
 	fasta_contigs_name[0]=0;
 	scRNA_cell_barcode_list[0]=0;
 	scRNA_sample_sheet[0]=0;
+	is_paired_end_reads_expected[0]='0';
+	is_paired_end_reads_expected[1]='\0';
 
 	alias_file_name[0]=0;
 	debug_command[0] = 0;
@@ -7440,7 +7489,7 @@ int feature_count_main(int argc, char ** argv)
 				max_dist = atoi(optarg);
 				break;
 			case 'p':
-				is_PE = 1;
+				is_paired_end_reads_expected[0]='1';
 				break;
 			case 'C':
 				is_Chimeric_Disallowed = 1;
@@ -7491,6 +7540,9 @@ int feature_count_main(int argc, char ** argv)
 				break;
 			case 0 :	// long options
 
+				if(strcmp("countReadPairs", long_options[option_index].name)==0){
+					is_PE=1;
+				}
 				if(strcmp("primary", long_options[option_index].name)==0)
 				{
 					is_primary_alignment_only = 1;
@@ -7774,10 +7826,11 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[55] = read_shift_size_str;
 	Rargv[56] = scRNA_sample_sheet;
 	Rargv[57] = scRNA_cell_barcode_list;
+	Rargv[58] = is_paired_end_reads_expected;
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(58, Rargv);
+	else retvalue = readSummary(59, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
