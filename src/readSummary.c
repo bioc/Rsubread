@@ -211,7 +211,7 @@ typedef struct {
 
 typedef struct {
 	int is_gene_level;
-	int *is_paired_end_mode_assign;
+	int is_paired_end_mode_assign;
 	int *is_paired_end_reads_expected;
 	int is_multi_overlap_allowed;
 	int restricted_no_multi_overlap;
@@ -2814,6 +2814,8 @@ void warning_anno_BAM_chromosomes(fc_thread_global_context_t * global_context){
 	HashTableDestroy(ANNO_chro_tab);
 }
 
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step);
+
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2)
 {
 	if(global_context -> is_input_bad_format) return;
@@ -3574,7 +3576,7 @@ int scRNA_get_cell_id(fc_thread_global_context_t * global_context, fc_thread_thr
 }
 
 void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step ){
-	char * testi, * sample_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
+	char * testi, *lane_str = NULL, * sample_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
 	int xx=0, laneno=0;
 	for(testi = read_name +13 +global_context -> known_cell_barcode_length; * testi; testi ++){
 		if( * testi=='|'){
@@ -4633,11 +4635,11 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 
 	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
-		srInt_64 mapped_reads = 0;, all_reads = 0;
+		srInt_64 mapped_reads = 0, all_reads = 0;
 		int thrid;
 		for(thrid=0; thrid<global_context-> thread_number; thrid++){
-			mapped_reads += thread_context -> scRNA_mapped_reads_per_sample[thrid];
-			all_reads += thread_context -> scRNA_reads_per_sample[thrid];
+			mapped_reads += global_context -> thread_contexts[thrid].scRNA_mapped_reads_per_sample[x1];
+			all_reads += global_context -> thread_contexts[thrid].scRNA_reads_per_sample[x1];
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
@@ -6606,7 +6608,7 @@ int readSummary(int argc,char *argv[]){
 	char * fasta_contigs_fname, *annotation_file_screen_output;
 	unsigned char * sorted_strand;
 
-	int isPE, minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
+	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
 	char * isPE,  *is_paired_end_reads_expected;
 
 	int  isGTF, n_input_files=0;
@@ -6788,7 +6790,7 @@ int readSummary(int argc,char *argv[]){
 		long_read_minimum_length = atoi(argv[44])?1:1999999999;
 	else  long_read_minimum_length = 1999999999;
 
-	if(long_read_minimum_length < 2 && isPE){
+	if(long_read_minimum_length < 2 && isPE[0]=='1'){
 		SUBREADputs("ERROR: long read assignment can only be done on single-end mode");
 		return -1;
 	}
@@ -6876,7 +6878,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, isPE[0]=='1', minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
