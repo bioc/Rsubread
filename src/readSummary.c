@@ -5089,7 +5089,6 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> is_read_details_out = is_sam_out;
 	global_context -> is_multi_overlap_allowed = is_overlap_allowed;
 	global_context -> restricted_no_multi_overlap = isRestrictlyNoOvelrapping;
-	global_context -> is_paired_end_mode_assign = is_PE_data;
 	global_context -> is_gene_level = is_gene_level;
 	global_context -> strand_check_mode = strand_check_mode;
 	global_context -> is_both_end_required = is_both_end_required;
@@ -6625,7 +6624,7 @@ int readSummary(int argc,char *argv[]){
 
 	isCVersion = ((argv[0][0]=='C')?1:0);
 
-	isPEassigne = argv[4];
+	isPEassign = argv[4];
 	minPEDistance = atoi(argv[5]);
 	maxPEDistance = atoi(argv[6]);
 
@@ -6797,7 +6796,7 @@ int readSummary(int argc,char *argv[]){
 		long_read_minimum_length = atoi(argv[44])?1:1999999999;
 	else  long_read_minimum_length = 1999999999;
 
-	if(long_read_minimum_length < 2 && isPEassigb[0]=='1'){
+	if(long_read_minimum_length < 2 && isPEassign[0]=='1'){
 		SUBREADputs("ERROR: long read assignment can only be done on single-end mode");
 		return -1;
 	}
@@ -7003,7 +7002,7 @@ int readSummary(int argc,char *argv[]){
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
 		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
-		int this_file_isPEassign = isPEassign[1]?isPEassign[x1] == '1' : isPE[0]=='1';
+		int this_file_isPEassign = isPEassign[1]?isPEassign[x1] == '1' : isPEassign[0]=='1';
 		int this_file_isPEexpected = is_paired_end_reads_expected[1]?is_paired_end_reads_expected[x1]=='1' : is_paired_end_reads_expected[0]=='1';
 		global_context.is_paired_end_reads_expected = this_file_isPEexpected;
 		global_context.is_paired_end_mode_assign = this_file_isPEassign;
@@ -7311,7 +7310,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	// Nothing is done if the file does not exist.
 
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
-	if(global_context -> is_paired_reads_expected && !global_context -> any_reads_are_PE){
+	if(global_context -> is_paired_end_reads_expected && !global_context -> any_reads_are_PE){
 		SUBREADprintf("ERROR: No paired-end reads were detected in paired-end read library : %s\n", global_context -> input_file_name);
 		return -1;
 	}
