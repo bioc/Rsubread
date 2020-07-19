@@ -2,6 +2,12 @@
 .R_flist_splitor <- "\026"
 .filepath_maximum_len <- 990L
 
+.stop_quietly <- function() {
+  opt <- options(show.error.messages = FALSE)
+  on.exit(options(opt))
+  stop()
+}
+
 .is.64bit.system <- function(){
 	return(grepl("[-_]64",Sys.info()[["machine"]]))
 }
@@ -50,7 +56,11 @@
   return(rv)
 }
 
-featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,sampleSheet=NULL,cellBarcodeList=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
+.flatten.and.numeric <- function(logicarr){
+	paste0(as.numeric(logicarr),collapse="")
+}
+
+featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,countReadPairs=FALSE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,sampleSheet=NULL,cellBarcodeList=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
 	flag <- FALSE
 	if(!.is.64bit.system()) warning("your system seems to be 32-bit. Rsubread supports 32-bit systems to a limited level only.\nWe recommend that Rsubread be run on 64-bit systems to avoid any possible problems.\n\n",call.=FALSE)
@@ -62,6 +72,14 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     .check_string_param(readShiftType, "readShiftType")
     .check_string_param(sampleSheet, "sampleSheet")
     .check_string_param(cellBarcodeList, "cellBarcodeList")
+
+	if(length(countReadPairs)>1){
+		if(length(countReadPairs) != length(files))stop("The argumet for countReadPairs is a vector, but it has a different length to the files vector.")
+		if(length(isPairedEnd)>1 && length(countReadPairs)!=length(isPairedEnd))stop("The argumets for countReadPairs and isPairedEnd are both vectors, but they have different lengths.")
+	}
+    if(length(isPairedEnd)>1){
+		if(length(isPairedEnd) != length(files))stop("The argumet for isPairedEnd is a vector, but it has a different length to the files vector.")
+    }
 
 	if(length(GTF.featureType)>1) GTF.featureType<-paste(GTF.featureType, collapse=",")
     out.base.names <- basename(files)
@@ -193,7 +211,10 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     if(is.null(sampleSheet)) sampleSheet<-' '
     if(is.null(cellBarcodeList)) cellBarcodeList<-' '
 	  
-	cmd <- paste("readSummary",ann,files_C,fout,as.numeric(isPairedEnd),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize, sampleSheet, cellBarcodeList ,sep=.R_param_splitor)
+
+	print(.flatten.and.numeric(countReadPairs))
+	print(.flatten.and.numeric(isPairedEnd))
+	cmd <- paste("readSummary",ann,files_C,fout,.flatten.and.numeric(countReadPairs),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize, sampleSheet, cellBarcodeList ,.flatten.and.numeric(isPairedEnd),sep=.R_param_splitor)
     #print(cmd)
 	n <- length(unlist(strsplit(cmd, .R_param_splitor )))
 	C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
@@ -223,7 +244,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		  file.remove(fout_annot)
 
 		if(ncol(x) <= (6 + add_attr_numb)){
-		  stop("No count data were generated.")
+		  cat("No count data were generated.\n")
+		  .stop_quietly()
 		}
 		
 		y <- as.matrix(x[,-c(1:(6 + add_attr_numb))])
@@ -236,7 +258,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 			z <- list(counts=y,annotation=x[,1:(6 + add_attr_numb)],targets=out.col.names,stat=x_summary)	
 		z	
 	}else{
-		stop("No counts were generated.")
+		cat("No counts were generated.\n")
+		.stop_quietly()
 	}
 }
 

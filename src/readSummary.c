@@ -271,7 +271,6 @@ typedef struct {
 
 	unsigned short thread_number;
 	fc_thread_thread_context_t * thread_contexts;
-	int is_all_finished;
 	int sambam_chro_table_items;
 	int is_input_bad_format;
 	int any_reads_are_PE;
@@ -2881,7 +2880,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 
 		if(  ( alignment_masks & SAM_FLAG_PAIRED_TASK ) && !global_context -> any_reads_are_PE ) global_context -> any_reads_are_PE=1;
-		if(((!global_context -> is_paired_end_mode_assign)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context ->is_paired_end_mode_assign)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
+		if(((!global_context -> is_paired_end_reads_expected)  && ( alignment_masks & SAM_FLAG_PAIRED_TASK )) || ((global_context -> is_paired_end_reads_expected)  && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK ))){
 			if(global_context -> is_mixed_PE_SE == 0) global_context -> is_mixed_PE_SE =1;
 			if(!global_context -> is_paired_end_reads_expected){
 				SUBREADprintf("ERROR: Paired-end reads were detected in single-end read library : %s\n", global_context -> input_file_name);
@@ -4934,15 +4933,15 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 
 	if(0 == global_context -> is_input_bad_format){
 
-		if(global_context -> is_paired_end_mode_assign){
+		if(global_context -> is_paired_end_reads_expected){
 			if(global_context -> is_mixed_PE_SE)
 					print_in_box(80,0,0,"   WARNING: Single-end reads were found%s.", global_context -> is_strand_checked?" and excluded":"");
 			else print_in_box(80,0,0,"   Paired-end reads are included.");
-		}
-		if(global_context -> is_paired_end_mode_assign==0){
-			if(global_context -> is_mixed_PE_SE)
-				print_in_box(80,0,0,"   WARNING: Paired-end reads were found%s.", global_context -> is_strand_checked?" and excluded":"");
-			else print_in_box(80,0,0,"   Single-end reads are included.");
+			if(!global_context -> is_paired_end_mode_assign)
+				print_in_box(80,0,0, "   The reads are assigned on the single-end mode.");
+		}else{
+			// paired-end reads in a single-end lib will result in error.
+			print_in_box(80,0,0,"   Single-end reads are included.");
 		}
 
 		char pct_str[10];
@@ -5278,7 +5277,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	global_context -> sambam_chro_table = NULL;
 	pthread_spin_init(&global_context->sambam_chro_table_lock, PTHREAD_PROCESS_PRIVATE);
 
-	global_context -> is_all_finished = 0;
 	global_context -> thread_contexts = malloc(sizeof(fc_thread_thread_context_t) * global_context -> thread_number);
 	for(xk1=0; xk1<global_context -> thread_number; xk1++)
 	{
@@ -7002,8 +7000,8 @@ int readSummary(int argc,char *argv[]){
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
 		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
-		int this_file_isPEassign = isPEassign[1]?isPEassign[x1] == '1' : isPEassign[0]=='1';
-		int this_file_isPEexpected = is_paired_end_reads_expected[1]?is_paired_end_reads_expected[x1]=='1' : is_paired_end_reads_expected[0]=='1';
+		int this_file_isPEassign = isPEassign[1]?isPEassign[x1] == '1' :(isPEassign[0]=='1');
+		int this_file_isPEexpected = is_paired_end_reads_expected[1]?is_paired_end_reads_expected[x1]=='1' :(is_paired_end_reads_expected[0]=='1');
 		global_context.is_paired_end_reads_expected = this_file_isPEexpected;
 		global_context.is_paired_end_mode_assign = this_file_isPEassign;
 
@@ -7310,13 +7308,11 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	// Nothing is done if the file does not exist.
 
 	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
+	fc_thread_wait_threads(global_context);
 	if(global_context -> is_paired_end_reads_expected && !global_context -> any_reads_are_PE){
 		SUBREADprintf("ERROR: No paired-end reads were detected in paired-end read library : %s\n", global_context -> input_file_name);
 		return -1;
 	}
-
-	global_context->is_all_finished = 1;
-	fc_thread_wait_threads(global_context);
 
 	srInt_64 nreads_mapped_to_exon = 0;
 	fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon, my_read_counter, junction_global_table, splicing_global_table, merged_RG_table, loaded_features);
