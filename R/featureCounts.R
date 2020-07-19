@@ -81,6 +81,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 		if(length(isPairedEnd) != length(files))stop("The argumet for isPairedEnd is a vector, but it has a different length to the files vector.")
     }
 
+	countReadPairs <- ifelse( isPairedEnd, countReadPairs, F )
+
 	if(length(GTF.featureType)>1) GTF.featureType<-paste(GTF.featureType, collapse=",")
     out.base.names <- basename(files)
     if(any(duplicated(out.base.names))){

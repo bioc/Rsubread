@@ -609,7 +609,7 @@ srInt_64 unistr_cpy(fc_thread_global_context_t * global_context, char * str, int
 	return ret;
 }
 
-int print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport)
+int print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport, char * PE_exp, char * PE_ass)
 {
 	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+MAX_FILE_NAME_LENGTH), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
 	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
@@ -684,18 +684,17 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	print_in_box(80,0,0,"            Input files : %s%s%s", sam_ntxt, bam_ntxt, next_ntxt);
 	nfiles=0;
 
-	while(1)
-	{
+	while(1){
 		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
 
-		char file_chr = 'o';
-		if(file_probe == -1) file_chr = '?';
-		else if(is_first_read_PE == 1) file_chr = 'o';
-		//file_chr = 'o';
+		char file_expected_chr = 'S';
+		char file_assmode_chr = 'S';
+		if(PE_ass[1]?PE_ass[nfiles]=='1':(PE_ass[0]=='1')) file_assmode_chr = 'P';
+		if(PE_exp[1]?PE_exp[nfiles]=='1':(PE_exp[0]=='1')) file_expected_chr = 'P';
 
-		print_in_box(94,0,0,"                          %c[32m%c%c[36m %s%c[0m",CHAR_ESC, file_chr,CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
+		print_in_box(94,0,0,"                          %c[32m%c,%c%c[36m %s%c[0m",CHAR_ESC, file_expected_chr, file_assmode_chr, CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
 		nfiles++;
 	}
 
@@ -743,7 +742,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	#endif
 	print_in_box(80,0,0,"                Threads : %d", global_context->thread_number);
 	print_in_box(80,0,0,"                  Level : %s level", global_context->is_gene_level?"meta-feature":"feature");
-	print_in_box(80,0,0,"             Paired-end : %s", global_context->is_paired_end_mode_assign?"yes":"no");
+//	print_in_box(80,0,0,"             Paired-end : %s", global_context->is_paired_end_mode_assign?"yes":"no");
 	if(global_context -> do_not_sort && global_context->is_paired_end_mode_assign) {
 		print_in_box(80,0,0,"       Sorting PE Reads : never");
 		print_in_box(80,0,0,"");
@@ -6886,7 +6885,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
-	if( print_FC_configuration(&global_context, argv[1], file_name_ptr, argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport) )
+	if( print_FC_configuration(&global_context, argv[1], file_name_ptr, argv[3], global_context.is_SAM_file, isGTF, & n_input_files, isReadSummaryReport, is_paired_end_reads_expected, isPEassign) )
 		return -1;
 	// Loading the annotations.
 	// Nothing is done if the annotation does not exist.
@@ -7311,6 +7310,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	fc_thread_wait_threads(global_context);
 	if(global_context -> is_paired_end_reads_expected && !global_context -> any_reads_are_PE){
 		SUBREADprintf("ERROR: No paired-end reads were detected in paired-end read library : %s\n", global_context -> input_file_name);
+		global_context -> is_input_bad_format=1;
 		return -1;
 	}
 
