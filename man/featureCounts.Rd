@@ -58,6 +58,7 @@ featureCounts(files,
     
     # parameters specific to paired end reads
     isPairedEnd = FALSE,
+    countReadPairs = TRUE,
     requireBothEndsMapped = FALSE,
     checkFragLength = FALSE,
     minFragLength = 50,
@@ -115,7 +116,8 @@ featureCounts(files,
   \item{strandSpecific}{ an integer vector indicating if strand-specific read counting should be performed. Length of the vector should be either \code{1} (meaning that the value is applied to all input files), or equal to the total number of input files provided. Each vector element should have one of the following three values: \code{0} (unstranded), \code{1} (stranded) and \code{2} (reversely stranded). Default value of this parameter is \code{0} (ie. unstranded read counting is performed for all input files).}
   \item{juncCounts}{ logical indicating if number of reads supporting each exon-exon junction will be reported. Junctions are identified from those exon-spanning reads in input data. \code{FALSE} by default.}
   \item{genome}{ a character string giving the name of a FASTA-format file that includes the reference sequences used in read mapping that produced the provided SAM/BAM files. \code{NULL} by default. This argument should only be used when \code{juncCounts} is \code{TRUE}. Note that providing reference sequences is optional when \code{juncCounts} is set to \code{TRUE}.}
-  \item{isPairedEnd}{ logical indicating if counting should be performed on read pairs or reads. \code{FALSE} by default.  If \code{TRUE}, read pairs will be counted instead of individual reads.}
+  \item{isPairedEnd}{ A logical scalar or a logical vector, indicating whether libraries contain paired-end reads or not. \code{FALSE} by default. For any library that contains paired-end reads, the 'countReadPairs' parameter controls if read pairs or reads should be counted.}
+  \item{countReadPairs}{ A logical scalar or a logical vector, indicating if read pairs, instead of reads, should be counted for paired-end read data. \code{TRUE} by default. This parameter is only applicable for paired-end data. For single-end data, it is ignored.}
   \item{requireBothEndsMapped}{ logical indicating if both ends from the same fragment are required to be successfully aligned before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}.}
   \item{checkFragLength}{ logical indicating if the two ends from the same fragment are required to satisify the fragment length criteria before the fragment can be assigned to a feature or meta-feature. This parameter is only appliable when \code{isPairedEnd} is \code{TRUE}. The fragment length criteria are specified via \code{minFragLength} and \code{maxFragLength}.}
   \item{minFragLength}{ \code{integer} giving the minimum fragment length for paired-end reads. \code{50} by default.}

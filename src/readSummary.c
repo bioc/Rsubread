@@ -2922,12 +2922,13 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 		if(this_is_inconsistent_read_type){
-			if(global_context -> is_strand_checked){
+			if(0 && global_context -> is_strand_checked){
+				// on 20JUL2020, "If strand-specific counting is on, isPairedEnd = TRUE, countReadPairs = TRUE and the input BAM file contains mixed single-end and paired-end reads, then both single-end reads and paired-end reads will be counted.  The single-end reads will be counted as they are R1 in a read-pair. "
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context, thread_context,"Unassigned_Read_Type", 0, NULL, bin1, bin2);
 				if(RG_ptr){
-                    void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
-                    fc_read_counters * sumtab = tab4s[1];
+					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
+					fc_read_counters * sumtab = tab4s[1];
 					sumtab -> unassigned_read_type++;
 				}else thread_context->read_counters.unassigned_read_type ++;
 		
@@ -2938,10 +2939,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context , thread_context ,"Unassigned_Singleton",0, NULL, bin1, bin2);
 				if(RG_ptr){
-                    void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
-                    fc_read_counters * sumtab = tab4s[1];
-                    sumtab -> unassigned_singleton++;
-                }else thread_context->read_counters.unassigned_singleton ++;
+					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
+					fc_read_counters * sumtab = tab4s[1];
+					sumtab -> unassigned_singleton++;
+				}else thread_context->read_counters.unassigned_singleton ++;
 
 				return; // when running on PE mode, SE reads are seen as "only one end mapped"
 			}
@@ -3067,7 +3068,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		int is_this_negative_strand = (alignment_masks & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0; 
 		int is_fragment_negative_strand = is_this_negative_strand;
 
-		if( global_context -> is_paired_end_mode_assign ){
+		if(1 || global_context -> is_paired_end_mode_assign){ // On 20 JULY 2020: If strand-specific counting is on, isPairedEnd = TRUE, countReadPairs = FALSE and the BAM file contains mixed reads, then the single-end reads and the R1 reads in read-pairs will be directly compared with the strand of the gene, but the R2 reads in read-pairs will be compared with the opposite strand of the gene. A read-pair will be counted twice no matter if the strand-specific mode is on or off. If the argument to the strand-specific option is "1", then R1 must have the same strand of the gene and R2 must have the opposite strand of the gene to be counted. 
 			int is_second_read_in_pair = alignment_masks & SAM_FLAG_SECOND_READ_IN_PAIR;
 			//is_fragment_negative_strand = is_second_read_in_pair?(!is_this_negative_strand):is_this_negative_strand;
 			if(is_second_read_in_pair)
