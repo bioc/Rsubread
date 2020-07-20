@@ -87,6 +87,7 @@ subjunc(
     input_format = "gzFASTQ",
     output_format = "BAM",
     output_file = paste(readfile1,"subjunc",output_format,sep = "."),
+    isBCLinput = FALSE,
     
     # offset value added to Phred quality scores of read bases
     phredOffset = 33,
