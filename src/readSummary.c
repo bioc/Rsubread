@@ -689,12 +689,14 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
 
-		char file_expected_chr = 'S';
-		char file_assmode_chr = 'S';
-		if(PE_ass[1]?PE_ass[nfiles]=='1':(PE_ass[0]=='1')) file_assmode_chr = 'P';
-		if(PE_exp[1]?PE_exp[nfiles]=='1':(PE_exp[0]=='1')) file_expected_chr = 'P';
+		char *file_expected_chr = "expect SE reads, ";
+		char *file_assmode_chr = "count reads";
+		if(PE_ass[1]?PE_ass[nfiles]=='1':(PE_ass[0]=='1')) file_assmode_chr = "count read-pairs";
+		if(PE_exp[1]?PE_exp[nfiles]=='1':(PE_exp[0]=='1')) file_expected_chr = "expect PE reads, ";
 
-		print_in_box(94,0,0,"                          %c[32m%c,%c%c[36m %s%c[0m",CHAR_ESC, file_expected_chr, file_assmode_chr, CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
+		print_in_box(80,0,0,"");
+		print_in_box(89,0,0,"                          %c[36m%s%c[0m",CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
+		print_in_box(89,0,0,"                          %c[32m(%s%s)%c[0m",CHAR_ESC, file_expected_chr, file_assmode_chr,CHAR_ESC);
 		nfiles++;
 	}
 
