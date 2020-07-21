@@ -1,3 +1,6 @@
+21 July 2020 - 2.3.8
+(1) Largely change the isPairedEnd option in featureCounts() and added countReadPairs option.
+
 18 July 2020 - 2.3.7
 (1) Report mapped and all reads in cellCounts per sample.
 
