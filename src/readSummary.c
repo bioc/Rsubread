@@ -612,7 +612,7 @@ srInt_64 unistr_cpy(fc_thread_global_context_t * global_context, char * str, int
 int print_FC_configuration(fc_thread_global_context_t * global_context, char * annot, char * sam, char * out, int is_sam, int is_GTF, int *n_input_files, int isReadSummaryReport, char * PE_exp, char * PE_ass)
 {
 	char * tmp_ptr1 = NULL , * next_fn, *sam_used = malloc(strlen(sam)+MAX_FILE_NAME_LENGTH), sam_ntxt[30],bam_ntxt[30], next_ntxt[50];
-	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0;
+	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0, x1;
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 
@@ -682,21 +682,14 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	strcpy(sam_used, sam);
 
 	print_in_box(80,0,0,"            Input files : %s%s%s", sam_ntxt, bam_ntxt, next_ntxt);
+	print_in_box(80,0,0,"");
 	nfiles=0;
 
 	while(1){
 		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
 		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
-
-		char *file_expected_chr = "expect SE reads, ";
-		char *file_assmode_chr = "count reads";
-		if(PE_ass[1]?PE_ass[nfiles]=='1':(PE_ass[0]=='1')) file_assmode_chr = "count read-pairs";
-		if(PE_exp[1]?PE_exp[nfiles]=='1':(PE_exp[0]=='1')) file_expected_chr = "expect PE reads, ";
-
-		print_in_box(80,0,0,"");
 		print_in_box(89,0,0,"                          %c[36m%s%c[0m",CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
-		print_in_box(89,0,0,"                          %c[32m(%s%s)%c[0m",CHAR_ESC, file_expected_chr, file_assmode_chr,CHAR_ESC);
 		nfiles++;
 	}
 
@@ -704,10 +697,47 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	print_in_box(80,0,0,"");
 
 	if(global_context -> annotation_file_screen_output[0]==0){
-	print_in_box(80,0,0,"            Output file : %s", get_short_fname(out));
-	print_in_box(80,0,0,"                Summary : %s.summary", get_short_fname(out));
+		print_in_box(80,0,0,"            Output file : %s", get_short_fname(out));
+		print_in_box(80,0,0,"                Summary : %s.summary", get_short_fname(out));
 	}
 
+	char * PEassignStr = malloc(nfiles * 6);
+	char * PEexpectStr = malloc(nfiles * 6);
+
+	int exp_all_same = 1, ass_all_same = 1;
+
+	sprintf(PEexpectStr,"%s, ", (PE_exp[0]=='1')?"yes":"no");
+	char * Ystr = nfiles>5?"Y":"yes";
+	char * Nstr = nfiles>5?"N":"no";
+	if(PE_exp[1]){
+		for(x1=1; PE_exp[x1]; x1++)
+			if(PE_exp[x1]!=PE_exp[0]) exp_all_same=0;
+
+		if(!exp_all_same){
+			PEexpectStr[0]=0;
+			for(x1=0; PE_exp[x1]; x1++)
+				sprintf(PEexpectStr+strlen(PEexpectStr), "%s, ", (PE_exp[x1]=='1')?Ystr:Nstr);
+		}
+	}
+	PEexpectStr[strlen(PEexpectStr)-2]=0;
+
+	sprintf(PEassignStr,"%s, ", (PE_ass[0]=='1')?"yes":"no");
+	if(PE_ass[1]){
+		for(x1=1; PE_ass[x1]; x1++)
+			if(PE_ass[x1]!=PE_ass[0]) ass_all_same=0;
+
+		if(!ass_all_same){
+			PEassignStr[0]=0;
+			for(x1=0; PE_ass[x1]; x1++)
+				sprintf(PEassignStr+strlen(PEassignStr), "%s, ", (PE_ass[x1]=='1')?Ystr:Nstr);
+		}
+	}
+	PEassignStr[strlen(PEassignStr)-2]=0;
+
+	print_in_box(80,0,0,"             Paired-end : %s",PEexpectStr);
+	print_in_box(80,0,0,"       Count read pairs : %s",PEassignStr);
+	free(PEassignStr);
+	free(PEexpectStr);
 
     if(global_context -> annotation_file_screen_output[0])
 		print_in_box(80,0,0,"             Annotation : %s",global_context -> annotation_file_screen_output);

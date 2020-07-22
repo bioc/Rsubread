@@ -79,9 +79,11 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 	}
     if(length(isPairedEnd)>1){
 		if(length(isPairedEnd) != length(files))stop("The argumet for isPairedEnd is a vector, but it has a different length to the files vector.")
-    }
+		countReadPairs <- ifelse( isPairedEnd, countReadPairs, F )
+    }else{
+		if(!isPairedEnd) countReadPairs <- F
+	}
 
-	countReadPairs <- ifelse( isPairedEnd, countReadPairs, F )
 
 	if(length(GTF.featureType)>1) GTF.featureType<-paste(GTF.featureType, collapse=",")
     out.base.names <- basename(files)
@@ -214,8 +216,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     if(is.null(cellBarcodeList)) cellBarcodeList<-' '
 	  
 
-	print(.flatten.and.numeric(countReadPairs))
-	print(.flatten.and.numeric(isPairedEnd))
+	#print(.flatten.and.numeric(countReadPairs))
+	#print(.flatten.and.numeric(isPairedEnd))
 	cmd <- paste("readSummary",ann,files_C,fout,.flatten.and.numeric(countReadPairs),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize, sampleSheet, cellBarcodeList ,.flatten.and.numeric(isPairedEnd),sep=.R_param_splitor)
     #print(cmd)
 	n <- length(unlist(strsplit(cmd, .R_param_splitor )))
