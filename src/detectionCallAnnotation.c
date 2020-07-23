@@ -248,7 +248,7 @@ calculateExonGCContent(void){
 
 	/* Output result to file*/
 	
-	char *DCC_exon_GC_file = "DCC_exon_GC.txt";
+	char *DCC_exon_GC_file = "exon_GC.txt";
 	FILE *f_annotation_DCC_exon = fopen(DCC_exon_GC_file, "w");
 	node *dh;
 	//fprintf(f_annotation_DCC_exon,"entrezid\tchr\tstart\tend\tnnum\tgcnum\tatnum\n");
