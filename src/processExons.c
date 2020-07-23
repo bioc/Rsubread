@@ -59,7 +59,7 @@ gene * gene_array;
 
 int current_gene_id;
 
-char *exon_file;
+char *PEE_exon_file;
 char *gene_file;
 
 
@@ -72,7 +72,7 @@ initialise_process_exons(){
 	gene_index = 0;
 	current_gene_id = 0;
 	exon_num = 0;
-	exon_file = (char *)malloc(STR);
+	PEE_exon_file = (char *)malloc(STR);
 	gene_file = (char *)malloc(STR);
 }
 
@@ -171,7 +171,7 @@ insert_exon(void *pt, int start, int end){
 void output_exons_to_file(){
 	FILE *fexon;
 	FILE *fgene;
-	fexon = fopen(exon_file,"w");
+	fexon = fopen(PEE_exon_file,"w");
 	fgene = fopen(gene_file,"w");
 	//fprintf(fexon, "entrezid\tchromosome\tchr_start\tchr_stop\n");
 	//fprintf(fgene, "entrezid\tchromosome\tchr_start\tchr_stop\n");
@@ -284,7 +284,7 @@ processExons(char **utr_cds, char **fexon, char** fgene){
 	exon *dh;
 
 	initialise_process_exons();
-	strcpy(exon_file, *fexon);
+	strcpy(PEE_exon_file, *fexon);
 	strcpy(gene_file, *fgene);
 	
 	fin = fopen(*utr_cds,"r");
