@@ -182,6 +182,7 @@ typedef struct {
 	srInt_64 scRNA_pooled_reads;
 	srInt_64 *scRNA_reads_per_sample;
 	srInt_64 *scRNA_mapped_reads_per_sample;
+	srInt_64 *scRNA_assigned_reads_per_sample;
 	srInt_64 scRNA_has_valid_sample_index;
 	srInt_64 scRNA_has_valid_cell_barcode;
 	fc_read_counters read_counters;
@@ -3533,6 +3534,7 @@ int scRNA_register_umi_id(fc_thread_global_context_t * global_context, fc_thread
 	}
 	ubc[xk1]=0;
 	int uno = HashTableGet(thread_context -> scRNA_registered_UMI_table, ubc ) -NULL -1;
+	//SUBREADprintf("UMIREGR %s = %d of %lld\n", ubc, uno,  thread_context -> scRNA_registered_UMI_table -> numOfElements);
 	if(uno<0) {
 		uno =  thread_context -> scRNA_registered_UMI_table -> numOfElements;
 		assert(strlen(ubc) < MAX_UMI_BARCODE_LENGTH);
@@ -3634,9 +3636,9 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	}
 	int sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
 	if(sample_id>0){
-		if(mapped_step)
+		if(mapped_step == 1)
 			thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
-		else
+		else if(mapped_step == 0)
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
 	}
 }
@@ -3681,6 +3683,7 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		print_in_box(80,0,0,"     %.1f pct reads have valid cell barcodes.", thread_context->scRNA_has_valid_cell_barcode*100./thread_context -> scRNA_pooled_reads);
 		print_in_box(80,0,0,"");
 	}
+	if(sample_id >0) thread_context -> scRNA_assigned_reads_per_sample[sample_id-1] ++; 
 	//if(sample_id>1)SUBREADprintf("Sample=%s, Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", sample_barcode, cell_barcode, umi_barcode, laneno, sample_id);
 	if(sample_id >0 && cell_id >=0 && umi_id >=0){
 		assert(sample_id<= global_context -> scRNA_sample_sheet_table -> numOfElements );
@@ -4447,14 +4450,18 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 
 void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * merged_umi_list, ArrayList * highconf_list){
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
-	srInt_64 UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
+	srInt_64 xk1,UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
 
-	if(0){
-		SUBREADprintf("HIGHEST 30 TH UMIs = %lld\n", UMIs_30th_high);
+	for(xk1=0;xk1<sorted_idx->numOfElements; xk1++){
+		SUBREADprintf("SORTIDX_5CODE %lld %lld\n",xk1, ArrayListGet(sorted_idx,xk1)-NULL );
+	}
+
+	if(1){
+		SUBREADprintf("HIGHEST_5CODE 30 TH UMIs = %lld\n", UMIs_30th_high);
 		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -0 ))-NULL;
-		SUBREADprintf("HIGHEST 31 TH UMIs = %lld\n", UMIs_30th_high);
+		SUBREADprintf("HIGHEST_5CODE 31 TH UMIs = %lld\n", UMIs_30th_high);
 		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -2 ))-NULL;
-		SUBREADprintf("HIGHEST 29 TH UMIs = %lld\n", UMIs_30th_high);
+		SUBREADprintf("HIGHEST_CODE 29 TH UMIs = %lld\n", UMIs_30th_high);
 	}
 
 	srInt_64 x2,x1;
@@ -4467,7 +4474,7 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 		}
 	}
 	this_total /= SCRNA_BOOTSTRAP_SAMPLING_TIMES;
-	if(0) SUBREADprintf("FINAL SELECTION_IDX =  %lld\n",this_total);
+	if(0) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %lld\n",this_total);
 	for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++) ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) -1 );
 }
 
@@ -4671,25 +4678,37 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1;
 
-	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\n");
+	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\tAssigned.Reads\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
-		srInt_64 mapped_reads = 0, all_reads = 0;
+		srInt_64 mapped_reads = 0, all_reads = 0, assigned_reads = 0;
 		int thrid;
 		for(thrid=0; thrid<global_context-> thread_number; thrid++){
 			mapped_reads += global_context -> thread_contexts[thrid].scRNA_mapped_reads_per_sample[x1];
+			assigned_reads += global_context -> thread_contexts[thrid].scRNA_mapped_reads_per_sample[x1];
 			all_reads += global_context -> thread_contexts[thrid].scRNA_reads_per_sample[x1];
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
 #else
-		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads);
+		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
 #endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
 		ArrayList * this_sample_45k_90k_barcode_idx = ArrayListCreate(90000 - 45000 + 100);
+
 		scRNA_merged_bootstrap_a_sample(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1],merged_umi_list, high_confid_barcode_index_list);
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
+
+		unsigned int xk1;
+		for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
+			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
+		}
+		for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
+			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
+		}
+
+
 
 		//SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], high_confid_barcode_index_list, x1, "HighConf",  loaded_features);
@@ -4770,6 +4789,9 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			HashTableIteration(  merged_sample_cell_umi_tables[xk1], scRNA_merge_merge_UMIs);
 		}
 
+		if(0)for(xk1=0; xk1< merged_umi_list->numOfElements; xk1++){
+			SUBREADprintf("MGRRE_UMI %lld\t%s\n", xk1, ArrayListGet(merged_umi_list, xk1));
+		}
 		scRNA_merged_to_tables_write(global_context , merged_sample_cell_umi_tables , used_cell_no_tables, merged_umi_list, loaded_features);
 
 	//	SUBREADprintf("MERGED UMI TABLE = %ld items\n", merged_umi_table -> numOfElements);
@@ -5386,6 +5408,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		if(global_context -> do_scRNA_table){
 			global_context -> thread_contexts[xk1].scRNA_reads_per_sample = calloc(sizeof(srInt_64),global_context-> scRNA_sample_sheet_table ->numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample = calloc(sizeof(srInt_64),global_context-> scRNA_sample_sheet_table ->numOfElements);
+			global_context -> thread_contexts[xk1].scRNA_assigned_reads_per_sample = calloc(sizeof(srInt_64),global_context-> scRNA_sample_sheet_table ->numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_sample_bc_tables = malloc(sizeof(HashTable*) * global_context -> scRNA_sample_id_to_name -> numOfElements);
 			global_context -> thread_contexts[xk1].scRNA_registered_UMI_table = StringTableCreate(100000);
 			HashTableSetDeallocationFunctions(global_context  -> thread_contexts[xk1].scRNA_registered_UMI_table, free, NULL);
@@ -5476,6 +5499,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++)HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
 			free(global_context -> thread_contexts[xk1].scRNA_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample);
+			free(global_context -> thread_contexts[xk1].scRNA_assigned_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables);
 			HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_registered_UMI_table);
 		}
