@@ -4452,11 +4452,11 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
 	srInt_64 xk1,UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
 
-	for(xk1=0;xk1<sorted_idx->numOfElements; xk1++){
+	if(0)for(xk1=0;xk1<sorted_idx->numOfElements; xk1++){
 		SUBREADprintf("SORTIDX_5CODE %lld %lld\n",xk1, ArrayListGet(sorted_idx,xk1)-NULL );
 	}
 
-	if(1){
+	if(0){
 		SUBREADprintf("HIGHEST_5CODE 30 TH UMIs = %lld\n", UMIs_30th_high);
 		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -0 ))-NULL;
 		SUBREADprintf("HIGHEST_5CODE 31 TH UMIs = %lld\n", UMIs_30th_high);
@@ -4701,10 +4701,10 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
 
 		unsigned int xk1;
-		for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
+		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
 			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
 		}
-		for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
+		if(0)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
 			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
 		}
 
