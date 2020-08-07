@@ -4684,7 +4684,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		int thrid;
 		for(thrid=0; thrid<global_context-> thread_number; thrid++){
 			mapped_reads += global_context -> thread_contexts[thrid].scRNA_mapped_reads_per_sample[x1];
-			assigned_reads += global_context -> thread_contexts[thrid].scRNA_mapped_reads_per_sample[x1];
+			assigned_reads += global_context -> thread_contexts[thrid].scRNA_assigned_reads_per_sample[x1];
 			all_reads += global_context -> thread_contexts[thrid].scRNA_reads_per_sample[x1];
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
