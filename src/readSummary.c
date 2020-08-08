@@ -4452,7 +4452,7 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
 	srInt_64 x2, x1, UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
 
-	if(1)for(x1=0;x1<sorted_idx->numOfElements; x1++){
+	if(0)for(x1=0;x1<sorted_idx->numOfElements; x1++){
 		SUBREADprintf("SORTIDX_5CODE %lld %lld\n",x1, ArrayListGet(sorted_idx,x1)-NULL );
 	}
 
@@ -4476,9 +4476,9 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 		}
 	}
 	this_total /= SCRNA_BOOTSTRAP_SAMPLING_TIMES;
-	if(1) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %lld\n",this_total);
+	if(0) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %lld\n",this_total);
 	for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++){
-		SUBREADprintf("INSERT_5CODE %lld = %lld , of %lld HLST\n",x1 , ArrayListGet( sorted_idx, x1 ) - NULL, highconf_list -> numOfElements);
+		if(0)SUBREADprintf("INSERT_5CODE %lld = %lld , of %lld HLST\n",x1 , ArrayListGet( sorted_idx, x1 ) - NULL, highconf_list -> numOfElements);
 		ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) - 1 );
 	}
 }
@@ -4706,10 +4706,10 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
 
 		unsigned int xk1;
-		if(1)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
+		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
 			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
 		}
-		if(1)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
+		if(0)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
 			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
 		}
 
