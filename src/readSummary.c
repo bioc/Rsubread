@@ -4450,10 +4450,10 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 
 void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * merged_umi_list, ArrayList * highconf_list){
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
-	srInt_64 xk1,UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
+	srInt_64 x2, x1, UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
 
-	if(0)for(xk1=0;xk1<sorted_idx->numOfElements; xk1++){
-		SUBREADprintf("SORTIDX_5CODE %lld %lld\n",xk1, ArrayListGet(sorted_idx,xk1)-NULL );
+	if(1)for(x1=0;x1<sorted_idx->numOfElements; x1++){
+		SUBREADprintf("SORTIDX_5CODE %lld %lld\n",x1, ArrayListGet(sorted_idx,x1)-NULL );
 	}
 
 	if(0){
@@ -4464,18 +4464,23 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 		SUBREADprintf("HIGHEST_CODE 29 TH UMIs = %lld\n", UMIs_30th_high);
 	}
 
-	srInt_64 x2,x1;
-	srInt_64 this_total = 0;
+	#define SCRNA_IDX_PRIME_NUMBER_BIG 11218439llu;
+	srInt_64 this_total = 0, seed_rand = sorted_idx -> numOfElements/2 + merged_umi_list -> numOfElements /2;
 	for(x1 = 0; x1 < SCRNA_BOOTSTRAP_SAMPLING_TIMES; x1++){
 		for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
-			void * barcode_idx = ArrayListRandom(sorted_idx);
+			seed_rand %= sorted_idx -> numOfElements;
+			void * barcode_idx = ArrayListGet(sorted_idx, seed_rand);
+			seed_rand += SCRNA_IDX_PRIME_NUMBER_BIG;
 			srInt_64 this_umis = HashTableGet( used_cell_barcode_tab, barcode_idx )-NULL;
 			if(this_umis >= UMIs_30th_high/10) this_total ++;
 		}
 	}
 	this_total /= SCRNA_BOOTSTRAP_SAMPLING_TIMES;
-	if(0) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %lld\n",this_total);
-	for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++) ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) -1 );
+	if(1) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %lld\n",this_total);
+	for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++){
+		SUBREADprintf("INSERT_5CODE %lld = %lld , of %lld HLST\n",x1 , ArrayListGet( sorted_idx, x1 ) - NULL, highconf_list -> numOfElements);
+		ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) - 1 );
+	}
 }
 
 void build_exon_name(fc_thread_global_context_t * global_context, fc_feature_info_t * loaded_features, int i, char * exon_name){
@@ -4701,10 +4706,10 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
 
 		unsigned int xk1;
-		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
+		if(1)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
 			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
 		}
-		if(0)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
+		if(1)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
 			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
 		}
 
