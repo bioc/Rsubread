@@ -4453,7 +4453,9 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 	srInt_64 x2, x1, UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
 
 	if(0)for(x1=0;x1<sorted_idx->numOfElements; x1++){
-		SUBREADprintf("SORTIDX_5CODE %lld %lld\n",x1, ArrayListGet(sorted_idx,x1)-NULL );
+		void * vpp = ArrayListGet(sorted_idx,x1);
+		srInt_64 umis = HashTableGet(used_cell_barcode_tab, vpp) - NULL;
+		SUBREADprintf("SORTIDX_5CODE %lld %lld %lld\n",x1, vpp-NULL, umis );
 	}
 
 	if(0){
@@ -4461,7 +4463,7 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -0 ))-NULL;
 		SUBREADprintf("HIGHEST_5CODE 31 TH UMIs = %lld\n", UMIs_30th_high);
 		UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -2 ))-NULL;
-		SUBREADprintf("HIGHEST_CODE 29 TH UMIs = %lld\n", UMIs_30th_high);
+		SUBREADprintf("HIGHEST_5CODE 29 TH UMIs = %lld\n", UMIs_30th_high);
 	}
 
 	#define SCRNA_IDX_PRIME_NUMBER_BIG 11218439llu;
@@ -4702,6 +4704,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
 		ArrayList * this_sample_45k_90k_barcode_idx = ArrayListCreate(90000 - 45000 + 100);
 
+		if(0)SUBREADprintf("SORT_START_IDX_5CODE %d\n", x1);
 		scRNA_merged_bootstrap_a_sample(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1],merged_umi_list, high_confid_barcode_index_list);
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
 
