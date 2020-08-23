@@ -274,6 +274,7 @@ library(Matrix)
 }
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no ){
+  set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
@@ -295,7 +296,7 @@ library(Matrix)
   ret
 }
 
-cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", aligner="align", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=TRUE){
+cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", aligner="align", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=TRUE,reportAllJunctions=FALSE){
   input.directory <- .check_and_NormPath(input.directory,  mustWork=T, opt="input.directory")
   sample.sheet <- .check_and_NormPath(sample.sheet,  mustWork=T, opt="sample.sheet")
   output.BAM <- .check_and_NormPath(output.BAM,  mustWork=F, opt="output.BAM")
@@ -318,7 +319,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  }else if(aligner=="align"){
 		align(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
 	  }else if(aligner=="subjunc"){
-		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE)
+		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, reportAllJunctions=reportAllJunctions)
 	  }
 	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
 	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))

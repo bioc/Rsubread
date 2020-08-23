@@ -27,7 +27,8 @@ cellCounts(
     chrAliases = NULL,
     useMetaFeatures = TRUE,
     allowMultiOverlap = FALSE,
-    countMultiMappingReads = TRUE)
+    countMultiMappingReads = TRUE,
+    reportAllJunctions = FALSE)
 }
 \arguments{
   \item{index}{ a character string giving the subread index built by the {buildindex} function.}
@@ -39,6 +40,7 @@ cellCounts(
   \item{aligner}{ a character string giving the name of the aligner: \code{"align"} or \code{"subjunc"} (not yet implemented). A NULL value indicates the function to skip the mapping step but directly use the BAM file in \code{"output.BAM"} for generating UMI counts. \code{"align"} by default.}
   \item{nthreads}{ a numeric value giving the number of threads used for read mapping and counting. 16 by default.}
   \item{annot.inbuilt, annot.ext, isGTFAnnotationFile, GTF.featureType, GTF.attrType, GTF.attrType.extra, chrAliases, useMetaFeatures, allowMultiOverlap, countMultiMappingReads}{ options for counting the mapping results. The options have the same meanings as them \code{featureCounts}}
+  \item{reportAllJunctions}{logical indicating if all discovered junctions will be reported when the aligner is \code{"subjunc"}. This includes exon-exon junctions and also gene fusions. Presence of donor/receptor sites is not required when \code{reportAllJunctions} is \code{TRUE}. \code{FALSE} by default.}
 }
 
 \details{

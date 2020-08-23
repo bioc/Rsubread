@@ -4240,13 +4240,71 @@ int scRNA_merge_write_zero_gene(fc_thread_global_context_t * global_context, cha
 	return ret;
 }
 
-int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context , ArrayList * cellno_umino_p1_list, srInt_64 cell_sec_start, srInt_64 cell_sec_end, ArrayList * merged_umi_no_to_seq, ArrayList * ret_arr){
+//#warning "======== SCRNA_ALLOWED_MAX_HAMMING_DIFF IS ZERO !! ========"
+#define SCRNA_ALLOWED_MAX_HAMMING_DIFF 1
+
+int scRNA_reduce_cellno_compare(void * arr, int l, int r){
+	void **sd = arr;
+	ArrayList * cellno_umino_p1_list = sd[0];
+	ArrayList * merged_umi_no_to_seq = sd[3];
+	srInt_64 off = sd[1]-NULL;
+
+	int umino_L = (ArrayListGet(cellno_umino_p1_list, off+l)-NULL-1)&0xffffffff;
+	int umino_R = (ArrayListGet(cellno_umino_p1_list, off+r)-NULL-1)&0xffffffff;
+	char * ls = ArrayListGet(merged_umi_no_to_seq, umino_L);
+	char * rs = ArrayListGet(merged_umi_no_to_seq, umino_R);
+	return strcmp(ls, rs);
+}
+
+void scRNA_reduce_cellno_exchange(void * arr, int l, int r){
+	void **sd = arr;
+	ArrayList * cellno_umino_p1_list = sd[0];
+	srInt_64 off = sd[1]-NULL;
+
+	void* ti = cellno_umino_p1_list->elementList[off+l];
+	cellno_umino_p1_list->elementList[off+l] = cellno_umino_p1_list->elementList[off+r];
+	cellno_umino_p1_list->elementList[off+r] = ti;
+}
+
+void scRNA_reduce_cellno_merge(void * arr, int start, int items, int items2){
+	void **sd = arr;
+	ArrayList * cellno_umino_p1_list = sd[0];
+	srInt_64 off = sd[1]-NULL;
+
+	void ** tmpelem=malloc(sizeof(void*)*(items+items2));
+	int i1_cursor = start, i2_cursor = items + start, tmp_cursor=0;
+	while(1){
+		if(i1_cursor == items + start && i2_cursor == items + items2 + start )break;
+		int select_items_1 = (i2_cursor == start + items + items2) || (i1_cursor < items + start && scRNA_reduce_cellno_compare(arr, i1_cursor, i2_cursor) <= 0);
+
+		if(select_items_1)
+			tmpelem[tmp_cursor++] = cellno_umino_p1_list->elementList[off+(i1_cursor++)];
+		else
+			tmpelem[tmp_cursor++] = cellno_umino_p1_list->elementList[off+(i2_cursor++)];
+	}
+
+	memcpy(cellno_umino_p1_list -> elementList+off+start, tmpelem, sizeof(void*)*(items+items2));
+	free(tmpelem);
+}
+
+int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context , ArrayList * cellno_umino_p1_list, srInt_64 cell_sec_start, srInt_64 cell_sec_end, ArrayList * merged_umi_no_to_seq, ArrayList * ret_arr, HashTable* cellno_bc_tab){
 	srInt_64 x1, ret=0;
-	HashTable * headtail_table = StringTableCreate((cell_sec_end - cell_sec_start)/5);
+
+	void * sort_data[5];
+	sort_data[0]=cellno_umino_p1_list;
+	sort_data[1]=NULL+cell_sec_start;
+	sort_data[2]=NULL+cell_sec_end-cell_sec_start;
+	sort_data[3]= merged_umi_no_to_seq;
+
+	merge_sort(sort_data, cell_sec_end-cell_sec_start, scRNA_reduce_cellno_compare, scRNA_reduce_cellno_exchange, scRNA_reduce_cellno_merge);
+
+	int initsize = (cell_sec_end - cell_sec_start)/4;
+	HashTable * headtail_table = StringTableCreate(max(3, initsize));
 	HashTableSetDeallocationFunctions( headtail_table, free, (void(*)(void *))ArrayListDestroy );
 	for(x1 = cell_sec_start; x1 < cell_sec_end;x1++){
 		srInt_64 cellno_umuno = ArrayListGet(cellno_umino_p1_list, x1)-NULL-1;
 		int umino = cellno_umuno & 0xffffffff;
+		if(umino<0) SUBREADprintf("ERROR: WRONG UMINO: %d\n", umino);
 		char * umistr = ArrayListGet(merged_umi_no_to_seq, umino );
 		char tken[MAX_UMI_BARCODE_LENGTH/2+5];
 		int x2, x3, umilen = strlen(umistr), found=0;
@@ -4262,8 +4320,8 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 				for(x3=0; x3<had_umi_nos -> numOfElements; x3++){
 					char * had_umistr = ArrayListGet(merged_umi_no_to_seq, ArrayListGet(had_umi_nos, x3)-NULL-1 );
 					int diff = hamming_dist_ATGC_max2(had_umistr, umistr);
-					if(diff<2){
-					//	SUBREADprintf("REDUCE_MATCH %s ~ %s with %d\n",had_umistr , umistr, diff );
+					if(diff<=SCRNA_ALLOWED_MAX_HAMMING_DIFF){
+						if(0)SUBREADprintf("REDUCE_MATCH_8CODE %s ~ %s with %d\n",had_umistr , umistr, diff );
 						found=1;
 					}
 					if(found) break;
@@ -4323,8 +4381,8 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 			int cell_umi = 0;
 			srInt_64 sec_end = x1 + ((cellbc_no == old_bcno)?1:0);
 			if(0 && sec_end - cell_sec_start > 40000) SUBREADprintf("BIGSEC: %lld\n", sec_end - cell_sec_start);
-			if(sec_end - cell_sec_start > 70){
-				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret );
+			if(sec_end - cell_sec_start > 70 - 69){
+				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret , used_cellno_tab);
 			}else{
 				srInt_64 rescan_i, ret_sec_start = ret -> numOfElements, test_i;
 
@@ -4337,7 +4395,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 						char * test_umi_str = ArrayListGet(merged_umi_no_to_seq, test_umi_no);
 						int eddt = hamming_dist_ATGC_max2(umi_str, test_umi_str);
 						computational_cost++;
-						if(eddt<=1){
+						if(eddt<=SCRNA_ALLOWED_MAX_HAMMING_DIFF){
 							found=1;
 							break;
 						}
@@ -4791,15 +4849,17 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		}
 
 		for(xk1=0; xk1< global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
+			if(0)SUBREADprintf("MERGENOS_8CODE %lld\n", merged_sample_cell_umi_tables[xk1] ->numOfElements);
 			merged_sample_cell_umi_tables[xk1] -> appendix1 = global_context;
 			merged_sample_cell_umi_tables[xk1] -> appendix2 = used_cell_no_tables[xk1];
 			merged_sample_cell_umi_tables[xk1] -> appendix3 = merged_umi_list;
 			HashTableIteration(  merged_sample_cell_umi_tables[xk1], scRNA_merge_merge_UMIs);
 		}
 
-		if(0)for(xk1=0; xk1< merged_umi_list->numOfElements; xk1++){
-			SUBREADprintf("MGRRE_UMI %lld\t%s\n", xk1, ArrayListGet(merged_umi_list, xk1));
-		}
+		if(0){SUBREADprintf("MGRRE_7CODE_NON %lld\n", merged_umi_list -> numOfElements);
+		for(xk1=0; xk1< merged_umi_list->numOfElements; xk1++){
+			SUBREADprintf("MGRRE_7CODE_UMI %lld\t%s\n", xk1, ArrayListGet(merged_umi_list, xk1));
+		}}
 		scRNA_merged_to_tables_write(global_context , merged_sample_cell_umi_tables , used_cell_no_tables, merged_umi_list, loaded_features);
 
 	//	SUBREADprintf("MERGED UMI TABLE = %ld items\n", merged_umi_table -> numOfElements);
