@@ -329,11 +329,11 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, reportAllJunctions=reportAllJunctions)
 	  }
       raw.fc<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
-	  fc[[paste0("Dataset.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))
       if(is.null(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
+	  fc[[paste0("Dataset.", ii)]] <- .load.all.scSamples(output.1, raw.fc.annot$GeneID))
   }
   fc[["Input.Files"]] <- input.directory
-  fc[["Annotations"]] <- raw.fc.annot
+  fc[["Annotation"]] <- raw.fc.annot
 
   fc
 }
