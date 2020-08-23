@@ -28,7 +28,7 @@ cellCounts(
     useMetaFeatures = TRUE,
     allowMultiOverlap = FALSE,
     countMultiMappingReads = TRUE,
-    reportAllJunctions = FALSE)
+    reportAllJunctions = FALSE}
 }
 \arguments{
   \item{index}{ a character string giving the subread index built by the {buildindex} function.}

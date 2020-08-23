@@ -274,7 +274,6 @@ library(Matrix)
 }
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no ){
-  set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
@@ -297,6 +296,7 @@ library(Matrix)
 }
 
 cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.barcode.list=NULL, input.mode="BCL", aligner="align", nthreads=16, annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,countMultiMappingReads=TRUE,reportAllJunctions=FALSE){
+  set.seed(0)
   input.directory <- .check_and_NormPath(input.directory,  mustWork=T, opt="input.directory")
   sample.sheet <- .check_and_NormPath(sample.sheet,  mustWork=T, opt="sample.sheet")
   output.BAM <- .check_and_NormPath(output.BAM,  mustWork=F, opt="output.BAM")
