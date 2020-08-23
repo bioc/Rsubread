@@ -278,7 +278,13 @@ library(Matrix)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
   if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
-  list( HighConf=highconf, Rescued=rescued )
+  unique.genes <- sort(unique(c(rownames(highconf), rownames(rescued)))) 
+  ret <- matrix( ncol=ncol(highconf)+ncol(rescued), nrow=length(unique.genes) )
+  colnames(ret) <- c( colnames(highconf), colnames(rescued) )
+  rownames(ret) <- unique.genes
+  ret[rownames(highconf), colnames(highconf) ] <- highconf
+  ret[rownames(rescued), colnames(rescued) ] <- rescued
+  list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
 }
 
 .load.all.scSamples <- function( BAM.name, FC.gene.ids){
@@ -288,7 +294,7 @@ library(Matrix)
     sname <- sum.tab$SampleName[roiw]
     sid <- sum.tab$Index[roiw]
     count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid)
-	ret[[sprintf("Sample.%03d",sid)]] <- count.tab
+	ret[[sprintf("Sample.%d",sid)]] <- count.tab
   }
   ret[["Sample.Table"]] <- sum.tab
 
@@ -310,6 +316,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
     cell.barcode.list <- .check_and_NormPath(cell.barcode.list, mustWork=T, opt="cell.barcode.list")
   }
 
+  raw.fc.annot <- NA
   for(ii in 1:length(input.directory)){
 	  input.1 <- input.directory[ii]
 	  output.1 <- output.BAM[ii]
@@ -321,10 +328,12 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  }else if(aligner=="subjunc"){
 		subjunc(index, input.1, output_file=output.1, nthreads=nthreads, isBCLinput=TRUE, reportAllJunctions=reportAllJunctions)
 	  }
-	  fc[[paste0("counts.", ii)]]<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
-	  fc[[paste0("scRNA.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))
+      raw.fc<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
+	  fc[[paste0("Dataset.", ii)]] <- .load.all.scSamples(output.1, as.character(fc[[paste0("counts.", ii)]]$annotation$GeneID))
+      if(is.null(raw.fc.annot)) raw.fc.annot<-raw.fc$annotations
   }
   fc[["Input.Files"]] <- input.directory
+  fc[["Annotations"]] <- raw.fc.annot
 
   fc
 }
