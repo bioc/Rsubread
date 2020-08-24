@@ -277,10 +277,9 @@ library(Matrix)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
   if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
-  unique.genes <- sort(unique(c(rownames(highconf), rownames(rescued)))) 
-  ret <- matrix( ncol=ncol(highconf)+ncol(rescued), nrow=length(unique.genes) )
+  ret <- matrix(0,ncol=ncol(highconf)+ncol(rescued), nrow=length(FC.gene.ids))
   colnames(ret) <- c( colnames(highconf), colnames(rescued) )
-  rownames(ret) <- unique.genes
+  rownames(ret) <- FC.gene.ids 
   ret[rownames(highconf), colnames(highconf) ] <- highconf
   ret[rownames(rescued), colnames(rescued) ] <- rescued
   list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
