@@ -4544,7 +4544,7 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 }
 
 void build_exon_name(fc_thread_global_context_t * global_context, fc_feature_info_t * loaded_features, int i, char * exon_name){
-    sprintf(exon_name, "%s:fc,spl:%s:fc,spl:%u:fc,spl:%u:fc,spl:%c", global_context -> unistr_buffer_space + loaded_features[i].feature_name_pos,
+    sprintf(exon_name, "%s:fc@R@Spl:%s:fc@R@Spl:%u:fc@R@Spl:%u:fc@R@Spl:%c", global_context -> unistr_buffer_space + loaded_features[i].feature_name_pos,
        global_context-> unistr_buffer_space + loaded_features[i].feature_name_pos + loaded_features[i].chro_name_pos_delta,
        loaded_features[i].start, loaded_features[i].end, loaded_features[i].is_negative_strand == 1?'N':(  loaded_features[i].is_negative_strand ==  0? 'P':'X'));
 }

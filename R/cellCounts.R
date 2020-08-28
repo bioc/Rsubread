@@ -272,33 +272,50 @@ library(Matrix)
   }
 }
 
-.load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no ){
+.match.exons <- function(annot.tab, counts){
+  annot.str <- paste(annot.tab$GeneID, annot.tab$Chr, annot.tab$Start,
+    annot.tab$End, ifelse(annot.tab$Strand == "+", "P","N"), sep=":fc@R@Spl:")
+  ret <- matrix(0, ncol=ncol(counts), nrow=nrow(annot.tab))
+  colnames(ret) <- colnames(counts)
+  rownames(ret) <- annot.str
+  ret[ rownames(counts),] <- counts
+  ret
+}
+
+.load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
-  if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
-  ncolRescued <- 0
-  if(is.na(rescued)){
-    ret <- matrix(0,ncol=ncol(highconf), nrow=length(FC.gene.ids))
-    colnames(ret) <- colnames(highconf)
-  }else{
-    ret <- matrix(0,ncol=ncol(highconf)+ncol(rescued), nrow=length(FC.gene.ids))
-    colnames(ret) <- c( colnames(highconf), colnames(rescued) )
-  }
-  rownames(ret) <- FC.gene.ids 
-  ret[rownames(highconf), colnames(highconf) ] <- highconf
-  if(!is.na(rescued)) ret[rownames(rescued), colnames(rescued) ] <- rescued
 
-  list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
+  if(use.meta.features){
+    if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
+    ncolRescued <- 0
+    if(is.na(rescued)){
+      ret <- matrix(0,ncol=ncol(highconf), nrow=length(FC.gene.ids))
+      colnames(ret) <- colnames(highconf)
+    }else{
+      ret <- matrix(0,ncol=ncol(highconf)+ncol(rescued), nrow=length(FC.gene.ids))
+      colnames(ret) <- c( colnames(highconf), colnames(rescued) )
+    }
+    rownames(ret) <- FC.gene.ids 
+    ret[rownames(highconf), colnames(highconf) ] <- highconf
+    if(!is.na(rescued)) ret[rownames(rescued), colnames(rescued) ] <- rescued
+
+    list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
+  }else{
+    fcmat <- .match.exons(annot.tab,highconf)
+    rownames(fcmat)<-NULL
+    list(Counts=fcmat, HighConfidneceCell=rep(T, ncol(highconf))) 
+  }
 }
 
-.load.all.scSamples <- function( BAM.name, FC.gene.ids){
+.load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab){
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
     sname <- sum.tab$SampleName[roiw]
     sid <- sum.tab$Index[roiw]
-    count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid)
+    count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid, use.meta.features, annot.tab)
 	ret[[sprintf("Sample.%d",sid)]] <- count.tab
   }
   ret[["Sample.Table"]] <- sum.tab
@@ -335,7 +352,7 @@ cellCounts <- function(index, input.directory, output.BAM, sample.sheet, cell.ba
 	  }
       raw.fc<-featureCounts(output.1, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, GTF.attrType.extra=GTF.attrType.extra, chrAliases=chrAliases, useMetaFeatures=useMetaFeatures, allowMultiOverlap=allowMultiOverlap, countMultiMappingReads=countMultiMappingReads, sampleSheet=sample.1, cellBarcodeList=cell.barcode.list, nthreads=nthreads)
       if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
-	  fc[[paste0("Dataset.", ii)]] <- .load.all.scSamples(output.1, as.character(raw.fc.annot$GeneID))
+	  fc[[paste0("Dataset.", ii)]] <- .load.all.scSamples(output.1, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
   }
   fc[["Input.Files"]] <- input.directory
   fc[["Annotation"]] <- raw.fc.annot
