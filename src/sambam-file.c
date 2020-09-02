@@ -1110,6 +1110,7 @@ int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, 
 
 	writer -> threads = threads;
 	writer -> keep_in_memory = keep_in_memory;
+	writer -> fastest_compression = 0;
 	writer -> compressed_chunk_buffer = malloc(70000); 
 	writer -> chunk_buffer = malloc(70000); 
 	writer -> chunk_buffer_max_size = 70000;
@@ -1203,7 +1204,7 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	this_stream -> zfree = Z_NULL;
 	this_stream -> opaque = Z_NULL;
 
-	deflateInit2(this_stream, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
+	deflateInit2(this_stream, writer -> fastest_compression? SAMBAM_COMPRESS_LEVEL_FASTEST : SAMBAM_COMPRESS_LEVEL_NORMAL, Z_DEFLATED,
 		SAMBAM_GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 	
 	this_stream -> next_in = (unsigned char *)this_buffer;

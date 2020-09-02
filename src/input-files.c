@@ -2392,7 +2392,7 @@ int SAM_pairer_multi_thread_compress(SAM_pairer_writer_main_t * bam_main ,  SAM_
 		nstrm.avail_in = 0;
 		nstrm.next_in = Z_NULL;
 	
-		deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
+		deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL_NORMAL, Z_DEFLATED,
 			PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 
 		nstrm.avail_in = 0;
@@ -4743,7 +4743,7 @@ int  fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 			nstrm.avail_in = 0;
 			nstrm.next_in = Z_NULL;
 		
-			deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL, Z_DEFLATED,
+			deflateInit2(&nstrm, SAMBAM_COMPRESS_LEVEL_NORMAL, Z_DEFLATED,
 				PAIRER_GZIP_WINDOW_BITS, PAIRER_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 	
 			nstrm.avail_in = 0;

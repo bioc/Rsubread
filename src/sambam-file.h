@@ -38,7 +38,8 @@ typedef unsigned int BS_uint_32;
 #define BAM_FILE_STAGE_ALIGNMENT 20
 
 
-#define SAMBAM_COMPRESS_LEVEL Z_BEST_SPEED
+#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_NO_COMPRESSION 
+#define SAMBAM_COMPRESS_LEVEL_NORMAL Z_BEST_SPEED
 #define SAMBAM_GZIP_WINDOW_BITS -15
 #define SAMBAM_INPUT_STREAM_SIZE 140000
 
@@ -118,6 +119,7 @@ typedef struct
 	int writer_state;
 	int is_internal_error;
 	int keep_in_memory;
+	int fastest_compression;
 	int sorted_batch_id;
 	unsigned int crc0;
 
