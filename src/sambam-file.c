@@ -1619,6 +1619,34 @@ char * duplicate_TAB_record_field(char * rline, int fno, int to_end){
 	return ret;
 }
 
+int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbin, int committable){
+	char * this_chunk_buffer=NULL;
+	srInt_64 *this_chunk_buffer_used=NULL;
+	if(thread_no >= 0){
+		if(writer -> keep_in_memory && writer -> threads_chunk_buffer_max_size[thread_no] < writer -> threads_chunk_buffer_used[thread_no] + 12000){
+			writer -> threads_chunk_buffer_max_size[thread_no] = writer -> threads_chunk_buffer_max_size[thread_no] * 7/4;
+			writer -> threads_chunk_buffer[ thread_no ] = realloc(writer -> threads_chunk_buffer[ thread_no ], writer -> threads_chunk_buffer_max_size[thread_no]);
+		}
+		this_chunk_buffer = writer -> threads_chunk_buffer[ thread_no ];
+		this_chunk_buffer_used = writer -> threads_chunk_buffer_used + thread_no;
+	}else{
+		if(writer -> keep_in_memory && writer -> chunk_buffer_max_size < writer -> chunk_buffer_used + 12000){
+			//SUBREADprintf("REALLOCATE MEM : %d -> %d\n", writer -> chunk_buffer_max_size,  writer -> chunk_buffer_max_size * 7/4);
+			writer -> chunk_buffer_max_size = writer -> chunk_buffer_max_size * 7/4;
+			writer -> chunk_buffer = realloc(writer -> chunk_buffer, writer -> chunk_buffer_max_size);
+		}
+		this_chunk_buffer = writer -> chunk_buffer;
+		this_chunk_buffer_used = &writer -> chunk_buffer_used;
+	}
+	int reclen=0;
+	memcpy(&reclen, rbin,4);
+	memcpy(this_chunk_buffer+(*this_chunk_buffer_used), rbin, reclen+4);
+	(*this_chunk_buffer_used)+= reclen+4;
+
+	if((*this_chunk_buffer_used)>55000 && committable && !writer -> keep_in_memory)
+		SamBam_writer_add_chunk(writer, thread_no);
+	return 0;
+}
 int SamBam_writer_add_read_line(SamBam_Writer * writer, int thread_no, char * rline, int committable){
 	char * read_name, * flag_str, *chro_name, *chro_position_str, * mapping_quality_str, * cigar, * next_chro_name, *next_chro_position_str, *temp_len_str, *read_text, *qual_text, *additional_columns;
 	read_name = duplicate_TAB_record_field(rline, 0,0);
@@ -1674,7 +1702,7 @@ int SamBam_writer_add_read(SamBam_Writer * writer, int thread_no, char * read_na
 
 
 	char * this_chunk_buffer;
-	long long * this_chunk_buffer_used;
+	srInt_64 * this_chunk_buffer_used;
 
 	if(thread_no >= 0){
 		if(writer -> keep_in_memory && writer -> threads_chunk_buffer_max_size[thread_no] < writer -> threads_chunk_buffer_used[thread_no] + 12000){

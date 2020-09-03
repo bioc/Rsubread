@@ -174,7 +174,7 @@ typedef struct {
 	z_stream bam_file_output_stream;
 
 	HashTable ** scRNA_sample_bc_tables; // sample_ID ==> int64s: cell barcode id <<32 | umi barcode id
-	HashTable * scRNA_registered_UMI_table; // UMI bases => UMI_no +1 in this thread
+	HashTable * scRNA_registered_UMI_table; // UMI bases ==> UMI_no +1 in this thread
 	HashTable * junction_counting_table;   // key: string chro_name \t last_base_previous_exont \t first_base_next_exon
 	HashTable * splicing_point_table;
 	HashTable * RG_table;	// rg_name -> [ count_table, sum_fc_read_counters, junction_counting_table,  splicing_point_table]
@@ -291,6 +291,7 @@ typedef struct {
 	ArrayList * scRNA_cell_barcodes_array;
 	HashTable * scRNA_cell_barcode_head_tail_table;
 	ArrayList * scRNA_sample_id_to_name;
+	HashTable * scRNA_sample_BAM_writers; // samole_ID+1 ==> SamBam_writer
 	HashTable * lineno_2_sortedno_tab;
 	int known_cell_barcode_length;
 	HashTable * junction_features_table;
@@ -1860,6 +1861,21 @@ int is_value_contig_name(char * n, int l){
 void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * rg_name);
 int compress_read_detail_BAM(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, int write_start, int write_end, char * bam_buf);
 
+void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab){
+	char *bin = tab -> appendix1;
+	int bin_len = tab -> counter1;
+	int txt_ptr = 0, old_ptr=0;
+	SamBam_Writer * writer = v;
+
+	for(; txt_ptr < bin_len; txt_ptr++){
+		if(txt_ptr == '\n'){
+			bin[txt_ptr]=0;
+			SamBam_writer_add_header(writer, bin+old_ptr, 1);
+			old_ptr = txt_ptr;
+		}
+	}
+}
+
 int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len){
 	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
 	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
@@ -1868,6 +1884,11 @@ int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigne
 	//SUBREADprintf("ENTER PROCESS (THRD %d): IS_TXT=%d,  ITEMS = %d, CURRENT_ITEMS=%d\n", thread_no, is_text, items, global_context -> sambam_chro_table_items);
 	pthread_spin_lock(&global_context -> sambam_chro_table_lock);
 
+	if(global_context -> do_scRNA_table && is_text) {
+		global_context -> scRNA_sample_BAM_writers -> appendix1 = bin;
+		global_context -> scRNA_sample_BAM_writers -> counter1 = bin_len;
+		HashTableIteration( global_context -> scRNA_sample_BAM_writers, scRNA_sample_SamBam_writers_add_header);
+	}
 	if(global_context -> is_read_details_out == FILE_TYPE_BAM){
 		int write_cursor;
 		int first_block = 1;
@@ -2846,7 +2867,7 @@ void warning_anno_BAM_chromosomes(fc_thread_global_context_t * global_context){
 	HashTableDestroy(ANNO_chro_tab);
 }
 
-void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step);
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step,char * bin);
 
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2)
 {
@@ -2901,7 +2922,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		RG_ptr = NULL;
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
 
-		if(global_context -> do_scRNA_table) add_scRNA_read_tota1_no(global_context, thread_context, read_name, 0);
+		if(global_context -> do_scRNA_table) add_scRNA_read_tota1_no(global_context, thread_context, read_name, 0, is_second_read?bin2:bin1);
 		if(global_context -> is_paired_end_mode_assign && (alignment_masks&1)==0) alignment_masks|=8;
 
 		//#warning "========= DEBUG OUTPUT =============="
@@ -2939,7 +2960,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
-		if(global_context -> do_scRNA_table) add_scRNA_read_tota1_no(global_context, thread_context, read_name, 1);
+		if(global_context -> do_scRNA_table) add_scRNA_read_tota1_no(global_context, thread_context, read_name, 1, NULL);
 
 		if(((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required){
 				if(RG_ptr){
@@ -3615,7 +3636,7 @@ int scRNA_get_cell_id(fc_thread_global_context_t * global_context, fc_thread_thr
 	return tb1;
 }
 
-void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step ){
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step, char * bambin ){
 	char * testi, *lane_str = NULL, * sample_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
 	int xx=0, laneno=0;
 	for(testi = read_name +13 +global_context -> known_cell_barcode_length; * testi; testi ++){
@@ -3636,6 +3657,8 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	}
 	int sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
 	if(sample_id>0){
+		SamBam_Writer * sample_bam = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+1+sample_id);
+		SamBam_writer_add_read_bin(sample_bam, thread_context -> thread_id, bambin, 1);
 		if(mapped_step == 1)
 			thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
 		else if(mapped_step == 0)
@@ -5211,6 +5234,31 @@ void scRNA_make_barcode_HT_table( fc_thread_global_context_t * global_context ){
 	}
 }
 
+void scRNA_close_sample_SamBam_writers(void *v){
+	SamBam_Writer * wtr = v;
+	SamBam_writer_close(wtr);
+}
+
+void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
+	HashTable * fp_tab = tab -> appendix1;
+	fc_thread_global_context_t * global_context = tab -> appendix2;
+	ArrayList * scRNA_sample_id_to_name = tab -> appendix3;
+
+	char * samplename = k;
+	char fname [MAX_FILE_NAME_LENGTH+20];
+	sprintf(fname, "%s.bam", samplename);
+	SamBam_Writer * wtr = calloc(sizeof(SamBam_Writer),1);
+	SamBam_writer_create(wtr, fname, global_context -> thread_number, 0, "del4-cellCounts-0.del");
+	int x1;
+	for(x1=0; x1<scRNA_sample_id_to_name -> numOfElements; x1++){
+		char * sample_name = ArrayListGet( scRNA_sample_id_to_name, x1 );
+		if(strcmp(sample_name, samplename)==0){
+			HashTablePut(fp_tab, NULL+x1+1 , wtr);
+			break;
+		}
+	}
+}
+
 void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list) {
 	int x1;
 	myrand_srand(time(NULL));
@@ -5288,7 +5336,12 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 			scRNA_make_barcode_HT_table( global_context );
 			//print_in_box(80,0,0,"Loaded %ld cell barcodes from the list.", global_context-> scRNA_cell_barcodes_array -> numOfElements);
 		}
-
+		global_context-> scRNA_sample_BAM_writers = HashTableCreate(global_context-> scRNA_sample_sheet_table -> numOfElements);
+		HashTableSetDeallocationFunctions(global_context-> scRNA_sample_BAM_writers, NULL, scRNA_close_sample_SamBam_writers);
+		global_context-> scRNA_sample_sheet_table ->appendix1 = global_context -> scRNA_sample_BAM_writers;
+		global_context-> scRNA_sample_sheet_table ->appendix2 = global_context;
+		global_context-> scRNA_sample_sheet_table ->appendix3 = global_context -> scRNA_sample_id_to_name;
+		HashTableIteration( global_context-> scRNA_sample_sheet_table, scRNA_sample_SamBam_writers_new_files);
 	}else{
 		global_context -> do_scRNA_table = 0;
 		global_context-> scRNA_cell_barcodes_array = NULL;
@@ -5581,6 +5634,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		if(global_context -> do_scRNA_table){
 			int xk2;
 			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++)HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
+			HashTableDestroy(global_context -> scRNA_sample_BAM_writers);
 			free(global_context -> thread_contexts[xk1].scRNA_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_assigned_reads_per_sample);

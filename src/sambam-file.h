@@ -191,6 +191,8 @@ int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text, int add
 
 int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length, int add_header_too);
 
+int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbin, int committable);
+
 int SamBam_writer_add_read(SamBam_Writer * writer, int threadno, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns, int can_submit);
 
 int is_badBAM(char * fn);
