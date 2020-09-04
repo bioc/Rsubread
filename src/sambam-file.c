@@ -1357,6 +1357,8 @@ int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text, int add
 	writer -> header_plain_text_buffer_used += new_text_len;
 	strcpy(writer -> header_plain_text_buffer + writer -> header_plain_text_buffer_used, "\n");
 	writer -> header_plain_text_buffer_used ++;
+
+//	SUBREADprintf("ADJHEADERXCD BIN=%s\n", header_text);
 	if(add_chro && memcmp(header_text, "@SQ",3)==0)
 	{
 		char * chro = NULL;
@@ -1387,6 +1389,7 @@ int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsig
 {
 	unsigned int chro_id = writer -> chromosome_name_table -> numOfElements;
 
+	//SUBREADprintf("ADJHEADER_CHRO %s of %u\n", chro_name, chro_length);
 	//assert(strlen(chro_name) < 30);
 
 	char * chro_name_space = malloc(strlen(chro_name)+1);
@@ -1638,6 +1641,7 @@ int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbi
 		this_chunk_buffer = writer -> chunk_buffer;
 		this_chunk_buffer_used = &writer -> chunk_buffer_used;
 	}
+	//SUBREADprintf("WRTXBIN: PTR %p of USED %lld at read %p\n", this_chunk_buffer, *this_chunk_buffer_used, rbin);
 	int reclen=0;
 	memcpy(&reclen, rbin,4);
 	memcpy(this_chunk_buffer+(*this_chunk_buffer_used), rbin, reclen+4);
@@ -1645,6 +1649,7 @@ int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbi
 
 	if((*this_chunk_buffer_used)>55000 && committable && !writer -> keep_in_memory)
 		SamBam_writer_add_chunk(writer, thread_no);
+	//SUBREADprintf("WRTXBIN: FIN WTR %p of USED %lld\n", this_chunk_buffer, *this_chunk_buffer_used);
 	return 0;
 }
 int SamBam_writer_add_read_line(SamBam_Writer * writer, int thread_no, char * rline, int committable){
