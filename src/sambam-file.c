@@ -34,6 +34,7 @@
 #include "core.h"
 #include "gene-algorithms.h"
 #include "sambam-file.h"
+#include "input-files.h"
 
 int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 {
@@ -1620,6 +1621,67 @@ char * duplicate_TAB_record_field(char * rline, int fno, int to_end){
 	memcpy(ret, rline+start_pos, end_pos -start_pos);
 	ret[end_pos -start_pos] = 0;
 	return ret;
+}
+
+int SamBam_writer_add_read_fqs_scRNA(gzFile *outfps, char * bambin){
+	int reclen=0;
+	gzFile outR1fp = outfps[0];
+	gzFile outI1fp = outfps[1];
+	gzFile outR2fp = outfps[2];
+
+	memcpy(&reclen, bambin,4);
+	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0, tmpc;
+	memcpy(&l_read_name, bambin+12,1);
+	memcpy(&n_cigar_ops, bambin+16,2);
+	memcpy(&flag, bambin+18,2);
+	memcpy(&l_seq, bambin+20,4);
+
+	int x1=0;
+
+	gzwrite(outR2fp,"@",1);
+	gzwrite(outR1fp,"@",1);
+	gzwrite(outI1fp,"@",1);
+	char * readname = bambin+36;
+	gzwrite(outR1fp,readname, 12);
+	gzwrite(outR2fp,readname, 12);
+	gzwrite(outI1fp,readname, 12);
+	gzwrite(outR1fp,"\n",1);
+	gzwrite(outR2fp,"\n",1);
+	gzwrite(outI1fp,"\n",1);
+
+	char * R1seq = bambin+36+13;
+	int R1len = 0;
+	for(R1len=0; R1seq[R1len] && R1seq[R1len]!='|' ;R1len++);
+	char * R1qual = R1seq + R1len + 1;
+	gzwrite(outR1fp,R1seq, R1len);
+	gzwrite(outR1fp,"\n+\n",3);
+	gzwrite(outR1fp,R1qual, R1len);
+	gzwrite(outR1fp,"\n",1);
+
+	char * I1seq = R1qual + R1len + 1;
+	int I1len = 0;
+	for(I1len=0; I1seq[I1len] && I1seq[I1len]!='|' ;I1len++);
+	char * I1qual = I1seq + I1len + 1;
+	gzwrite(outI1fp,I1seq, I1len);
+	gzwrite(outI1fp,"\n+\n",3);
+	gzwrite(outI1fp,I1qual, I1len);
+	gzwrite(outI1fp,"\n",1);
+
+	char oseq[l_seq+1];
+	int seqbase = 36+l_read_name+n_cigar_ops*4;
+	for(x1=0; x1<l_seq;x1++)oseq[x1]="=ACMGRSVTWYHKDBN"[(bambin[ seqbase+(x1/2)] >> (((x1%2)?0:1) *4) )&0xf];
+	oseq[l_seq]=0;
+	if(flag & 16) reverse_read(oseq,l_seq, GENE_SPACE_BASE);
+	gzwrite(outR2fp, oseq, l_seq);
+	gzwrite(outR2fp,"\n+\n",3);
+
+	seqbase = 36+l_read_name+n_cigar_ops*4 + ( l_seq+1 )/2;
+	for(x1=0; x1<l_seq;x1++)oseq[x1]=33+bambin[ seqbase+x1];
+	if(flag & 16)reverse_quality(oseq, l_seq);
+	oseq[l_seq]=0;
+	gzwrite(outR2fp, oseq, l_seq);
+	gzwrite(outR2fp,"\n",1);
+	return 0;
 }
 
 int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbin, int committable){

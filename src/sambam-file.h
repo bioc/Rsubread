@@ -38,7 +38,8 @@ typedef unsigned int BS_uint_32;
 #define BAM_FILE_STAGE_ALIGNMENT 20
 
 
-#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_NO_COMPRESSION 
+//#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_NO_COMPRESSION 
+#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_BEST_SPEED
 #define SAMBAM_COMPRESS_LEVEL_NORMAL Z_BEST_SPEED
 #define SAMBAM_GZIP_WINDOW_BITS -15
 #define SAMBAM_INPUT_STREAM_SIZE 140000
@@ -192,6 +193,8 @@ int SamBam_writer_add_header(SamBam_Writer * writer, char * header_text, int add
 int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsigned int chro_length, int add_header_too);
 
 int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbin, int committable);
+
+int SamBam_writer_add_read_fqs_scRNA(gzFile * outfp, char * bambin);
 
 int SamBam_writer_add_read(SamBam_Writer * writer, int threadno, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns, int can_submit);
 

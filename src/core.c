@@ -4153,7 +4153,8 @@ int load_global_context(global_context_t * context)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
 			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates, context -> config.temp_file_prefix);
-			if(context->config.is_BCL_input) context -> output_bam_writer -> fastest_compression=1;
+			#warning "::::::::::: DO_NOT_DO :::::::"
+			if(0&&context->config.is_BCL_input) context -> output_bam_writer -> fastest_compression=1;
 			context -> output_sam_fp = NULL;
 		}
 		else

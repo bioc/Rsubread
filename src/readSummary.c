@@ -1865,16 +1865,19 @@ void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab)
 	char *bin = tab -> appendix1;
 	int bin_len = tab -> counter1;
 	int txt_ptr = 0, old_ptr=0;
-	SamBam_Writer * writer = v;
+	void ** vv = v;
+	SamBam_Writer * writer = vv[0];
 
+	char * tmpbin = malloc(bin_len);
+	memcpy(tmpbin, bin, bin_len);
 	for(; txt_ptr < bin_len; txt_ptr++){
-		if(bin[txt_ptr] == '\n'){
-			bin[txt_ptr]=0;
-			SamBam_writer_add_header(writer, bin+old_ptr, 1);
+		if(tmpbin[txt_ptr] == '\n'){
+			tmpbin[txt_ptr]=0;
+			SamBam_writer_add_header(writer, tmpbin+old_ptr, 1);
 			old_ptr = txt_ptr+1;
-			bin[txt_ptr]= '\n';
 		}
 	}
+	free(tmpbin);
 	SamBam_writer_finish_header(writer);
 }
 
@@ -1883,7 +1886,7 @@ int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigne
 	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
 	fc_thread_thread_context_t * thread_context = global_context -> thread_contexts;
 
-	SUBREADprintf("ENTER PROCESS (THRD %d): IS_TXT=%d,  ITEMS = %d, CURRENT_ITEMS=%d\n", thread_no, is_text, items, global_context -> sambam_chro_table_items);
+	//SUBREADprintf("ENTER PROCESS (THRD %d): IS_TXT=%d,  ITEMS = %d, CURRENT_ITEMS=%d\n", thread_no, is_text, items, global_context -> sambam_chro_table_items);
 	pthread_spin_lock(&global_context -> sambam_chro_table_lock);
 
 	if(global_context -> do_scRNA_table && is_text) {
@@ -3662,9 +3665,14 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 		if(mapped_step == 1)
 			thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
 		else if(mapped_step == 0){
-			SamBam_Writer * sample_bam = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
-			if(sample_bam==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
-			SamBam_writer_add_read_bin(sample_bam, thread_context -> thread_id, bambin, 1);
+			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
+			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
+
+			pthread_spin_lock(sample_bam_2fps[4]);
+			gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
+			SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
+			pthread_spin_unlock(sample_bam_2fps[4]);
+			SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin, 1);
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
 		}
 	}
@@ -4677,6 +4685,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 	HashTableDestroy(bc_no_to_output_no_tab);
 	HashTableDestroy(used_cell_barcodes_tab);
 	ArrayListDestroy(output_gene_idxs);
+	ArrayListDestroy(output_no_tab_to_bcno_arr);
 	fclose(ofp_bcs);
 	fclose(ofp_genes);
 	fclose(ofp_mtx);
@@ -4719,7 +4728,7 @@ void scRNA_merged_45K_to_90K_sum_WRT(void * kyGeneID, void * valUMIs, HashTable 
 }
 
 void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, HashTable * gene_to_cell_umis_tab, ArrayList * bcid_arr, int sample_no, fc_feature_info_t * loaded_features, HashTable * sorted_index_p1_to_i_p1_tab){
-	HashTable * ret = HashTableCreate( gene_to_cell_umis_tab->numOfElements/6 );
+	HashTable * ret = HashTableCreate( 3+gene_to_cell_umis_tab->numOfElements/6 );
 	HashTable * bcid_look_tab = ArrayListToLookupTable_Int(bcid_arr);
 	gene_to_cell_umis_tab -> appendix1 = ret;
 	gene_to_cell_umis_tab -> appendix2 = bcid_look_tab;
@@ -5239,8 +5248,25 @@ void scRNA_make_barcode_HT_table( fc_thread_global_context_t * global_context ){
 }
 
 void scRNA_close_sample_SamBam_writers(void *v){
-	SamBam_Writer * wtr = v;
+	void ** vv = v;
+	SamBam_Writer * wtr = vv[0];
 	SamBam_writer_close(wtr);
+	free(wtr);
+
+	gzFile gzfp = vv[1];
+	gzclose(gzfp);
+
+	gzfp = vv[2];
+	gzclose(gzfp);
+
+	gzfp = vv[3];
+	gzclose(gzfp);
+
+	pthread_spinlock_t * gz_lock = vv[4];
+	pthread_spin_destroy(gz_lock);
+	free(gz_lock);
+	
+	free(vv);
 }
 
 void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
@@ -5253,11 +5279,26 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	sprintf(fname, "%s.bam", samplename);
 	SamBam_Writer * wtr = calloc(sizeof(SamBam_Writer),1);
 	SamBam_writer_create(wtr, fname, global_context -> thread_number, 0, "del4-cellCounts-0.del");
+	sprintf(fname, "%s_R1.fastq.gz", samplename);
+	gzFile gzipR1fq = gzopen(fname,"w");
+	sprintf(fname, "%s_I1.fastq.gz", samplename);
+	gzFile gzipI1fq = gzopen(fname,"w");
+	sprintf(fname, "%s_R2.fastq.gz", samplename);
+	gzFile gzipR2fq = gzopen(fname,"w");
+
+	pthread_spinlock_t * gzfp_lock = malloc(sizeof(pthread_spinlock_t));
+	pthread_spin_init(gzfp_lock, PTHREAD_PROCESS_PRIVATE);
 	int x1;
 	for(x1=0; x1<scRNA_sample_id_to_name -> numOfElements; x1++){
 		char * sample_name = ArrayListGet( scRNA_sample_id_to_name, x1 );
 		if(strcmp(sample_name, samplename)==0){
-			HashTablePut(fp_tab, NULL+x1+1 , wtr);
+			void ** wtrptr = malloc(sizeof(void*)*5);
+			wtrptr[0]=wtr;
+			wtrptr[1]=gzipR1fq;
+			wtrptr[2]=gzipI1fq;
+			wtrptr[3]=gzipR2fq;
+			wtrptr[4]=gzfp_lock;
+			HashTablePut(fp_tab, NULL+x1+1 , wtrptr);
 			break;
 		}
 	}
@@ -5579,7 +5620,8 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 
 void scRNA_close_file_one_thread(void * k, void * v, HashTable * tab){
 	int threadno = tab -> counter1;
-	SamBam_Writer * wtr = v;
+	void ** vv = v;
+	SamBam_Writer * wtr = vv[0];
 	SamBam_writer_finalise_thread(wtr, threadno);
 }
 
@@ -5639,7 +5681,7 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		if(global_context -> do_scRNA_table){
 			int xk2;
 			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++)HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
-			HashTableDestroy(global_context -> scRNA_sample_BAM_writers);
+			//HashTableDestroy(global_context -> scRNA_sample_BAM_writers);
 			free(global_context -> thread_contexts[xk1].scRNA_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_assigned_reads_per_sample);
