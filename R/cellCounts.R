@@ -572,7 +572,7 @@ library(Matrix)
       cand_umis <- sum(rescue.candidates[,candi])
       cand.simu.pvs <- simu.pvalues[[ cand_umis ]]
       cand.actual.pv <- log.like.cands[candi]
-      actual.pvalues[candi] <- sum(cand.simu.pvs > cand.actual.pv) / length(cand.simu.pvs)
+      actual.pvalues[candi] <- (1+sum(cand.simu.pvs > cand.actual.pv))/(length(cand.simu.pvs)+1)
     }
   
     # p-value => FDR
