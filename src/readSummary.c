@@ -3641,6 +3641,18 @@ int scRNA_get_cell_id(fc_thread_global_context_t * global_context, fc_thread_thr
 	return tb1;
 }
 
+#define SCRNA_BAM_WRITE_SECTION (100llu*1000*1000)
+void sorted_bam_scRNA_write( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, void ** vv ){
+	if( thread_context -> thread_id != 0 )return;
+	if( vv[5] < NULL+SCRNA_BAM_WRITE_SECTION )return;
+	pthread_spin_lock(vv[4]);
+	int thi;
+	for(thi=0; thi<global_context->thread_number; thi++)
+		SamBam_writer_finalise_thread(vv[0], thi);
+	vv[5]=NULL;
+	pthread_spin_unlock(vv[4]);
+}
+
 void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step, char * bambin ){
 	char * testi, *lane_str = NULL, * sample_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
 	int xx=0, laneno=0;
@@ -3667,8 +3679,10 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 		else if(mapped_step == 0){
 			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
 			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
+			sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
 
 			pthread_spin_lock(sample_bam_2fps[4]);
+			sample_bam_2fps[5]=sample_bam_2fps[5]+1;
 			gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
 			SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
 			pthread_spin_unlock(sample_bam_2fps[4]);
@@ -5278,10 +5292,11 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	ArrayList * scRNA_sample_id_to_name = tab -> appendix3;
 
 	char * samplename = k;
-	char fname [MAX_FILE_NAME_LENGTH+20];
+	char fname [MAX_FILE_NAME_LENGTH+20], fnamet[MAX_FILE_NAME_LENGTH+20];
 	sprintf(fname, "%s.bam", samplename);
+	sprintf(fnamet, "del4-cC-tmp0-%s.del", samplename);
 	SamBam_Writer * wtr = calloc(sizeof(SamBam_Writer),1);
-	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, "del4-cellCounts-0.del");
+	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, fnamet);
 	sprintf(fname, "%s_R1.fastq.gz", samplename);
 	gzFile gzipR1fq = gzopen(fname,"w1");
 	sprintf(fname, "%s_I1.fastq.gz", samplename);
@@ -5295,12 +5310,13 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	for(x1=0; x1<scRNA_sample_id_to_name -> numOfElements; x1++){
 		char * sample_name = ArrayListGet( scRNA_sample_id_to_name, x1 );
 		if(strcmp(sample_name, samplename)==0){
-			void ** wtrptr = malloc(sizeof(void*)*5);
+			void ** wtrptr = malloc(sizeof(void*)*6);
 			wtrptr[0]=wtr;
 			wtrptr[1]=gzipR1fq;
 			wtrptr[2]=gzipI1fq;
 			wtrptr[3]=gzipR2fq;
 			wtrptr[4]=gzfp_lock;
+			wtrptr[5]=NULL;
 			HashTablePut(fp_tab, NULL+x1+1 , wtrptr);
 			break;
 		}
