@@ -5271,6 +5271,7 @@ void scRNA_close_sample_SamBam_writers(void *v){
 	free(vv);
 }
 
+#define SORT_BAM_FROM_SCRNA 1
 void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	HashTable * fp_tab = tab -> appendix1;
 	fc_thread_global_context_t * global_context = tab -> appendix2;
@@ -5280,7 +5281,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	char fname [MAX_FILE_NAME_LENGTH+20];
 	sprintf(fname, "%s.bam", samplename);
 	SamBam_Writer * wtr = calloc(sizeof(SamBam_Writer),1);
-	SamBam_writer_create(wtr, fname, global_context -> thread_number, 0, "del4-cellCounts-0.del");
+	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, "del4-cellCounts-0.del");
 	sprintf(fname, "%s_R1.fastq.gz", samplename);
 	gzFile gzipR1fq = gzopen(fname,"w1");
 	sprintf(fname, "%s_I1.fastq.gz", samplename);

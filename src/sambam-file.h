@@ -119,7 +119,7 @@ typedef struct
 	long long chunk_buffer_max_size;
 	int writer_state;
 	int is_internal_error;
-	int keep_in_memory;
+	int sort_reads_by_coord;
 	int fastest_compression;
 	int sorted_batch_id;
 	unsigned int crc0;
@@ -184,7 +184,7 @@ int SamBam_feof(SamBam_FILE * fp);
  */
 char * SamBam_fgets(SamBam_FILE * fp , char * buff , int buff_len , int seq_needed);
 
-int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int keep_in_memory, char * tmpfname);
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int sort_reads_by_coord, char * tmpfname);
 
 int SamBam_writer_close(SamBam_Writer * writer);
 
