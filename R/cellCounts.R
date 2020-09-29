@@ -1,10 +1,11 @@
-.index.names.to.sheet<-function(dirname, nametab, fname){
+.index.names.to.sheet<-function(dirname, nametab, fname, sample.name=NA){
   lanes <- c()
   index.names <- c()
   sample.names <- c()
   index.seq <- c()
   for(cli in 1:nrow(nametab)){
     if(nametab$InputDirectory[cli]!=dirname)next
+    if((!is.na(sample.name)) && nametab$SampleName[cli]!=sample.name)next
     seqs <- .convert.sample_index.id.to.seq(nametab$IndexSetName[cli])
     for(seq in seqs){
       lanes <-c(lanes, nametab$Lane[cli])
@@ -696,7 +697,6 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     unique.samples <- unique( sample.index$SampleName[ sample.index$InputDirectory == dirname ] )
 
     sample.1 <- paste0(temp.file.prefix,".samplesheet")
-    .index.names.to.sheet(dirname, sample.index, sample.1) 
     if(is.null(cell.barcode)){
       cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
     }else{
@@ -707,6 +707,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       generate.scRNA.BAM <- FALSE 
       if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
       for(samplename in unique.samples){
+        .index.names.to.sheet(dirname, sample.index, sample.1, samplename)
         one.bam.name <- paste0(samplename, ".bam")
         one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
         if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
@@ -714,10 +715,10 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
         stt <- one.result[["Sample.Table"]]
-        stt <- stt[ stt$SampleName == samplename, ]
         df.sample.info <- rbind(df.sample.info, stt)
       }
     }else{
+      .index.names.to.sheet(dirname, sample.index, sample.1)
       generate.scRNA.BAM <- TRUE
       if(aligner=="align"){
         align(index, dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
