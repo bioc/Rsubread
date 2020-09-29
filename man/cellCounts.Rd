@@ -58,7 +58,7 @@ The \code{"sample.info"} component of the returned object is a data frame provid
 The \code{"cell.confidence"} component of the returned object is a list object indicating if a cell is a high-confidence cell or a rescued cell in each sample. Each component is a logical vector indicating the confidence of cells called in a sample. A high-confidence cell has a \code{"TRUE"} status.
 }
 
-\examples{
+\examples{\dontrun{
 # Assume that we had four samples: Gene1KO, Gene2KO, Gene3KO and WT. 
 #
 # Cells from the four samples were marked by sample indices SI-GA-E1, SI-GA-E2,
@@ -106,5 +106,5 @@ res <- cellCounts("mm10_index", sample.index)
 
 # Check the statistics of the results.
 print(res$sample.info)
-}
+}}
 \author{Wei Shi and Yang Liao}
