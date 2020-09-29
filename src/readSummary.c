@@ -4623,7 +4623,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 	fprintf(ofp_mtx,"%%%%MatrixMarket matrix coordinate integer general\n");
 
 	HashTable * used_cell_barcodes_tab = NULL;
-	if(used_cell_barcodes)ArrayListToLookupTable_Int( used_cell_barcodes );
+	if(used_cell_barcodes) used_cell_barcodes_tab = ArrayListToLookupTable_Int( used_cell_barcodes );
 
 	ArrayList * output_gene_idxs = HashTableKeys(merged_tab_gene_to_cell_umis);
 	ArrayListSort(output_gene_idxs, NULL);
