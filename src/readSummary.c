@@ -4820,9 +4820,9 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[xi]->numOfElements);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[x1]->numOfElements);
 #else
-		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[xi]->numOfElements);
+		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[x1]->numOfElements);
 #endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
