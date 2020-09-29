@@ -4809,7 +4809,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1;
 
-	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\tAssigned.Reads\tAll.NonZero.Genes\n");
+	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\tAssigned.Reads\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
 		srInt_64 mapped_reads = 0, all_reads = 0, assigned_reads = 0;
 		int thrid;
@@ -4820,9 +4820,9 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[x1]->numOfElements);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
 #else
-		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[x1]->numOfElements);
+		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
 #endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
