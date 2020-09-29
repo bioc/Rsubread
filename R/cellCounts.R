@@ -698,6 +698,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
 
     sample.1 <- paste0(temp.file.prefix,".samplesheet")
     if(is.null(cell.barcode)){
+      .index.names.to.sheet(dirname, sample.index, sample.1)
       cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
@@ -711,7 +712,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         one.bam.name <- paste0(samplename, ".bam")
         one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
         if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
-        one.result <- .load.all.scSamples(samplename, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+        one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
         fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
         stt <- one.result[["Sample.Table"]]
