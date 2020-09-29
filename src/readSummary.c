@@ -286,6 +286,7 @@ typedef struct {
 	srInt_64 max_BAM_header_size;
 	srInt_64 unistr_buffer_size;
 	srInt_64 unistr_buffer_used;
+	int is_scRNA_BAM_FQ_out_generated;
 	HashTable * scRNA_sample_sheet_table;
 	ArrayList * scRNA_sample_barcode_list;
 	ArrayList * scRNA_cell_barcodes_array;
@@ -1889,7 +1890,7 @@ int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigne
 	//SUBREADprintf("ENTER PROCESS (THRD %d): IS_TXT=%d,  ITEMS = %d, CURRENT_ITEMS=%d\n", thread_no, is_text, items, global_context -> sambam_chro_table_items);
 	pthread_spin_lock(&global_context -> sambam_chro_table_lock);
 
-	if(global_context -> do_scRNA_table && is_text) {
+	if(global_context -> is_scRNA_BAM_FQ_out_generated && global_context -> do_scRNA_table && is_text) {
 		global_context -> scRNA_sample_BAM_writers -> appendix1 = bin;
 		global_context -> scRNA_sample_BAM_writers -> counter1 = bin_len;
 		HashTableIteration( global_context -> scRNA_sample_BAM_writers, scRNA_sample_SamBam_writers_add_header);
@@ -3641,7 +3642,7 @@ int scRNA_get_cell_id(fc_thread_global_context_t * global_context, fc_thread_thr
 	return tb1;
 }
 
-#define SCRNA_BAM_WRITE_SECTION (100llu*1000*1000)
+#define SCRNA_BAM_WRITE_SECTION (40llu*1000*1000)
 void sorted_bam_scRNA_write( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, void ** vv ){
 	if( thread_context -> thread_id != 0 )return;
 	if( vv[5] < NULL+SCRNA_BAM_WRITE_SECTION )return;
@@ -3677,16 +3678,18 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 		if(mapped_step == 1)
 			thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
 		else if(mapped_step == 0){
-			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
-			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
-			sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
+			if(global_context -> is_scRNA_BAM_FQ_out_generated){
+				void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
+				if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
+				sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
 
-			pthread_spin_lock(sample_bam_2fps[4]);
-			sample_bam_2fps[5]=sample_bam_2fps[5]+1;
-			gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
-			SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
-			pthread_spin_unlock(sample_bam_2fps[4]);
-			SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin, 1);
+				pthread_spin_lock(sample_bam_2fps[4]);
+				sample_bam_2fps[5]=sample_bam_2fps[5]+1;
+				gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
+				SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
+				pthread_spin_unlock(sample_bam_2fps[4]);
+				SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin, 1);
+			}
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
 		}
 	}
@@ -4533,7 +4536,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 	}
 	if(high_conf_cells >0){
 		srInt_64 median_umis = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  (high_conf_cells-1)/2))-NULL;
-		srInt_64 median_umis_001_cut = (srInt_64)(median_umis *1. *SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION);
+		srInt_64 median_umis_001_cut = (srInt_64)(median_umis *1. *SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION +0.50000001);
 		//SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
 		for(x1=0; x1 < sorted_idx -> numOfElements; x1++){
 			void * this_bc_pnt = ArrayListGet(sorted_idx ,  x1);
@@ -4806,7 +4809,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1;
 
-	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\tAssigned.Reads\n");
+	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\tAssigned.Reads\tAll.NonZero.Genes\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
 		srInt_64 mapped_reads = 0, all_reads = 0, assigned_reads = 0;
 		int thrid;
@@ -4817,9 +4820,9 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[xi]->numOfElements);
 #else
-		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
+		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads, merged_tables_gene_to_cell_umis[xi]->numOfElements);
 #endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
@@ -5323,7 +5326,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list) {
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list, int is_scRNA_BAM_FQ_out_generated) {
 	int x1;
 	myrand_srand(time(NULL));
 
@@ -5400,7 +5403,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 			scRNA_make_barcode_HT_table( global_context );
 			//print_in_box(80,0,0,"Loaded %ld cell barcodes from the list.", global_context-> scRNA_cell_barcodes_array -> numOfElements);
 		}
-
+		global_context -> is_scRNA_BAM_FQ_out_generated = is_scRNA_BAM_FQ_out_generated;
 	}else{
 		global_context -> do_scRNA_table = 0;
 		global_context-> scRNA_cell_barcodes_array = NULL;
@@ -5705,8 +5708,10 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 			free(global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_assigned_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables);
-			global_context -> scRNA_sample_BAM_writers -> counter1 = xk1;
-			HashTableIteration( global_context -> scRNA_sample_BAM_writers, scRNA_close_file_one_thread );
+			if(global_context -> is_scRNA_BAM_FQ_out_generated){
+				global_context -> scRNA_sample_BAM_writers -> counter1 = xk1;
+				HashTableIteration( global_context -> scRNA_sample_BAM_writers, scRNA_close_file_one_thread );
+			}
 			HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_registered_UMI_table);
 		}
 	}
@@ -6874,7 +6879,7 @@ int readSummary(int argc,char *argv[]){
 	char * fasta_contigs_fname, *annotation_file_screen_output;
 	unsigned char * sorted_strand;
 
-	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
+	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping ,is_scRNA_BAM_FQ_out_generated;
 	char * isPEassign,  *is_paired_end_reads_expected;
 
 	int  isGTF, n_input_files=0;
@@ -7113,6 +7118,9 @@ int readSummary(int argc,char *argv[]){
 	if(argc>58 && strlen(argv[58])>0 && argv[58][0]!=' ') is_paired_end_reads_expected = argv[58];
 	else is_paired_end_reads_expected = "0";
 
+	if(argc>59 && strlen(argv[59])>0 && argv[59][0]!=' ') is_scRNA_BAM_FQ_out_generated = atoi(argv[59]);
+	else is_scRNA_BAM_FQ_out_generated = 1;
+
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
 		return -1;
@@ -7144,7 +7152,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list, is_scRNA_BAM_FQ_out_generated);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -7281,7 +7289,7 @@ int readSummary(int argc,char *argv[]){
 		}else global_context.is_strand_checked = one_single_strand_mode;
 		global_context.redo=0;
 		
-		if(global_context.scRNA_sample_sheet_table){
+		if(global_context.is_scRNA_BAM_FQ_out_generated && global_context.scRNA_sample_sheet_table){
 			global_context.scRNA_sample_BAM_writers = HashTableCreate(global_context.scRNA_sample_sheet_table -> numOfElements);
 			HashTableSetDeallocationFunctions(global_context.scRNA_sample_BAM_writers, NULL, scRNA_close_sample_SamBam_writers);
 			global_context.scRNA_sample_sheet_table ->appendix1 = global_context.scRNA_sample_BAM_writers;
@@ -7446,7 +7454,7 @@ int readSummary(int argc,char *argv[]){
 		HashTableDestroy(global_context.scRNA_sample_sheet_table);
 		ArrayListDestroy(global_context.scRNA_sample_barcode_list);
 		ArrayListDestroy(global_context.scRNA_sample_id_to_name);
-		HashTableDestroy(global_context.scRNA_sample_BAM_writers);
+		if(global_context.is_scRNA_BAM_FQ_out_generated)HashTableDestroy(global_context.scRNA_sample_BAM_writers);
 	}
 	if(global_context.scRNA_cell_barcodes_array){
 		ArrayListDestroy(global_context.scRNA_cell_barcodes_array);
@@ -7604,7 +7612,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[59];
+	char * Rargv[60];
 	char annot_name[MAX_FILE_NAME_LENGTH];
 	char temp_dir[MAX_FILE_NAME_LENGTH];
 	char * out_name = malloc(MAX_FILE_NAME_LENGTH);
@@ -7672,6 +7680,7 @@ int feature_count_main(int argc, char ** argv)
 	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
 	float fracOverlap = 0.0, fracOverlapFeature = 0.0;
 	int std_input_output_mode = 0, long_read_mode = 0, is_verbose = 0;
+    int is_scRNA_BAM_FQ_out_generated = 1;
 	char strFiveEndExtension[11], strThreeEndExtension[11], strMinFragmentOverlap[11], fracOverlapStr[20], std_input_output_mode_str[16], long_read_mode_str[16];
 	very_long_file_names = malloc(very_long_file_names_size);
 	very_long_file_names [0] = 0;
@@ -8110,10 +8119,11 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[56] = scRNA_sample_sheet;
 	Rargv[57] = scRNA_cell_barcode_list;
 	Rargv[58] = is_paired_end_reads_expected;
+	Rargv[59] = is_scRNA_BAM_FQ_out_generated?"1":"0";
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(59, Rargv);
+	else retvalue = readSummary(60, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
