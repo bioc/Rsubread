@@ -4622,7 +4622,8 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 	FILE * ofp_mtx = fopen( ofname , "w" );
 	fprintf(ofp_mtx,"%%%%MatrixMarket matrix coordinate integer general\n");
 
-	HashTable * used_cell_barcodes_tab = ArrayListToLookupTable_Int( used_cell_barcodes );
+	HashTable * used_cell_barcodes_tab = NULL;
+	if(used_cell_barcodes)ArrayListToLookupTable_Int( used_cell_barcodes );
 
 	ArrayList * output_gene_idxs = HashTableKeys(merged_tab_gene_to_cell_umis);
 	ArrayListSort(output_gene_idxs, NULL);
@@ -4639,7 +4640,8 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 		for(x2=0; x2 < bc_umi_p1_list -> numOfElements; x2++){
 			srInt_64 bc_umi = ArrayListGet(bc_umi_p1_list, x2) - NULL - 1;
 			int bc_no = (int)(bc_umi >>32);
-			void * this_bc_needed = HashTableGet(used_cell_barcodes_tab, NULL+1+bc_no); 
+			void * this_bc_needed = NULL+1;
+			if(used_cell_barcodes_tab) this_bc_needed = HashTableGet(used_cell_barcodes_tab, NULL+1+bc_no); 
 			if(!this_bc_needed) continue;
 			int out_bc_no = HashTableGet( bc_no_to_output_no_tab , NULL+1+bc_no ) -NULL;
 			if( out_bc_no <1 ){
@@ -4673,7 +4675,8 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 			srInt_64 bc_umi = ArrayListGet(bc_umi_p1_list, x2) - NULL - 1;
 			int bc_no = (int)(bc_umi >>32);
 			int out_bc_no = HashTableGet( bc_no_to_output_no_tab , NULL+1+bc_no ) -NULL;
-			void * this_bc_needed = HashTableGet(used_cell_barcodes_tab, NULL+1+bc_no); 
+			void * this_bc_needed = NULL+1;
+			if(used_cell_barcodes_tab) this_bc_needed = HashTableGet(used_cell_barcodes_tab, NULL+1+bc_no); 
 			if(!this_bc_needed) continue;
 
 			this_gene_has_bc = 1;
@@ -4702,7 +4705,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 		nonozero_genes += this_gene_has_bc;
 	}
 	HashTableDestroy(bc_no_to_output_no_tab);
-	HashTableDestroy(used_cell_barcodes_tab);
+	if(used_cell_barcodes_tab)HashTableDestroy(used_cell_barcodes_tab);
 	ArrayListDestroy(output_gene_idxs);
 	ArrayListDestroy(output_no_tab_to_bcno_arr);
 	fclose(ofp_bcs);
@@ -4845,6 +4848,9 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		for(xk1 = 0; xk1 < nexons ; xk1++){
 			HashTablePut(sorted_order_p1_to_i_p1_tab, NULL+loaded_features[xk1].sorted_order+1 , NULL+xk1+1 );
 		}
+
+		if(1)  scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], NULL, x1, "RawMatrix",  loaded_features, sorted_order_p1_to_i_p1_tab);
+
 	
 		//SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], high_confid_barcode_index_list, x1, "HighConf",  loaded_features, sorted_order_p1_to_i_p1_tab);

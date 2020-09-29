@@ -7,15 +7,12 @@ cellCounts(
 
     # the mandatory arguments
     index,
-    input.directory,
-    output.BAM,
-    sample.sheet,
-    cell.barcode.list = NULL,
+    sample.index,
   
     # the optional arguments related to read mapping
     input.mode = "BCL",
+    cell.barcode = NULL,
     aligner = "align",
-    nthreads = 16,
   
     # the optional arguments related to counting
     annot.inbuilt = "mm10",
@@ -23,24 +20,26 @@ cellCounts(
     isGTFAnnotationFile = FALSE,
     GTF.featureType = "exon",
     GTF.attrType = "gene_id",
-    GTF.attrType.extra = NULL,
-    chrAliases = NULL,
     useMetaFeatures = TRUE,
-    allowMultiOverlap = FALSE,
-    countMultiMappingReads = TRUE,
-    reportAllJunctions = FALSE)
+    nthreads = 10,
+
+    # other parameters passed to align, subjunc and featureCounts functions 
+    ...)
 }
 \arguments{
   \item{index}{ a character string giving the subread index built by the {buildindex} function.}
-  \item{input.directory}{ a character strings giving one or many directories containing the input data sets. Each data set should be put into an individual directory.}
-  \item{output.BAM}{ a character strings giving one or many output file names, each corrsponding to an input directory. The output files are in the BAM format.}
-  \item{sample.sheet}{ a character strings giving one or many sample sheet files in the CSV format, with each sample sheet corresponding to an input directory. See the Illumina bcl2fastq manual for the file format.}
-  \item{cell.barcode.list}{ a character string giving the name of a textual file (can be gzipped) containing the set of cell barcodes used in sample preparation. All the input data sets must use the same cell barcode set. If \code{NULL} is given then a best cell barcode set is automatically chosen for the input data. \code{NULL} by default.}
-  \item{input.mode}{ a character string giving the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
+  \item{smaple.index}{ A data frame containing raw input directories and index set name for each sample. The data frame must contain three columns with column headers named \code{"InputDirectory"}, \code{"Lane"}, \code{"SampleName"} and \code{"IndexSetName"}. Note that this is not the Sample Sheet created by an Illumina sequencer. This data frame is used by cellCounts to locate the input data and to produce a Sample Sheet which is then used to demultiplex samples. The name of an index set specifies a set of indices that were used for the sequencing of a sample. An example of the index set name is \code{"SI-P01-A2"}. See example blow for details.}
+  \item{cell.barcode}{ A character string giving the name of a text file (can be gzipped) that contains the set of cell barcodes used in sample preparation. If \code{NULL}, a cell barcode set will be determined for the input data by cellCounts based on the matching of cell barcodes sequences of the first 100,000 reads in the data with the three cell barcode sets used by 10X Genomics. \code{NULL} by default.}
+  \item{input.mode}{ A character string giving the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
   \item{aligner}{ a character string giving the name of the aligner: \code{"align"} or \code{"subjunc"} (not yet implemented). A NULL value indicates the function to skip the mapping step but directly use the BAM file in \code{"output.BAM"} for generating UMI counts. \code{"align"} by default.}
-  \item{nthreads}{ a numeric value giving the number of threads used for read mapping and counting. 16 by default.}
-  \item{annot.inbuilt, annot.ext, isGTFAnnotationFile, GTF.featureType, GTF.attrType, GTF.attrType.extra, chrAliases, useMetaFeatures, allowMultiOverlap, countMultiMappingReads}{ options for counting the mapping results. The options have the same meanings as them \code{featureCounts}}
-  \item{reportAllJunctions}{logical indicating if all discovered junctions will be reported when the aligner is \code{"subjunc"}. This includes exon-exon junctions and also gene fusions. Presence of donor/receptor sites is not required when \code{reportAllJunctions} is \code{TRUE}. \code{FALSE} by default.}
+  \item{annot.inbuilt}{ Specify an inbuilt annotation for UMI counting. See \link[Rsubread]{featureCounts} for more details. \code{"mm10"} by default.}
+  \item{annot.ext}{ Specify an external annotation for UMI counting. See \link[Rsubread]{featureCounts} for more details. \code{NULL} by default.}
+  \item{isGTFAnnotationFile}{ See \link[Rsubread]{featureCounts} for more details. \code{FALSE} by default.}
+  \item{GTF.featureType}{ See \link[Rsubread]{featureCounts} for more details. \code{"exon"} by default.}
+  \item{GTF.attrType}{ See \link[Rsubread]{featureCounts} for more details. \code{"gene_id"} by default.} 
+  \item{useMetaFeatures}{ Specify if UMI counting should be carried out at the meta-feature level (eg. gene level).  See \link[Rsubread]{featureCounts} for more details. \code{TRUE} by default.}
+  \item{nthreads}{ A numeric value giving the number of threads used for read mapping and counting. 16 by default.}
+  \item{...}{other parameters passed to align, subjunc and featureCounts functions.}
 }
 
 \details{
