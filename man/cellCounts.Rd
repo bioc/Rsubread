@@ -47,6 +47,64 @@ cellCounts(
 }
 
 \value{
-  \code{cellCounts} returns a list object containing many elements. The \code{counts.*} elements give the counts of reads to each feature or meta-feature in each sample, the same as the returned object from \code{featureCounts}. The \code{scRNA.table.*} elements are tables giving the feature or meta-feature level UMI counts in each cells. 
+  \code{cellCounts} returns a list object containing many elements.
+
+The \code{"counts"} component of the returned object is itself a list object for the UMI counts for each sample. Each component in this list object is a matrix that contains UMI counts for a sample. Rows in the matrix are genes and columns are cells.
+
+The \code{"Annotation"} component of the returned object is a data frame for the annotations used in counting. The columns include \code{"GeneID"}, \code{"Chr"}, \code{"Start"}, \code{"End"} and \code{"Length"}.
+
+The \code{"sample.info"} component of the returned object is a data frame providing sample information and statistics related to the quantification results. It includes the following columns: \code{"SampleName"}, \code{"InputDirectory"}, \code{"TotalCells"}, \code{"HighConfidenceCells"}, \code{"RescuedCells"}, \code{"TotalUMI"}, \code{"TotalReads"}, \code{"MappedReads"} and \code{"AssignedReads"}. Order of sample names in this data frame is the same as the sample order in other components of the returned object including \code{"counts"} and \code{"cell.confidence"}. 
+
+The \code{"cell.confidence"} component of the returned object is a list object indicating if a cell is a high-confidence cell or a rescued cell in each sample. Each component is a logical vector indicating the confidence of cells called in a sample. A high-confidence cell has a \code{"TRUE"} status.
+}
+
+\examples{
+# Assume that we had four samples: Gene1KO, Gene2KO, Gene3KO and WT. 
+#
+# Cells from the four samples were marked by sample indices SI-GA-E1, SI-GA-E2,
+# SI-GA-E3 and SI-GA-E4, respectively.
+#
+# These cells were sequenced in two runs, producing two diretories of raw data
+# (RawData_1 and RawData_2). There should be RunInfo.xml, many gzipped BCL files
+# and other files in each of the two directories.
+#
+# The first run used four lanes to sequence the Gene1KO and Gene2KO samples, and
+# the second run uses four lanes to sequence the Gene3KO and WT samples.
+#
+# The sample-index data frame should contain all the information above:
+
+sample.index <- data.frame(
+  Input.Directory = c( rep("RawData_1",8), rep("RawData_2",8)),
+  Lane = c(1,1,2,2,3,3,4,4,1,1,2,2,3,3,4,4),
+  SampleName = c(rep(c("Gene1KO","Gene2KO"),4),rep(c("Gene3KO","WT"),4)),
+  IndexSetName = c(rep(c("SI-GA-E1","SI-GA-E2"),4),rep(c("SI-GA-E3","SI-GA-E4"),4))
+)
+
+print(sample.index)
+# the content in the sample-index data frame is:
+#
+#    Input.Directory Lane SampleName IndexSetName
+# 1        RawData_1    1    Gene1KO     SI-GA-E1
+# 2        RawData_1    1    Gene2KO     SI-GA-E2
+# 3        RawData_1    2    Gene1KO     SI-GA-E1
+# 4        RawData_1    2    Gene2KO     SI-GA-E2
+# 5        RawData_1    3    Gene1KO     SI-GA-E1
+# 6        RawData_1    3    Gene2KO     SI-GA-E2
+# 7        RawData_1    4    Gene1KO     SI-GA-E1
+# 8        RawData_1    4    Gene2KO     SI-GA-E2
+# 9        RawData_2    1    Gene3KO     SI-GA-E3
+# 10       RawData_2    1         WT     SI-GA-E4
+# 11       RawData_2    2    Gene3KO     SI-GA-E3
+# 12       RawData_2    2         WT     SI-GA-E4
+# 13       RawData_2    3    Gene3KO     SI-GA-E3
+# 14       RawData_2    3         WT     SI-GA-E4
+# 15       RawData_2    4    Gene3KO     SI-GA-E3
+# 16       RawData_2    4         WT     SI-GA-E4
+
+# We then use cellCounts to demultiplex, map and quantify the four samples.
+res <- cellCounts("mm10_index", sample.index)
+
+# Check the statistics of the results.
+print(res$sample.info)
 }
 \author{Wei Shi and Yang Liao}
