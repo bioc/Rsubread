@@ -5,16 +5,16 @@
 \usage{
 cellCounts(
 
-    # the mandatory arguments
+    # input data
     index,
     sample.index,
-  
-    # the optional arguments related to read mapping
     input.mode = "BCL",
     cell.barcode = NULL,
+  
+    # specify the aligner used for read mapping
     aligner = "align",
   
-    # the optional arguments related to counting
+    # parameters used by featureCounts for counting and assigning UMIs
     annot.inbuilt = "mm10",
     annot.ext = NULL,
     isGTFAnnotationFile = FALSE,
@@ -30,8 +30,8 @@ cellCounts(
   \item{index}{ a character string giving the subread index built by the {buildindex} function.}
   \item{smaple.index}{ A data frame containing raw input directories and index set name for each sample. The data frame must contain three columns with column headers named \code{"InputDirectory"}, \code{"Lane"}, \code{"SampleName"} and \code{"IndexSetName"}. Note that this is not the Sample Sheet created by an Illumina sequencer. This data frame is used by cellCounts to locate the input data and to produce a Sample Sheet which is then used to demultiplex samples. The name of an index set specifies a set of indices that were used for the sequencing of a sample. An example of the index set name is \code{"SI-P01-A2"}. See example blow for details.}
   \item{cell.barcode}{ A character string giving the name of a text file (can be gzipped) that contains the set of cell barcodes used in sample preparation. If \code{NULL}, a cell barcode set will be determined for the input data by cellCounts based on the matching of cell barcodes sequences of the first 100,000 reads in the data with the three cell barcode sets used by 10X Genomics. \code{NULL} by default.}
-  \item{input.mode}{ A character string giving the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
-  \item{aligner}{ a character string giving the name of the aligner: \code{"align"} or \code{"subjunc"} (not yet implemented). A NULL value indicates the function to skip the mapping step but directly use the BAM file in \code{"output.BAM"} for generating UMI counts. \code{"align"} by default.}
+  \item{input.mode}{ Specify the input mode. Currently only the BCL-format input (ie \code{"BCL"}) is supported.}
+  \item{aligner}{ Specify the name of the aligner: \code{"align"} or \code{"subjunc"} (not yet implemented). A NULL value indicates the function to skip the mapping step but directly use the BAM file in \code{"output.BAM"} for generating UMI counts. \code{"align"} by default.}
   \item{annot.inbuilt}{ Specify an inbuilt annotation for UMI counting. See \link[Rsubread]{featureCounts} for more details. \code{"mm10"} by default.}
   \item{annot.ext}{ Specify an external annotation for UMI counting. See \link[Rsubread]{featureCounts} for more details. \code{NULL} by default.}
   \item{isGTFAnnotationFile}{ See \link[Rsubread]{featureCounts} for more details. \code{FALSE} by default.}
