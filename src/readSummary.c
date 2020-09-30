@@ -4412,7 +4412,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 	srInt_64 old_id=-1;
 	for(x1 = 0; x1 < cellno_umino_p1_list -> numOfElements; x1++){
 		srInt_64 this_id = cellno_umino_p1_list -> elementList[x1] - NULL;
-		if(this_id != old_id){
+		if(this_id != old_id || x1 == cellno_umino_p1_list -> numOfElements -1){
 			assert( this_id > old_id );
 			if(x1 != short_ptr) cellno_umino_p1_list -> elementList[short_ptr] = NULL + this_id;
 			short_ptr++;
@@ -4432,8 +4432,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 		if(cellbc_no != old_bcno || x1 == cellno_umino_p1_list -> numOfElements-1){
 			int cell_umi = 0;
 			srInt_64 sec_end = x1 + ((cellbc_no == old_bcno)?1:0);
-			if(0 && sec_end - cell_sec_start > 40000) SUBREADprintf("BIGSEC: %lld\n", sec_end - cell_sec_start);
-			if(sec_end - cell_sec_start > 70 - 69){
+			if(sec_end - cell_sec_start > 1){
 				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret , used_cellno_tab);
 			}else{
 				srInt_64 rescan_i, ret_sec_start = ret -> numOfElements, test_i;
@@ -4561,36 +4560,70 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 #define SCRNA_BOOTSTRAP_HIGH_INDEX 30
 #define SCRNA_BOOTSTRAP_SAMPLING_TIMES 100
 
+#define DEBUG_FOR_EXACT
+
 void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * merged_umi_list, ArrayList * highconf_list){
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
 	srInt_64 x2, x1, UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
 
 	#define SCRNA_IDX_PRIME_NUMBER_BIG 11218439llu;
 	srInt_64 this_total = 0, seed_rand = sorted_idx -> numOfElements/2 + merged_umi_list -> numOfElements /2;
-	for(x1 = 0; x1 < SCRNA_BOOTSTRAP_SAMPLING_TIMES; x1++){
-		ArrayList * resampled_list = ArrayListCreate( sorted_idx->numOfElements );
 
+	#ifdef DEBUG_FOR_EXACT
+	#warning "============== THIS BUILD IS ONLY FOR DEBUGGING EXACT RESULTS !!!! ================="
+	ArrayListSort(sorted_idx, NULL);
+	FILE * dfp = fopen("/tmp/del4-YangLiao-for-resample.txt","w");
+	for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
+		int bc_no_p1 = ArrayListGet(sorted_idx, x2)-NULL;
+		fprintf(dfp,"%d\t%s\n", bc_no_p1, ArrayListGet(global_context -> scRNA_cell_barcodes_array, bc_no_p1-1));
+	}
+	fclose(dfp);
+	system("python /usr/local/work/liao/subread/scripts/Cellranger-replicate/CrepPY-resample.py");
+	FILE * rfp = fopen("/tmp/del4-YangLiao-from-resample.txt","r");
+	#endif
+
+	for(x1 = 0; x1 < SCRNA_BOOTSTRAP_SAMPLING_TIMES; x1++){
+		ArrayList * resampled_list_of_umis = ArrayListCreate( sorted_idx->numOfElements );
+
+		#ifdef DEBUG_FOR_EXACT
+		#warning "============== THIS BUILD IS ONLY FOR DEBUGGING EXACT RESULTS !!!! ================="
+		for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
+			char fl [100];
+			fgets(fl, 99, rfp);
+			int bc_no_p1 = atoi(fl);
+			int this_umis = HashTableGet(used_cell_barcode_tab, NULL+bc_no_p1);
+			ArrayListPush(resampled_list_of_umis, NULL+this_umis);
+		}
+		ArrayListSort(resampled_list_of_umis, NULL);
+		#else
 		for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
 			seed_rand %= sorted_idx -> numOfElements;
 			void * barcode_idx = ArrayListGet(sorted_idx, seed_rand);
 			seed_rand += SCRNA_IDX_PRIME_NUMBER_BIG;
 			srInt_64 this_umis = HashTableGet( used_cell_barcode_tab, barcode_idx )-NULL;
-			ArrayListPush(resampled_list,NULL+this_umis);
+			ArrayListPush(resampled_list_of_umis,NULL+this_umis);
 		}
-		ArrayListSort( resampled_list, NULL );
-		srInt_64 UMIs_30th_div10 = ArrayListGet(resampled_list, resampled_list -> numOfElements - SCRNA_BOOTSTRAP_HIGH_INDEX) -NULL;
+		#endif
+		ArrayListSort( resampled_list_of_umis, NULL );
+		srInt_64 UMIs_30th_div10 = ArrayListGet(resampled_list_of_umis, resampled_list_of_umis -> numOfElements - SCRNA_BOOTSTRAP_HIGH_INDEX) -NULL;
 		UMIs_30th_div10 = (srInt_64)(UMIs_30th_div10*1./10 + 0.500000001);
 
-		for(x2 =0; x2< resampled_list -> numOfElements; x2++){
-			srInt_64 lli = resampled_list -> numOfElements -1 -x2;
-			srInt_64 this_umis = ArrayListGet(resampled_list, lli)-NULL;
+		for(x2 =0; x2< resampled_list_of_umis -> numOfElements; x2++){
+			srInt_64 lli = resampled_list_of_umis -> numOfElements -1 -x2;
+			srInt_64 this_umis = ArrayListGet(resampled_list_of_umis, lli)-NULL;
 			if(this_umis >= UMIs_30th_div10) this_total ++;
 			else break;
 		}
-		ArrayListDestroy(resampled_list);
+		ArrayListDestroy(resampled_list_of_umis);
 	}
-	this_total /= SCRNA_BOOTSTRAP_SAMPLING_TIMES;
-	if(1) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %lld\n",this_total);
+	double total_f = this_total*1. / SCRNA_BOOTSTRAP_SAMPLING_TIMES;
+	if(1) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %.5f\n",total_f);
+	this_total = (int)(total_f + 0.500000001);
+
+	#ifdef DEBUG_FOR_EXACT
+	#warning "============== THIS BUILD IS ONLY FOR DEBUGGING EXACT RESULTS !!!! ================="
+	sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
+	#endif
 
 	for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++){
 		ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) - 1 );
@@ -4849,7 +4882,10 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 			HashTablePut(sorted_order_p1_to_i_p1_tab, NULL+loaded_features[xk1].sorted_order+1 , NULL+xk1+1 );
 		}
 
-		if(1)  scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], NULL, x1, "RawMatrix",  loaded_features, sorted_order_p1_to_i_p1_tab);
+		#ifdef DEBUG_FOR_EXACT
+		#warning " ======= Another debug ======"
+		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], NULL, x1, "RawMatrix",  loaded_features, sorted_order_p1_to_i_p1_tab);
+		#endif
 
 	
 		//SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
