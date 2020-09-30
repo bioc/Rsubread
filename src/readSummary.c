@@ -4553,7 +4553,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 		ArrayListPush(this_sample_45k_90k_barcode_idx, ArrayListGet(sorted_idx ,  x1) );
 	}
 	ArrayListDestroy(sorted_idx);
-	//SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
+	SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
 	HashTableDestroy(highconf_list_tab);
 }
 
