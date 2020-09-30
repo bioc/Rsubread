@@ -718,6 +718,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         stt <- one.result[["Sample.Table"]]
         df.sample.info <- rbind(df.sample.info, stt)
       }
+      stop("FOR_MY_TEST")
     }else{
       .index.names.to.sheet(dirname, sample.index, sample.1)
       generate.scRNA.BAM <- TRUE

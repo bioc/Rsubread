@@ -4519,45 +4519,68 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 	}
 	return total_count_in_row;
 }
+#define DEBUG_FOR_EXACT
 #define MIN_UMIS_FOR_CANDIDATE_RESCUE 500
 #define SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION 0.01
 void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * this_sample_ambient_rescure_candi, ArrayList * this_sample_45k_90k_barcode_idx, ArrayList * highconf_list){
-	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
+	ArrayList * sorted_bcno_p1 = HashTableSortedIndexes( used_cell_barcode_tab, 1);
 	HashTable * highconf_list_tab = ArrayListToLookupTable_Int(highconf_list);
 	srInt_64 x1, high_conf_cells = 0;
-	for(x1=0; x1 < sorted_idx -> numOfElements; x1++){
-		void * this_bc_pnt = ArrayListGet(sorted_idx ,  x1);
+	for(x1=0; x1 < sorted_bcno_p1 -> numOfElements; x1++){
+		void * this_bc_pnt = ArrayListGet(sorted_bcno_p1 ,  x1);
 		if(HashTableGet(highconf_list_tab, this_bc_pnt)) high_conf_cells = x1+1;
 		else break; // assuming that all high-umi barcodes are high-confident, this makes x1 being the # of total high-confidence barcodes.	
 	}
+	int UMIs_at_45k = -1, UMIs_at_90k = -1;
+	#ifdef DEBUG_FOR_EXACT
+	#warning "============= EXT 1 ==========="
+	FILE * tfp = fopen("/tmp/del4-YangLiao-rescue-cand.txt","w");
+	#endif
 	if(high_conf_cells >0){
-		srInt_64 median_umis = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  (high_conf_cells-1)/2))-NULL;
+		srInt_64 median_umis = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_bcno_p1 ,  (high_conf_cells-1)/2))-NULL;
 		srInt_64 median_umis_001_cut = (srInt_64)(median_umis *1. *SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION +0.50000001);
 		//SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
-		for(x1=0; x1 < sorted_idx -> numOfElements; x1++){
-			void * this_bc_pnt = ArrayListGet(sorted_idx ,  x1);
-			if(HashTableGet(highconf_list_tab, this_bc_pnt)) continue; // it is in high-conf list
-			srInt_64 this_bc_umis = HashTableGet(used_cell_barcode_tab, this_bc_pnt) - NULL;
+		for(x1=0; x1 < sorted_bcno_p1 -> numOfElements; x1++){
+			void * this_bc_pnt_p1 = ArrayListGet(sorted_bcno_p1 ,  x1);
+			if(HashTableGet(highconf_list_tab, this_bc_pnt_p1)) continue; // it is in high-conf list
+			srInt_64 this_bc_umis = HashTableGet(used_cell_barcode_tab, this_bc_pnt_p1) - NULL;
 			if(this_bc_umis < median_umis_001_cut) break;
-			if(this_bc_umis <MIN_UMIS_FOR_CANDIDATE_RESCUE) break;
+			if(this_bc_umis < MIN_UMIS_FOR_CANDIDATE_RESCUE) break;
 			if(x1 >= 45000) break;
-			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt-1);
+			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt_p1-1);
 		}
+		#ifdef DEBUG_FOR_EXACT
+		#warning "============= EXT 2 ==========="
+		for(x1=0; x1<this_sample_ambient_rescure_candi->numOfElements; x1++){
+			int this_bc_no_p0 = ArrayListGet(this_sample_ambient_rescure_candi, x1)-NULL;
+			srInt_64 this_bc_umis = HashTableGet(used_cell_barcode_tab, NULL+this_bc_no_p0+1) - NULL;
+			fprintf(tfp,"CAND %d %d\n", this_bc_no_p0+1, this_bc_umis);
+		}
+		#endif
 	}
-	for(x1=45000; x1 < sorted_idx -> numOfElements; x1++){
+	for(x1=45000; x1 < sorted_bcno_p1 -> numOfElements; x1++){
 		if(x1 >= 90000) break;
-		ArrayListPush(this_sample_45k_90k_barcode_idx, ArrayListGet(sorted_idx ,  x1) );
+		ArrayListPush(this_sample_45k_90k_barcode_idx, ArrayListGet(sorted_bcno_p1 ,  x1) );
+		#ifdef DEBUG_FOR_EXACT
+		int this_bc_no_p1 = ArrayListGet(sorted_bcno_p1, x1)-NULL;
+		int this_bc_umis = HashTableGet(used_cell_barcode_tab, NULL+this_bc_no_p1) - NULL;
+		fprintf(tfp,"45K90K %d %d\n", this_bc_no_p1, this_bc_umis);
+		#warning "============= EXT 3 ==========="
+		#endif
 	}
-	ArrayListDestroy(sorted_idx);
+	ArrayListDestroy(sorted_bcno_p1);
 	//SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
 	HashTableDestroy(highconf_list_tab);
+	#ifdef DEBUG_FOR_EXACT
+	#warning "============= EXT 4 ==========="
+	fclose(tfp);
+	#endif
 }
 
 
 #define SCRNA_BOOTSTRAP_HIGH_INDEX 30
 #define SCRNA_BOOTSTRAP_SAMPLING_TIMES 100
 
-#define DEBUG_FOR_EXACT
 
 void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * merged_umi_list, ArrayList * highconf_list){
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
@@ -4572,7 +4595,8 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 	FILE * dfp = fopen("/tmp/del4-YangLiao-for-resample.txt","w");
 	for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
 		int bc_no_p1 = ArrayListGet(sorted_idx, x2)-NULL;
-		fprintf(dfp,"%d\t%s\n", bc_no_p1, ArrayListGet(global_context -> scRNA_cell_barcodes_array, bc_no_p1-1));
+		int bc_umis = HashTableGet(used_cell_barcode_tab, NULL+bc_no_p1) - NULL;
+		fprintf(dfp,"%d\t%d\t%s\n", bc_no_p1, bc_umis, ArrayListGet(global_context -> scRNA_cell_barcodes_array, bc_no_p1-1));
 	}
 	fclose(dfp);
 	system("python /usr/local/work/liao/subread/scripts/Cellranger-replicate/CrepPY-resample.py");
