@@ -4409,12 +4409,12 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 	ArrayList * ret = ArrayListCreate( cellno_umino_p1_list -> numOfElements );
 	ArrayListSort(cellno_umino_p1_list,NULL);
 	srInt_64 x1, short_ptr = 0;
-	srInt_64 old_id=-1;
-	for(x1 = 0; x1 < cellno_umino_p1_list -> numOfElements; x1++){
-		srInt_64 this_id = cellno_umino_p1_list -> elementList[x1] - NULL;
-		if(this_id != old_id || x1 == cellno_umino_p1_list -> numOfElements -1){
-			assert( this_id > old_id );
-			if(x1 != short_ptr) cellno_umino_p1_list -> elementList[short_ptr] = NULL + this_id;
+	srInt_64 old_id= cellno_umino_p1_list -> elementList[0]-NULL;
+	for(x1 = 1; x1 <=cellno_umino_p1_list -> numOfElements; x1++){
+		srInt_64 this_id =(x1==cellno_umino_p1_list -> numOfElements) ? -1 :(cellno_umino_p1_list -> elementList[x1] - NULL);
+		if(this_id != old_id){
+			if(this_id>=0)assert(this_id >=old_id);
+			if(x1 != short_ptr) cellno_umino_p1_list -> elementList[short_ptr] = NULL + old_id;
 			short_ptr++;
 			old_id = this_id;
 		}
@@ -4427,11 +4427,11 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 	int cell_sec_start = 0;
 	int old_bcno =((srInt_64)(ArrayListGet(cellno_umino_p1_list, 0)-NULL-1))>> 32;
 	int computational_cost = 0;
-	for(x1 = 1; x1 < cellno_umino_p1_list -> numOfElements;x1++){
-		int cellbc_no =((srInt_64)(ArrayListGet(cellno_umino_p1_list, x1)-NULL -1))>>32;
-		if(cellbc_no != old_bcno || x1 == cellno_umino_p1_list -> numOfElements-1){
+	for(x1 = 1; x1 <=cellno_umino_p1_list -> numOfElements;x1++){
+		int cellbc_no =(x1==cellno_umino_p1_list -> numOfElements)?-1:(((srInt_64)(ArrayListGet(cellno_umino_p1_list, x1)-NULL -1))>>32);
+		if(cellbc_no != old_bcno){
 			int cell_umi = 0;
-			srInt_64 sec_end = x1 + ((cellbc_no == old_bcno)?1:0);
+			srInt_64 sec_end = x1;
 			if(sec_end - cell_sec_start > 1){
 				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret , used_cellno_tab);
 			}else{
@@ -4465,12 +4465,9 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 		}
 	}
 
-	if(ret -> numOfElements == 0 && cellno_umino_p1_list -> numOfElements)
+	if(0)if(ret -> numOfElements == 0 && cellno_umino_p1_list -> numOfElements)
 		for(x1 = 0; x1 < cellno_umino_p1_list -> numOfElements;x1++)
 			ArrayListPush(ret, ArrayListGet(cellno_umino_p1_list , x1));
-
-	//if(computational_cost>50000)SUBREADprintf("COMCOST=%d\n",computational_cost);
-	//if( ret -> numOfElements != cellno_umino_p1_list -> numOfElements ) SUBREADprintf("Merging UMIs: %ld -> %ld\n", cellno_umino_p1_list -> numOfElements, ret -> numOfElements );
 	return ret;
 }
 
