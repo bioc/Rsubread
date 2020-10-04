@@ -4519,10 +4519,10 @@ int scRNA_merged_write_a_gene(fc_thread_global_context_t * global_context,  Hash
 	}
 	return total_count_in_row;
 }
-#define DEBUG_FOR_EXACT
+// #define DEBUG_FOR_EXACT
 #define MIN_UMIS_FOR_CANDIDATE_RESCUE 500
 #define SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION 0.01
-void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * this_sample_ambient_rescure_candi, ArrayList * this_sample_45k_90k_barcode_idx, ArrayList * highconf_list){
+void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * this_sample_ambient_rescure_candi, ArrayList * this_sample_45k_90k_barcode_no_P0, ArrayList * highconf_list){
 	ArrayList * sorted_bcno_p1 = HashTableSortedIndexes( used_cell_barcode_tab, 1);
 	HashTable * highconf_list_tab = ArrayListToLookupTable_Int(highconf_list);
 	srInt_64 x1, high_conf_cells = 0;
@@ -4560,20 +4560,49 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 	}
 	for(x1=45000; x1 < sorted_bcno_p1 -> numOfElements; x1++){
 		if(x1 >= 90000) break;
-		ArrayListPush(this_sample_45k_90k_barcode_idx, ArrayListGet(sorted_bcno_p1 ,  x1) );
+		ArrayListPush(this_sample_45k_90k_barcode_no_P0, ArrayListGet(sorted_bcno_p1 ,  x1)-1 );
 		#ifdef DEBUG_FOR_EXACT
+		#warning "============= EXT 3 ==========="
 		int this_bc_no_p1 = ArrayListGet(sorted_bcno_p1, x1)-NULL;
 		int this_bc_umis = HashTableGet(used_cell_barcode_tab, NULL+this_bc_no_p1) - NULL;
 		fprintf(tfp,"45K90K %d %d\n", this_bc_no_p1, this_bc_umis);
-		#warning "============= EXT 3 ==========="
 		#endif
 	}
-	SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_idx-> numOfElements);
+	SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_no_P0-> numOfElements);
 	ArrayListDestroy(sorted_bcno_p1);
 	HashTableDestroy(highconf_list_tab);
 	#ifdef DEBUG_FOR_EXACT
 	#warning "============= EXT 4 ==========="
 	fclose(tfp);
+
+	FILE * fp = fopen("/tmp/del4-YangLiao-from-python-rescue.txt","r");
+
+	x1=0;
+	while(1){
+		char * tpm=NULL;
+		char fl[100];
+		char * fr = fgets(fl, 99, fp);
+		if(!fr) break;
+		if(fl[0]!='4') continue;
+		int bc_no = atoi(fl+7) -1;
+		this_sample_45k_90k_barcode_no_P0 -> elementList[x1++] = NULL+bc_no;
+		if(x1 >= 45000)break;
+	}
+	fclose(fp);
+	fp = fopen("/tmp/del4-YangLiao-from-python-rescue.txt","r");
+
+	x1=0;
+	this_sample_ambient_rescure_candi -> numOfElements = 0;
+	while(1){
+		char * tpm=NULL;
+		char fl[100];
+		char * fr = fgets(fl, 99, fp);
+		if(!fr) break;
+		if(fl[0]!='C') continue;
+		int bc_no = atoi(fl+5) -1;
+		ArrayListPush(this_sample_ambient_rescure_candi, NULL+bc_no);
+	}
+	fclose(fp);
 	#endif
 }
 
@@ -4772,6 +4801,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 void scRNA_merged_45K_to_90K_sum_SUM(void * kyGeneID, void * Vcb_umi_arr, HashTable * me){
 	HashTable * gene_to_umis  = me -> appendix1;
 	HashTable * bcid_look_tab = me -> appendix2;
+	fc_thread_global_context_t * global_context = me -> appendix3;
 	ArrayList * cb_umi_arr = Vcb_umi_arr;
 
 	srInt_64 x1, this_gene_added = HashTableGet(gene_to_umis, kyGeneID)-NULL;
@@ -4783,6 +4813,9 @@ void scRNA_merged_45K_to_90K_sum_SUM(void * kyGeneID, void * Vcb_umi_arr, HashTa
 		this_gene_added ++;
 		has_adding = 1;
 	}
+	unsigned char * gene_name = global_context -> gene_name_array[ kyGeneID - NULL-1 ];
+	if(strcmp(gene_name,"4513")==0)SUBREADprintf("TESTGENE %s = %lld\n", gene_name, this_gene_added);
+
 	if(has_adding)HashTablePut(gene_to_umis, kyGeneID, NULL+this_gene_added);
 }
 
@@ -4803,11 +4836,12 @@ void scRNA_merged_45K_to_90K_sum_WRT(void * kyGeneID, void * valUMIs, HashTable 
 	}
 }
 
-void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, HashTable * gene_to_cell_umis_tab, ArrayList * bcid_arr, int sample_no, fc_feature_info_t * loaded_features, HashTable * sorted_index_p1_to_i_p1_tab){
+void scRNA_merged_45K_to_90K_sum(fc_thread_global_context_t * global_context, HashTable * gene_to_cell_umis_tab, ArrayList * bcid_P0_arr, int sample_no, fc_feature_info_t * loaded_features, HashTable * sorted_index_p1_to_i_p1_tab){
 	HashTable * ret = HashTableCreate( 3+gene_to_cell_umis_tab->numOfElements/6 );
-	HashTable * bcid_look_tab = ArrayListToLookupTable_Int(bcid_arr);
+	HashTable * bcid_look_tab = ArrayListToLookupTable_Int(bcid_P0_arr);
 	gene_to_cell_umis_tab -> appendix1 = ret;
 	gene_to_cell_umis_tab -> appendix2 = bcid_look_tab;
+	gene_to_cell_umis_tab -> appendix3 = global_context;
 	HashTableIteration( gene_to_cell_umis_tab, scRNA_merged_45K_to_90K_sum_SUM );
 
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
@@ -4883,11 +4917,11 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 #endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
-		ArrayList * this_sample_45k_90k_barcode_idx = ArrayListCreate(90000 - 45000 + 100);
+		ArrayList * this_sample_45k_90k_barcode_no_P0 = ArrayListCreate(90000 - 45000 + 100);
 
 		if(0)SUBREADprintf("SORT_START_IDX_5CODE %d\n", x1);
 		scRNA_merged_bootstrap_a_sample(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1],merged_umi_list, high_confid_barcode_index_list);
-		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_idx, high_confid_barcode_index_list);
+		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_no_P0, high_confid_barcode_index_list);
 
 		srInt_64 xk1;
 		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
@@ -4906,17 +4940,18 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		#ifdef DEBUG_FOR_EXACT
 		#warning " ======= Another debug ======"
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], NULL, x1, "RawMatrix",  loaded_features, sorted_order_p1_to_i_p1_tab);
+		//scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1]  this_sample_45k_90k_barcode_no_P0, x1, "AmbProfCells",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		#endif
 
 	
 		//SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], high_confid_barcode_index_list, x1, "HighConf",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, x1, "RescCand",  loaded_features, sorted_order_p1_to_i_p1_tab);
-		scRNA_merged_45K_to_90K_sum( global_context, merged_tables_gene_to_cell_umis[x1], this_sample_45k_90k_barcode_idx, x1 , loaded_features, sorted_order_p1_to_i_p1_tab);
+		scRNA_merged_45K_to_90K_sum( global_context, merged_tables_gene_to_cell_umis[x1], this_sample_45k_90k_barcode_no_P0, x1 , loaded_features, sorted_order_p1_to_i_p1_tab);
 		scRNA_merged_write_nozero_geneids( global_context, merged_tables_gene_to_cell_umis[x1], x1, loaded_features, sorted_order_p1_to_i_p1_tab);
 
 		ArrayListDestroy(this_sample_ambient_rescure_candi);
-		ArrayListDestroy(this_sample_45k_90k_barcode_idx);
+		ArrayListDestroy(this_sample_45k_90k_barcode_no_P0);
 		ArrayListDestroy(high_confid_barcode_index_list);
 		HashTableDestroy(sorted_order_p1_to_i_p1_tab);
 	}

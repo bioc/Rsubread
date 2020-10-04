@@ -353,6 +353,7 @@
 }
 
 
+.do.EXACT.DEBUG <- FALSE 
 .simple.Good.Turing.Freq<-function( raw.freq ){
   n_zero <- sum(raw.freq == 0)
   times <- table(raw.freq[raw.freq>0])
@@ -395,6 +396,18 @@
       pres <- rep(p_zero / n_zero, length(raw.freq))
       pres [raw.freq>0] <- puniq[match( raw.freq[raw.freq>0], obs )]
       ret <- list(p0=p_zero, p=pres)
+
+      if(.do.EXACT.DEBUG){
+        print("DEBUG_EXACT")
+        skf <- "/tmp/del4-YangLiao-GoodTuring-Pr-vals.txt"
+        if(file.exists(skf))file.remove(skf)
+        sink(skf)
+        for(rr in pres){
+          cat(sprintf("%.20g\n",rr))
+        }
+        sink()
+      }
+
       ret
   }
 }
@@ -407,10 +420,7 @@
     obs.tab <- table(obs.per.spe[obs.per.spe>0])
     obs <- sort( as.numeric(names(obs.tab)))
     obs.tab <- obs.tab[ as.character(obs) ]
-    #saveRDS(obs.tab,"del4-obs.tab.RDS")
-    #saveRDS(obs.per.spe, "del4-obs.per.spe.RDS")
     sgtr <- .mySGTsorted(as.numeric(names(obs.tab)), obs.tab)
-    #saveRDS(sgtr, "del4-sgtr.RDS")
     res <- obs.per.spe
     res[obs.per.spe!=0] <- sgtr$p[match(as.character(obs.per.spe[obs.per.spe!=0]), names(obs.tab))]
     n_zero <- sum(obs.per.spe==0)
@@ -510,48 +520,138 @@ library(Matrix)
   mtx
 }
 
+.use.DEBUG.data <- NA
+# .use.DEBUG.i <- 1
+
+.get.multi.nomial <- function(n, size, prob){
+  if(.do.EXACT.DEBUG){
+	.use.DEBUG.i <- 1
+    ret <- read.table(paste0("/tmp/del4-YangLiao-multi-nomial-SIZE",size,"-",.use.DEBUG.i,".txt"), header=F)
+    ret <- t(ret)
+   #.use.DEBUG.i <<-  .use.DEBUG.i+1
+   #print(ret[1:5,1:5])
+    ret
+  }else{
+    rmultinom(n, size, prob )
+  }
+}
+
 .simu.multinomial <- function(candi.mat, gene.profile.freq , times=10000){
   bcsizes <- sort(unique( colSums(candi.mat) ))
   ret.nUMI.LLH.tab <- list()
   N10000.LLH <- NA
   Old_bs_one <- NA
   log_E_GTE <- log(gene.profile.freq)
+
+  if(.do.EXACT.DEBUG){
+    tff<-"/tmp/del4-YangLiao-for-multi-nomial-steps.txt"
+    if(file.exists(tff))file.remove(tff)
+    sink(tff)
+    for(bcsize_one in bcsizes){
+      UMI_step_diff <- NA
+      if(!any(is.na(Old_bs_one))) UMI_step_diff <- bcsize_one - Old_bs_one
+      st1 <- NA
+      if(is.na(Old_bs_one)) {
+        st1 <- bcsize_one
+      }else if(UMI_step_diff >= 1000){
+        st1 <- UMI_step_diff
+      }
+    
+      if(!is.na(st1))cat(st1,"\n")
+      Old_bs_one <- bcsize_one
+    }
+    sink()
+    system("python /usr/local/work/liao/subread/scripts/Cellranger-replicate/CrepPY-multi-nomial.py")
+  }
+
+  Old_bs_one <- NA
+  N1000.FstLLH <- c()
+
+  if(.do.EXACT.DEBUG) M50.gene.ids <- read.table("/tmp/del4-YangLiao-50M-gene-nos.txt", header=F)$V1
+  all.steps.len <- 0
+
+  for(bcsize_one in bcsizes){
+    UMI_step_diff <- NA
+    if(!is.na(Old_bs_one)) UMI_step_diff <- bcsize_one - Old_bs_one
+
+    if(is.na(Old_bs_one)){
+    }else if(UMI_step_diff >= 1000){
+    }else{
+      step_len <- bcsize_one - Old_bs_one
+      all.steps.len <- step_len + all.steps.len
+    }
+    Old_bs_one <- bcsize_one
+  }
+  if(5000 <= all.steps.len)print("WARNING: SMALL STEPS >= 5000!")
+
+  Old_bs_one <- NA
+  M50.in.loop.K <- 0
   for(bcsize_one in bcsizes){
     UMI_step_diff <- NA
     if(!any(is.na(Old_bs_one))) UMI_step_diff <- bcsize_one - Old_bs_one
   
     if(any(is.na(N10000.LLH))){
-        N10000 <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
+      N10000 <- .get.multi.nomial(n=times, size=bcsize_one, prob=gene.profile.freq )
+      print("======== N10000 and PROF DIM =======")
+      print(dim(N10000))
+      print(length(gene.profile.freq))
       N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
     }else if(UMI_step_diff >= 1000){
-      UMI_step_diff_N10000 <- rmultinom(n=times, size=UMI_step_diff, prob=gene.profile.freq )
+      UMI_step_diff_N10000 <- .get.multi.nomial(n=times, size=UMI_step_diff, prob=gene.profile.freq )
       N10000 <- N10000 + UMI_step_diff_N10000
       N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
     }else{
+      step_len <- bcsize_one - Old_bs_one
       for(curi in (Old_bs_one+1):bcsize_one){
-      UMI_step_indices_N10000 <- sample(1:nrow(candi.mat), size=times, prob=gene.profile.freq, replace=T)
-      for(idi in 1:times){
-        N10000[ UMI_step_indices_N10000[idi] ,idi ] <- N10000[ UMI_step_indices_N10000[idi] ,idi ]+1
-      }
-      UMI_step_values_N10000 <- rep(0, times)
-      for(idi in 1:times){
-        UMI_step_values_N10000[idi] <- N10000[UMI_step_indices_N10000[idi] ,idi ]
-      }
-      #print(UMI_step_values_N10000)
-      N10000.LLH <- N10000.LLH + log_E_GTE[ UMI_step_indices_N10000 ] + log((curi +1.) / UMI_step_values_N10000)
+        if(.do.EXACT.DEBUG){
+          UMI_step_indices_N10000 <- M50.gene.ids[1+M50.in.loop.K + (0:9999) * all.steps.len ]
+          if(curi == 588){
+			tff<-"/tmp/del4-YangLiao-DEBUG-588-10KJ.txt"
+			if(file.exists(tff))file.remove(tff)
+			sink(tff)
+			for(pi in 1:10000){
+				cat(pi," ", N10000[UMI_step_indices_N10000[pi],pi],"\n")
+			}
+			sink()
+	      }
+	      M50.in.loop.K <- 1+M50.in.loop.K
+        }else{
+          UMI_step_indices_N10000 <- sample(1:nrow(candi.mat), size=times, prob=gene.profile.freq, replace=T)
+        }
+        for(idi in 1:times){
+          N10000[ UMI_step_indices_N10000[idi] ,idi ] <- N10000[ UMI_step_indices_N10000[idi] ,idi ]+1
+        }
+        UMI_step_values_N10000 <- rep(0, times)
+        for(idi in 1:times){
+          UMI_step_values_N10000[idi] <- N10000[UMI_step_indices_N10000[idi] ,idi ]
+        }
+        #print(UMI_step_values_N10000)
+        N10000.LLH <- N10000.LLH + log_E_GTE[ UMI_step_indices_N10000 ] + log((curi) / UMI_step_values_N10000)
+
+		if(.do.EXACT.DEBUG && curi == 588)for(uii in 1:30){
+			tff<-"/tmp/del4-YangLiao-DEBUG-1-30-E_GTE.txt"
+			if(file.exists(tff))file.remove(tff)
+			sink(tff)
+			for(i in 1:30){
+				cat(sprintf("%.5g %.5g %.5g\n", N10000.LLH[i], log_E_GTE[ UMI_step_indices_N10000 [i]],  log((curi) / UMI_step_values_N10000[i])))
+			}
+			sink()
+        }
       }
     }
   
-    # cat("\n\n ++++++++++ ", bcsize_one," +++++++++ \n")
-    # print(summary(N10000.LLH))
-    do_CTRL <- F
-    if(do_CTRL && 0== bcsize_one %% 15){
-      CTRL <- rmultinom(n=times, size=bcsize_one, prob=gene.profile.freq )
-      CTRL.LLH <- apply(CTRL, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
-      #print(summary(CTRL.LLH))
-    }
     ret.nUMI.LLH.tab[[ bcsize_one ]] <- N10000.LLH
+    N1000.FstLLH <- c(  N1000.FstLLH, N10000.LLH[1] )
     Old_bs_one <- bcsize_one
+  }
+  if(.do.EXACT.DEBUG){
+    tff<-"/tmp/del4-YangLiao-10K-LLH-from-R.txt"
+    if(file.exists(tff))file.remove(tff)
+    sink(tff)
+    for(flh in N1000.FstLLH){
+      cat(sprintf("%.6g\n", flh))
+    }
+    sink()
   }
   ret.nUMI.LLH.tab
 }
@@ -604,12 +704,19 @@ library(Matrix)
       cand_umis <- sum(rescue.candidates[,candi])
       cand.simu.pvs <- simu.pvalues[[ cand_umis ]]
       cand.actual.pv <- log.like.cands[candi]
-      actual.pvalues[candi] <- (1+sum(cand.simu.pvs > cand.actual.pv))/(length(cand.simu.pvs)+1)
+      actual.pvalues[candi] <- (1+sum(cand.simu.pvs < cand.actual.pv))/(length(cand.simu.pvs)+1)
     }
   
     # p-value => FDR
     actual.FDR <- p.adjust(actual.pvalues, method='BH')
   
+    if(.do.EXACT.DEBUG){
+      tff<-"/tmp/del4-YangLiao-final-FDR.txt"
+      if(file.exists(tff))file.remove(tff)
+      sink(tff)
+      for(candi in names(log.like.cands)) cat(sprintf("%s %.10g %.10g\n", candi, actual.pvalues[candi], actual.FDR[candi]))
+      sink()
+    }
     # select cells that has FDR < cutoff
     FDR.Cutoff <- 0.01
     Rescured.Barcodes <- names(actual.FDR)[actual.FDR <= FDR.Cutoff]
@@ -718,7 +825,6 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         stt <- one.result[["Sample.Table"]]
         df.sample.info <- rbind(df.sample.info, stt)
       }
-      stop("FOR_MY_TEST")
     }else{
       .index.names.to.sheet(dirname, sample.index, sample.1)
       generate.scRNA.BAM <- TRUE
@@ -732,9 +838,9 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
-        fc[["counts"]][[samplename]] <- one.result[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        fc[["cell.confidence"]][[samplename]] <- one.result[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-        stt <- one.result[["Sample.Table"]]
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        stt <- some.results[["Sample.Table"]]
         stt <- stt[ stt$SampleName == samplename, ]
         df.sample.info <- rbind(df.sample.info, stt)
       }
