@@ -14,7 +14,7 @@ int input_BLC_tell ( input_BLC_t * blc_input , input_BLC_pos_t * pos );
 int input_BLC_seek ( input_BLC_t * blc_input , input_BLC_pos_t * pos );
 void input_BLC_close (input_BLC_t * blc_input);
 
-int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total-files );
+int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files );
 int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual );
 int input_mFQ_tell(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos );
 int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos );

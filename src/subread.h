@@ -486,17 +486,6 @@ typedef struct{
 } input_mFQ_pos_t;
 
 typedef struct {
-	char ** files1;
-	char ** files2;
-	char ** files3;
-	int total-files;
-	int current_file_no;
-	autozip_fp autofp1;
-	autozip_fp autofp2;
-	autozip_fp autofp3;
-} input_mFQ_t;
-
-typedef struct {
 	char filename[MAX_FILE_NAME_LENGTH+1];
 
 	int is_plain;
@@ -505,6 +494,19 @@ typedef struct {
 	int is_first_chars;
 	unsigned char first_chars[2];
 } autozip_fp;
+
+
+
+typedef struct {
+	char ** files1;
+	char ** files2;
+	char ** files3;
+	int total_files;
+	int current_file_no;
+	autozip_fp autofp1;
+	autozip_fp autofp2;
+	autozip_fp autofp3;
+} input_mFQ_t;
 
 typedef struct {
 	int read_no_in_chunk;
