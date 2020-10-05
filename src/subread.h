@@ -483,6 +483,7 @@ typedef struct{
 	seekable_position_t zpos_file2;
 	seekable_position_t zpos_file3;
 	int current_file_no;
+	srInt_64 current_read_no;
 } input_mFQ_pos_t;
 
 typedef struct {
