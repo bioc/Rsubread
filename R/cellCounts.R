@@ -23,11 +23,11 @@
 
 .convert.sample_index.id.to.seq <- function(spid){
   seqs <- .one.convert.sample_index.id.to.seq(spid)
-  if(is.na(seqs)){
+  if(any(is.na(seqs))){
     spid <- gsub("-","_", spid)
     seqs <- .one.convert.sample_index.id.to.seq(spid)
   }
-  if(is.na(seqs))stop(paste("Unable to find sample index for", spid))
+  if(any(is.na(seqs)))stop(paste("Unable to find sample index for", spid))
   seqs
 }
 .one.convert.sample_index.id.to.seq <- function(spid){
@@ -510,7 +510,7 @@
 
 library(Matrix)
 .read.sparse.mat <- function (fn){
-#  print(fn)
+  cat("Loading matrix from",fn,"\n")
   mtx <- readMM(paste0(fn, ".spmtx"))
   coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
   rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
@@ -719,7 +719,9 @@ library(Matrix)
     }
     # select cells that has FDR < cutoff
     FDR.Cutoff <- 0.01
+    head(actual.FDR)
     Rescured.Barcodes <- names(actual.FDR)[actual.FDR <= FDR.Cutoff]
+    head(Rescured.Barcodes)
     rescue.candidates[,Rescured.Barcodes, drop=FALSE]
   }
 }
@@ -736,6 +738,7 @@ library(Matrix)
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
+  cat("Loading high-conf matrix from '",fname,"'\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
 
@@ -788,6 +791,22 @@ library(Matrix)
   }
 }
 
+.extract.sample.table.cols <- function(rdir, smr){
+  total.cells <- c()
+  hiconf.cells <- c()
+  res.cells <- c()
+  umis <- c()
+  for(spi in 1:nrow(smr[["Sample.Table"]])){
+    samplename <- smr[["Sample.Table"]]$SampleName[spi]
+    sampleno <- sprintf("Sample.%d", spi)
+    total.cells <- c(total.cells,length(smr[[sampleno]][["HighConfidneceCell"]]))
+    hiconf.cells <- c(hiconf.cells,sum(smr[[sampleno]][["HighConfidneceCell"]]))
+    res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
+    umis <- c(umis,sum(smr[[sampleno]][["Counts"]]))
+  }
+  cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rdir, TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+}
+
 cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, nthreads=10, ...){
   set.seed(0)
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
@@ -799,8 +818,10 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
 
   fc[["counts"]] <- list()
   fc[["cell.confidence"]] <- list()
+  temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
+
   for(dirname in dirs){
-    temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
+    dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.index")
     unique.samples <- unique( sample.index$SampleName[ sample.index$InputDirectory == dirname ] )
 
     sample.1 <- paste0(temp.file.prefix,".samplesheet")
@@ -819,10 +840,11 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         one.bam.name <- paste0(samplename, ".bam")
         one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
         if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
+        cat("Processing sample '",samplename,"'\n")
         one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
         fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
-        stt <- one.result[["Sample.Table"]]
+        stt <- .extract.sample.table.cols(dirname,one.result)
         df.sample.info <- rbind(df.sample.info, stt)
       }
     }else{
@@ -840,16 +862,16 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-        stt <- some.results[["Sample.Table"]]
-        stt <- stt[ stt$SampleName == samplename, ]
-        df.sample.info <- rbind(df.sample.info, stt)
       }
+      stt <- .extract.sample.table.cols(dirname,some.results)
+      stt <- stt[ stt$SampleName == samplename, ]
+      df.sample.info <- rbind(df.sample.info, stt)
     }
   }
   fc[["Annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
 
-  if(!is.null(aligner)).del.temp.files(temp.file.prefix)
+  .del.temp.files(temp.file.prefix)
   fc
 }
 

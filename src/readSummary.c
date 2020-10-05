@@ -4539,16 +4539,19 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 	if(high_conf_cells >0){
 		srInt_64 median_umis = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_bcno_p1 ,  (high_conf_cells-1)/2))-NULL;
 		srInt_64 median_umis_001_cut = (srInt_64)(median_umis *1. *SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION +0.50000001);
-		//SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
 		for(x1=0; x1 < sorted_bcno_p1 -> numOfElements; x1++){
 			void * this_bc_pnt_p1 = ArrayListGet(sorted_bcno_p1 ,  x1);
-			if(HashTableGet(highconf_list_tab, this_bc_pnt_p1)) continue; // it is in high-conf list
+			if(HashTableGet(highconf_list_tab, this_bc_pnt_p1)){
+				//SUBREADprintf("SKIP FOR HIGHCONF %lld\n", this_bc_umis);
+				continue; // it is in high-conf list
+			}
 			srInt_64 this_bc_umis = HashTableGet(used_cell_barcode_tab, this_bc_pnt_p1) - NULL;
 			if(this_bc_umis < median_umis_001_cut) break;
 			if(this_bc_umis < MIN_UMIS_FOR_CANDIDATE_RESCUE) break;
 			if(x1 >= 45000) break;
 			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt_p1-1);
 		}
+		SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
 		#ifdef DEBUG_FOR_EXACT
 		#warning "============= EXT 2 ==========="
 		for(x1=0; x1<this_sample_ambient_rescure_candi->numOfElements; x1++){
@@ -4900,7 +4903,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1;
 
-	fprintf(sample_tab_fp,"SampleName\tIndex\tAll.Reads\tMapped.Reads\tAssigned.Reads\n");
+	fprintf(sample_tab_fp,"SampleName\tTotalReads\tMappedReads\tAssignedReads\tIndex\n");
 	for(x1 = 0; x1 < global_context -> scRNA_sample_sheet_table -> numOfElements ; x1++){
 		srInt_64 mapped_reads = 0, all_reads = 0, assigned_reads = 0;
 		int thrid;
@@ -4911,9 +4914,9 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		}
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
+		fprintf(sample_tab_fp,"%s\t%I64d\t%I64d\t%I64d\t%d\n", this_sample_name, all_reads, mapped_reads, assigned_reads,x1+1);
 #else
-		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\n", this_sample_name, 1+x1, all_reads, mapped_reads, assigned_reads);
+		fprintf(sample_tab_fp,"%s\t%lld\t%lld\t%lld\t%d\n", this_sample_name, all_reads, mapped_reads, assigned_reads, x1+1);
 #endif
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
@@ -4927,7 +4930,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
 			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
 		}
-		if(0)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
+		if(1)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
 			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
 		}
 
