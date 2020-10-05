@@ -804,7 +804,7 @@ library(Matrix)
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
     umis <- c(umis,sum(smr[[sampleno]][["Counts"]]))
   }
-  cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rdir, TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+  cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
 }
 
 cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, nthreads=10, ...){
@@ -821,7 +821,6 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
   temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
 
   for(dirname in dirs){
-    dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.index")
     unique.samples <- unique( sample.index$SampleName[ sample.index$InputDirectory == dirname ] )
 
     sample.1 <- paste0(temp.file.prefix,".samplesheet")
@@ -832,6 +831,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
 
+    full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.index")
     if(is.null(aligner)){
       generate.scRNA.BAM <- FALSE 
       if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
@@ -844,16 +844,16 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
         fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
-        stt <- .extract.sample.table.cols(dirname,one.result)
+        stt <- .extract.sample.table.cols(full_dirname,one.result)
         df.sample.info <- rbind(df.sample.info, stt)
       }
     }else{
       .index.names.to.sheet(dirname, sample.index, sample.1)
       generate.scRNA.BAM <- TRUE
       if(aligner=="align"){
-        align(index, dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
+        align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
       }else if(aligner=="subjunc"){
-        subjunc(index, dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
+        subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
       }
       raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
       if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
@@ -863,8 +863,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
-      stt <- .extract.sample.table.cols(dirname,some.results)
-      stt <- stt[ stt$SampleName == samplename, ]
+      stt <- .extract.sample.table.cols(full_dirname,some.results)
       df.sample.info <- rbind(df.sample.info, stt)
     }
   }

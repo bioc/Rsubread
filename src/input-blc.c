@@ -1044,4 +1044,54 @@ int main(int argc, char ** argv){
 	input_BLC_close(&blc_input);
 	return 0;
 }
+
+
+
+int input_mFQ_next_file(input_mFQ_t * fqs_input){
+	if(fqs_input -> autofp1.filename[0]){
+		autozip_close(&fqs_input -> autofp1);
+		autozip_close(&fqs_input -> autofp2);
+		autozip_close(&fqs_input -> autofp3);
+		fqs_input-> current_file_no ++;
+	}
+
+	int gzipped_ret = autozip_open(fqs_input->files1[fqs_input-> current_file_no],&fqs_input -> autofp1);
+	gzipped_ret = autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
+	gzipped_ret = autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
+}
+
+int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total-files ){
+	int x1;
+	memset(fqs_input, 0, sizeof(input_mFQ_t));
+	fqs_input->files1 = malloc(sizeof(char*)*total-files);
+	fqs_input->files2 = malloc(sizeof(char*)*total-files);
+	fqs_input->files3 = malloc(sizeof(char*)*total-files);
+	fqs_input -> total_files = total-files;
+
+	for(x1=0; x1<fqs_input -> total_files; x1++){
+		fqs_input->files1[x1] = strdup(files1[x1]);
+		fqs_input->files2[x1] = strdup(files2[x1]);
+		fqs_input->files3[x1] = strdup(files3[x1]);
+	}
+	current_file_no = 0;
+}
+
+void input_mFQ_close(input_mFQ_t * fqs_input){
+	int x1;
+
+	for(x1=0; x1<fqs_input -> total_files; x1++){
+		free(fqs_input->files1[x1]);
+		free(fqs_input->files2[x1]);
+		free(fqs_input->files3[x1]);
+	}
+
+	autozip_close(&fqs_input -> autofp1);
+	autozip_close(&fqs_input -> autofp2);
+	autozip_close(&fqs_input -> autofp3);
+
+	free(fqs_input->files1);
+	free(fqs_input->files2);
+	free(fqs_input->files3);
+}
+
 #endif

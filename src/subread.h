@@ -475,6 +475,27 @@ typedef struct {
 	int is_EOF;
 } input_BLC_t;
 
+typedef struct{
+	union{
+		srInt_64 pos_file1, pos_file2, pos_file3;
+		seekable_position_t zpos_file1;
+	};
+	seekable_position_t zpos_file2;
+	seekable_position_t zpos_file3;
+	int current_file_no;
+} input_mFQ_pos_t;
+
+typedef struct {
+	char ** files1;
+	char ** files2;
+	char ** files3;
+	int total-files;
+	int current_file_no;
+	autozip_fp autofp1;
+	autozip_fp autofp2;
+	autozip_fp autofp3;
+} input_mFQ_t;
+
 typedef struct {
 	char filename[MAX_FILE_NAME_LENGTH+1];
 
