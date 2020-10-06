@@ -30,6 +30,7 @@
 #define GENE_INPUT_FASTQ 1
 #define GENE_INPUT_FASTA 2
 #define GENE_INPUT_BCL   3
+#define GENE_INPUT_SCRNA_FASTQ 4
 #define GENE_INPUT_GZIP_FASTQ 51
 #define GENE_INPUT_GZIP_FASTA 52
 
@@ -328,5 +329,6 @@ void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
 int geinput_preload_buffer(gene_input_t * input, subread_lock_t* read_lock);
+int geinput_open_scRNA_fqs(const char * fnames,  gene_input_t * input, int reads_per_chunk, int threads );
 int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_in_chunk, int threads );
 #endif

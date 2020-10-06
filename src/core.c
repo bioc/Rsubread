@@ -499,7 +499,7 @@ void show_progress(global_context_t * global_context, thread_context_t * thread_
 	// current_circle_start_position_file1 is the file_offset of the first read in this 5-million read chunk (or whatever the chunk size is)
 
 
-	if(global_context->config.is_BCL_input){
+	if(global_context->config.scRNA_input_mode){
 		if(task == 10){
 			char minchr[10];
 			float min_value = (miltime() - global_context -> start_time)*1./60;
@@ -798,7 +798,7 @@ int check_configuration(global_context_t * global_context)
 		warning_file_limit();
 
 	int wret = 0, wret2 = 0;
-	if( global_context ->config.is_BCL_input == 0 )  warning_file_type(global_context -> config.first_read_file, expected_type);
+	if( global_context ->config.scRNA_input_mode == 0 )  warning_file_type(global_context -> config.first_read_file, expected_type);
 	if(global_context -> config.second_read_file[0])
 	{
 		if(expected_type==FILE_TYPE_FAST_ || expected_type==FILE_TYPE_GZIP_FAST_)
@@ -1102,8 +1102,15 @@ int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int 
 		}
 		else
 			fname = (half_number == 2)?global_context -> input_reads.second_read_file.filename:global_context -> input_reads.first_read_file.filename;
-		int rv = global_context->config. is_BCL_input?geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads ):geinput_open(fname, fp);
-		if(global_context->input_reads.is_paired_end_reads && global_context->config. is_BCL_input){
+		int rv = -1;
+		if(global_context->config.scRNA_input_mode == GENE_INPUT_BCL)
+			rv = geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
+		else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ)
+			rv = geinput_open_scRNA_fqs(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
+		else
+			rv = geinput_open(fname, fp);
+
+		if(global_context->input_reads.is_paired_end_reads && global_context->config. scRNA_input_mode){
 			SUBREADprintf("ERROR: No paired-end input is allowed on scRNA mode.\n");
 			return -1;
 		}
@@ -3338,7 +3345,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 		
 		if(!thread_context || thread_context->thread_id == 0)
 		{
-			if(0 == global_context -> config.is_BCL_input  && sqr_read_number > sqr_interval)
+			if(0 == global_context -> config.scRNA_input_mode  && sqr_read_number > sqr_interval)
 			{
 				show_progress(global_context, thread_context, current_read_number, STEP_VOTING);
 				sqr_read_number = 0;
@@ -3346,7 +3353,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 				unsigned long long guessed_all_reads = total_file_size / global_context -> input_reads . avg_read_length;// / (1+global_context -> config.is_SAM_file_input);
 				sqr_interval = max(10000,guessed_all_reads / global_context -> config.all_threads/10);
 			}
-			if(global_context -> config.is_BCL_input && current_read_number - last_shown_curr >= 1000000){
+			if(global_context -> config.scRNA_input_mode && current_read_number - last_shown_curr >= 1000000){
 				show_progress(global_context, thread_context, current_read_number + global_context -> all_processed_reads, STEP_VOTING);
 				last_shown_curr = current_read_number;
 			}
@@ -3771,7 +3778,7 @@ int print_configuration(global_context_t * context)
 	        print_in_box(80, 0, 0, "Input file 2  : %s", get_short_fname(context->config.second_read_file));
 	}
 	else
-	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):(context->config.is_BCL_input?" (BCL)":""));
+	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):(context->config.scRNA_input_mode?" (SC)":""));
 
 	if(context->config.output_prefix [0])
 	        print_in_box(80, 0, 0, "Output file   : %s (%s)%s", get_short_fname(context->config.output_prefix), context->config.is_BAM_output?"BAM":"SAM", context->config.is_input_read_order_required?", Keep Order":(context->config.sort_reads_by_coordinates?", Sorted":""));
@@ -4050,7 +4057,7 @@ int load_global_context(global_context_t * context)
 		context->config.report_multi_mapping_reads = 1;
 	}
 
-	if(context->config.is_BCL_input){
+	if(context->config.scRNA_input_mode){
 		// opening a BCL input needs the exact chunk size. 
 		context -> config.multi_best_reads = 3;
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
@@ -4101,7 +4108,7 @@ int load_global_context(global_context_t * context)
 	context -> config.max_vote_simples = max(context -> config.max_vote_simples ,  context -> config.reported_multi_best_reads);
 	context -> config.max_vote_combinations = max(context -> config.max_vote_combinations ,  context -> config.reported_multi_best_reads);
 
-	if(!context->config.is_BCL_input){
+	if(!context->config.scRNA_input_mode){
 		// if it is BCL input then these two parameters have been decided .
 		if(context->config.multi_best_reads>1) context->config.reads_per_chunk /= context->config.multi_best_reads;
 		if(context->input_reads.is_paired_end_reads) context->config.reads_per_chunk /= 2;
@@ -4153,7 +4160,7 @@ int load_global_context(global_context_t * context)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
 			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates, context -> config.temp_file_prefix);
-			if(context->config.is_BCL_input) context -> output_bam_writer -> fastest_compression=1;
+			if(context->config.scRNA_input_mode) context -> output_bam_writer -> fastest_compression=1;
 			context -> output_sam_fp = NULL;
 		}
 		else

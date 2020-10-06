@@ -366,6 +366,11 @@ int is_read(char * in_buff)
 	return space_type;
 }
 
+int geinput_open_scRNA_fqs(const char * fnames,  gene_input_t * input, int reads_per_chunk, int threads ){
+//	int rv = input_mFQ_init(&input -> scRNA_fq_input, );
+	return -1;
+}
+
 int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_per_chunk, int threads){
 	int rv = cacheBCL_init(&input -> bcl_input , (char*) dir_name, reads_per_chunk, threads );
 	strcpy(input->filename, dir_name);

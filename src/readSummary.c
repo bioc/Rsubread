@@ -4551,7 +4551,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 			if(x1 >= 45000) break;
 			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt_p1-1);
 		}
-		SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
+		if(0)SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
 		#ifdef DEBUG_FOR_EXACT
 		#warning "============= EXT 2 ==========="
 		for(x1=0; x1<this_sample_ambient_rescure_candi->numOfElements; x1++){
@@ -4571,7 +4571,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 		fprintf(tfp,"45K90K %d %d\n", this_bc_no_p1, this_bc_umis);
 		#endif
 	}
-	SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_no_P0-> numOfElements);
+	if(0)SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_no_P0-> numOfElements);
 	ArrayListDestroy(sorted_bcno_p1);
 	HashTableDestroy(highconf_list_tab);
 	#ifdef DEBUG_FOR_EXACT
@@ -4670,7 +4670,7 @@ void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context
 		ArrayListDestroy(resampled_list_of_umis);
 	}
 	double total_f = this_total*1. / SCRNA_BOOTSTRAP_SAMPLING_TIMES;
-	if(1) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %.5f\n",total_f);
+	if(0) SUBREADprintf("FINAL_5CODE SELECTION_IDX =  %.5f\n",total_f);
 	this_total = (int)(total_f + 0.500000001);
 
 	#ifdef DEBUG_FOR_EXACT
@@ -4930,7 +4930,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
 			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
 		}
-		if(1)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
+		if(0)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
 			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
 		}
 

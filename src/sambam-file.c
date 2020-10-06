@@ -2279,7 +2279,6 @@ void SamBam_writer_optimize_bins(HashTable *bin_tab, ArrayList *bin_arr, HashTab
 
 // MUST be called by THREAD 0!
 void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
-	print_in_box(80,0,0,"Sort the reads...");
 	SamBam_writer_one_thread_merge_sortedbins(writer);
 
 	FILE ** sb_fps = malloc(sizeof(FILE *) * writer -> sorted_batch_id);
