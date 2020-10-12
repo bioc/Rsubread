@@ -691,7 +691,7 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	while(1){
 		next_fn = strtok_r(nfiles==0?sam_used:NULL, FC_FLIST_SPLITOR, &tmp_ptr1);
 		if(next_fn == NULL || strlen(next_fn)<1) break;
-		int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
+		//int is_first_read_PE = 0 , file_probe = is_certainly_bam_file(next_fn, &is_first_read_PE, NULL);
 		print_in_box(89,0,0,"                          %c[36m%s%c[0m",CHAR_ESC, global_context -> use_stdin_file?"<STDIN>":get_short_fname(next_fn),CHAR_ESC);
 		nfiles++;
 	}
@@ -4531,7 +4531,6 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 		if(HashTableGet(highconf_list_tab, this_bc_pnt)) high_conf_cells = x1+1;
 		else break; // assuming that all high-umi barcodes are high-confident, this makes x1 being the # of total high-confidence barcodes.	
 	}
-	int UMIs_at_45k = -1, UMIs_at_90k = -1;
 	#ifdef DEBUG_FOR_EXACT
 	#warning "============= EXT 1 ==========="
 	FILE * tfp = fopen("/tmp/del4-YangLiao-rescue-cand.txt","w");
@@ -4616,7 +4615,7 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 
 void scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context, HashTable * merged_gene_to_cell_umis_tab, HashTable * used_cell_barcode_tab, ArrayList * merged_umi_list, ArrayList * highconf_list){
 	ArrayList * sorted_idx = HashTableSortedIndexes( used_cell_barcode_tab, 1);
-	srInt_64 x2, x1, UMIs_30th_high = HashTableGet(used_cell_barcode_tab, ArrayListGet(sorted_idx ,  SCRNA_BOOTSTRAP_HIGH_INDEX -1 ))-NULL;
+	srInt_64 x2, x1;
 
 	#define SCRNA_IDX_PRIME_NUMBER_BIG 11218439llu;
 	srInt_64 this_total = 0, seed_rand = sorted_idx -> numOfElements/2 + merged_umi_list -> numOfElements /2;
@@ -4804,7 +4803,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 void scRNA_merged_45K_to_90K_sum_SUM(void * kyGeneID, void * Vcb_umi_arr, HashTable * me){
 	HashTable * gene_to_umis  = me -> appendix1;
 	HashTable * bcid_look_tab = me -> appendix2;
-	fc_thread_global_context_t * global_context = me -> appendix3;
+	//fc_thread_global_context_t * global_context = me -> appendix3;
 	ArrayList * cb_umi_arr = Vcb_umi_arr;
 
 	srInt_64 x1, this_gene_added = HashTableGet(gene_to_umis, kyGeneID)-NULL;
@@ -4816,9 +4815,6 @@ void scRNA_merged_45K_to_90K_sum_SUM(void * kyGeneID, void * Vcb_umi_arr, HashTa
 		this_gene_added ++;
 		has_adding = 1;
 	}
-	unsigned char * gene_name = global_context -> gene_name_array[ kyGeneID - NULL-1 ];
-	if(strcmp(gene_name,"4513")==0)SUBREADprintf("TESTGENE %s = %lld\n", gene_name, this_gene_added);
-
 	if(has_adding)HashTablePut(gene_to_umis, kyGeneID, NULL+this_gene_added);
 }
 

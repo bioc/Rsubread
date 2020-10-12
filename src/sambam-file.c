@@ -1630,7 +1630,7 @@ int SamBam_writer_add_read_fqs_scRNA(gzFile *outfps, char * bambin){
 	gzFile outR2fp = outfps[2];
 
 	memcpy(&reclen, bambin,4);
-	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0, tmpc;
+	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0;
 	memcpy(&l_read_name, bambin+12,1);
 	memcpy(&n_cigar_ops, bambin+16,2);
 	memcpy(&flag, bambin+18,2);
