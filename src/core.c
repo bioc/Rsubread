@@ -1095,7 +1095,7 @@ int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int 
 		return geinput_open_sam(fname, fp, half_number);
 	} else {
 		int rv = -1;
-		SUBREADprintf("SCRNA_MODE=%d\n", global_context->config.scRNA_input_mode );
+		//SUBREADprintf("SCRNA_MODE=%d\n", global_context->config.scRNA_input_mode );
 		if(global_context -> config.is_gzip_fastq)
 			if(convert_GZ_to_FQ(global_context, (half_number==2)? global_context ->config.second_read_file : global_context ->config.first_read_file, half_number)) return -1;
 		fname = (half_number == 2)?global_context -> config.second_read_file:global_context -> config.first_read_file;

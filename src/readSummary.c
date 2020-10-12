@@ -6251,6 +6251,7 @@ static struct option long_options[] =
 	{"tmpDir", required_argument, 0, 0},
 	{"extraAttributes", required_argument, 0, 0},
 	{"largestOverlap", no_argument, 0,0},
+	{"countReadPairs", no_argument, 0, 0},
 	{"byReadGroup", no_argument, 0,0},
 	{"verbose", no_argument, 0,0},
 	{"detectionCall", no_argument, 0,0},
