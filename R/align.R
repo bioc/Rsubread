@@ -16,7 +16,7 @@
   return(tmp.frame)
 }
 
-align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),isBCLinput=FALSE,phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
+align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFASTQ",output_format="BAM",output_file=paste(readfile1,"subread",output_format,sep="."),isBCLinput=FALSE,isScRNAFastqinput=FALSE,phredOffset=33,nsubreads=10,TH1=3,TH2=1,maxMismatches=3,unique=FALSE,nBestLocations=1,indels=5,complexIndels=FALSE,nTrim5=0,nTrim3=0,minFragLength=50,maxFragLength=600,PE_orientation="fr",nthreads=1,readGroupID=NULL,readGroup=NULL,keepReadOrder=FALSE,sortReadsByCoordinates=FALSE,color2base=FALSE,DP_GapOpenPenalty=-1,DP_GapExtPenalty=0,DP_MismatchPenalty=0,DP_MatchScore=2,detectSV=FALSE,useAnnotation=FALSE,annot.inbuilt="mm10",annot.ext=NULL,isGTF=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",chrAliases=NULL)
 {
   if(!.is.64bit.system()) cat("WARNING: your system seems to be 32-bit. Rsubread supports 32-bit sustems to a very limited level.\nIt is highly recommended to run Rsubread on a 64-bit system to avoid errors.\n\n")
 
@@ -39,7 +39,7 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
   #out.table.cols <-gsub(" ", ".", out.table.cols)
 
   readfile1 <- as.character(readfile1)
-  readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
+  if(!isScRNAFastqinput)readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
   output_file <- .check_and_NormPath(output_file, mustWork=FALSE, opt="output_file")
   index <- .check_and_NormPath(index, mustWork=FALSE, opt="index")
   if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=TRUE, opt="annot.ext")
@@ -53,14 +53,6 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
     readfile2 <- .check_and_NormPath(readfile2, mustWork=TRUE, "readfile2")
     if(length(readfile1) != length(readfile2))
       stop("The number of file names for the first reads is different from the number of file names for the second reads.")
-  }
-
-  if(!all(file.exists(readfile1)))
-    stop("One or more input files cannot be found (readfile1).")
-
-  if(!is.null(readfile2)){
-    if(!all(file.exists(readfile2)))
-      stop("One or more input files cannot be found (readfile2).")
   }
 
   if(!all(file.exists(dirname(output_file))))
@@ -92,6 +84,9 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 
   if(complexIndels)
     opt <- paste(opt,"--complexIndels",sep=.R_param_splitor)
+
+  if(isScRNAFastqinput)
+    opt <- paste(opt,"--scRNA_FQinput",sep=.R_param_splitor)
 
   if(!unique)
     opt <- paste(opt,"--multiMapping",sep=.R_param_splitor)

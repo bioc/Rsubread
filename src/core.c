@@ -1084,25 +1084,21 @@ int convert_GZ_to_FQ(global_context_t * global_context, char * fname, int half_n
 	return !is_OK;
 }
 
-int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int half_number, int is_init)
+int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int half_number)
 {
 	char *fname;
 	if(global_context->config.is_SAM_file_input) {
-		fname = is_init?global_context ->config.first_read_file:global_context -> input_reads.first_read_file.filename;
-		if(is_init && half_number == 1)
+		fname = global_context ->config.first_read_file;
+		if(half_number == 1)
 			if(convert_BAM_to_SAM(global_context, global_context ->config.first_read_file, global_context ->config.is_BAM_input)) return -1;
 		if(!global_context->input_reads.is_paired_end_reads) half_number=0;
 		return geinput_open_sam(fname, fp, half_number);
 	} else {
-		if(is_init)
-		{
-			if(global_context -> config.is_gzip_fastq)
-				if(convert_GZ_to_FQ(global_context, (half_number==2)? global_context ->config.second_read_file : global_context ->config.first_read_file, half_number)) return -1;
-			fname = (half_number == 2)?global_context -> config.second_read_file:global_context -> config.first_read_file;
-		}
-		else
-			fname = (half_number == 2)?global_context -> input_reads.second_read_file.filename:global_context -> input_reads.first_read_file.filename;
 		int rv = -1;
+		SUBREADprintf("SCRNA_MODE=%d\n", global_context->config.scRNA_input_mode );
+		if(global_context -> config.is_gzip_fastq)
+			if(convert_GZ_to_FQ(global_context, (half_number==2)? global_context ->config.second_read_file : global_context ->config.first_read_file, half_number)) return -1;
+		fname = (half_number == 2)?global_context -> config.second_read_file:global_context -> config.first_read_file;
 		if(global_context->config.scRNA_input_mode == GENE_INPUT_BCL)
 			rv = geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
 		else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ)
@@ -4065,7 +4061,7 @@ int load_global_context(global_context_t * context)
 	}
 	print_in_box(80,0,0,"Check the input reads.");
 	subread_init_lock(&context->input_reads.input_lock);
-	if(core_geinput_open(context, &context->input_reads.first_read_file, 1,1)) {
+	if(core_geinput_open(context, &context->input_reads.first_read_file, 1)) {
 	//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
 		return -1;
 	}
@@ -4087,7 +4083,7 @@ int load_global_context(global_context_t * context)
 
 	if(context->input_reads.is_paired_end_reads)
 	{
-		if(core_geinput_open(context, &context->input_reads.second_read_file, 2,1))
+		if(core_geinput_open(context, &context->input_reads.second_read_file, 2))
 		{
 			//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.second_read_file);
 			return -1;

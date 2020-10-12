@@ -354,6 +354,7 @@
 
 
 .do.EXACT.DEBUG <- FALSE 
+#.do.EXACT.DEBUG <- TRUE 
 .simple.Good.Turing.Freq<-function( raw.freq ){
   n_zero <- sum(raw.freq == 0)
   times <- table(raw.freq[raw.freq>0])
@@ -525,7 +526,7 @@ library(Matrix)
 
 .get.multi.nomial <- function(n, size, prob){
   if(.do.EXACT.DEBUG){
-	.use.DEBUG.i <- 1
+    .use.DEBUG.i <- 1
     ret <- read.table(paste0("/tmp/del4-YangLiao-multi-nomial-SIZE",size,"-",.use.DEBUG.i,".txt"), header=F)
     ret <- t(ret)
    #.use.DEBUG.i <<-  .use.DEBUG.i+1
@@ -606,15 +607,15 @@ library(Matrix)
         if(.do.EXACT.DEBUG){
           UMI_step_indices_N10000 <- M50.gene.ids[1+M50.in.loop.K + (0:9999) * all.steps.len ]
           if(curi == 588){
-			tff<-"/tmp/del4-YangLiao-DEBUG-588-10KJ.txt"
-			if(file.exists(tff))file.remove(tff)
-			sink(tff)
-			for(pi in 1:10000){
-				cat(pi," ", N10000[UMI_step_indices_N10000[pi],pi],"\n")
-			}
-			sink()
-	      }
-	      M50.in.loop.K <- 1+M50.in.loop.K
+            tff<-"/tmp/del4-YangLiao-DEBUG-588-10KJ.txt"
+            if(file.exists(tff))file.remove(tff)
+            sink(tff)
+            for(pi in 1:10000){
+                cat(pi," ", N10000[UMI_step_indices_N10000[pi],pi],"\n")
+            }
+            sink()
+          }
+          M50.in.loop.K <- 1+M50.in.loop.K
         }else{
           UMI_step_indices_N10000 <- sample(1:nrow(candi.mat), size=times, prob=gene.profile.freq, replace=T)
         }
@@ -628,14 +629,14 @@ library(Matrix)
         #print(UMI_step_values_N10000)
         N10000.LLH <- N10000.LLH + log_E_GTE[ UMI_step_indices_N10000 ] + log((curi) / UMI_step_values_N10000)
 
-		if(.do.EXACT.DEBUG && curi == 588)for(uii in 1:30){
-			tff<-"/tmp/del4-YangLiao-DEBUG-1-30-E_GTE.txt"
-			if(file.exists(tff))file.remove(tff)
-			sink(tff)
-			for(i in 1:30){
-				cat(sprintf("%.5g %.5g %.5g\n", N10000.LLH[i], log_E_GTE[ UMI_step_indices_N10000 [i]],  log((curi) / UMI_step_values_N10000[i])))
-			}
-			sink()
+        if(.do.EXACT.DEBUG && curi == 588)for(uii in 1:30){
+            tff<-"/tmp/del4-YangLiao-DEBUG-1-30-E_GTE.txt"
+            if(file.exists(tff))file.remove(tff)
+            sink(tff)
+            for(i in 1:30){
+                cat(sprintf("%.5g %.5g %.5g\n", N10000.LLH[i], log_E_GTE[ UMI_step_indices_N10000 [i]],  log((curi) / UMI_step_values_N10000[i])))
+            }
+            sink()
         }
       }
     }
@@ -807,70 +808,82 @@ library(Matrix)
   cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
 }
 
+.SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
+.SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
+
 cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, nthreads=10, ...){
   set.seed(0)
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   fc <- list()
 
-  dirs <- unique( sample.index$InputDirectory )
+  temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame()
 
-  fc[["counts"]] <- list()
-  fc[["cell.confidence"]] <- list()
-  temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
-
-  for(dirname in dirs){
-    unique.samples <- unique( sample.index$SampleName[ sample.index$InputDirectory == dirname ] )
-
-    sample.1 <- paste0(temp.file.prefix,".samplesheet")
-    if(is.null(cell.barcode)){
-      .index.names.to.sheet(dirname, sample.index, sample.1)
-      cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
-    }else{
-      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
-    }
-
-    full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.index")
-    if(is.null(aligner)){
-      generate.scRNA.BAM <- FALSE 
-      if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
-      for(samplename in unique.samples){
-        .index.names.to.sheet(dirname, sample.index, sample.1, samplename)
-        one.bam.name <- paste0(samplename, ".bam")
-        one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
-        if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
-        cat("Processing sample '",samplename,"'\n")
-        one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
-        fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
-        fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
-        stt <- .extract.sample.table.cols(full_dirname,one.result)
+  if("InputDirectory" %in% colnames(sample.index)){
+    dirs <- unique( sample.index$InputDirectory )
+    fc[["counts"]] <- list()
+    fc[["cell.confidence"]] <- list()
+  
+    for(dirname in dirs){
+      unique.samples <- unique( sample.index$SampleName[ sample.index$InputDirectory == dirname ] )
+  
+      sample.1 <- paste0(temp.file.prefix,".samplesheet")
+      if(is.null(cell.barcode)){
+        .index.names.to.sheet(dirname, sample.index, sample.1)
+        cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
+      }else{
+        cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+      }
+  
+      full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.index")
+      if(is.null(aligner)){
+        generate.scRNA.BAM <- FALSE 
+        if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
+        for(samplename in unique.samples){
+          .index.names.to.sheet(dirname, sample.index, sample.1, samplename)
+          one.bam.name <- paste0(samplename, ".bam")
+          one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
+          if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
+          cat("Processing sample '",samplename,"'\n")
+          one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+          fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
+          fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
+          stt <- .extract.sample.table.cols(full_dirname,one.result)
+          df.sample.info <- rbind(df.sample.info, stt)
+        }
+      }else{
+        .index.names.to.sheet(dirname, sample.index, sample.1)
+        generate.scRNA.BAM <- TRUE
+        if(aligner=="align"){
+          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
+        }else if(aligner=="subjunc"){
+          subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
+        }
+        raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
+        if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+        for(spi in 1:nrow(some.results[["Sample.Table"]])){
+          samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
+          fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+          fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        }
+        stt <- .extract.sample.table.cols(full_dirname,some.results)
         df.sample.info <- rbind(df.sample.info, stt)
       }
-    }else{
-      .index.names.to.sheet(dirname, sample.index, sample.1)
-      generate.scRNA.BAM <- TRUE
-      if(aligner=="align"){
-        align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
-      }else if(aligner=="subjunc"){
-        subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
-      }
-      raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
-      if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      stt <- .extract.sample.table.cols(full_dirname,some.results)
-      df.sample.info <- rbind(df.sample.info, stt)
     }
+  } else  {
+    if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
+    combined.fastq.names <- ""
+    for(rowi in 1:nrow(sample.index)){
+        combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, sample.index[rowi,"File.BC.UMIs"], .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, sample.index[rowi,"File.Genomic"] )
+    }
+    combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
+    align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads, isScRNAFastqinput=TRUE, ...)
   }
+
   fc[["Annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
-
   .del.temp.files(temp.file.prefix)
   fc
 }
-

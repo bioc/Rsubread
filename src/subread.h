@@ -33,6 +33,7 @@
 
 #include "hashtable.h" 
 
+#define MAX_SCRNA_FASTQ_FILES 200
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80
@@ -504,6 +505,7 @@ typedef struct {
 	char ** files3;
 	int total_files;
 	int current_file_no;
+	srInt_64 current_read_no;
 	autozip_fp autofp1;
 	autozip_fp autofp2;
 	autozip_fp autofp3;
@@ -535,17 +537,6 @@ typedef struct {
 	char * lane_no_in_chunk;
 	int is_EOF;
 } cache_BCL_t;
-
-
-typedef struct {
-	char filename [300];
-	int space_type ;
-	int file_type ;
-	void * input_fp;   // can be system (FILE * sam or fastq or fasta), (seekable_zfile_t *)
-	char gzfa_last_name[MAX_READ_NAME_LEN];
-	unsigned long long read_chunk_start;
-	cache_BCL_t bcl_input;
-} gene_input_t;
 
 typedef struct{
 	union{
@@ -593,6 +584,20 @@ typedef struct{
 	unsigned int pos;
 	short type;	
 } VCF_temp_read_t;
+
+typedef struct {
+	char filename [MAX_FILE_NAME_LENGTH * MAX_SCRNA_FASTQ_FILES * 3];
+	int space_type ;
+	int file_type ;
+	void * input_fp;   // can be system (FILE * sam or fastq or fasta), (seekable_zfile_t *)
+	char gzfa_last_name[MAX_READ_NAME_LEN];
+	unsigned long long read_chunk_start;
+	union{
+		cache_BCL_t bcl_input;
+		input_mFQ_t scRNA_fq_input;
+	};
+} gene_input_t;
+
 
 
 struct explorer_section_t

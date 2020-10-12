@@ -1044,40 +1044,8 @@ int main(int argc, char ** argv){
 	input_BLC_close(&blc_input);
 	return 0;
 }
+#endif
 
-
-
-int input_mFQ_next_file(input_mFQ_t * fqs_input){
-	input_mFQ_fp_close(fqs_input);
-	fqs_input-> current_file_no ++;
-
-	if(fqs_input-> current_file_no >= fqs_input-> total_files)return -1;
-	return input_mFQ_open_files(fqs_input);
-}
-
-int input_mFQ_open_files(input_mFQ_t * fqs_input){
-	int gzipped_ret = autozip_open(fqs_input->files1[fqs_input-> current_file_no],&fqs_input -> autofp1);
-	if(fqs_input -> files2)gzipped_ret = gzipped_ret <0 ||autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
-	gzipped_ret = gzipped_ret <0 ||autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
-	return gzipped_ret;
-}
-
-int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total-files ){
-	int x1;
-	memset(fqs_input, 0, sizeof(input_mFQ_t));
-	fqs_input->files1 = malloc(sizeof(char*)*total-files);
-	fqs_input->files2 = files2?malloc(sizeof(char*)*total-files):NULL;
-	fqs_input->files3 = malloc(sizeof(char*)*total-files);
-	fqs_input->total_files = total-files;
-
-	for(x1=0; x1<fqs_input -> total_files; x1++){
-		fqs_input->files1[x1] = strdup(files1[x1]);
-		if(files2)fqs_input->files2[x1] = strdup(files2[x1]);
-		fqs_input->files3[x1] = strdup(files3[x1]);
-	}
-	fqs_input->current_file_no = 0;
-	fqs_input->current_read_no = 0;
-}
 
 void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 	if(fqs_input -> autofp1.filename[0]){
@@ -1087,11 +1055,44 @@ void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 	}
 }
 
+
+int input_mFQ_open_files(input_mFQ_t * fqs_input){
+	int gzipped_ret = autozip_open(fqs_input->files1[fqs_input-> current_file_no],&fqs_input -> autofp1);
+	if(fqs_input -> files2)gzipped_ret = gzipped_ret <0 ||autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
+	gzipped_ret = gzipped_ret <0 ||autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
+	return gzipped_ret;
+}
+
+int input_mFQ_next_file(input_mFQ_t * fqs_input){
+	input_mFQ_fp_close(fqs_input);
+	fqs_input-> current_file_no ++;
+
+	if(fqs_input-> current_file_no >= fqs_input-> total_files)return -1;
+	return input_mFQ_open_files(fqs_input);
+}
+
+int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files ){
+	int x1;
+	memset(fqs_input, 0, sizeof(input_mFQ_t));
+	fqs_input->files1 = malloc(sizeof(char*)*total_files);
+	fqs_input->files2 = files2?malloc(sizeof(char*)*total_files):NULL;
+	fqs_input->files3 = malloc(sizeof(char*)*total_files);
+	fqs_input->total_files = total_files;
+
+	for(x1=0; x1<fqs_input -> total_files; x1++){
+		fqs_input->files1[x1] = strdup(files1[x1]);
+		if(files2)fqs_input->files2[x1] = strdup(files2[x1]);
+		fqs_input->files3[x1] = strdup(files3[x1]);
+	}
+	fqs_input->current_file_no = 0;
+	fqs_input->current_read_no = 0;
+	return 0;
+}
 int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual ){
 	char tmpline [MAX_READ_NAME_LEN+1];
 	int ret = -1;
 	while(1){
-		ret = autozip_gets(fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
+		ret = autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 		int write_ptr=0;
 		if(ret==0){
 			ret = input_mFQ_next_file(fqs_input);
@@ -1105,36 +1106,36 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		sprintf(readname, "R%011lld", fqs_input -> current_read_no);
 		#endif
 		readname[12]='|';
-		ret = autozip_gets(fqs_input -> autofp1, readname+13, MAX_READ_NAME_LEN);
+		ret = autozip_gets(&fqs_input -> autofp1, readname+13, MAX_READ_NAME_LEN);
 		readname[12+ret]='|';
 		write_ptr = 13+ret;
 
-		autozip_gets(fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
+		autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 
-		ret = autozip_gets(fqs_input -> autofp1, readname+write_ptr, MAX_READ_NAME_LEN);
+		ret = autozip_gets(&fqs_input -> autofp1, readname+write_ptr, MAX_READ_NAME_LEN);
 		readname[write_ptr+ret-1]='|';
 		write_ptr += ret;
 
 		if(fqs_input->files2){
-			ret = autozip_gets(fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
+			ret = autozip_gets(&fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
 			if(ret<=0) return -1;
-			ret = autozip_gets(fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
+			ret = autozip_gets(&fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
 			readname[write_ptr+ret-1]='|';
 			write_ptr += ret;
 
-			autozip_gets(fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
-			ret = autozip_gets(fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
+			autozip_gets(&fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
+			ret = autozip_gets(&fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
 			readname[write_ptr+ret-1]='|';
 		}else{
 			strcat(readname+write_ptr,"N|N|");
 			write_ptr+=4;
 		}
 
-		ret = autozip_gets(fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
+		ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
 		if(ret<=0) return -1;
-		ret = autozip_gets(fqs_input -> autofp3, read, MAX_READ_LENGTH);
-		autozip_gets(fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
-		autozip_gets(fqs_input -> autofp3, qual, MAX_READ_LENGTH);
+		ret = autozip_gets(&fqs_input -> autofp3, read, MAX_READ_LENGTH);
+		autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
+		autozip_gets(&fqs_input -> autofp3, qual, MAX_READ_LENGTH);
 		break;
 	}
 	fqs_input->current_read_no ++;
@@ -1162,14 +1163,14 @@ int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 		fqs_input -> current_file_no = pos -> current_file_no;
 		input_mFQ_open_files(fqs_input);
 	}
-	if(fqs_input -> autozip_fp1.is_plain){
-		fseeko(fqs_input -> autozip_fp1.plain_fp,  pos -> pos_file1, SEEK_SET);
-		if(fqs_input -> files2)fseeko(fqs_input -> autozip_fp2.plain_fp,  pos -> pos_file2, SEEK_SET);
-		fseeko(fqs_input -> autozip_fp3.plain_fp,  pos -> pos_file3, SEEK_SET);
+	if(fqs_input -> autofp1.is_plain){
+		fseeko(fqs_input -> autofp1.plain_fp,  pos -> pos_file1, SEEK_SET);
+		if(fqs_input -> files2)fseeko(fqs_input -> autofp2.plain_fp,  pos -> pos_file2, SEEK_SET);
+		fseeko(fqs_input -> autofp3.plain_fp,  pos -> pos_file3, SEEK_SET);
 	}else{
-		seekgz_seek(&fqs_input -> autozip_fp1.gz_fp,&pos -> zpos_file1);
-		if(fqs_input -> files2)seekgz_seek(&fqs_input -> autozip_fp2.gz_fp,&pos -> zpos_file2);
-		seekgz_seek(&fqs_input -> autozip_fp3.gz_fp,&pos -> zpos_file3);
+		seekgz_seek(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
+		if(fqs_input -> files2)seekgz_seek(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+		seekgz_seek(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
 	}
 	return 0;
 }
@@ -1178,15 +1179,14 @@ int input_mFQ_tell(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 	memset(pos, 0, sizeof(input_mFQ_pos_t));
 	pos -> current_file_no = fqs_input -> current_file_no;
 
-	if(fqs_input -> autozip_fp1.is_plain){
-		pos -> pos_file1 = ftello(fqs_input -> autozip_fp1.plain_fp);
-		if(fqs_input -> files2)pos -> pos_file2 = ftello(fqs_input -> autozip_fp2.plain_fp);
-		pos -> pos_file3 = ftello(fqs_input -> autozip_fp3.plain_fp);
+	if(fqs_input -> autofp1.is_plain){
+		pos -> pos_file1 = ftello(fqs_input -> autofp1.plain_fp);
+		if(fqs_input -> files2)pos -> pos_file2 = ftello(fqs_input -> autofp2.plain_fp);
+		pos -> pos_file3 = ftello(fqs_input -> autofp3.plain_fp);
 	}else{
-		seekgz_tell(&fqs_input -> autozip_fp1.gz_fp,&pos -> zpos_file1);
-		if(fqs_input -> files2)seekgz_tell(&fqs_input -> autozip_fp2.gz_fp,&pos -> zpos_file2);
-		seekgz_tell(&fqs_input -> autozip_fp3.gz_fp,&pos -> zpos_file3);
+		seekgz_tell(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
+		if(fqs_input -> files2)seekgz_tell(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+		seekgz_tell(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
 	}
 	return 0;
 }
-#endif

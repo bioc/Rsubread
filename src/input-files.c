@@ -366,9 +366,61 @@ int is_read(char * in_buff)
 	return space_type;
 }
 
-int geinput_open_scRNA_fqs(const char * fnames,  gene_input_t * input, int reads_per_chunk, int threads ){
-//	int rv = input_mFQ_init(&input -> scRNA_fq_input, );
-	return -1;
+char *strtokmm(char *str, const char *delim, char ** next) {
+    char *tok;
+    char *m;
+
+    if (delim == NULL) return NULL;
+
+    tok = (str) ? str : (*next);
+    if (tok == NULL) return NULL;
+
+    m = strstr(tok, delim);
+
+    if (m) {
+        (*next) = m + strlen(delim);
+        *m = '\0';
+    } else {
+        (*next) = NULL;
+    }
+
+    return tok;
+}
+
+#define SCRNA_FASTA_SPLIT1 "|Rsd:cCounts:mFQs|"
+#define SCRNA_FASTA_SPLIT2 "|Rsd:cCounts:1mFQ|"
+int geinput_open_scRNA_fqs(const char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
+	SUBREADprintf("QMFQ0 %s\n", rfnames);
+
+	int total_files = 0;
+	char * fnames = strdup(rfnames);
+	char ** files1 = malloc(sizeof(char*) * MAX_SCRNA_FASTQ_FILES);
+	char ** files2 = malloc(sizeof(char*) * MAX_SCRNA_FASTQ_FILES);
+	char ** files3 = malloc(sizeof(char*) * MAX_SCRNA_FASTQ_FILES);
+
+	char * tpl1 = NULL, * tpl2 = NULL;
+	char * fnl1 = strtokmm(fnames, SCRNA_FASTA_SPLIT1, &tpl1);
+	int no_file2 = 0;
+	while(fnl1){
+		char * fnl2 = strtokmm(fnl1, SCRNA_FASTA_SPLIT2, &tpl2);
+		SUBREADprintf("QMFQ1 %s\n", fnl2);
+		files1[total_files] = fnl2;
+		fnl2 = strtokmm(NULL, SCRNA_FASTA_SPLIT2, &tpl2);
+		SUBREADprintf("QMFQ2 %s\n", fnl2);
+		files2[total_files] = fnl2;
+		no_file2 = no_file2 || strlen(fnl2)<2;
+		fnl2 = strtokmm(NULL, SCRNA_FASTA_SPLIT2, &tpl2);
+		files3[total_files] = fnl2;
+		fnl1 = strtokmm(NULL, SCRNA_FASTA_SPLIT1, &tpl1);
+	}
+
+	int rv = input_mFQ_init(&input -> scRNA_fq_input, files1, no_file2?NULL:files2, files3, total_files);
+	strcpy(input->filename, fnames);
+	free(fnames);
+	free(files1);
+	free(files2);
+	free(files3);
+	return rv;
 }
 
 int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_per_chunk, int threads){
