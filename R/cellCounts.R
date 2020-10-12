@@ -476,7 +476,7 @@
     sprintf("http://bioinf.wehi.edu.au/cellCounts/cell-barcodes/%s",uri)
 }
 
-.find_best_cellbarcode <- function( input.directory, sample.sheet){
+.find_best_cellbarcode <- function( input.directory, sample.sheet=NULL, input.mode="bcl"){
     barcode.database.file <- path.expand("~/.Rsubread/cellCounts/known_barcode_sets.txt")
     if(!file.exists(barcode.database.file)){
         dir.create("~/.Rsubread/cellCounts", recursive=TRUE)
@@ -853,6 +853,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
           df.sample.info <- rbind(df.sample.info, stt)
         }
       }else{
+        stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
         .index.names.to.sheet(dirname, sample.index, sample.1)
         generate.scRNA.BAM <- TRUE
         if(aligner=="align"){
@@ -874,6 +875,13 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     }
   } else  {
     if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
+
+    if(is.null(cell.barcode)){
+      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, sample.sheet=NULL, input.mode="fastq")
+    }else{
+      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+    }
+
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.index)){
         combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, sample.index[rowi,"File.BC.UMIs"], .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, sample.index[rowi,"File.Genomic"] )
