@@ -868,7 +868,6 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
           df.sample.info <- rbind(df.sample.info, stt)
         }
       }else{
-        stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
         .index.names.to.sheet(dirname, sample.index, sample.1)
         generate.scRNA.BAM <- TRUE
         .write.tmp.parameters(list(isBCLinput=TRUE))
@@ -891,6 +890,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       }
     }
   } else  {
+    stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
     if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
 
     if(is.null(cell.barcode)){
