@@ -1,3 +1,17 @@
+.write.tmp.parameters <- function(param){
+  temp.file.prefix <- file.path(".",paste(".Rsubread_PARAM_cellCounts_",Sys.getpid(),sep=""))
+  param$PMR_CREATE_TIME <- Sys.time()
+  saveRDS(param, temp.file.prefix)
+}
+
+.retrieve.tmp.parameters <- function(){
+  temp.file.prefix <- file.path(".",paste(".Rsubread_PARAM_cellCounts_",Sys.getpid(),sep=""))
+  if(!file.exists(temp.file.prefix)) return (NA)
+  rv <- readRDS(temp.file.prefix)
+  if( Sys.time() - rv$PMR_CREATE_TIME > 5) return (NA) # the file should be created no longer than 5 seconds ago
+  file.remove(temp.file.prefix)
+}
+
 .index.names.to.sheet<-function(dirname, nametab, fname, sample.name=NA){
   lanes <- c()
   index.names <- c()
@@ -843,7 +857,8 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         for(samplename in unique.samples){
           .index.names.to.sheet(dirname, sample.index, sample.1, samplename)
           one.bam.name <- paste0(samplename, ".bam")
-          one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
+          .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+          one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, ...)
           if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
           cat("Processing sample '",samplename,"'\n")
           one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
@@ -856,12 +871,14 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
         .index.names.to.sheet(dirname, sample.index, sample.1)
         generate.scRNA.BAM <- TRUE
+        .write.tmp.parameters(list(isBCLinput=TRUE))
         if(aligner=="align"){
-          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
+          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }else if(aligner=="subjunc"){
-          subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, isBCLinput=TRUE, ...)
+          subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
-        raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, sampleSheet=sample.1, cellBarcodeList=cell.barcode, nthreads=nthreads, generate.scRNA.BAM=generate.scRNA.BAM, ...)
+        .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+        raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
         if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
@@ -887,7 +904,8 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, sample.index[rowi,"File.BC.UMIs"], .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, sample.index[rowi,"File.Genomic"] )
     }
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
-    align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads, isScRNAFastqinput=TRUE, ...)
+    .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
+    align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
   }
 
   fc[["Annotation"]] <- raw.fc.annot

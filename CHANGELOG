@@ -1,3 +1,6 @@
+16 Oct 2020 - 2.3.14
+(1) Remove cellCounts-related parameters from align(), subjunc() and featureCounts().
+
 14 Oct 2020 - 2.3.13
 (1) Largely change cellCounts() to remove bugs and improve the cell-rescuing algorithm.
 
