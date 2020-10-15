@@ -8,8 +8,9 @@
   temp.file.prefix <- file.path(".",paste(".Rsubread_PARAM_cellCounts_",Sys.getpid(),sep=""))
   if(!file.exists(temp.file.prefix)) return (NA)
   rv <- readRDS(temp.file.prefix)
-  if( Sys.time() - rv$PMR_CREATE_TIME > 5) return (NA) # the file should be created no longer than 5 seconds ago
   file.remove(temp.file.prefix)
+  if( Sys.time() - rv$PMR_CREATE_TIME > 5) return (NA) # the file should be created no longer than 5 seconds ago
+  rv
 }
 
 .index.names.to.sheet<-function(dirname, nametab, fname, sample.name=NA){
