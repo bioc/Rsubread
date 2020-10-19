@@ -1,3 +1,6 @@
+20 Oct 2020 - 2.3.15
+(1) Remove warnings from a deprecated function and string bondary checks.
+
 16 Oct 2020 - 2.3.14
 (1) Remove cellCounts-related parameters from align(), subjunc() and featureCounts().
 

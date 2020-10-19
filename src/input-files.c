@@ -6269,6 +6269,7 @@ int is_SAM_unsorted(char * SAM_line, char * tmp_read_name, short * tmp_flag, srI
 {
 	char read_name[MAX_READ_NAME_LEN];
 	int flags = 0, line_cursor = 0, field_cursor = 0, tabs=0;
+	read_name[0] =0;
 
 	while(1)
 	{

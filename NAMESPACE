@@ -6,5 +6,5 @@ importFrom("grDevices", "dev.off", "pdf")
 importFrom("stats", "approxfun", "density", "dgamma", "dpois", "lowess",
            "ppois", "runif", "rmultinom", "dmultinom", "p.adjust")
 importFrom("utils", "download.file", "read.csv", "read.delim",
-           "write.table")
+           "write.table", "head", "read.table")
 importFrom("Matrix", "readMM")

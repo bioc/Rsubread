@@ -5597,7 +5597,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 				if(modified_fname[i]=='\\' || modified_fname[i]=='/'||modified_fname[i]==' ')modified_fname[i]='.';
 				i++;
 			}
-			char tmp_fname2[MAX_FILE_NAME_LENGTH+100];
+			char tmp_fname2[MAX_FILE_NAME_LENGTH*2+100];
 			sprintf(tmp_fname2, "%s/%s", applied_detail_path, modified_fname);
 			global_context -> read_details_out_FP = f_subr_open(tmp_fname2, "w");
 			//SUBREADprintf("FCSSF=%s\n", tmp_fname2);
