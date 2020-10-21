@@ -1,13 +1,14 @@
 Package: Rsubread
-Version: 2.3.15
-Date: 2020-10-20
-Title: Subread Sequence Alignment and Counting for R
+Version: 2.3.16
+Date: 2020-10-21
+Title: Mapping, quantification and variant analysis of sequencing data 
 Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
 Maintainer: Wei Shi <wei.shi@onjcri.org.au>, Yang Liao <yang.liao@onjcri.org.au> and Gordon K Smyth <smyth@wehi.edu.au>
 Description: Alignment, quantification and analysis of
-        second and third generation sequencing data. Includes functionality
-        for read mapping, read counting, SNP calling, structural
-        variant detection and gene fusion discovery. Can be applied
+        RNA sequencing data (including both bulk RNA-seq and scRNA-seq) and
+        DNA sequenicng data (including ATAC-seq, ChIP-seq, WGS, WES etc). 
+        Includes functionality for read mapping, read counting, SNP calling, 
+        structural variant detection and gene fusion discovery. Can be applied
         to all major sequencing techologies and to both short and long
         sequence reads.
 URL: http://bioconductor.org/packages/Rsubread

@@ -2,10 +2,23 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+\section{Version 2.4.0}{\itemize{
+\item
+The 'isPairedEnd' parameter in featureCounts() is now used to check if the type of input reads (paired-end or single-end) is correctly specified.
+
+\item
+A new parameter 'countReadPairs' was added to featureCounts to specify if read pairs should be counted for paired-end read data.
+
+\item
+Changes to the input parameters and output of cellCounts() function. CellCounts will generate a Sample Sheet for samples included in the scRNA-seq data, based on the sample index set name provided by the user. Structure of the List object returned by cellCounts() is also simplified. cellCounts() now also outputs a BAM file and a gzipped FASTQ file including raw reads for each sample.
+}}
+
+
 \section{Version 2.2.0}{\itemize{
 \item
 Improve cellCounts() on the identification of cell barcodes arising from ambient RNAs.
 }}
+
 
 \section{Version 2.0.0}{\itemize{
 \item
