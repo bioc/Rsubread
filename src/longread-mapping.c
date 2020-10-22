@@ -220,11 +220,10 @@ int LRMvalidate_and_init_context(LRMcontext_t ** context, int argc, char ** argv
 	return retv;
 }
 
-#define CLOCK_USE_GETTIME
-
+#define LRM_CLOCK_USE_GETTIME
 double LRMmiltime(){
 	double ret;
-	#ifdef CLOCK_USE_GETTIME
+	#ifdef LRM_CLOCK_USE_GETTIME
 	struct timespec tsc;
 	clock_gettime(CLOCK_REALTIME, &tsc);
 	ret = tsc.tv_sec*1. + tsc.tv_nsec*1./1000/1000/1000;

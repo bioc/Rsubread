@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -1562,6 +1563,7 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 }
 
 #define CLOCK_USE_GETTIME
+
 double miltime(){
 	double ret;
 	#ifdef FREEBSD
