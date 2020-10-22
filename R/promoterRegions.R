@@ -1,21 +1,26 @@
 promoterRegions <- function(annotation="mm10", upstream=3000L, downstream=2000L)
 #	Create a SAF data.frame of genewise promoter regions
 #	Gordon Smyth
-#	24 April 2017
+#	Created 24 April 2017. Last modified 22 Oct 2020.
 {
-    .check_string_param(annotation,'annotation')
 #	annotation can be a SAF format data.frame or can be the name of a genome with built-in annotation
-	if(is.character(annotation)) annotation <- getInBuiltAnnotation(annotation)
+	if(is.character(annotation)) {
+	    .check_string_param(annotation,'annotation')
+		annotation <- getInBuiltAnnotation(annotation)
+	} else {
+		if(!is.data.frame(annotation)) stop("annotation should be character string or data.frame")
+		if(!all(c("GeneID", "Chr", "Start", "End", "Strand") %in% names(annotation))) stop("annotation data.frame is not in SAF format")
+	}
 
 #	Remove unassembled contigs
 	N <- grep("^N",annotation$Chr)
 	annotation <- annotation[-N,]
 
 #	Check upstream and downstream limits
-	upstream <- as.integer(upstream[1])
-	if(upstream < 0L) upstream <- 0L
-	downstream <- as.integer(downstream[1])
-	if(downstream < 0L) downstream <- 0L
+	upstream <- max(upstream[1],0L)
+	upstream <- as.integer(min(.Machine$integer.max %/% 2L,upstream))
+	downstream <- max(downstream[1],0L)
+	downstream <- as.integer(pmin(.Machine$integer.max %/% 2L,downstream))
 
 #	Combine Chr and GeneID
 	annotation$ChrGeneID <- paste(annotation$Chr,annotation$GeneID,sep=".")

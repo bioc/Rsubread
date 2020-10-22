@@ -16,7 +16,7 @@ detectionCall(
   \item{plot}{ logical indicating whether a density plot of detection p values will be generated.}
 }
 
-\value{A data frame which includes detection p values and annotation information for each genes.}
+\value{A data frame which includes detection p values and annotation information for each gene.}
 
 %\references{}
 \author{Zhiyin Dai and Wei Shi}
