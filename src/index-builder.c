@@ -1269,7 +1269,7 @@ int main_buildindex(int argc,char ** argv)
 			print_in_box(80, 0, 1, "");
 			print_in_box(80, 0, 1, "WARNING: available memory is lower than %.1f GB." ,needed_mem*1./1024l/1024/1024); 
 			print_in_box(80, 0, 1, "         The program may run very slow.");
-			print_in_box(80, 0, 1, "Build a gapped index and/or split index into blocks to reduce memore use.");
+			print_in_box(80, 0, 1, "Build a gapped index and/or split index into blocks to reduce memory use.");
 			print_in_box(80, 0, 1, "");
 		}else
 			print_in_box(80, 0, 0, "%.1f GB of memory is needed for index building." ,needed_mem*1./1024l/1024/1024); 
