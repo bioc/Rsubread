@@ -1,3 +1,6 @@
+25 Oct 2020 - 2.3.19
+(1) Updated cellCounts.Rd and users guide.
+
 22 Oct 2020 - 2.3.17
 (1) Fixed the error caused by the new time-getting function on Windows.
 
