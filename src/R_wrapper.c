@@ -105,7 +105,7 @@ void R_try_cell_barcode_wrapper(int * nargs, char ** argv, int * retv){
 	char * r_argv = strdup(*argv);
 	char ** c_argv = (char **) calloc(n+1+4,sizeof(char *)); // 4 for return variables.
 
-	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH*MAX_SCRNA_FASTQ_FILES,sizeof(char));
 	strcpy(c_argv[0],"R_cell_barcode");
 	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
 	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));

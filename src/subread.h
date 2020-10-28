@@ -34,6 +34,10 @@
 #include "hashtable.h" 
 
 #define MAX_SCRNA_FASTQ_FILES 200
+#define SCRNA_FASTA_SPLIT1 "|Rsd:cCounts:mFQs|"
+#define SCRNA_FASTA_SPLIT2 "|Rsd:cCounts:1mFQ|"
+
+
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
 #define SAM_FLAG_SECOND_READ_IN_PAIR 0x80

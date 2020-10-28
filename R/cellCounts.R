@@ -472,9 +472,9 @@
 }
 
 
-.cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing ){ # the three parameters can only be one string, not strings!
-
-    cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing)), collapse=.R_param_splitor)
+.cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing, input.mode ){ # the three parameters can only be one string, not strings!
+    if(is.null(sample.sheet)) sample.sheet<-"."
+    cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing), input.mode), collapse=.R_param_splitor)
     rvs <- as.integer(rep(0,5))
     C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(4),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
     return_val <- ifelse(C_args$retv[1]==0,"FINISHED","ERROR")
@@ -508,7 +508,7 @@
             if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
         }
         cat(sprintf("Testing the cell barcodes in %s.\n", libf))
-        barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, 30000)
+        barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, 30000, input.mode)
         if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
         sample.good.rate <- barcode_res[2]/barcode_res[1]
         cell.good.rate <- barcode_res[3]/barcode_res[1]
@@ -891,20 +891,21 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       }
     }
   } else  {
-    stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
+#    stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
     if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
-
-    if(is.null(cell.barcode)){
-      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, sample.sheet=NULL, input.mode="fastq")
-    }else{
-      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
-    }
 
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.index)){
         combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, sample.index[rowi,"File.BC.UMIs"], .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, sample.index[rowi,"File.Genomic"] )
     }
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
+
+    if(is.null(cell.barcode)){
+      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, input.mode="fastq")
+    }else{
+      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+    }
+
     .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
     align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
   }

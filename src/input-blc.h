@@ -15,6 +15,7 @@ int input_BLC_seek ( input_BLC_t * blc_input , input_BLC_pos_t * pos );
 void input_BLC_close (input_BLC_t * blc_input);
 
 int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files );
+int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames);
 int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual );
 int input_mFQ_tell(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos );
 int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos );
@@ -39,5 +40,5 @@ ArrayList * input_BLC_parse_CellBarcodes(char * fname);
 int hamming_dist_ATGC_max2(char* s1, char* s2 );
 
 // returns -1 if error, or 0 if no error.
-int cacheBCL_quality_test(char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode);
+int cacheBCL_quality_test(int is_FASTQ_input, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode);
 #endif
