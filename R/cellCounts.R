@@ -834,6 +834,8 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
   temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame()
+  sample.index$SampleName <- as.character(sample.index$SampleName)
+  sample.index$IndexSetName <- as.character(sample.index$IndexSetName)
 
   if("InputDirectory" %in% colnames(sample.index)){
     dirs <- unique( sample.index$InputDirectory )
