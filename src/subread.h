@@ -547,6 +547,7 @@ typedef struct{
 		unsigned long long simple_file_position;
 		seekable_position_t seekable_gzip_position;
 		input_BLC_pos_t BCL_position;
+		input_mFQ_pos_t mFQ_position;
 	};
 	char gzfa_last_name[MAX_READ_NAME_LEN];
 } gene_inputfile_position_t;

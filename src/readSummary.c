@@ -7365,6 +7365,12 @@ int readSummary(int argc,char *argv[]){
 
 	int ret_int = 0;
 
+#ifdef MAKE_STANDALONE
+	#define NO_SORT_OPTION_NAME "donotsort"
+#else
+	#define NO_SORT_OPTION_NAME "autosort"
+#endif
+
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
 		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
@@ -7372,6 +7378,10 @@ int readSummary(int argc,char *argv[]){
 		int this_file_isPEexpected = is_paired_end_reads_expected[1]?is_paired_end_reads_expected[x1]=='1' :(is_paired_end_reads_expected[0]=='1');
 		global_context.is_paired_end_reads_expected = this_file_isPEexpected;
 		global_context.is_paired_end_mode_assign = this_file_isPEassign;
+		if(global_context.do_not_sort && 0==this_file_isPEassign){
+			print_in_box(80,0,0,"      WARNING the %s option is ignored when single-end reads", NO_SORT_OPTION_NAME);
+			print_in_box(80,0,0,"              are being counted.");
+		}
 
 		read_count_type_t * column_numbers = calloc(nexons, sizeof(read_count_type_t));
 		HashTable * junction_global_table = NULL;

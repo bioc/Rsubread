@@ -387,9 +387,10 @@ char *strtokmm(char *str, const char *delim, char ** next) {
     return tok;
 }
 
-int geinput_open_scRNA_fqs(const char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
+int geinput_open_scRNA_fqs(char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
 	strcpy(input->filename,rfnames);
 	int rv = input_mFQ_init_by_one_string(&input -> scRNA_fq_input, rfnames);
+	input -> file_type = GENE_INPUT_SCRNA_FASTQ;
 	return rv;
 }
 
@@ -671,7 +672,9 @@ unsigned int read_numbers(gene_input_t * input)
 }
 
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_BCL){
+	if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+		input_mFQ_tell(&input -> scRNA_fq_input, &pos -> mFQ_position);
+	}else if(input -> file_type == GENE_INPUT_BCL){
 		assert(input -> file_type != GENE_INPUT_BCL);
 	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
@@ -683,7 +686,9 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
 }
 
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_BCL){
+	if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+		input_mFQ_seek(&input -> scRNA_fq_input, &pos -> mFQ_position);
+	}else if(input -> file_type == GENE_INPUT_BCL){
 		assert(input -> file_type != GENE_INPUT_BCL);
 	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
@@ -756,6 +761,11 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 {
 	if(input -> file_type == GENE_INPUT_BCL) {
 		int rv = cacheBCL_next_read(&input -> bcl_input, read_name, read_string, quality_string, NULL);
+		if(rv<=0) return -1;
+		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
+		return rv;
+	} else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
+		int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
 		if(rv<=0) return -1;
 		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
@@ -1049,7 +1059,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 
 void geinput_close(gene_input_t * input)
 {
-	if(input -> file_type == GENE_INPUT_BCL)
+	if(input -> file_type == GENE_INPUT_SCRNA_FASTQ)
+		input_mFQ_close(&input -> scRNA_fq_input);
+	else if(input -> file_type == GENE_INPUT_BCL)
 		cacheBCL_close(&input -> bcl_input);
 	else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA)
 		seekgz_close((seekable_zfile_t * ) input->input_fp);

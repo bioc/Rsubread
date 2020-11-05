@@ -3531,21 +3531,25 @@ void clean_context_after_chunk(global_context_t * context)
 
 void locate_read_files(global_context_t * global_context, int type)
 {
-	if(global_context -> input_reads.first_read_file. file_type == GENE_INPUT_BCL) return;
-	if(type==SEEK_SET)
-	{
-		global_context -> current_circle_start_abs_offset_file1 = geinput_file_offset(&(global_context -> input_reads.first_read_file));
+	// The BCL input module uses its own chunking algorithm.
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL) return;
+
+	if(type==SEEK_SET) {
 		geinput_tell(&global_context -> input_reads.first_read_file, &global_context -> current_circle_start_position_file1);
 		if(global_context ->input_reads.is_paired_end_reads)
 			geinput_tell(&global_context -> input_reads.second_read_file, &global_context -> current_circle_start_position_file2);
-	}
-	else
-	{
+	} else {
 		geinput_tell(&global_context -> input_reads.first_read_file, &global_context -> current_circle_end_position_file1);
 		if(global_context ->input_reads.is_paired_end_reads)
 			geinput_tell(&global_context -> input_reads.second_read_file, &global_context -> current_circle_end_position_file2);
-	
 	}
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_SCRNA_FASTQ) return;
+
+	// This variable is only used to display the running progress.
+	// That is why the scRNA-seq mode doesn't need to keep the start pos.
+	if(type==SEEK_SET)
+		global_context -> current_circle_start_abs_offset_file1 = geinput_file_offset(&(global_context -> input_reads.first_read_file));
+
 }
 
 void rewind_read_files(global_context_t * global_context, int type)

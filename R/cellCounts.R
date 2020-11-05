@@ -476,7 +476,7 @@
     if(is.null(sample.sheet)) sample.sheet<-"."
     cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing), input.mode), collapse=.R_param_splitor)
     rvs <- as.integer(rep(0,5))
-    C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(4),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
+    C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(5),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
     return_val <- ifelse(C_args$retv[1]==0,"FINISHED","ERROR")
     tested_reads <- C_args$retv[2]
     good_sample <- C_args$retv[3]
@@ -513,8 +513,8 @@
         sample.good.rate <- barcode_res[2]/barcode_res[1]
         cell.good.rate <- barcode_res[3]/barcode_res[1]
         max.cell.good <- max(max.cell.good, cell.good.rate)
-        #cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
-        if(sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
+        cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
+        if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
         if(cell.good.rate > 0.6){
             cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
             return(listfile)
