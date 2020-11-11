@@ -2093,7 +2093,7 @@ void SamBam_writer_one_thread_merge_sortedbins(SamBam_Writer * writer){
 				current_min_fps[bii] = SUBREAD_MAX_ULONGLONG;
 
 				sprintf(tfpx , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii + merge_i);
-				sb_fps[bii] = fopen(tfpx,"r");
+				sb_fps[bii] = fopen(tfpx,"rb");
 				current_min_fps[bii] = SamBam_writer_sort_bins_to_BAM_FP_pos(sb_fps[bii]);
 				if(current_min_fps[bii] < SUBREAD_MAX_ULONGLONG && current_min_fps[bii] < current_min){
 					current_min = current_min_fps[bii];
@@ -2293,7 +2293,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 		current_min_fps[bii] = SUBREAD_MAX_ULONGLONG;
 
 		sprintf(tfp , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii);
-		sb_fps[bii] = fopen(tfp,"r");
+		sb_fps[bii] = fopen(tfp,"rb");
 		if(sb_fps[bii]!=NULL){
 			current_min_fps[bii] = SamBam_writer_sort_bins_to_BAM_FP_pos(sb_fps[bii]);
 			if(current_min_fps[bii] < SUBREAD_MAX_ULONGLONG && current_min_fps[bii] < current_min){
