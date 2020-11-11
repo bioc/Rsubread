@@ -2046,7 +2046,7 @@ void SamBam_writer_sort_bins_to_BAM_write_1R(SamBam_Writer * writer, FILE * fp, 
 	int rlen = fread(&block_len, 4,1,fp);
 	//SUBREADprintf("WBIN=%d\n", block_len);
 	if(rlen<1 || block_len >= 10000){
-		SUBREADprintf("ERROR: sorted bin files are brolen. RLEN=%d , BLKLEN=%d\n", rlen, block_len);
+		SUBREADprintf("ERROR: sorted bin files are broken. RLEN=%d , BLKLEN=%d\n", rlen, block_len);
 		assert(rlen >=1);
 	}
 
@@ -2054,7 +2054,7 @@ void SamBam_writer_sort_bins_to_BAM_write_1R(SamBam_Writer * writer, FILE * fp, 
 	writer -> chunk_buffer_used += 4;
 	rlen = fread(writer -> chunk_buffer + writer -> chunk_buffer_used, 1, block_len ,fp);
 	if(rlen < block_len){
-		SUBREADprintf("ERROR: sorted bin files are brolen.\n");
+		SUBREADprintf("ERROR: sorted bin files are broken.\n");
 		assert(rlen >=block_len);
 	}
 	writer -> chunk_buffer_used += rlen;
@@ -2093,7 +2093,7 @@ void SamBam_writer_one_thread_merge_sortedbins(SamBam_Writer * writer){
 				current_min_fps[bii] = SUBREAD_MAX_ULONGLONG;
 
 				sprintf(tfpx , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii + merge_i);
-				sb_fps[bii] = fopen(tfpx,"r");
+				sb_fps[bii] = fopen(tfpx,"rb");
 				current_min_fps[bii] = SamBam_writer_sort_bins_to_BAM_FP_pos(sb_fps[bii]);
 				if(current_min_fps[bii] < SUBREAD_MAX_ULONGLONG && current_min_fps[bii] < current_min){
 					current_min = current_min_fps[bii];
@@ -2293,7 +2293,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 		current_min_fps[bii] = SUBREAD_MAX_ULONGLONG;
 
 		sprintf(tfp , "%s-%06d.sortedbin", writer -> tmpf_prefix, bii);
-		sb_fps[bii] = fopen(tfp,"r");
+		sb_fps[bii] = fopen(tfp,"rb");
 		if(sb_fps[bii]!=NULL){
 			current_min_fps[bii] = SamBam_writer_sort_bins_to_BAM_FP_pos(sb_fps[bii]);
 			if(current_min_fps[bii] < SUBREAD_MAX_ULONGLONG && current_min_fps[bii] < current_min){

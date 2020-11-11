@@ -1114,6 +1114,7 @@ void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 		if(fqs_input->files2)autozip_close(&fqs_input -> autofp2);
 		autozip_close(&fqs_input -> autofp3);
 	}
+	fqs_input -> autofp1.filename[0] = 0;
 }
 
 
@@ -1193,6 +1194,7 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		int write_ptr=0;
 		if(ret==0){
 			ret = input_mFQ_next_file(fqs_input);
+			SUBREADprintf("SEEKING_NEXT_FILE %d = %d\n", fqs_input -> current_file_no, ret);
 			if(ret >=0) continue;
 			return -1;
 		} else if(ret<0) return -1;
@@ -1256,18 +1258,27 @@ void input_mFQ_close(input_mFQ_t * fqs_input){
 
 int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 	if(fqs_input -> current_file_no != pos -> current_file_no){
+		Rprintf("SEEKCLOSE START\n");
 		input_mFQ_fp_close(fqs_input);
+		Rprintf("SEEKOPEN START\n");
 		fqs_input -> current_file_no = pos -> current_file_no;
-		input_mFQ_open_files(fqs_input);
+		int openret = input_mFQ_open_files(fqs_input);
+		Rprintf("SEEKOPEN FIN by %d\n", openret);
 	}
 	if(fqs_input -> autofp1.is_plain){
+		Rprintf("SEEKPLTFP1 START\n");
 		fseeko(fqs_input -> autofp1.plain_fp,  pos -> pos_file1, SEEK_SET);
+		Rprintf("SEEKPLTFP3 START\n");
 		if(fqs_input -> files2)fseeko(fqs_input -> autofp2.plain_fp,  pos -> pos_file2, SEEK_SET);
 		fseeko(fqs_input -> autofp3.plain_fp,  pos -> pos_file3, SEEK_SET);
+		Rprintf("SEEKPLTFP3 FIN\n");
 	}else{
+		Rprintf("SEEKFP1 START\n");
 		seekgz_seek(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
 		if(fqs_input -> files2)seekgz_seek(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+		Rprintf("SEEKFP3 START\n");
 		seekgz_seek(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
+		Rprintf("SEEKFP3 FIN\n");
 	}
 	return 0;
 }

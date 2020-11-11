@@ -835,13 +835,15 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
   raw.fc.annot <- NA
   df.sample.info <- data.frame()
   sample.index$SampleName <- as.character(sample.index$SampleName)
-  sample.index$IndexSetName <- as.character(sample.index$IndexSetName)
+  if('IndexSetName' %in% colnames(sample.index))sample.index$IndexSetName <- as.character(sample.index$IndexSetName)
 
   if("InputDirectory" %in% colnames(sample.index)){
     dirs <- unique( sample.index$InputDirectory )
     fc[["counts"]] <- list()
     fc[["cell.confidence"]] <- list()
   
+    for(dirname in dirs) .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.index") # check files before the slow mapping/counting step.
+
     for(dirname in dirs){
       unique.samples <- unique( sample.index$SampleName[ sample.index$InputDirectory == dirname ] )
   
@@ -893,12 +895,13 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       }
     }
   } else  {
-#    stop("FASTQ input for scRNA-seq data hasn't been fully tested.")
     if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
 
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.index)){
-        combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, sample.index[rowi,"File.BC.UMIs"], .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, sample.index[rowi,"File.Genomic"] )
+      R1.file.name <- .check_and_NormPath(sample.index[rowi,"File.BC.UMIs"], mustWork=TRUE, "The barcode FASTQ file in sample.index")
+      R2.file.name <- .check_and_NormPath(sample.index[rowi,"File.Genomic"], mustWork=TRUE, "The genomic read FASTQ file in sample.index")
+      combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
     }
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
 
@@ -912,7 +915,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
   }
 
-  fc[["Annotation"]] <- raw.fc.annot
+  fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
   .del.temp.files(temp.file.prefix)
   fc
