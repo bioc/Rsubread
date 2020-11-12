@@ -818,7 +818,7 @@ library(Matrix)
   }
 }
 
-.extract.sample.table.cols <- function(rdir, smr){
+.extract.sample.table.cols <- function(rdir, smr, fastq1=NA, fastq2=NA){
   total.cells <- c()
   hiconf.cells <- c()
   res.cells <- c()
@@ -831,7 +831,11 @@ library(Matrix)
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
     umis <- c(umis,sum(smr[[sampleno]][["Counts"]]))
   }
-  cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+  if(is.na(rdir)){
+    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, File.BC.UMIs=rep(fastq1, nrow(smr[["Sample.Table"]])), File.Genomic=rep(fastq2, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
+  }else{
+    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
+  }
 }
 
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
@@ -907,7 +911,6 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     }
   } else  {
     if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
-    generate.scRNA.BAM <- TRUE
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.index)){
       R1.file.name <- .check_and_NormPath(sample.index[rowi,"File.BC.UMIs"], mustWork=TRUE, "The barcode FASTQ file in sample.index")
@@ -922,8 +925,16 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
 
-    .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
-    align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
+    bam.for.FC <- c()
+    if(is.na(aligner)){
+      bam.for.FC <- paste0(sample.index$SampleName,".bam")
+      generate.scRNA.BAM <- FALSE
+    }else{
+      .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
+      align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
+      bam.for.FC <- temp.file.prefix
+      generate.scRNA.BAM <- TRUE
+    }
 
     sample.1 <- paste0(temp.file.prefix,".samplesheet")
     .index.names.to.sheet.FASTQ.mode(sample.index, sample.1)
@@ -931,7 +942,15 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
 
     raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
     for(rowi in 1:nrow(sample.index)){
-      # do the output files for each sample in the combined fastq files
+      if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+      for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      }
+      stt <- .extract.sample.table.cols(NA,some.results,sample.index$File.BC.UMIs[rowi], sample.index$File.Genomic[rowi])
+      df.sample.info <- rbind(df.sample.info, stt)
     }
   }
 
