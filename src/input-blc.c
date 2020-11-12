@@ -667,27 +667,52 @@ void iBLC_free_3tp(void * t){
 	free(tt);
 }
 
+#define SHEET_FORMAT_RAWDIR_INPUT 10
+#define SHEET_FORMAT_FASTQ_INPUT 20
 HashTable * input_BLC_parse_SampleSheet(char * fname){
 	HashTable * ret = StringTableCreate(30);
 	HashTableSetDeallocationFunctions(ret, free, iBLC_free_sample_items);
 	FILE * fp = fopen(fname, "rb");
 	if(fp==NULL) return NULL;
 	char linebuf[MAX_FILE_NAME_LENGTH];
-	int state = -1;
+	int state = -1, file_format=-1;
 	while(!feof(fp)){
 		char * gret = fgets(linebuf, MAX_FILE_NAME_LENGTH-1, fp);
 		if(gret == NULL) break;
-		if(strlen(linebuf)<5)continue;
+		int linelen = strlen(linebuf);
+		if(linelen<5)continue;
+		if(linebuf[linelen -1] == '\r' || linebuf[linelen -1] == '\n') linebuf[linelen -1] =0;
+		if(linebuf[linelen -2] == '\r' || linebuf[linelen -2] == '\n') linebuf[linelen -2] =0;
+		
 		if(state < 0 && strstr(linebuf,"EMFileVersion,4")) state = 0;
 		if(state == 1 && linebuf[0]=='[') state = 99999;
 		if(state == 1){
-			if(memcmp( linebuf, "Lane", 4 )==0)continue;
+			if(memcmp( linebuf, "Lane", 4 )==0){
+				file_format = SHEET_FORMAT_RAWDIR_INPUT;
+				continue;
+			}
+
+			if(memcmp( linebuf, "File.BC", 7 )==0){
+				file_format = SHEET_FORMAT_FASTQ_INPUT;
+				continue;
+			}
 
 			char * tokp=NULL;
-			int lane_no = atoi(strtok_r(linebuf, ",", &tokp));
-			strtok_r(NULL, ",", &tokp);
-			char * sample_name = strtok_r(NULL, ",", &tokp);
-			char * sample_index = strdup(strtok_r(NULL, ",", &tokp));
+			int lane_no = 1;
+			char * sample_name = NULL;
+			char * sample_index = NULL;
+
+			if(file_format == SHEET_FORMAT_RAWDIR_INPUT){
+				lane_no = atoi(strtok_r(linebuf, ",", &tokp));
+				strtok_r(NULL, ",", &tokp);
+				sample_name = strtok_r(NULL, ",", &tokp);
+				sample_index = strdup(strtok_r(NULL, ",", &tokp));
+			}else{
+				strtok_r(linebuf, ",", &tokp); // fastq file 1
+				strtok_r(NULL, ",", &tokp); // fastq file 2
+				sample_name = strtok_r(NULL, ",", &tokp); // sample name
+			}
+
 			char ** entry = malloc(sizeof(void*)*3);
 			entry[0] = NULL + lane_no;
 			entry[1] = sample_index;
@@ -897,7 +922,6 @@ int do_R_try_cell_barcode_files(int argc, char ** argv){
 int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
 	input_mFQ_t fqs_input;
 	int ret = input_mFQ_init_by_one_string(&fqs_input, datadir);
-	SUBREADprintf("TFQMODE RETV=%d\n", ret);
 	if(ret)return ret;
 	while(1){
 		char base[MAX_READ_LENGTH], qual[MAX_READ_LENGTH], rname[MAX_READ_NAME_LEN];
@@ -922,8 +946,8 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 				}
 			}
 		}
-		assert(xx ==4 && (*lane_str)=='L');
-		for(testi = lane_str+1; *testi; testi++){
+
+		if(xx == 4) for(testi = lane_str+1; *testi; testi++){
 			assert(isdigit(*testi));
 			laneno = laneno*10 + (*testi)-'0';
 		}
@@ -1119,14 +1143,10 @@ void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 
 
 int input_mFQ_open_files(input_mFQ_t * fqs_input){
-	SUBREADprintf("QZEEF1 '%s'\n", fqs_input->files1[fqs_input-> current_file_no]);
-	if(fqs_input -> files2)SUBREADprintf("QZEEF2 '%s'\n", fqs_input->files2[fqs_input-> current_file_no]);
-	SUBREADprintf("QZEEF3 '%s'\n", fqs_input->files3[fqs_input-> current_file_no]);
-
 	int gzipped_ret = autozip_open(fqs_input->files1[fqs_input-> current_file_no],&fqs_input -> autofp1);
-	if(fqs_input -> files2)gzipped_ret = gzipped_ret <0 ||autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
-	gzipped_ret = gzipped_ret <0 ||autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
-	return gzipped_ret<0;
+	if(fqs_input -> files2)gzipped_ret = gzipped_ret < 0 ?gzipped_ret:autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
+	gzipped_ret = gzipped_ret < 0?gzipped_ret:autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
+	return gzipped_ret < 0;
 }
 
 int input_mFQ_next_file(input_mFQ_t * fqs_input){
@@ -1149,7 +1169,6 @@ int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fq
 	int no_file2 = 0;
 	while(fnl1){
 		char * fnl2 = strtokmm(fnl1, SCRNA_FASTA_SPLIT2, &tpl2);
-		SUBREADprintf("ZQQM1 %s %s\n", fnl1, fnl2);
 		files1[total_files] = fnl2;
 		fnl2 = strtokmm(NULL, SCRNA_FASTA_SPLIT2, &tpl2);
 		files2[total_files] = fnl2;
@@ -1188,13 +1207,13 @@ int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, cha
 }
 int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual ){
 	char tmpline [MAX_READ_NAME_LEN+1];
-	int ret = -1;
+	int ret = -1,x1;
+	if(fqs_input -> current_file_no == fqs_input -> total_files) return -1;
 	while(1){
 		ret = autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 		int write_ptr=0;
 		if(ret==0){
 			ret = input_mFQ_next_file(fqs_input);
-			SUBREADprintf("SEEKING_NEXT_FILE %d = %d\n", fqs_input -> current_file_no, ret);
 			if(ret >=0) continue;
 			return -1;
 		} else if(ret<0) return -1;
@@ -1206,35 +1225,43 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		#endif
 		readname[12]='|';
 		ret = autozip_gets(&fqs_input -> autofp1, readname+13, MAX_READ_NAME_LEN);
+		ret --;
 		readname[12+ret]='|';
 		write_ptr = 13+ret;
 
 		autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 
 		ret = autozip_gets(&fqs_input -> autofp1, readname+write_ptr, MAX_READ_NAME_LEN);
-		readname[write_ptr+ret-1]='|';
+		ret --;
+		for(x1=write_ptr; x1<write_ptr+ret; x1++) if(readname[x1]>='/') readname[x1]++;
+		readname[write_ptr+ret]='|';
 		write_ptr += ret;
 
 		if(fqs_input->files2){
 			ret = autozip_gets(&fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
 			if(ret<=0) return -1;
 			ret = autozip_gets(&fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
-			readname[write_ptr+ret-1]='|';
+			ret --;
+			readname[write_ptr+ret]='|';
 			write_ptr += ret;
 
 			autozip_gets(&fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
 			ret = autozip_gets(&fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
-			readname[write_ptr+ret-1]='|';
-		}else{
-			strcat(readname+write_ptr,"N|N|");
-			write_ptr+=4;
-		}
+			for(x1=write_ptr; x1<write_ptr+ret; x1++) if(readname[x1]>='/') readname[x1]++;
+			ret --;
+			readname[write_ptr+ret]=0;
+		}else
+			write_ptr+=sprintf(readname+write_ptr,"|input#%04d", fqs_input -> current_file_no);
 
 		ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
 		if(ret<=0) return -1;
 		ret = autozip_gets(&fqs_input -> autofp3, read, MAX_READ_LENGTH);
+		ret --; // read length excludes "\n"
+		read[ret]=0;
 		autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
 		autozip_gets(&fqs_input -> autofp3, qual, MAX_READ_LENGTH);
+		qual[ret]=0;
+
 		break;
 	}
 	fqs_input->current_read_no ++;
@@ -1258,27 +1285,21 @@ void input_mFQ_close(input_mFQ_t * fqs_input){
 
 int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 	if(fqs_input -> current_file_no != pos -> current_file_no){
-		Rprintf("SEEKCLOSE START\n");
-		input_mFQ_fp_close(fqs_input);
-		Rprintf("SEEKOPEN START\n");
+		if(fqs_input -> current_file_no < fqs_input -> total_files)input_mFQ_fp_close(fqs_input);
 		fqs_input -> current_file_no = pos -> current_file_no;
-		int openret = input_mFQ_open_files(fqs_input);
-		Rprintf("SEEKOPEN FIN by %d\n", openret);
+		if(fqs_input -> current_file_no < fqs_input -> total_files)input_mFQ_open_files(fqs_input);
 	}
-	if(fqs_input -> autofp1.is_plain){
-		Rprintf("SEEKPLTFP1 START\n");
-		fseeko(fqs_input -> autofp1.plain_fp,  pos -> pos_file1, SEEK_SET);
-		Rprintf("SEEKPLTFP3 START\n");
-		if(fqs_input -> files2)fseeko(fqs_input -> autofp2.plain_fp,  pos -> pos_file2, SEEK_SET);
-		fseeko(fqs_input -> autofp3.plain_fp,  pos -> pos_file3, SEEK_SET);
-		Rprintf("SEEKPLTFP3 FIN\n");
-	}else{
-		Rprintf("SEEKFP1 START\n");
-		seekgz_seek(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
-		if(fqs_input -> files2)seekgz_seek(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
-		Rprintf("SEEKFP3 START\n");
-		seekgz_seek(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
-		Rprintf("SEEKFP3 FIN\n");
+	if(fqs_input -> current_file_no < fqs_input -> total_files){
+		fqs_input -> current_read_no = pos -> current_read_no;
+		if(fqs_input -> autofp1.is_plain){
+			fseeko(fqs_input -> autofp1.plain_fp,  pos -> pos_file1, SEEK_SET);
+			if(fqs_input -> files2)fseeko(fqs_input -> autofp2.plain_fp,  pos -> pos_file2, SEEK_SET);
+			fseeko(fqs_input -> autofp3.plain_fp,  pos -> pos_file3, SEEK_SET);
+		}else{
+			seekgz_seek(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
+			if(fqs_input -> files2)seekgz_seek(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+			seekgz_seek(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
+		}
 	}
 	return 0;
 }
@@ -1286,15 +1307,18 @@ int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 int input_mFQ_tell(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 	memset(pos, 0, sizeof(input_mFQ_pos_t));
 	pos -> current_file_no = fqs_input -> current_file_no;
+	pos -> current_read_no = fqs_input -> current_read_no;
 
-	if(fqs_input -> autofp1.is_plain){
-		pos -> pos_file1 = ftello(fqs_input -> autofp1.plain_fp);
-		if(fqs_input -> files2)pos -> pos_file2 = ftello(fqs_input -> autofp2.plain_fp);
-		pos -> pos_file3 = ftello(fqs_input -> autofp3.plain_fp);
-	}else{
-		seekgz_tell(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
-		if(fqs_input -> files2)seekgz_tell(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
-		seekgz_tell(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
+	if(fqs_input -> current_file_no < fqs_input -> total_files){
+		if(fqs_input -> autofp1.is_plain){
+			pos -> pos_file1 = ftello(fqs_input -> autofp1.plain_fp);
+			if(fqs_input -> files2)pos -> pos_file2 = ftello(fqs_input -> autofp2.plain_fp);
+			pos -> pos_file3 = ftello(fqs_input -> autofp3.plain_fp);
+		}else{
+			seekgz_tell(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
+			if(fqs_input -> files2)seekgz_tell(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+			seekgz_tell(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
+		}
 	}
 	return 0;
 }

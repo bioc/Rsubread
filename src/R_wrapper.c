@@ -110,10 +110,8 @@ void R_try_cell_barcode_wrapper(int * nargs, char ** argv, int * retv){
 	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
 	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 	R_child_thread_run(do_R_try_cell_barcode_files, 9, c_argv, 0);
-	SUBREADprintf("FREE_X %p\n", r_argv);
 	free(r_argv);
 	for(i=0;i<n+1;i++){
-		SUBREADprintf("FREE_%d %p\n",i,c_argv[i]);
 		free(c_argv[i]);
 	}
 	int rv = (void*)c_argv[6]-NULL;
@@ -124,7 +122,6 @@ void R_try_cell_barcode_wrapper(int * nargs, char ** argv, int * retv){
 	retv[1] = tested_reads;
 	retv[2] = sample_good_reads;
 	retv[3] = cell_good_reads;
-	SUBREADprintf("FREE_C %p\n", c_argv);
 	free(c_argv);
 }
 

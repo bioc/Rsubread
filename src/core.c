@@ -1131,7 +1131,7 @@ int fetch_next_read_pair(global_context_t * global_context, thread_context_t * t
 		{
 			is_second_R1 = 0; is_second_R2 = 0;
 			rl1 = geinput_next_read_trim(ginp1, read_name_1, read_text_1 , qual_text_1, global_context->config.read_trim_5, global_context->config.read_trim_3, &is_second_R1);
-			//SUBREADprintf("%s LEN=%d\n", read_name_1, rl1);
+			//if(global_context -> running_processed_reads_in_chunk < 100)SUBREADprintf("GETRNAMES %s LEN=%d\n", read_name_1, rl1);
 			if(global_context->config.space_type == GENE_SPACE_COLOR && remove_color_head)
 			{
 				if(isalpha(read_text_1[0]))
@@ -2168,7 +2168,7 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		mate_chro_for_2="=";
 	}
 
-	//if(161436 == pair_number)	SUBREADprintf("DOUBLE_ADD: %u      %d/%d\n", pair_number, current_location, all_locations);
+	//if(pair_number<10)SUBREADprintf("FIN_ADD #%d: %s in %p \n", pair_number, read_name_1, thread_context);
 
 	if(thread_context)
 		add_buffered_fragment(global_context, thread_context, pair_number,
@@ -2637,9 +2637,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			max_votes = max(_global_retrieve_alignment_ptr(global_context, current_read_number, 0, 0)->selected_votes, _global_retrieve_alignment_ptr(global_context, current_read_number, 1, 0)->selected_votes);
 		else	max_votes = _global_retrieve_alignment_ptr(global_context, current_read_number, 0, 0)->selected_votes;
 
-		//#warning "========== COMMENT DEBUG============="
-		if(0 && FIXLENstrcmp("R00000007859", read_name_1)==0)
-			SUBREADprintf("BSSS2 : %s : %d\n", read_name_1, max_votes);
+		//if(  current_read_number < 10 ) SUBREADprintf("BSSS2 : %s : %d\n", read_name_1, max_votes);
 
 		int best_read_id=0;
 
@@ -2995,6 +2993,7 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			}
 		}
 
+		//if(  current_read_number < 10 ) SUBREADprintf("BEEE2 : %s : %d\n", read_name_1, max_votes);
 		//#warning ">>>>>>> COMMENT THIS <<<<<<<"
 		//printf("OCT27-WRITE-UNMAP?-%s-THRE %d\n", read_name_1, thread_context -> thread_id);
 		if(output_cursor<1) {
@@ -3246,13 +3245,11 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
 //#warning "====== CHECK PRINTING !!! =========="
-				if(0 && FIXLENstrcmp("R00000110641:", read_name_1)==0){
-//				if(vote_1->max_vote>= 9){
+				if(0&&current_read_number == 4000){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s  VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2, vote_1->max_vote, min_first_read_votes);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
 					print_votes(vote_2, global_context -> config.index_prefix);
-					//if(is_reversed==1)exit(0);
 				}
 
 				if(global_context -> input_reads.is_paired_end_reads)

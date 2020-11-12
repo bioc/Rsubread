@@ -287,6 +287,7 @@ typedef struct {
 	srInt_64 unistr_buffer_size;
 	srInt_64 unistr_buffer_used;
 	int is_scRNA_BAM_FQ_out_generated;
+	int BAM_is_from_scRNA_FASTQ;
 	HashTable * scRNA_sample_sheet_table;
 	ArrayList * scRNA_sample_barcode_list;
 	ArrayList * scRNA_cell_barcodes_array;
@@ -3668,12 +3669,23 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 			}
 		}
 	}
-	assert(xx ==4 && (*lane_str)=='L');
-	for(testi = lane_str+1; *testi; testi++){
-		assert(isdigit(*testi));
-		laneno = laneno*10 + (*testi)-'0';
-	}
-	int sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
+	int sample_id = -1;
+
+	if(global_context -> BAM_is_from_scRNA_FASTQ){
+		if(sample_barcode == NULL || memcmp(sample_barcode, "input#", 6) || !isdigit(sample_barcode[6]))
+			SUBREADprintf("SPBCFMT_ERR %d // %s in %s // %s\n", xx, sample_barcode, read_name, read_name +13 +global_context -> known_cell_barcode_length);
+		else sample_id = atoi(sample_barcode +6) +1;
+	}else{
+		if(xx !=4 || (*lane_str)!='L')
+			SUBREADprintf("LANESTR_ERR %d , %s\n", xx, lane_str);
+		for(testi = lane_str+1; *testi; testi++){
+			assert(isdigit(*testi));
+			laneno = laneno*10 + (*testi)-'0';
+		}
+
+		sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
+ 	}
+
 	if(sample_id>0){
 		if(mapped_step == 1)
 			thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
@@ -3683,11 +3695,13 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 				if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
 				sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
 
-				pthread_spin_lock(sample_bam_2fps[4]);
-				sample_bam_2fps[5]=sample_bam_2fps[5]+1;
-				gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
-				SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
-				pthread_spin_unlock(sample_bam_2fps[4]);
+				if(0 == global_context -> BAM_is_from_scRNA_FASTQ){
+					pthread_spin_lock(sample_bam_2fps[4]);
+					sample_bam_2fps[5]=sample_bam_2fps[5]+1;
+					gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
+					SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
+					pthread_spin_unlock(sample_bam_2fps[4]);
+				}
 				SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin, 1);
 			}
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
@@ -3713,14 +3727,22 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 			}
 		}
 	}
-	assert(xx ==4 && (*lane_str)=='L');
-	for(testi = lane_str+1; *testi; testi++){
-		assert(isdigit(*testi));
-		laneno = laneno*10 + (*testi)-'0';
+
+	int sample_id = -1;
+
+	if(global_context -> BAM_is_from_scRNA_FASTQ){
+		assert(0==memcmp(sample_barcode, "input#", 6));
+		assert(isdigit(sample_barcode[6]));
+		sample_id = atoi(sample_barcode +6) +1;
+	}else{
+		assert(xx ==4 && (*lane_str)=='L');
+		for(testi = lane_str+1; *testi; testi++){
+			assert(isdigit(*testi));
+			laneno = laneno*10 + (*testi)-'0';
+		}
+
+		sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
 	}
-
-
-	int sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
 	int cell_id = scRNA_get_cell_id(global_context, thread_context, cell_barcode);
 	int umi_id = scRNA_register_umi_id( global_context, thread_context, umi_barcode);
 	//SUBREADprintf("Rname=%s, Lane=%d ==> sample %d  cell %d  UMI %d\n", read_name, laneno, sample_id , cell_id, umi_id);
@@ -5397,12 +5419,16 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	sprintf(fnamet, "del4-cC-tmp0-%s.del", samplename);
 	SamBam_Writer * wtr = calloc(sizeof(SamBam_Writer),1);
 	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, fnamet);
-	sprintf(fname, "%s_R1.fastq.gz", samplename);
-	gzFile gzipR1fq = gzopen(fname,"w1");
-	sprintf(fname, "%s_I1.fastq.gz", samplename);
-	gzFile gzipI1fq = gzopen(fname,"w1");
-	sprintf(fname, "%s_R2.fastq.gz", samplename);
-	gzFile gzipR2fq = gzopen(fname,"w1");
+	gzFile gzipR1fq=NULL, gzipI1fq=NULL, gzipR2fq=NULL;
+
+	if(global_context -> BAM_is_from_scRNA_FASTQ == 0){
+		sprintf(fname, "%s_R1.fastq.gz", samplename);
+		gzipR1fq = gzopen(fname,"w1");
+		sprintf(fname, "%s_I1.fastq.gz", samplename);
+		gzipI1fq = gzopen(fname,"w1");
+		sprintf(fname, "%s_R2.fastq.gz", samplename);
+		gzipR2fq = gzopen(fname,"w1");
+	}
 
 	pthread_spinlock_t * gzfp_lock = malloc(sizeof(pthread_spinlock_t));
 	pthread_spin_init(gzfp_lock, PTHREAD_PROCESS_PRIVATE);
@@ -5423,7 +5449,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list, int is_scRNA_BAM_FQ_out_generated) {
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list, int is_scRNA_BAM_FQ_out_generated, int BAM_is_from_scRNA_FASTQ) {
 	int x1;
 	myrand_srand(time(NULL));
 
@@ -5501,6 +5527,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 			//print_in_box(80,0,0,"Loaded %ld cell barcodes from the list.", global_context-> scRNA_cell_barcodes_array -> numOfElements);
 		}
 		global_context -> is_scRNA_BAM_FQ_out_generated = is_scRNA_BAM_FQ_out_generated;
+		global_context -> BAM_is_from_scRNA_FASTQ = BAM_is_from_scRNA_FASTQ;
 	}else{
 		global_context -> do_scRNA_table = 0;
 		global_context-> scRNA_cell_barcodes_array = NULL;
@@ -6962,7 +6989,7 @@ int readSummary(int argc,char *argv[]){
 	55: as.numeric(read_shift_size) : how many bases to shift. Mush be a positive number or zero.
 	 */
 
-	int isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, do_detectionCall, max_missing_bases_in_feature, max_missing_bases_in_read, is_Primary_Alignment_only, read_shift_size, read_shift_type;
+	int isCVersion, isChimericDisallowed, isPEDistChecked, minMappingQualityScore=0, isInputFileResortNeeded, feature_block_size = 20, reduce_5_3_ends_to_one, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, do_detectionCall, max_missing_bases_in_feature, max_missing_bases_in_read, is_Primary_Alignment_only, read_shift_size, read_shift_type, BAM_is_from_scRNA_FASTQ;
 	float fracOverlap, fracOverlapFeature;
 	char **chr;
 	srInt_64 *start, *stop;
@@ -7219,6 +7246,9 @@ int readSummary(int argc,char *argv[]){
 	if(argc>59 && strlen(argv[59])>0 && argv[59][0]!=' ') is_scRNA_BAM_FQ_out_generated = atoi(argv[59]);
 	else is_scRNA_BAM_FQ_out_generated = 1;
 
+	if(argc>60) BAM_is_from_scRNA_FASTQ = (argv[60][0]=='1');
+	else BAM_is_from_scRNA_FASTQ = 0;
+
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
 		return -1;
@@ -7250,7 +7280,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list, is_scRNA_BAM_FQ_out_generated);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list, is_scRNA_BAM_FQ_out_generated, BAM_is_from_scRNA_FASTQ);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -8228,6 +8258,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[57] = scRNA_cell_barcode_list;
 	Rargv[58] = is_paired_end_reads_expected;
 	Rargv[59] = is_scRNA_BAM_FQ_out_generated?"1":"0";
+	// Rargv[60] should be BAM_is_from_scRNA_FASTQ : 1 or 0
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");

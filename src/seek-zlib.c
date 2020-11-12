@@ -439,7 +439,6 @@ int seekgz_gets(seekable_zfile_t * fp, char * buff, int buff_len){
 	//if(fp -> blocks_in_chain<3)SUBREADprintf("GTS: %d BLK, %d AVI\n", fp -> blocks_in_chain, fp -> stem.avail_in);
 	int line_write_ptr = 0, is_end_line = 0;
 	if(fp->blocks_in_chain < 1 && seekgz_eof(fp)){
-		SUBREADprintf("EOF_GZ\n");
 		return 0;
 	}
 	while(1){
@@ -548,21 +547,15 @@ int seekgz_next_char(seekable_zfile_t * fp){ // MUST BE PROTECTED BY read_lock
 void seekgz_close(seekable_zfile_t * fp){
 	int ii;
 	fclose(fp -> gz_fp);
-	SUBREADprintf("FREE_ZBUF %p\n", fp -> in_zipped_buffer);
 	free(fp -> in_zipped_buffer);
-	SUBREADprintf("FREE_ZBUF_EQ %p\n", fp -> in_zipped_buffer);
 	for(ii = 0; ii < fp -> blocks_in_chain ; ii++){
 		int iv = ii + fp -> block_chain_current_no;
 		if(iv >=SEEKGZ_CHAIN_BLOCKS_NO) iv-=SEEKGZ_CHAIN_BLOCKS_NO;
-		SUBREADprintf("FREE_BROLLCHAIN %d %p\n", iv, fp -> block_rolling_chain[iv].block_txt);
 		free(fp -> block_rolling_chain[iv].block_txt);
-		SUBREADprintf("FREE_LINEBKR %d %p\n", iv, fp -> block_rolling_chain[iv].linebreak_positions);
 		free(fp -> block_rolling_chain[iv].linebreak_positions);
-		SUBREADprintf("FREE_LINEBKR_EQ %d %p\n", iv, fp -> block_rolling_chain[iv].linebreak_positions);
 	}
 
 	inflateEnd(&fp -> stem);
-	SUBREADprintf("FREE_inflateEnd_ED\n");
 	subread_destroy_lock(&fp -> write_lock);
 }
 

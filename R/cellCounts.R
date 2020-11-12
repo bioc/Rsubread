@@ -13,7 +13,14 @@
   rv
 }
 
-.index.names.to.sheet<-function(dirname, nametab, fname, sample.name=NA){
+.index.names.to.sheet.FASTQ.mode<-function(fqtab, fname){
+  lines <- paste(fqtab$File.BC.UMIs, fqtab$File.Genomic, fqtab$SampleName , sep=",")
+  fileConn<-file(fname)
+  writeLines(c("EMFileVersion,4","[data]","File.BC.UMIs,File.Genomic,Sample_Name",lines), fileConn)
+  close(fileConn)
+}
+
+.index.names.to.sheet.raw.dir.mode<-function(dirname, nametab, fname, sample.name=NA){
   lanes <- c()
   index.names <- c()
   sample.names <- c()
@@ -513,7 +520,11 @@
         sample.good.rate <- barcode_res[2]/barcode_res[1]
         cell.good.rate <- barcode_res[3]/barcode_res[1]
         max.cell.good <- max(max.cell.good, cell.good.rate)
-        cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
+        if(input.mode == "fastq"){
+          cat(sprintf("Cell supporting rate : %.1f%%.\n", cell.good.rate*100.))
+        }else{
+          cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
+        }
         if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
         if(cell.good.rate > 0.6){
             cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
@@ -849,7 +860,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
   
       sample.1 <- paste0(temp.file.prefix,".samplesheet")
       if(is.null(cell.barcode)){
-        .index.names.to.sheet(dirname, sample.index, sample.1)
+        .index.names.to.sheet.raw.dir.mode(dirname, sample.index, sample.1)
         cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
       }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
@@ -860,7 +871,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         generate.scRNA.BAM <- FALSE 
         if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
         for(samplename in unique.samples){
-          .index.names.to.sheet(dirname, sample.index, sample.1, samplename)
+          .index.names.to.sheet.raw.dir.mode(dirname, sample.index, sample.1, samplename)
           one.bam.name <- paste0(samplename, ".bam")
           .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
           one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, ...)
@@ -873,7 +884,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
           df.sample.info <- rbind(df.sample.info, stt)
         }
       }else{
-        .index.names.to.sheet(dirname, sample.index, sample.1)
+        .index.names.to.sheet.raw.dir.mode(dirname, sample.index, sample.1)
         generate.scRNA.BAM <- TRUE
         .write.tmp.parameters(list(isBCLinput=TRUE))
         if(aligner=="align"){
@@ -896,7 +907,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     }
   } else  {
     if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
-
+    generate.scRNA.BAM <- TRUE
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.index)){
       R1.file.name <- .check_and_NormPath(sample.index[rowi,"File.BC.UMIs"], mustWork=TRUE, "The barcode FASTQ file in sample.index")
@@ -913,6 +924,15 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
 
     .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
     align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
+
+    sample.1 <- paste0(temp.file.prefix,".samplesheet")
+    .index.names.to.sheet.FASTQ.mode(sample.index, sample.1)
+    .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+
+    raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+    for(rowi in 1:nrow(sample.index)){
+      # do the output files for each sample in the combined fastq files
+    }
   }
 
   fc[["annotation"]] <- raw.fc.annot

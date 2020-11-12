@@ -391,6 +391,7 @@ int geinput_open_scRNA_fqs(char * rfnames,  gene_input_t * input, int reads_per_
 	strcpy(input->filename,rfnames);
 	int rv = input_mFQ_init_by_one_string(&input -> scRNA_fq_input, rfnames);
 	input -> file_type = GENE_INPUT_SCRNA_FASTQ;
+	input -> space_type = GENE_SPACE_BASE;
 	return rv;
 }
 
