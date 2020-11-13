@@ -879,7 +879,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
           one.bam.name <- paste0(samplename, ".bam")
           .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
           one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, ...)
-          if(is.na(raw.fc.annot)) raw.fc.annot<- one.raw.fc$annotation
+          if(any(is.na(raw.fc.annot))) raw.fc.annot<- one.raw.fc$annotation
           cat("Processing sample '",samplename,"'\n")
           one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
           fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
@@ -898,7 +898,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         }
         .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
         raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
-        if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
+        if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
@@ -942,7 +942,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
 
     raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
     for(rowi in 1:nrow(sample.index)){
-      if(is.na(raw.fc.annot)) raw.fc.annot<-raw.fc$annotation
+      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]

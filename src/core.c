@@ -399,9 +399,9 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 0,1,"  ");
 
 	#ifdef __MINGW32__
-    if(global_context->input_reads.is_paired_end_reads)
+	if(global_context->input_reads.is_paired_end_reads)
 		print_in_box(80, 0,0,"            Total fragments : %I64d" , global_context -> all_processed_reads);
-    else
+	else
 		print_in_box(80, 0,0,"                Total reads : %I64d" , global_context -> all_processed_reads);
 
 	print_in_box(81, 0,0,"                     Mapped : %u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
@@ -431,9 +431,9 @@ int show_summary(global_context_t * global_context)
 	        print_in_box(80, 0,0,"                     Indels : %u", global_context -> all_indels);
 	}
 	#else
-    if(global_context->input_reads.is_paired_end_reads)
+	if(global_context->input_reads.is_paired_end_reads)
 		print_in_box(80, 0,0,"            Total fragments : %'llu" , global_context -> all_processed_reads);
-    else
+	else
 		print_in_box(80, 0,0,"                Total reads : %'llu" , global_context -> all_processed_reads);
 
 	print_in_box(81, 0,0,"                     Mapped : %'u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
@@ -1870,14 +1870,14 @@ int for_one_threads = 0;
 
 
 void add_buffered_fragment(global_context_t * global_context, thread_context_t * thread_context, subread_read_number_t pair_number ,
-    char * read_name1, unsigned int flags1, char * chro_name1, unsigned int chro_position1, int mapping_quality1, char * cigar1,
-    char * next_chro_name1, unsigned int next_chro_pos1, int temp_len1, int read_len1,
-    char * read_text1, char * qual_text1, char * additional_columns1,
-    char * read_name2, unsigned int flags2, char * chro_name2, unsigned int chro_position2, int mapping_quality2, char * cigar2,
-    char * next_chro_name2, unsigned int next_chro_pos2, int temp_len2, int read_len2,
-    char * read_text2, char * qual_text2, char * additional_columns2,
-    int all_locations, int this_location
-    ){
+	char * read_name1, unsigned int flags1, char * chro_name1, unsigned int chro_position1, int mapping_quality1, char * cigar1,
+	char * next_chro_name1, unsigned int next_chro_pos1, int temp_len1, int read_len1,
+	char * read_text1, char * qual_text1, char * additional_columns1,
+	char * read_name2, unsigned int flags2, char * chro_name2, unsigned int chro_position2, int mapping_quality2, char * cigar2,
+	char * next_chro_name2, unsigned int next_chro_pos2, int temp_len2, int read_len2,
+	char * read_text2, char * qual_text2, char * additional_columns2,
+	int all_locations, int this_location
+	){
 
 	assert(global_context -> config.all_threads > 1);
 
@@ -3384,13 +3384,13 @@ void subread_init_topKbuff(global_context_t * global_context, topK_buffer_t * to
 
 void subread_free_topKbuff(global_context_t * global_context, topK_buffer_t * topKbuff){
 	
-    free(topKbuff ->junction_tmp_r1);
-    free(topKbuff ->junction_tmp_r2);
-    free(topKbuff ->alignment_tmp_r1);
-    free(topKbuff ->alignment_tmp_r2);
-    free(topKbuff ->comb_buffer);
-    free(topKbuff ->vote_simple_1_buffer);
-    free(topKbuff ->vote_simple_2_buffer);
+	free(topKbuff ->junction_tmp_r1);
+	free(topKbuff ->junction_tmp_r2);
+	free(topKbuff ->alignment_tmp_r1);
+	free(topKbuff ->alignment_tmp_r2);
+	free(topKbuff ->comb_buffer);
+	free(topKbuff ->vote_simple_1_buffer);
+	free(topKbuff ->vote_simple_2_buffer);
 }
 
 
@@ -3760,22 +3760,31 @@ int print_configuration(global_context_t * context)
 
 	if(context->config.do_breakpoint_detection)
 	{
-        if(context-> config.do_fusion_detection)
+	    if(context-> config.do_fusion_detection)
 			print_in_box(80, 0, 0, "Function      : Read alignment + Junction/Fusion detection%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
-        else if(context-> config.do_long_del_detection)
+	    else if(context-> config.do_long_del_detection)
 			print_in_box(80, 0, 0, "Function      : Read alignment + Long Deletion detection%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
 		else
 			print_in_box(80, 0, 0, "Function      : Read alignment + Junction detection (%s)", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?"DNA-Seq":"RNA-Seq");
 	}
 	else
 	        print_in_box(80, 0, 0, "Function      : Read alignment%s", context->config.experiment_type == CORE_EXPERIMENT_DNASEQ?" (DNA-Seq)":" (RNA-Seq)");
-	if( context->config.second_read_file[0])
-	{
+	if( context->config.second_read_file[0]){
 	        print_in_box(80, 0, 0, "Input file 1  : %s", get_short_fname(context->config.first_read_file));
 	        print_in_box(80, 0, 0, "Input file 2  : %s", get_short_fname(context->config.second_read_file));
+	}else if(context->config.scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ){
+			const char *strmm_tmp = context->config.first_read_file;
+			int sample_no = 1;
+			while((strmm_tmp = strstr(strmm_tmp, SCRNA_FASTA_SPLIT1))!=NULL) {
+				sample_no++;
+				strmm_tmp++;
+			}
+	        print_in_box(80, 0, 0, "Input file    : %d samples from scRNA-seq", sample_no);
+	}else if(context->config.scRNA_input_mode == GENE_INPUT_BCL){
+	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), " (scRNA)");
+	}else{
+	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):(""));
 	}
-	else
-	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):(context->config.scRNA_input_mode?" (SC)":""));
 
 	if(context->config.output_prefix [0])
 	        print_in_box(80, 0, 0, "Output file   : %s (%s)%s", get_short_fname(context->config.output_prefix), context->config.is_BAM_output?"BAM":"SAM", context->config.is_input_read_order_required?", Keep Order":(context->config.sort_reads_by_coordinates?", Sorted":""));
