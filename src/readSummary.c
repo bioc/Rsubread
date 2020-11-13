@@ -3694,14 +3694,14 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 				void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
 				if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
 				sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
+				pthread_spin_lock(sample_bam_2fps[4]);
 				sample_bam_2fps[5]=sample_bam_2fps[5]+1;
 
 				if(0 == global_context -> BAM_is_from_scRNA_FASTQ){
-					pthread_spin_lock(sample_bam_2fps[4]);
 					gzFile * gz3fps = (gzFile *)sample_bam_2fps+1;
 					SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
-					pthread_spin_unlock(sample_bam_2fps[4]);
 				}
+				pthread_spin_unlock(sample_bam_2fps[4]);
 				SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin, 1);
 			}
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;

@@ -926,7 +926,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     }
 
     bam.for.FC <- c()
-    if(is.na(aligner)){
+    if(is.null(aligner)){
       bam.for.FC <- paste0(sample.index$SampleName,".bam")
       generate.scRNA.BAM <- FALSE
     }else{
@@ -940,7 +940,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
     .index.names.to.sheet.FASTQ.mode(sample.index, sample.1)
     .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
 
-    raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+    raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
     for(rowi in 1:nrow(sample.index)){
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
