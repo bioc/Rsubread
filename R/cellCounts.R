@@ -807,8 +807,9 @@ library(Matrix)
 
 .del.temp.files  <- function(pfx){
   if(nchar(pfx)<16) stop("Prefix should be longer.")
-  flist <- dir(".")
-  to.delete <- flist[substr(flist,1,nchar(pfx)) == pfx]
+  flist <- dir(".", "^[.]Rsubread", all.files=TRUE)
+  to.delete <- flist[grepl(pfx, flist)]
+  cat(paste(flist,";"),"Delete temporary files :", paste(to.delete, collapse=","),"\nthat have a prefix of",pfx,"\n")
   for(df in to.delete){
     if(grepl(pfx, df)){
       file.remove(df)
@@ -846,7 +847,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   fc <- list()
 
-  temp.file.prefix <- file.path(".",paste(".Rsubread_TEMP_cellCounts_",Sys.getpid(),sep=""))
+  temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame()
   sample.index$SampleName <- as.character(sample.index$SampleName)
@@ -956,6 +957,6 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
 
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
-  .del.temp.files(temp.file.prefix)
+  .del.temp.files(substr(temp.file.prefix,4,99))
   fc
 }
