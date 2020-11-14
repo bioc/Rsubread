@@ -772,7 +772,7 @@ library(Matrix)
   if(use.meta.features){
     if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
     ncolRescued <- 0
-    if(is.na(rescued)){
+    if(any(is.na(rescued))){
       ret <- matrix(0,ncol=ncol(highconf), nrow=length(FC.gene.ids))
       colnames(ret) <- colnames(highconf)
     }else{
