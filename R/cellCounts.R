@@ -14,9 +14,9 @@
 }
 
 .index.names.to.sheet.FASTQ.mode<-function(fqtab, fname){
-  lines <- paste(fqtab$File.BC.UMIs, fqtab$File.Genomic, fqtab$SampleName , sep=",")
+  lines <- paste(fqtab$BarcodeUMIFile, fqtab$ReadFile, fqtab$SampleName , sep=",")
   fileConn<-file(fname)
-  writeLines(c("EMFileVersion,4","[data]","File.BC.UMIs,File.Genomic,Sample_Name",lines), fileConn)
+  writeLines(c("EMFileVersion,4","[data]","BarcodeUMIFile,ReadFile,Sample_Name",lines), fileConn)
   close(fileConn)
 }
 
@@ -833,7 +833,7 @@ library(Matrix)
     umis <- c(umis,sum(smr[[sampleno]][["Counts"]]))
   }
   if(is.na(rdir)){
-    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, File.BC.UMIs=rep(fastq1, nrow(smr[["Sample.Table"]])), File.Genomic=rep(fastq2, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
+    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, BarcodeUMIFile=rep(fastq1, nrow(smr[["Sample.Table"]])), ReadFile=rep(fastq2, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
   }else{
     return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
   }
@@ -911,11 +911,11 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
       }
     }
   } else  {
-    if(!("File.BC.UMIs" %in%  colnames(sample.index) && "File.Genomic" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
+    if(!("BarcodeUMIFile" %in%  colnames(sample.index) && "ReadFile" %in%  colnames(sample.index) )) stop("You need to provide BC+UMI and Genomic sequence files")
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.index)){
-      R1.file.name <- .check_and_NormPath(sample.index[rowi,"File.BC.UMIs"], mustWork=TRUE, "The barcode FASTQ file in sample.index")
-      R2.file.name <- .check_and_NormPath(sample.index[rowi,"File.Genomic"], mustWork=TRUE, "The genomic read FASTQ file in sample.index")
+      R1.file.name <- .check_and_NormPath(sample.index[rowi,"BarcodeUMIFile"], mustWork=TRUE, "The barcode FASTQ file in sample.index")
+      R2.file.name <- .check_and_NormPath(sample.index[rowi,"ReadFile"], mustWork=TRUE, "The genomic read FASTQ file in sample.index")
       combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
     }
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
@@ -950,7 +950,7 @@ cellCounts <- function(index, sample.index,input.mode="BCL", cell.barcode=NULL, 
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
-      stt <- .extract.sample.table.cols(NA,some.results,sample.index$File.BC.UMIs[rowi], sample.index$File.Genomic[rowi])
+      stt <- .extract.sample.table.cols(NA,some.results,sample.index$BarcodeUMIFile[rowi], sample.index$ReadFile[rowi])
       df.sample.info <- rbind(df.sample.info, stt)
     }
   }
