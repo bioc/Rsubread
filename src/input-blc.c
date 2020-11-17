@@ -675,7 +675,7 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 	FILE * fp = fopen(fname, "rb");
 	if(fp==NULL) return NULL;
 	char linebuf[MAX_FILE_NAME_LENGTH];
-	int state = -1, file_format=-1;
+	int state = -1, file_format=-1, stat1_line = 0;
 	while(!feof(fp)){
 		char * gret = fgets(linebuf, MAX_FILE_NAME_LENGTH-1, fp);
 		if(gret == NULL) break;
@@ -687,15 +687,18 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 		if(state < 0 && strstr(linebuf,"EMFileVersion,4")) state = 0;
 		if(state == 1 && linebuf[0]=='[') state = 99999;
 		if(state == 1){
-			if(memcmp( linebuf, "Lane", 4 )==0){
-				file_format = SHEET_FORMAT_RAWDIR_INPUT;
-				continue;
-			}
+			if(0==stat1_line){
+				if(strstr( linebuf, "Lane")){
+					file_format = SHEET_FORMAT_RAWDIR_INPUT;
+					continue;
+				}
 
-			if(memcmp( linebuf, "File.BC", 7 )==0){
-				file_format = SHEET_FORMAT_FASTQ_INPUT;
-				continue;
+				if(strstr( linebuf, "BarcodeUMIFile")){
+					file_format = SHEET_FORMAT_FASTQ_INPUT;
+					continue;
+				}
 			}
+			if(strlen(linebuf)>10)stat1_line ++;
 
 			char * tokp=NULL;
 			int lane_no = 1;
@@ -726,7 +729,10 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 			}
 			ArrayListPush(arr,entry);
 		}
-		if(state == 0 && strstr(linebuf,"ata]"))state = 1;
+		if(state == 0 && strstr(linebuf,"ata]")){
+			state = 1;
+			stat1_line = 0;
+		}
 	}
 	if(state <1){
 		SUBREADprintf("ERROR: the sample sheet doesn't contain any sample.\n");

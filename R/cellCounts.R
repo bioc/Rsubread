@@ -839,6 +839,22 @@ library(Matrix)
   }
 }
 
+.scan.fastq.dir <- function(dirname){
+  ddf <- list.files(dirname , recursive=TRUE)
+  ddf <- ddf[grepl("L[0-9][0-9][1-9]_R1_[0-9][0-9][1-9].fastq.gz$",ddf) &(!grepl("Undetermined_S",ddf)) &!grepl("/fork0/", ddf)]
+  sample.sheet <- data.frame()
+  for(df1 in sort(ddf)){
+    r1_part <- substr(df1, nchar(df1)-13, 9999)
+    r1_pref <- substr(df1, 1, nchar(df1)-16)
+    df2 <- paste0(r1_pref, "R2", r1_part)
+    sample.name <- unlist(strsplit(df2, "\\/"))
+    sample.name <- sample.name[length(sample.name)]
+    sample.name <- substr(sample.name, 1, nchar(sample.name)-24)
+    sample.sheet <- rbind(sample.sheet, data.frame( SampleName=sample.name, BarcodeUMIFile=df1, ReadFile=df2))
+  }
+  sample.sheet
+}
+
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
