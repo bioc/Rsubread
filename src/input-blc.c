@@ -10,6 +10,7 @@
 #include "gene-algorithms.h"
 #include "input-files.h"
 #include "input-blc.h"
+#include "sambam-file.h"
 
 #ifdef __MINGW32__
 #define SR_PATH_SPLIT_STR "\\"
@@ -1137,6 +1138,11 @@ int main(int argc, char ** argv){
 }
 #endif
 
+void input_scBAM_init(input_scBAM_t * bam_input, char * bam_fname){
+}
+
+void input_scBAM_close(input_scBAM_t * bam_input){
+}
 
 void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 	if(fqs_input -> autofp1.filename[0]){
@@ -1231,9 +1237,8 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		#endif
 		readname[12]='|';
 		ret = autozip_gets(&fqs_input -> autofp1, readname+13, MAX_READ_NAME_LEN);
-		ret --;
-		readname[12+ret]='|';
-		write_ptr = 13+ret;
+		readname[13+ret-1]='|';
+		write_ptr = 13+ret-1;
 
 		autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 

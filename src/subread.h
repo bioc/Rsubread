@@ -515,6 +515,16 @@ typedef struct {
 	autozip_fp autofp3;
 } input_mFQ_t;
 
+typedef struct{
+	srInt_64 section_start_pos;
+	int in_section_offset;
+	srInt_64 current_read_no;
+} input_scBAM_pos_t;
+
+typedef struct {
+	srInt_64 current_read_no;
+} input_scBAM_t;
+
 typedef struct {
 	int read_no_in_chunk;
 	int reads_available_in_chunk; // -1 : EOF of all input reads : no next chunk available.
