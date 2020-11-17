@@ -1,0 +1,6 @@
+18 Nov 2020 - 2.4.2
+(1) Amended the author information in the document of the simReads() function.
+
+11 Nov 2020 - 2.4.1
+(1) Fixed the bug in the align() and subjunc() in generating coordinate-sorted BAM files in Windows.
+

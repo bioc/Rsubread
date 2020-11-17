@@ -1138,10 +1138,132 @@ int main(int argc, char ** argv){
 }
 #endif
 
-void input_scBAM_init(input_scBAM_t * bam_input, char * bam_fname){
+void scBAM_tell(input_scBAM_t * bam_input, input_scBAM_pos_t * pos){
+	pos -> section_start_pos = bam_input -> section_start_pos;
+	pos -> current_read_no = bam_input -> current_read_no;
+	pos -> in_section_offset = bam_input -> in_section_offset;
+}
+
+int scBAM_rebuffer(input_scBAM_t * bam_input){
+	int bin_len=0;
+	while(1){
+		if(feof(bam_input -> os_file))return -1;
+		char zipped_bam_buf[66000];
+		bam_input -> section_start_pos = ftello(bam_input -> os_file);
+		int ziplen = PBam_get_next_zchunk(bam_input -> os_file, zipped_bam_buf, 66000, &bin_len);
+		if(ziplen<1) return -1;
+		bin_len = SamBam_unzip(bam_input -> section_buff, zipped_bam_buf, ziplen);
+		if(bin_len>0){
+			bam_input -> section_bin_bytes = bin_len;
+			bam_input -> in_section_offset = 0;
+			break;
+		}else if(bin_len<0) return -1;
+	}
+	return bin_len;
+}
+
+// negative : EOF
+int scBAM_next_char(input_scBAM_t * bam_input){
+	if(bam_input -> in_section_offset == bam_input -> section_bin_bytes)
+		if(0>scBAM_rebuffer(bam_input))return -1;
+	
+	int ret = bam_input -> section_buff[bam_input -> in_section_offset++];
+	if(ret<0)ret+=256;
+	return ret;
+}
+
+
+void scBAM_seek(input_scBAM_t * bam_input, input_scBAM_pos_t * pos){
+	bam_input -> section_start_pos = pos -> section_start_pos;
+	fseeko(bam_input -> os_file, bam_input -> section_start_pos, SEEK_SET);
+	scBAM_rebuffer(bam_input);
+	bam_input -> current_read_no = pos -> current_read_no;
+	bam_input -> in_section_offset = pos -> in_section_offset;
+}
+
+int scBAM_next_int(input_scBAM_t * bam_input, int *ret){
+	*ret = 0;
+	int xk1;
+	for(xk1=0;xk1<4;xk1++){
+		int nbyte = scBAM_next_char(bam_input);
+		if(nbyte<0) return -1;
+		(*ret) += nbyte <<(8*xk1);
+	}
+	return 0;
+}
+
+int scBAM_next_string(input_scBAM_t * bam_input, char * strbuff, int lenstr){
+	int x1=0;
+	while(lenstr--){
+		int nbyte = scBAM_next_char(bam_input);
+		if(nbyte<0) return -1;
+		strbuff[x1++]=nbyte;
+	}
+	return x1;
+}
+
+
+// binbuf >= FC_LONG_READ_RECORD_HARDLIMIT 
+// the alignment block with binlen will be written into binbuf.
+// negative : EOF
+int scBAM_next_alignment_bin(input_scBAM_t * bam_input, char * binbuf){
+	int reclen = 0 , x1 = 0;
+	int ret = scBAM_next_int(bam_input, &reclen);
+	if(ret<0)return -1;
+	if(reclen < 36 || reclen > FC_LONG_READ_RECORD_HARDLIMIT -4)return -1;
+	memcpy(binbuf, &reclen, 4);
+	return scBAM_next_string(bam_input, binbuf +4, reclen);
+}
+
+int scBAM_next_read(input_scBAM_t * bam_input, char * read_name, char * seq, char * qual){
+	int ret = scBAM_next_alignment_bin(bam_input, bam_input -> align_buff);
+	if(ret<0)return -1;
+	int binlen=0, l_read_name = 0, flag=0, n_cigar_op=0, l_seq=0, x1;
+	memcpy(&binlen, bam_input -> align_buff, 4);
+	memcpy(&l_read_name, bam_input -> align_buff+12,1);
+	memcpy(&n_cigar_op, bam_input -> align_buff+16,2);
+	memcpy(&flag, bam_input -> align_buff+18,2);
+	memcpy(&l_seq, bam_input -> align_buff+20,4);
+	strcpy(read_name, bam_input -> align_buff+36);
+	char * seq_start = bam_input -> align_buff+36+l_read_name+4*n_cigar_op;
+	for(x1=0;x1<l_seq;x1++)
+		seq[x1]="=ACMGRSVTWYHKDBN"[(seq_start[x1/2] >> ( 4*!(x1%2) ) ) & 15];
+
+	char * qual_start = seq_start + (l_seq+1)/2;
+	memcpy(qual, qual_start, l_seq);
+	for(x1=0;x1<l_seq;x1++) qual[x1]+=33;
+	if(flag & 16){
+		reverse_quality(qual, l_seq);
+		reverse_read(seq, l_seq, GENE_SPACE_BASE);
+	}
+	qual[l_seq] = 0;
+	return l_seq;
+}
+
+int input_scBAM_init(input_scBAM_t * bam_input, char * bam_fname){
+	memset(bam_input, 0, sizeof(input_scBAM_t));
+	bam_input -> os_file = f_subr_open(bam_fname, "rb");
+	if(!bam_input -> os_file)return -1;
+	int ret = 0, tmpi = 0, nref=0, x1;
+	ret = scBAM_next_int(bam_input, &tmpi);
+	SUBREADprintf("OPEN '%s' : %08x marker of %d\n", bam_fname, tmpi, ret);
+	if(ret < 0 || tmpi != 0x014d4142)return -1; // 0x014d4142 = 'BAM\1' little-endian
+	scBAM_next_int(bam_input, &tmpi); // header txt length
+	while(tmpi--) scBAM_next_char(bam_input); // skip header txt
+	scBAM_next_int(bam_input, &nref); // n_ref
+	bam_input -> chro_table = calloc(sizeof(SamBam_Reference_Info), nref);
+	SUBREADprintf("OPEN '%s' : %d refs\n", bam_fname, nref);
+	for(x1=0;x1<nref;x1++){
+		scBAM_next_int(bam_input, &tmpi); // l_name
+		scBAM_next_string(bam_input, bam_input -> chro_table [x1].chro_name, tmpi);
+		ret = scBAM_next_int(bam_input, &bam_input -> chro_table [x1].chro_length);
+		if(ret < 0) return -1;
+	}
+	return 0;
 }
 
 void input_scBAM_close(input_scBAM_t * bam_input){
+	fclose(bam_input -> os_file);
 }
 
 void input_mFQ_fp_close(input_mFQ_t * fqs_input){
@@ -1238,7 +1360,7 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		readname[12]='|';
 		ret = autozip_gets(&fqs_input -> autofp1, readname+13, MAX_READ_NAME_LEN);
 		readname[13+ret-1]='|';
-		write_ptr = 13+ret-1;
+		write_ptr = 13+ret;
 
 		autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 

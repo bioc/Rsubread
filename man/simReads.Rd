@@ -93,7 +93,7 @@ scanFasta(
 %Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.
 %\emph{Nucleic Acids Research}, 41(10):e108, 2013.
 %}
-\author{Wei Shi and Yang Liao}
+\author{Yang Liao, Gordon K Smyth and Wei Shi}
 \examples{
 \dontrun{
 # Scan through the fasta file to get transcript names and lengths

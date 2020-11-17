@@ -1103,6 +1103,8 @@ int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int 
 			rv = geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
 		else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ)
 			rv = geinput_open_scRNA_fqs(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
+		else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_BAM)
+			rv = geinput_open_scRNA_BAM(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
 		else
 			rv = geinput_open(fname, fp);
 
@@ -3541,6 +3543,7 @@ void locate_read_files(global_context_t * global_context, int type)
 			geinput_tell(&global_context -> input_reads.second_read_file, &global_context -> current_circle_end_position_file2);
 	}
 	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_SCRNA_FASTQ) return;
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_SCRNA_BAM) return;
 
 	// This variable is only used to display the running progress.
 	// That is why the scRNA-seq mode doesn't need to keep the start pos.
@@ -3782,6 +3785,8 @@ int print_configuration(global_context_t * context)
 	        print_in_box(80, 0, 0, "Input file    : %d samples from scRNA-seq", sample_no);
 	}else if(context->config.scRNA_input_mode == GENE_INPUT_BCL){
 	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), " (scRNA)");
+	}else if(context->config.scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
+	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), " (10X BAM)");
 	}else{
 	        print_in_box(80, 0, 0, "Input file    : %s%s", get_short_fname(context->config.first_read_file), context->config.is_SAM_file_input?(context->config.is_BAM_input?" (BAM)":" (SAM)"):(""));
 	}
@@ -4072,7 +4077,7 @@ int load_global_context(global_context_t * context)
 	print_in_box(80,0,0,"Check the input reads.");
 	subread_init_lock(&context->input_reads.input_lock);
 	if(core_geinput_open(context, &context->input_reads.first_read_file, 1)) {
-	//	sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open '%s' as input. Please check if it exists, you have the permission to read it, and it is in the correct format.\n", context->config.first_read_file);
+		sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_ERROR,"Unable to open the input file '%s'\n", context->config.first_read_file);
 		return -1;
 	}
 
@@ -4126,7 +4131,8 @@ int load_global_context(global_context_t * context)
 	context->input_reads.first_read_file_size = ginp1_stat.st_size;
 
 	print_in_box(80,0,0,"Estimate the mean read length.");
-	context -> input_reads.avg_read_length = guess_reads_density_format(context->config.first_read_file , context->config.is_SAM_file_input?1:0, &min_phred_score, &max_phred_score , &guess_tested_reads);
+	context -> input_reads.avg_read_length = 100;
+	if(context->config.scRNA_input_mode != GENE_INPUT_SCRNA_BAM && context->config.scRNA_input_mode != GENE_INPUT_SCRNA_FASTQ) context -> input_reads.avg_read_length = guess_reads_density_format(context->config.first_read_file , context->config.is_SAM_file_input?1:0, &min_phred_score, &max_phred_score , &guess_tested_reads);
 	if(context -> input_reads.avg_read_length<0 )context -> input_reads.avg_read_length = 250;
 //	SUBREADprintf("QR=[%d,%d]; ALEN=%f\n",  min_phred_score, max_phred_score, context -> input_reads.avg_read_length);
 	if(max_phred_score>=0)

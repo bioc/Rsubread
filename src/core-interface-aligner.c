@@ -50,6 +50,7 @@ static struct option long_options[] =
 	{"reportPairedMultiBest",  no_argument, 0, 0},
 	{"BCLinput", no_argument, 0, 0},
 	{"scRNA_FQinput", no_argument, 0, 0},
+	{"scRNA_BAMinput", no_argument, 0, 0},
 	{"sv", no_argument, 0, 0},
 	{"longDel", no_argument, 0, 0},
 	{"exonAnnotationScreenOut", required_argument, 0, 0},
@@ -505,6 +506,10 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				else if(strcmp("scRNA_FQinput", long_options[option_index].name)==0) 
 				{
 					global_context->config.scRNA_input_mode=GENE_INPUT_SCRNA_FASTQ;
+				}
+				else if(strcmp("scRNA_BAMinput", long_options[option_index].name)==0) 
+				{
+					global_context->config.scRNA_input_mode=GENE_INPUT_SCRNA_BAM;
 				}
 				else if(strcmp("rg-id", long_options[option_index].name)==0) 
 				{

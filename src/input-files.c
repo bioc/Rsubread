@@ -378,13 +378,21 @@ char *strtokmm(char *str, const char *delim, char ** next) {
     m = strstr(tok, delim);
 
     if (m) {
-        (*next) = m + strlen(delim);
-        *m = '\0';
+	(*next) = m + strlen(delim);
+	*m = '\0';
     } else {
-        (*next) = NULL;
+	(*next) = NULL;
     }
 
     return tok;
+}
+
+int geinput_open_scRNA_BAM(char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
+	strcpy(input->filename,rfnames);
+	int rv = input_scBAM_init(&input -> scBAM_input, rfnames);
+	input -> file_type = GENE_INPUT_SCRNA_BAM;
+	input -> space_type = GENE_SPACE_BASE;
+	return rv;
 }
 
 int geinput_open_scRNA_fqs(char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
@@ -673,7 +681,9 @@ unsigned int read_numbers(gene_input_t * input)
 }
 
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+	if(input -> file_type == GENE_INPUT_SCRNA_BAM){
+		scBAM_tell(&input -> scBAM_input, &pos -> scBAM_position);
+	}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
 		input_mFQ_tell(&input -> scRNA_fq_input, &pos -> mFQ_position);
 	}else if(input -> file_type == GENE_INPUT_BCL){
 		assert(input -> file_type != GENE_INPUT_BCL);
@@ -687,7 +697,9 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
 }
 
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+	if(input -> file_type == GENE_INPUT_SCRNA_BAM){
+		scBAM_seek(&input -> scBAM_input, &pos -> scBAM_position);
+	}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
 		input_mFQ_seek(&input -> scRNA_fq_input, &pos -> mFQ_position);
 	}else if(input -> file_type == GENE_INPUT_BCL){
 		assert(input -> file_type != GENE_INPUT_BCL);
@@ -767,6 +779,11 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 		return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
 		int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
+		if(rv<=0) return -1;
+		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
+		return rv;
+	} else if(input -> file_type == GENE_INPUT_SCRNA_BAM) {
+		int rv = scBAM_next_read(&input -> scBAM_input, read_name, read_string, quality_string);
 		if(rv<=0) return -1;
 		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
@@ -1060,7 +1077,9 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
 
 void geinput_close(gene_input_t * input)
 {
-	if(input -> file_type == GENE_INPUT_SCRNA_FASTQ)
+	if(input -> file_type == GENE_INPUT_SCRNA_BAM)
+		input_scBAM_close(&input -> scBAM_input);
+	else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ)
 		input_mFQ_close(&input -> scRNA_fq_input);
 	else if(input -> file_type == GENE_INPUT_BCL)
 		cacheBCL_close(&input -> bcl_input);
@@ -2307,7 +2326,7 @@ void delete_with_prefix(char * prefix){
 		//SUBREADprintf("SCANDEL: %s, PREFIX %s, SUFFIX %s\n", del2, prefix, del_suffix);
 		if(strlen(del_suffix)>8)
 		{
-			DIR           *d;
+			DIR	   *d;
 			struct dirent *dir;
 
 			d = opendir(del2);
@@ -4995,7 +5014,7 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 				if(0 && x1 == 32 && block_size > 60000 ){
 					print_in_box(80,0,0,"");
 					print_in_box(80,0,0,"   ERROR: Alignment record is too long.");
-					print_in_box(80,0,0,"          Please use the long read mode.");
+					print_in_box(80,0,0,"	  Please use the long read mode.");
 					return -1;
 				}
 
@@ -6324,8 +6343,8 @@ int warning_file_type(char * fname, int expected_type)
 	if(ret_pipe_file)
 	{
 		print_in_box(80,0,0,"WARNING file '%s' is not a regular file.", fname);
-		print_in_box(80,0,0,"        No alignment can be done on a pipe file.");
-		print_in_box(80,0,0,"        If the FASTQ file is gzipped, please use gzFASTQinput option.");
+		print_in_box(80,0,0,"	No alignment can be done on a pipe file.");
+		print_in_box(80,0,0,"	If the FASTQ file is gzipped, please use gzFASTQinput option.");
 		print_in_box(80,0,0,"");
 		return 1;
 	}
@@ -6359,11 +6378,11 @@ int warning_file_type(char * fname, int expected_type)
 		else if(read_type==FILE_TYPE_GZIP_FASTA) real_fmt = "gzip FASTA";
 
 		print_in_box(80,0,0,"WARNING format issue in file '%s':", fname);
-		print_in_box(80,0,0,"        The required format is : %s", req_fmt); 
+		print_in_box(80,0,0,"	The required format is : %s", req_fmt); 
 		if(read_type == FILE_TYPE_UNKNOWN)
-			print_in_box(80,0,0,"        The file format is unknown.");
+			print_in_box(80,0,0,"	The file format is unknown.");
 		else
-			print_in_box(80,0,0,"        The real format seems to be : %s", real_fmt);
+			print_in_box(80,0,0,"	The real format seems to be : %s", real_fmt);
 		print_in_box(80,0,0,"A wrong format may result in wrong results or crash the program.");
 		print_in_box(80,0,0,"Please refer to the manual for file format options.");
 		print_in_box(80,0,0,"If the file is in the correct format, please ignore this message.");

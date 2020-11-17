@@ -14,6 +14,12 @@ int input_BLC_tell ( input_BLC_t * blc_input , input_BLC_pos_t * pos );
 int input_BLC_seek ( input_BLC_t * blc_input , input_BLC_pos_t * pos );
 void input_BLC_close (input_BLC_t * blc_input);
 
+int input_scBAM_init(input_scBAM_t * bam_input, char * bam_fname);
+void input_scBAM_close(input_scBAM_t * bam_input);
+void scBAM_seek(input_scBAM_t * bam_input, input_scBAM_pos_t * pos);
+void scBAM_tell(input_scBAM_t * bam_input, input_scBAM_pos_t * pos);
+int scBAM_next_read(input_scBAM_t * bam_input, char * readname , char * read, char * qual );
+
 int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files );
 int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames);
 int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual );

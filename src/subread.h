@@ -515,6 +515,14 @@ typedef struct {
 	autozip_fp autofp3;
 } input_mFQ_t;
 
+
+typedef struct
+{
+        char chro_name[MAX_CHROMOSOME_NAME_LEN];
+        unsigned int chro_length;
+} SamBam_Reference_Info;
+
+
 typedef struct{
 	srInt_64 section_start_pos;
 	int in_section_offset;
@@ -522,7 +530,16 @@ typedef struct{
 } input_scBAM_pos_t;
 
 typedef struct {
+	FILE * os_file;
+	char section_buff[66000];
+	char align_buff[FC_LONG_READ_RECORD_HARDLIMIT];
+	int in_section_offset;
+	int section_bin_bytes;
+	int chro_table_size;
+	SamBam_Reference_Info * chro_table;
+	srInt_64 section_start_pos;
 	srInt_64 current_read_no;
+	subread_lock_t read_lock;
 } input_scBAM_t;
 
 typedef struct {
@@ -558,6 +575,7 @@ typedef struct{
 		seekable_position_t seekable_gzip_position;
 		input_BLC_pos_t BCL_position;
 		input_mFQ_pos_t mFQ_position;
+		input_scBAM_pos_t scBAM_position;
 	};
 	char gzfa_last_name[MAX_READ_NAME_LEN];
 } gene_inputfile_position_t;
@@ -610,6 +628,7 @@ typedef struct {
 	union{
 		cache_BCL_t bcl_input;
 		input_mFQ_t scRNA_fq_input;
+		input_scBAM_t scBAM_input;
 	};
 } gene_input_t;
 

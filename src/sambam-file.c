@@ -449,10 +449,12 @@ int PBam_get_next_zchunk(FILE * bam_fp, char * buffer, int buffer_length, unsign
 		int CDATA_READING = min(CDATA_LEN, buffer_length);
 		rrtv = fread(buffer, 1, CDATA_READING, bam_fp);
 		if(rrtv < CDATA_READING) return -1;
-		if(CDATA_READING<CDATA_LEN)
-			fseeko(bam_fp, CDATA_LEN-CDATA_READING, SEEK_CUR);
+		if(CDATA_READING<CDATA_LEN){
+			SUBREADputs("ERROR: buffer insufficient");
+			return -1;
+		}
 		fseeko(bam_fp, 4, SEEK_CUR);
-		rlen = fread(&real_len, 4, 1, bam_fp);
+		rlen = fread(&real_len, 4, 1, bam_fp);//Input SIZE (length of uncompressed data);uint32_t
 		if(rlen < 1) is_file_broken = 1;
 
 	//	SUBREADprintf("read_data=%u\n", CDATA_LEN);

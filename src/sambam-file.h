@@ -26,7 +26,7 @@ typedef unsigned char BS_uint_8;
 typedef unsigned short BS_uint_16;
 typedef unsigned int BS_uint_32;
 
-#define BAM_MAX_CHROMOSOME_NAME_LEN 100 
+#define BAM_MAX_CHROMOSOME_NAME_LEN 200 
 #define BAM_MAX_CIGAR_LEN (30000)
 #define BAM_MAX_READ_NAME_LEN 256
 #define BAM_MAX_READ_LEN 3000
@@ -45,13 +45,6 @@ typedef unsigned int BS_uint_32;
 #define SAMBAM_INPUT_STREAM_SIZE 140000
 
 #define TEST_BAD_BAM_CHUNKS 9999925 
-
-typedef struct
-{
-	char chro_name[BAM_MAX_CHROMOSOME_NAME_LEN];
-	unsigned int chro_length;
-} SamBam_Reference_Info;
-
 
 typedef struct
 {
