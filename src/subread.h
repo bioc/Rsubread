@@ -509,6 +509,7 @@ typedef struct {
 	char ** files3;
 	int total_files;
 	int current_file_no;
+	int current_guessed_lane_no;
 	srInt_64 current_read_no;
 	autozip_fp autofp1;
 	autozip_fp autofp2;

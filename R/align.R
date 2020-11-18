@@ -23,8 +23,10 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
   extra.params <- .retrieve.tmp.parameters()
   isBCLinput <- FALSE
   isScRNAFastqinput <- FALSE
+  isScRNABAMinput <- FALSE
   if("isBCLinput" %in% names(extra.params))isBCLinput <- extra.params[["isBCLinput"]]
   if("isScRNAFastqinput" %in% names(extra.params))isScRNAFastqinput <- extra.params[["isScRNAFastqinput"]]
+  if("isScRNABAMinput" %in% names(extra.params)) isScRNABAMinput <- extra.params[["isScRNABAMinput"]]
 
   .check_string_param(input_format,"input_format")
   .check_string_param(output_format,"output_format")
@@ -93,6 +95,9 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
 
   if(isScRNAFastqinput)
     opt <- paste(opt,"--scRNA_FQinput",sep=.R_param_splitor)
+
+  if(isScRNABAMinput)
+    opt <- paste(opt,"--scRNA_BAMinput",sep=.R_param_splitor)
 
   if(!unique)
     opt <- paste(opt,"--multiMapping",sep=.R_param_splitor)

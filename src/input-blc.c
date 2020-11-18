@@ -436,7 +436,7 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 	read_name[13+idx_offset]='|';
 	read_name[14+2*idx_offset]='|';
 	read_name[15+base_offset+idx_offset]='|';
-	sprintf(read_name +16 +2*base_offset, "|L%03d" , cache_input -> lane_no_in_chunk[cache_input -> read_no_in_chunk]);
+	sprintf(read_name +16 +2*base_offset, "|@RgLater@L%03d" , cache_input -> lane_no_in_chunk[cache_input -> read_no_in_chunk]);
 
 	for(bii = 0; bii < cache_input -> total_bases_in_each_cluster; bii++){
 		int nch = cache_input -> bcl_bin_cache[bii][cache_input -> read_no_in_chunk];
@@ -670,6 +670,7 @@ void iBLC_free_3tp(void * t){
 
 #define SHEET_FORMAT_RAWDIR_INPUT 10
 #define SHEET_FORMAT_FASTQ_INPUT 20
+#define SHEET_FORMAT_BAM_INPUT 30
 HashTable * input_BLC_parse_SampleSheet(char * fname){
 	HashTable * ret = StringTableCreate(30);
 	HashTableSetDeallocationFunctions(ret, free, iBLC_free_sample_items);
@@ -694,6 +695,11 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 					continue;
 				}
 
+				if(strstr( linebuf, "BAMFile")){
+					file_format = SHEET_FORMAT_BAM_INPUT;
+					continue;
+				}
+
 				if(strstr( linebuf, "BarcodeUMIFile")){
 					file_format = SHEET_FORMAT_FASTQ_INPUT;
 					continue;
@@ -711,9 +717,12 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 				strtok_r(NULL, ",", &tokp);
 				sample_name = strtok_r(NULL, ",", &tokp);
 				sample_index = strdup(strtok_r(NULL, ",", &tokp));
-			}else{
+			}else if(file_format == SHEET_FORMAT_FASTQ_INPUT){
 				strtok_r(linebuf, ",", &tokp); // fastq file 1
 				strtok_r(NULL, ",", &tokp); // fastq file 2
+				sample_name = strtok_r(NULL, ",", &tokp); // sample name
+			}else{
+				strtok_r(linebuf, ",", &tokp); // bam file
 				sample_name = strtok_r(NULL, ",", &tokp); // sample name
 			}
 
@@ -895,23 +904,26 @@ void iCache_delete_bcb_key(void *k){
 	if(((k-NULL) & 0xFFFFFFFFF0000000llu)!= IMPOSSIBLE_MEMORY_ADDRESS) ArrayListDestroy(k);
 }
 
-int cacheBCL_quality_test(int is_FASTQ_input, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode);
+int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode);
 #ifdef MAKE_TEST_QUALITY_TEST
 int main(int argc,char ** argv){
 #else
 int do_R_try_cell_barcode_files(int argc, char ** argv){
 #endif
 	assert(argc>=6);
-	int is_FASTQ_input_mode = strcmp("fastq", argv[5])==0;
+	int input_mode = GENE_INPUT_BCL;
+	if(strcmp("fastq", argv[5])==0) input_mode = GENE_INPUT_SCRNA_FASTQ;
+	if(strcmp("bam", argv[5])==0) input_mode = GENE_INPUT_SCRNA_BAM;
 	int testing_reads = atoi(argv[4]);
 	ArrayList * cell_barcode_list = input_BLC_parse_CellBarcodes(argv[3]);
+	SUBREADprintf("Loaded %lld cell barcodes from %s\n", cell_barcode_list -> numOfElements, argv[3]);
 
 	HashTable * sample_sheet = NULL;
-	if(!is_FASTQ_input_mode) input_BLC_parse_SampleSheet(argv[2]);
+	if(input_mode==GENE_INPUT_BCL) input_BLC_parse_SampleSheet(argv[2]);
 	char * input_BCL_raw_dir = argv[1];
 
 	int tested_reads=0, valid_sample_index=0, valid_cell_barcode=0;
-	int rv = cacheBCL_quality_test(is_FASTQ_input_mode, input_BCL_raw_dir, sample_sheet, cell_barcode_list, testing_reads, &tested_reads, &valid_sample_index, &valid_cell_barcode );
+	int rv = cacheBCL_quality_test(input_mode, input_BCL_raw_dir, sample_sheet, cell_barcode_list, testing_reads, &tested_reads, &valid_sample_index, &valid_cell_barcode );
 
 #ifdef MAKE_TEST_QUALITY_TEST
 	printf("Samples = %ld loaded\n", sample_sheet -> numOfElements);
@@ -926,6 +938,46 @@ int do_R_try_cell_barcode_files(int argc, char ** argv){
 	return 0;
 }
 
+int cacheBCL_qualTest_BAMmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
+	input_scBAM_t * scBAM_input = malloc(sizeof(input_scBAM_t));
+	int ret = input_scBAM_init(scBAM_input, datadir);
+	if(ret)return ret;
+	while(1){
+		char base[MAX_READ_LENGTH], qual[MAX_READ_LENGTH], rname[MAX_READ_NAME_LEN];
+		base[0]=qual[0]=rname[0]=0;
+		ret = scBAM_next_read(scBAM_input, rname , base, qual);
+		if(ret<=0)break;
+//		SUBREADprintf("BBRNAME %s\n", rname);
+
+		char *cell_barcode = NULL, *sample_barcode=NULL, *lane_str=NULL;
+
+		int xx=0, laneno=0;
+		char *testi;
+		for(testi = rname+1; * testi; testi ++){
+			if( * testi=='|'){
+				xx++;
+				if(xx == 1) {
+					cell_barcode = testi +1;
+				}else if(xx == 2) {
+					sample_barcode = testi +1;
+				}else if(xx == 4){
+					lane_str = testi+1;
+					break;
+				}
+			}
+		}
+
+		int cell_no = iCache_get_cell_no(cell_barcode_table, cell_barcode_list, cell_barcode, known_cell_barcode_length);
+		if(cell_no>0) (*valid_cell_barcode)++;
+
+		(*tested_reads)++;
+		if((*tested_reads) >= testing_reads)break;
+	}
+	input_scBAM_close(scBAM_input);
+	free(scBAM_input);
+	return 0;
+}
+
 int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
 	input_mFQ_t fqs_input;
 	int ret = input_mFQ_init_by_one_string(&fqs_input, datadir);
@@ -936,16 +988,17 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 		ret = input_mFQ_next_read(&fqs_input, rname , base, qual);
 		if(ret<=0)break;
 
-		char *cell_barcode = rname + 13, *sample_barcode=NULL, *lane_str=NULL, *umi_barcode;
-		umi_barcode = cell_barcode + known_cell_barcode_length;
+		char *cell_barcode = NULL, *sample_barcode=NULL, *lane_str=NULL;
 
 
 		int xx=0, laneno=0;
 		char *testi;
-		for(testi = umi_barcode+1; * testi; testi ++){
+		for(testi = rname+1; * testi; testi ++){
 			if( * testi=='|'){
 				xx++;
 				if(xx == 2) {
+					cell_barcode = testi+1;
+				}else if(xx == 2) {
 					sample_barcode = testi +1;
 				}else if(xx == 4){
 					lane_str = testi+1;
@@ -959,9 +1012,7 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 			laneno = laneno*10 + (*testi)-'0';
 		}
 
-		int sample_no = iCache_get_sample_id(sample_sheet_list, sample_barcode, laneno);
 		int cell_no = iCache_get_cell_no(cell_barcode_table, cell_barcode_list, cell_barcode, known_cell_barcode_length);
-		if(sample_no>0) (*valid_sample_index)++;
 		if(cell_no>0) (*valid_cell_barcode)++;
 
 		(*tested_reads)++;
@@ -1019,7 +1070,7 @@ int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_
 	return 0;
 }
 
-int cacheBCL_quality_test(int is_FASTQ_input, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
+int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
 	ArrayList * sample_sheet_list = ArrayListCreate(100);
 	ArrayListSetDeallocationFunction(sample_sheet_list, free);
 	if(sample_sheet_table){
@@ -1057,9 +1108,16 @@ int cacheBCL_quality_test(int is_FASTQ_input, char * datadir, HashTable * sample
 			ArrayListPush(array_of_codes, NULL+xx1);
 		}
 	}
-    int ret = -1;
-	if(is_FASTQ_input)
+	if(known_cell_barcode_length<0){
+		SUBREADprintf("ERROR: cannot load any cell barcode from database\n");
+		return -1;
+	}
+
+	int ret = -1;
+	if(input_mode == GENE_INPUT_SCRNA_FASTQ)
 		ret=cacheBCL_qualTest_FQmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode);
+	else if(input_mode == GENE_INPUT_SCRNA_BAM)
+		ret=cacheBCL_qualTest_BAMmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode);
 	else
 		ret=cacheBCL_qualTest_BCLmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode);
 	ArrayListDestroy(sample_sheet_list);
@@ -1224,6 +1282,7 @@ int scBAM_next_read(input_scBAM_t * bam_input, char * read_name, char * seq, cha
 	memcpy(&n_cigar_op, bam_input -> align_buff+16,2);
 	memcpy(&flag, bam_input -> align_buff+18,2);
 	memcpy(&l_seq, bam_input -> align_buff+20,4);
+	int rname_build_ptr = l_read_name-1;
 	strcpy(read_name, bam_input -> align_buff+36);
 	char * seq_start = bam_input -> align_buff+36+l_read_name+4*n_cigar_op;
 	for(x1=0;x1<l_seq;x1++)
@@ -1237,6 +1296,29 @@ int scBAM_next_read(input_scBAM_t * bam_input, char * read_name, char * seq, cha
 		reverse_read(seq, l_seq, GENE_SPACE_BASE);
 	}
 	qual[l_seq] = 0;
+	char * extag_start = qual_start + l_seq;
+	char * tag_str_val=NULL, tag_type = 0;
+
+	for(x1=0;x1<5;x1++){
+		char * tagname = NULL;
+		if(x1==0)tagname ="CR";
+		if(x1==1)tagname ="UR";
+
+		if(x1==2)tagname ="CY";
+		if(x1==3)tagname ="UY";
+
+		if(x1==4)tagname ="RG";
+
+		tag_type = 0;
+		SAM_pairer_iterate_tags(extag_start, bam_input -> align_buff + 4 + binlen - extag_start, tagname, &tag_type, &tag_str_val);
+		if(tag_type!='Z')return -1;
+		int tag_str_len = strlen(tag_str_val);
+		if(x1==0||x1==2||x1==4)read_name[rname_build_ptr++] = '|';
+		memcpy( read_name +  rname_build_ptr, tag_str_val, tag_str_len );
+		rname_build_ptr += tag_str_len;
+	}
+
+	read_name[rname_build_ptr] = 0;
 	return l_seq;
 }
 
@@ -1275,8 +1357,14 @@ void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 	fqs_input -> autofp1.filename[0] = 0;
 }
 
+int input_mFQ_guess_lane_no(char * f1_name){
+	char * lst = strstr(f1_name, "_L0");
+	if(lst) return atoi(lst);
+	return 999;
+}
 
 int input_mFQ_open_files(input_mFQ_t * fqs_input){
+	fqs_input -> current_guessed_lane_no = input_mFQ_guess_lane_no(fqs_input->files1[fqs_input-> current_file_no]);
 	int gzipped_ret = autozip_open(fqs_input->files1[fqs_input-> current_file_no],&fqs_input -> autofp1);
 	if(fqs_input -> files2)gzipped_ret = gzipped_ret < 0 ?gzipped_ret:autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
 	gzipped_ret = gzipped_ret < 0?gzipped_ret:autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
@@ -1383,8 +1471,7 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 			for(x1=write_ptr; x1<write_ptr+ret; x1++) if(readname[x1]>='/') readname[x1]++;
 			ret --;
 			readname[write_ptr+ret]=0;
-		}else
-			write_ptr+=sprintf(readname+write_ptr,"|input#%04d", fqs_input -> current_file_no);
+		}else write_ptr+=sprintf(readname+write_ptr,"|input#%04d@L%03d", fqs_input -> current_file_no, fqs_input  -> current_guessed_lane_no);
 
 		ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
 		if(ret<=0) return -1;
