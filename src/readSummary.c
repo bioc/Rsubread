@@ -3654,39 +3654,115 @@ void sorted_bam_scRNA_write( fc_thread_global_context_t * global_context,  fc_th
 	vv[5]=NULL;
 	pthread_spin_unlock(vv[4]);
 }
+#define SCRNA_READ_NAME_SPLIT_CHAR '|'
 
-void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step, char * bambin ){
-	char * testi, *lane_str = NULL, * sample_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
-	int xx=0, laneno=0;
-	for(testi = read_name +13 +global_context -> known_cell_barcode_length; * testi; testi ++){
-		if( * testi=='|'){
-			xx++;
-			if(xx == 2) {
-				sample_barcode = testi +1;
-			}else if(xx == 4){
-				lane_str = testi+1;
+void scRNA_move_barcodes_to_tags(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * inbin, char ** outbin_pr){
+	int inbin_len=0;
+	memcpy(&inbin_len, inbin, 4);
+	char* outbin = malloc(inbin_len + 400);
+	*outbin_pr = outbin;
+
+	int l_read_name=0, new_l_read_name=0, x1;
+	memcpy(&l_read_name, inbin+12, 1);
+
+	char * BC_seq=NULL, * BC_qual=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *RG=NULL;
+	int BC_len=global_context -> known_cell_barcode_length, UMI_len=0, RG_len=0, field_i = 0;
+
+	for(x1=1; x1<l_read_name-1; x1++){
+		char rnchar = inbin [ 36 + x1];
+		if(rnchar == SCRNA_READ_NAME_SPLIT_CHAR){
+			field_i ++;
+			if(field_i == 1){
+				new_l_read_name = x1+1;
+				BC_seq = inbin+36 + x1+1;
+				UMI_seq = BC_seq + BC_len;
+			}else if(field_i == 2){
+				BC_qual = inbin+36 + x1+1;
+				UMI_len = BC_qual - BC_seq - 1 - global_context -> known_cell_barcode_length;
+				UMI_qual = BC_qual + BC_len;
+			}else if(field_i == 3){
+				RG = inbin+36 + x1+1;
+				RG_len = l_read_name - x1 - 2;
+			}
+		}
+	}
+
+	memcpy(outbin, inbin, 36+new_l_read_name);
+	outbin[36+new_l_read_name-1]=0;
+	memcpy(outbin + 12,&new_l_read_name, 1);
+	memcpy(outbin + 36 + new_l_read_name, inbin + 36 + l_read_name, inbin_len +4 - 36 - l_read_name);
+
+	int ext_ptr = inbin_len +4 - (l_read_name - new_l_read_name);
+	for(x1 = 0;x1<5;x1++){
+		int this_len = BC_len;
+		char * this_tag = "CR", * this_val = BC_seq;
+
+		if(x1 == 1){this_tag = "CY"; this_val = BC_qual;}
+		if(x1 == 2){this_tag = "UR"; this_val = UMI_seq;}
+		if(x1 == 3){this_tag = "UY"; this_val = UMI_qual;}
+		if(x1 == 4){this_tag = "RG"; this_val = RG;}
+
+		if(x1 == 2 || x1 == 3) this_len = UMI_len;
+		if(x1 == 4) this_len = RG_len;
+
+		outbin[ext_ptr]= this_tag[0];
+		outbin[ext_ptr+1]= this_tag[1];
+		outbin[ext_ptr+2]= 'Z';
+		memcpy(outbin+ext_ptr+3, this_val, this_len);
+		outbin[ext_ptr+3+this_len]= 0;
+		ext_ptr += 3+1+this_len;
+	}
+
+	ext_ptr -=4;	// block_size excl itself
+	memcpy(outbin, &ext_ptr, 4);
+}
+
+void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name,
+  int * sample_id, char ** BC_seq, char ** UMI_seq, char ** RG){
+	int field_i = 0, laneno = 0;
+	char * testi, * lane_str = NULL, *sample_barcode = NULL;
+	*sample_id = -1;
+
+	for(testi = read_name +1; * testi; testi ++){
+		if((*testi)== SCRNA_READ_NAME_SPLIT_CHAR || ((*testi)== ':' && global_context -> scRNA_input_mode == GENE_INPUT_BCL )){
+			field_i++;
+			if(field_i == 1) {
+				if(BC_seq)(*BC_seq) = testi+1;
+				if(UMI_seq)(*UMI_seq) = testi+1+global_context -> known_cell_barcode_length;
+			}else if(field_i == 3){
+				sample_barcode = testi + 1;
+				if(RG)(*RG) = sample_barcode;
+			}else if(field_i == 5){
+				lane_str = testi + 1;
+				if(memcmp(lane_str, "@RgLater@", 9)==0) lane_str += 9;
 				break;
 			}
 		}
 	}
-	int sample_id = -1;
 
 	if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
-		sample_id = 1; // on the BAM mode, every featureCounts run only has one sample
+		*sample_id = 1; // on the BAM mode, every featureCounts run only has one sample
 	}else if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ){
 		if(sample_barcode == NULL || memcmp(sample_barcode, "input#", 6) || !isdigit(sample_barcode[6]))
-			SUBREADprintf("SPBCFMT_ERR %d // %s in %s // %s\n", xx, sample_barcode, read_name, read_name +13 +global_context -> known_cell_barcode_length);
-		else sample_id = atoi(sample_barcode +6) +1;
+			SUBREADprintf("SPBCFMT_ERR %d // %s in %s // %s\n", field_i, sample_barcode, read_name, read_name +13 +global_context -> known_cell_barcode_length);
+		else *sample_id = atoi(sample_barcode +6) +1;
 	}else{
-		if(xx !=4 || (*lane_str)!='L')
-			SUBREADprintf("LANESTR_ERR %d , %s\n", xx, lane_str);
+		if(field_i !=5 || (*lane_str)!='L')
+			SUBREADprintf("LANESTR_ERR %d , %s\n", field_i, lane_str);
 		for(testi = lane_str+1; *testi; testi++){
-			assert(isdigit(*testi));
+			if(!isdigit(*testi))break;
 			laneno = laneno*10 + (*testi)-'0';
 		}
 
-		sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
+		*sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
+		//Rprintf("LOOKUP SAMPLE %d by %s-%s-%d\n", *sample_id, sample_barcode, lane_str, laneno);
  	}
+}
+
+
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, int mapped_step, char * bambin ){
+	int sample_id= -1;
+	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, &sample_id, NULL, NULL, NULL);
 
 	if(sample_id>0){
 		if(mapped_step == 1)
@@ -3704,7 +3780,11 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 					SamBam_writer_add_read_fqs_scRNA(gz3fps, bambin);
 				}
 				pthread_spin_unlock(sample_bam_2fps[4]);
-				SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin, 1);
+
+				char * bambin_out=NULL;
+				scRNA_move_barcodes_to_tags(global_context, thread_context, bambin, &bambin_out);
+				SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin_out, 1);
+				free(bambin_out);
 			}
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
 		}
@@ -3714,40 +3794,11 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name ){ // the index of gene or the index of exon
 	// R00000000218:CGTAGNAGTTTAGTCGAATACTCGTAAT|BBB7B#FFFFFF0FFFFFFFFFFFFFFF|GGATGCCG|BBBBBFFB
 	//SUBREADprintf("Assigned %s to %ld\n", read_name, assign_target_number);
-	char * testi, *lane_str = NULL, * sample_barcode = NULL, * cell_barcode = NULL, * umi_barcode = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
-	int xx=0, laneno=0;
-	for(testi = read_name+1; * testi; testi ++){
-		if( * testi=='|'){
-			xx++;
-			if(xx == 1) {
-				cell_barcode = testi +1;
-				umi_barcode = cell_barcode + global_context -> known_cell_barcode_length;
-			}else if(xx == 3) {
-				sample_barcode = testi +1;
-			}else if(xx == 5){
-				lane_str = testi+1;
-				break;
-			}
-		}
-	}
+	char * cell_barcode = NULL, * umi_barcode = NULL, * lane_str = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
+	int sample_id = -1, laneno = 0;
 
-	int sample_id = -1;
+	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, &sample_id, &cell_barcode, &umi_barcode, &lane_str);
 
-	if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
-		sample_id = 1;	// on the BAM mode, featureCounts only run on BAM files from the same sample.
-	}else if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ){
-		assert(0==memcmp(sample_barcode, "input#", 6));
-		assert(isdigit(sample_barcode[6]));
-		sample_id = atoi(sample_barcode +6) +1;
-	}else{
-		assert(xx ==4 && (*lane_str)=='L');
-		for(testi = lane_str+1; *testi; testi++){
-			assert(isdigit(*testi));
-			laneno = laneno*10 + (*testi)-'0';
-		}
-
-		sample_id = scRNA_get_sample_id(global_context, sample_barcode, laneno); 
-	}
 	int cell_id = scRNA_get_cell_id(global_context, thread_context, cell_barcode);
 	int umi_id = scRNA_register_umi_id( global_context, thread_context, umi_barcode);
 	//SUBREADprintf("Rname=%s, Lane=%d ==> sample %d  cell %d  UMI %d\n", read_name, laneno, sample_id , cell_id, umi_id);
@@ -7694,7 +7745,9 @@ void sort_bucket_table(fc_thread_global_context_t * global_context){
 }
 
 
+void fc_generate_scRNA_BAM_FQ(fc_thread_global_context_t * global_context){
 
+}
 
 int readSummary_single_file(fc_thread_global_context_t * global_context, read_count_type_t * column_numbers, srInt_64 nexons,  int * geneid, char ** chr, srInt_64 * start, srInt_64 * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, srInt_64 * anno_chr_head, srInt_64 * block_end_index, srInt_64 * block_min_start , srInt_64 * block_max_end, fc_read_counters * my_read_counter, HashTable * junction_global_table, HashTable * splicing_global_table, HashTable * merged_RG_table, fc_feature_info_t * loaded_features)
 {
@@ -7739,6 +7792,7 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	srInt_64 nreads_mapped_to_exon = 0;
 	fc_thread_merge_results(global_context, column_numbers , &nreads_mapped_to_exon, my_read_counter, junction_global_table, splicing_global_table, merged_RG_table, loaded_features, nexons);
 	fc_thread_destroy_thread_context(global_context);
+	if(global_context -> do_scRNA_table) fc_generate_scRNA_BAM_FQ(global_context);
 
 	if(global_context -> sambam_chro_table) free(global_context -> sambam_chro_table);
 	global_context -> sambam_chro_table = NULL;

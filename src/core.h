@@ -138,7 +138,7 @@ typedef struct{
 	int fast_run;
 
 	// input_scheme
-	char first_read_file[MAX_FILE_NAME_LENGTH];
+	char first_read_file[MAX_FILE_NAME_LENGTH * MAX_SCRNA_FASTQ_FILES * 3];
 	char second_read_file[MAX_FILE_NAME_LENGTH];
 	char exon_annotation_file[MAX_FILE_NAME_LENGTH];
 	char exon_annotation_file_screen_out[MAX_FILE_NAME_LENGTH];

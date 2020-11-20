@@ -33,7 +33,7 @@
 
 #include "hashtable.h" 
 
-#define MAX_SCRNA_FASTQ_FILES 200
+#define MAX_SCRNA_FASTQ_FILES 256 
 #define SCRNA_FASTA_SPLIT1 "|Rsd:cCounts:mFQs|"
 #define SCRNA_FASTA_SPLIT2 "|Rsd:cCounts:1mFQ|"
 
@@ -525,6 +525,7 @@ typedef struct
 
 
 typedef struct{
+	int current_BAM_file_no;
 	srInt_64 section_start_pos;
 	int in_section_offset;
 	srInt_64 current_read_no;
@@ -532,8 +533,11 @@ typedef struct{
 
 typedef struct {
 	FILE * os_file;
+	char * BAM_file_names[MAX_SCRNA_FASTQ_FILES];
 	char section_buff[66000];
 	char align_buff[FC_LONG_READ_RECORD_HARDLIMIT];
+	int current_BAM_file_no;
+	int total_BAM_files;
 	int in_section_offset;
 	int section_bin_bytes;
 	int chro_table_size;

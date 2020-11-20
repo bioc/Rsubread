@@ -252,9 +252,10 @@ void R_align_wrapper(int * nargs, char ** argv)
 
 	n = *nargs;
 	c_argv = (char **) calloc(n,sizeof(char *));
-	for(i=0;i<n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
-	strcpy(c_argv[0],strtok(r_argv,PARAM_SPLITTOR));
-	for(i=1;i<n;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
+	c_argv[0] = strdup(strtok(r_argv,PARAM_SPLITTOR));
+	for(i=1;i<n;i++){
+		c_argv[i] = strdup(strtok(NULL,PARAM_SPLITTOR));
+	}
 
 	R_child_thread_run(main_align,n,c_argv, 1);
 

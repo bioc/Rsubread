@@ -854,12 +854,19 @@ library(Matrix)
   ddf <- ddf[grepl("L[0-9][0-9][1-9]_R1_[0-9][0-9][1-9].fastq.gz$",ddf) &(!grepl("Undetermined_S",ddf)) &!grepl("/fork0/", ddf)]
   sample.sheet <- data.frame()
   for(df1 in sort(ddf)){
-    r1_part <- substr(df1, nchar(df1)-13, 9999)
-    r1_pref <- substr(df1, 1, nchar(df1)-16)
+    df1 <- file.path(dirname,df1)
+    r1_part <- substr(df1, nchar(df1)-12, 9999)
+    r1_pref <- substr(df1, 1, nchar(df1)-15)
     df2 <- paste0(r1_pref, "R2", r1_part)
     sample.name <- unlist(strsplit(df2, "\\/"))
+    sample.name0<- sample.name
     sample.name <- sample.name[length(sample.name)]
-    sample.name <- substr(sample.name, 1, nchar(sample.name)-24)
+    sample.name <- substr(sample.name, 1, nchar(sample.name)-25)
+
+    if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
+    if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
+    if(substr(sample.name,1,1)!="S")stop(sprintf("Unable to parse the FASTQ file name : '%s'", sample.name0))
+
     sample.sheet <- rbind(sample.sheet, data.frame( SampleName=sample.name, BarcodeUMIFile=df1, ReadFile=df2))
   }
   sample.sheet
@@ -877,10 +884,10 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
   temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame()
-  sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
-  if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
+  if(input.mode=="BCL"){
+    sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
+    if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
 
-  if(input.mode == "BCL"){
     dirs <- unique( sample.info.idx$InputDirectory )
     fc[["counts"]] <- list()
     fc[["cell.confidence"]] <- list()
@@ -949,38 +956,34 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
     unique.samples <- unique(sample.info.idx$SampleName)
     for(this.sample in unique.samples){
       .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=this.sample), sample.1)
-      splrow <- 1
-      out.files <- c()
-      if(sum(sample.info.idx$SampleName == this.sample)>1){
-        stop("ERROR: one sample can have only on BAM file.")
-      }
-      for(this.BAM.names in sample.info.idx$BAMFile[ sample.info.idx$SampleName == this.sample ]){
-        if(splrow>=2)stop("LOGIC ERROR")
-        .write.tmp.parameters(list(isScRNABAMinput=TRUE))
-        out.name <- paste0(temp.file.prefix, "--", splrow)
-        align(index, this.BAM.names, output_file=out.name, nthreads=nthreads,...)
-        out.files <- c(out.files,out.name)
-        splrow <- 1+splrow
-      }
+      BAM.names <- paste(sample.info.idx$BAMFile[ sample.info.idx$SampleName == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
+      .write.tmp.parameters(list(isScRNABAMinput=TRUE))
+      align(index, BAM.names, output_file=temp.file.prefix, nthreads=nthreads,...)
+
       generate.scRNA.BAM <- TRUE
       .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
-      raw.fc<-featureCounts(out.files, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+      raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(out.name, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
-      stt <- .extract.sample.table.cols(NA,some.results,bam=this.BAM.names)
+      stt <- .extract.sample.table.cols(NA,some.results,bam=temp.file.prefix)
       df.sample.info <- rbind(df.sample.info, stt)
     }
-  } else if(input.mode == "FASTQ"){
+  } else if(input.mode == "FASTQ" || input.mode == "FASTQ-dir"){
+    if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
+    print(sample.info.idx)
     if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.info.idx)){
-      R1.file.name <- .check_and_NormPath(sample.info.idx[rowi,"BarcodeUMIFile"], mustWork=TRUE, "The barcode FASTQ file in sample.info.idx")
-      R2.file.name <- .check_and_NormPath(sample.info.idx[rowi,"ReadFile"], mustWork=TRUE, "The genomic read FASTQ file in sample.info.idx")
+      df1 <- as.character(sample.info.idx[rowi,"BarcodeUMIFile"])
+      df2 <- as.character(sample.info.idx[rowi,"ReadFile"])
+      R1.file.name <- .check_and_NormPath(df1, mustWork=TRUE, "The barcode FASTQ file in sample.info.idx")
+      R2.file.name <- .check_and_NormPath(df2, mustWork=TRUE, "The genomic read FASTQ file in sample.info.idx")
       combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
     }
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)

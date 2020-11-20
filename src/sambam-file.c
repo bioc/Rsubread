@@ -2018,28 +2018,28 @@ void SamBam_writer_sort_bins_to_BAM_test_bins(SamBam_Writer * writer, HashTable 
 			ArrayListPush(win16k_list, NULL+ this_Vpos);
 	}
 
-	ArrayList * this_bin_chinks = HashTableGet(bin_tab, NULL+binno+1);
-	if(NULL == this_bin_chinks){
-		this_bin_chinks = ArrayListCreate(5);
-		HashTablePut(bin_tab, NULL+binno+1, this_bin_chinks);
+	ArrayList * this_bin_chunks = HashTableGet(bin_tab, NULL+binno+1);
+	if(NULL == this_bin_chunks){
+		this_bin_chunks = ArrayListCreate(5);
+		HashTablePut(bin_tab, NULL+binno+1, this_bin_chunks);
 		ArrayListPush(bin_list, NULL+binno);
 	}
 
 	int found = 0;
-	if(this_bin_chinks -> numOfElements > 0){
-		//SUBREADprintf("RESLOCS : %ld == %ld\n", this_Vpos, this_bin_chinks -> elementList [ this_bin_chinks -> numOfElements - 1 ] - NULL);
+	if(this_bin_chunks -> numOfElements > 0){
+		//SUBREADprintf("RESLOCS : %ld == %ld\n", this_Vpos, this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1 ] - NULL);
 		long long diff = this_Vpos >>16;
-		diff -=(this_bin_chinks -> elementList [ this_bin_chinks -> numOfElements - 1 ] - NULL)>>16;
+		diff -=(this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1 ] - NULL)>>16;
 		if(diff < MAX_ALLOWED_GAP_IN_BAI_CHUNK){
-			this_bin_chinks -> elementList [ this_bin_chinks -> numOfElements -1] = NULL+this_Vpos + block_len+4;
-			*last_chunk_ptr = this_bin_chinks -> elementList + this_bin_chinks -> numOfElements -1;
+			this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements -1] = NULL+this_Vpos + block_len+4;
+			*last_chunk_ptr = this_bin_chunks -> elementList + this_bin_chunks -> numOfElements -1;
 			found = 1;
 		}
 	}
 	if(!found){
-		ArrayListPush(this_bin_chinks, NULL + this_Vpos);
-		ArrayListPush(this_bin_chinks, NULL + this_Vpos + block_len+4);
-		*last_chunk_ptr = this_bin_chinks -> elementList + this_bin_chinks -> numOfElements -1;
+		ArrayListPush(this_bin_chunks, NULL + this_Vpos);
+		ArrayListPush(this_bin_chunks, NULL + this_Vpos + block_len+4);
+		*last_chunk_ptr = this_bin_chunks -> elementList + this_bin_chunks -> numOfElements -1;
 	}
 }
 

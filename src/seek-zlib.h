@@ -7,6 +7,31 @@
 #include <zlib.h>
 #include "subread.h"
 
+
+#define PARALLEL_GZIP_TXT_BUFFER_SIZE (1024*1024)
+
+typedef struct{
+	int thread_no;
+	int out_buffer_used;
+	char in_buffer[PARALLEL_GZIP_TXT_BUFFER_SIZE];
+	z_stream zipper;
+} parallel_gzip_writer_thread_t;
+
+typedef struct{
+	int threads;
+	FILE * os_file;
+	subread_lock_t writer_lock;
+	parallel_gzip_writer_thread_t * thread_objs;
+} parallel_gzip_writer_t;
+
+void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_filename, int total_threads);
+void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no);
+// because we have to keep sync between three fastq files, the flush function has to be manually called three times at the same time point.
+// otherwise R1, I2 and R2 files will have inconsistent read orders.
+// the outer program has to check if any of the three in_buffers is full.
+void parallel_gzip_writer_flush(parallel_gzip_writer_t * pzwtr, int thread_no);
+void parallel_gzip_writer_close(parallel_gzip_writer_t * pzwtr);
+
 // returns 0 if OK; returns 1 if the file is not indexable; returns -1 if file doesn't exist.
 int seekgz_open(const char * fname, seekable_zfile_t * fp, FILE * old_fp);
 

@@ -1197,15 +1197,66 @@ int main(int argc, char ** argv){
 #endif
 
 void scBAM_tell(input_scBAM_t * bam_input, input_scBAM_pos_t * pos){
+	pos -> current_BAM_file_no = bam_input -> current_BAM_file_no;
 	pos -> section_start_pos = bam_input -> section_start_pos;
 	pos -> current_read_no = bam_input -> current_read_no;
 	pos -> in_section_offset = bam_input -> in_section_offset;
 }
 
+int scBAM_next_char(input_scBAM_t * bam_input);
+int scBAM_next_string(input_scBAM_t * bam_input, char * strbuff, int lenstr);
+
+int scBAM_next_int(input_scBAM_t * bam_input, int *ret){
+	*ret = 0;
+	int xk1;
+	for(xk1=0;xk1<4;xk1++){
+		int nbyte = scBAM_next_char(bam_input);
+		if(nbyte<0) return -1;
+		(*ret) += nbyte <<(8*xk1);
+	}
+	return 0;
+}
+
+int scBAM_skip_bam_header(input_scBAM_t * bam_input){
+	int ret = 0, tmpi = 0, nref=0, x1;
+	ret = scBAM_next_int(bam_input, &tmpi);
+	if(ret < 0 || tmpi != 0x014d4142)return -1; // 0x014d4142 = 'BAM\1' little-endian
+	scBAM_next_int(bam_input, &tmpi); // header txt length
+	while(tmpi--) scBAM_next_char(bam_input); // skip header txt
+	scBAM_next_int(bam_input, &nref); // n_ref
+	bam_input -> chro_table = calloc(sizeof(SamBam_Reference_Info), nref);
+	SUBREADprintf("OPEN '%s' : %d refs\n",bam_input -> BAM_file_names[bam_input -> current_BAM_file_no], nref);
+	for(x1=0;x1<nref;x1++){
+		scBAM_next_int(bam_input, &tmpi); // l_name
+		scBAM_next_string(bam_input, bam_input -> chro_table [x1].chro_name, tmpi);
+		ret = scBAM_next_int(bam_input, &bam_input -> chro_table [x1].chro_length);
+		if(ret < 0) return -1;
+	}
+}
+
+int scBAM_inner_fopen(input_scBAM_t * bam_input){
+	bam_input -> os_file = f_subr_open(bam_input -> BAM_file_names[bam_input -> current_BAM_file_no], "rb");
+	if(!bam_input -> os_file)return -1;
+	return scBAM_skip_bam_header(bam_input);
+}
+
+void scBAM_inner_fclose(input_scBAM_t * bam_input){
+	free(bam_input -> chro_table);
+	fclose(bam_input -> os_file);
+}
+
 int scBAM_rebuffer(input_scBAM_t * bam_input){
 	int bin_len=0;
 	while(1){
-		if(feof(bam_input -> os_file))return -1;
+		if(bam_input -> current_BAM_file_no== bam_input -> total_BAM_files) return -1;
+		if(feof(bam_input -> os_file)){
+			scBAM_inner_fclose(bam_input);
+			bam_input -> current_BAM_file_no++;
+			if(bam_input -> current_BAM_file_no== bam_input -> total_BAM_files){
+				return -1;
+			}
+			scBAM_inner_fopen(bam_input);
+		}
 		char zipped_bam_buf[66000];
 		bam_input -> section_start_pos = ftello(bam_input -> os_file);
 		int ziplen = PBam_get_next_zchunk(bam_input -> os_file, zipped_bam_buf, 66000, &bin_len);
@@ -1222,6 +1273,7 @@ int scBAM_rebuffer(input_scBAM_t * bam_input){
 
 // negative : EOF
 int scBAM_next_char(input_scBAM_t * bam_input){
+	if(bam_input -> current_BAM_file_no== bam_input -> total_BAM_files) return -1;
 	if(bam_input -> in_section_offset == bam_input -> section_bin_bytes)
 		if(0>scBAM_rebuffer(bam_input))return -1;
 	
@@ -1232,22 +1284,18 @@ int scBAM_next_char(input_scBAM_t * bam_input){
 
 
 void scBAM_seek(input_scBAM_t * bam_input, input_scBAM_pos_t * pos){
-	bam_input -> section_start_pos = pos -> section_start_pos;
-	fseeko(bam_input -> os_file, bam_input -> section_start_pos, SEEK_SET);
-	scBAM_rebuffer(bam_input);
-	bam_input -> current_read_no = pos -> current_read_no;
-	bam_input -> in_section_offset = pos -> in_section_offset;
-}
-
-int scBAM_next_int(input_scBAM_t * bam_input, int *ret){
-	*ret = 0;
-	int xk1;
-	for(xk1=0;xk1<4;xk1++){
-		int nbyte = scBAM_next_char(bam_input);
-		if(nbyte<0) return -1;
-		(*ret) += nbyte <<(8*xk1);
+	if(bam_input -> current_BAM_file_no!= pos -> current_BAM_file_no){
+		if(bam_input -> current_BAM_file_no < bam_input -> total_BAM_files) scBAM_inner_fclose(bam_input);
+		bam_input -> current_BAM_file_no = pos -> current_BAM_file_no;
+		if(bam_input -> current_BAM_file_no < bam_input -> total_BAM_files) scBAM_inner_fopen(bam_input);
 	}
-	return 0;
+	if(bam_input -> current_BAM_file_no < bam_input -> total_BAM_files){
+		bam_input -> section_start_pos = pos -> section_start_pos;
+		fseeko(bam_input -> os_file, bam_input -> section_start_pos, SEEK_SET);
+		scBAM_rebuffer(bam_input);
+		bam_input -> current_read_no = pos -> current_read_no;
+		bam_input -> in_section_offset = pos -> in_section_offset;
+	}
 }
 
 int scBAM_next_string(input_scBAM_t * bam_input, char * strbuff, int lenstr){
@@ -1322,30 +1370,26 @@ int scBAM_next_read(input_scBAM_t * bam_input, char * read_name, char * seq, cha
 	return l_seq;
 }
 
-int input_scBAM_init(input_scBAM_t * bam_input, char * bam_fname){
+int input_scBAM_init(input_scBAM_t * bam_input, char * bam_fnames){
+	char * ubamnames = strdup(bam_fnames);
+	char * tpl1 = NULL;
+	char * fnl1 = strtokmm(ubamnames, SCRNA_FASTA_SPLIT1, &tpl1);
+	int no_file = 0;
+
 	memset(bam_input, 0, sizeof(input_scBAM_t));
-	bam_input -> os_file = f_subr_open(bam_fname, "rb");
-	if(!bam_input -> os_file)return -1;
-	int ret = 0, tmpi = 0, nref=0, x1;
-	ret = scBAM_next_int(bam_input, &tmpi);
-	SUBREADprintf("OPEN '%s' : %08x marker of %d\n", bam_fname, tmpi, ret);
-	if(ret < 0 || tmpi != 0x014d4142)return -1; // 0x014d4142 = 'BAM\1' little-endian
-	scBAM_next_int(bam_input, &tmpi); // header txt length
-	while(tmpi--) scBAM_next_char(bam_input); // skip header txt
-	scBAM_next_int(bam_input, &nref); // n_ref
-	bam_input -> chro_table = calloc(sizeof(SamBam_Reference_Info), nref);
-	SUBREADprintf("OPEN '%s' : %d refs\n", bam_fname, nref);
-	for(x1=0;x1<nref;x1++){
-		scBAM_next_int(bam_input, &tmpi); // l_name
-		scBAM_next_string(bam_input, bam_input -> chro_table [x1].chro_name, tmpi);
-		ret = scBAM_next_int(bam_input, &bam_input -> chro_table [x1].chro_length);
-		if(ret < 0) return -1;
+	while(fnl1){
+		bam_input -> BAM_file_names[no_file++] = strdup(fnl1);
+		fnl1 = strtokmm(NULL, SCRNA_FASTA_SPLIT1, &tpl1);
 	}
-	return 0;
+	bam_input -> total_BAM_files = no_file;
+	free(ubamnames);
+	return scBAM_inner_fopen(bam_input);
 }
 
 void input_scBAM_close(input_scBAM_t * bam_input){
-	fclose(bam_input -> os_file);
+	int x1;
+	for(x1=0; x1<bam_input -> total_BAM_files; x1++)free(bam_input ->BAM_file_names[x1]);
+	if(bam_input -> current_BAM_file_no < bam_input -> total_BAM_files)scBAM_inner_fclose(bam_input);
 }
 
 void input_mFQ_fp_close(input_mFQ_t * fqs_input){
@@ -1358,8 +1402,13 @@ void input_mFQ_fp_close(input_mFQ_t * fqs_input){
 }
 
 int input_mFQ_guess_lane_no(char * f1_name){
-	char * lst = strstr(f1_name, "_L0");
-	if(lst) return atoi(lst);
+	int fnamelen = strlen(f1_name);
+	char * lst = strstr(f1_name + fnamelen - 24, "_L0");
+	if(lst){
+		int lno = 0;
+		lno += lst[3]-'0';
+		lno = lno*10+( lst[4]-'0' );
+	}
 	return 999;
 }
 

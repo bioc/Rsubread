@@ -405,7 +405,7 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 
 				break;
 			case 'r':
-				strncpy(global_context->config.first_read_file, optarg, MAX_FILE_NAME_LENGTH-1);
+				strncpy(global_context->config.first_read_file, optarg, MAX_FILE_NAME_LENGTH * 3 * MAX_SCRNA_FASTQ_FILES-1);
 				break;
 			case 'R':
 				global_context->input_reads.is_paired_end_reads = 1;

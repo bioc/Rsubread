@@ -1257,9 +1257,10 @@ int rebuild_command_line(char ** lineptr, int argc, char ** argv){
 
 	for(c = 0; c<argc;c++)
 	{
-		if(strlen(*lineptr) + 500 > linecap)
+		int cline = strlen(argv[c]);
+		if(strlen(*lineptr) + 100 + cline > linecap)
 		{
-			linecap *=2;
+			linecap += cline+500;
 			*lineptr = realloc(*lineptr, linecap);
 		}
 		sprintf((*lineptr) + strlen(*lineptr), "\"%s\" ", argv[c]);
