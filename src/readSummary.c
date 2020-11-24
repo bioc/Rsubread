@@ -2983,19 +2983,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		}
 
 		if(this_is_inconsistent_read_type){
-			if(0 && global_context -> is_strand_checked){
-				// on 20JUL2020, "If strand-specific counting is on, isPairedEnd = TRUE, countReadPairs = TRUE and the input BAM file contains mixed single-end and paired-end reads, then both single-end reads and paired-end reads will be counted.  The single-end reads will be counted as they are R1 in a read-pair. "
-				if(global_context -> read_details_out_FP)
-					write_read_details_FP(global_context, thread_context,"Unassigned_Read_Type", 0, NULL, bin1, bin2);
-				if(RG_ptr){
-					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
-					fc_read_counters * sumtab = tab4s[1];
-					sumtab -> unassigned_read_type++;
-				}else thread_context->read_counters.unassigned_read_type ++;
-		
-				return;	// strand_specific assignment only accept the correct mode of reads.
-			}
-
 			if(global_context -> is_both_end_required && 0 == ( alignment_masks & SAM_FLAG_PAIRED_TASK )){
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context , thread_context ,"Unassigned_Singleton",0, NULL, bin1, bin2);
@@ -3414,7 +3401,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	}	// loop for is_second_read
 
 
-	if(global_context -> do_junction_counting)// junction reads that passed the basic filters will be considered with the junction counting.
+	if(global_context -> do_junction_counting)// junction reads that passed the basic filters will be considered with the junction counting. Filters: Unmapped, Singleton, MAPQ, TemplateLength, Chimeric, Duplicate, Multimapping, Secondary alignment, Junction-containing status, 
 	        process_line_junctions(global_context, thread_context, bin1, bin2);
 
 	if(global_context -> need_calculate_fragment_len )
