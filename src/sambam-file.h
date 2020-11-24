@@ -95,6 +95,15 @@ typedef struct
 	int is_bam_broken;
 } SamBam_FILE;
 
+struct SamBam_sorted_compressor_st{
+	char plain_text[66000];
+	char zipped_bin[66000];
+	int text_size, bin_size;
+	z_stream strm;
+	pthread_t thread_stub;
+	srInt_64 bam_block_no;
+	subread_lock_t running_lock;
+};
 
 typedef struct
 {
@@ -127,8 +136,13 @@ typedef struct
 	HashTable * chromosome_name_table;
 	HashTable * chromosome_id_table;
 	HashTable * chromosome_len_table;
-
 	subread_lock_t thread_bam_lock;
+
+	HashTable * block_no_p1_to_vpos_tab;
+	char * sorted_compress_plain_text_buffer;
+	int * sorted_compress_plain_text_used;
+	int sorted_compress_this_thread_no;
+	struct SamBam_sorted_compressor_st * writer_threads;
 } SamBam_Writer;
 
 // This function reads the next BAM section from the bam_fp. The buffer has a variable length but should be at least 64K bytes.
