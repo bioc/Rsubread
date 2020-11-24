@@ -2628,7 +2628,7 @@ int process_pairer_output(void * pairer_vp, int thread_no, char * bin1, char * b
 	}
 
 	process_line_buffer(global_context, thread_context, bin1, bin2);
-	if(global_context -> do_junction_counting){
+	if(0 && global_context -> do_junction_counting){
 		process_line_junctions(global_context, thread_context, bin1, bin2);
 	}
 	return 0;
@@ -3413,6 +3413,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		else	nhits1 = nhits;
 	}	// loop for is_second_read
 
+
+	if(global_context -> do_junction_counting)// junction reads that passed the basic filters will be considered with the junction counting.
+	        process_line_junctions(global_context, thread_context, bin1, bin2);
 
 	if(global_context -> need_calculate_fragment_len )
 		total_frag_len = calc_total_frag_len( global_context, thread_context, CIGAR_intervals_R1, CIGAR_intervals_R1_sections, CIGAR_intervals_R2, CIGAR_intervals_R2_sections , read_name);
