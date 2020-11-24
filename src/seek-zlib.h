@@ -9,10 +9,11 @@
 
 
 #define PARALLEL_GZIP_TXT_BUFFER_SIZE (1024*1024)
+#define PARALLEL_GZIP_ZIPPED_BUFFER_SIZE (PARALLEL_GZIP_TXT_BUFFER_SIZE + 2048)
 
 typedef struct{
 	int thread_no;
-	int out_buffer_used;
+	int in_buffer_used;
 	char in_buffer[PARALLEL_GZIP_TXT_BUFFER_SIZE];
 	z_stream zipper;
 } parallel_gzip_writer_thread_t;
@@ -20,7 +21,6 @@ typedef struct{
 typedef struct{
 	int threads;
 	FILE * os_file;
-	subread_lock_t writer_lock;
 	parallel_gzip_writer_thread_t * thread_objs;
 } parallel_gzip_writer_t;
 

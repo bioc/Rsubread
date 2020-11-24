@@ -2365,9 +2365,6 @@ void do_SIGINT_remove(char * prefix, int param) {
 
 void * old_sig_TERM = NULL, * old_sig_INT = NULL;
 
-#define PAIRER_GZIP_WINDOW_BITS -15
-#define PAIRER_DEFAULT_MEM_LEVEL 8
-
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads , int has_dummy, int BAM_input, int c_level, char * out_file){
 	int x1;
 

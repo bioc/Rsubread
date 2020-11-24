@@ -639,3 +639,70 @@ void autozip_rewind(autozip_fp * fp){
 	autozip_close(fp);
 	autozip_open(fname, fp);
 }
+
+void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_filename, int total_threads){
+	memset(pzwtr, 0, sizeof(parallel_gzip_writer_t));
+	pzwtr -> threads = total_threads;
+	pzwtr -> thread_objs = calloc(sizeof(parallel_gzip_writer_thread_t), total_threads);
+	int x1;
+	for(x1=0; x1<total_threads; x1++){
+		pzwtr -> thread_objs[x1].thread_no = x1;
+		inflateInit2(&pzwtr -> thread_objs[x1].zipper, PAIRER_GZIP_WINDOW_BITS);
+	}
+}
+
+void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no){
+	if(tlen + tho -> in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE){
+		SUBREADprintf("Insufficient gzip buffer.\n");
+		return;
+	}
+	memcpy(tho -> in_buffer + tho -> in_buffer_used, text, tlen);
+	tho -> in_buffer_used += tlen;
+}
+// because we have to keep sync between three fastq files, the flush function has to be manually called three times at the same time point.
+// otherwise R1, I2 and R2 files will have inconsistent read orders.
+// the outer program has to check if any of the three in_buffers is full.
+void parallel_gzip_writer_flush(parallel_gzip_writer_t * pzwtr, int thread_no){
+	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
+	int write_txt_ptr = 0;
+	char * outbuf = malloc(PARALLEL_GZIP_ZIPPED_BUFFER_SIZE);
+	while(tho -> in_buffer_used > 0){
+		tho -> zipper . next_in = tho -> in_buffer + write_txt_ptr;
+		tho -> zipper . avail_in = tho -> in_buffer_used - write_txt_ptr;
+		tho -> zipper . next_out = outbuf;
+		tho -> zipper . avail_out = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE;
+		int defret = deflate(tho -> zipper, Z_SYNC_FLUSH);
+		int consumed_input = tho -> in_buffer_used - write_txt_ptr - tho -> zipper . avail_in;
+		int generated_output = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> zipper . avail_out;
+
+		if(defret == Z_OK){
+			write_txt_ptr += consumed_input;
+			int fret = fwrite(outbuf, 1, generated_output, pzwtr -> os_file);
+			if(fret != generated_output)
+				SUBREADprintf("Cannot write the zipped output: %d\n", fret);
+		}else{
+			SUBREADprintf("Cannot compress the zipped output: %d\n", defret);
+		}
+	}
+	tho -> in_buffer_used =0;
+	free(outbuf);
+}
+
+void plgz_finish_in_buffers(parallel_gzip_writer_t * pzwtr){
+	int x1;
+	for(x1=0; x1<pzwtr -> threads; x1++)
+		parallel_gzip_writer_flush(pzwtr, x1);
+}
+
+void parallel_gzip_writer_close(parallel_gzip_writer_t * pzwtr){
+	free(pzwtr -> thread_objs);
+	int x1;
+	plgz_finish_in_buffers(pzwtr);
+
+	for(x1=0; x1<pzwtr -> threads; x1++){
+		inflateEnd(&pzwtr -> thread_objs[x1].zipper);
+	}
+	fclose(pzwtr -> os_file);
+}
+
+

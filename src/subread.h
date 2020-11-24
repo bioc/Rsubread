@@ -399,7 +399,8 @@ struct thread_input_buffer {
 
 #define SEEKGZ_CHAIN_BLOCKS_NO 15
 #define SEEKGZ_ZLIB_WINDOW_SIZE (32*1024)
-
+#define PAIRER_GZIP_WINDOW_BITS -15
+#define PAIRER_DEFAULT_MEM_LEVEL 8
 
 typedef struct {
 	unsigned long long block_start_in_file_offset;
