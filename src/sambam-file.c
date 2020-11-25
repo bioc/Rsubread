@@ -1995,6 +1995,7 @@ void * SamBam_writer_sorted_compress(void * vptr0){
 	int deret = deflate(&me->strm,Z_FINISH);
 	me->bin_size = 66000 - me->strm.avail_out;
 	subread_lock_release(&me -> running_lock);
+	SUBREADprintf("FINISHING_SORTCOMP th#%d , which is %llu\n", this_thread_no, me -> bam_block_no);
 	return NULL;
 }
 
@@ -2019,6 +2020,7 @@ void SamBam_thread_wait_merge_write(SamBam_Writer * writer, int thread_no){
 
 
 void SamBam_writer_submit_sorted_compressing_task(SamBam_Writer * writer){
+	SUBREADprintf("SUBMIT_SORTCOMP th#%d , which is %llu\n", writer -> sorted_compress_this_thread_no, writer -> writer_threads[writer -> sorted_compress_this_thread_no].bam_block_no);
 	SamBam_thread_wait_merge_write(writer, writer -> sorted_compress_this_thread_no);
 	srInt_64 last_bam_block = writer -> writer_threads[writer -> sorted_compress_this_thread_no].bam_block_no;
 	subread_lock_occupy(&writer -> writer_threads[writer -> sorted_compress_this_thread_no].running_lock);
