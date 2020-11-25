@@ -1,6 +1,7 @@
 #include <assert.h> 
 #include "core.h"
 #include "seek-zlib.h"
+#include "input-files.h"
 #include "gene-algorithms.h"
 
 #define SEEKGZ_INIT_TEXT_SIZE (1024*1024)
@@ -644,14 +645,26 @@ void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_fil
 	memset(pzwtr, 0, sizeof(parallel_gzip_writer_t));
 	pzwtr -> threads = total_threads;
 	pzwtr -> thread_objs = calloc(sizeof(parallel_gzip_writer_thread_t), total_threads);
+	pzwtr -> os_file = f_subr_open(output_filename, "wb");
+	fputc(31, pzwtr -> os_file);
+	fputc(139, pzwtr -> os_file);
+	fputc(8, pzwtr -> os_file);
+	fputc(0, pzwtr -> os_file);
+	fputc(0, pzwtr -> os_file); // MTIME x 4
+	fputc(0, pzwtr -> os_file);
+	fputc(0, pzwtr -> os_file);
+	fputc(0, pzwtr -> os_file);
+	fputc(4, pzwtr -> os_file); // XFL : fastest
+	fputc(255, pzwtr -> os_file); // OS=unknown
 	int x1;
 	for(x1=0; x1<total_threads; x1++){
 		pzwtr -> thread_objs[x1].thread_no = x1;
-		inflateInit2(&pzwtr -> thread_objs[x1].zipper, PAIRER_GZIP_WINDOW_BITS);
+		deflateInit2(&pzwtr -> thread_objs[x1].zipper, SAMBAM_COMPRESS_LEVEL_FASTEST, Z_DEFLATED, SAMBAM_GZIP_WINDOW_BITS, 8, Z_DEFAULT_STRATEGY);
 	}
 }
 
 void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no){
+	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
 	if(tlen + tho -> in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE){
 		SUBREADprintf("Insufficient gzip buffer.\n");
 		return;
@@ -659,33 +672,41 @@ void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, 
 	memcpy(tho -> in_buffer + tho -> in_buffer_used, text, tlen);
 	tho -> in_buffer_used += tlen;
 }
+
+void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no){
+	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
+	int write_txt_ptr = 0;
+	tho -> out_buffer_used = 0;
+
+	while(tho -> in_buffer_used - write_txt_ptr > 0){
+		tho -> zipper . next_in = tho -> in_buffer + write_txt_ptr;
+		tho -> zipper . avail_in = tho -> in_buffer_used - write_txt_ptr;
+		tho -> zipper . next_out = tho -> out_buffer + tho -> out_buffer_used;
+		tho -> zipper . avail_out = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> out_buffer_used;
+		int defret = deflate(&tho -> zipper, Z_SYNC_FLUSH);
+		int consumed_input = tho -> in_buffer_used - write_txt_ptr - tho -> zipper . avail_in;
+		int generated_output = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> out_buffer_used - tho -> zipper.avail_out;
+
+		if(defret == Z_OK){
+			write_txt_ptr += consumed_input;
+			tho -> out_buffer_used += generated_output;
+		}else{
+			SUBREADprintf("Cannot compress the zipped output: %d with in_len=%d, consumed=%d and out_aval=%d\n", defret, tho -> in_buffer_used, consumed_input, tho -> zipper.avail_out);
+			break;
+		}
+	}
+	tho -> in_buffer_used =0;
+}
+
 // because we have to keep sync between three fastq files, the flush function has to be manually called three times at the same time point.
 // otherwise R1, I2 and R2 files will have inconsistent read orders.
 // the outer program has to check if any of the three in_buffers is full.
 void parallel_gzip_writer_flush(parallel_gzip_writer_t * pzwtr, int thread_no){
 	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
-	int write_txt_ptr = 0;
-	char * outbuf = malloc(PARALLEL_GZIP_ZIPPED_BUFFER_SIZE);
-	while(tho -> in_buffer_used > 0){
-		tho -> zipper . next_in = tho -> in_buffer + write_txt_ptr;
-		tho -> zipper . avail_in = tho -> in_buffer_used - write_txt_ptr;
-		tho -> zipper . next_out = outbuf;
-		tho -> zipper . avail_out = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE;
-		int defret = deflate(tho -> zipper, Z_SYNC_FLUSH);
-		int consumed_input = tho -> in_buffer_used - write_txt_ptr - tho -> zipper . avail_in;
-		int generated_output = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> zipper . avail_out;
-
-		if(defret == Z_OK){
-			write_txt_ptr += consumed_input;
-			int fret = fwrite(outbuf, 1, generated_output, pzwtr -> os_file);
-			if(fret != generated_output)
-				SUBREADprintf("Cannot write the zipped output: %d\n", fret);
-		}else{
-			SUBREADprintf("Cannot compress the zipped output: %d\n", defret);
-		}
-	}
-	tho -> in_buffer_used =0;
-	free(outbuf);
+	int fret = fwrite(tho -> out_buffer, 1, tho -> out_buffer_used, pzwtr -> os_file);
+	if(fret != tho ->out_buffer_used)
+		SUBREADprintf("Cannot write the zipped output: %d\n", fret);
+	tho -> out_buffer_used =0;
 }
 
 void plgz_finish_in_buffers(parallel_gzip_writer_t * pzwtr){
@@ -700,9 +721,70 @@ void parallel_gzip_writer_close(parallel_gzip_writer_t * pzwtr){
 	plgz_finish_in_buffers(pzwtr);
 
 	for(x1=0; x1<pzwtr -> threads; x1++){
-		inflateEnd(&pzwtr -> thread_objs[x1].zipper);
+		deflateEnd(&pzwtr -> thread_objs[x1].zipper);
 	}
 	fclose(pzwtr -> os_file);
 }
 
+
+int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char * bambin, int thread_no){
+	int reclen=0;
+	parallel_gzip_writer_t * outR1fp = outfps[0];
+	parallel_gzip_writer_t * outI1fp = outfps[1];
+	parallel_gzip_writer_t * outR2fp = outfps[2];
+
+	memcpy(&reclen, bambin,4);
+	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0;
+	memcpy(&l_read_name, bambin+12,1);
+	memcpy(&n_cigar_ops, bambin+16,2);
+	memcpy(&flag, bambin+18,2);
+	memcpy(&l_seq, bambin+20,4);
+
+	int x1=0;
+
+	parallel_gzip_writer_add_text(outR2fp,"@",1,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"@",1,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"@",1,thread_no);
+	char * readname = bambin+36;
+	parallel_gzip_writer_add_text(outR1fp,readname, 12,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,readname, 12,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,readname, 12,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,"\n",1,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
+
+	char * R1seq = bambin+36+13;
+	int R1len = 0;
+	for(R1len=0; R1seq[R1len] && R1seq[R1len]!='|' ;R1len++);
+	char * R1qual = R1seq + R1len + 1;
+	parallel_gzip_writer_add_text(outR1fp,R1seq, R1len,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"\n+\n",3,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,R1qual, R1len,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
+
+	char * I1seq = R1qual + R1len + 1;
+	int I1len = 0;
+	for(I1len=0; I1seq[I1len] && I1seq[I1len]!='|' ;I1len++);
+	char * I1qual = I1seq + I1len + 1;
+	parallel_gzip_writer_add_text(outI1fp,I1seq, I1len,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"\n+\n",3,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,I1qual, I1len,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
+
+	char oseq[l_seq+1];
+	int seqbase = 36+l_read_name+n_cigar_ops*4;
+	for(x1=0; x1<l_seq;x1++)oseq[x1]="=ACMGRSVTWYHKDBN"[(bambin[ seqbase+(x1/2)] >> (((x1%2)?0:1) *4) )&0xf];
+	oseq[l_seq]=0;
+	if(flag & 16) reverse_read(oseq,l_seq, GENE_SPACE_BASE);
+	parallel_gzip_writer_add_text(outR2fp, oseq, l_seq,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,"\n+\n",3,thread_no);
+
+	seqbase = 36+l_read_name+n_cigar_ops*4 + ( l_seq+1 )/2;
+	for(x1=0; x1<l_seq;x1++)oseq[x1]=33+bambin[ seqbase+x1];
+	if(flag & 16)reverse_quality(oseq, l_seq);
+	oseq[l_seq]=0;
+	parallel_gzip_writer_add_text(outR2fp, oseq, l_seq,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,"\n",1,thread_no);
+	return 0;
+}
 

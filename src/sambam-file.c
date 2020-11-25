@@ -1625,67 +1625,6 @@ char * duplicate_TAB_record_field(char * rline, int fno, int to_end){
 	return ret;
 }
 
-int SamBam_writer_add_read_fqs_scRNA(gzFile *outfps, char * bambin){
-	int reclen=0;
-	gzFile outR1fp = outfps[0];
-	gzFile outI1fp = outfps[1];
-	gzFile outR2fp = outfps[2];
-
-	memcpy(&reclen, bambin,4);
-	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0;
-	memcpy(&l_read_name, bambin+12,1);
-	memcpy(&n_cigar_ops, bambin+16,2);
-	memcpy(&flag, bambin+18,2);
-	memcpy(&l_seq, bambin+20,4);
-
-	int x1=0;
-
-	gzwrite(outR2fp,"@",1);
-	gzwrite(outR1fp,"@",1);
-	gzwrite(outI1fp,"@",1);
-	char * readname = bambin+36;
-	gzwrite(outR1fp,readname, 12);
-	gzwrite(outR2fp,readname, 12);
-	gzwrite(outI1fp,readname, 12);
-	gzwrite(outR1fp,"\n",1);
-	gzwrite(outR2fp,"\n",1);
-	gzwrite(outI1fp,"\n",1);
-
-	char * R1seq = bambin+36+13;
-	int R1len = 0;
-	for(R1len=0; R1seq[R1len] && R1seq[R1len]!='|' ;R1len++);
-	char * R1qual = R1seq + R1len + 1;
-	gzwrite(outR1fp,R1seq, R1len);
-	gzwrite(outR1fp,"\n+\n",3);
-	gzwrite(outR1fp,R1qual, R1len);
-	gzwrite(outR1fp,"\n",1);
-
-	char * I1seq = R1qual + R1len + 1;
-	int I1len = 0;
-	for(I1len=0; I1seq[I1len] && I1seq[I1len]!='|' ;I1len++);
-	char * I1qual = I1seq + I1len + 1;
-	gzwrite(outI1fp,I1seq, I1len);
-	gzwrite(outI1fp,"\n+\n",3);
-	gzwrite(outI1fp,I1qual, I1len);
-	gzwrite(outI1fp,"\n",1);
-
-	char oseq[l_seq+1];
-	int seqbase = 36+l_read_name+n_cigar_ops*4;
-	for(x1=0; x1<l_seq;x1++)oseq[x1]="=ACMGRSVTWYHKDBN"[(bambin[ seqbase+(x1/2)] >> (((x1%2)?0:1) *4) )&0xf];
-	oseq[l_seq]=0;
-	if(flag & 16) reverse_read(oseq,l_seq, GENE_SPACE_BASE);
-	gzwrite(outR2fp, oseq, l_seq);
-	gzwrite(outR2fp,"\n+\n",3);
-
-	seqbase = 36+l_read_name+n_cigar_ops*4 + ( l_seq+1 )/2;
-	for(x1=0; x1<l_seq;x1++)oseq[x1]=33+bambin[ seqbase+x1];
-	if(flag & 16)reverse_quality(oseq, l_seq);
-	oseq[l_seq]=0;
-	gzwrite(outR2fp, oseq, l_seq);
-	gzwrite(outR2fp,"\n",1);
-	return 0;
-}
-
 int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbin, int committable){
 	char * this_chunk_buffer=NULL;
 	srInt_64 *this_chunk_buffer_used=NULL;
@@ -2047,7 +1986,7 @@ void * SamBam_writer_sorted_compress(void * vptr0){
 	void ** vptr = vptr0;
 	SamBam_Writer * writer = vptr[0];
 	int this_thread_no = vptr[1]-NULL;
-	//TODO: compress the data.
+	free(vptr0);
 	struct SamBam_sorted_compressor_st * me = writer -> writer_threads + this_thread_no;
 	me->strm.next_in = me->plain_text;
 	me->strm.avail_in = me->text_size;
@@ -2056,6 +1995,7 @@ void * SamBam_writer_sorted_compress(void * vptr0){
 	int deret = deflate(&me->strm,Z_FINISH);
 	me->bin_size = 66000 - me->strm.avail_out;
 	subread_lock_release(&me -> running_lock);
+	return NULL;
 }
 
 void SamBam_thread_wait_merge_write(SamBam_Writer * writer, int thread_no){
@@ -2082,7 +2022,7 @@ void SamBam_writer_submit_sorted_compressing_task(SamBam_Writer * writer){
 	SamBam_thread_wait_merge_write(writer, writer -> sorted_compress_this_thread_no);
 	srInt_64 last_bam_block = writer -> writer_threads[writer -> sorted_compress_this_thread_no].bam_block_no;
 	subread_lock_occupy(&writer -> writer_threads[writer -> sorted_compress_this_thread_no].running_lock);
-	void * vptr[2];
+	void ** vptr=malloc(sizeof(void*)*2);
 	vptr[0] = writer;
 	vptr[1] = NULL + writer -> sorted_compress_this_thread_no;
 	pthread_create(&writer -> writer_threads[writer -> sorted_compress_this_thread_no].thread_stub, NULL, SamBam_writer_sorted_compress, vptr);

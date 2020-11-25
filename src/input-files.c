@@ -2936,7 +2936,8 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					BAM_next_nch;
 					header_txt [x1] = nch;
 				}
-				int is_OK = pairer -> output_header(pairer, thread_context -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
+				int is_OK = 0;
+				if(pairer -> output_header)pairer -> output_header(pairer, thread_context -> thread_id, 1, pairer -> BAM_l_text , header_txt , pairer -> BAM_l_text );
 
 				BAM_next_u32(pairer -> BAM_n_ref);
 				unsigned int ref_bin_len = 0;
@@ -2966,7 +2967,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 					ref_bin_len += 4;
 				}
 
-				is_OK = is_OK || pairer -> output_header(pairer, thread_context -> thread_id, 0, pairer -> BAM_n_ref , header_txt ,  ref_bin_len );
+				is_OK = is_OK || (pairer -> output_header?pairer -> output_header(pairer, thread_context -> thread_id, 0, pairer -> BAM_n_ref , header_txt ,  ref_bin_len ):0);
 				//SUBREADprintf("TFMT:HEADER REFS=%d TXTS=%d SIGN=%u\n", pairer -> BAM_n_ref, pairer->BAM_l_text, bam_signature);
 
 				if(header_txt) free(header_txt);
@@ -5691,7 +5692,7 @@ int SAM_pairer_run( SAM_pairer_context_t * pairer){
 			if(pairer -> is_bad_format || pairer -> is_internal_error)
 				return -1;
 			SAM_pairer_reset(pairer);
-			pairer -> reset_output_function(pairer);
+			if(pairer -> reset_output_function)pairer -> reset_output_function(pairer);
 			pairer_increase_SAMBAM_buffer(pairer);
 
 			if(pairer -> long_cigar_mode) return SAM_pairer_long_cigar_run(pairer);
