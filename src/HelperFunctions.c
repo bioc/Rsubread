@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <math.h>
 #include <unistd.h>
+#include <pthread.h>
 
 
 #ifdef MACOS
@@ -2737,4 +2738,57 @@ int get_free_total_mem(size_t * total, size_t * free_mem){
     return 0;
 #endif
 #endif
+}
+
+void worker_master_mutex_init(worker_master_mutex_t * wmt, int all_workers){
+	memset(wmt,0,sizeof(worker_master_mutex_t));
+	wmt -> conds_worker_wait = malloc(sizeof(pthread_cond_t) * all_workers);
+	wmt -> mutexs_worker_wait = malloc(sizeof(pthread_mutex_t) * all_workers);
+
+	wmt -> workers = all_workers;
+	int x1;
+	for(x1=0;x1<all_workers;x1++){
+		pthread_cond_init(&wmt -> conds_worker_wait [x1], NULL);
+		pthread_mutex_init(&wmt -> mutexs_worker_wait [x1], NULL);
+	}
+}
+
+void worker_thread_start(worker_master_mutex_t * wmt, int worker_id){
+	pthread_mutex_lock(&wmt -> mutexs_worker_wait [worker_id]);
+}
+
+void worker_master_mutex_destroy(worker_master_mutex_t * wmt){
+	int x1;
+	for(x1=0;x1<wmt -> workers;x1++){
+		pthread_mutex_destroy(&wmt -> mutexs_worker_wait [x1]);
+		pthread_cond_destroy(&wmt -> conds_worker_wait [x1]);
+	}
+	free( wmt -> conds_worker_wait);
+	free( wmt -> mutexs_worker_wait);
+}
+
+int worker_wait_for_job(worker_master_mutex_t * wmt, int worker_id){
+	pthread_cond_wait(&wmt->conds_worker_wait[worker_id], &wmt->mutexs_worker_wait[worker_id]);
+	if(wmt -> all_terminate)
+		pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
+	return wmt -> all_terminate;
+}
+
+void master_wait_for_job_done(worker_master_mutex_t * wmt, int worker_id){
+	pthread_mutex_lock(&wmt->mutexs_worker_wait[worker_id]);
+}
+
+// master collects results between master_wait_for_job_done and master_notify_worker
+void master_notify_worker(worker_master_mutex_t * wmt, int worker_id){
+	pthread_cond_signal(&wmt->conds_worker_wait[worker_id]);
+	pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
+}
+
+// this function must be called when the master thread has all the worker locks in control.
+// ie all the workers should be in the "wait_for_job" status.
+void terminate_workers(worker_master_mutex_t * wmt){
+	int x1;
+	wmt -> all_terminate = 1;
+	for(x1=0;x1<wmt -> workers;x1++)
+		master_notify_worker(wmt,x1);
 }

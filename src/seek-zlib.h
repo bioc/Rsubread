@@ -15,6 +15,8 @@ typedef struct{
 	int thread_no;
 	int in_buffer_used;
 	int out_buffer_used;
+	int CRC32;
+	int plain_length;
 	char in_buffer[PARALLEL_GZIP_TXT_BUFFER_SIZE];
 	char out_buffer[PARALLEL_GZIP_ZIPPED_BUFFER_SIZE];
 	z_stream zipper;
@@ -22,6 +24,8 @@ typedef struct{
 
 typedef struct{
 	int threads;
+	srInt_64 plain_length;
+	unsigned int CRC32;
 	FILE * os_file;
 	parallel_gzip_writer_thread_t * thread_objs;
 } parallel_gzip_writer_t;

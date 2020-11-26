@@ -677,6 +677,7 @@ void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no){
 	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
 	int write_txt_ptr = 0;
 	tho -> out_buffer_used = 0;
+	tho -> CRC32 = crc_pos(tho -> in_buffer, tho -> in_buffer_used);
 
 	while(tho -> in_buffer_used - write_txt_ptr > 0){
 		tho -> zipper . next_in = tho -> in_buffer + write_txt_ptr;
@@ -695,6 +696,7 @@ void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no){
 			break;
 		}
 	}
+	tho -> plain_length = tho -> in_buffer_used;
 	tho -> in_buffer_used =0;
 }
 
@@ -703,10 +705,14 @@ void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no){
 // the outer program has to check if any of the three in_buffers is full.
 void parallel_gzip_writer_flush(parallel_gzip_writer_t * pzwtr, int thread_no){
 	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
-	int fret = fwrite(tho -> out_buffer, 1, tho -> out_buffer_used, pzwtr -> os_file);
-	if(fret != tho ->out_buffer_used)
-		SUBREADprintf("Cannot write the zipped output: %d\n", fret);
-	tho -> out_buffer_used =0;
+	if(tho -> out_buffer_used>0){
+		int fret = fwrite(tho -> out_buffer, 1, tho -> out_buffer_used, pzwtr -> os_file);
+		pzwtr -> plain_length += tho -> plain_length;
+		pzwtr -> CRC32 = crc32_combine( pzwtr -> CRC32, tho -> CRC32, tho -> plain_length );
+		if(fret != tho ->out_buffer_used)
+			SUBREADprintf("Cannot write the zipped output: %d\n", fret);
+		tho -> out_buffer_used =0;
+	}
 }
 
 void plgz_finish_in_buffers(parallel_gzip_writer_t * pzwtr){
@@ -716,14 +722,16 @@ void plgz_finish_in_buffers(parallel_gzip_writer_t * pzwtr){
 }
 
 void parallel_gzip_writer_close(parallel_gzip_writer_t * pzwtr){
-	free(pzwtr -> thread_objs);
 	int x1;
 	plgz_finish_in_buffers(pzwtr);
 
-	for(x1=0; x1<pzwtr -> threads; x1++){
+	for(x1=0; x1<pzwtr -> threads; x1++)
 		deflateEnd(&pzwtr -> thread_objs[x1].zipper);
-	}
+	
+	fwrite(&pzwtr -> CRC32, 4, 1, pzwtr -> os_file);
+	fwrite(&pzwtr -> plain_length, 4, 1, pzwtr -> os_file); // write the first (lowest) 4 bytes in a 64-bit integer -- as gzip file format required original (uncompressed) input data modulo 2^32.
 	fclose(pzwtr -> os_file);
+	free(pzwtr -> thread_objs);
 }
 
 

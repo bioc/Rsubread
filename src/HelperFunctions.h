@@ -20,12 +20,44 @@
 #ifndef __HELPER_FUNCTIONS_H_
 #define __HELPER_FUNCTIONS_H_
 
+#include <pthread.h>
 #include "subread.h"
 #include "hashtable.h"
 
 #define PARSE_STATUS_TAGNAME 1
 #define PARSE_STATUS_TAGTYPE 2
 #define PARSE_STATUS_TAGVALUE 3
+
+typedef struct{
+	int workers;
+	pthread_cond_t *conds_worker_wait;
+	pthread_mutex_t *mutexs_worker_wait;
+	int all_terminate;
+} worker_master_mutex_t;
+
+
+/**** How to run master and worker
+ *    Master: prepare_next_job -> wait_for_last_job_done -> collect_results -> notify_worker_do_next -> goto 0 
+ *    Worker: wait_for_next_job -> do_next_job -> goto 0
+ *    The result is collected from worker while it is "wait_for_next_job": it releases the lock when "cond_wait" is called.
+ *    Master can prepare the next job while the worker is running on the last job, hence parallel.
+ */
+
+void worker_master_mutex_init(worker_master_mutex_t * wmt, int all_workers);
+void worker_thread_start(worker_master_mutex_t * wmt, int worker_id);
+void worker_master_mutex_destroy(worker_master_mutex_t * wmt);
+void worker_notify_master(worker_master_mutex_t * wmt, int worker_id);
+
+// 0 : a job is allocated; 1 : worker should terminate
+int worker_wait_for_job(worker_master_mutex_t * wmt, int worker_id);
+
+void master_wait_for_job_done(worker_master_mutex_t * wmt, int worker_id);
+// master collects results between master_wait_for_job_done and master_notify_worker
+void master_notify_worker(worker_master_mutex_t * wmt, int worker_id);
+
+// this function must be called when the master thread has all the worker locks in control.
+// ie all the workers should be in the "wait_for_job" status.
+void terminate_workers(worker_master_mutex_t * wmt);
 
 typedef struct{
 	HashTable * contig_table;

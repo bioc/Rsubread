@@ -21,6 +21,7 @@
 #define _SAMBAM_FILE_H_
 
 #include <zlib.h>
+#include "HelperFunctions.h"
 
 typedef unsigned char BS_uint_8;
 typedef unsigned short BS_uint_16;
@@ -97,12 +98,14 @@ typedef struct
 
 struct SamBam_sorted_compressor_st{
 	char plain_text[66000];
-	char zipped_bin[66000];
+	char zipped_bin[70000];
 	int text_size, bin_size;
+	unsigned int CRC32_plain;
 	z_stream strm;
 	pthread_t thread_stub;
 	srInt_64 bam_block_no;
-	subread_lock_t running_lock;
+	int last_job_done;
+	int mutex_owned_by_master;
 };
 
 typedef struct
@@ -138,10 +141,11 @@ typedef struct
 	HashTable * chromosome_len_table;
 	subread_lock_t thread_bam_lock;
 
+	worker_master_mutex_t sorted_notifier;
 	HashTable * block_no_p1_to_vpos_tab;
-	char * sorted_compress_plain_text_buffer;
-	int * sorted_compress_plain_text_used;
+	//int sorted_compress_plain_text_used;
 	int sorted_compress_this_thread_no;
+	srInt_64 this_bam_block_no;
 	struct SamBam_sorted_compressor_st * writer_threads;
 } SamBam_Writer;
 
