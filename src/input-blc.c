@@ -1261,7 +1261,7 @@ int scBAM_rebuffer(input_scBAM_t * bam_input){
 		bam_input -> section_start_pos = ftello(bam_input -> os_file);
 		int ziplen = PBam_get_next_zchunk(bam_input -> os_file, zipped_bam_buf, 66000, &bin_len);
 		if(ziplen<1) return -1;
-		bin_len = SamBam_unzip(bam_input -> section_buff, zipped_bam_buf, ziplen);
+		bin_len = SamBam_unzip(bam_input -> section_buff, 65536, zipped_bam_buf, ziplen, 0);
 		if(bin_len>0){
 			bam_input -> section_bin_bytes = bin_len;
 			bam_input -> in_section_offset = 0;

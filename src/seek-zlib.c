@@ -1,4 +1,5 @@
 #include <assert.h> 
+#include <arpa/inet.h>
 #include "core.h"
 #include "seek-zlib.h"
 #include "input-files.h"
@@ -14,7 +15,7 @@ unsigned long long seekgz_ftello(seekable_zfile_t * fp){
 }
 
 unsigned int crc_pos(char * bin, int len){
-	unsigned int crc0 = crc32(0, NULL, 0);
+	unsigned int crc0 = 0;//crc32(0, NULL, 0);
 	unsigned int CRC32 = crc32(crc0, (unsigned char *) bin, len);
 	return CRC32;
 }
@@ -645,6 +646,7 @@ void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_fil
 	memset(pzwtr, 0, sizeof(parallel_gzip_writer_t));
 	pzwtr -> threads = total_threads;
 	pzwtr -> thread_objs = calloc(sizeof(parallel_gzip_writer_thread_t), total_threads);
+	
 	pzwtr -> os_file = f_subr_open(output_filename, "wb");
 	fputc(31, pzwtr -> os_file);
 	fputc(139, pzwtr -> os_file);
@@ -659,8 +661,9 @@ void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_fil
 	int x1;
 	for(x1=0; x1<total_threads; x1++){
 		pzwtr -> thread_objs[x1].thread_no = x1;
-		deflateInit2(&pzwtr -> thread_objs[x1].zipper, SAMBAM_COMPRESS_LEVEL_FASTEST, Z_DEFLATED, SAMBAM_GZIP_WINDOW_BITS, 8, Z_DEFAULT_STRATEGY);
+		deflateInit2(&pzwtr -> thread_objs[x1].zipper, SAMBAM_COMPRESS_LEVEL_NORMAL, Z_DEFLATED, SAMBAM_GZIP_WINDOW_BITS, 8, Z_DEFAULT_STRATEGY);
 	}
+	pzwtr -> CRC32 = crc32(0, NULL, 0);
 }
 
 void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no){
@@ -673,29 +676,32 @@ void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, 
 	tho -> in_buffer_used += tlen;
 }
 
-void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no){
+void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no, int eof_marker){
 	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
 	int write_txt_ptr = 0;
+
 	tho -> out_buffer_used = 0;
 	tho -> CRC32 = crc_pos(tho -> in_buffer, tho -> in_buffer_used);
 
-	while(tho -> in_buffer_used - write_txt_ptr > 0){
+	while(tho -> in_buffer_used - write_txt_ptr > 0 || eof_marker){
 		tho -> zipper . next_in = tho -> in_buffer + write_txt_ptr;
 		tho -> zipper . avail_in = tho -> in_buffer_used - write_txt_ptr;
 		tho -> zipper . next_out = tho -> out_buffer + tho -> out_buffer_used;
 		tho -> zipper . avail_out = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> out_buffer_used;
-		int defret = deflate(&tho -> zipper, Z_SYNC_FLUSH);
+		int defret = deflate(&tho -> zipper, eof_marker?Z_FINISH:Z_FULL_FLUSH);
 		int consumed_input = tho -> in_buffer_used - write_txt_ptr - tho -> zipper . avail_in;
 		int generated_output = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> out_buffer_used - tho -> zipper.avail_out;
 
-		if(defret == Z_OK){
+		if(defret == Z_OK || defret == Z_STREAM_END ){
 			write_txt_ptr += consumed_input;
 			tho -> out_buffer_used += generated_output;
 		}else{
 			SUBREADprintf("Cannot compress the zipped output: %d with in_len=%d, consumed=%d and out_aval=%d\n", defret, tho -> in_buffer_used, consumed_input, tho -> zipper.avail_out);
 			break;
 		}
+		if(eof_marker)break;
 	}
+
 	tho -> plain_length = tho -> in_buffer_used;
 	tho -> in_buffer_used =0;
 }
@@ -705,30 +711,43 @@ void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no){
 // the outer program has to check if any of the three in_buffers is full.
 void parallel_gzip_writer_flush(parallel_gzip_writer_t * pzwtr, int thread_no){
 	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
+
 	if(tho -> out_buffer_used>0){
 		int fret = fwrite(tho -> out_buffer, 1, tho -> out_buffer_used, pzwtr -> os_file);
-		pzwtr -> plain_length += tho -> plain_length;
-		pzwtr -> CRC32 = crc32_combine( pzwtr -> CRC32, tho -> CRC32, tho -> plain_length );
-		if(fret != tho ->out_buffer_used)
-			SUBREADprintf("Cannot write the zipped output: %d\n", fret);
-		tho -> out_buffer_used =0;
+		if(fret != tho ->out_buffer_used) SUBREADprintf("Cannot write the zipped output: %d\n", fret);
+
+		if(tho -> plain_length){
+			unsigned int CRCnew = crc32_combine( pzwtr -> CRC32, tho -> CRC32, tho -> plain_length );
+			pzwtr -> plain_length += tho -> plain_length;
+			pzwtr -> CRC32 = CRCnew;
+		}
 	}
+	tho -> out_buffer_used =0;
+	tho -> plain_length = 0;
 }
 
 void plgz_finish_in_buffers(parallel_gzip_writer_t * pzwtr){
 	int x1;
-	for(x1=0; x1<pzwtr -> threads; x1++)
+	for(x1=0; x1<pzwtr -> threads; x1++){
+		if(pzwtr -> thread_objs[x1].in_buffer_used<1) continue;
+		parallel_gzip_zip_texts(pzwtr, x1, 0);
 		parallel_gzip_writer_flush(pzwtr, x1);
+	}
 }
 
 void parallel_gzip_writer_close(parallel_gzip_writer_t * pzwtr){
 	int x1;
 	plgz_finish_in_buffers(pzwtr);
 
+	// write the last "Z_FINISH" 0-len block to tell gzip that the zipped chunk end
+	pzwtr -> thread_objs[0].in_buffer_used = 0;
+	parallel_gzip_zip_texts(pzwtr, 0, 1);
+	parallel_gzip_writer_flush(pzwtr, 0);
+
 	for(x1=0; x1<pzwtr -> threads; x1++)
 		deflateEnd(&pzwtr -> thread_objs[x1].zipper);
 	
-	fwrite(&pzwtr -> CRC32, 4, 1, pzwtr -> os_file);
+	fwrite(&pzwtr -> CRC32,        4, 1, pzwtr -> os_file);
 	fwrite(&pzwtr -> plain_length, 4, 1, pzwtr -> os_file); // write the first (lowest) 4 bytes in a 64-bit integer -- as gzip file format required original (uncompressed) input data modulo 2^32.
 	fclose(pzwtr -> os_file);
 	free(pzwtr -> thread_objs);

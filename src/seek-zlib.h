@@ -15,7 +15,8 @@ typedef struct{
 	int thread_no;
 	int in_buffer_used;
 	int out_buffer_used;
-	int CRC32;
+	unsigned int CRC32;
+	unsigned int zipped_CRC32;
 	int plain_length;
 	char in_buffer[PARALLEL_GZIP_TXT_BUFFER_SIZE];
 	char out_buffer[PARALLEL_GZIP_ZIPPED_BUFFER_SIZE];
@@ -35,7 +36,7 @@ void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, 
 // because we have to keep sync between three fastq files, the flush function has to be manually called three times at the same time point.
 // otherwise R1, I2 and R2 files will have inconsistent read orders.
 // the outer program has to check if any of the three in_buffers is full.
-void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no);
+void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no, int for_eof_marker);
 void parallel_gzip_writer_flush(parallel_gzip_writer_t * pzwtr, int thread_no);
 void parallel_gzip_writer_close(parallel_gzip_writer_t * pzwtr);
 int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char * bambin, int thread_no);

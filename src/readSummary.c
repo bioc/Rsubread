@@ -2613,10 +2613,10 @@ void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thr
 	return ret;
 }
 
-void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bin1);
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bin1, int step);
 void process_scRNAr2_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context,  char * bin1, char * bin2){
 	char * read_name = bin1+36;
-	add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1);
+	add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 1);
 }
 
 int process_pairer_scRNAr2_output(void * pairer_vp, int thread_no, char * bin1, char * bin2){
@@ -2985,6 +2985,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
+		if(global_context -> do_scRNA_table)add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 0);
 		if(((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required){
 				if(RG_ptr){
 					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
@@ -3767,34 +3768,37 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
  	}
 }
 
-void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bambin ){
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bambin, int step ){
 	int sample_id= -1;
 	char * fixed_sample_barcode=NULL, * cell_bc = NULL, * umi = NULL;
 	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, &sample_id, &cell_bc, &umi, NULL);
-	int fixed_cell_bc_no = scRNA_get_cell_id(global_context, thread_context, cell_bc);
-	//SUBREADprintf("GET BCC = %s => %d [%lld]\n",  cell_bc , fixed_cell_bc_no, global_context -> scRNA_cell_barcodes_array -> numOfElements);
-	if(fixed_cell_bc_no < 0) return;
+	char * fixed_cell_bc = NULL, *fixed_UMI = NULL ;
 
-	char * fixed_cell_bc = ArrayListGet(global_context -> scRNA_cell_barcodes_array,fixed_cell_bc_no);
+	if(step){
+		int fixed_cell_bc_no = scRNA_get_cell_id(global_context, thread_context, cell_bc);
+		//SUBREADprintf("GET BCC = %s => %d [%lld]\n",  cell_bc , fixed_cell_bc_no, global_context -> scRNA_cell_barcodes_array -> numOfElements);
+		if(fixed_cell_bc_no < 0) return;
+		fixed_cell_bc = ArrayListGet(global_context -> scRNA_cell_barcodes_array,fixed_cell_bc_no);
+		int umi_end_pos=0,nch;
+		for(umi_end_pos=0; 0!=(nch = umi [umi_end_pos]); umi_end_pos++) if(!isalpha(nch))break;
+		umi[umi_end_pos] = 0;
+		int UMIno_before_fixing = HashTableGet(global_context -> scRNA_merged_umi_table, umi) - NULL-1;
+		if(UMIno_before_fixing<0) return; 
 
-	int umi_end_pos=0,nch;
-	for(umi_end_pos=0; 0!=(nch = umi [umi_end_pos]); umi_end_pos++) if(!isalpha(nch))break;
-	umi[umi_end_pos] = 0;
-	int UMIno_before_fixing = HashTableGet(global_context -> scRNA_merged_umi_table, umi) - NULL-1;
-	if(UMIno_before_fixing<0) return; 
+		int fixed_UMI_no = HashTableGet(global_context ->scRNA_umi_nos_p1_before_after_fixing, NULL+( fixed_cell_bc_no *1llu << 32 )+1+UMIno_before_fixing) - NULL;
+		if(fixed_UMI_no >0) fixed_UMI_no--;
+		else fixed_UMI_no = UMIno_before_fixing;
+		umi[umi_end_pos] = nch;
+		fixed_UMI = ArrayListGet(global_context -> scRNA_merged_umi_list, fixed_UMI_no);
+	}
 
-	int fixed_UMI_no = HashTableGet(global_context ->scRNA_umi_nos_p1_before_after_fixing, NULL+( fixed_cell_bc_no *1llu << 32 )+1+UMIno_before_fixing) - NULL;
-	if(fixed_UMI_no >0) fixed_UMI_no--;
-	else fixed_UMI_no = UMIno_before_fixing;
-	umi[umi_end_pos] = nch;
-
-	char * fixed_UMI = ArrayListGet(global_context -> scRNA_merged_umi_list, fixed_UMI_no);
 	//SUBREADprintf("GET UUC = %s,%d => %d [%lld]\n",  umi, UMIno_before_fixing , fixed_UMI_no, global_context -> scRNA_merged_umi_list -> numOfElements);
 
 //	SUBREADprintf("SRR2:%s => %d\n", read_name, sample_id);
 
 	if(sample_id>0){
 		thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
+		if(step==0)return;
 		if(global_context -> is_scRNA_BAM_FQ_out_generated){
 			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
 			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
@@ -3807,9 +3811,9 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 				if( gz3fps[0]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
 				    gz3fps[1]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
 				    gz3fps[2]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ){
-					parallel_gzip_zip_texts(gz3fps[0], thread_context -> thread_id);
-					parallel_gzip_zip_texts(gz3fps[1], thread_context -> thread_id);
-					parallel_gzip_zip_texts(gz3fps[2], thread_context -> thread_id);
+					parallel_gzip_zip_texts(gz3fps[0], thread_context -> thread_id, 0);
+					parallel_gzip_zip_texts(gz3fps[1], thread_context -> thread_id, 0);
+					parallel_gzip_zip_texts(gz3fps[2], thread_context -> thread_id, 0);
 					pthread_spin_lock(sample_bam_2fps[4]);
 					parallel_gzip_writer_flush(gz3fps[0], thread_context -> thread_id);
 					parallel_gzip_writer_flush(gz3fps[1], thread_context -> thread_id);
@@ -5511,7 +5515,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, fnamet);
 	parallel_gzip_writer_t * gzipR1fq=NULL, * gzipI1fq=NULL, * gzipR2fq=NULL;
 
-	if(global_context -> scRNA_input_mode == GENE_INPUT_BCL){
+	if(global_context -> scRNA_input_mode == GENE_INPUT_BCL || global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
 		gzipR1fq = calloc(sizeof(parallel_gzip_writer_t),1);
 		gzipI1fq = calloc(sizeof(parallel_gzip_writer_t),1);
 		gzipR2fq = calloc(sizeof(parallel_gzip_writer_t),1);
@@ -7795,6 +7799,7 @@ void scRNA_generate_BAM_FASTQ(fc_thread_global_context_t * global_context){
 
 	SAM_pairer_create(&global_context -> scRNA_read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, 1 /* is bam */, 0 /* do not drop seq/qual */ , 1 /*single end*/, 0 /*do not sort*/,0 /* no RG*/ ,0, global_context -> input_file_name, NULL, NULL, process_pairer_scRNAr2_output, rand_prefix, global_context,  9999);
 	SAM_pairer_run(&global_context -> scRNA_read_pairer);
+	SAM_pairer_destroy(&global_context -> scRNA_read_pairer);
 }
 
 int readSummary_single_file(fc_thread_global_context_t * global_context, read_count_type_t * column_numbers, srInt_64 nexons,  int * geneid, char ** chr, srInt_64 * start, srInt_64 * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, srInt_64 * anno_chr_head, srInt_64 * block_end_index, srInt_64 * block_min_start , srInt_64 * block_max_end, fc_read_counters * my_read_counter, HashTable * junction_global_table, HashTable * splicing_global_table, HashTable * merged_RG_table, fc_feature_info_t * loaded_features)

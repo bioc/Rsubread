@@ -5274,7 +5274,7 @@ int SAM_nosort_decompress_next_block(SAM_pairer_context_t * pairer){
 	} else (* BIN_buff_used) = 0;
 	(* BIN_buff_ptr) = 0;
 
-	int binlen = SamBam_unzip(BIN_buff + (* BIN_buff_used), SBAM_buff , SBAM_used);
+	int binlen = SamBam_unzip(BIN_buff + (* BIN_buff_used), 65536, SBAM_buff , SBAM_used, 0);
 	//assert(binlen == decompressed_len);
 	if(binlen < 0) return -1;
 	(* BIN_buff_used) += binlen;

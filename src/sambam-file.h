@@ -211,7 +211,7 @@ int SamBam_writer_add_read(SamBam_Writer * writer, int threadno, char * read_nam
 
 int is_badBAM(char * fn);
 
-int SamBam_unzip(char * out , char * in , int inlen);
+int SamBam_unzip(char * out, int out_max_len , char * in , int inlen, int sync_only);
 
 int SamBam_fetch_next_chunk(SamBam_FILE *fp);
 
