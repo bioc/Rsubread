@@ -2791,7 +2791,9 @@ void master_wait_for_job_done(worker_master_mutex_t * wmt, int worker_id){
 		while(1){
 			pthread_mutex_lock(&wmt->mutexs_worker_wait[worker_id]);
 			if(!wmt->worker_is_working[worker_id])break;
-			// in a rare situation, the worker hasn't been scheduled after the last notification.
+			// In a rare situation, the worker hasn't been scheduled after the last notification.
+			// Namely, the master will notify twice the worker when the worker thread hasn't started at all. The second notification will cause no condition signaled.
+			// This test is to prevent such a situation.
 			pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
 			usleep(50);
 		}
