@@ -2744,6 +2744,8 @@ void worker_master_mutex_init(worker_master_mutex_t * wmt, int all_workers){
 	memset(wmt,0,sizeof(worker_master_mutex_t));
 	wmt -> conds_worker_wait = malloc(sizeof(pthread_cond_t) * all_workers);
 	wmt -> mutexs_worker_wait = malloc(sizeof(pthread_mutex_t) * all_workers);
+	wmt -> mutex_with_master = calloc(sizeof(int), all_workers);
+	wmt -> worker_is_working = calloc(sizeof(int), all_workers);
 
 	wmt -> workers = all_workers;
 	int x1;
@@ -2754,7 +2756,8 @@ void worker_master_mutex_init(worker_master_mutex_t * wmt, int all_workers){
 }
 
 void worker_thread_start(worker_master_mutex_t * wmt, int worker_id){
-	pthread_mutex_lock(&wmt -> mutexs_worker_wait [worker_id]);
+	pthread_mutex_lock(&wmt->mutexs_worker_wait[worker_id]);
+	wmt -> mutex_with_master[worker_id] = 0;
 }
 
 void worker_master_mutex_destroy(worker_master_mutex_t * wmt){
@@ -2763,23 +2766,47 @@ void worker_master_mutex_destroy(worker_master_mutex_t * wmt){
 		pthread_mutex_destroy(&wmt -> mutexs_worker_wait [x1]);
 		pthread_cond_destroy(&wmt -> conds_worker_wait [x1]);
 	}
+	free( wmt -> worker_is_working);
+	free( wmt -> mutex_with_master);
 	free( wmt -> conds_worker_wait);
 	free( wmt -> mutexs_worker_wait);
 }
 
 int worker_wait_for_job(worker_master_mutex_t * wmt, int worker_id){
-	pthread_cond_wait(&wmt->conds_worker_wait[worker_id], &wmt->mutexs_worker_wait[worker_id]);
-	if(wmt -> all_terminate)
-		pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
+
+int trv = pthread_mutex_trylock(wmt->mutexs_worker_wait + worker_id);
+	wmt->worker_is_working[worker_id] = 0;
+	while(1){
+		pthread_cond_wait(&wmt->conds_worker_wait[worker_id], &wmt->mutexs_worker_wait[worker_id]);
+		if(wmt -> all_terminate)
+			pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
+		if(wmt -> mutex_with_master[worker_id] == 0)break;
+		// otherwise, it is a spurious wakeup
+	}
 	return wmt -> all_terminate;
 }
 
 void master_wait_for_job_done(worker_master_mutex_t * wmt, int worker_id){
-	pthread_mutex_lock(&wmt->mutexs_worker_wait[worker_id]);
+	if(!wmt -> mutex_with_master[worker_id] ){
+		while(1){
+			pthread_mutex_lock(&wmt->mutexs_worker_wait[worker_id]);
+			if(!wmt->worker_is_working[worker_id])break;
+			// in a rare situation, the worker hasn't been scheduled after the last notification.
+			pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
+			usleep(50);
+		}
+		if(wmt->worker_is_working[worker_id])
+			SUBREADprintf("ERROR 3: HOW CAN I HAVE THIS LOCK : %d?? TH_%d\n", wmt->worker_is_working[worker_id], worker_id);
+	}
+	wmt -> mutex_with_master[worker_id] = 1;
 }
 
 // master collects results between master_wait_for_job_done and master_notify_worker
 void master_notify_worker(worker_master_mutex_t * wmt, int worker_id){
+	if(!wmt -> mutex_with_master[worker_id])SUBREADprintf("ERROR 2: HOW CAN I NOT HAVE THE LOCK : %d ; TERM=%d\n", worker_id, wmt -> all_terminate);
+
+	wmt -> worker_is_working[worker_id] = 1;
+	wmt -> mutex_with_master[worker_id] = 0;
 	pthread_cond_signal(&wmt->conds_worker_wait[worker_id]);
 	pthread_mutex_unlock(&wmt->mutexs_worker_wait[worker_id]);
 }

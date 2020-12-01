@@ -3792,10 +3792,6 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 		fixed_UMI = ArrayListGet(global_context -> scRNA_merged_umi_list, fixed_UMI_no);
 	}
 
-	//SUBREADprintf("GET UUC = %s,%d => %d [%lld]\n",  umi, UMIno_before_fixing , fixed_UMI_no, global_context -> scRNA_merged_umi_list -> numOfElements);
-
-//	SUBREADprintf("SRR2:%s => %d\n", read_name, sample_id);
-
 	if(sample_id>0){
 		thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
 		if(step==0)return;

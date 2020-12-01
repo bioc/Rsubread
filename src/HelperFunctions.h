@@ -30,9 +30,11 @@
 
 typedef struct{
 	int workers;
+	int * mutex_with_master;
 	pthread_cond_t *conds_worker_wait;
 	pthread_mutex_t *mutexs_worker_wait;
 	int all_terminate;
+	int * worker_is_working;
 } worker_master_mutex_t;
 
 
@@ -43,6 +45,7 @@ typedef struct{
  *    Master can prepare the next job while the worker is running on the last job, hence parallel.
  */
 
+void wait_worker_started(worker_master_mutex_t * wmt, int all_workers);
 void worker_master_mutex_init(worker_master_mutex_t * wmt, int all_workers);
 void worker_thread_start(worker_master_mutex_t * wmt, int worker_id);
 void worker_master_mutex_destroy(worker_master_mutex_t * wmt);

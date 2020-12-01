@@ -105,7 +105,6 @@ struct SamBam_sorted_compressor_st{
 	pthread_t thread_stub;
 	srInt_64 bam_block_no;
 	int last_job_done;
-	int mutex_owned_by_master;
 };
 
 typedef struct
