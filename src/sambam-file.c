@@ -2454,7 +2454,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 	terminate_workers(&writer->sorted_notifier);
 	for(thread_i = 0; thread_i < writer -> threads; thread_i++){
 		pthread_join(writer -> writer_threads[thread_i].thread_stub, NULL);
-		inflateEnd(&(writer -> writer_threads[thread_i].strm));
+		deflateEnd(&(writer -> writer_threads[thread_i].strm));
 	}
 	HashTableDestroy(writer -> block_no_p1_to_vpos_tab);
 	
