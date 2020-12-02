@@ -3677,7 +3677,7 @@ void scRNA_move_barcodes_to_tags(fc_thread_global_context_t * global_context,  f
 
 	for(x1=1; x1<l_read_name-1; x1++){
 		char rnchar = inbin [ 36 + x1];
-		if(rnchar == SCRNA_READ_NAME_SPLIT_CHAR){
+		if(rnchar == SCRNA_READ_NAME_SPLIT_CHAR || (rnchar== ':' && global_context -> scRNA_input_mode == GENE_INPUT_BCL)){
 			field_i ++;
 			if(field_i == 1){
 				new_l_read_name = x1+1;
@@ -3687,7 +3687,7 @@ void scRNA_move_barcodes_to_tags(fc_thread_global_context_t * global_context,  f
 				BC_qual = inbin+36 + x1+1;
 				UMI_len = BC_qual - BC_seq - 1 - global_context -> known_cell_barcode_length;
 				UMI_qual = BC_qual + BC_len;
-			}else if(field_i == 3){
+			}else if(field_i == 5){
 				RG = inbin+36 + x1+1;
 				RG_len = l_read_name - x1 - 2;
 			}

@@ -2296,7 +2296,7 @@ void SamBam_write_sorted_thread_collect(SamBam_Writer * writer){
 	}
 }
 
-#define SAMBAM_Block2Vpos(v) (v)=( HashTableGet(writer -> block_no_p1_to_vpos_tab, NULL+(v>>16)+1)-NULL )|(v & 0xffff);
+#define SAMBAM_Block2Vpos(v) (v)=((HashTableGet(writer -> block_no_p1_to_vpos_tab, NULL+(v>>16)+1)-NULL )<<16 )|(v & 0xffff);
 void SamBam_write_BAI_for_1chr(SamBam_Writer * writer, HashTable ** bin_chunks_table, ArrayList ** bins_list, ArrayList ** win16k_list){
 	SamBam_write_sorted_thread_collect(writer);
 
@@ -2406,7 +2406,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 
 	SAMBAM_reset_sorting_writer;
 	while(1){ // GO THROUGH EACH READ and write into BAM
-		if(current_min_batch<0)SUBREADprintf("FINALTEST: OLD/NEW = %d , %d\n", old_chro_no ,chro_no);
+		//if(current_min_batch<0)SUBREADprintf("FINALTEST: OLD/NEW = %d , %d\n", old_chro_no ,chro_no);
 		if(old_chro_no >=0 && chro_no != old_chro_no){ // if there is old_chro && if has to write. Note: old_chro_no<0 means we reached the "unmapped" part of the sorted temp files
 			//SUBREADprintf("\n====== W1CHR %d =====\n", old_chro_no);
 			SamBam_write_BAI_for_1chr(writer, &bin_chunks_table, &bins_list, &win16k_list);
