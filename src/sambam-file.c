@@ -1094,7 +1094,7 @@ int test_bamview(int argc, char ** argv)
 	return 0;
 }
 
-int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int sort_reads_by_coord, char * tmpfname)
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int sort_reads_by_coord, int is_temp_BAM_file, char * tmpfname)
 {
 	memset(writer, 0, sizeof(SamBam_Writer));
 
@@ -1116,7 +1116,7 @@ int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, 
 
 	writer -> threads = threads;
 	writer -> sort_reads_by_coord = sort_reads_by_coord;
-	writer -> fastest_compression = 0;
+	writer -> fastest_compression = is_temp_BAM_file;
 	writer -> compressed_chunk_buffer = malloc(70000); 
 	writer -> chunk_buffer = malloc(70000); 
 	writer -> chunk_buffer_max_size = 70000;
@@ -1199,6 +1199,14 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	char * this_buffer = thread_no < 0 ? writer ->chunk_buffer: writer -> threads_chunk_buffer[thread_no];
 	char * this_compressed_chunk_buffer = thread_no < 0 ? writer ->compressed_chunk_buffer : writer -> threads_chunk_buffer_compressed[thread_no];
 
+	if(*this_buffer_used < 1){
+		// magic block with 0 byte data(EOF)
+		subread_lock_occupy(&writer -> thread_bam_lock);
+		fwrite( "\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43\x02\x00\x1b\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00",1,28,writer -> bam_fp);
+		writer -> current_BAM_pos = ftello(writer -> bam_fp);
+		subread_lock_release(&writer -> thread_bam_lock);
+		return;
+	}
 	//if(thread_no>=0)SUBREADprintf("MTBAM : WRITE THR_%d ; LEN=%d\n", thread_no, *this_buffer_used);
 
 	this_stream -> avail_out = 70000;

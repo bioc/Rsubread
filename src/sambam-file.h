@@ -39,8 +39,8 @@ typedef unsigned int BS_uint_32;
 #define BAM_FILE_STAGE_ALIGNMENT 20
 
 
-//#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_NO_COMPRESSION 
-#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_BEST_SPEED
+#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_NO_COMPRESSION 
+//#define SAMBAM_COMPRESS_LEVEL_FASTEST Z_BEST_SPEED
 #define SAMBAM_COMPRESS_LEVEL_NORMAL Z_BEST_SPEED
 #define SAMBAM_GZIP_WINDOW_BITS -15
 #define SAMBAM_INPUT_STREAM_SIZE 140000
@@ -194,7 +194,7 @@ int SamBam_feof(SamBam_FILE * fp);
  */
 char * SamBam_fgets(SamBam_FILE * fp , char * buff , int buff_len , int seq_needed);
 
-int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int sort_reads_by_coord, char * tmpfname);
+int SamBam_writer_create(SamBam_Writer * writer, char * BAM_fname, int threads, int sort_reads_by_coord, int is_tmp_BAM, char * tmpfname);
 
 int SamBam_writer_close(SamBam_Writer * writer);
 

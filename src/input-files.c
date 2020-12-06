@@ -2776,7 +2776,7 @@ void SAM_pairer_fill_BIN_buff(SAM_pairer_context_t * pairer ,  SAM_pairer_thread
 				if(feof(pairer -> input_fp) && last_read_len != -1 ){
 					pairer -> is_bad_format |= (last_read_len > 2);
 					pairer -> is_incomplete_BAM |= (last_read_len > 2);
-					//SUBREADprintf("BAM-FINISHED, CORRECT=%d (%d)\n", !pairer -> is_bad_format, last_read_len);
+					if(pairer -> is_incomplete_BAM)SUBREADprintf("ERROR: the BAM file seems incomplete : this %d, last %d.\n", this_size , last_read_len );
 				}
 				*is_finished = 1;
 				break;
@@ -2859,8 +2859,7 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
 			int test_read_bin = SAM_pairer_find_start(pairer, thread_context);
 			if(test_read_bin<1 && thread_context -> input_buff_BIN_used >= 32  ){
 				pairer -> is_bad_format = 1;
-			//	#warning "BADFORMAT-DEBUG"
-			//	SUBREADprintf("ABBO : BAD_FMT 01\n");
+				SUBREADprintf("ERROR: cannot find the start of the next BAM block.\n");
 			}
 		}
 		//SUBREADprintf("FETCHED BLOCK DECOMP=%d FROM COMP=%d\n", have, used_BAM);
@@ -3024,8 +3023,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 	//			#warning "=========== CHECK IF '0 && ' IS CORRECT ==========="
 				if(record_len < 32 || (0 && record_len > min(MAX_BIN_RECORD_LENGTH,60000))|| seq_len >= pairer -> long_read_minimum_length){
 					if(seq_len >= pairer -> long_read_minimum_length) pairer -> is_single_end_mode = 1;
-			//		#warning "BADFORMAT-DEBUG"
-			//		SUBREADprintf("BADFMT: THID=%d; rlen %d; seqlen %d; BIN_PTR=%d\n",  thread_context -> thread_id,  record_len, seq_len, thread_context -> input_buff_BIN_ptr);
+					SUBREADprintf("ERROR: sequence length in the BAM record is out of the expected region: %d, %d\n", record_len , seq_len );
 					pairer -> is_bad_format = 1;
 					return 0;
 				}
@@ -4612,7 +4610,10 @@ int SAM_pairer_verify_read_bin_ONE(SAM_pairer_context_t * pairer, SAM_pairer_thr
 	int block_len = 9;
 	int ret = is_read_bin_ONE(bin, binlen, pairer -> BAM_n_ref, &block_len);
 
-	if(ret != 1 || block_len+4 != binlen) ret = -1;
+	if(ret != 1 || block_len+4 != binlen){
+		SUBREADprintf("ERROR: cannot retrieve a read from the BAM file: %d, %d\n", block_len+4, ret);
+		ret = -1;
+	}
 	//SUBREADprintf("FINAL_BIN_MATCH VERIFY : %d\n", ret);
 	return ret;
 }

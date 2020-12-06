@@ -5508,7 +5508,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	sprintf(fname, "%s.bam", samplename);
 	sprintf(fnamet, "del4-cC-tmp0-%s.del", samplename);
 	SamBam_Writer * wtr = calloc(sizeof(SamBam_Writer),1);
-	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, fnamet);
+	SamBam_writer_create(wtr, fname, global_context -> thread_number, SORT_BAM_FROM_SCRNA, 0, fnamet);
 	parallel_gzip_writer_t * gzipR1fq=NULL, * gzipI1fq=NULL, * gzipR2fq=NULL;
 
 	if(global_context -> scRNA_input_mode == GENE_INPUT_BCL || global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_BAM){

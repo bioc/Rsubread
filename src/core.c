@@ -4171,8 +4171,7 @@ int load_global_context(global_context_t * context)
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
-			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates, context -> config.temp_file_prefix);
-			if(context->config.scRNA_input_mode) context -> output_bam_writer -> fastest_compression=1;
+			SamBam_writer_create(context -> output_bam_writer , tmp_fname, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates, context->config.scRNA_input_mode, context -> config.temp_file_prefix);
 			context -> output_sam_fp = NULL;
 		}
 		else
@@ -4193,7 +4192,7 @@ int load_global_context(global_context_t * context)
 		if(context -> config.is_BAM_output)
 		{
 			context -> output_bam_writer = malloc(sizeof(SamBam_Writer));
-			SamBam_writer_create(context -> output_bam_writer ,NULL, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates,  context -> config.temp_file_prefix);
+			SamBam_writer_create(context -> output_bam_writer ,NULL, context -> config.is_input_read_order_required?1:context -> config.all_threads,  context -> config.sort_reads_by_coordinates, 0,  context -> config.temp_file_prefix);
 		}
 		context->output_sam_fp = NULL;
 	}

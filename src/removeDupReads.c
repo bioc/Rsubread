@@ -163,7 +163,7 @@ int report_remainder(char *in_SAM_file, char *out_SAM_file)
 	int bam_retv = 1;
 
 	if(generate_SAM_output) out_fp = f_subr_open(out_SAM_file,"w");
-	else bam_retv = SamBam_writer_create(&writer, out_SAM_file, -1, 0, ".");
+	else bam_retv = SamBam_writer_create(&writer, out_SAM_file, -1, 0, 0, ".");
 
 	if(!(out_fp || bam_retv == 0))
 	{
