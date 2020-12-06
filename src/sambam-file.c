@@ -1899,22 +1899,18 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 }
 
 unsigned long long SamBam_writer_sort_bins_to_BAM_FP_pos(FILE * fp){
-	int blklen = 0;
+	int intvals[3];
 	unsigned long long ret = 0;
-	int rlen = fread(&blklen, 4,1,fp);
-	if(rlen>0 && blklen<10000){
-		int chro_no=0, poss=0;
-		rlen = fread(&chro_no, 4,1,fp);
-		if(rlen < 1) return SUBREAD_MAX_ULONGLONG;
-		rlen = fread(&poss, 4,1,fp);
-		if(rlen < 1) return SUBREAD_MAX_ULONGLONG;
+	int rlen = fread(intvals, sizeof(int),3,fp);
+	if(rlen>0 && intvals[0]<10000){
+		int chro_no, poss;
+		chro_no=intvals[1];
+		poss=intvals[2];
 		ret =((1LLU*chro_no) << 32)| poss;
 		if(ret == SUBREAD_MAX_ULONGLONG) ret = ret- 10 ;
-
-		fseek(fp,-12, SEEK_CUR);
+		fseek(fp, -12, SEEK_CUR);
 		return ret;
-	}else if(rlen < 1) return SUBREAD_MAX_ULONGLONG;
-	assert(rlen >0 && blklen<10000);
+	}
 	return SUBREAD_MAX_ULONGLONG;
 }
 
