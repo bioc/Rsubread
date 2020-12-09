@@ -204,7 +204,7 @@ int chars2color(char c1, char c2);
 int genekey2color(char last_base,char * key);
 
 // Convert a string key into an integer key
-int genekey2int(char key [], int space_type);
+int genekey2int(char * key, int space_type);
 
 // Open a read file. This function automatically decides its type.
 // Return 0 if successfully opened, or 1 if error occurred

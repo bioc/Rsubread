@@ -1216,11 +1216,11 @@ int genekey2int(char *key,int space_type)
 	int ret;
 
 	ret = 0;
-	int q=0;
 	if(space_type == GENE_SPACE_BASE)
 		for (i=30; i>=0; i-=2)
 		{
-			ret |= (base2int(*(key++)))<<i;
+			char c1 = *(key++);
+			ret |= base2int(c1)<<i;
 		}
 	else
 		for (i=0; i<16; i++)
