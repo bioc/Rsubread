@@ -811,10 +811,14 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 			for (;  last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++)
 			{
-				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
 				int iix, offsetX2, offsetX, datalen, datalen2;
-				offsetX2 = offsetX = _index_vote_tol(kv);
-				datalen = datalen2 = vote -> items[offsetX2];
+				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
+				offsetX2 = _index_vote_tol(kv);
+				datalen = vote -> items[offsetX2];
+				if(!datalen)continue;
+
+				datalen2 = datalen;
+				offsetX = offsetX2;
 				unsigned int * dat2, *dat;
 				dat = dat2 = vote -> pos[offsetX2];
 
@@ -826,11 +830,10 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 					{
 						offsetX = _index_vote_tol(kv+iix);
 						datalen = vote -> items[offsetX];
+						if(!datalen)continue;
+
 						dat = vote -> pos[offsetX];
 					}
-
-
-					if(!datalen)continue;
 
 					for (i=0;i<datalen;i++)
 					{
@@ -890,9 +893,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 							break;
 						}
 					}
-					if (i==9999999){
-						break;
-					}
+					if (i==9999999)break;
 
 				}
 
@@ -992,10 +993,12 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 		//for (; last_accepted_index<items && current_keys[last_accepted_index] == key ; last_accepted_index++){
 		while(1){
-			unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
 			int iix, offsetX2, offsetX, datalen, datalen2;
-			offsetX2 = offsetX = _index_vote_tol(kv);
-			datalen = datalen2 = vote -> items[offsetX2];
+			unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
+
+			offsetX = offsetX2 = _index_vote_tol(kv);
+			datalen = datalen2 = vote -> items[offsetX];
+
 			unsigned int * dat2, *dat;
 			dat = dat2 = vote -> pos[offsetX2];
 			int found_some = 0;
@@ -1003,15 +1006,12 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 			//SUBREADprintf("You can find KV at %u\n", kv);
 
 			for(iix = 0; iix<=ii_end; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)) {
-
 				if(iix) {
 					offsetX = _index_vote_tol(kv+iix);
 					datalen = vote -> items[offsetX];
+					if(!datalen)continue;
 					dat = vote -> pos[offsetX];
-				}
-
-
-				if(!datalen)continue;
+				} else if(!datalen) continue;
 
 				for (i=0;i<datalen;i++)
 				{
@@ -1046,7 +1046,6 @@ size_t gehash_go_X(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 
 						if (offset +16 > vote->coverage_end [offsetX][i])
 							vote->coverage_end [offsetX][i] = of_p_16;
-	
 	
 						if (dist0 ==  vote->current_indel_cursor[offsetX][i]){
 							vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;

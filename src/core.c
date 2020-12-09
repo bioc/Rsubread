@@ -3212,8 +3212,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 								 gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
 							else
 								 gehash_go_X(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote,  voting_max_indel_length, subread_no,  low_index_border, current_high_border, allow_indel_i, shift_indel_locs, &shift_indel_NO);
-				if(0 && FIXLENstrcmp("R00000110641:", read_name_1)==0)SUBREADprintf("SR %d = %u  %s ; SPC=%d; INDELNO=%u\n", subread_no, subread_integer, subread_string, global_context->config.space_type , shift_indel_NO);
-	
 							if(global_context->config.SAM_extra_columns)
 								noninformative_subreads_for_each_gap[xk1] = current_vote -> noninformative_subreads;
 						}
@@ -3221,22 +3219,14 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 					}
 					if(shift_indel_NO == 0 || global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection)break;
 				}
-	//			SUBREADprintf("\n");
-
-				//puts("");
 
 				if(global_context->config.SAM_extra_columns)
 				{
 					short max_noninformative_subreads = -1;
 
 					for(xk1=0;xk1<GENE_SLIDING_STEP;xk1++)
-					{
-						//SUBREADprintf("NON-INF [%d] = %d\n", xk1, noninformative_subreads_for_each_gap[xk1]);
 						if(noninformative_subreads_for_each_gap[xk1] > max_noninformative_subreads)
-						{
 							max_noninformative_subreads = noninformative_subreads_for_each_gap[xk1];
-						}
-					}
 
 					current_vote -> noninformative_subreads = max_noninformative_subreads;
 				}
@@ -3274,12 +3264,8 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed == 0)
 			{
 				reverse_read(read_text_1, read_len_1,  global_context->config.space_type);
-				if(0)reverse_quality(qual_text_1, read_len_1); // qual is not used at all.
-
-				if(global_context -> input_reads.is_paired_end_reads){
+				if(global_context -> input_reads.is_paired_end_reads)
 					reverse_read(read_text_2, read_len_2,  global_context->config.space_type);
-					if(0)reverse_quality(qual_text_2, read_len_2);  // qual is not used at all.
-				}
 			}
 		}
 

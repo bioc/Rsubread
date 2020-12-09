@@ -1216,12 +1216,11 @@ int genekey2int(char key [],int space_type)
 	int ret;
 
 	ret = 0;
+	int q=0;
 	if(space_type == GENE_SPACE_BASE)
-		for (i=0; i<16; i++)
+		for (i=30; i>=0; i-=2)
 		{
-			//SUBREADprintf("KV=%c\n", key[i]);
-			//ret = ret << 2;
-			ret |= (base2int(key[i]))<<(2*(15-i));
+			ret |= (base2int(key[q++]))<<(i);
 		}
 	else
 		for (i=0; i<16; i++)
@@ -1229,8 +1228,6 @@ int genekey2int(char key [],int space_type)
 			ret = ret << 2;
 			ret |= color2int (key[i]);
 		}
-	
-	//SUBREADprintf("RET=%u\n",ret);
 	return ret;
 }
 
