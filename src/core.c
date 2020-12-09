@@ -3207,7 +3207,6 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 							char * subread_string = current_read + subread_offset;
 	
 							gehash_key_t subread_integer = genekey2int(subread_string, global_context->config.space_type);
-	
 							if(global_context->config.is_methylation_reads)
 								 gehash_go_q_CtoT(global_context->current_index, subread_integer , subread_offset, current_rlen, is_reversed, current_vote, 1, 0xffffff, voting_max_indel_length, subread_no, 1,  low_index_border, high_index_border - current_rlen);
 							else

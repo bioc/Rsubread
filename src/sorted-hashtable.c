@@ -815,7 +815,6 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 				unsigned int kv = current_bucket->item_values[last_accepted_index] - offset;
 				offsetX2 = _index_vote_tol(kv);
 				datalen = vote -> items[offsetX2];
-				if(!datalen)continue;
 
 				datalen2 = datalen;
 				offsetX = offsetX2;
@@ -833,7 +832,7 @@ size_t gehash_go_q(gehash_t * the_table, gehash_key_t raw_key, int offset, int r
 						if(!datalen)continue;
 
 						dat = vote -> pos[offsetX];
-					}
+					}else if(!datalen)continue;
 
 					for (i=0;i<datalen;i++)
 					{
