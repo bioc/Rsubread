@@ -1210,7 +1210,7 @@ int genekey2intX(char * key,int space_type)
 }
 
 
-int genekey2int(char key [],int space_type)
+int genekey2int(char *key,int space_type)
 {
 	int i;
 	int ret;
@@ -1220,7 +1220,7 @@ int genekey2int(char key [],int space_type)
 	if(space_type == GENE_SPACE_BASE)
 		for (i=30; i>=0; i-=2)
 		{
-			ret |= (base2int(key[q++]))<<(i);
+			ret |= (base2int(*(key++)))<<i;
 		}
 	else
 		for (i=0; i<16; i++)
