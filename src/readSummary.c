@@ -5133,14 +5133,17 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		}
 
 		for(xk1=0; xk1< global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
-			if(1)SUBREADprintf("MERGENOS_8CODE %lld  TIME=%u\n", merged_sample_cell_umi_tables[xk1] ->numOfElements, time(NULL));
+			if(0)SUBREADprintf("MERGENOS_8CODE %lld\n", merged_sample_cell_umi_tables[xk1] ->numOfElements);
 			merged_sample_cell_umi_tables[xk1] -> appendix1 = global_context;
 			merged_sample_cell_umi_tables[xk1] -> appendix2 = used_cell_no_tables[xk1];
 			merged_sample_cell_umi_tables[xk1] -> appendix3 = global_context -> scRNA_merged_umi_list;
 			HashTableIteration(  merged_sample_cell_umi_tables[xk1], scRNA_merge_merge_UMIs);
 		}
-		if(1)SUBREADprintf("MERGENOS_8CODE END TIME=%u\n", time(NULL));
 
+		if(0){SUBREADprintf("MGRRE_7CODE_NON %lld\n", global_context -> scRNA_merged_umi_list -> numOfElements);
+		for(xk1=0; xk1< global_context -> scRNA_merged_umi_list->numOfElements; xk1++){
+			SUBREADprintf("MGRRE_7CODE_UMI %lld\t%s\n", xk1, ArrayListGet(global_context -> scRNA_merged_umi_list, xk1));
+		}}
 		scRNA_merged_to_tables_write(global_context , merged_sample_cell_umi_tables , used_cell_no_tables, global_context -> scRNA_merged_umi_list, loaded_features, nexons);
 
 		for(xk1=0; xk1<global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
