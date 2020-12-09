@@ -4054,9 +4054,10 @@ int load_global_context(global_context_t * context)
 	}
 
 	if(context->config.scRNA_input_mode){
-		// opening a BCL input needs the exact chunk size. 
+		context -> config.reads_per_chunk *= 2;
 		context -> config.multi_best_reads = 3;
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
+		// opening a BCL input needs the exact chunk size. 
 		if(context->config.multi_best_reads>1) context -> config.reads_per_chunk /= context->config.multi_best_reads;
 	}
 	print_in_box(80,0,0,"Check the input reads.");
