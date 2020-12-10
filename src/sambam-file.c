@@ -2469,6 +2469,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 
 void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id){
 	if(writer -> sort_reads_by_coord){
+		//SUBREADprintf("WTRWPP threads_chunk_buffer_used [%d] = %d\n", thread_id, writer -> threads_chunk_buffer_used[thread_id]);
 		SamBam_writer_sort_buff_one_write(writer, writer -> threads_chunk_buffer[thread_id], writer -> threads_chunk_buffer_used[thread_id], thread_id);
 		writer -> threads_chunk_buffer_used [thread_id] = 0;
 	}else{

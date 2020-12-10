@@ -3653,16 +3653,11 @@ int scRNA_get_cell_id(fc_thread_global_context_t * global_context, fc_thread_thr
 	return tb1;
 }
 
-#define SCRNA_BAM_WRITE_SECTION (40llu*1000*1000)
+#define SCRNA_BAM_WRITE_SECTION (400*1000*1000)
 void sorted_bam_scRNA_write( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, void ** vv ){
-	if( thread_context -> thread_id != 0 )return;
-	if( vv[5] < NULL+SCRNA_BAM_WRITE_SECTION )return;
-	pthread_spin_lock(vv[4]);
-	int thi;
-	for(thi=0; thi<global_context->thread_number; thi++)
-		SamBam_writer_finalise_thread(vv[0], thi);
-	vv[5]=NULL;
-	pthread_spin_unlock(vv[4]);
+	SamBam_Writer * wtr = vv[0];
+	int thi = thread_context -> thread_id;
+	if(wtr -> threads_chunk_buffer_used[thi]>SCRNA_BAM_WRITE_SECTION ) SamBam_writer_finalise_thread(wtr, thi);
 }
 #define SCRNA_READ_NAME_SPLIT_CHAR '|'
 
@@ -3802,7 +3797,6 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
 			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
 			sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
-			sample_bam_2fps[5]=sample_bam_2fps[5]+1;
 
 			if(GENE_INPUT_SCRNA_FASTQ != global_context -> scRNA_input_mode){
 				parallel_gzip_writer_t **gz3fps = (parallel_gzip_writer_t **)sample_bam_2fps+1;
@@ -5480,14 +5474,16 @@ void scRNA_close_sample_SamBam_writers(void *v){
 	SamBam_writer_close(wtr);
 	free(wtr);
 
-	parallel_gzip_writer_t* gzfp = vv[1];
-	parallel_gzip_writer_close(gzfp);
+	if(vv[1]){
+		parallel_gzip_writer_t* gzfp = vv[1];
+		parallel_gzip_writer_close(gzfp);
 
-	gzfp = vv[2];
-	parallel_gzip_writer_close(gzfp);
+		gzfp = vv[2];
+		parallel_gzip_writer_close(gzfp);
 
-	gzfp = vv[3];
-	parallel_gzip_writer_close(gzfp);
+		gzfp = vv[3];
+		parallel_gzip_writer_close(gzfp);
+	}
 
 	pthread_spinlock_t * gz_lock = vv[4];
 	pthread_spin_destroy(gz_lock);
