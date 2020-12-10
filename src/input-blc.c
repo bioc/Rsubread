@@ -941,14 +941,13 @@ int do_R_try_cell_barcode_files(int argc, char ** argv){
 int cacheBCL_qualTest_BAMmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
 	input_scBAM_t * scBAM_input = malloc(sizeof(input_scBAM_t));
 	int ret = input_scBAM_init(scBAM_input, datadir);
+	SUBREADprintf("cacheBCL_qualTest_RET_BAMmode = %d for %s\n", ret, datadir);
 	if(ret)return ret;
 	while(1){
 		char base[MAX_READ_LENGTH], qual[MAX_READ_LENGTH], rname[MAX_READ_NAME_LEN];
 		base[0]=qual[0]=rname[0]=0;
 		ret = scBAM_next_read(scBAM_input, rname , base, qual);
 		if(ret<=0)break;
-//		SUBREADprintf("BBRNAME %s\n", rname);
-
 		char *cell_barcode = NULL, *sample_barcode=NULL, *lane_str=NULL;
 
 		int xx=0, laneno=0;
@@ -988,28 +987,18 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 		ret = input_mFQ_next_read(&fqs_input, rname , base, qual);
 		if(ret<=0)break;
 
-		char *cell_barcode = NULL, *sample_barcode=NULL, *lane_str=NULL;
-
-
-		int xx=0, laneno=0;
+		char *cell_barcode = NULL;
+		//SUBREADprintf("RETV=%d, RN=%s\n" ,ret, rname);
+		int xx=0;
 		char *testi;
 		for(testi = rname+1; * testi; testi ++){
 			if( * testi=='|'){
 				xx++;
-				if(xx == 2) {
+				if(xx == 1) {
 					cell_barcode = testi+1;
-				}else if(xx == 2) {
-					sample_barcode = testi +1;
-				}else if(xx == 4){
-					lane_str = testi+1;
 					break;
 				}
 			}
-		}
-
-		if(xx == 4) for(testi = lane_str+1; *testi; testi++){
-			assert(isdigit(*testi));
-			laneno = laneno*10 + (*testi)-'0';
 		}
 
 		int cell_no = iCache_get_cell_no(cell_barcode_table, cell_barcode_list, cell_barcode, known_cell_barcode_length);

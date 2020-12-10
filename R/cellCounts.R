@@ -884,6 +884,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
   temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame()
+  sample.1 <- paste0(temp.file.prefix,".samplesheet")
+
   if(input.mode=="BCL"){
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
     if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
@@ -897,7 +899,6 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
     for(dirname in dirs){
       unique.samples <- unique( sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] )
   
-      sample.1 <- paste0(temp.file.prefix,".samplesheet")
       if(is.null(cell.barcode)){
         .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
         cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
@@ -945,10 +946,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       }
     }
   } else if(input.mode == "BAM"){
-    sample.1 <- paste0(temp.file.prefix,".samplesheet")
-
     if(is.null(cell.barcode)){
-      cell.barcode <- .find_best_cellbarcode(sample, input.mode="bam")
+      cell.barcode <- .find_best_cellbarcode(sample$BAMFile, "N/A", input.mode="bam")
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
@@ -978,6 +977,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
     print(sample.info.idx)
     if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
+ 
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.info.idx)){
       df1 <- as.character(sample.info.idx[rowi,"BarcodeUMIFile"])
@@ -987,7 +987,12 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
     }
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
-
+    if(is.null(cell.barcode)){
+      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, "N/A", input.mode="fastq")
+    }else{
+      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+    }
+ 
     bam.for.FC <- c()
     if(is.null(aligner)){
       bam.for.FC <- paste0(sample.info.idx$SampleName,".bam")
@@ -998,9 +1003,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       bam.for.FC <- temp.file.prefix
       generate.scRNA.BAM <- TRUE
     }
-
-    sample.1 <- paste0(temp.file.prefix,".samplesheet")
-    .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
+    .index.names.to.sheet.FASTQ.mode(sample, sample.1)
     .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
 
     raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
