@@ -2616,7 +2616,7 @@ void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thr
 void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bin1, int step);
 void process_scRNAr2_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context,  char * bin1, char * bin2){
 	char * read_name = bin1+36;
-	add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 1);
+	add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 2);
 }
 
 int process_pairer_scRNAr2_output(void * pairer_vp, int thread_no, char * bin1, char * bin2){
@@ -2966,6 +2966,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 			this_is_inconsistent_read_type = 1;
 		}
+
+		if(global_context -> do_scRNA_table)add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 0);
+
 		if(is_second_read == 0)
 		{
 			//skip the read if unmapped (its mate will be skipped as well if paired-end)
@@ -2985,7 +2988,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 			}
 		}
 
-		if(global_context -> do_scRNA_table)add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 0);
+		if(global_context -> do_scRNA_table)add_scRNA_read_tota1_no(global_context, thread_context, read_name, bin1, 1);
 		if(((alignment_masks & SAM_FLAG_UNMAPPED) || (alignment_masks & SAM_FLAG_MATE_UNMATCHED)) && global_context -> is_paired_end_mode_assign && global_context -> is_both_end_required){
 				if(RG_ptr){
 					void ** tab4s = get_RG_tables(global_context, thread_context, RG_ptr);
@@ -3774,7 +3777,7 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, &sample_id, &cell_bc, &umi, NULL);
 	char * fixed_cell_bc = NULL, *fixed_UMI = NULL ;
 
-	if(step){
+	if(step == 2){
 		int fixed_cell_bc_no = scRNA_get_cell_id(global_context, thread_context, cell_bc);
 		//SUBREADprintf("GET BCC = %s => %d [%lld]\n",  cell_bc , fixed_cell_bc_no, global_context -> scRNA_cell_barcodes_array -> numOfElements);
 		if(fixed_cell_bc_no < 0) return;
@@ -3793,9 +3796,9 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	}
 
 	if(sample_id>0){
-		thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
-		if(step==0)return;
-		if(global_context -> is_scRNA_BAM_FQ_out_generated){
+		if(step==0) thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
+		else if(step==1) thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
+		else if(global_context -> is_scRNA_BAM_FQ_out_generated){
 			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
 			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
 			sorted_bam_scRNA_write(global_context, thread_context, sample_bam_2fps);
@@ -3823,7 +3826,6 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 			SamBam_writer_add_read_bin(sample_bam_2fps[0], thread_context -> thread_id, bambin_out, 1);
 			free(bambin_out);
 		}
-		thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
 	}
 }
 
@@ -6374,6 +6376,7 @@ static struct option long_options[] =
 	{"detectionCall", no_argument, 0,0},
 	{"Rpath", required_argument, 0, 0},
 	{"scSampleSheet", required_argument, 0, 0},
+	{"scInputMode", required_argument, 0, 0},
 	{"scCellBarcodeFile", required_argument, 0, 0},
 	{0, 0, 0, 0}
 };
@@ -7859,7 +7862,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[60];
+	char * Rargv[61];
 	char annot_name[MAX_FILE_NAME_LENGTH];
 	char temp_dir[MAX_FILE_NAME_LENGTH];
 	char * out_name = malloc(MAX_FILE_NAME_LENGTH);
@@ -7922,6 +7925,7 @@ int feature_count_main(int argc, char ** argv)
 	int option_index = 0;
 	int max_missing_bases_in_feature = -1;
 	int max_missing_bases_in_read = -1;
+	int scRNA_input_mode = GENE_INPUT_BCL;
 	int c;
 	int very_long_file_names_size = 200;
 	int fiveEndExtension = 0, threeEndExtension = 0, minFragmentOverlap = 1;
@@ -8082,6 +8086,7 @@ int feature_count_main(int argc, char ** argv)
 				if(strcmp("countReadPairs", long_options[option_index].name)==0){
 					is_PE=1;
 				}
+
 				if(strcmp("primary", long_options[option_index].name)==0)
 				{
 					is_primary_alignment_only = 1;
@@ -8139,6 +8144,15 @@ int feature_count_main(int argc, char ** argv)
 				{
 					 strcpy(scRNA_sample_sheet,optarg);
 				}
+
+				if(strcmp("scInputMode", long_options[option_index].name)==0)
+				{
+					if(strcmp("FASTQ", optarg)==0)
+						scRNA_input_mode=GENE_INPUT_SCRNA_FASTQ;
+					if(strcmp("BAM", optarg)==0)
+						scRNA_input_mode=GENE_INPUT_SCRNA_BAM;
+				}
+
 
 				if(strcmp("extraAttributes", long_options[option_index].name)==0)
 				{
@@ -8367,11 +8381,14 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[57] = scRNA_cell_barcode_list;
 	Rargv[58] = is_paired_end_reads_expected;
 	Rargv[59] = is_scRNA_BAM_FQ_out_generated?"1":"0";
-	// Rargv[60] should be scRNA_input_mode : 1 or 0
+
+	Rargv[60] = "3";
+	if(scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ) Rargv[60] = "4";
+	if(scRNA_input_mode == GENE_INPUT_SCRNA_BAM) Rargv[60] = "5";
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(60, Rargv);
+	else retvalue = readSummary(61, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
