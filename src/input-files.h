@@ -326,6 +326,7 @@ void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);
 int SAM_pairer_iterate_tags(unsigned char * bin, int bin_len, char * tag_name, char * data_type, char ** saved_value);
 int SAM_pairer_warning_file_open_limit();
+int SAM_pairer_get_tag_bin_start(char * bin);
 void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);

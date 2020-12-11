@@ -3591,10 +3591,19 @@ int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text
 	return 0;
 }
 
+int SAM_pairer_get_tag_bin_start(char * bin1){
+	int seq_len = 0;
+	int cigar_opts = 0;
+	int len_name = (unsigned char)bin1[12];
+	memcpy(&seq_len, bin1 + 20,4);
+	memcpy(&cigar_opts, bin1 + 16, 2);
+	return 36 + len_name + seq_len + (seq_len+1)/2 + 4 * cigar_opts;
+}
+
 void SAM_pairer_make_dummy(char * rname, char * bin1, char * out_bin2, int need_RG_tag){
 	char * realname = bin1 + 36;
 	int block1len =-1;
-	int len_name = strlen(realname);
+	int len_name = (unsigned char)bin1[12] -1;
 	int old_read_chro =-1;
 	int old_read_pos =-1;
 	int new_dummy_chro =-1;

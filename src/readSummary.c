@@ -3756,11 +3756,13 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
 	if(testi - read_name < 15 && field_i < 1 && read_bin){
 		int tag_found = 0, bin_len = 0;
 		char tag_type = 0;
-			
+		int bintag_start = SAM_pairer_get_tag_bin_start(read_bin);
 		memcpy(&bin_len, read_bin, 4);
-		if(BC_seq) tag_found = SAM_pairer_iterate_tags(read_bin, bin_len + 4 , "CR", &tag_type, BC_seq);
-		if(UMI_seq) tag_found = SAM_pairer_iterate_tags(read_bin, bin_len + 4 , "UR", &tag_type, UMI_seq);
-		if(RG) tag_found = SAM_pairer_iterate_tags(read_bin, bin_len + 4 , "RG", &tag_type, RG);
+		bin_len = bin_len +4 -bintag_start;
+
+		if(BC_seq) tag_found = SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "CR", &tag_type, BC_seq);
+		if(UMI_seq) tag_found = SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "UR", &tag_type, UMI_seq);
+		if(RG) tag_found = SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "RG", &tag_type, RG);
 	}
 
 	if(!sample_id) return;
