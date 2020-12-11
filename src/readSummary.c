@@ -7364,7 +7364,7 @@ int readSummary(int argc,char *argv[]){
 	if(argc>60) scRNA_input_mode = (argv[60][0]-'0');
 	else scRNA_input_mode = GENE_INPUT_BCL;
 
-	if(argc>61) scRNA_rerun_on_persample_BAM = (argv[60][0]-'0');
+	if(argc>61) scRNA_rerun_on_persample_BAM = (argv[61][0]-'0');
 	else scRNA_rerun_on_persample_BAM = 0;
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
