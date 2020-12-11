@@ -878,6 +878,7 @@ library(Matrix)
 cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, nthreads=10, ...){
   set.seed(0)
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
+  BAM_is_Rerun_Persample <- is.null(aligner)
   sample.info.idx <- sample
   fc <- list()
 
@@ -913,7 +914,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         for(samplename in unique.samples){
           .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1, samplename)
           one.bam.name <- paste0(samplename, ".bam")
-          .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+          .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM, BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
           one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, ...)
           if(any(is.na(raw.fc.annot))) raw.fc.annot<- one.raw.fc$annotation
           cat("Processing sample '",samplename,"'\n")
@@ -932,7 +933,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         }else if(aligner=="subjunc"){
           subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
-        .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+        .write.tmp.parameters(list(sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
         raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
@@ -960,7 +961,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       align(index, BAM.names, output_file=temp.file.prefix, nthreads=nthreads,...)
 
       generate.scRNA.BAM <- TRUE
-      .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+      .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
       raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
 
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
@@ -1004,7 +1005,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       generate.scRNA.BAM <- TRUE
     }
     .index.names.to.sheet.FASTQ.mode(sample, sample.1)
-    .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM))
+    .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
 
     raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
     for(rowi in 1:nrow(sample.info.idx)){

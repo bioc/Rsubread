@@ -245,6 +245,7 @@ typedef struct {
 	int use_fraction_multi_mapping;
 	int do_junction_counting;
 	int do_detection_call;
+	int this_input_number;
 
 	int need_calculate_overlap_len;
 	int need_calculate_fragment_len;
@@ -289,6 +290,7 @@ typedef struct {
 	srInt_64 unistr_buffer_used;
 	int is_scRNA_BAM_FQ_out_generated;
 	int scRNA_input_mode;
+	int scRNA_rerun_on_persample_BAM;
 	HashTable * scRNA_sample_sheet_table;
 	ArrayList * scRNA_sample_barcode_list;
 	HashTable * scRNA_merged_umi_table;
@@ -1869,8 +1871,9 @@ int compress_read_detail_BAM(fc_thread_global_context_t * global_context, fc_thr
 
 void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab){
 	char *bin = tab -> appendix1;
+	fc_thread_global_context_t * global_context = tab -> appendix2;
 	int bin_len = tab -> counter1;
-	int txt_ptr = 0, old_ptr=0;
+	int txt_ptr = 0, old_ptr=0, bam_is_from_cellCounts = 0;
 	void ** vv = v;
 	SamBam_Writer * writer = vv[0];
 
@@ -1880,9 +1883,11 @@ void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab)
 		if(tmpbin[txt_ptr] == '\n'){
 			tmpbin[txt_ptr]=0;
 			SamBam_writer_add_header(writer, tmpbin+old_ptr, 1);
+			if(strstr(tmpbin+old_ptr,"Per-sample-BAM-output:cellCounts"))bam_is_from_cellCounts = 1;
 			old_ptr = txt_ptr+1;
 		}
 	}
+	if(!bam_is_from_cellCounts) SamBam_writer_add_header(writer,"@CO\tPer-sample-BAM-output:cellCounts", 0);
 	free(tmpbin);
 	SamBam_writer_finish_header(writer);
 }
@@ -1898,6 +1903,7 @@ int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigne
 	if(global_context -> is_scRNA_BAM_FQ_out_generated && global_context -> do_scRNA_table && is_text) {
 		global_context -> scRNA_sample_BAM_writers -> appendix1 = bin;
 		global_context -> scRNA_sample_BAM_writers -> counter1 = bin_len;
+		global_context -> scRNA_sample_BAM_writers -> appendix2 = global_context;
 		HashTableIteration( global_context -> scRNA_sample_BAM_writers, scRNA_sample_SamBam_writers_add_header);
 	}
 	if(global_context -> is_read_details_out == FILE_TYPE_BAM){
@@ -3724,11 +3730,11 @@ void scRNA_move_barcodes_to_tags(fc_thread_global_context_t * global_context,  f
 	memcpy(outbin, &ext_ptr, 4);
 }
 
-void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name,
+void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * read_bin,
   int * sample_id, char ** BC_seq, char ** UMI_seq, char ** RG){
 	int field_i = 0, laneno = 0;
 	char * testi, * lane_str = NULL, *sample_barcode = NULL;
-	*sample_id = -1;
+	if(sample_id)*sample_id = -1;
 
 	for(testi = read_name +1; * testi; testi ++){
 		if((*testi)== SCRNA_READ_NAME_SPLIT_CHAR || ((*testi)== ':' && global_context -> scRNA_input_mode == GENE_INPUT_BCL )){
@@ -3747,6 +3753,17 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
 		}
 	}
 
+	if(testi - read_name < 15 && field_i < 1 && read_bin){
+		int tag_found = 0, bin_len = 0;
+		char tag_type = 0;
+			
+		memcpy(&bin_len, read_bin, 4);
+		if(BC_seq) tag_found = SAM_pairer_iterate_tags(read_bin, bin_len + 4 , "CR", &tag_type, BC_seq);
+		if(UMI_seq) tag_found = SAM_pairer_iterate_tags(read_bin, bin_len + 4 , "UR", &tag_type, UMI_seq);
+		if(RG) tag_found = SAM_pairer_iterate_tags(read_bin, bin_len + 4 , "RG", &tag_type, RG);
+	}
+
+	if(!sample_id) return;
 	if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
 		*sample_id = 1; // on the BAM mode, every featureCounts run only has one sample
 	}else if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ){
@@ -3766,10 +3783,14 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
  	}
 }
 
-void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bambin, int step ){
+void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bambin, int step){
 	int sample_id= -1;
 	char * fixed_sample_barcode=NULL, * cell_bc = NULL, * umi = NULL;
-	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, &sample_id, &cell_bc, &umi, NULL);
+	int known_sample_id = 0;
+	if(global_context -> scRNA_rerun_on_persample_BAM) known_sample_id = global_context -> this_input_number+1; 
+
+	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, bambin, (known_sample_id>0)?NULL:&sample_id, &cell_bc, &umi, NULL);
+	if(known_sample_id>0) sample_id = known_sample_id;
 	char * fixed_cell_bc = NULL, *fixed_UMI = NULL ;
 
 	if(step == 2){
@@ -3823,13 +3844,15 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	}
 }
 
-void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name ){ // the index of gene or the index of exon
+void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name, char * read_bin ){ // the index of gene or the index of exon
 	// R00000000218:CGTAGNAGTTTAGTCGAATACTCGTAAT|BBB7B#FFFFFF0FFFFFFFFFFFFFFF|GGATGCCG|BBBBBFFB
 	//SUBREADprintf("Assigned %s to %ld\n", read_name, assign_target_number);
 	char * cell_barcode = NULL, * umi_barcode = NULL, * lane_str = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
-	int sample_id = -1, laneno = 0;
+	int sample_id = -1, laneno = 0, known_sample_id = 0;
+	if(global_context -> scRNA_rerun_on_persample_BAM) known_sample_id = global_context -> this_input_number+1; 
 
-	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, &sample_id, &cell_barcode, &umi_barcode, &lane_str);
+	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, read_bin, (known_sample_id >0)?NULL:&sample_id, &cell_barcode, &umi_barcode, &lane_str);
+	if(known_sample_id >0) sample_id = known_sample_id;
 
 	int cell_id = scRNA_get_cell_id(global_context, thread_context, cell_barcode);
 	int umi_id = scRNA_register_umi_id( global_context, thread_context, umi_barcode);
@@ -3925,7 +3948,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		if(global_context -> do_scRNA_table){
 			srInt_64 assignment_target_number = hit_exon_id;
 			if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[hit_exon_id];
-			add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name);
+			add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name, bin1);
 		}
 	} else if(global_context -> need_calculate_overlap_len == 0 && nhits2 == 1 && nhits1 == 1 && hits_indices2[0]==hits_indices1[0]) {
 		srInt_64 hit_exon_id = hits_indices1[0];
@@ -3952,7 +3975,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		if(global_context -> do_scRNA_table){
 			srInt_64 assignment_target_number = hit_exon_id;
 			if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[hit_exon_id];
-			add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name);
+			add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name, bin1);
 		}
 	} else {
 		// Build a voting table.
@@ -4256,7 +4279,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						if(global_context -> do_scRNA_table){
 							srInt_64 assignment_target_number = max_exon_id;
 							if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[max_exon_id];
-							add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name);
+							add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name, bin1);
 						}
 					}else if(global_context -> is_multi_overlap_allowed) {
 						#define GENE_NAME_LIST_BUFFER_SIZE (FEATURE_NAME_LENGTH * 50) 
@@ -4285,7 +4308,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							if(global_context -> do_scRNA_table){
 								srInt_64 assignment_target_number = tmp_voter_id;
 								if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[tmp_voter_id];
-								add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name);
+								add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name, bin1);
 							}
 
 							if(global_context -> read_details_out_FP) {
@@ -5537,7 +5560,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 	}
 }
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list, int is_scRNA_BAM_FQ_out_generated, int scRNA_input_mode) {
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, char * scRNA_sample_sheet, char * scRNA_cell_barcode_list, int is_scRNA_BAM_FQ_out_generated, int scRNA_input_mode, int scRNA_rerun_on_persample_BAM) {
 	int x1;
 	myrand_srand(time(NULL));
 
@@ -5616,6 +5639,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 		}
 		global_context -> is_scRNA_BAM_FQ_out_generated = is_scRNA_BAM_FQ_out_generated;
 		global_context -> scRNA_input_mode = scRNA_input_mode;
+		global_context -> scRNA_rerun_on_persample_BAM = scRNA_rerun_on_persample_BAM;
 	}else{
 		global_context -> do_scRNA_table = 0;
 		global_context-> scRNA_cell_barcodes_array = NULL;
@@ -7093,7 +7117,7 @@ int readSummary(int argc,char *argv[]){
 	char * fasta_contigs_fname, *annotation_file_screen_output;
 	unsigned char * sorted_strand;
 
-	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping ,is_scRNA_BAM_FQ_out_generated;
+	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping ,is_scRNA_BAM_FQ_out_generated, scRNA_rerun_on_persample_BAM;
 	char * isPEassign,  *is_paired_end_reads_expected;
 
 	int  isGTF, n_input_files=0;
@@ -7338,6 +7362,8 @@ int readSummary(int argc,char *argv[]){
 	if(argc>60) scRNA_input_mode = (argv[60][0]-'0');
 	else scRNA_input_mode = GENE_INPUT_BCL;
 
+	if(argc>61) scRNA_rerun_on_persample_BAM = (argv[60][0]-'0');
+	else scRNA_rerun_on_persample_BAM = 0;
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
 		return -1;
@@ -7369,7 +7395,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list, is_scRNA_BAM_FQ_out_generated, scRNA_input_mode);
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, scRNA_sample_sheet, scRNA_cell_barcode_list, is_scRNA_BAM_FQ_out_generated, scRNA_input_mode, scRNA_rerun_on_persample_BAM);
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -7508,6 +7534,7 @@ int readSummary(int argc,char *argv[]){
 
 		strcpy(global_context.input_file_name, next_fn);
 		strcpy(global_context.raw_input_file_name, next_fn);
+		global_context.this_input_number = x1;
 		global_context.input_file_unique = is_unique[x1];
 		global_context.input_file_short_name = get_short_fname(next_fn);
 		if(strstr( global_context.strand_check_mode, "." )){
