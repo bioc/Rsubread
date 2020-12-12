@@ -800,6 +800,8 @@ library(Matrix)
 
 .load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab){
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
+  print(paste("========== .scRNA.SampleTable of ",BAM.name,"=========="))
+  print(sum.tab)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
     sname <- sum.tab$SampleName[roiw]
@@ -826,7 +828,7 @@ library(Matrix)
   }
 }
 
-.extract.sample.table.cols <- function(rdir, smr, fastq1=NA, fastq2=NA, bam=NA){
+.extract.sample.table.cols <- function(rdir, smr, input.mode="bcl"){
   total.cells <- c()
   hiconf.cells <- c()
   res.cells <- c()
@@ -839,14 +841,10 @@ library(Matrix)
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
     umis <- c(umis,sum(smr[[sampleno]][["Counts"]]))
   }
-  if(is.na(rdir)){
-    if(is.na(bam))
-      return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, BarcodeUMIFile=rep(fastq1, nrow(smr[["Sample.Table"]])), ReadFile=rep(fastq2, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
-    else
-      return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, BAMFile=rep(bam, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
-  }else{
+  if(input.mode=="fastq" || input.mode=="bam")
+    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
+  else
     return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] ))
-  }
 }
 
 .scan.fastq.dir <- function(dirname){
@@ -971,9 +969,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
         fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
-      stt <- .extract.sample.table.cols(NA,some.results,bam=temp.file.prefix)
-      df.sample.info <- rbind(df.sample.info, stt)
     }
+    df.sample.info <- .extract.sample.table.cols(NA,some.results, input.mode="bam")
   } else if(input.mode == "FASTQ" || input.mode == "FASTQ-dir"){
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
     print(sample.info.idx)
@@ -1014,9 +1011,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
       fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
       fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      stt <- .extract.sample.table.cols(NA,some.results,sample.info.idx$BarcodeUMIFile[spi], sample.info.idx$ReadFile[spi])
-      df.sample.info <- rbind(df.sample.info, stt)
     }
+    df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq")
   }
 
   fc[["annotation"]] <- raw.fc.annot
