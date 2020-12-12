@@ -1008,15 +1008,13 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
     .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
 
     raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
-    for(rowi in 1:nrow(sample.info.idx)){
-      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      stt <- .extract.sample.table.cols(NA,some.results,sample.info.idx$BarcodeUMIFile[rowi], sample.info.idx$ReadFile[rowi])
+    if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
+    some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+    for(spi in 1:nrow(some.results[["Sample.Table"]])){
+      samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
+      fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+      fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      stt <- .extract.sample.table.cols(NA,some.results,sample.info.idx$BarcodeUMIFile[spi], sample.info.idx$ReadFile[spi])
       df.sample.info <- rbind(df.sample.info, stt)
     }
   }
