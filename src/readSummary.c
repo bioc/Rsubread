@@ -3753,7 +3753,7 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
 		}
 	}
 
-	if(testi - read_name < 15 && field_i < 1 && read_bin){
+	if(field_i < 3 && read_bin){
 		int tag_found = 0, bin_len = 0;
 		char tag_type = 0;
 		int bintag_start = SAM_pairer_get_tag_bin_start(read_bin);
@@ -3765,7 +3765,10 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
 		if(RG) tag_found = SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "RG", &tag_type, RG);
 	}
 
-	if(!sample_id) return;
+	if(!sample_id){
+		if(!(UMI_seq && BC_seq))SUBREADprintf("ERROR: Cannot get UMI or BC: %s, %s\n", UMI_seq, BC_seq);
+		return;
+	}
 	if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
 		*sample_id = 1; // on the BAM mode, every featureCounts run only has one sample
 	}else if(global_context -> scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ){
@@ -3847,18 +3850,15 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 }
 
 void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name, char * read_bin ){ // the index of gene or the index of exon
-	// R00000000218:CGTAGNAGTTTAGTCGAATACTCGTAAT|BBB7B#FFFFFF0FFFFFFFFFFFFFFF|GGATGCCG|BBBBBFFB
-	//SUBREADprintf("Assigned %s to %ld\n", read_name, assign_target_number);
-	char * cell_barcode = NULL, * umi_barcode = NULL, * lane_str = NULL; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
+	char * cell_barcode = NULL, * umi_barcode = NULL; 
 	int sample_id = -1, laneno = 0, known_sample_id = 0;
 	if(global_context -> scRNA_rerun_on_persample_BAM) known_sample_id = global_context -> this_input_number+1; 
 
-	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, read_bin, (known_sample_id >0)?NULL:&sample_id, &cell_barcode, &umi_barcode, &lane_str);
+	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, read_bin, (known_sample_id >0)?NULL:&sample_id, &cell_barcode, &umi_barcode, NULL);
 	if(known_sample_id >0) sample_id = known_sample_id;
 
 	int cell_id = scRNA_get_cell_id(global_context, thread_context, cell_barcode);
 	int umi_id = scRNA_register_umi_id( global_context, thread_context, umi_barcode);
-	//SUBREADprintf("Rname=%s, Lane=%d ==> sample %d  cell %d  UMI %d\n", read_name, laneno, sample_id , cell_id, umi_id);
 
 	thread_context -> scRNA_pooled_reads ++;
 	if(sample_id >0)thread_context -> scRNA_has_valid_sample_index ++;
@@ -4510,7 +4510,7 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 					int diff = hamming_dist_ATGC_max2(had_umistr, umistr);
 					if(diff<=SCRNA_ALLOWED_MAX_HAMMING_DIFF){
 						if(0)SUBREADprintf("REDUCE_MATCH_8CODE %s ~ %s with %d\n", had_umistr, umistr, diff );
-						HashTablePut( global_context -> scRNA_umi_nos_p1_before_after_fixing, NULL+1+cellno_umuno, NULL+1+trying_known_umino );
+						if(global_context -> scRNA_umi_nos_p1_before_after_fixing)HashTablePut( global_context -> scRNA_umi_nos_p1_before_after_fixing, NULL+1+cellno_umuno, NULL+1+trying_known_umino );
 						found=1;
 					}
 					if(found) break;
