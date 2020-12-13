@@ -712,8 +712,6 @@ library(Matrix)
     return(NA)
   }else{
     gte <- rstfq$p
-    print("Summary of the ambient RNA profile (proportions)")
-    print(summary(gte))
     # This function returns "times" log-likelihoods.
   
     rescue.candidates <- as.matrix(.read.sparse.mat(resc.bc.fn))
@@ -800,8 +798,6 @@ library(Matrix)
 
 .load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab){
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
-  print(paste("========== .scRNA.SampleTable of ",BAM.name,"=========="))
-  print(sum.tab)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
     sname <- sum.tab$SampleName[roiw]
@@ -995,24 +991,40 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
     if(is.null(aligner)){
       bam.for.FC <- paste0(sample.info.idx$SampleName,".bam")
       generate.scRNA.BAM <- FALSE
+      for(rowi in 1:nrow(sample.info.idx)){
+        samplename <- sample.info.idx$SampleName [rowi]
+        leftover.bam <- paste0(samplename, ".bam")
+
+        .index.names.to.sheet.FASTQ.mode(sample[ sample$SampleName == samplename, ], sample.1)
+        .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
+        raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+
+        if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
+        some.results <- .load.all.scSamples(leftover.bam, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["Counts"]] # featureCounts treats each left-over BAM file as a single run and has only one sample 
+        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["HighConfidneceCell"]]
+
+        newrow<- .extract.sample.table.cols(NA,some.results,input.mode="fastq")
+        df.sample.info <- rbind(df.sample.info,newrow)
+      }
     }else{
       .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
       align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
       bam.for.FC <- temp.file.prefix
       generate.scRNA.BAM <- TRUE
-    }
-    .index.names.to.sheet.FASTQ.mode(sample, sample.1)
-    .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
+      .index.names.to.sheet.FASTQ.mode(sample, sample.1)
+      .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
+      raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
 
-    raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
-    if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-    some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
-    for(spi in 1:nrow(some.results[["Sample.Table"]])){
-      samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
-      fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-      fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      }
+      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq")
     }
-    df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq")
   }
 
   fc[["annotation"]] <- raw.fc.annot

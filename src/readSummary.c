@@ -3798,7 +3798,7 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	if(known_sample_id>0) sample_id = known_sample_id;
 	char * fixed_cell_bc = NULL, *fixed_UMI = NULL ;
 
-	if(step == 2){
+	if(step == 2 && global_context -> is_scRNA_BAM_FQ_out_generated){
 		int fixed_cell_bc_no = scRNA_get_cell_id(global_context, thread_context, cell_bc);
 		//SUBREADprintf("GET BCC = %s => %d [%lld]\n",  cell_bc , fixed_cell_bc_no, global_context -> scRNA_cell_barcodes_array -> numOfElements);
 		if(fixed_cell_bc_no < 0) return;
@@ -5154,13 +5154,11 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		}
 
 		for(xk1=0; xk1< global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
-			if(1)SUBREADprintf("MERGENOS_8CODE %lld  TIME=%u\n", merged_sample_cell_umi_tables[xk1] ->numOfElements, time(NULL));
 			merged_sample_cell_umi_tables[xk1] -> appendix1 = global_context;
 			merged_sample_cell_umi_tables[xk1] -> appendix2 = used_cell_no_tables[xk1];
 			merged_sample_cell_umi_tables[xk1] -> appendix3 = global_context -> scRNA_merged_umi_list;
 			HashTableIteration(  merged_sample_cell_umi_tables[xk1], scRNA_merge_merge_UMIs);
 		}
-		if(1)SUBREADprintf("MERGENOS_8CODE END TIME=%u\n", time(NULL));
 
 		scRNA_merged_to_tables_write(global_context , merged_sample_cell_umi_tables , used_cell_no_tables, global_context -> scRNA_merged_umi_list, loaded_features, nexons);
 
