@@ -1,3 +1,6 @@
+14 Dec 2020 - 2.5.1
+(1) Support FASTQ input in cellCounts.
+
 25 Oct 2020 - 2.3.19
 (1) Updated cellCounts.Rd and users guide.
 
