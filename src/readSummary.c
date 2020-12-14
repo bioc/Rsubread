@@ -3875,15 +3875,15 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 	if(sample_id >0 && cell_id >=0 && umi_id >=0){
 		assert(sample_id<= global_context -> scRNA_sample_sheet_table -> numOfElements );
 		HashTable * gene_table = thread_context -> scRNA_sample_bc_tables[sample_id-1];
-		srInt_64 key =((cell_id*1llu)<<32)+umi_id;
-		HashTable * sample_bc_list = HashTableGet(gene_table, NULL+1+assign_target_number);
-		if(NULL == sample_bc_list){
-			sample_bc_list = HashTableCreate(20);
-			HashTablePut(gene_table, NULL+1+assign_target_number, sample_bc_list);
+		srInt_64 cellbc_umi =((cell_id*1llu)<<32)+umi_id;
+		HashTable * bc_umi_to_reads_tab = HashTableGet(gene_table, NULL+1+assign_target_number);
+		if(NULL == bc_umi_to_reads_tab){
+			bc_umi_to_reads_tab = HashTableCreate(500);
+			HashTablePut(gene_table, NULL+1+assign_target_number, bc_umi_to_reads_tab);
 		}
 
-		int val = HashTableGet( sample_bc_list, NULL+1+key ) - NULL;
-		HashTablePut(sample_bc_list, NULL+1+key, NULL+val+1);
+		int nreads = HashTableGet( bc_umi_to_reads_tab, NULL+1+cellbc_umi ) - NULL;
+		HashTablePut(bc_umi_to_reads_tab, NULL+1+cellbc_umi, NULL+nreads+1);
 	}
 }
 
@@ -4360,29 +4360,42 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 
 void scRNA_merge_thread_reads_in(void *ky, void *val, HashTable * tab){
 	int * thread_umi_no_to_global_umi_no = tab->appendix1;
-	HashTable * merged_reads_table = tab->appendix2;
+	int supp_reads_to_umi_in_cell = val-NULL;
+	HashTable * merged_genep1_to_bcumip1_lists_table = tab->appendix2;
+	HashTable * merged_genep1_to_bcumip1_reads_tab_table = tab->appendix3;
 	srInt_64 gene_no = tab->counter1;
 	srInt_64 cellno_locel_umino = (ky - NULL-1);
 	srInt_64 cellno_global_umino = (cellno_locel_umino & 0xffffffff00000000llu) + thread_umi_no_to_global_umi_no[ cellno_locel_umino & 0xffffffff ];
 
-	ArrayList * merged_reads_gene_list = HashTableGet(merged_reads_table , NULL+1+gene_no);
-	if(NULL == merged_reads_gene_list){
-		merged_reads_gene_list = ArrayListCreate(10);
-		HashTablePut(merged_reads_table, NULL+1+gene_no, merged_reads_gene_list);
+	ArrayList * merged_reads_gene_p1_list = HashTableGet(merged_genep1_to_bcumip1_lists_table , NULL+1+gene_no);
+	if(NULL == merged_reads_gene_p1_list){
+		merged_reads_gene_p1_list = ArrayListCreate(10);
+		HashTablePut(merged_genep1_to_bcumip1_lists_table, NULL+1+gene_no, merged_reads_gene_p1_list);
+	}
+	ArrayListPush( merged_reads_gene_p1_list, NULL+cellno_global_umino +1 );
+
+	HashTable * genep1_to_bcumip1_reads_tab = HashTableGet(merged_genep1_to_bcumip1_reads_tab_table, NULL+1+gene_no);
+	if(NULL == genep1_to_bcumip1_reads_tab){
+		genep1_to_bcumip1_reads_tab = HashTableCreate(100);
+		HashTablePut(merged_genep1_to_bcumip1_reads_tab_table, NULL+1+gene_no, genep1_to_bcumip1_reads_tab);
 	}
 
-	ArrayListPush( merged_reads_gene_list, NULL+cellno_global_umino +1 );
+	int sup_reads = HashTableGet(merged_genep1_to_bcumip1_reads_tab_table, NULL+cellno_global_umino+1) - NULL;
+	sup_reads += supp_reads_to_umi_in_cell;
+	HashTablePut(merged_genep1_to_bcumip1_reads_tab_table, NULL+cellno_global_umino+1, NULL+sup_reads);
 }
 
 void scRNA_merge_thread_reads(void *ky, void *val, HashTable * tab){
 	int * thread_umi_no_to_global_umi_no = tab->appendix1;
 	srInt_64 gene_no = ky-NULL -1;
-	HashTable * merged_reads_table = tab->appendix2;
+	HashTable * merged_genep1_to_bcumip1_lists_table = tab->appendix2;
+	HashTable * merged_genep1_to_bcumip1_reads_tab_table = tab->appendix3;
 	HashTable * in_gene_cell_umi_table = val;
 
 	//SUBREADprintf("scRNA_merge_thread_reads : %llu has %ld\n", gene_no, in_gene_cell_umi_table -> numOfElements);
 
-	in_gene_cell_umi_table -> appendix2 = merged_reads_table;
+	in_gene_cell_umi_table -> appendix3 = merged_genep1_to_bcumip1_reads_tab_table;
+	in_gene_cell_umi_table -> appendix2 = merged_genep1_to_bcumip1_lists_table;
 	in_gene_cell_umi_table -> appendix1 = thread_umi_no_to_global_umi_no;
 	in_gene_cell_umi_table -> counter1 = gene_no;
 	HashTableIteration(in_gene_cell_umi_table, scRNA_merge_thread_reads_in);
@@ -4542,7 +4555,7 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 	return ret;
 }
 
-ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * global_context , ArrayList * cellno_umino_p1_list, ArrayList * merged_umi_no_to_seq, HashTable * used_cellno_tab, srInt_64 gene_no){
+ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * global_context , ArrayList * cellno_umino_p1_list, HashTable * cellno_umino_p1_to_reads_tab, ArrayList * merged_umi_no_to_seq, HashTable * used_cellno_tab, srInt_64 gene_no){
 	ArrayList * ret = ArrayListCreate( cellno_umino_p1_list -> numOfElements );
 	ArrayListSort(cellno_umino_p1_list,NULL);
 	srInt_64 x1, short_ptr = 0;
@@ -5098,10 +5111,11 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 void  scRNA_merge_merge_UMIs(void * gno_ky, void * cell_umi_2_reads_list_va , HashTable * tab){
 	fc_thread_global_context_t * global_context = tab-> appendix1;
 	HashTable * used_cellno_tab = tab-> appendix2;
-	ArrayList * merged_umi_no_to_seq = tab-> appendix3;
+	ArrayList * merged_umi_no_to_seq = global_context -> scRNA_merged_umi_list;
+	HashTable * merged_sample_cell_umi_to_reads_table = tab-> appendix3;
 
 	ArrayList * cellno_umino_list = cell_umi_2_reads_list_va;
-	ArrayList * short_list = scRNA_reduce_cellno_umino_p1_list(global_context , cellno_umino_list, merged_umi_no_to_seq, used_cellno_tab, gno_ky -NULL -1);
+	ArrayList * short_list = scRNA_reduce_cellno_umino_p1_list(global_context , cellno_umino_list, merged_sample_cell_umi_to_reads_table, merged_umi_no_to_seq, used_cellno_tab, gno_ky -NULL -1);
 	HashTablePutReplace( tab, gno_ky, short_list, 0 ); // old array (cell_umi_2_reads_list_va) is deallocated automatically
 }
 
@@ -5121,11 +5135,14 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		global_context -> scRNA_merged_umi_table = StringTableCreate(1000000); // UMI string to UMI no
 		global_context -> scRNA_merged_umi_list = ArrayListCreate(1000000*3);  // UMI no to UMI string
 		HashTable ** merged_sample_cell_umi_tables = malloc(sizeof(HashTable*) * global_context -> scRNA_sample_sheet_table -> numOfElements);
+		HashTable ** merged_sample_cell_umi_to_reads_tables = malloc(sizeof(HashTable*) * global_context -> scRNA_sample_sheet_table -> numOfElements);
 		HashTable ** used_cell_no_tables = malloc(sizeof(HashTable*) * global_context -> scRNA_sample_sheet_table -> numOfElements);
 		for(xk1=0; xk1<global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
 			merged_sample_cell_umi_tables[xk1] = HashTableCreate(50000); //  gene_no => list of cell_no_UMIno 
+			merged_sample_cell_umi_to_reads_tables[xk1] = HashTableCreate(50000); //  gene_no => hashtable of cell_no_UMIno+1 => reads
 			HashTableSetDeallocationFunctions(merged_sample_cell_umi_tables[xk1], NULL, (void (*) (void *))ArrayListDestroy);
-			used_cell_no_tables[xk1] = HashTableCreate(10000);
+			HashTableSetDeallocationFunctions(merged_sample_cell_umi_to_reads_tables[xk1], NULL, (void (*) (void *))HashTableDestroy);
+			used_cell_no_tables[xk1] = HashTableCreate(30000);
 			used_cell_no_tables[xk1] -> appendix1 = malloc(sizeof(pthread_spinlock_t));
 			pthread_spin_init((pthread_spinlock_t*)used_cell_no_tables[xk1] -> appendix1,1);
 		}
@@ -5142,12 +5159,17 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			HashTableIteration( thread_umi_table, scRNA_merge_thread_umitables );
 
 			HashTable **thread_cell_umi_2_reads_table =  global_context -> thread_contexts[xk1].scRNA_sample_bc_tables;
-
 			for(xk2 = 0; xk2 < global_context -> scRNA_sample_sheet_table -> numOfElements ; xk2++){
 				HashTable * one_thread_gene_to_cell_umi_tab = thread_cell_umi_2_reads_table[xk2];
+				if(0==xk1){
+					HashTable *in_sample_cell_umi_p1_to_reads_tab = HashTableCreate(500000);
+					HashTableSetDeallocationFunctions(in_sample_cell_umi_p1_to_reads_tab, NULL, (void (*)(void*))HashTableDestroy);
+					merged_sample_cell_umi_to_reads_tables[xk2] = in_sample_cell_umi_p1_to_reads_tab;
+				}
 	//			SUBREADprintf("THREAD_UMI_TAB_LEN of %d/%d/%d:  %ld\n", xk2, xk1, global_context-> thread_number, one_thread_gene_to_cell_umi_tab -> numOfElements);
 				one_thread_gene_to_cell_umi_tab -> appendix1 = thread_umi_no_to_global_umi_no;
 				one_thread_gene_to_cell_umi_tab -> appendix2 = merged_sample_cell_umi_tables[xk2];
+				one_thread_gene_to_cell_umi_tab -> appendix3 = merged_sample_cell_umi_to_reads_tables[xk2];
 				HashTableIteration( one_thread_gene_to_cell_umi_tab , scRNA_merge_thread_reads);
 			}
 			free(thread_umi_no_to_global_umi_no);
@@ -5156,7 +5178,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		for(xk1=0; xk1< global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
 			merged_sample_cell_umi_tables[xk1] -> appendix1 = global_context;
 			merged_sample_cell_umi_tables[xk1] -> appendix2 = used_cell_no_tables[xk1];
-			merged_sample_cell_umi_tables[xk1] -> appendix3 = global_context -> scRNA_merged_umi_list;
+			merged_sample_cell_umi_tables[xk1] -> appendix3 = merged_sample_cell_umi_to_reads_tables[xk1];
 			HashTableIteration(  merged_sample_cell_umi_tables[xk1], scRNA_merge_merge_UMIs);
 		}
 
@@ -5164,11 +5186,13 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 
 		for(xk1=0; xk1<global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
 			HashTableDestroy(merged_sample_cell_umi_tables[xk1]);
+			HashTableDestroy(merged_sample_cell_umi_to_reads_tables[xk1]);
 			pthread_spin_destroy((pthread_spinlock_t*)used_cell_no_tables[xk1] -> appendix1);
 			HashTableDestroy(used_cell_no_tables[xk1]);
 		}
 
 		free(merged_sample_cell_umi_tables);
+		free(merged_sample_cell_umi_to_reads_tables);
 		free(used_cell_no_tables);
 	}
 
@@ -5938,7 +5962,9 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 
 		if(global_context -> do_scRNA_table){
 			int xk2;
-			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++)HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
+			for(xk2=0;xk2< global_context -> scRNA_sample_id_to_name -> numOfElements;xk2++) {
+				HashTableDestroy(global_context -> thread_contexts[xk1].scRNA_sample_bc_tables[xk2]);
+			}
 			//HashTableDestroy(global_context -> scRNA_sample_BAM_writers);
 			free(global_context -> thread_contexts[xk1].scRNA_reads_per_sample);
 			free(global_context -> thread_contexts[xk1].scRNA_mapped_reads_per_sample);
