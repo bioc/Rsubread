@@ -1,5 +1,4 @@
 #include <assert.h> 
-#include <arpa/inet.h>
 #include "core.h"
 #include "seek-zlib.h"
 #include "input-files.h"
