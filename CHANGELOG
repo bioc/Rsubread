@@ -1,3 +1,6 @@
+16 Dec 2020 - 2.5.2
+(1) Use the two-step UMI merging algorithm in cellCounts.
+
 14 Dec 2020 - 2.5.1
 (1) Support FASTQ input in cellCounts.
 

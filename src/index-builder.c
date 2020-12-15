@@ -87,7 +87,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 //	gehash_t huge_table;
 	gene_value_index_t value_array_index;
 
-	gene_input_t ginp;
+	gene_input_t * ginp = malloc(sizeof(gene_input_t));
 	begin_ftime = miltime();
 
 //	SUBREADprintf ("Index items per partition = %u\n\n", expected_hash_items);
@@ -155,7 +155,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				{
 					FILE * fp;
 
-					geinput_close(&ginp);
+					geinput_close(ginp);
 
 					//SUBREADprintf ("Processing chromosome files ...\n");
 
@@ -194,15 +194,15 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 				else
 				{
 					if (file_number)
-						geinput_close(&ginp);
-					geinput_open(chro_files[file_number++], &ginp);
+						geinput_close(ginp);
+					geinput_open(chro_files[file_number++], ginp);
 					status = NEXT_READ;
 				}
 			}
 			if (status == NEXT_READ)
 			{
 
-				geinput_readline(&ginp, fn, 0);
+				geinput_readline(ginp, fn, 0);
 
 				if(read_no>0){
 					read_offsets[read_no-1] = offset + table.padding;
@@ -218,12 +218,12 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				sprintf(fn, "%s.files", index_prefix);
 				FILE * fname_fp = f_subr_open(fn, "a");
-				fprintf(fname_fp, "%s\t%s\t%ld\n", read_names+read_no*MAX_READ_NAME_LEN, ginp.filename, ftell(ginp.input_fp));
+				fprintf(fname_fp, "%s\t%s\t%ld\n", read_names+read_no*MAX_READ_NAME_LEN, ginp -> filename, ftell(ginp -> input_fp));
 				fclose(fname_fp);
 				
 				for (i=0; i<16; i++)
 				{
-					char nch = geinput_next_char(&ginp);
+					char nch = geinput_next_char(ginp);
 					if (nch == 'N') skips = 16;
 					else if (skips>0) skips--;
 					window[i] = nch;
@@ -290,15 +290,15 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 				while(seek_back_reads)
 				{
-					fseek(ginp.input_fp, -1, SEEK_CUR);
-					char bnch = fgetc(ginp.input_fp);
+					fseek(ginp -> input_fp, -1, SEEK_CUR);
+					char bnch = fgetc(ginp -> input_fp);
 					if ((bnch >='A' && bnch <= 'Z' ) || (bnch >='a' && bnch <= 'z' ) || bnch == '-' || bnch == 'N' || bnch=='.')seek_back_reads--;
-					fseek(ginp.input_fp, -1, SEEK_CUR);
+					fseek(ginp -> input_fp, -1, SEEK_CUR);
 				}
 
 				for (i=0; i<16; i++)
 				{
-					char nch = geinput_next_char(&ginp);
+					char nch = geinput_next_char(ginp);
 					if (nch == 'N' ) skips = 16;
 					else if (skips>0) skips--;
 					window[i] = nch;
@@ -354,7 +354,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 
 			for (i=0; i<GENE_SLIDING_STEP; i++)
 			{
-				next_char = geinput_next_char(&ginp);
+				next_char = geinput_next_char(ginp);
 				if(next_char < 0) {
 					if( 0 == for_measure_buckets ) gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
 
@@ -435,6 +435,7 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 		}
 	}
 	free(fn);
+	free(ginp);
 	*total_tables = table_no+1;
 	return 0;
 }
@@ -486,7 +487,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 	if(gehash_create_ex(&occurrence_table, 500000, 0, SUBINDEX_VER0, 1, 0)) return 1;
 
-	gene_input_t ginp;
+	gene_input_t * ginp = malloc(sizeof(gene_input_t));
 
 	print_in_box(80,0,0,"Scan uninformative subreads in reference sequences ...");
 
@@ -537,15 +538,15 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				(*actual_total_bases_inc_marging)+=padding_around_contigs;
 				if(file_number == chro_file_number)
 				{
-					geinput_close(&ginp);
+					geinput_close(ginp);
 
 					break;
 				}
 				else
 				{
 					if (file_number)
-						geinput_close(&ginp);
-					geinput_open(chro_files[file_number++], &ginp);
+						geinput_close(ginp);
+					geinput_open(chro_files[file_number++], ginp);
 					status = NEXT_READ;
 				}
 			}
@@ -553,12 +554,12 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			{
 				(*actual_total_bases_inc_marging)+=2*padding_around_contigs;
 
-				geinput_readline(&ginp, fn, 0);
+				geinput_readline(ginp, fn, 0);
 				//SUBREADprintf("HEADER_SCAN '''%s'''\n", fn);
 
 				for (i=0; i<16; i++)
 				{
-					char nch = geinput_next_char(&ginp);
+					char nch = geinput_next_char(ginp);
 					if (nch == 'N') skips = 16;
 					else if (skips>0) skips--;
 					window[i] = nch;
@@ -593,7 +594,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 
 			for (i=0; i<GENE_SLIDING_STEP; i++)
 			{
-				next_char = geinput_next_char(&ginp);
+				next_char = geinput_next_char(ginp);
 				if(next_char < 0)
 				{
 					if (next_char == -1) status = NEXT_READ;
@@ -665,6 +666,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 	for(i=0;i<128;i++)
 		if(huge_index[i])  free(huge_index[i]);
 
+	free(ginp);
 	gehash_destory(&occurrence_table);
 
 	if(huge_table -> numOfElements)

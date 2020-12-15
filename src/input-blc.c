@@ -1221,6 +1221,7 @@ int scBAM_skip_bam_header(input_scBAM_t * bam_input){
 		ret = scBAM_next_int(bam_input, &bam_input -> chro_table [x1].chro_length);
 		if(ret < 0) return -1;
 	}
+	return 0;
 }
 
 int scBAM_inner_fopen(input_scBAM_t * bam_input){
