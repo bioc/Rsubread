@@ -4507,6 +4507,8 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 	int initsize = (cell_sec_end - cell_sec_start)/4;
 	HashTable * headtail_table = StringTableCreate(max(3, initsize));
 	HashTableSetDeallocationFunctions( headtail_table, free, (void(*)(void *))ArrayListDestroy );
+
+	SUBREADprintf("TESTING_SORT\n");
 	for(x1 = cell_sec_start; x1 < cell_sec_end;x1++){
 		srInt_64 cellno_umuno = ArrayListGet(cellno_umino_p1_list, x1)-NULL-1;
 		int umino_before_fix = cellno_umuno & 0xffffffff;
@@ -4514,6 +4516,12 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 		char * umistr = ArrayListGet(merged_umi_no_to_seq, umino_before_fix );
 		char tken[MAX_UMI_BARCODE_LENGTH/2+5];
 		int x2, x3, umilen = strlen(umistr), found=0;
+
+		if(0){
+			int nsupp = HashTableGet(cellno_umino_p1_to_reads_tab, NULL+1+cellno_umuno) - NULL;
+			int cellno = cellno_umuno >> 32;
+			SUBREADprintf("TESTING_SORT : %d of %d have %d reads\n", umino_before_fix, cellno, nsupp);
+		}
 
 		for(x2 = 0; x2<2; x2++){
 			tken[0]= x2?'S':'F';
@@ -5156,6 +5164,19 @@ void scRNA_find_gene_to_umi_mark_deletee(void * key_bc_umi_p1, void * val_arr_ge
 	HashTable * gene_to_bc_umi_p1_to_reads_tab = tab->appendix2;
 	int gene1_no = ArrayListGet(arr_genes, 0)-NULL;
 	int gene2_no = ArrayListGet(arr_genes, 1)-NULL;
+
+		if(1){
+			int x1; 
+			for(x1=0; x1<arr_genes -> numOfElements; x1++){
+				int gene_no = ArrayListGet(arr_genes, x1)-NULL;
+				int nsupp = HashTableGet(HashTableGet(gene_to_bc_umi_p1_to_reads_tab , NULL+gene_no+1), key_bc_umi_p1) - NULL;
+				int cellno = ( key_bc_umi_p1-NULL-1 ) >> 32;
+				SUBREADprintf("TESTING_SORT : %d of %d have %d reads\n", gene_no, cellno, nsupp);
+			}
+		}
+
+
+
 	int supp1 = HashTableGet(HashTableGet(gene_to_bc_umi_p1_to_reads_tab, NULL+gene1_no+1), key_bc_umi_p1)-NULL;
 	int supp2 = HashTableGet(HashTableGet(gene_to_bc_umi_p1_to_reads_tab, NULL+gene2_no+1), key_bc_umi_p1)-NULL;
 
