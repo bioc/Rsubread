@@ -5165,7 +5165,7 @@ void scRNA_find_gene_to_umi_mark_deletee(void * key_bc_umi_p1, void * val_arr_ge
 	int gene1_no = ArrayListGet(arr_genes, 0)-NULL;
 	int gene2_no = ArrayListGet(arr_genes, 1)-NULL;
 
-		if(1){
+		if(0){
 			int x1; 
 			for(x1=0; x1<arr_genes -> numOfElements; x1++){
 				int gene_no = ArrayListGet(arr_genes, x1)-NULL;
