@@ -4508,7 +4508,6 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 	HashTable * headtail_table = StringTableCreate(max(3, initsize));
 	HashTableSetDeallocationFunctions( headtail_table, free, (void(*)(void *))ArrayListDestroy );
 
-	SUBREADprintf("TESTING_SORT\n");
 	for(x1 = cell_sec_start; x1 < cell_sec_end;x1++){
 		srInt_64 cellno_umuno = ArrayListGet(cellno_umino_p1_list, x1)-NULL-1;
 		int umino_before_fix = cellno_umuno & 0xffffffff;
@@ -4537,10 +4536,12 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 					int diff = hamming_dist_ATGC_max2(had_umistr, umistr);
 					if(diff<=SCRNA_ALLOWED_MAX_HAMMING_DIFF){
 						if(0)SUBREADprintf("REDUCE_MATCH_8CODE %s ~ %s with %d\n", had_umistr, umistr, diff );
+						srInt_64 merged_bc_umi = (cellno_umuno & 0xffffffff00000000llu) | trying_known_umino ;
 						if(global_context -> scRNA_umi_nos_p1_before_after_fixing)HashTablePut( global_context -> scRNA_umi_nos_p1_before_after_fixing, NULL+1+cellno_umuno, NULL+1+trying_known_umino );
 						int bemerged_reads = HashTableGet(cellno_umino_p1_to_reads_tab, NULL+1+cellno_umuno)-NULL;
-						int tomerged_reads = HashTableGet(cellno_umino_p1_to_reads_tab, NULL+1+trying_known_umino)-NULL;
-						HashTablePut(cellno_umino_p1_to_reads_tab, NULL+1+trying_known_umino, NULL+bemerged_reads+tomerged_reads);
+						int tomerged_reads = HashTableGet(cellno_umino_p1_to_reads_tab, NULL+1+merged_bc_umi)-NULL;
+						HashTablePut(cellno_umino_p1_to_reads_tab, NULL+1+merged_bc_umi , NULL+bemerged_reads+tomerged_reads);
+//						SUBREADprintf("BC_UMI %016llx : %d -> %d\n", merged_bc_umi, tomerged_reads , bemerged_reads+tomerged_reads);
 						HashTableRemove(cellno_umino_p1_to_reads_tab, NULL+1+cellno_umuno);
 
 						found=1;
