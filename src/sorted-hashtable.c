@@ -1500,7 +1500,11 @@ int gehash_load(gehash_t * the_table, const char fname [])
 				curr_bucks = 0;
 			}
 			#ifdef __MINGW32__
-			{int kk; char buffkk[sizeof(short) + sizeof(gehash_data_t)]; for(kk=0;kk<current_items; kk++) fread(buffkk, 1,sizeof(short) + sizeof(gehash_data_t), fp);}
+			{
+				char * buffkk = malloc(current_bytes );
+				fread(buffkk,sizeof(short) + sizeof(gehash_data_t), current_items , fp);
+				free(buffkk);
+			}
 			#else
 			fseeko(fp, current_bytes, SEEK_CUR);
 			#endif
