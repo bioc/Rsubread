@@ -1486,6 +1486,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 
 		srInt_64 fp_curr = ftello(fp);
 		unsigned int accued_bytes = 0, grp_i = 0, curr_bucks = 0, per_group_bucks = the_table -> buckets_number/ GEHASH_MEM_PTR_NO + 2;
+
 		for(i=0; i<the_table -> buckets_number ; i++){
 			unsigned int current_items = load_int32(fp);
 			load_int32(fp);//useless for loading : space size
@@ -1498,7 +1499,11 @@ int gehash_load(gehash_t * the_table, const char fname [])
 				accued_bytes = 0;
 				curr_bucks = 0;
 			}
+			#ifdef __MINGW32__
+			{int kk; char buffkk[sizeof(short) + sizeof(gehash_data_t)]; for(kk=0;kk<current_items; kk++) fread(buffkk, 1,sizeof(short) + sizeof(gehash_data_t), fp);}
+			#else
 			fseeko(fp, current_bytes, SEEK_CUR);
+			#endif
 		}
 		if(curr_bucks)
 			bucket_bytes[grp_i++] = accued_bytes;
