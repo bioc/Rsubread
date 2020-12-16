@@ -1490,6 +1490,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		for(i=0; i<the_table -> buckets_number ; i++){
 			unsigned int current_items = load_int32(fp);
 			load_int32(fp);//useless for loading : space size
+//if(i%50000 == 0)SUBREADprintf("LOADHUGE %d/%d\n", i, the_table -> buckets_number);
 			unsigned int current_bytes = current_items*( sizeof(short) + sizeof(gehash_data_t) );
 			accued_bytes += current_bytes; 
 			curr_bucks ++;
@@ -1502,7 +1503,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			#ifdef __MINGW32__
 			{
 				char * buffkk = malloc(current_bytes );
-				fread(buffkk,sizeof(short) + sizeof(gehash_data_t), current_items , fp);
+				fread(buffkk,current_bytes ,1, fp);
 				free(buffkk);
 			}
 			#else
@@ -1514,6 +1515,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		fseeko(fp, (off_t)fp_curr, SEEK_SET);
 
 		for(i=0; i<GEHASH_MEM_PTR_NO ; i++){
+
+//if(i%50000 == 0)SUBREADprintf("MEMHUGE %d/%d\n", i, the_table -> buckets_number);
 			unsigned int current_bytes = bucket_bytes[i];
 			if(current_bytes<0xff000000u){
 				the_table -> malloc_ptr[i] = malloc(current_bytes);
@@ -1529,6 +1532,9 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		curr_bucks = 0;
 		accued_bytes = 0;
 		for(i=0; i<the_table -> buckets_number ; i++){
+
+//if(i%50000 == 0)SUBREADprintf("FILLHUGE %d/%d\n", i, the_table -> buckets_number);
+
 			struct gehash_bucket * current_bucket = the_table -> buckets+i;
 			current_bucket -> current_items = load_int32(fp);
 			load_int32(fp);//useless for lo: space size
