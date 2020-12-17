@@ -768,11 +768,12 @@ library(Matrix)
   ret
 }
 
-.load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab){
+.load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab, umi.cutoff){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   cat("Loading high-conf matrix from '",fname,"'\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
-  rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
+  rescued <- NA
+  if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
 
   if(use.meta.features){
     if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
@@ -796,13 +797,13 @@ library(Matrix)
   }
 }
 
-.load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab){
+.load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab, umi.cutoff){
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
     sname <- sum.tab$SampleName[roiw]
     sid <- sum.tab$Index[roiw]
-    count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid, use.meta.features, annot.tab)
+    count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid, use.meta.features, annot.tab, umi.cutoff)
     ret[[sprintf("Sample.%d",sid)]] <- count.tab
   }
   ret[["Sample.Table"]] <- sum.tab
@@ -916,7 +917,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
           one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, ...)
           if(any(is.na(raw.fc.annot))) raw.fc.annot<- one.raw.fc$annotation
           cat("Processing sample '",samplename,"'\n")
-          one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+          one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
           fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
           fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
           stt <- .extract.sample.table.cols(full_dirname,one.result)
@@ -934,7 +935,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
         raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
@@ -963,7 +964,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
 
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
@@ -1004,7 +1005,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
 
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-        some.results <- .load.all.scSamples(leftover.bam, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+        some.results <- .load.all.scSamples(leftover.bam, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["Counts"]] # featureCounts treats each left-over BAM file as a single run and has only one sample 
         fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["HighConfidneceCell"]]
 
@@ -1020,7 +1021,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
       raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
 
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
