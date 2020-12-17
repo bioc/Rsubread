@@ -22,6 +22,9 @@ cellCounts(
     GTF.attrType = "gene_id",
     useMetaFeatures = TRUE,
     
+    # user provided UMI cutoff for cell calling
+    umi.cutoff = NULL,
+
     # number of threads
     nthreads = 10,
 
@@ -40,6 +43,7 @@ cellCounts(
   \item{GTF.featureType}{ See \code{\link{featureCounts}} for more details. \code{"exon"} by default.}
   \item{GTF.attrType}{ See \code{\link{featureCounts}} for more details. \code{"gene_id"} by default.} 
   \item{useMetaFeatures}{ Specify if UMI counting should be carried out at the meta-feature level (eg. gene level).  See \code{\link{featureCounts}} for more details. \code{TRUE} by default.}
+  \item{umi.cutoff}{ Specify the minimum of UMIs each called cell must have. The cutoff will be automatically decided if the value is \code{NULL}. \code{NULL} by default. }
   \item{nthreads}{ A numeric value giving the number of threads used for read mapping and counting. \code{10} by default.}
   \item{...}{other parameters passed to \code{\link{align}} and and \code{\link{featureCounts}} functions.}
 }
