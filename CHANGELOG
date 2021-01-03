@@ -1,3 +1,7 @@
+1 Jan 2021 - 2.5.3
+(1) Allow the user to specify the UMI-number cutoff to cellCounts.
+(2) Update the document of cellCounts, describing the new format of the output object.
+
 16 Dec 2020 - 2.5.2
 (1) Use the two-step UMI merging algorithm in cellCounts.
 

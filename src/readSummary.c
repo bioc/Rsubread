@@ -4786,7 +4786,7 @@ int scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context,
 		for(x1 = 0; x1 < sorted_idx -> numOfElements ; x1++){
 			void * barcode_idx = ArrayListGet(sorted_idx,x1);
 			srInt_64 this_umis = HashTableGet( used_cell_barcode_tab, barcode_idx )-NULL;
-			if(this_umis >= scRNA_umi_cutoff-0.000001){
+			if(this_umis >= scRNA_umi_cutoff-0.1){
 				ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) - 1 );
 				last_umi_no = this_umis;
 			}else break;	// #UMI-sorted so no need to scan more

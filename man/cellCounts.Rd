@@ -85,7 +85,19 @@ The returned \code{List} object contains the following components:
 
 \item{annotation}{a \code{data.frame} object containing an annotation (eg. a gene annotation). UMIs were assigned to features (eg. genes) in this annotation. Rows in the annotation are features. Columns of the annotation include \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}.}
 
-\item{sample.info}{a \code{data.frame} object containing sample information and also statistics related to the quantification result. It includes the following columns: \code{SampleName}, \code{InputDirectory}, \code{TotalCells}, \code{HighConfidenceCells}, \code{RescuedCells}, \code{TotalUMI}, \code{TotalReads}, \code{MappedReads} and \code{AssignedReads}. The order of samples in this object is the same as that in the components \code{counts} and \code{cell.confidence}.}
+\item{sample.info}{a \code{data.frame} object containing sample information and also statistics related to the quantification result.
+
+The following columns are included in the \code{data.frame} object:
+
+The \code{SampleName} and \code{InputDirectory} columns describe the input data. The \code{InputDirectory} column is included in the \code{data.frame} object only if the input mode is \code{"BCL"}.
+
+The \code{TotalCells}, \code{HighConfidenceCells} and \code{RescuedCells} columns give the numbers of cells called from each sample: the total number of cells, the number of high-confidence cells and the number of cells that were rescued because their gene expression profiles are significantly different from the gene expression profiles of ambient RNA. The \code{HighConfidenceCells} and \code{RescuedCells} columns are not included in the \code{data.frame} object if a numeric argument is given to the \code{umi.cutoff} option. This is because the cell-rescuing step is skipped when a UMI-number cutoff is specified by the user.
+
+The \code{TotalUMI} column gives the total number of UMIs called from each sample.
+
+The \code{MinUMI}, \code{MedianUMI}, \code{MaxUMI} and \code{MeanUMI} columns give statistics describing the UMI-count-per-cell in all the cells called from each sample.
+
+The \code{TotalReads}, \code{MappedReads} and \code{AssignedReads} columns give the number of all input reads that have known sample index sequences, the number of reads that are mapped to the reference genome and the number of reads that are assigned to the known genesin the annotation. }
 
 \item{cell.confidence}{a \code{List} object indicating if a cell is a high-confidence cell or a rescued cell (low confidence). Each component in the \code{List} object corresponds to a sample. Each component is a logical vector with a \code{TRUE} value indicating a high-confidence cell.}
 }

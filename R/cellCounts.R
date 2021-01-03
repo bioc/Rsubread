@@ -825,23 +825,34 @@ library(Matrix)
   }
 }
 
-.extract.sample.table.cols <- function(rdir, smr, input.mode="bcl"){
+.extract.sample.table.cols <- function(rdir, smr, input.mode="bcl", umi.cutoff=NULL){
   total.cells <- c()
   hiconf.cells <- c()
   res.cells <- c()
   umis <- c()
+  umi.statistics <- data.frame(MinUMI=NULL, MedianUMI=NULL, MaxUMI=NULL, MeanUMI=NULL)[,0]
   for(spi in 1:nrow(smr[["Sample.Table"]])){
     samplename <- smr[["Sample.Table"]]$SampleName[spi]
     sampleno <- sprintf("Sample.%d", spi)
     total.cells <- c(total.cells,length(smr[[sampleno]][["HighConfidneceCell"]]))
     hiconf.cells <- c(hiconf.cells,sum(smr[[sampleno]][["HighConfidneceCell"]]))
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
-    umis <- c(umis,sum(smr[[sampleno]][["Counts"]]))
+    cell.umis <- colSums(smr[[sampleno]][["Counts"]])
+    umis <- c(umis,sum(cell.umis))
+    umi.statistics <- rbind(umi.statistics, list(MinUMI=min(cell.umis), MedianUMI=median(cell.umis), MaxUMI=max(cell.umis), MeanUMI=mean(cell.umis)))
   }
-  if(input.mode=="fastq" || input.mode=="bam")
-    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("UMICutoff","TotalReads","MappedReads","AssignedReads")] ))
-  else
-    return(cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, smr[["Sample.Table"]][,c("UMICutoff","TotalReads","MappedReads","AssignedReads")] ))
+  ret <- NULL
+  if(is.null(umi.cutoff)){
+    if(input.mode=="fastq" || input.mode=="bam")
+      ret <- cbind( SampleName=smr[["Sample.Table"]]$SampleName, TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, umi.statistics, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+    else
+      ret <- cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, HighConfidenceCells=hiconf.cells, RescuedCells=res.cells, TotalUMI=umis, umi.statistics, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+  }else{
+    if(input.mode=="fastq" || input.mode=="bam")
+      ret <- cbind( SampleName=smr[["Sample.Table"]]$SampleName, TotalCells=total.cells, TotalUMI=umis, umi.statistics, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+    else
+      ret <- cbind( SampleName=smr[["Sample.Table"]]$SampleName, InputDirectory=rep(rdir, nrow(smr[["Sample.Table"]])), TotalCells=total.cells, TotalUMI=umis, umi.statistics, smr[["Sample.Table"]][,c("TotalReads","MappedReads","AssignedReads")] )
+  }
 }
 
 .scan.fastq.dir <- function(dirname){
@@ -892,7 +903,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
 
     dirs <- unique( sample.info.idx$InputDirectory )
     fc[["counts"]] <- list()
-    fc[["cell.confidence"]] <- list()
+#    if(is.null(umi.cutoff))fc[["cell.confidence"]] <- list()
   
     for(dirname in dirs) .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx") # check files before the slow mapping/counting step.
 
@@ -919,8 +930,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
           cat("Processing sample '",samplename,"'\n")
           one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
           fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
-          fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
-          stt <- .extract.sample.table.cols(full_dirname,one.result)
+          if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
+          stt <- .extract.sample.table.cols(full_dirname,one.result, umi.cutoff=umi.cutoff)
           df.sample.info <- rbind(df.sample.info, stt)
         }
       }else{
@@ -939,9 +950,9 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-          fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+          if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
         }
-        stt <- .extract.sample.table.cols(full_dirname,some.results)
+        stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
         df.sample.info <- rbind(df.sample.info, stt)
       }
     }
@@ -968,10 +979,10 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
     }
-    df.sample.info <- .extract.sample.table.cols(NA,some.results, input.mode="bam")
+    df.sample.info <- .extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff)
   } else if(input.mode == "FASTQ" || input.mode == "FASTQ-dir"){
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
     print(sample.info.idx)
@@ -1007,9 +1018,9 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(leftover.bam, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["Counts"]] # featureCounts treats each left-over BAM file as a single run and has only one sample 
-        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["HighConfidneceCell"]]
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["HighConfidneceCell"]]
 
-        newrow<- .extract.sample.table.cols(NA,some.results,input.mode="fastq")
+        newrow<- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
         df.sample.info <- rbind(df.sample.info,newrow)
       }
     }else{
@@ -1026,9 +1037,9 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- some.results[["Sample.Table"]][["SampleName"]][spi]
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
-      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq")
+      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
     }
   }
 
