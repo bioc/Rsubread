@@ -99,7 +99,7 @@ The \code{MinUMI}, \code{MedianUMI}, \code{MaxUMI} and \code{MeanUMI} columns gi
 
 The \code{TotalReads}, \code{MappedReads} and \code{AssignedReads} columns give the number of all input reads that have known sample index sequences, the number of reads that are mapped to the reference genome and the number of reads that are assigned to the known genesin the annotation. }
 
-\item{cell.confidence}{a \code{List} object indicating if a cell is a high-confidence cell or a rescued cell (low confidence). Each component in the \code{List} object corresponds to a sample. Each component is a logical vector with a \code{TRUE} value indicating a high-confidence cell.}
+\item{cell.confidence}{a \code{List} object indicating if a cell is a high-confidence cell or a rescued cell (low confidence). Each component in the \code{List} object corresponds to a sample. Each component is a logical vector with a \code{TRUE} value indicating a high-confidence cell. The \code{cell.confidence} object is not provided if the argument to the \code{umi.cutoff} option is not \code{NULL} because no cell-rescuing step is performed.}
 }
 
 \author{Yang Liao and Wei Shi}
