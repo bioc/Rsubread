@@ -5638,6 +5638,7 @@ void scRNA_convert_ss_to_arr( void * key, void * hashed_obj, HashTable * tab ){
 
 		int line_no_in_sheet = sbc_lane_sample[2] - (char*)NULL;
 		HashTablePut(global_context -> scRNA_lineno1B_to_sampleno1B_tab , NULL+line_no_in_sheet, NULL + global_context -> scRNA_sample_id_to_name -> numOfElements);
+		//SUBREADprintf("Push_LineNo : %d -> %d\n", line_no_in_sheet, global_context -> scRNA_sample_id_to_name -> numOfElements);
 		//SUBREADprintf("Push Barcode %s in Lane %ld for %s [%d]\n", push_arr[2], (sbc_lane_sample[0]-(char*)NULL), key, global_context -> scRNA_sample_id_to_name -> numOfElements);
 	}
 }
