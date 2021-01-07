@@ -737,7 +737,7 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 				ArrayListSetDeallocationFunction(arr, iBLC_free_3tp);
 				HashTablePut( ret, strdup(sample_name), arr );
 			}
-			SUBREADprintf("PUT_SAMPLE=%s of lane_no %d\n", sample_name, lane_no);
+			//SUBREADprintf("PUT_SAMPLE=%s of lane_no %d\n", sample_name, lane_no);
 			ArrayListPush(arr,entry);
 		}
 		if(state == 0 && strstr(linebuf,"ata]")){
