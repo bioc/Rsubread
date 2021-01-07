@@ -871,7 +871,7 @@ library(Matrix)
 
     if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
     if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
-    if(substr(sample.name,1,1)!="S")stop(sprintf("Unable to parse the FASTQ file name : '%s'", sample.name0))
+    #if(substr(sample.name,1,1)!="S")stop(sprintf("Unable to parse the FASTQ file name : '%s'", sample.name0))
 
     sample.sheet <- rbind(sample.sheet, data.frame( SampleName=sample.name, BarcodeUMIFile=df1, ReadFile=df2))
   }
