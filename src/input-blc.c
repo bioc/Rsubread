@@ -729,14 +729,15 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 			char ** entry = malloc(sizeof(void*)*3);
 			entry[0] = NULL + lane_no;
 			entry[1] = sample_index;
+			entry[2] = NULL + stat1_line; // the N-th line in the file , 1 based
 
 			ArrayList * arr = HashTableGet(ret, sample_name);
 			if(NULL == arr){
 				arr = ArrayListCreate(16);
 				ArrayListSetDeallocationFunction(arr, iBLC_free_3tp);
-				//SUBREADprintf("PUT_SAMPLE=%s\n", sample_name);
 				HashTablePut( ret, strdup(sample_name), arr );
 			}
+			SUBREADprintf("PUT_SAMPLE=%s of lane_no %d\n", sample_name, lane_no);
 			ArrayListPush(arr,entry);
 		}
 		if(state == 0 && strstr(linebuf,"ata]")){

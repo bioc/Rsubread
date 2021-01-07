@@ -1649,7 +1649,7 @@ int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbi
 		this_chunk_buffer_used = writer -> threads_chunk_buffer_used + thread_no;
 	}else{
 		if(writer -> sort_reads_by_coord && writer -> chunk_buffer_max_size < writer -> chunk_buffer_used + 12000){
-			//SUBREADprintf("REALLOCATE MEM : %d -> %d\n", writer -> chunk_buffer_max_size,  writer -> chunk_buffer_max_size * 7/4);
+			SUBREADprintf("0THR_REALLOCATE MEM : %d -> %d\n", writer -> chunk_buffer_max_size,  writer -> chunk_buffer_max_size * 7/4);
 			writer -> chunk_buffer_max_size = writer -> chunk_buffer_max_size * 7/4;
 			writer -> chunk_buffer = realloc(writer -> chunk_buffer, writer -> chunk_buffer_max_size);
 		}
@@ -2468,12 +2468,20 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 } 
 
 void SamBam_writer_finalise_thread(SamBam_Writer * writer, int thread_id){
-	if(writer -> sort_reads_by_coord){
-		//SUBREADprintf("WTRWPP threads_chunk_buffer_used [%d] = %d\n", thread_id, writer -> threads_chunk_buffer_used[thread_id]);
-		SamBam_writer_sort_buff_one_write(writer, writer -> threads_chunk_buffer[thread_id], writer -> threads_chunk_buffer_used[thread_id], thread_id);
-		writer -> threads_chunk_buffer_used [thread_id] = 0;
+	if(writer -> threads < 2){
+		if(writer -> sort_reads_by_coord){
+			SamBam_writer_sort_buff_one_write(writer, writer ->chunk_buffer, writer -> chunk_buffer_used, -1);
+			writer -> chunk_buffer_used= 0;
+		}else{
+			if(writer -> chunk_buffer_used) SamBam_writer_add_chunk(writer, thread_id);
+		}
 	}else{
-		if(writer -> threads_chunk_buffer_used[thread_id]) SamBam_writer_add_chunk(writer, thread_id);
+		if(writer -> sort_reads_by_coord){
+			SamBam_writer_sort_buff_one_write(writer, writer -> threads_chunk_buffer[thread_id], writer -> threads_chunk_buffer_used[thread_id], thread_id);
+			writer -> threads_chunk_buffer_used [thread_id] = 0;
+		}else{
+			if(writer -> threads_chunk_buffer_used[thread_id]) SamBam_writer_add_chunk(writer, thread_id);
+		}
 	}
 }
 

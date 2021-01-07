@@ -867,7 +867,7 @@ library(Matrix)
     sample.name <- unlist(strsplit(df2, "\\/"))
     sample.name0<- sample.name
     sample.name <- sample.name[length(sample.name)]
-    sample.name <- substr(sample.name, 1, nchar(sample.name)-25)
+    sample.name <- substr(sample.name, 1, nchar(sample.name)-24)
 
     if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
     if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
@@ -1028,7 +1028,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
       bam.for.FC <- temp.file.prefix
       generate.scRNA.BAM <- TRUE
-      .index.names.to.sheet.FASTQ.mode(sample, sample.1)
+      .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
       .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
       raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
