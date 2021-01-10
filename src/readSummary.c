@@ -169,6 +169,7 @@ typedef struct {
 	unsigned int * scoring_buff_flags;
 	unsigned int * scoring_buff_overlappings;
 	srInt_64 * scoring_buff_exon_ids;
+	srInt_64 del4_added_reads;
 
 	char * chro_name_buff;
 	z_stream bam_file_output_stream;
@@ -1806,6 +1807,8 @@ void process_pairer_reset(void * pairer_vp){
 		{
 			global_context -> thread_contexts[xk1].count_table[xk2] = 0;
 		}
+
+		global_context -> thread_contexts[xk1].del4_added_reads = 0;
 
 		global_context -> thread_contexts[xk1].all_reads = 0;
 		global_context -> thread_contexts[xk1].nreads_mapped_to_exon = 0;
@@ -3897,6 +3900,7 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 
 		int nreads = HashTableGet( bc_umi_to_reads_tab, NULL+1+cellbc_umi ) - NULL;
 		HashTablePut(bc_umi_to_reads_tab, NULL+1+cellbc_umi, NULL+nreads+1);
+		thread_context -> del4_added_reads++;
 	}
 	//if(sample_id >0) SUBREADprintf("P2 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
 }
@@ -4471,7 +4475,13 @@ int scRNA_reduce_cellno_compare(void * arr, int l, int r){
 	if(nreads_L<1 || nreads_R<1) SUBREADprintf("ERROR: No known read counts: %d, %d\n", nreads_L, nreads_R);
 	if(nreads_L>nreads_R) return -1;
 	if(nreads_L<nreads_R) return 1;
-	return 0;
+
+	srInt_64 umiLno = (bc_umi_p1_L-1) & 0xffffffff;
+	srInt_64 umiRno = (bc_umi_p1_R-1) & 0xffffffff;
+	ArrayList * merged_umi_no_to_seq = sd[3];
+	char * umiLseq = ArrayListGet(merged_umi_no_to_seq, umiLno);
+	char * umiRseq = ArrayListGet(merged_umi_no_to_seq, umiRno);
+	return strcmp(umiLseq, umiRseq);
 }
 
 void scRNA_reduce_cellno_exchange(void * arr, int l, int r){
@@ -5307,8 +5317,10 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 
 		ArrayListSetDeallocationFunction( global_context -> scRNA_merged_umi_list, free );
 
+		srInt_64 del4_added_reads=0;
 		for(xk1=0; xk1<global_context-> thread_number; xk1++){
 			HashTable * thread_umi_table = global_context -> thread_contexts[xk1].scRNA_registered_UMI_table;
+			del4_added_reads += global_context -> thread_contexts[xk1].del4_added_reads;
 			int * thread_umi_no_to_global_umi_no = malloc( sizeof(int) * thread_umi_table -> numOfElements );
 
 			thread_umi_table -> appendix1 = thread_umi_no_to_global_umi_no;
@@ -5327,6 +5339,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			}
 			free(thread_umi_no_to_global_umi_no);
 		}
+		SUBREADprintf("DEL4_ADED = %lld\n", del4_added_reads);
 
 		for(xk1=0; xk1< global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
 			HashTable * genesp1_to_cell_umip1_tab = merged_sample_cell_umi_tables[xk1];

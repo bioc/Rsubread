@@ -1005,13 +1005,14 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
  
     bam.for.FC <- c()
     if(is.null(aligner)){
+      unique.samples <- unique(sample.info.idx$SampleName)
       bam.for.FC <- paste0(sample.info.idx$SampleName,".bam")
       generate.scRNA.BAM <- FALSE
-      for(rowi in 1:nrow(sample.info.idx)){
-        samplename <- sample.info.idx$SampleName [rowi]
+      
+      for(samplename in unique.samples){
         leftover.bam <- paste0(samplename, ".bam")
 
-        .index.names.to.sheet.FASTQ.mode(sample[ sample$SampleName == samplename, ], sample.1)
+        .index.names.to.sheet.FASTQ.mode(sample.info.idx[ sample.info.idx$SampleName == samplename, ][1,], sample.1)
         .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
         raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
 

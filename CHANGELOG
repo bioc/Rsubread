@@ -1,4 +1,7 @@
-1 Jan 2021 - 2.5.3
+11 Jan 2021 - 2.5.4
+(1) Fix a bug in cellCounts that reads the sample sheet with multiple FASTQ files in a unpredictable order.
+
+4 Jan 2021 - 2.5.3
 (1) Allow the user to specify the UMI-number cutoff to cellCounts.
 (2) Update the document of cellCounts, describing the new format of the output object.
 
