@@ -925,7 +925,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
           .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1, samplename)
           one.bam.name <- paste0(samplename, ".bam")
           .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM, BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-          one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, ...)
+          one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, strandSpecific=1, ...)
           if(any(is.na(raw.fc.annot))) raw.fc.annot<- one.raw.fc$annotation
           cat("Processing sample '",samplename,"'\n")
           one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
@@ -944,7 +944,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
           subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
         .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-        raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+        raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
@@ -972,7 +972,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
 
       generate.scRNA.BAM <- TRUE
       .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-      raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+      raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
 
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
@@ -1014,7 +1014,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
 
         .index.names.to.sheet.FASTQ.mode(sample.info.idx[ sample.info.idx$SampleName == samplename, ][1,], sample.1)
         .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-        raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+        raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
 
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(leftover.bam, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
@@ -1031,7 +1031,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       generate.scRNA.BAM <- TRUE
       .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
       .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-      raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads, ...)
+      raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
 
