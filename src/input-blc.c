@@ -521,33 +521,33 @@ int iBLC_current_lane_next_read(input_BLC_t * blc_input, char * readname , char 
 		int baseii =0;
 		for(bii =0; bii< blc_input -> total_bases_in_each_cluster; bii++){
 			int nch = blc_input -> bcl_is_gzipped?seekgz_next_int8(blc_input -> bcl_gzip_fps[bii]):fgetc(blc_input -> bcl_fps[bii]), bv, qv;
-			assert(nch >=0 && nch <=255);
 
-			if(0==nch){
-				bv='N';
-				qv='#';
-			}else{
-				bv="ACGT"[nch%4];
-				qv=33+(nch>>2);
-				if(qv >= '/') qv++;
-			}
-			if(bii < idx_offset){
-				assert(bv !=0 && qv !=0);
-				readname[13+ bii]=bv;
-				readname[14+ bii+idx_offset]=qv;
-			}else if(bii < base_offset){
-				assert(bv !=0 && qv !=0);
-				readname[15+ bii+ idx_offset]=bv;
-				readname[16+ bii+ base_offset]=qv;
-			}else{
-				read[baseii] = bv;
-				qual[baseii] = qv;
-				baseii++;
+			if(fch == 1){
+				if(0==nch){
+					bv='N';
+					qv='#';
+				}else{
+					bv="ACGT"[nch%4];
+					qv=33+(nch>>2);
+					if(qv >= '/') qv++;
+				}
+				if(bii < idx_offset){
+					assert(bv !=0 && qv !=0);
+					readname[13+ bii]=bv;
+					readname[14+ bii+idx_offset]=qv;
+				}else if(bii < base_offset){
+					assert(bv !=0 && qv !=0);
+					readname[15+ bii+ idx_offset]=bv;
+					readname[16+ bii+ base_offset]=qv;
+				}else{
+					read[baseii] = bv;
+					qual[baseii] = qv;
+					baseii++;
+				}
 			}
 		}
-		assert(fch==1||fch==0);
+
 		if(fch==1){
-		//	SUBREADprintf("ASS_RNAME=%s\n", readname);
 			blc_input -> read_number ++;
 			return baseii;
 		}
