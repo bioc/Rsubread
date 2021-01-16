@@ -867,7 +867,9 @@ library(Matrix)
     sample.name <- unlist(strsplit(df2, "\\/"))
     sample.name0<- sample.name
     sample.name <- sample.name[length(sample.name)]
-    sample.name <- substr(sample.name, 1, nchar(sample.name)-24)
+    if(substr(sample.name, nchar(sample.name)-22, nchar(sample.name)-22)=='S') sample.name <- substr(sample.name, 1, nchar(sample.name)-24)
+    else if(substr(sample.name, nchar(sample.name)-23, nchar(sample.name)-23)=='S') sample.name <- substr(sample.name, 1, nchar(sample.name)-25)
+    else stop(paste("ERROR: Unable to parse the file name,",sample.name))
 
     if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
     if(substr(sample.name,1,1)=="_") sample.name <- substr(sample.name,2,999)
