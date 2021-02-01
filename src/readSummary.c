@@ -5264,6 +5264,7 @@ void scRNA_merge_merge_umi_by_genes(void * key_genep1, void * val_array_bc_umip1
 	HashTable * gene_bc_umi_to_deleted_genes_tab = tab -> appendix1;
 	ArrayList * array_bc_umip1 = val_array_bc_umip1;
 	HashTable * used_cellno_tab = tab -> appendix2;
+	fc_thread_global_context_t * global_context = tab -> appendix3;
 	int x1, wtr_ptr=0;
 	int geneno = key_genep1 -NULL - 1;
 	int old_bcno =-1, cell_umi=0;
@@ -5283,6 +5284,11 @@ void scRNA_merge_merge_umi_by_genes(void * key_genep1, void * val_array_bc_umip1
 		ArrayList * todel_genes = HashTableGet(gene_bc_umi_to_deleted_genes_tab, bc_umip1_ptr);
 		if(todel_genes && ArrayListContainsPtr(todel_genes, NULL+geneno)){
 			tab -> counter1 ++;
+			if(1){
+				int umi_no = (bc_umip1_ptr-NULL-1) & 0xffffffff;
+				char *gene_name = (char*)global_context -> gene_name_array [geneno];
+				Rprintf("STEP2_MERGING_DEL_UMI %s %s %s\n", ArrayListGet(global_context -> scRNA_cell_barcodes_array, bcno), gene_name, ArrayListGet(global_context ->scRNA_merged_umi_list, umi_no));
+			}
 		}else{
 			if(wtr_ptr != x1) array_bc_umip1 -> elementList[wtr_ptr] = array_bc_umip1 -> elementList[ x1 ];
 			cell_umi++;
@@ -5294,7 +5300,6 @@ void scRNA_merge_merge_umi_by_genes(void * key_genep1, void * val_array_bc_umip1
 		HashTablePut(used_cellno_tab, NULL+1+old_bcno, NULL+old_umis_in_used+cell_umi);
 	}
 	array_bc_umip1 -> numOfElements = wtr_ptr;
-
 }
 
 // return the number of RG result sets
@@ -5361,6 +5366,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			HashTable * gene_bc_umi_to_deleted_genes_tab = scRNA_find_gene_to_umi_merger(global_context, genesp1_to_cell_umip1_tab, merged_sample_cell_umi_to_reads_tables[xk1]);
 			genesp1_to_cell_umip1_tab -> appendix1 = gene_bc_umi_to_deleted_genes_tab;
 			genesp1_to_cell_umip1_tab -> appendix2 = used_cell_no_tables[xk1];
+			genesp1_to_cell_umip1_tab -> appendix3 = global_context;
 			genesp1_to_cell_umip1_tab -> counter1 = 0;
 			HashTableIteration( genesp1_to_cell_umip1_tab, scRNA_merge_merge_umi_by_genes );
 			SUBREADprintf("GENE_LEVEL MERGER REMOVED %lld UMIs\n", genesp1_to_cell_umip1_tab -> counter1);
