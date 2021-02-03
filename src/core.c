@@ -3857,16 +3857,7 @@ int print_configuration(global_context_t * context)
 
 int init_paired_votes(global_context_t *context)
 {
-
 	init_bigtable_results(context, 0);
-
-	//context -> big_margin_record = malloc( sizeof(*context -> big_margin_record) * (context->input_reads.is_paired_end_reads?2:1) * context -> config.big_margin_record_size * context ->config.reads_per_chunk);
-
-	//memset(context ->big_margin_record  , 0 , sizeof(*context -> big_margin_record) *context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context -> config.big_margin_record_size);
-
-		//fprintf(stderr, "MALLOC=%llu = %d * %d * %d \n", sizeof(mapping_result_t) * context ->config.reads_per_chunk * (context->input_reads.is_paired_end_reads?2:1) * context->config.multi_best_reads, sizeof(mapping_result_t), context ->config.reads_per_chunk, context->config.multi_best_reads);
-		//sleep(10000);
-
 	return 0;
 }
 
@@ -4054,7 +4045,7 @@ int load_global_context(global_context_t * context)
 	}
 
 	if(context->config.scRNA_input_mode){
-		context -> config.reads_per_chunk *= 2;
+		context -> config.reads_per_chunk *= 10;
 		context -> config.multi_best_reads = 3;
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
 		// opening a BCL input needs the exact chunk size. 

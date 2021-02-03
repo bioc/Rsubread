@@ -445,6 +445,12 @@ int test_redundant_event( global_context_t * global_context, chromosome_event_t*
 	return is_redund;
 }
 
+
+#define reallocate_to_be_removed_ids		if(to_be_removed_number >= remove_id_size-1){\
+							remove_id_size = remove_id_size*3/2;\
+							to_be_removed_ids = realloc(to_be_removed_ids, remove_id_size);\
+						}
+
 void remove_sorted_neighbours(global_context_t * global_context)
 {
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
@@ -470,10 +476,11 @@ void remove_sorted_neighbours(global_context_t * global_context)
 
 	merge_sort(sort_data, indel_context->total_events, event_neighbour_sort_compare, event_neighbour_sort_exchange, event_neighbour_sort_merge);
 
-	int xk2, position_delta, maxinum_removed_events =(global_context->  config.do_fusion_detection || global_context->  config.do_long_del_detection)? 9999999:1999999;
+	int xk2, position_delta;// maxinum_removed_events =(global_context->  config.do_fusion_detection || global_context->  config.do_long_del_detection)? 9999999:1999999;
+	int remove_id_size = 999999;
 
 	position_delta = 10;
-	int * to_be_removed_ids = malloc(sizeof(int) * (1+maxinum_removed_events)), to_be_removed_number=0;
+	int * to_be_removed_ids = malloc(sizeof(int) * (1+remove_id_size)), to_be_removed_number=0;
 	for(xk1=0; xk1<indel_context->total_events; xk1++)
 	{
 		unsigned int event_id = global_id_list[xk1];
@@ -490,6 +497,7 @@ void remove_sorted_neighbours(global_context_t * global_context)
 			for(xk3 = 0; xk3 < found_events ; xk3++){
 				chromosome_event_t * neighbour_event = search_return[xk3];
 				if(test_redundant_event(global_context, event_body, neighbour_event)){
+					reallocate_to_be_removed_ids;
 					to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 					is_redundant = 1;
 					break;
@@ -532,6 +540,8 @@ void remove_sorted_neighbours(global_context_t * global_context)
 
 }
 
+#define MIN_EVENT_SUPPORT_NO 2
+
 void remove_neighbour(global_context_t * global_context)
 {
 	indel_context_t * indel_context = (indel_context_t *)global_context -> module_contexts[MODULE_INDEL_ID]; 
@@ -541,13 +551,18 @@ void remove_neighbour(global_context_t * global_context)
 	int xk1;
 	int * to_be_removed_ids;
 	int to_be_removed_number = 0, all_junctions = 0;
-	int maxinum_removed_events =(global_context->  config.do_fusion_detection || global_context->  config.do_long_del_detection)? 9999999:1999999;
+	int remove_id_size = 999999;
 
-
-	to_be_removed_ids = malloc(sizeof(int) * (1+maxinum_removed_events));
+	to_be_removed_ids = malloc(sizeof(int) * (1+remove_id_size));
 	for(xk1=0; xk1<indel_context->total_events; xk1++)
 	{
 		chromosome_event_t * event_body = &event_space[xk1];
+		if(CHRO_EVENT_TYPE_REMOVED == event_body->event_type) continue;
+		if(global_context -> config.scRNA_input_mode && event_body -> supporting_reads < MIN_EVENT_SUPPORT_NO){
+			reallocate_to_be_removed_ids;
+			to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
+			continue;
+		}
 		all_junctions++;
 		int xk2;
 		int event_type;
@@ -558,8 +573,7 @@ void remove_neighbour(global_context_t * global_context)
 				int neighbour_range = 3;
 				if(event_body->event_type != CHRO_EVENT_TYPE_INDEL) continue;
 
-				if(to_be_removed_number >= maxinum_removed_events) break;
-
+				reallocate_to_be_removed_ids;
 				if(is_ambiguous_indel_score(event_body))to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 				else for(xk2=-neighbour_range; xk2<=neighbour_range; xk2++)
 				{
@@ -572,7 +586,7 @@ void remove_neighbour(global_context_t * global_context)
 
 					for(xk3 = 0; xk3<found_events; xk3++)
 					{
-						if(to_be_removed_number>=maxinum_removed_events) break;
+						reallocate_to_be_removed_ids;
 						chromosome_event_t * tested_neighbour = search_return[xk3];
 						long long int length_diff = tested_neighbour -> indel_length;
 						length_diff -=  event_body -> indel_length;
@@ -617,7 +631,8 @@ void remove_neighbour(global_context_t * global_context)
 						int xk3, found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return);
 						for(xk3 = 0; xk3<found_events; xk3++)
 						{
-							if(to_be_removed_number>=maxinum_removed_events) break;
+
+							reallocate_to_be_removed_ids;
 							chromosome_event_t * tested_neighbour = search_return[xk3];
 
 							if(tested_neighbour -> indel_at_junction > event_body -> indel_at_junction) continue;
@@ -633,8 +648,8 @@ void remove_neighbour(global_context_t * global_context)
 					for(xk2=-10 ; xk2 < 10 ; xk2++)
 					{
 						if(!xk2)continue;
-						if(to_be_removed_number>=maxinum_removed_events) break;
 
+						reallocate_to_be_removed_ids;
 						unsigned int test_pos_small = event_body -> event_small_side + xk2;
 						chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
 						int  xk3, found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_BOTH_SIDES, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return); 
@@ -658,13 +673,10 @@ void remove_neighbour(global_context_t * global_context)
 	{
 		chromosome_event_t * deleted_event =  &event_space[to_be_removed_ids[xk1]];
 
-		//printf("NBR_REMOVED=%u - %u\n", deleted_event -> event_small_side , deleted_event -> event_large_side);
 		if(deleted_event -> event_type == CHRO_EVENT_TYPE_INDEL && deleted_event -> inserted_bases)
 			free(deleted_event -> inserted_bases);
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
 	}
-
-	//sublog_printf(SUBLOG_STAGE_RELEASED, SUBLOG_LEVEL_INFO, "There are %d low-confidence chromosome events out of %d removed.", to_be_removed_number, all_junctions);
 
 	free(to_be_removed_ids);
 }

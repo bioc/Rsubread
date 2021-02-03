@@ -1,3 +1,6 @@
+3 Feb 2021 - 2.5.5
+(1) Increase chunk size and modify indel-merging in cellCounts.
+
 11 Jan 2021 - 2.5.4
 (1) Fix a bug in cellCounts that reads the sample sheet with multiple FASTQ files in a unpredictable order.
 

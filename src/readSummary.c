@@ -5284,7 +5284,7 @@ void scRNA_merge_merge_umi_by_genes(void * key_genep1, void * val_array_bc_umip1
 		ArrayList * todel_genes = HashTableGet(gene_bc_umi_to_deleted_genes_tab, bc_umip1_ptr);
 		if(todel_genes && ArrayListContainsPtr(todel_genes, NULL+geneno)){
 			tab -> counter1 ++;
-			if(1){
+			if(0){
 				int umi_no = (bc_umip1_ptr-NULL-1) & 0xffffffff;
 				char *gene_name = (char*)global_context -> gene_name_array [geneno];
 				Rprintf("STEP2_MERGING_DEL_UMI %s %s %s\n", ArrayListGet(global_context -> scRNA_cell_barcodes_array, bcno), gene_name, ArrayListGet(global_context ->scRNA_merged_umi_list, umi_no));
@@ -5354,7 +5354,6 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			}
 			free(thread_umi_no_to_global_umi_no);
 		}
-		SUBREADprintf("DEL4_ADED = %lld\n", del4_added_reads);
 
 		for(xk1=0; xk1< global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
 			HashTable * genesp1_to_cell_umip1_tab = merged_sample_cell_umi_tables[xk1];
