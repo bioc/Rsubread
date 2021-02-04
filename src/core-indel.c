@@ -459,7 +459,7 @@ void remove_neighbour(global_context_t * global_context)
 
 	HashTable * event_table = indel_context -> event_entry_table;
 	chromosome_event_t * event_space = indel_context -> event_space_dynamic;
-	int xk1,xk2;
+	int xk1,xk2,xk3;
 	int * to_be_removed_ids;
 	int to_be_removed_number = 0, all_junctions = 0;
 	int remove_id_size = 999999;
@@ -491,7 +491,7 @@ void remove_neighbour(global_context_t * global_context)
 					unsigned int test_pos_small = event_body -> event_small_side + xk2;
 					chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
 					
-					int xk3, found_events = search_event(global_context, event_table, event_space, test_pos_small  , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_INDEL, search_return);
+					int found_events = search_event(global_context, event_table, event_space, test_pos_small  , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_INDEL, search_return);
 					//if(test_pos_small > 284136 && test_pos_small < 284146) printf("POS=%u\tTRES=%d\n", test_pos_small, found_events);
 
 					for(xk3 = 0; xk3<found_events; xk3++)
@@ -538,7 +538,7 @@ void remove_neighbour(global_context_t * global_context)
 						unsigned int test_pos_small = event_body -> event_small_side + xk2;
 						chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
 						
-						int xk3, found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return);
+						int found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_SMALL_SIDE, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return);
 						for(xk3 = 0; xk3<found_events; xk3++)
 						{
 
@@ -562,7 +562,7 @@ void remove_neighbour(global_context_t * global_context)
 						reallocate_to_be_removed_ids;
 						unsigned int test_pos_small = event_body -> event_small_side + xk2;
 						chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
-						int  xk3, found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_BOTH_SIDES, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return); 
+						int found_events = search_event(global_context,event_table, event_space, test_pos_small + delta_small , EVENT_SEARCH_BY_BOTH_SIDES, CHRO_EVENT_TYPE_JUNCTION|CHRO_EVENT_TYPE_FUSION, search_return); 
 
 						for(xk3 = 0; xk3<found_events; xk3++)
 						{
@@ -579,24 +579,23 @@ void remove_neighbour(global_context_t * global_context)
 		}
 	}
 
-	for(xk1=0; xk1<to_be_removed_number; xk1++)
-	{
+	for(xk1=0; xk1<to_be_removed_number; xk1++) {
 		int event_no = to_be_removed_ids[xk1];
 		chromosome_event_t * deleted_event =  &event_space[event_no];
 		
-		for(xk1=0;xk1<2;xk1++){
-			unsigned int pos = xk1?deleted_event->event_large_side:deleted_event->event_small_side;
+		for(xk2=0;xk2<2;xk2++){
+			unsigned int pos = xk2?deleted_event->event_large_side:deleted_event->event_small_side;
 			unsigned int * res = HashTableGet(event_table, NULL+pos);
 			if(res){
 				int current_size = res[0]&0x0fffffff;
 				int wrt_ptr = 1;
-				for(xk2 = 1 ; xk2< current_size+1 ; xk2++){
-					if(!res[xk2])break;
-					if(res[xk2] == event_no) continue;
-					if(wrt_ptr != xk2) res[wrt_ptr]=res[xk2];
+				for(xk3 = 1 ; xk3< current_size+1 ; xk3++){
+					if(!res[xk3])break;
+					if(res[xk3] -1 == event_no) continue;
+					if(wrt_ptr != xk3) res[wrt_ptr]=res[xk3];
 					wrt_ptr++;
 				}
-				if(wrt_ptr==1){
+				if(0 && wrt_ptr==1){
 					HashTableRemove(event_table, NULL+pos);
 					free(res);
 				}else if(wrt_ptr < current_size +1)res[wrt_ptr]=0;
@@ -704,7 +703,7 @@ int init_indel_thread_contexts(global_context_t * global_context, thread_context
 	indel_context_t * indel_context = (indel_context_t *) global_context -> module_contexts[MODULE_INDEL_ID];
 	
 	if(task == STEP_VOTING) {
-		indel_thread_context -> event_entry_table = HashTableCreate(399997);
+		indel_thread_context -> event_entry_table = HashTableCreate(399997 * ( global_context -> config.scRNA_input_mode?15:2 ));
 		indel_thread_context -> event_entry_table -> appendix1=NULL;//indel_context -> event_entry_table-> appendix1;
 		indel_thread_context -> event_entry_table -> appendix2=NULL;//indel_context -> event_entry_table-> appendix2;
 		HashTableSetKeyComparisonFunction(indel_thread_context->event_entry_table, localPointerCmp_forEventEntry);
