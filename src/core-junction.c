@@ -1062,7 +1062,7 @@ int is_long_del_high_quality(global_context_t * global_context, thread_context_t
 void copy_vote_to_alignment_res(global_context_t * global_context, thread_context_t * thread_context, mapping_result_t * align_res, subjunc_result_t * junc_res, gene_vote_t * current_vote, int vote_i, int vote_j, int curr_read_len, char * read_name, char * curr_read_text, int used_subreads_in_vote, int noninformative_subreads_in_vote, subread_read_number_t pair_number, int is_second_read, int * is_fully_covered)
 {
 	int vv = current_vote -> votes[vote_i][vote_j];
-	if(global_context->config.scRNA_input_mode) vv += 2*is_pos_in_annotated_exon_regions(global_context, current_vote -> pos[vote_i][vote_j]);
+	if(global_context->config.scRNA_input_mode && !global_context -> input_reads.is_paired_end_reads) vv += 2*is_pos_in_annotated_exon_regions(global_context, current_vote -> pos[vote_i][vote_j]);
 	align_res -> selected_position = current_vote -> pos[vote_i][vote_j];
 	align_res -> selected_votes = vv;
 	align_res -> indels_in_confident_coverage = indel_recorder_copy(align_res -> selected_indel_record, current_vote -> indel_recorder[vote_i][vote_j]);
@@ -2233,7 +2233,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 		{
 			for (j=0; j< current_vote->items[i]; j++){
 				int vv = current_vote -> votes[i][j];
-				if(global_context->config.scRNA_input_mode)vv += 2*is_pos_in_annotated_exon_regions(global_context, current_vote -> pos[i][j]);
+				if(global_context->config.scRNA_input_mode && !global_context -> input_reads.is_paired_end_reads)vv += 2*is_pos_in_annotated_exon_regions(global_context, current_vote -> pos[i][j]);
 				update_top_three(global_context, top_three_buff, vv);
 			}
 		}
@@ -2278,7 +2278,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 						insert_big_margin_record(global_context , _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read), current_vote -> votes[i][j], current_vote -> coverage_start[i][j], current_vote -> coverage_end[i][j] , current_read_len, (current_vote -> masks[i][j] & IS_NEGATIVE_STRAND)?1:0);
 					
 					int vv = current_vote->votes[i][j];
-					if(global_context->config.scRNA_input_mode)vv += 2*is_pos_in_annotated_exon_regions(global_context,  current_vote -> pos[i][j]);
+					if(global_context->config.scRNA_input_mode && !global_context -> input_reads.is_paired_end_reads)vv += 2*is_pos_in_annotated_exon_regions(global_context,  current_vote -> pos[i][j]);
 					if(vv == this_vote_N &&  vv >= global_context->config.minimum_subread_for_second_read)
 					{
 						current_simple[current_simple_number].is_vote_t_item = 1;
