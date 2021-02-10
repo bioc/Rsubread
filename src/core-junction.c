@@ -1061,9 +1061,10 @@ int is_long_del_high_quality(global_context_t * global_context, thread_context_t
 
 void copy_vote_to_alignment_res(global_context_t * global_context, thread_context_t * thread_context, mapping_result_t * align_res, subjunc_result_t * junc_res, gene_vote_t * current_vote, int vote_i, int vote_j, int curr_read_len, char * read_name, char * curr_read_text, int used_subreads_in_vote, int noninformative_subreads_in_vote, subread_read_number_t pair_number, int is_second_read, int * is_fully_covered)
 {
-
+	int vv = current_vote -> votes[vote_i][vote_j];
+	if(global_context->config.scRNA_input_mode) vv += 2*is_pos_in_annotated_exon_regions(global_context, current_vote -> pos[vote_i][vote_j]);
 	align_res -> selected_position = current_vote -> pos[vote_i][vote_j];
-	align_res -> selected_votes = current_vote -> votes[vote_i][vote_j];
+	align_res -> selected_votes = vv;
 	align_res -> indels_in_confident_coverage = indel_recorder_copy(align_res -> selected_indel_record, current_vote -> indel_recorder[vote_i][vote_j]);
 	align_res -> confident_coverage_end = current_vote -> coverage_end[vote_i][vote_j];
 	align_res -> confident_coverage_start = current_vote -> coverage_start[vote_i][vote_j];
@@ -2230,8 +2231,11 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 
 		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		{
-			for (j=0; j< current_vote->items[i]; j++)
-				update_top_three(global_context, top_three_buff, current_vote -> votes[i][j]);
+			for (j=0; j< current_vote->items[i]; j++){
+				int vv = current_vote -> votes[i][j];
+				if(global_context->config.scRNA_input_mode)vv += 2*is_pos_in_annotated_exon_regions(global_context, current_vote -> pos[i][j]);
+				update_top_three(global_context, top_three_buff, vv);
+			}
 		}
 
 		if(0 && FIXLENstrcmp("R00000003493",read_name_1)==0)SUBREADprintf("3N [R %d] =%d,%d,%d\n", 1+is_second_read, top_three_buff[0], top_three_buff[1], top_three_buff[2]);
@@ -2273,14 +2277,16 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 					if(global_context->config.do_big_margin_filtering_for_junctions && third_k == 0 && current_vote->votes[i][j] >= third_highest_votes [is_second_read][global_context -> config.top_scores - 1])
 						insert_big_margin_record(global_context , _global_retrieve_big_margin_ptr(global_context,pair_number, is_second_read), current_vote -> votes[i][j], current_vote -> coverage_start[i][j], current_vote -> coverage_end[i][j] , current_read_len, (current_vote -> masks[i][j] & IS_NEGATIVE_STRAND)?1:0);
 					
-					if(current_vote->votes[i][j] == this_vote_N && current_vote->votes[i][j] >= global_context->config.minimum_subread_for_second_read)
+					int vv = current_vote->votes[i][j];
+					if(global_context->config.scRNA_input_mode)vv += 2*is_pos_in_annotated_exon_regions(global_context,  current_vote -> pos[i][j]);
+					if(vv == this_vote_N &&  vv >= global_context->config.minimum_subread_for_second_read)
 					{
 						current_simple[current_simple_number].is_vote_t_item = 1;
 						current_simple[current_simple_number].item_index_i = i;
 						current_simple[current_simple_number].item_index_j = j;
 						current_simple[current_simple_number].read_start_base = current_vote -> coverage_start[i][j];
 						current_simple[current_simple_number].mapping_position = current_vote -> pos[i][j];
-						current_simple[current_simple_number].major_half_votes = current_vote -> votes[i][j];
+						current_simple[current_simple_number].major_half_votes = vv;
 
 						current_simple_number ++;
 					
