@@ -703,7 +703,7 @@ int init_indel_thread_contexts(global_context_t * global_context, thread_context
 	indel_context_t * indel_context = (indel_context_t *) global_context -> module_contexts[MODULE_INDEL_ID];
 	
 	if(task == STEP_VOTING) {
-		indel_thread_context -> event_entry_table = HashTableCreate(399997 * ( global_context -> config.scRNA_input_mode?15:2 ));
+		indel_thread_context -> event_entry_table = HashTableCreate(399997 * ( global_context -> config.scRNA_input_mode?18:2 ));
 		indel_thread_context -> event_entry_table -> appendix1=NULL;//indel_context -> event_entry_table-> appendix1;
 		indel_thread_context -> event_entry_table -> appendix2=NULL;//indel_context -> event_entry_table-> appendix2;
 		HashTableSetKeyComparisonFunction(indel_thread_context->event_entry_table, localPointerCmp_forEventEntry);
