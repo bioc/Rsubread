@@ -4045,11 +4045,15 @@ int load_global_context(global_context_t * context)
 	}
 
 	if(context->config.scRNA_input_mode){
-		context -> config.reads_per_chunk *= 10;
+		context -> config.reads_per_chunk = 150000000;
 		context -> config.multi_best_reads = 3;
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
 		// opening a BCL input needs the exact chunk size. 
 		if(context->config.multi_best_reads>1) context -> config.reads_per_chunk /= context->config.multi_best_reads;
+		char * reads_per_chunk = getenv("CC_READS_PER_CHUNK");
+		char * remove_beighbour = getenv("CC_REMOVE_NEIGHBOUR");
+		if(remove_beighbour) context -> config.do_remove_neighbour_for_scRNA = remove_beighbour[0]-'0';
+		if(reads_per_chunk) context -> config.reads_per_chunk = atoi(reads_per_chunk);
 	}
 	print_in_box(80,0,0,"Check the input reads.");
 	subread_init_lock(&context->input_reads.input_lock);

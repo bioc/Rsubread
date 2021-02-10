@@ -3902,7 +3902,7 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		HashTablePut(bc_umi_to_reads_tab, NULL+1+cellbc_umi, NULL+nreads+1);
 		thread_context -> del4_added_reads++;
 	}
-	//if(sample_id >0) SUBREADprintf("P2 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
+	//SUBREADprintf("P2 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
 }
 
 unsigned int calc_score_overlaps(fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char ** chros, unsigned int * start_poses, unsigned short * lens, int sections, char * read_name){
@@ -4391,6 +4391,7 @@ void scRNA_merge_thread_reads_in(void *ky, void *val, HashTable * tab){
 		HashTablePut(merged_genep1_to_bcumip1_lists_table, NULL+1+gene_no, merged_reads_gene_p1_list);
 	}
 	ArrayListPush( merged_reads_gene_p1_list, NULL+cellno_global_umino +1 );
+//	Rprintf("PUSH_GLB : %016llx\n", cellno_global_umino);
 
 	HashTable * bc_umip1_to_reads_tab = HashTableGet(merged_genep1_to_bcumip1_reads_tab_table, NULL+1+gene_no);
 	if(NULL == bc_umip1_to_reads_tab){
@@ -4544,7 +4545,6 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 			for(x3 = 0; x3 < umilen - 1; x3+=2)
 				tken[1+x3/2] = umistr[x3+x2];
 			tken[1+x3/2]=0;
-		//	SUBREADprintf("REDUCE_TOKEN %s -> %s\n", umistr , tken );
 			ArrayList * had_umi_nos = HashTableGet(headtail_table, tken);
 			if(had_umi_nos){
 				for(x3=0; x3<had_umi_nos -> numOfElements; x3++){
@@ -4558,7 +4558,6 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 						int bemerged_reads = HashTableGet(cellno_umino_p1_to_reads_tab, NULL+1+cellno_umuno)-NULL;
 						int tomerged_reads = HashTableGet(cellno_umino_p1_to_reads_tab, NULL+1+merged_bc_umi)-NULL;
 						HashTablePut(cellno_umino_p1_to_reads_tab, NULL+1+merged_bc_umi , NULL+bemerged_reads+tomerged_reads);
-//						SUBREADprintf("BC_UMI %016llx : %d -> %d\n", merged_bc_umi, tomerged_reads , bemerged_reads+tomerged_reads);
 						HashTableRemove(cellno_umino_p1_to_reads_tab, NULL+1+cellno_umuno);
 
 						found=1;
@@ -4569,9 +4568,6 @@ int scRNA_reduce_cellno_umino_large(fc_thread_global_context_t * global_context 
 			if(found) break;
 		}
 		if(found) continue;
-
-//int cellno = cellno_umuno >> 32;
-//if(cellno == 2789630) SUBREADprintf("BC_2789630_MGR of gene %016llx \n", cellno_umuno);
 
 		ArrayListPush(ret_arr , NULL+1+cellno_umuno );
 		ret++;	
@@ -4615,6 +4611,7 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 	int cell_sec_start = 0;
 	int old_bcno =((srInt_64)(ArrayListGet(cellno_umino_p1_list, 0)-NULL-1))>> 32;
 	int computational_cost = 0;
+	//Rprintf("per-gene cellno_umino_p1_list of %lld has %lld elements\n", gene_no, cellno_umino_p1_list -> numOfElements  );
 	for(x1 = 1; x1 <=cellno_umino_p1_list -> numOfElements;x1++){
 		int cellbc_no =(x1==cellno_umino_p1_list -> numOfElements)?-1:(((srInt_64)(ArrayListGet(cellno_umino_p1_list, x1)-NULL -1))>>32);
 		if(cellbc_no != old_bcno){
@@ -4623,12 +4620,6 @@ ArrayList * scRNA_reduce_cellno_umino_p1_list(fc_thread_global_context_t * globa
 			if(sec_end - cell_sec_start > 1){
 				cell_umi = scRNA_reduce_cellno_umino_large( global_context, cellno_umino_p1_list, cellno_umino_p1_to_reads_tab, cell_sec_start, sec_end,merged_umi_no_to_seq,  ret , used_cellno_tab);
 			}else if(sec_end - cell_sec_start ==1){
-
-
-//srInt_64 cellno_umuno =  ArrayListGet(cellno_umino_p1_list, cell_sec_start)-NULL-1;
-//int cellno = cellno_umuno >> 32;
-//if(cellno == 2789630) SUBREADprintf("BC_2789630_DIRMGR of gene %016llx \n", cellno_umuno);
-
 				ArrayListPush( ret, ArrayListGet(cellno_umino_p1_list, cell_sec_start) );
 				cell_umi ++;
 			}else SUBREADprintf("ERROR: sec_end == cell_sec_start\n");
@@ -4804,13 +4795,13 @@ int scRNA_merged_bootstrap_a_sample(fc_thread_global_context_t * global_context,
 	FILE * rfp = fopen("/tmp/del4-YangLiao-from-resample.txt","r");
 	#endif
 
+
 	int last_umi_no= -1;
 	if(scRNA_umi_cutoff >= 0.0){
 		for(x1 = 0; x1 < sorted_idx -> numOfElements ; x1++){
 			void * cellbc_p1_ptr = ArrayListGet(sorted_idx,x1);
 			srInt_64 this_umis = HashTableGet( used_cell_barcode_tab, cellbc_p1_ptr )-NULL;
 			if(this_umis >= scRNA_umi_cutoff-0.1){
-				//SUBREADprintf("THIS_USED_UMI=%lld / %f ; bc=%d\n", this_umis, scRNA_umi_cutoff-0.1, cellbc_p1_ptr -NULL - 1 );
 				ArrayListPush(highconf_list, ArrayListGet( sorted_idx, x1 ) - 1 );
 				last_umi_no = this_umis;
 			}else break;	// #UMI-sorted so no need to scan more
@@ -4930,9 +4921,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 				old_bc_no = bc_no;
 			}
 		}
-		if(this_gene_has_bc){
-			nonozero_genes ++;
-		}
+		if(this_gene_has_bc) nonozero_genes ++;
 	}
 	fprintf(ofp_mtx, "%u %u %u\n", nonozero_genes, (unsigned int)bc_no_to_output_no_tab->numOfElements, nonzero_items );
 
@@ -4964,7 +4953,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 				mybc_UMIs = 1;
 			}
 		}
-		if(mybc_UMIs>0) fprintf(ofp_mtx,"%d %d %d\n", nonozero_genes+1, old_out_bc_no, mybc_UMIs);
+		if(mybc_UMIs>0)fprintf(ofp_mtx,"%d %d %d\n", nonozero_genes+1, old_out_bc_no, mybc_UMIs);
 
 		if(this_gene_has_bc){
 			if(global_context->is_gene_level){
@@ -5108,7 +5097,6 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		scRNA_merged_ambient_rescure(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1], this_sample_ambient_rescure_candi, this_sample_45k_90k_barcode_no_P0, high_confid_barcode_index_list);
 
 		int umi_cutoff = global_context -> scRNA_applied_umi_cut[x1];
-		SUBREADprintf("Applied UMI cutoff for sample #%d = %d\n", x1, umi_cutoff);
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
 		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads,x1+1);
@@ -5274,8 +5262,6 @@ void scRNA_merge_merge_umi_by_genes(void * key_genep1, void * val_array_bc_umip1
 
 		if(old_bcno!=bcno && old_bcno>=0){
 			srInt_64 old_umis_in_used = HashTableGet( used_cellno_tab, NULL+1+old_bcno )-NULL;
-//if(old_bcno == 2789630) SUBREADprintf("BC_2789630_FTR of gene %d = %d UMIs ; list=%lld\n", geneno, cell_umi, array_bc_umip1 -> numOfElements);
-
 			HashTablePut(used_cellno_tab, NULL+1+old_bcno, NULL+old_umis_in_used+cell_umi);
 			cell_umi=0;
 		}
@@ -5295,7 +5281,7 @@ void scRNA_merge_merge_umi_by_genes(void * key_genep1, void * val_array_bc_umip1
 			wtr_ptr++;
 		}
 	}
-	if(cell_umi>0 && old_bcno>0){
+	if(cell_umi>0 && old_bcno>=0){
 		srInt_64 old_umis_in_used = HashTableGet( used_cellno_tab, NULL+1+old_bcno )-NULL;
 		HashTablePut(used_cellno_tab, NULL+1+old_bcno, NULL+old_umis_in_used+cell_umi);
 	}
@@ -5368,7 +5354,6 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			genesp1_to_cell_umip1_tab -> appendix3 = global_context;
 			genesp1_to_cell_umip1_tab -> counter1 = 0;
 			HashTableIteration( genesp1_to_cell_umip1_tab, scRNA_merge_merge_umi_by_genes );
-			SUBREADprintf("GENE_LEVEL MERGER REMOVED %lld UMIs\n", genesp1_to_cell_umip1_tab -> counter1);
 			HashTableDestroy(gene_bc_umi_to_deleted_genes_tab);
 		}
 

@@ -469,7 +469,7 @@ void remove_neighbour(global_context_t * global_context)
 	{
 		chromosome_event_t * event_body = &event_space[xk1];
 		if(CHRO_EVENT_TYPE_REMOVED == event_body->event_type) continue;
-		if(global_context -> config.scRNA_input_mode && event_body -> supporting_reads < MIN_EVENT_SUPPORT_NO){
+		if(global_context -> config.do_remove_neighbour_for_scRNA && global_context -> config.scRNA_input_mode && event_body -> supporting_reads < MIN_EVENT_SUPPORT_NO){
 			reallocate_to_be_removed_ids;
 			to_be_removed_ids[to_be_removed_number++] = event_body -> global_event_id;
 			continue;

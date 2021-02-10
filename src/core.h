@@ -148,6 +148,7 @@ typedef struct{
 	char exon_annotation_feature_name_column[MAX_READ_NAME_LEN];
 
 
+	int do_remove_neighbour_for_scRNA;
 	int scRNA_input_mode;
 	short read_trim_5;
 	short read_trim_3;

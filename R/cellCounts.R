@@ -941,7 +941,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         generate.scRNA.BAM <- TRUE
         .write.tmp.parameters(list(isBCLinput=TRUE))
         if(aligner=="align"){
-          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
+          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation=TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, ...)
         }else if(aligner=="subjunc"){
           subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
@@ -970,7 +970,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=this.sample), sample.1)
       BAM.names <- paste(sample.info.idx$BAMFile[ sample.info.idx$SampleName == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
       .write.tmp.parameters(list(isScRNABAMinput=TRUE))
-      align(index, BAM.names, output_file=temp.file.prefix, nthreads=nthreads,...)
+      align(index, BAM.names, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE,annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType,...)
 
       generate.scRNA.BAM <- TRUE
       .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
@@ -1028,7 +1028,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       }
     }else{
       .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
-      align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads,...)
+      align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType,...)
       bam.for.FC <- temp.file.prefix
       generate.scRNA.BAM <- TRUE
       .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
