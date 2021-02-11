@@ -1058,7 +1058,7 @@ int is_long_del_high_quality(global_context_t * global_context, thread_context_t
 	if( read_len - max(p1_end, p2_end)  > 10 ) return 0;
 	return 1;
 }
-#define SE_READ_IN_KNOWN_EXON_REWARD 2
+#define SE_READ_IN_KNOWN_EXON_REWARD 1
 
 void copy_vote_to_alignment_res(global_context_t * global_context, thread_context_t * thread_context, mapping_result_t * align_res, subjunc_result_t * junc_res, gene_vote_t * current_vote, int vote_i, int vote_j, int curr_read_len, char * read_name, char * curr_read_text, int used_subreads_in_vote, int noninformative_subreads_in_vote, subread_read_number_t pair_number, int is_second_read, int * is_fully_covered)
 {
@@ -2280,7 +2280,7 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 					
 					int vv = current_vote->votes[i][j];
 					if(global_context->config.scRNA_input_mode && !global_context -> input_reads.is_paired_end_reads)vv += SE_READ_IN_KNOWN_EXON_REWARD*is_pos_in_annotated_exon_regions(global_context,  current_vote -> pos[i][j]);
-					if(vv == this_vote_N &&  vv >= global_context->config.minimum_subread_for_second_read)
+					if(vv == this_vote_N && current_vote->votes[i][j] >= global_context->config.minimum_subread_for_second_read)
 					{
 						current_simple[current_simple_number].is_vote_t_item = 1;
 						current_simple[current_simple_number].item_index_i = i;

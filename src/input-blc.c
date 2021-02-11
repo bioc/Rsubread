@@ -936,6 +936,7 @@ int do_R_try_cell_barcode_files(int argc, char ** argv){
 	argv[8]=NULL+valid_sample_index;
 	argv[9]=NULL+valid_cell_barcode;
 #endif
+	ArrayListDestroy(cell_barcode_list);
 	return 0;
 }
 
