@@ -703,20 +703,14 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end = tested_read_pos + min(0, tested_event->indel_length) - tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_tail_abs_offset; 
 
-			if(0 && FIXLENstrcmp("R000404427", explain_context -> read_name) == 0)
-				SUBREADprintf("BACK_ADD_EVENT : %s , %u ~ %u , INDELLEN=%d, TEST_READ_POS=%u, RPED=%u, ABSSTART=%u\n", explain_context -> read_name, tested_event -> event_small_side, tested_event -> event_large_side, tested_event -> indel_length, tested_read_pos, explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end, new_read_tail_abs_offset);
-
 						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
-						//else if(tested_event->event_type == CHRO_EVENT_TYPE_JUNCTION) jump_penalty = 1;
 
 						int current_is_jumped = explain_context -> current_is_strand_jumped ;
 						int current_sup_as_complex = explain_context -> tmp_min_support_as_complex;
 						int current_sup_as_simple = explain_context -> tmp_support_as_simple;
-						//int current_unsup_as_simple = explain_context -> tmp_min_unsupport;
 						int current_pure_donor_found = explain_context -> tmp_is_pure_donor_found_explain;
 
 						explain_context -> tmp_support_as_simple = tested_event -> supporting_reads;
-						//explain_context -> tmp_min_support_as_complex = min(tested_event -> supporting_reads,explain_context -> tmp_min_support_as_complex);
 						explain_context -> tmp_min_support_as_complex = min((tested_event -> is_donor_found_or_annotation & 64)?0x7fffffff:tested_event -> supporting_reads,explain_context -> tmp_min_support_as_complex);
 						explain_context -> tmp_min_unsupport = min(tested_event -> anti_supporting_reads,explain_context -> tmp_min_unsupport);
 						explain_context -> tmp_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain && tested_event -> is_donor_found_or_annotation;
@@ -737,7 +731,6 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_support_as_simple = current_sup_as_simple;
 						explain_context -> tmp_is_pure_donor_found_explain = current_pure_donor_found;
 					}
-					//if(global_context ->config.limited_tree_scan) break;
 				}
 			if(( global_context ->config.limited_tree_scan) && explain_context -> full_read_len <= EXON_LONG_READ_LENGTH) break;
 			this_round_junction_scanned = max(this_round_junction_scanned, is_junction_scanned);
@@ -3357,7 +3350,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 
 			//#warning " ========== COMMENT THIS LINE !! ========="
-			if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", explain_context -> read_name) ==0){
+			if(0 && FIXLENstrcmp("HWI-ST945:119:D0J2JACXX:1:1303:17374:199067", explain_context -> read_name) ==0){
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);

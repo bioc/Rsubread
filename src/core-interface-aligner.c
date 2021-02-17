@@ -617,9 +617,9 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("complexIndels", long_options[option_index].name)==0)
 				{
+#warning "=========== OLD VERSION: BOTH LINES ENABLED ============="
 					global_context->config.maximise_sensitivity_indel = 1;
 					global_context->config.realignment_minimum_variant_distance = 1;
-				//	global_context->config.max_indel_length = max(16, global_context->config.max_indel_length);
 				}
 				else if(strcmp("exonAnnotationScreenOut", long_options[option_index].name)==0){
 					strcpy(global_context->config.exon_annotation_file_screen_out, optarg);
