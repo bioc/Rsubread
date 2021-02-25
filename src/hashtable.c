@@ -40,7 +40,7 @@ srInt_64 long_random_val(){
 HashTable * ArrayListToLookupTable_Int(ArrayList * arr){
 	srInt_64 x1;
 	HashTable * ret = HashTableCreate( max(1,arr -> numOfElements / 6) );
-	for(x1 = 0; x1 < arr->numOfElements; x1++) HashTablePut(ret, ArrayListGet(arr, x1)+1, NULL+1);
+	for(x1 = 0; x1 < arr->numOfElements; x1++) HashTablePut(ret, ArrayListGet(arr, x1)+1, NULL+x1+1);
 	return ret;
 }
 

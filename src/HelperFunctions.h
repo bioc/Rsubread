@@ -45,11 +45,9 @@ typedef struct{
  *    Master can prepare the next job while the worker is running on the last job, hence parallel.
  */
 
-void wait_worker_started(worker_master_mutex_t * wmt, int all_workers);
 void worker_master_mutex_init(worker_master_mutex_t * wmt, int all_workers);
 void worker_thread_start(worker_master_mutex_t * wmt, int worker_id);
 void worker_master_mutex_destroy(worker_master_mutex_t * wmt);
-void worker_notify_master(worker_master_mutex_t * wmt, int worker_id);
 
 // 0 : a job is allocated; 1 : worker should terminate
 int worker_wait_for_job(worker_master_mutex_t * wmt, int worker_id);

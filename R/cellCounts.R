@@ -819,6 +819,7 @@ library(Matrix)
   for(df in to.delete){
     if(grepl(pfx, df)){
       file.remove(df)
+#cat ("Goinng to remove",df,"\n")
     }else{
       stop("Wrong selection of files to delete")
     }

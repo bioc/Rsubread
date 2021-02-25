@@ -1933,7 +1933,7 @@ int SamBam_writer_calc_cigar_span(char * bin, int blen){
 	return ret;
 }
 
-#define MAX_ALLOWED_GAP_IN_BAI_CHUNK 0x10000 
+#define MAX_ALLOWED_GAP_IN_BAI_CHUNK 5 // the number of blocks, not the file positions.
 
 void SamBam_writer_sort_bins_to_BAM_test_bins(SamBam_Writer * writer, HashTable * bin_tab, ArrayList * bin_list, ArrayList * win16k_list, int block_len, void ***last_chunk_ptr, int chro_no){
 	int inbin_pos = writer -> chunk_buffer_used - block_len ; // point to the byte AFTER "block_len" int.
@@ -1948,12 +1948,14 @@ void SamBam_writer_sort_bins_to_BAM_test_bins(SamBam_Writer * writer, HashTable 
 	int this_w16_no = (pos + cigar_span) >>14;	// WIN is calculated on 0-based pos.
 	unsigned long long this_Vpos = writer -> this_bam_block_no<<16 | (inbin_pos-4);
 
+	// if this read is after the maximum coordinate in the win16k list: all elements before last one and this one starts at this read.
 	if(this_w16_no >=win16k_list->numOfElements){
 		int bbi;
 		for(bbi = win16k_list->numOfElements; bbi <=this_w16_no; bbi++)
 			ArrayListPush(win16k_list, NULL+ this_Vpos);
 	}
 
+	// a read only belongs to ONE bin which is the smallest bin that can FULLY cover the full length of this read.
 	ArrayList * this_bin_chunks = HashTableGet(bin_tab, NULL+binno+1);
 	if(NULL == this_bin_chunks){
 		this_bin_chunks = ArrayListCreate(5);
@@ -1962,16 +1964,19 @@ void SamBam_writer_sort_bins_to_BAM_test_bins(SamBam_Writer * writer, HashTable 
 	}
 
 	int found = 0;
+	// a bin is not necessarily continuous. Say, a top-level bin only contains a few reads (most reads a in low-level bins), but their locations are everywhere.
 	if(this_bin_chunks -> numOfElements > 0){
 		//SUBREADprintf("RESLOCS : %ld == %ld\n", this_Vpos, this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1 ] - NULL);
 		long long diff = this_Vpos >>16;
-		diff -=(this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1 ] - NULL)>>16;
+		diff -=(this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1] - NULL)>>16;
 		if(diff < MAX_ALLOWED_GAP_IN_BAI_CHUNK){
 			this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements -1] = NULL+this_Vpos + block_len+4;
 			*last_chunk_ptr = this_bin_chunks -> elementList + this_bin_chunks -> numOfElements -1;
 			found = 1;
 		}
 	}
+
+	// if the last chunk in this bin isn't good to be extended (too far from the file location of the new read), a new chunk is created.
 	if(!found){
 		ArrayListPush(this_bin_chunks, NULL + this_Vpos);
 		ArrayListPush(this_bin_chunks, NULL + this_Vpos + block_len+4);
