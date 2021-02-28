@@ -374,7 +374,7 @@ static void about(void);
  *   procedure needs no input table, but tracks the way the table was built.
  */ 
 int
-main(int argc, char *argv[])
+NCOMPRESS_main(int argc, char *argv[])
 	{
 		char **filelist;
 		char **fileptr;
