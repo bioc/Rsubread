@@ -1874,7 +1874,6 @@ int is_value_contig_name(char * n, int l){
 		if(n[x]>'~' || n[x]<'!') return 0;
 	}
 	return 1;
-
 }
 
 unsigned int FC_CRC32(char * dat, int len){
@@ -1883,14 +1882,95 @@ unsigned int FC_CRC32(char * dat, int len){
 	return ret;
 }
 
+struct simple_bam_writer_index_per_chro{
+	HashTable * index_binP1_table;
+	ArrayList * index_binP0_list;
+	ArrayList * win16k_list;
+};
+
+void simple_bam_writer_deallocate_index_per_chro(void * p){
+	struct simple_bam_writer_index_per_chro * ch = p;
+	HashTableDestroy(ch->index_binP1_table);
+	ArrayListDestroy(ch->index_binP0_list);
+	ArrayListDestroy(ch->win16k_list);
+	free(ch);
+}
+
+
+struct simple_bam_writer_index_per_chro * simple_bam_writer_new_index_per_chro(){
+	struct simple_bam_writer_index_per_chro * ret = malloc(sizeof(struct simple_bam_writer_index_per_chro ));
+	ret -> index_binP1_table = HashTableCreate(4000);
+	HashTableSetDeallocationFunctions(ret -> index_binP1_table, NULL, (void (*) (void*)) ArrayListDestroy);
+	ret -> index_binP0_list = ArrayListCreate(20000);
+	ret -> win16k_list = ArrayListCreate(20000);
+	return ret;
+}
+
 #define MERGER_WORKER_BINSIZE 66000
 typedef struct {
 	FILE * bam_FP;
+	FILE * bai_FP;
 	z_stream strm;
 	char inbin[MERGER_WORKER_BINSIZE];
 	int inbin_len;
+	int total_chromosomes;
 	HashTable * bam_blockP1_to_offset0B_table;
+	HashTable * index_per_chro;
 } simple_bam_writer;
+
+#define MAX_ALLOWED_GAP_IN_BAI_CHUNK 10  // 10 blocks
+
+void simple_bam_writer_update_index(simple_bam_writer * writer, char * rbin, int binlen, srInt_64 block_number, int inbin_pos){
+	int chro_no=0;
+	memcpy(&chro_no, rbin + 4, 4);
+	if(chro_no<0)return;
+
+	unsigned int pos=0, bin_mq_nl=0;
+	memcpy(&pos, rbin + 8, 4);
+	memcpy(&bin_mq_nl, rbin + 12, 4);
+
+	struct simple_bam_writer_index_per_chro * index_chro = HashTableGet(writer -> index_per_chro, NULL+chro_no+1);
+	//fprintf(stderr, "PUSHPTR %p for %d\n", index_chro , chro_no);
+	if(NULL==index_chro){
+		index_chro = simple_bam_writer_new_index_per_chro();
+		HashTablePut(writer -> index_per_chro, NULL+chro_no+1, index_chro);
+	}
+
+	unsigned int binno = bin_mq_nl>>16;
+	int cigar_span = SamBam_writer_calc_cigar_span(rbin +4);
+	int this_w16_no = (pos + cigar_span) >>14;      // WIN is calculated on 0-based pos.
+	unsigned long long this_Vpos = block_number<<16 | inbin_pos;
+	ArrayList * win16k_list = index_chro -> win16k_list;
+	// if this read is after the maximum coordinate in the win16k list: all elements before last one and this one starts at this read.
+	if(this_w16_no > win16k_list->numOfElements){
+		int bbi;
+		for(bbi = win16k_list->numOfElements; bbi <=this_w16_no; bbi++)
+			ArrayListPush(win16k_list, NULL+ this_Vpos);
+	}
+
+	ArrayList * this_bin_chunks = HashTableGet(index_chro -> index_binP1_table, NULL+binno+1);
+	if(NULL == this_bin_chunks){
+		this_bin_chunks = ArrayListCreate(4);
+		HashTablePut(index_chro -> index_binP1_table, NULL+binno+1, this_bin_chunks);
+		ArrayListPush(index_chro -> index_binP0_list, NULL+binno);
+	}
+	int found = 0;
+	// a bin is not necessarily continuous. Say, a top-level bin only contains a few reads (most reads a in low-level bins), but their locations are everywhere
+
+	if(this_bin_chunks -> numOfElements > 0){
+		long long diff = this_Vpos >>16;
+		diff -=(this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1] - NULL)>>16;
+		if(diff < MAX_ALLOWED_GAP_IN_BAI_CHUNK){
+			this_bin_chunks -> elementList [ this_bin_chunks -> numOfElements - 1] = NULL+this_Vpos + binlen + 4;
+			found = 1;
+		}
+	}
+	// if the last chunk in this bin isn't good to be extended (too far from the file location of the new read), a new chunk is created.
+	if(!found){
+		ArrayListPush(this_bin_chunks, NULL + this_Vpos);
+		ArrayListPush(this_bin_chunks, NULL + this_Vpos + binlen+4);
+	}
+}
 
 void simple_bam_write_compressed_block(simple_bam_writer * writer,char *obuf, int olen, int ilen, unsigned int crcval, srInt_64 block_number){
 	if(block_number >= 0)HashTablePut(writer -> bam_blockP1_to_offset0B_table, NULL+1+block_number, NULL+ftello(writer -> bam_FP));
@@ -1934,15 +2014,63 @@ simple_bam_writer * simple_bam_create(char * fname){
 	ret -> bam_FP = fopen(fname, "wb");
 	ret -> bam_blockP1_to_offset0B_table = HashTableCreate(100000);
 	simple_bam_write("BAM\1", 4, ret, 0);
+
+	char bainame [strlen(fname)+10];
+	strcpy(bainame , fname);
+	strcat(bainame, ".bai");
+	ret -> bai_FP = fopen(bainame, "wb");
+	fwrite("BAI\1", 1, 4, ret -> bai_FP);
+	ret -> index_per_chro = HashTableCreate(1000);
+	HashTableSetDeallocationFunctions(ret -> index_per_chro , NULL , simple_bam_writer_deallocate_index_per_chro);
 	return ret;
 }
 
+#define vpos_to_rpos rposone = (vposone & 0xffff ) + ( (HashTableGet(writer -> bam_blockP1_to_offset0B_table, NULL+1+(vposone >>16)) - NULL) << 16 )
 
 #define BAM_EOF_MARKER "\x1f\x8b\x08\x04\0\0\0\0\0\xff\x06\0\x42\x43\x02\0\x1b\0\x03\0\0\0\0\0\0\0\0\0"
 void simple_bam_close(simple_bam_writer * writer){
-	HashTableDestroy(writer -> bam_blockP1_to_offset0B_table);
 	fwrite(BAM_EOF_MARKER, 1, 28, writer -> bam_FP);
 	fclose(writer -> bam_FP);
+
+	fwrite(&writer -> total_chromosomes, 1, 4, writer -> bai_FP);
+	int chri;
+	for(chri=0; chri<writer -> total_chromosomes; chri++){
+		struct simple_bam_writer_index_per_chro *this_idx = HashTableGet(writer -> index_per_chro , NULL+1+chri);
+		//fprintf(stderr, "WTRBAI %p for chro %d\n" , this_idx , chri);
+		if(NULL == this_idx ){
+			fwrite("\0\0\0\0\0\0\0\0", 1, 8, writer -> bai_FP);//0 intervals and 0 bins
+		}else{
+			HashTable * new_tab=NULL;
+			ArrayList * new_arr=NULL;
+			SamBam_writer_optimize_bins(this_idx -> index_binP1_table, this_idx -> index_binP0_list ,& new_tab, & new_arr);
+			this_idx -> index_binP1_table = new_tab;
+			this_idx -> index_binP0_list = new_arr;
+			fwrite(&this_idx -> index_binP0_list->numOfElements ,1, 4, writer -> bai_FP);
+			int bini;
+			for(bini = 0; bini < this_idx -> index_binP0_list -> numOfElements; bini ++){
+				int binno = ArrayListGet(this_idx -> index_binP0_list, bini)-NULL;
+				ArrayList * bingaps = HashTableGet(this_idx -> index_binP1_table, NULL+1+binno);
+				srInt_64 gapi = bingaps -> numOfElements/2;
+				fwrite(&binno, 1, 4, writer -> bai_FP);
+				fwrite(&gapi ,1, 4, writer -> bai_FP);
+				for(gapi = 0; gapi < bingaps -> numOfElements; gapi++){
+					srInt_64 rposone, vposone = ArrayListGet(bingaps , gapi)-NULL;
+					vpos_to_rpos;
+//					fprintf(stderr, "CONVTT %016llx -> %016llx\n", vposone , rposone);
+					fwrite(&rposone, 1, 8, writer -> bai_FP);
+				}
+			}
+
+			fwrite(&this_idx -> win16k_list -> numOfElements ,1, 4, writer -> bai_FP);
+			for(bini = 0; bini < this_idx -> win16k_list -> numOfElements; bini ++){
+				srInt_64 rposone, vposone = ArrayListGet(this_idx -> win16k_list , bini )-NULL;
+				vpos_to_rpos;
+				fwrite(&rposone, 1, 8, writer -> bai_FP);
+			}
+		}
+	}
+	HashTableDestroy(writer -> index_per_chro);
+	fclose(writer -> bai_FP);
 }
 
 
@@ -2042,6 +2170,7 @@ void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab)
 	}
 	ArrayListDestroy(chroname_size_list);
 	simple_bam_write("",0,writer,1);
+	writer -> total_chromosomes = seq_count;
 }
 
 int process_pairer_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len){
@@ -3042,6 +3171,7 @@ void warning_anno_BAM_chromosomes(fc_thread_global_context_t * global_context){
 	HashTableDestroy(ANNO_chro_tab);
 }
 
+void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name, char * read_bin, ArrayList * target_list );
 
 void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2)
 {
@@ -3134,6 +3264,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context , thread_context ,"Unassigned_Unmapped",0, NULL, bin1, bin2);
 
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return;	// do nothing if a read is unmapped, or the first read in a pair of reads is unmapped.
 			}
 		}
@@ -3149,6 +3280,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context , thread_context ,"Unassigned_Singleton",0, NULL, bin1, bin2);
+
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return;
 		}
 
@@ -3162,6 +3295,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					sumtab -> unassigned_singleton++;
 				}else thread_context->read_counters.unassigned_singleton ++;
 
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return; // when running on PE mode, SE reads are seen as "only one end mapped"
 			}
 		}
@@ -3177,6 +3311,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				{
 					write_read_details_FP(global_context, thread_context, "Unassigned_MappingQuality", 0, NULL, bin1, bin2);
 				}
+
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return;
 			}
 			if(is_second_read==0 && global_context -> is_paired_end_mode_assign)
@@ -3211,6 +3347,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 						if(global_context -> read_details_out_FP)
 							write_read_details_FP(global_context, thread_context, "Unassigned_FragmentLength", -1, NULL, bin1, bin2);
+						if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 						return;
 					}
 				} else {
@@ -3224,6 +3361,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 						if(global_context -> read_details_out_FP)
 							write_read_details_FP(global_context, thread_context, "Unassigned_Chimera", -1, NULL, bin1, bin2);
+						if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 						return;
 					}
 				}
@@ -3244,6 +3382,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context, thread_context, "Unassigned_Duplicate", -1, NULL, bin1, bin2);
 
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return;
 			}
 
@@ -3264,6 +3403,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				if(global_context -> read_details_out_FP)
 					write_read_details_FP(global_context, thread_context, "Unassigned_MultiMapping", -1, NULL, bin1, bin2);
 
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return;
 			}
 		}
@@ -3280,6 +3420,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 
 			if(global_context -> read_details_out_FP)
 				write_read_details_FP(global_context, thread_context, "Unassigned_Secondary", -1, NULL, bin1, bin2);
+			if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 			return;
 		}
 
@@ -3315,6 +3456,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 					fc_read_counters * sumtab = tab4s[1];
 					sumtab -> unassigned_junction_condition++;
 				}else thread_context->read_counters.unassigned_junction_condition ++;
+
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				return;
 			}
 		}
@@ -3328,6 +3471,8 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 				fc_read_counters * sumtab = tab4s[1];
 				sumtab -> unassigned_junction_condition++;
 			}else thread_context->read_counters.unassigned_junction_condition ++;
+
+			if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 			return;
 		}
 
@@ -4013,32 +4158,49 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		print_in_box(80,0,0,"     %.1f pct reads have valid cell barcodes.", thread_context->scRNA_has_valid_cell_barcode*100./thread_context -> scRNA_pooled_reads);
 		print_in_box(80,0,0,"");
 	}
+
 	if(sample_id >0) thread_context -> scRNA_assigned_reads_per_sample[sample_id-1] ++; 
 	//if(sample_id >0) SUBREADprintf("P1 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
-	if(sample_id >0 && cell_id >=0){
-		int barcode_hashed_key = cell_id % global_context -> scRNA_barcode_batched_bin_no;
+	if(sample_id >0){
+		int barcode_hashed_key;
+
+		// has cell-bc, assigned : to hashed bin
+		// has cell-bc, not assigned, has mapping location: to hashed bin, with 0-len gene list
+		// no cell-bc, has mapping location: to the MAX - 1 bin, with 0-len gene list
+		// no mapping location: to the MAX bin; only has rbins but no headers.
+		if(cell_id >=0 && (assign_target_number>=0 || target_list))barcode_hashed_key = cell_id % global_context -> scRNA_barcode_batched_bin_no;
+		else{
+			int chro_no = -1, chro_pos = -1;
+			memcpy(&chro_no, read_bin + 4, 4);
+			memcpy(&chro_pos, read_bin + 8, 4);
+			if(cell_id >= 0 && chro_no>=0) barcode_hashed_key = cell_id % global_context -> scRNA_barcode_batched_bin_no;
+			else if(cell_id <0 && chro_no>=0) barcode_hashed_key = global_context -> scRNA_barcode_batched_bin_no;
+			else barcode_hashed_key = global_context -> scRNA_barcode_batched_bin_no+1;
+
+		}
+
 		pthread_spin_lock(global_context -> scRNA_barcode_batched_locks+barcode_hashed_key);
 		FILE * myfp = global_context -> scRNA_barcode_batched_bins[barcode_hashed_key];
 		fwrite(&sample_id,1,4,myfp);
-		fwrite(&cell_id,1,4,myfp);
-		if(target_list){
-			srInt_64 itemno = target_list -> numOfElements;
-			itemno = itemno | (1llu << 63);
-			fwrite(&itemno,1,8,myfp);
-			int x1;
-			for(x1=0;x1<target_list -> numOfElements;x1++){
-				srInt_64 geneno_0B = ArrayListGet(target_list, x1) -NULL;
-				fwrite(&geneno_0B,1,8,myfp);
-			}
-		}else fwrite(&assign_target_number,1,8,myfp);
-		fwrite(umi_barcode,1,global_context -> scRNA_UMI_length,myfp);
+		if(barcode_hashed_key<=global_context -> scRNA_barcode_batched_bin_no){
+			fwrite(&cell_id,1,4,myfp);
+			if(assign_target_number<0){
+				srInt_64 itemno = target_list?target_list -> numOfElements:0;
+				itemno = itemno | (1llu << 63);
+				fwrite(&itemno,1,8,myfp);
+				int x1;
+				if(target_list)for(x1=0;x1<target_list -> numOfElements;x1++){
+					srInt_64 geneno_0B = ArrayListGet(target_list, x1) -NULL;
+					fwrite(&geneno_0B,1,8,myfp);
+				}
+			}else fwrite(&assign_target_number,1,8,myfp);
+			fwrite(umi_barcode,1,global_context -> scRNA_UMI_length,myfp);
+		}
 		int read_bin_len=0;
 		memcpy(&read_bin_len , read_bin, 4);
-	//fprintf(stderr,"THREEQNAME %s\n", read_bin+36);
 		fwrite(read_bin, 1, 4+read_bin_len, myfp);
 		pthread_spin_unlock(global_context -> scRNA_barcode_batched_locks+barcode_hashed_key);
 	}
-	//SUBREADprintf("P2 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
 }
 
 int scRNA_do_one_batch_sort_compare(void * ar, int l, int r){
@@ -4048,8 +4210,13 @@ int scRNA_do_one_batch_sort_compare(void * ar, int l, int r){
 
 	char * Lptr = bin_ptrs[l];
 	char * Rptr = bin_ptrs[r];
-	srInt_64 Lpos= ((0LLU+*(int*)(Lptr+16+global_context->scRNA_UMI_length+4))<<32) | *(unsigned int*)(Lptr+16+global_context->scRNA_UMI_length+4+4);
-	srInt_64 Rpos= ((0LLU+*(int*)(Rptr+16+global_context->scRNA_UMI_length+4))<<32) | *(unsigned int*)(Rptr+16+global_context->scRNA_UMI_length+4+4);
+	srInt_64 Lgenes=0, Rgenes=0;
+	memcpy(&Lgenes, Lptr+8, 8);
+	memcpy(&Rgenes, Rptr+8, 8);
+	if(Lgenes & (1LLU<<63))Lgenes=Lgenes & 0x7fffffffllu; else Lgenes=0;
+	if(Rgenes & (1LLU<<63))Rgenes=Rgenes & 0x7fffffffllu; else Rgenes=0;
+	srInt_64 Lpos= ((0LLU+*(int*)(Lptr+16+Lgenes*8+global_context->scRNA_UMI_length+4))<<32) | *(unsigned int*)(Lptr+16+Lgenes*8+global_context->scRNA_UMI_length+4+4);
+	srInt_64 Rpos= ((0LLU+*(int*)(Rptr+16+Rgenes*8+global_context->scRNA_UMI_length+4))<<32) | *(unsigned int*)(Rptr+16+Rgenes*8+global_context->scRNA_UMI_length+4+4);
 	if(Lpos>Rpos)return 1;
 	if(Lpos<Rpos)return -1;
 	return 0;
@@ -4222,10 +4389,7 @@ void scRNA_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2,
 		struct cell_gene_umi_supp * str1 =NULL;
 		if(x1<structs -> numOfElements){
 			str1 = ArrayListGet(structs, x1);
-			if(str1 -> cellbc <0){
-				sec_start = x1+1;
-				continue;
-			}
+			if(str1 -> cellbc <0) continue;
 			sec_key = str1 -> cellbc;
 			sec_key = sec_key << 32;
 			if(is_UMI_step2 && sec_key == old_sec_key){
@@ -4236,16 +4400,13 @@ void scRNA_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2,
 				// structures that have the same last 32-bit of gene_no.
 		}
 
-if(0 && str1 && str1 -> cellbc == 686270 ){
+if(0 && str1 && str1 -> cellbc == 11493 ){
 	fprintf(stderr, "TARGETTEST: GNP=%08lld: UMI=%.12s [%dbp], STEP=%d, INDEEP = %d , Start=%d, x1=%d\n", str1 -> gene_no, str1 -> umi, global_context-> scRNA_UMI_length, is_UMI_step2, sec_key!=old_sec_key, sec_start, x1);
 }
 		if(x1>sec_start && sec_key!=old_sec_key || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
-			if(x1 - sec_start>1)scRNA_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table);
-			else if(is_UMI_step2){
-				struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
-				ADD_count_hash(str0->cellbc,str0->gene_no,1);
-			}
-			// otherwise no merging is needed.
+			struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
+			if(x1 - sec_start>1 && str0->cellbc>=0) scRNA_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table);
+			else if(is_UMI_step2 && str0->cellbc>=0) ADD_count_hash(str0->cellbc,str0->gene_no,1);
 
 			old_sec_key = sec_key;
 			sec_start = x1;
@@ -4347,7 +4508,7 @@ void * scRNA_do_one_batch(void * paramsp1){
 	while(1){
 		int this_batch_no = -1;
 		pthread_spin_lock(&global_context -> scRNA_do_one_batch_runner_lock);
-		if(global_context -> scRNA_do_one_batch_runner_current < global_context -> scRNA_barcode_batched_bin_no)
+		if(global_context -> scRNA_do_one_batch_runner_current < global_context -> scRNA_barcode_batched_bin_no +1)
 			this_batch_no = (global_context -> scRNA_do_one_batch_runner_current ++);
 		if(me_max_genes > global_context -> scRNA_barcode_batched_max_genes) global_context -> scRNA_barcode_batched_max_genes = me_max_genes;
 		if(me_max_Rbin_len > global_context->scRNA_barcode_batched_max_Rbin_len) global_context->scRNA_barcode_batched_max_Rbin_len = me_max_Rbin_len;
@@ -4459,6 +4620,8 @@ void * scRNA_do_one_batch(void * paramsp1){
 		sort_base[1] = global_context;
 		merge_sort(sort_base, rbin_no, scRNA_do_one_batch_sort_compare, scRNA_do_one_batch_sort_exchange, scRNA_do_one_batch_sort_merge);
 
+
+
 		for(x1 = 0; x1 < rbin_no; x1++){
 			char * binptr = bin_ptrs[x1];
 			int cellid =0, sampleid = 0;
@@ -4488,6 +4651,7 @@ void * scRNA_do_one_batch(void * paramsp1){
 			if(gene_no & (1LLU<<63)) fwrite( glist_ptr, 1, 8*genes, fp );
 			fwrite(umi,1, global_context -> scRNA_UMI_length, fp);
 			int binlen;
+
 			memcpy(&binlen, binptr+16+8*genes+global_context -> scRNA_UMI_length,4 );
 			fwrite(binptr+16+genes*8+global_context -> scRNA_UMI_length,1, binlen+4, fp);
 		}
@@ -4839,6 +5003,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 				fc_read_counters * sumtab = tab4s[1];
 				sumtab -> unassigned_nofeatures++;
 			}else thread_context->read_counters.unassigned_nofeatures ++;
+
+			if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 		}else{
 				for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
 //					#warning "======= DEBUG OUT ================"
@@ -4868,6 +5034,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						fc_read_counters * sumtab = tab4s[1];
 						sumtab -> unassigned_overlapping_length++;
 					}else thread_context->read_counters.unassigned_overlapping_length ++;
+
+					if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 				}else{
 
 					// final adding votes.
@@ -4974,6 +5142,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						}else{
 							thread_context->read_counters.unassigned_ambiguous ++;
 						}
+
+						if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 					}
 				}
 		}
@@ -5720,6 +5890,13 @@ void scRNA_save_BAM_result(fc_thread_global_context_t * global_context, struct s
 	int sample_id = finished_job -> task -> sample_id;
 	void ** fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+sample_id);
 	simple_bam_writer * wtr = fps[0];
+	int inbin_pos = 0;
+	while(inbin_pos < finished_job -> task -> inbin_len){
+		int binlen = 0;
+		memcpy(&binlen, finished_job -> task -> inbin+inbin_pos, 4);
+		simple_bam_writer_update_index(wtr, finished_job -> task -> inbin+inbin_pos, binlen, finished_job -> task -> block_number, inbin_pos);
+		inbin_pos += 4+binlen;
+	}
 	simple_bam_write_compressed_block(wtr, finished_job -> outbin, finished_job -> outbin_len, finished_job -> task -> inbin_len, finished_job -> crc32, finished_job -> task -> block_number);
 	finished_job -> task = NULL;
 }
@@ -5740,7 +5917,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		int current_filling_worker_per_sample [global_context->scRNA_sample_sheet_table -> numOfElements];
 		struct scRNA_merge_batches_worker_current * worker_current_jobs = calloc(sizeof(struct scRNA_merge_batches_worker_current), compress_workers);
 
-		for(xk1=0; xk1<global_context-> scRNA_barcode_batched_bin_no; xk1++)fclose(global_context -> scRNA_barcode_batched_bins[xk1]);
+		for(xk1=0; xk1<global_context-> scRNA_barcode_batched_bin_no +2; xk1++)fclose(global_context -> scRNA_barcode_batched_bins[xk1]);
 
 		srInt_64 block_numbers_current [global_context->scRNA_sample_sheet_table -> numOfElements];
 		for(xk1=0; xk1<global_context->scRNA_sample_sheet_table -> numOfElements; xk1++){
@@ -5776,14 +5953,15 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			pthread_create(threads + xk1, NULL, scRNA_merge_batches_worker, vpp);
 		}
 
-		FILE * input_fps[global_context -> scRNA_barcode_batched_bin_no];
-		char * last_rbin_buffer[global_context -> scRNA_barcode_batched_bin_no];
-		srInt_64 current_sorting_key[global_context -> scRNA_barcode_batched_bin_no];
+		FILE * input_fps[global_context -> scRNA_barcode_batched_bin_no+2];
+		char * last_rbin_buffer[global_context -> scRNA_barcode_batched_bin_no+1];
+		srInt_64 current_sorting_key[global_context -> scRNA_barcode_batched_bin_no+1];
 		
-		for(xk1=0; xk1<global_context -> scRNA_barcode_batched_bin_no; xk1++){
+		for(xk1=0; xk1<global_context -> scRNA_barcode_batched_bin_no+2; xk1++){
 			char tmp_fname[MAX_FILE_NAME_LENGTH+20];
 			sprintf(tmp_fname, "%s/cellCounts-Splitted-Reads-%05d-%05d.bin", global_context -> temp_file_dir, getpid(), xk1);
 			input_fps[xk1] = fopen(tmp_fname,"rb");
+			if(xk1 == global_context -> scRNA_barcode_batched_bin_no+1)break;
 
 			srInt_64 section1_items=0;
 			for(sample_i = 0; sample_i < global_context -> scRNA_sample_sheet_table -> numOfElements; sample_i++){
@@ -5832,7 +6010,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		while(1){
 			int selected_fp_no = 0;
 			srInt_64 selected_fp_key = current_sorting_key[0];
-			for(xk1=1; xk1<global_context -> scRNA_barcode_batched_bin_no; xk1++){
+			for(xk1=1; xk1<global_context -> scRNA_barcode_batched_bin_no+1; xk1++){
 				if(current_sorting_key[xk1] < selected_fp_key){
 					selected_fp_key = current_sorting_key[xk1] ;
 					selected_fp_no = xk1;
@@ -5897,7 +6075,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			} else current_sorting_key[selected_fp_no] = 0x7fffffffffffffffLLU;
 		}
 
-		for(xk1=0; xk1<global_context -> scRNA_barcode_batched_bin_no; xk1++){
+		for(xk1=0; xk1<global_context -> scRNA_barcode_batched_bin_no+1; xk1++){
 			fclose(input_fps[xk1]);
 			free(last_rbin_buffer[xk1]);
 		}
@@ -5917,6 +6095,65 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			if(current_worker == compress_workers) current_worker=0;
 		}
 		for(xk1=0; xk1<compress_workers; xk1++){
+			struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
+			if(my_finished_job -> task)master_wait_for_job_done(&worker_mut, current_worker);
+			scRNA_save_BAM_result(global_context, my_finished_job);
+
+			current_worker ++;
+			if(current_worker == compress_workers) current_worker=0;
+		}
+
+		//TODO: add "scRNA_barcode_batched_bin_no+1" bin into "all unmapped"
+
+		for(xk1 = 0; xk1 < 1+compress_workers; xk1++) for(xk2 = 0; xk2 < global_context->scRNA_sample_sheet_table -> numOfElements;xk2++) 
+			task_buffers[ xk1 * global_context->scRNA_sample_sheet_table -> numOfElements  + xk2 ].inbin_len = 0;
+		current_worker = 0;
+		FILE * notmapped_fp = input_fps[global_context -> scRNA_barcode_batched_bin_no+1];
+		while(1){
+			int sample_id = 0, binlen = 0;
+			int rlen = fread(&sample_id, 1, 4, notmapped_fp);
+			if(rlen < 4) break;
+			struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * global_context->scRNA_sample_sheet_table -> numOfElements +sample_id-1);
+			fread(&binlen, 1, 4, notmapped_fp);
+			memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
+			tofill -> inbin_len += 4;
+			fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
+			tofill -> inbin_len += binlen;
+			if(tofill-> inbin_len > 60000){
+				struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
+				if(my_finished_job -> task)master_wait_for_job_done(&worker_mut, current_worker);
+				scRNA_save_BAM_result(global_context, my_finished_job);
+				my_finished_job -> task = tofill;
+				my_finished_job -> task -> block_number = (block_numbers_current[sample_id-1]++);
+				my_finished_job -> outbin_len = 0;
+				master_notify_worker(&worker_mut, current_worker);
+
+				current_filling_worker_per_sample[sample_id-1] ++;
+				if(current_filling_worker_per_sample[sample_id-1] == compress_workers +1) current_filling_worker_per_sample[sample_id-1] = 0;
+				tofill = task_buffers+(current_filling_worker_per_sample[sample_id-1] * global_context->scRNA_sample_sheet_table -> numOfElements +sample_id-1);
+				tofill -> inbin_len = 0;
+				
+				current_worker ++;
+				if(current_worker == compress_workers) current_worker=0;
+			}
+		}
+
+		for(xk1=0; xk1<global_context -> scRNA_sample_sheet_table -> numOfElements; xk1++){
+			struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[xk1] * global_context->scRNA_sample_sheet_table -> numOfElements +xk1);
+			if(tofill->inbin_len<1) continue;
+
+			master_wait_for_job_done(&worker_mut, current_worker);
+			struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
+			scRNA_save_BAM_result(global_context, my_finished_job);
+			my_finished_job -> task = tofill;
+			my_finished_job -> task -> block_number = (block_numbers_current[xk1]++);
+			my_finished_job -> outbin_len = 0;
+			master_notify_worker(&worker_mut, current_worker);
+			current_worker ++;
+			if(current_worker == compress_workers) current_worker=0;
+		}
+
+		for(xk1=0; xk1<compress_workers; xk1++){
 			master_wait_for_job_done(&worker_mut, current_worker);
 			struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
 			scRNA_save_BAM_result(global_context, my_finished_job);
@@ -5925,9 +6162,11 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			if(current_worker == compress_workers) current_worker=0;
 		}
 
+		fclose(notmapped_fp);
 		terminate_workers(&worker_mut);
 		free(task_buffers);
 		free(worker_current_jobs);
+		
 
 		for(xk1=0; xk1< compress_workers; xk1++){
 			pthread_join(threads[xk1],NULL);
@@ -6433,9 +6672,9 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 		global_context -> scRNA_rerun_on_persample_BAM = scRNA_rerun_on_persample_BAM;
 		global_context -> scRNA_barcode_batched_bin_no = 99;
 		pthread_spin_init(&global_context -> scRNA_do_one_batch_runner_lock, PTHREAD_PROCESS_PRIVATE);
-		global_context -> scRNA_barcode_batched_locks = malloc(sizeof(pthread_spinlock_t)*global_context -> scRNA_barcode_batched_bin_no);
-		global_context -> scRNA_barcode_batched_bins = malloc(sizeof(FILE*)*global_context -> scRNA_barcode_batched_bin_no);
-		for(x1=0; x1<global_context -> scRNA_barcode_batched_bin_no; x1++){
+		global_context -> scRNA_barcode_batched_locks = malloc(sizeof(pthread_spinlock_t)*(global_context -> scRNA_barcode_batched_bin_no+2));
+		global_context -> scRNA_barcode_batched_bins = malloc(sizeof(FILE*)*(global_context -> scRNA_barcode_batched_bin_no+2));
+		for(x1=0; x1<global_context -> scRNA_barcode_batched_bin_no+2; x1++){
 			char tmp_fname[MAX_FILE_NAME_LENGTH+20];
 			sprintf(tmp_fname, "%s/cellCounts-Splitted-Reads-%05d-%05d.bin", temp_dir, getpid(), x1);
 			//SUBREADprintf("CREATE TEMP FILE %s\n" , tmp_fname);
@@ -8505,7 +8744,7 @@ int readSummary(int argc,char *argv[]){
 		ArrayListDestroy(global_context.scRNA_sample_id_to_name);
 		HashTableDestroy(global_context.scRNA_lineno1B_to_sampleno1B_tab);
 
-		for(x1=0; x1<global_context.scRNA_barcode_batched_bin_no; x1++){
+		for(x1=0; x1<global_context.scRNA_barcode_batched_bin_no +2; x1++){
 			char tmp_fname[MAX_FILE_NAME_LENGTH+20];
 			sprintf(tmp_fname, "%s/cellCounts-Splitted-Reads-%05d-%05d.bin", temp_dir, getpid(), x1);
 			unlink(tmp_fname);

@@ -1843,8 +1843,8 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	int bin_cursor = 0;
 	if(binlen<1){
 		SUBREADprintf("WONE : BINLEN=%d, TH=%d\n", binlen, thread_id);
-		assert(binlen >0);
 	}
+	assert(binlen >0);
 
 	ArrayList* sort_linear_pos = ArrayListCreate(1000000);
 	ArrayListSetDeallocationFunction(sort_linear_pos,  free);
@@ -1866,7 +1866,8 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	}
 	ArrayListSort(sort_linear_pos, SamBam_writer_sort_buff_one_compare);
 
-	char * nbin = malloc(binlen);
+	char * nbin = NULL;
+	if(binlen >0 && binlen < 0x7fffffff)malloc(binlen);
 	int nb_cursor = 0, xx, wlen=0;
 	for(xx=0; xx<ii_reads;xx++){
 		int * binpos = ArrayListGet(sort_linear_pos, xx);
@@ -1915,7 +1916,7 @@ unsigned long long SamBam_writer_sort_bins_to_BAM_FP_pos(FILE * fp){
 }
 
 
-int SamBam_writer_calc_cigar_span(char * bin, int blen){
+int SamBam_writer_calc_cigar_span(char * bin){
 	int cops = 0, rname_len = 0, ret = 0;
 	memcpy(&cops, bin+12, 4);
 	memcpy(&rname_len, bin+8, 4);
@@ -1943,7 +1944,7 @@ void SamBam_writer_sort_bins_to_BAM_test_bins(SamBam_Writer * writer, HashTable 
 	memcpy(&bin_mq_nl, writer -> chunk_buffer + inbin_pos + 8,4);
 	binno = bin_mq_nl>>16;
 
-	int cigar_span = SamBam_writer_calc_cigar_span(writer -> chunk_buffer + inbin_pos, block_len);
+	int cigar_span = SamBam_writer_calc_cigar_span(writer -> chunk_buffer + inbin_pos);
 
 	int this_w16_no = (pos + cigar_span) >>14;	// WIN is calculated on 0-based pos.
 	unsigned long long this_Vpos = writer -> this_bam_block_no<<16 | (inbin_pos-4);

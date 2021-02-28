@@ -204,9 +204,13 @@ int SamBam_writer_add_chromosome(SamBam_Writer * writer, char * chro_name, unsig
 
 int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbin, int committable);
 
+int SamBam_writer_calc_cigar_span(char * bin);
+
 int SamBam_writer_add_read_fqs_scRNA(gzFile * outfp, char * bambin);
 
 int SamBam_writer_add_read(SamBam_Writer * writer, int threadno, char * read_name, unsigned int flags, char * chro_name, unsigned int chro_position, int mapping_quality, char * cigar, char * next_chro_name, unsigned int next_chro_pos, int temp_len, int read_len, char * read_text, char * qual_text, char * additional_columns, int can_submit);
+
+void SamBam_writer_optimize_bins(HashTable *bin_tab, ArrayList *bin_arr, HashTable ** new_tab, ArrayList ** new_arrs);
 
 int is_badBAM(char * fn);
 
