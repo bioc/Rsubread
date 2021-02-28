@@ -4134,6 +4134,12 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	}
 }
 
+void scRNA_do_one_batch_write_extend_rbin(fc_thread_global_context_t * global_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
+	char * cellbc_seq,*umi_seq;
+	char * gene_assign_mode;
+	fwrite(rbin, 1, binlen+4, fp);
+}
+
 //int cttt = 0;
 
 void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name, char * read_bin, ArrayList * target_list ){ // the index of gene or the index of exon
@@ -4198,7 +4204,7 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		}
 		int read_bin_len=0;
 		memcpy(&read_bin_len , read_bin, 4);
-		fwrite(read_bin, 1, 4+read_bin_len, myfp);
+		fwrite(read_bin, 1, read_bin_len+4, myfp);
 		pthread_spin_unlock(global_context -> scRNA_barcode_batched_locks+barcode_hashed_key);
 	}
 }
@@ -4653,7 +4659,8 @@ void * scRNA_do_one_batch(void * paramsp1){
 			int binlen;
 
 			memcpy(&binlen, binptr+16+8*genes+global_context -> scRNA_UMI_length,4 );
-			fwrite(binptr+16+genes*8+global_context -> scRNA_UMI_length,1, binlen+4, fp);
+			char * new_cellbc = ArrayListGet(global_context -> scRNA_cell_barcodes_array, cellid);
+			scRNA_do_one_batch_write_extend_rbin(global_context, binptr+16+8*genes+global_context -> scRNA_UMI_length, binlen, fp, new_cellbc, new_UMI, gene_no, (srInt_64*)glist_ptr);
 		}
 		fclose(fp);
 		free(batch_content);

@@ -4045,7 +4045,7 @@ int load_global_context(global_context_t * context)
 	}
 
 	if(context->config.scRNA_input_mode){
-		context -> config.reads_per_chunk = 150000000;
+		context -> config.reads_per_chunk = 150000000/2;
 		context -> config.multi_best_reads = 3;
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
 		// opening a BCL input needs the exact chunk size. 
