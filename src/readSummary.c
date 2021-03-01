@@ -4035,7 +4035,7 @@ int scRNA_scan_read_name_str(fc_thread_global_context_t * global_context, char *
 				if(sample_qual)(*sample_qual) = testi + 1;
 			}else if(field_i == 5){
 				(*lane_str) = testi + 1;
-				if(memcmp(lane_str, "@RgLater@", 9)==0) (*lane_str) += 9;
+				if(memcmp(*lane_str, "@RgLater@", 9)==0) (*lane_str) += 9;
 				break;
 			}
 		}
@@ -4112,47 +4112,31 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 		global_context -> scRNA_UMI_length = umi_end_pos;
 	}
 
-	/*
-	if(step == 2 && global_context -> is_scRNA_BAM_FQ_out_generated){
-		int fixed_cell_bc_no = scRNA_get_cell_id(global_context, thread_context, cell_bc);
-		//SUBREADprintf("GET BCC = %s => %d [%lld]\n",  cell_bc , fixed_cell_bc_no, global_context -> scRNA_cell_barcodes_array -> numOfElements);
-		if(fixed_cell_bc_no < 0) return;
-		fixed_cell_bc = ArrayListGet(global_context -> scRNA_cell_barcodes_array,fixed_cell_bc_no);
-		int umi_end_pos=0,nch;
-		for(umi_end_pos=0; 0!=(nch = umi [umi_end_pos]); umi_end_pos++) if(!isalpha(nch))break;
-		umi[umi_end_pos] = 0;
-		umi[umi_end_pos] = nch;
-	}*/
-
 	if(sample_id>0){
-		if(step==0) thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
-		else if(step==1) thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
-		else if(global_context -> is_scRNA_BAM_FQ_out_generated){
-			void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
-			if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
-
-			if(GENE_INPUT_SCRNA_FASTQ != global_context -> scRNA_input_mode){
-				parallel_gzip_writer_t **gz3fps = (parallel_gzip_writer_t **)sample_bam_2fps+1;
-				parallel_gzip_writer_add_read_fqs_scRNA(gz3fps, bambin, thread_context -> thread_id);
-				if( gz3fps[0]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
-				    gz3fps[1]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
-				    gz3fps[2]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ){
-					parallel_gzip_zip_texts(gz3fps[0], thread_context -> thread_id, 0);
-					parallel_gzip_zip_texts(gz3fps[1], thread_context -> thread_id, 0);
-					parallel_gzip_zip_texts(gz3fps[2], thread_context -> thread_id, 0);
-					pthread_spin_lock(sample_bam_2fps[4]);
-					parallel_gzip_writer_flush(gz3fps[0], thread_context -> thread_id);
-					parallel_gzip_writer_flush(gz3fps[1], thread_context -> thread_id);
-					parallel_gzip_writer_flush(gz3fps[2], thread_context -> thread_id);
-					pthread_spin_unlock(sample_bam_2fps[4]);
+		if(step==0){
+			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
+			if(global_context -> is_scRNA_BAM_FQ_out_generated){
+				void ** sample_bam_2fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+(sample_id-1) + 1); // sample_id-1: 0,1,2,...
+				if(sample_bam_2fps==NULL) SUBREADprintf("Error: unknown sample id = %d\n", sample_id);
+	
+				if(GENE_INPUT_SCRNA_FASTQ != global_context -> scRNA_input_mode){
+					parallel_gzip_writer_t **gz3fps = (parallel_gzip_writer_t **)sample_bam_2fps+1;
+					parallel_gzip_writer_add_read_fqs_scRNA(gz3fps, bambin, thread_context -> thread_id);
+					if( gz3fps[0]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
+					    gz3fps[1]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
+					    gz3fps[2]-> thread_objs[thread_context -> thread_id].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ){
+						parallel_gzip_zip_texts(gz3fps[0], thread_context -> thread_id, 0);
+						parallel_gzip_zip_texts(gz3fps[1], thread_context -> thread_id, 0);
+						parallel_gzip_zip_texts(gz3fps[2], thread_context -> thread_id, 0);
+						pthread_spin_lock(sample_bam_2fps[4]);
+						parallel_gzip_writer_flush(gz3fps[0], thread_context -> thread_id);
+						parallel_gzip_writer_flush(gz3fps[1], thread_context -> thread_id);
+						parallel_gzip_writer_flush(gz3fps[2], thread_context -> thread_id);
+						pthread_spin_unlock(sample_bam_2fps[4]);
+					}
 				}
 			}
-
-		/*	char * bambin_out=NULL;
-			scRNA_move_barcodes_to_tags(global_context, thread_context, bambin, &bambin_out, fixed_cell_bc, fixed_UMI);
-			SamBam_writer_add_read_bin(sample_bam_2fps[0], global_context -> thread_number>1?thread_context -> thread_id:-1, bambin_out, 1);
-			free(bambin_out);*/
-		}
+		}else if(step==1) thread_context -> scRNA_mapped_reads_per_sample[sample_id-1] ++;
 	}
 }
 
