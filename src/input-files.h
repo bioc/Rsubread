@@ -320,7 +320,7 @@ void SAM_pairer_set_unsorted_notification(SAM_pairer_context_t * pairer, void (*
 
 int SAM_pairer_multi_thread_output( void * pairer, int thread_no, char * bin1, char * bin2 );
 int SAM_pairer_multi_thread_header (void * pairer_vp, int thread_no, int is_text, unsigned int items, char * bin, unsigned int bin_len);
-
+int SAP_pairer_skip_tag_body_len(char * tag_start);
 int SAM_pairer_writer_create( SAM_pairer_writer_main_t * bam_main , int all_threads, int has_dummy , int BAM_output, int BAM_compression_level, char * out_file);
 void SAM_pairer_writer_destroy( SAM_pairer_writer_main_t * bam_main ) ;
 int SAM_pairer_iterate_int_tags(unsigned char * bin, int bin_len, char * tag_name, int * saved_value);

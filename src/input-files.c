@@ -3417,6 +3417,30 @@ int reduce_SAM_to_BAM(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * thre
 	return bin_ptr;
 }
 
+int SAP_pairer_skip_tag_body_len(char *bin){
+	int skip_content = 0;
+	if(bin[2]=='i' || bin[2]=='I' || bin[2]=='f')
+		skip_content = 4;
+	else if(bin[2]=='s' || bin[2]=='S')
+		skip_content = 2;
+	else if(bin[2]=='c' || bin[2]=='C' ||  bin[2]=='A')
+		skip_content = 1;
+	else if(bin[2]=='Z' || bin[2]=='H'){
+		while(bin[skip_content + 3]) skip_content++;
+		skip_content ++;
+	} else if(bin[2]=='B'){
+		char cell_type = tolower(bin[3]);
+		memcpy(&skip_content, bin + 4, 4);
+		if(cell_type == 's')skip_content *=2;
+		else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
+		skip_content += 4+1; // 32-bit count, 1 byte type
+	}else{
+		SUBREADprintf("UnknownTag=%c\n", bin[2]);
+		assert(0);
+	}
+	return skip_content+3;
+}
+
 int SAM_pairer_iterate_tags(unsigned char * bin, int bin_len, char * tag_name, char * data_type, char ** saved_value){
 	int found = 0;
 	int bin_cursor = 0;
@@ -3436,34 +3460,9 @@ int SAM_pairer_iterate_tags(unsigned char * bin, int bin_len, char * tag_name, c
 			found = 1;
 			break;
 		}
-		int skip_content = 0;
-		//SUBREADprintf("NextTag=%c; ", bin[bin_cursor+2]);
-		if(bin[bin_cursor+2]=='i' || bin[bin_cursor+2]=='I' || bin[bin_cursor+2]=='f')
-			skip_content = 4;
-		else if(bin[bin_cursor+2]=='s' || bin[bin_cursor+2]=='S')
-			skip_content = 2;
-		else if(bin[bin_cursor+2]=='c' || bin[bin_cursor+2]=='C' ||  bin[bin_cursor+2]=='A')
-			skip_content = 1;
-		else if(bin[bin_cursor+2]=='Z' || bin[bin_cursor+2]=='H'){
-			while(bin[bin_cursor+skip_content + 3]){
-				//SUBREADprintf("ACHAR=%c\n", (bin[skip_content + 3]));
-				skip_content++;
-			}
-			skip_content ++;
-		} else if(bin[bin_cursor+2]=='B'){
-			char cell_type = tolower(bin[bin_cursor+3]);
-			
-			memcpy(&skip_content, bin + bin_cursor + 4, 4);
-		//	SUBREADprintf("Array Type=%c, cells=%d\n", cell_type, skip_content);
-			if(cell_type == 's')skip_content *=2;
-			else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
-			skip_content += 4 + 1;
-		}else{
-			SUBREADprintf("UnknownTag=%c\n", bin[bin_cursor+2]);
-			assert(0);
-		}
-		//SUBREADprintf("SKIP=%d\n", skip_content);
-		bin_cursor += skip_content + 3;
+
+		int skip_content = SAP_pairer_skip_tag_body_len(bin+bin_cursor);
+		bin_cursor += skip_content ;
 	}
 	return found;
 }
