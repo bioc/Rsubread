@@ -1,3 +1,7 @@
+5 Mar 2021 - 2.5.6
+(1) Raise the limit to the maximum length of a line in the annotation file because some new annotation files from NCBI have very long lines.
+(2) Improve cellCounts to use less memory in the counting step and run faster.
+
 3 Feb 2021 - 2.5.5
 (1) Increase chunk size and modify indel-merging in cellCounts.
 

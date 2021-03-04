@@ -1841,10 +1841,6 @@ int SamBam_writer_sort_buff_one_compare(void * Lbin, void * Rbin, ArrayList * me
 // return total reads in bin.
 int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int binlen, int thread_id){
 	int bin_cursor = 0;
-	if(binlen<1){
-		SUBREADprintf("WONE : BINLEN=%d, TH=%d\n", binlen, thread_id);
-	}
-	assert(binlen >0);
 
 	ArrayList* sort_linear_pos = ArrayListCreate(1000000);
 	ArrayListSetDeallocationFunction(sort_linear_pos,  free);
@@ -1887,11 +1883,11 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	if(writer -> threads>1) subread_lock_release(&writer -> thread_bam_lock);
 	FILE * tofp  = fopen(tmpfname, "wb");
 	if(tofp){
-		wlen = fwrite(nbin, binlen,1, tofp);
+		if(binlen>0)wlen = fwrite(nbin, binlen,1, tofp);
 		fclose(tofp);
 	}
 	free(nbin);
-	if(wlen < 1) {
+	if(wlen < 1 && binlen>0) {
 		SUBREADprintf("ERROR: no space (%d bytes) in the temp directory (%s).\nThe program cannot run properly.\n", binlen, tmpfname);
 		writer ->is_internal_error = 1;
 		return -1;
