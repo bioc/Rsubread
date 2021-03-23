@@ -1,3 +1,6 @@
+23 Mar 2021 - 2.5.7
+(1) Make the results always consistent no matter if the aligner was run or not, in cellCounts.
+
 5 Mar 2021 - 2.5.6
 (1) Raise the limit to the maximum length of a line in the annotation file because some new annotation files from NCBI have very long lines.
 (2) Improve cellCounts to use less memory in the counting step and run faster.
