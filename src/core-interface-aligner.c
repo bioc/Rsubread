@@ -617,7 +617,6 @@ int parse_opts_aligner(int argc , char ** argv, global_context_t * global_contex
 				}
 				else if(strcmp("complexIndels", long_options[option_index].name)==0)
 				{
-#warning "=========== OLD VERSION: BOTH LINES ENABLED ============="
 					global_context->config.maximise_sensitivity_indel = 1;
 					global_context->config.realignment_minimum_variant_distance = 1;
 				}

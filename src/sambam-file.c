@@ -1863,7 +1863,7 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	ArrayListSort(sort_linear_pos, SamBam_writer_sort_buff_one_compare);
 
 	char * nbin = NULL;
-	if(binlen >0 && binlen < 0x7fffffff)malloc(binlen);
+	if(binlen >0 && binlen < 0x7fffffff)nbin=malloc(binlen);
 	int nb_cursor = 0, xx, wlen=0;
 	for(xx=0; xx<ii_reads;xx++){
 		int * binpos = ArrayListGet(sort_linear_pos, xx);
