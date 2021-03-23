@@ -769,6 +769,7 @@ library(Matrix)
 }
 
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab, umi.cutoff){
+  set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   cat("Loading high-conf matrix from '",fname,"'\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
@@ -884,8 +885,7 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
-cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=F, ...){
-  set.seed(0)
+cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=F, .remove.temp.files=T, ...){
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   if(!is.null(umi.cutoff)){
     umi.cutoff <- as.numeric(umi.cutoff)
@@ -1050,6 +1050,6 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
 
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
-  .del.temp.files(substr(temp.file.prefix,4,99))
+  if(.remove.temp.files).del.temp.files(substr(temp.file.prefix,4,99))
   fc
 }

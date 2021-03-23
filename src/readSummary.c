@@ -4298,10 +4298,11 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		pthread_spin_lock(global_context -> scRNA_barcode_batched_locks+barcode_hashed_key);
 		FILE * myfp = global_context -> scRNA_barcode_batched_bins[barcode_hashed_key];
 		fwrite(&sample_id,1,4,myfp);
+		srInt_64 itemno = 1;
 		if(barcode_hashed_key<=global_context -> scRNA_barcode_batched_bin_no){
 			fwrite(&cell_id,1,4,myfp);
 			if(assign_target_number<0){
-				srInt_64 itemno = target_list?target_list -> numOfElements:0;
+				itemno = target_list?target_list -> numOfElements:0;
 				itemno = itemno | (1llu << 63);
 				fwrite(&itemno,1,8,myfp);
 				int x1;
@@ -4314,6 +4315,8 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		}
 		int read_bin_len=0;
 		memcpy(&read_bin_len , read_bin, 4);
+		//fprintf(stderr, "CELLHASH %d in BUCKET %d has %d bytes and %lld genes\n", cell_id, barcode_hashed_key, read_bin_len+4, itemno & 0xfffffffllu);
+
 		if(barcode_hashed_key==global_context -> scRNA_barcode_batched_bin_no+1){ // the read is unmapped. It can still have a fixed cell barcode
 			char * new_cellbc = NULL;
 			if(cell_id>=0)new_cellbc = ArrayListGet(global_context -> scRNA_cell_barcodes_array, cell_id);
@@ -5985,7 +5988,9 @@ void * scRNA_merge_batches_worker(void * vp){
 	int Z_DEFAULT_MEM_LEVEL = 8;
 	worker_thread_start(worker_mut, my_worker_id);
 	while(1){
-		if(worker_wait_for_job(worker_mut, my_worker_id))break;
+		if(worker_wait_for_job(worker_mut, my_worker_id)) break;
+		if(!global_context -> is_scRNA_BAM_FQ_out_generated) continue;
+
 		deflateInit2(&my_current_job -> strm , SAMBAM_COMPRESS_LEVEL_NORMAL, Z_DEFLATED, SAMBAM_GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 
 		struct scRNA_merge_batches_worker_task * current_input = my_current_job -> task;
@@ -6003,17 +6008,19 @@ void * scRNA_merge_batches_worker(void * vp){
 
 void scRNA_save_BAM_result(fc_thread_global_context_t * global_context, struct scRNA_merge_batches_worker_current * finished_job){
 	if(!finished_job -> task)return;
-	int sample_id = finished_job -> task -> sample_id;
-	void ** fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+sample_id);
-	simple_bam_writer * wtr = fps[0];
-	int inbin_pos = 0;
-	while(inbin_pos < finished_job -> task -> inbin_len){
-		int binlen = 0;
-		memcpy(&binlen, finished_job -> task -> inbin+inbin_pos, 4);
-		simple_bam_writer_update_index(wtr, finished_job -> task -> inbin+inbin_pos, binlen, finished_job -> task -> block_number, inbin_pos);
-		inbin_pos += 4+binlen;
+	if(global_context -> is_scRNA_BAM_FQ_out_generated){
+		int sample_id = finished_job -> task -> sample_id;
+		void ** fps = HashTableGet(global_context -> scRNA_sample_BAM_writers, NULL+sample_id);
+		simple_bam_writer * wtr = fps[0];
+		int inbin_pos = 0;
+		while(inbin_pos < finished_job -> task -> inbin_len){
+			int binlen = 0;
+			memcpy(&binlen, finished_job -> task -> inbin+inbin_pos, 4);
+			simple_bam_writer_update_index(wtr, finished_job -> task -> inbin+inbin_pos, binlen, finished_job -> task -> block_number, inbin_pos);
+			inbin_pos += 4+binlen;
+		}
+		simple_bam_write_compressed_block(wtr, finished_job -> outbin, finished_job -> outbin_len, finished_job -> task -> inbin_len, finished_job -> crc32, finished_job -> task -> block_number);
 	}
-	simple_bam_write_compressed_block(wtr, finished_job -> outbin, finished_job -> outbin_len, finished_job -> task -> inbin_len, finished_job -> crc32, finished_job -> task -> block_number);
 	finished_job -> task = NULL;
 }
 
