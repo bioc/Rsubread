@@ -2770,7 +2770,10 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						}else{
 							unsigned int skip = 0; int is_exonic_regions = 1;
 							if(global_context -> exonic_region_bitmap)calc_end_pos(current_realignment_result -> first_base_position, current_realignment_result -> cigar_string, &skip, &is_exonic_regions, global_context  );
-							this_SCORE =((100000llu * (10000 - this_MISMATCH + 2*is_exonic_regions) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
+
+							if(global_context -> config.scRNA_input_mode)
+								this_SCORE =((100000llu * (10000 - this_MISMATCH + 2*is_exonic_regions) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
+							else this_SCORE =((100000llu * (10000 - this_MISMATCH) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
 						}
 
 						best_score_highest = max(best_score_highest, this_SCORE);
