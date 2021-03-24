@@ -5208,7 +5208,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							srInt_64 assignment_target_number = tmp_voter_id;
 							if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[tmp_voter_id];
 
-							ArrayListPush(assigned_list, NULL+assignment_target_number);
+							if(global_context -> do_scRNA_table)ArrayListPush(assigned_list, NULL+assignment_target_number);
 							//if(1 && FIXLENstrcmp( read_name , "V0112_0155:7:1101:5467:23779#ATCACG" )==0)
 							//	SUBREADprintf("CountsFrac = %d ; add=%d\n", overlapping_total_count, calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count) );
 							if(RG_name){
