@@ -2773,7 +2773,7 @@ void worker_master_mutex_destroy(worker_master_mutex_t * wmt){
 }
 
 int worker_wait_for_job(worker_master_mutex_t * wmt, int worker_id){
-	int trv = pthread_mutex_trylock(wmt->mutexs_worker_wait + worker_id);
+	pthread_mutex_trylock(wmt->mutexs_worker_wait + worker_id);
 	wmt->worker_is_working[worker_id] = 0;
 	while(1){
 		pthread_cond_wait(&wmt->conds_worker_wait[worker_id], &wmt->mutexs_worker_wait[worker_id]);
