@@ -120,8 +120,8 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 	if(1==for_measure_buckets){
 		*bucket_sizes = realloc(*bucket_sizes, sizeof(int) * (table_no+1) * bucket_no);
 		memset((*bucket_sizes) + table_no * bucket_no, 0, sizeof(int) *  bucket_no);
-		memset(&table, sizeof(gehash_t));
-		memset(&value_array_index, sizeof(gene_value_index_t));
+		memset(&table,0 , sizeof(gehash_t));
+		memset(&value_array_index, 0, sizeof(gene_value_index_t));
 		table.padding = padding_around_contigs;
 		table.index_gap = GENE_SLIDING_STEP;
 	}

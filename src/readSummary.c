@@ -7733,10 +7733,14 @@ void print_usage()
 
 	SUBREADputs("# Parameters specific to paired end reads");
 	SUBREADputs("");
-	SUBREADputs("  -p                  If specified, fragments (or templates) will be counted");
+	SUBREADputs("  -p                  If specified, libraries are assumed to contain paired-end");
+	SUBREADputs("                      reads. For any library that contains paired-end reads, the");
+	SUBREADputs("                      'countReadPairs' parameter controls if read pairs or reads");
+	SUBREADputs("                      should be counted.");
+	SUBREADputs("");
+	SUBREADputs("  --countReadPairs    If specified, fragments (or templates) will be counted");
 	SUBREADputs("                      instead of reads. This option is only applicable for");
-	SUBREADputs("                      paired-end reads; single-end reads are always counted as");
-	SUBREADputs("                      reads.");
+	SUBREADputs("                      paired-end reads. For single-end data, it is ignored.");
 	SUBREADputs("");
 	SUBREADputs("  -B                  Only count read pairs that have both ends aligned.");
 	SUBREADputs("");
