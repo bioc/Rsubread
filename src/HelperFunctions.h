@@ -270,4 +270,5 @@ void TNbignum_isqrt(struct bn* a, struct bn* b);             /* Integer square r
 void TNbignum_assign(struct bn* dst, struct bn* src);        /* Copy src into dst -- dst := src */
 size_t get_sys_mem_info(char * keyword);
 int get_free_total_mem(size_t * total, size_t * free_mem);
+void *windows_memmem(const void *haystack_start, size_t haystack_len, const void *needle_start, size_t needle_len);
 #endif
