@@ -2770,7 +2770,10 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 						}else{
 							unsigned int skip = 0; int is_exonic_regions = 1;
 							if(global_context -> exonic_region_bitmap)calc_end_pos(current_realignment_result -> first_base_position, current_realignment_result -> cigar_string, &skip, &is_exonic_regions, global_context  );
-							this_SCORE =((100000llu * (10000 - this_MISMATCH + 2*is_exonic_regions) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
+
+							if(global_context -> config.scRNA_input_mode)
+								this_SCORE =((100000llu * (10000 - this_MISMATCH + 2*is_exonic_regions) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
+							else this_SCORE =((100000llu * (10000 - this_MISMATCH) + this_MATCH)*50llu - this_PENALTY)*20llu+ current_realignment_result -> known_junction_supp;
 						}
 
 						best_score_highest = max(best_score_highest, this_SCORE);
@@ -4045,8 +4048,9 @@ int load_global_context(global_context_t * context)
 	}
 
 	if(context->config.scRNA_input_mode){
-		context -> config.reads_per_chunk = 150000000/2;
 		context -> config.multi_best_reads = 3;
+		context -> config.do_remove_neighbour_for_scRNA = 1;
+		context -> config.reads_per_chunk = 30000000*context -> config.multi_best_reads;
 		context -> config.multi_best_reads = max(context -> config.multi_best_reads , context -> config.reported_multi_best_reads);
 		// opening a BCL input needs the exact chunk size. 
 		if(context->config.multi_best_reads>1) context -> config.reads_per_chunk /= context->config.multi_best_reads;

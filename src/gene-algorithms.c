@@ -1562,7 +1562,9 @@ int load_offsets(gene_offset_t* offsets , const char index_prefix [])
 	return 0;
 }
 
+#ifndef MAKE_STANDALONE
 #define CLOCK_USE_GETTIME
+#endif
 
 double miltime(){
 	double ret;
@@ -1575,14 +1577,14 @@ double miltime(){
 		ret = tp.tv_sec+ 0.001*0.001* tp.tv_usec; 
 	#else
     	#ifdef CLOCK_USE_GETTIME
-	    struct timespec tsc;
-    	clock_gettime(CLOCK_REALTIME, &tsc);
-	    ret = tsc.tv_sec*1. + tsc.tv_nsec*1./1000/1000/1000;
+	 	struct timespec tsc;
+		clock_gettime(CLOCK_REALTIME, &tsc);
+	 	ret = tsc.tv_sec*1. + tsc.tv_nsec*1./1000/1000/1000;
     	#else
-	    struct timeb trp;
-    	ftime(&trp);
-	    ret = trp.time*1.0+(trp.millitm*1.0/1000.0);
-		#endif
+		struct timeb trp;
+		ftime(&trp);
+		ret = trp.time*1.0+(trp.millitm*1.0/1000.0);
+	#endif
 	#endif
 
 	return ret;

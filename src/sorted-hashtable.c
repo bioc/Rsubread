@@ -1490,7 +1490,6 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		for(i=0; i<the_table -> buckets_number ; i++){
 			unsigned int current_items = load_int32(fp);
 			load_int32(fp);//useless for loading : space size
-//if(i%50000 == 0)SUBREADprintf("LOADHUGE %d/%d\n", i, the_table -> buckets_number);
 			unsigned int current_bytes = current_items*( sizeof(short) + sizeof(gehash_data_t) );
 			accued_bytes += current_bytes; 
 			curr_bucks ++;
@@ -1502,6 +1501,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			}
 			#ifdef __MINGW32__
 			{
+//if(i%500000 == 0)SUBREADprintf("ESTMHUGE %d/%d\n", i, the_table -> buckets_number);
+
 				char * buffkk = malloc(current_bytes );
 				fread(buffkk,current_bytes ,1, fp);
 				free(buffkk);

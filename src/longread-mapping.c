@@ -220,7 +220,9 @@ int LRMvalidate_and_init_context(LRMcontext_t ** context, int argc, char ** argv
 	return retv;
 }
 
+#ifndef MAKE_STANDALONE
 #define LRM_CLOCK_USE_GETTIME
+#endif
 double LRMmiltime(){
 	double ret;
 	#ifdef LRM_CLOCK_USE_GETTIME

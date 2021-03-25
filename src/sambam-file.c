@@ -1649,7 +1649,7 @@ int SamBam_writer_add_read_bin(SamBam_Writer * writer, int thread_no, char * rbi
 		this_chunk_buffer_used = writer -> threads_chunk_buffer_used + thread_no;
 	}else{
 		if(writer -> sort_reads_by_coord && writer -> chunk_buffer_max_size < writer -> chunk_buffer_used + 12000){
-			SUBREADprintf("0THR_REALLOCATE MEM : %d -> %d\n", writer -> chunk_buffer_max_size,  writer -> chunk_buffer_max_size * 7/4);
+			//SUBREADprintf("0THR_REALLOCATE MEM : %d -> %d\n", writer -> chunk_buffer_max_size,  writer -> chunk_buffer_max_size * 7/4);
 			writer -> chunk_buffer_max_size = writer -> chunk_buffer_max_size * 7/4;
 			writer -> chunk_buffer = realloc(writer -> chunk_buffer, writer -> chunk_buffer_max_size);
 		}
@@ -1863,7 +1863,7 @@ int SamBam_writer_sort_buff_one_write(SamBam_Writer * writer, char * bin, int bi
 	ArrayListSort(sort_linear_pos, SamBam_writer_sort_buff_one_compare);
 
 	char * nbin = NULL;
-	if(binlen >0 && binlen < 0x7fffffff)malloc(binlen);
+	if(binlen >0 && binlen < 0x7fffffff)nbin=malloc(binlen);
 	int nb_cursor = 0, xx, wlen=0;
 	for(xx=0; xx<ii_reads;xx++){
 		int * binpos = ArrayListGet(sort_linear_pos, xx);
@@ -1997,9 +1997,9 @@ void * SamBam_writer_sorted_compress(void * vptr0){
 		if(termed)break;
 
 		me->CRC32_plain = SamBam_CRC32(me->plain_text,  me->text_size);
-		me->strm.next_in = me->plain_text;
+		me->strm.next_in = (unsigned char*)me->plain_text;
 		me->strm.avail_in = me->text_size;
-		me->strm.next_out = me->zipped_bin;
+		me->strm.next_out = (unsigned char*)me->zipped_bin;
 		me->strm.avail_out = 70000;
 		int deret = deflate(&me->strm,Z_FINISH);
 		if(deret >=0){

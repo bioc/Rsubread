@@ -666,7 +666,6 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 
 		srInt_64 BAM_header_size = -1;
 		int file_probe = is_certainly_bam_file(next_fn, NULL, &BAM_header_size);
-		//SUBREADprintf(" >>> %s : header=%lld , BSIZE=%lld\n", next_fn,BAM_header_size, global_context -> max_BAM_header_size );
 		if(BAM_header_size>0) global_context -> max_BAM_header_size = max( global_context -> max_BAM_header_size , BAM_header_size + 180000);
 		if(file_probe==-1){
 			nNonExistFiles++;
@@ -1994,9 +1993,9 @@ void simple_bam_write(void * bin, int binlen, simple_bam_writer * writer, int fo
 		if(writer->inbin_len >=63000 || force_flush){
 			deflateInit2(&writer -> strm, Z_BEST_SPEED, Z_DEFLATED, -15, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 			char obuf[MERGER_WORKER_BINSIZE];
-			writer->strm.next_in = writer->inbin;
+			writer->strm.next_in = (unsigned char *)writer->inbin;
 			writer->strm.avail_in = writer->inbin_len;
-			writer->strm.next_out = obuf;
+			writer->strm.next_out = (unsigned char *)obuf;
 			writer->strm.avail_out = MERGER_WORKER_BINSIZE;
 			deflate(&writer->strm, Z_FINISH);
 			int have = MERGER_WORKER_BINSIZE-writer->strm.avail_out;
@@ -2071,12 +2070,18 @@ void simple_bam_close(simple_bam_writer * writer){
 }
 
 
+#ifdef __MINGW32__
+#define this_memmem windows_memmem
+#else
+#define this_memmem memmem
+#endif
+
+
 void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * rg_name);
 int compress_read_detail_BAM(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, int write_start, int write_end, char * bam_buf);
 
 void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab){
 	char *bin = tab -> appendix1;
-	fc_thread_global_context_t * global_context = tab -> appendix2;
 	int bin_len = tab -> counter1;
 	int txt_ptr = 0, old_ptr=0, xk1, bam_is_from_cellCounts = 0;
 	void ** vv = v;
@@ -2085,7 +2090,7 @@ void scRNA_sample_SamBam_writers_add_header(void * k, void * v, HashTable * tab)
 	ArrayList * chroname_size_list = ArrayListCreate(2000);
 	for(txt_ptr=0; txt_ptr <= bin_len; txt_ptr++){
 		if(bin[txt_ptr] == '\n' || txt_ptr == bin_len){
-			if(memmem(bin+old_ptr, txt_ptr - old_ptr,"Per-sample-BAM-output:cellCounts", 31))bam_is_from_cellCounts = 1;
+			if(this_memmem(bin+old_ptr, txt_ptr - old_ptr,"Per-sample-BAM-output:cellCounts", 31))bam_is_from_cellCounts = 1;
 			else if(memcmp("@SQ\t",bin+old_ptr, 4)==0){
 				unsigned int seqlen = 0;
 				char seqname[MAX_CHROMOSOME_NAME_LEN];
@@ -3864,7 +3869,6 @@ int scRNA_register_umi_id(fc_thread_global_context_t * global_context, fc_thread
 	}
 	ubc[xk1]=0;
 	int uno = HashTableGet(thread_context -> scRNA_registered_UMI_table, ubc ) -NULL -1;
-	//SUBREADprintf("UMIREGR %s = %d of %lld\n", ubc, uno,  thread_context -> scRNA_registered_UMI_table -> numOfElements);
 	if(uno<0) {
 		uno =  thread_context -> scRNA_registered_UMI_table -> numOfElements;
 		assert(strlen(ubc) <=MAX_UMI_LEN);
@@ -4044,13 +4048,13 @@ int scRNA_scan_read_name_str(fc_thread_global_context_t * global_context, char *
 		memcpy(&bin_len, read_bin, 4);
 		bin_len = bin_len +4 -bintag_start;
 
-		if(BC_seq) SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "CR", &tag_type, BC_seq);
-		if(UMI_seq) SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "UR", &tag_type, UMI_seq);
+		if(BC_seq) SAM_pairer_iterate_tags((unsigned char*)read_bin+bintag_start, bin_len , "CR", &tag_type, BC_seq);
+		if(UMI_seq) SAM_pairer_iterate_tags((unsigned char*)read_bin+bintag_start, bin_len , "UR", &tag_type, UMI_seq);
 
-		if(BC_qual) SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "CY", &tag_type, BC_qual);
-		if(UMI_qual) SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "UY", &tag_type, UMI_qual);
+		if(BC_qual) SAM_pairer_iterate_tags((unsigned char*)read_bin+bintag_start, bin_len , "CY", &tag_type, BC_qual);
+		if(UMI_qual) SAM_pairer_iterate_tags((unsigned char*)read_bin+bintag_start, bin_len , "UY", &tag_type, UMI_qual);
 
-		if(RG) SAM_pairer_iterate_tags(read_bin+bintag_start, bin_len , "RG", &tag_type, RG);
+		if(RG) SAM_pairer_iterate_tags((unsigned char*)read_bin+bintag_start, bin_len , "RG", &tag_type, RG);
 	}
 
 	return field_i;
@@ -4066,7 +4070,7 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
 	field_i = scRNA_scan_read_name_str(global_context, read_name, read_bin, &sample_barcode, NULL, BC_seq, NULL, UMI_seq, NULL, &lane_str, RG, NULL);
 
 	if(!sample_id){
-		if(!(UMI_seq && BC_seq))SUBREADprintf("ERROR: Cannot get UMI or BC: %s, %s\n", UMI_seq, BC_seq);
+		if(!(UMI_seq && BC_seq))SUBREADprintf("ERROR: Cannot get UMI or BC: %s, %s\n", *UMI_seq, *BC_seq);
 		return;
 	}
 
@@ -4095,7 +4099,7 @@ void scRNA_find_sample_cell_umi_from_readname(fc_thread_global_context_t * globa
 
 void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, char * read_name, char * bambin, int step){
 	int sample_id= -1;
-	char * fixed_sample_barcode=NULL, * cell_bc = NULL, * umi = NULL;
+	char * cell_bc = NULL, * umi = NULL;
 	int known_sample_id = 0;
 	if(global_context -> scRNA_rerun_on_persample_BAM) known_sample_id = global_context -> this_input_number+1; 
 
@@ -4138,9 +4142,8 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 
 void scRNA_do_one_batch_write_extend_rbin(fc_thread_global_context_t * global_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
 	char * cellbc_seq=NULL,*umi_seq=NULL, * cellbc_qual=NULL,*umi_qual=NULL, *sample_seq=NULL, *sample_qual=NULL, *lane_str=NULL;
-	char * gene_assign_mode=NULL;
 	int rname_trimmed_len=0;
-	int fields = scRNA_scan_read_name_str(global_context, NULL, rbin, & sample_seq, & sample_qual, & cellbc_seq, & cellbc_qual, & umi_seq, & umi_qual, &lane_str, NULL, &rname_trimmed_len);
+	scRNA_scan_read_name_str(global_context, NULL, rbin, & sample_seq, & sample_qual, & cellbc_seq, & cellbc_qual, & umi_seq, & umi_qual, &lane_str, NULL, &rname_trimmed_len);
 	char new_rbin_stake[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
 	char * new_rbin = new_rbin_stake;
 	int new_rbin_len = 0, n_cigar_op =0, l_read_name=0, l_seq=0;
@@ -4159,7 +4162,7 @@ void scRNA_do_one_batch_write_extend_rbin(fc_thread_global_context_t * global_co
 	new_rbin_len += 4*n_cigar_op + l_seq + (l_seq+1)/2;
 	char * ext_bin_ptr = rbin + 36 + l_read_name +4*n_cigar_op + l_seq + (l_seq+1)/2;
 
-	int CR_found=0, CB_found=0, CY_found=0, UR_found=0, UY_found=0, UB_found=0, Gene_found=0;
+	int CR_found=0, CB_found=0, CY_found=0, UR_found=0, UY_found=0, UB_found=0;
 	while(ext_bin_ptr < rbin+binlen+4){
 		char * tagstr = NULL; 
 		int taglen = 0;
@@ -4254,7 +4257,7 @@ void scRNA_do_one_batch_write_extend_rbin(fc_thread_global_context_t * global_co
 
 void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_thread_thread_context_t * thread_context, srInt_64 assign_target_number, char * read_name, char * read_bin, ArrayList * target_list ){ // the index of gene or the index of exon
 	char * cell_barcode = NULL, * umi_barcode = NULL; 
-	int sample_id = -1, laneno = 0, known_sample_id = 0;
+	int sample_id = -1, known_sample_id = 0;
 	if(global_context -> scRNA_rerun_on_persample_BAM) known_sample_id = global_context -> this_input_number+1; 
 
 	scRNA_find_sample_cell_umi_from_readname(global_context, thread_context, read_name, read_bin, (known_sample_id >0)?NULL:&sample_id, &cell_barcode, &umi_barcode, NULL);
@@ -4315,7 +4318,6 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		}
 		int read_bin_len=0;
 		memcpy(&read_bin_len , read_bin, 4);
-		//fprintf(stderr, "CELLHASH %d in BUCKET %d has %d bytes and %lld genes\n", cell_id, barcode_hashed_key, read_bin_len+4, itemno & 0xfffffffllu);
 
 		if(barcode_hashed_key==global_context -> scRNA_barcode_batched_bin_no+1){ // the read is unmapped. It can still have a fixed cell barcode
 			char * new_cellbc = NULL;
@@ -4409,7 +4411,11 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 
 			str1 -> cellbc = -1;
 			char replaced_key[40+MAX_UMI_LEN];
+#ifdef __MINGW32__
+			int keyptr = sprintf(replaced_key,"%d-%I64d-", str1 -> cellbc, str1 -> gene_no);
+#else
 			int keyptr = sprintf(replaced_key,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
+#endif
 			memcpy(replaced_key+keyptr, str1 -> umi, global_context -> scRNA_UMI_length);
 			replaced_key[keyptr+global_context -> scRNA_UMI_length]=0;
 			HashTablePut(filtered_CGU_table, strdup(replaced_key), NULL-1);
@@ -4446,7 +4452,12 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 							try_str -> cellbc = -1;
 
 							char replaced_key[55+MAX_UMI_LEN];
+#ifdef __MINGW32__
+							int keyptr = sprintf(replaced_key,"%d-%d-%I64d-", sample_id, try_str -> cellbc, try_str -> gene_no);
+#else
 							int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
+#endif
+
 							memcpy(replaced_key+keyptr, try_str -> umi, global_context -> scRNA_UMI_length);
 							replaced_key[keyptr+global_context -> scRNA_UMI_length]=0;
 							HashTablePut(filtered_CGU_table, strdup(replaced_key), acc_str -> umi);
@@ -4466,7 +4477,11 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 						try_str -> cellbc = -1;
 
 						char replaced_key[55+MAX_UMI_LEN];
+#ifdef __MINGW32__
+						int keyptr = sprintf(replaced_key,"%d-%d-%I64d-", sample_id, try_str -> cellbc, try_str -> gene_no);
+#else
 						int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
+#endif
 						memcpy(replaced_key+keyptr, try_str -> umi, global_context -> scRNA_UMI_length);
 						replaced_key[keyptr+global_context -> scRNA_UMI_length]=0;
 						HashTablePut(filtered_CGU_table, strdup(replaced_key), acc_str -> umi);
@@ -4522,7 +4537,7 @@ void scRNA_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2,
 				// structures that have the same last 32-bit of gene_no.
 		}
 
-		if(x1>sec_start && sec_key!=old_sec_key || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
+		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
 			if(x1 - sec_start>1 && str0->cellbc>=0) scRNA_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table);
 			else if(is_UMI_step2 && str0->cellbc>=0) ADD_count_hash(str0->cellbc,str0->gene_no,1);
@@ -4581,7 +4596,7 @@ void scRNA_do_one_batch_tab_to_struct_list(void *ky, void *val, HashTable * tab)
 	for(; '-' != *kyptr; kyptr++);
 	memcpy(new_item->umi, kyptr+1, UMI_length);
 	new_item -> supp_reads = supp_reads;
-	if(sample_id<1)SUBREADprintf("WRONG SAMPLE ID: %d from '%s'\n", sample_id, ky);
+	if(sample_id<1)SUBREADprintf("WRONG SAMPLE ID: %d from '%s'\n", sample_id, (char*)ky);
 	ArrayListPush(cell_gene_umi_list[sample_id-1], new_item);
 }
 
@@ -4604,8 +4619,13 @@ int two_long_compare(void * k1, void * k2){
 	return 0;
 }
 
+#ifdef __MINGW32__
+#define ADD_key_FMT1 "%d-%d-%I64d-%s"
+#else
+#define ADD_key_FMT1 "%d-%d-%lld-%s"
+#endif
 #define ADD_key_struct { char my_key [50+MAX_UMI_LEN]; \
-	sprintf(my_key,"%d-%d-%lld-%s", sample_id, cell_no, gene_no, UMI_str); \
+	sprintf(my_key,ADD_key_FMT1, sample_id, cell_no, gene_no, UMI_str); \
 	srInt_64 supp_reads = HashTableGet(supp_reads_SCGU, my_key)-NULL; \
 	if(1>supp_reads) HashTablePut(supp_reads_SCGU, strdup(my_key), NULL+1); \
 	else HashTablePutReplaceEx(supp_reads_SCGU, my_key, NULL+supp_reads+1, 0,0,0); }
@@ -4614,7 +4634,6 @@ void * scRNA_do_one_batch(void * paramsp1){
 	srInt_64 x1;
 	void ** params = paramsp1;
 	fc_thread_global_context_t * global_context = params[0];
-	fc_thread_thread_context_t * thread_context = params[1];
 	ArrayList * file_size_list = params[2];
 	char *temp_dir = global_context -> temp_file_dir;
 	free(paramsp1);
@@ -4634,7 +4653,7 @@ void * scRNA_do_one_batch(void * paramsp1){
 		if(me_max_Rbin_len > global_context->scRNA_barcode_batched_max_Rbin_len) global_context->scRNA_barcode_batched_max_Rbin_len = me_max_Rbin_len;
 		pthread_spin_unlock(&global_context -> scRNA_do_one_batch_runner_lock);
 		if(0>this_batch_no)break;
-		char tmp_fname[MAX_FILE_NAME_LENGTH+20];
+		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		sprintf(tmp_fname, "%s/cellCounts-Splitted-Reads-%05d-%05d.bin", temp_dir, getpid(), this_batch_no);
 		FILE * fp = fopen(tmp_fname, "rb");
 		fseek(fp, 0, SEEK_END);
@@ -4694,7 +4713,7 @@ void * scRNA_do_one_batch(void * paramsp1){
 			if(me_max_Rbin_len < rbinlen) me_max_Rbin_len = rbinlen;
 			scanptr += rbinlen +4; // read_bin
 
-			if(sample_id <0 || sample_id > 1000) SUBREADprintf("Wrong Sample: RNO=%d; ptr=%lld\n", rbin_no, scanptr);
+//			if(sample_id <0 || sample_id > 1000) SUBREADprintf("Wrong Sample: RNO=%d; ptr=%lld\n", rbin_no, scanptr);
 			rbin_no++;
 		}
 		ArrayList ** cell_gene_umi_list = malloc(sizeof(void*)*global_context -> scRNA_sample_sheet_table -> numOfElements);
@@ -4757,7 +4776,11 @@ void * scRNA_do_one_batch(void * paramsp1){
 			umi = binptr + 16 + 8*genes;
 			char SCGU_key [40+MAX_UMI_LEN];
 
+#ifdef __MINGW32__
+			int keyptr = sprintf(SCGU_key,"%d-%d-%I64d-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
+#else
 			int keyptr = sprintf(SCGU_key,"%d-%d-%lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
+#endif
 			memcpy(SCGU_key+keyptr, umi, global_context -> scRNA_UMI_length);
 			SCGU_key[keyptr+global_context -> scRNA_UMI_length] = 0;
 
@@ -4980,9 +5003,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 								}
 							}
 						}
-						//#warning "DEBUG OUT 1"
-						if(0 && FIXLENstrcmp("V0112_0155:7:1102:10036:21940#ACTTGA", read_name) == 0)
-							SUBREADprintf("OVERLAP TO %lld : %lld >= %lld ; EXON_SPAN=%lld ( %lld ~ %lld)\n", tested_exon_id, tested_exon_overlap_any_read, applied_overlapping_threshold, exon_span, global_context -> exontable_start[tested_exon_id], global_context -> exontable_stop[tested_exon_id]);
 					}
 				}
 			}
@@ -5208,7 +5228,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 							srInt_64 assignment_target_number = tmp_voter_id;
 							if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[tmp_voter_id];
 
-							ArrayListPush(assigned_list, NULL+assignment_target_number);
+							if(global_context -> do_scRNA_table)ArrayListPush(assigned_list, NULL+assignment_target_number);
 							//if(1 && FIXLENstrcmp( read_name , "V0112_0155:7:1101:5467:23779#ATCACG" )==0)
 							//	SUBREADprintf("CountsFrac = %d ; add=%d\n", overlapping_total_count, calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count) );
 							if(RG_name){
@@ -5432,7 +5452,6 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 		for(x1=0; x1 < sorted_bcno_p1 -> numOfElements; x1++){
 			void * this_bc_pnt_p1 = ArrayListGet(sorted_bcno_p1 ,  x1);
 			if(HashTableGet(highconf_cellbc_list_tab, this_bc_pnt_p1)){
-				//SUBREADprintf("SKIP FOR HIGHCONF %lld\n", this_bc_umis);
 				continue; // it is in high-conf list
 			}
 			srInt_64 this_bc_umis = HashTableGet(cellnoP1_to_umis_tab, this_bc_pnt_p1) - NULL;
@@ -5441,7 +5460,6 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 			if(x1 >= 45000) break;
 			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt_p1-1);
 		}
-		if(0)SUBREADprintf("MEDIANTEST : X1 = %lld, MID = %lld, MID_CUT = %lld\n", x1, median_umis, median_umis_001_cut);
 		#ifdef DEBUG_FOR_EXACT
 		#warning "============= EXT 2 ==========="
 		for(x1=0; x1<this_sample_ambient_rescure_candi->numOfElements; x1++){
@@ -5461,7 +5479,6 @@ void scRNA_merged_ambient_rescure(fc_thread_global_context_t * global_context, H
 		fprintf(tfp,"45K90K %d %d\n", this_bc_no_p1, this_bc_umis);
 		#endif
 	}
-	if(0)SUBREADprintf("AMBIENT_CANDIDATES = %lld   45K-90K = %lld\n", this_sample_ambient_rescure_candi -> numOfElements, this_sample_45k_90k_barcode_no_P0-> numOfElements);
 	ArrayListDestroy(sorted_bcno_p1);
 	HashTableDestroy(highconf_cellbc_list_tab);
 	#ifdef DEBUG_FOR_EXACT
@@ -5621,11 +5638,6 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
 	sprintf(ofname,"%s.scRNA.%03d.%s.summary",global_context->input_file_name, sample_index+1,tabtype);
-	/*
-	FILE * ofp_bcs = fopen( ofname , "w" );
-	fprintf(ofp_bcs,"MappedReads\t%I64d\n",);
-	fprintf(ofp_bcs,"MappedReads\t%lld\n", );
-	fclose(ofp_bcs);*/
 	sprintf(ofname,"%s.scRNA.%03d.%s.BCtab",global_context->input_file_name, sample_index+1,tabtype);
 	FILE * ofp_bcs = fopen( ofname , "w" );
 	sprintf(ofname,"%s.scRNA.%03d.%s.GENEtab",global_context->input_file_name, sample_index+1,tabtype);
@@ -5646,7 +5658,11 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 	HashTableDestroy(used_cellnoP1_tab);
 	ArrayListSort(unique_NZ_genenosP1_list, NULL);
 
+	#ifdef __MINGW32__
+	fprintf(ofp_mtx, "%I64d %I64d %I64d\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
+	#else
 	fprintf(ofp_mtx, "%lld %lld %lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
+	#endif
 
 	for(x2=0; x2 < unique_NZ_genenosP1_list -> numOfElements; x2++){
 		int gene_index_0B = ArrayListGet(unique_NZ_genenosP1_list, x2) - NULL-1;
@@ -5812,7 +5828,6 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		HashTableIteration(cellP1_to_geneP1_to_umis[x1], scRNA_merged_to_tables_write_build_UMIcounts);
 
 		int applied_umi_cut = scRNA_merged_bootstrap_a_sample(global_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, high_confid_barcode_index_list);
-		if(0)SUBREADprintf("BOOTSTRAP_CUTV %d and had %d high-conf cells\n", applied_umi_cut, high_confid_barcode_index_list -> numOfElements);
 		global_context -> scRNA_applied_umi_cut[x1] = applied_umi_cut;
 		scRNA_merged_ambient_rescure(global_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, this_sample_45k_90k_barcode_no_P0, this_sample_ambient_rescure_candi, high_confid_barcode_index_list);
 
@@ -5823,17 +5838,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 #else
 		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads, x1+1);
 #endif
-
-
 		srInt_64 xk1;
-		if(0)for(xk1=0; xk1< high_confid_barcode_index_list->numOfElements; xk1++){
-			SUBREADprintf("HIGHXF_6CODE %lld\t%lld\n", xk1, ArrayListGet(high_confid_barcode_index_list, xk1)-NULL);
-		}
-		if(0)for(xk1=0; xk1< this_sample_ambient_rescure_candi->numOfElements; xk1++){
-			SUBREADprintf("RESQAB_6CODE %lld\t%lld\n", xk1, ArrayListGet(this_sample_ambient_rescure_candi, xk1)-NULL);
-		}
-
-
 		HashTable * sorted_order_p1_to_i_p1_tab = HashTableCreate(nexons/4);
 		for(xk1 = 0; xk1 < nexons ; xk1++){
 			HashTablePut(sorted_order_p1_to_i_p1_tab, NULL+loaded_features[xk1].sorted_order+1 , NULL+xk1+1 );
@@ -5845,7 +5850,6 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		//scRNA_merged_write_sparse_matrix(global_context, merged_tables_gene_to_cell_umis[x1], used_cell_barcode_tabs[x1]  this_sample_45k_90k_barcode_no_P0, x1, "AmbProfCells",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		#endif
 
-		//SUBREADprintf("HAVING_HIGHCONF_TOTAL %lld\n", high_confid_barcode_index_list -> numOfElements);
 		scRNA_merged_write_sparse_matrix(global_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, high_confid_barcode_index_list, x1, "HighConf",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		scRNA_merged_write_sparse_matrix(global_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, this_sample_ambient_rescure_candi, x1, "RescCand",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		scRNA_merged_45K_to_90K_sum( global_context, cellP1_to_geneP1_to_umis[x1], this_sample_45k_90k_barcode_no_P0, x1 , loaded_features, sorted_order_p1_to_i_p1_tab);
@@ -5868,7 +5872,6 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 
 void scRNA_find_gene_to_umi_do_merger(void * ky_genep1, void * val_arr_bc_umip1, HashTable * tab){
 	HashTable * bc_umi_to_genes_tab = tab -> appendix1;
-	fc_thread_global_context_t * global_context = tab->appendix2;
 	ArrayList * arr_bc_umip1 = val_arr_bc_umip1;
 	int gene_no = ky_genep1-NULL-1;
 	int x1;
@@ -5995,15 +5998,16 @@ void * scRNA_merge_batches_worker(void * vp){
 
 		struct scRNA_merge_batches_worker_task * current_input = my_current_job -> task;
 		my_current_job -> strm.avail_in = current_input -> inbin_len;
-		my_current_job -> strm.next_in = current_input -> inbin;
+		my_current_job -> strm.next_in = (unsigned char*)current_input -> inbin;
 		my_current_job -> strm.avail_out = MERGER_WORKER_BINSIZE;
-		my_current_job -> strm.next_out = my_current_job -> outbin;
+		my_current_job -> strm.next_out = (unsigned char*)my_current_job -> outbin;
 
 		deflate(&my_current_job -> strm, Z_FINISH);
 		my_current_job -> outbin_len = MERGER_WORKER_BINSIZE-my_current_job -> strm.avail_out;
 		my_current_job -> crc32 = FC_CRC32(current_input -> inbin, current_input -> inbin_len);
 		deflateEnd(&my_current_job -> strm);
 	}
+	return NULL;
 }
 
 void scRNA_save_BAM_result(fc_thread_global_context_t * global_context, struct scRNA_merge_batches_worker_current * finished_job){
@@ -6091,7 +6095,7 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 		srInt_64 current_sorting_key[global_context -> scRNA_barcode_batched_bin_no+1];
 		
 		for(xk1=0; xk1<global_context -> scRNA_barcode_batched_bin_no+2; xk1++){
-			char tmp_fname[MAX_FILE_NAME_LENGTH+20];
+			char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 			sprintf(tmp_fname, "%s/cellCounts-Splitted-Reads-%05d-%05d.bin", global_context -> temp_file_dir, getpid(), xk1);
 			input_fps[xk1] = fopen(tmp_fname,"rb");
 			if(xk1 == global_context -> scRNA_barcode_batched_bin_no+1)break;
@@ -8972,7 +8976,6 @@ void sort_bucket_table(fc_thread_global_context_t * global_context){
 
 
 void scRNA_generate_BAM_FASTQ(fc_thread_global_context_t * global_context){
-	char new_fn[MAX_FILE_NAME_LENGTH+10];
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
 	char rand_prefix[MAX_FILE_NAME_LENGTH+100];

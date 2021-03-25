@@ -683,9 +683,9 @@ void parallel_gzip_zip_texts(parallel_gzip_writer_t * pzwtr, int thread_no, int 
 	tho -> CRC32 = crc_pos(tho -> in_buffer, tho -> in_buffer_used);
 
 	while(tho -> in_buffer_used - write_txt_ptr > 0 || eof_marker){
-		tho -> zipper . next_in = tho -> in_buffer + write_txt_ptr;
+		tho -> zipper . next_in = (unsigned char*)tho -> in_buffer + write_txt_ptr;
 		tho -> zipper . avail_in = tho -> in_buffer_used - write_txt_ptr;
-		tho -> zipper . next_out = tho -> out_buffer + tho -> out_buffer_used;
+		tho -> zipper . next_out = (unsigned char*)tho -> out_buffer + tho -> out_buffer_used;
 		tho -> zipper . avail_out = PARALLEL_GZIP_ZIPPED_BUFFER_SIZE - tho -> out_buffer_used;
 		int defret = deflate(&tho -> zipper, eof_marker?Z_FINISH:Z_FULL_FLUSH);
 		int consumed_input = tho -> in_buffer_used - write_txt_ptr - tho -> zipper . avail_in;

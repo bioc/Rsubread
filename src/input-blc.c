@@ -952,7 +952,7 @@ int cacheBCL_qualTest_BAMmode(char * datadir, int testing_reads, int known_cell_
 		if(ret<=0)break;
 		char *cell_barcode = NULL, *sample_barcode=NULL, *lane_str=NULL;
 
-		int xx=0, laneno=0;
+		int xx=0;
 		char *testi;
 		for(testi = rname+1; * testi; testi ++){
 			if( * testi=='|'){
@@ -1220,7 +1220,7 @@ int scBAM_skip_bam_header(input_scBAM_t * bam_input){
 	for(x1=0;x1<nref;x1++){
 		scBAM_next_int(bam_input, &tmpi); // l_name
 		scBAM_next_string(bam_input, bam_input -> chro_table [x1].chro_name, tmpi);
-		ret = scBAM_next_int(bam_input, &bam_input -> chro_table [x1].chro_length);
+		ret = scBAM_next_int(bam_input, (int*)&bam_input -> chro_table [x1].chro_length);
 		if(ret < 0) return -1;
 	}
 	return 0;
@@ -1251,7 +1251,7 @@ int scBAM_rebuffer(input_scBAM_t * bam_input){
 		}
 		char zipped_bam_buf[66000];
 		bam_input -> section_start_pos = ftello(bam_input -> os_file);
-		int ziplen = PBam_get_next_zchunk(bam_input -> os_file, zipped_bam_buf, 66000, &bin_len);
+		int ziplen = PBam_get_next_zchunk(bam_input -> os_file, zipped_bam_buf, 66000, (unsigned int*)&bin_len);
 		if(ziplen<1) return -1;
 		bin_len = SamBam_unzip(bam_input -> section_buff, 65536, zipped_bam_buf, ziplen, 0);
 		if(bin_len>0){
@@ -1305,7 +1305,7 @@ int scBAM_next_string(input_scBAM_t * bam_input, char * strbuff, int lenstr){
 // the alignment block with binlen will be written into binbuf.
 // negative : EOF
 int scBAM_next_alignment_bin(input_scBAM_t * bam_input, char * binbuf){
-	int reclen = 0 , x1 = 0;
+	int reclen = 0;
 	int ret = scBAM_next_int(bam_input, &reclen);
 	if(ret<0)return -1;
 	if(reclen < 36 || reclen > FC_LONG_READ_RECORD_HARDLIMIT -4)return -1;
@@ -1350,7 +1350,7 @@ int scBAM_next_read(input_scBAM_t * bam_input, char * read_name, char * seq, cha
 		if(x1==4)tagname ="RG";
 
 		tag_type = 0;
-		SAM_pairer_iterate_tags(extag_start, bam_input -> align_buff + 4 + binlen - extag_start, tagname, &tag_type, &tag_str_val);
+		SAM_pairer_iterate_tags((unsigned char*)extag_start, bam_input -> align_buff + 4 + binlen - extag_start, tagname, &tag_type, &tag_str_val);
 		if(tag_type!='Z')return -1;
 		int tag_str_len = strlen(tag_str_val);
 		if(x1==0||x1==2||x1==4)read_name[rname_build_ptr++] = '|';

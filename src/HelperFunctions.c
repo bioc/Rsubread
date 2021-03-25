@@ -2773,7 +2773,7 @@ void worker_master_mutex_destroy(worker_master_mutex_t * wmt){
 }
 
 int worker_wait_for_job(worker_master_mutex_t * wmt, int worker_id){
-	int trv = pthread_mutex_trylock(wmt->mutexs_worker_wait + worker_id);
+	pthread_mutex_trylock(wmt->mutexs_worker_wait + worker_id);
 	wmt->worker_is_working[worker_id] = 0;
 	while(1){
 		pthread_cond_wait(&wmt->conds_worker_wait[worker_id], &wmt->mutexs_worker_wait[worker_id]);
@@ -2819,4 +2819,49 @@ void terminate_workers(worker_master_mutex_t * wmt){
 	wmt -> all_terminate = 1;
 	for(x1=0;x1<wmt -> workers;x1++)
 		master_notify_worker(wmt,x1);
+}
+
+void *windows_memmem(const void *haystack_start, size_t haystack_len, const void *needle_start, size_t needle_len)
+{
+
+    const unsigned char *haystack = (const unsigned char *) haystack_start;
+    const unsigned char *needle = (const unsigned char *) needle_start;
+    const unsigned char *h = NULL;
+    const unsigned char *n = NULL;
+    size_t x = needle_len;
+
+    /* The first occurrence of the empty string is deemed to occur at
+ *     the beginning of the string.  */
+    if (needle_len == 0)
+        return (void *) haystack_start;
+
+    /* Sanity check, otherwise the loop might search through the whole
+ *         memory.  */
+     if (haystack_len < needle_len)
+       return NULL;
+
+    for (; *haystack && haystack_len--; haystack++) {
+
+        x = needle_len;
+        n = needle;
+        h = haystack;
+
+        if (haystack_len < needle_len)
+            break;
+
+        if ((*haystack != *needle) || ( *haystack + needle_len != *needle + needle_len))
+            continue;
+
+        for (; x ; h++ , n++) {
+            x--;
+
+            if (*h != *n) 
+                break;
+
+           if (x == 0)
+            return (void *)haystack;
+        }
+    }
+
+    return NULL;
 }

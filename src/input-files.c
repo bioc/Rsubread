@@ -3461,7 +3461,7 @@ int SAM_pairer_iterate_tags(unsigned char * bin, int bin_len, char * tag_name, c
 			break;
 		}
 
-		int skip_content = SAP_pairer_skip_tag_body_len(bin+bin_cursor);
+		int skip_content = SAP_pairer_skip_tag_body_len((char*)bin+bin_cursor);
 		bin_cursor += skip_content ;
 	}
 	return found;
