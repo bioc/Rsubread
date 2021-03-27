@@ -1199,6 +1199,7 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	char * this_buffer = thread_no < 0 ? writer ->chunk_buffer: writer -> threads_chunk_buffer[thread_no];
 	char * this_compressed_chunk_buffer = thread_no < 0 ? writer ->compressed_chunk_buffer : writer -> threads_chunk_buffer_compressed[thread_no];
 
+	//SUBREADprintf("MTBAM : WRITE THR_%d ; LEN=%d\n", thread_no, *this_buffer_used);
 	if(*this_buffer_used < 1){
 		// magic block with 0 byte data(EOF)
 		subread_lock_occupy(&writer -> thread_bam_lock);
@@ -1207,7 +1208,6 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 		subread_lock_release(&writer -> thread_bam_lock);
 		return;
 	}
-	//if(thread_no>=0)SUBREADprintf("MTBAM : WRITE THR_%d ; LEN=%d\n", thread_no, *this_buffer_used);
 
 	this_stream -> avail_out = 70000;
 	this_stream -> avail_in = (* this_buffer_used);
@@ -1227,7 +1227,6 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	deflateEnd(this_stream);
 
 	compressed_size = 70000 - this_stream -> avail_out;
-	//printf("ADDED BLOCK=%d; LEN=%d; S=%s\n", compressed_size, writer ->chunk_buffer_used,  writer ->chunk_buffer);
 
 	subread_lock_occupy(&writer -> thread_bam_lock);
 	SamBam_writer_chunk_header(writer, compressed_size);
@@ -1235,6 +1234,7 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	fwrite(&CRC32 , 4, 1, writer -> bam_fp);
 	fwrite(this_buffer_used , 4, 1, writer -> bam_fp);
 	writer -> current_BAM_pos = ftello(writer -> bam_fp);
+	SUBREADprintf("MTBAM : FOFF=%lld ; COMPLEN=%d\n", ftello(writer -> bam_fp), compressed_size);
 	subread_lock_release(&writer -> thread_bam_lock);
 
 	if(chunk_write_size < compressed_size){
@@ -2005,7 +2005,6 @@ void * SamBam_writer_sorted_compress(void * vptr0){
 		if(deret >=0){
 			deflateReset(&me->strm);
 			me->bin_size = 70000 - me->strm.avail_out;
-			me->text_size = 0;
 			me->last_job_done = 1;
 		}else{
 			SUBREADprintf("Error: cannot compress BAM block #%d , which is %llu, had %d => 70000 [ %d ] bytes , return = %d\n", this_thread_no, me -> bam_block_no, me->text_size, me->bin_size, deret);
@@ -2016,7 +2015,6 @@ void * SamBam_writer_sorted_compress(void * vptr0){
 
 void SamBam_thread_wait_merge_write(SamBam_Writer * writer, int thread_no){
 	master_wait_for_job_done(&writer -> sorted_notifier, thread_no);
-	if(writer -> writer_threads[thread_no].text_size>0 && !writer -> writer_threads[thread_no].last_job_done )SUBREADprintf("ERROR: MASTER DIDNT WAIT of TH%d BLK%lld\n", thread_no, writer -> writer_threads[thread_no].bam_block_no);
 
 	if(writer -> writer_threads[thread_no].last_job_done){
 		srInt_64 fpos = ftello(writer -> bam_fp);
@@ -2031,6 +2029,7 @@ void SamBam_thread_wait_merge_write(SamBam_Writer * writer, int thread_no){
 		rlen = fwrite(&writer -> writer_threads[thread_no].CRC32_plain , 4, 1, writer -> bam_fp);
 		rlen = fwrite(&writer -> writer_threads[thread_no].text_size , 4, 1, writer -> bam_fp);
 
+		writer -> writer_threads[thread_no].text_size = 0;
 		writer -> writer_threads[thread_no].bin_size = 0;
 		writer -> writer_threads[thread_no].bam_block_no = -1;
 		writer -> writer_threads[thread_no].last_job_done = 0;
