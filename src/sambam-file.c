@@ -1199,7 +1199,6 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	char * this_buffer = thread_no < 0 ? writer ->chunk_buffer: writer -> threads_chunk_buffer[thread_no];
 	char * this_compressed_chunk_buffer = thread_no < 0 ? writer ->compressed_chunk_buffer : writer -> threads_chunk_buffer_compressed[thread_no];
 
-	//SUBREADprintf("MTBAM : WRITE THR_%d ; LEN=%d\n", thread_no, *this_buffer_used);
 	if(*this_buffer_used < 1){
 		// magic block with 0 byte data(EOF)
 		subread_lock_occupy(&writer -> thread_bam_lock);
@@ -1234,7 +1233,6 @@ void SamBam_writer_add_chunk(SamBam_Writer * writer, int thread_no)
 	fwrite(&CRC32 , 4, 1, writer -> bam_fp);
 	fwrite(this_buffer_used , 4, 1, writer -> bam_fp);
 	writer -> current_BAM_pos = ftello(writer -> bam_fp);
-	SUBREADprintf("MTBAM : FOFF=%lld ; COMPLEN=%d\n", ftello(writer -> bam_fp), compressed_size);
 	subread_lock_release(&writer -> thread_bam_lock);
 
 	if(chunk_write_size < compressed_size){
