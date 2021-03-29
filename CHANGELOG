@@ -1,3 +1,6 @@
+29 Mar 2021 - 2.5.8
+(1) Fix a few bugs and match the Subread-2.0.2 release.
+
 23 Mar 2021 - 2.5.7
 (1) Make the results always consistent no matter if the aligner was run or not, in cellCounts.
 
