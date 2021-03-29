@@ -976,7 +976,7 @@ int locate_junc_features(fc_thread_global_context_t *global_context, char * chro
 // Memory will be allowcated in this function. The pointer is saved in *loaded_features.
 // The invoker must release the memory itself.
 
-#define MAX_ANNOT_LINE_LENGTH 1000000
+#define MAX_ANNOT_LINE_LENGTH 1500000
 int load_feature_info(fc_thread_global_context_t *global_context, const char * annotation_file, int file_type, fc_feature_info_t ** loaded_features)
 {
 	unsigned int features = 0, xk1 = 0, lineno=0;
