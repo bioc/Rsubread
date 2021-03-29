@@ -28,6 +28,10 @@ cellCounts(
     # number of threads
     nthreads = 10,
 
+    # dealing with multi-mapping reads in the alignment step
+    nBestLocations = 1,
+    unique.mapping = FALSE,
+
     # other parameters passed to align, subjunc and featureCounts functions 
     ...)
 }
@@ -54,6 +58,8 @@ If the input mode is \code{"FASTQ-dir"}, a character string specifying the path 
   \item{useMetaFeatures}{ Specify if UMI counting should be carried out at the meta-feature level (eg. gene level).  See \code{\link{featureCounts}} for more details. \code{TRUE} by default.}
   \item{umi.cutoff}{ Specify the minimum of UMIs each called cell must have. The cutoff will be automatically decided if the value is \code{NULL}. The step for rescuing non-ambient low-UMI cells is skipped if a positive value is specified. Only positive values or \code{NULL} are allowed.  \code{NULL} by default. }
   \item{nthreads}{ A numeric value giving the number of threads used for read mapping and counting. \code{10} by default.}
+  \item{nBestLocations}{A numeric value giving the maximum number of reported alignments for each multi-mapping read. \code{0} by default.}
+  \item{unique.mapping}{A logical value specifying if the multi-mapping reads should not be reported as mapped (i.e. reporting uniquely mapped reads only). \code{FALSE} by default.}
   \item{...}{other parameters passed to \code{\link{align}} and and \code{\link{featureCounts}} functions.}
 }
 
