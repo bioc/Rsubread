@@ -6102,11 +6102,11 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 
 			srInt_64 section1_items=0;
 			for(sample_i = 0; sample_i < global_context -> scRNA_sample_sheet_table -> numOfElements; sample_i++){
-				fread(&section1_items,1, 8, input_fps[xk1]);
+				int rrv = fread(&section1_items,1, 8, input_fps[xk1]);
 				for(xk2 = 0; xk2 < section1_items; xk2++){
 					srInt_64 cellbcP0_geneno0B=0, umis=0;
-					fread(&cellbcP0_geneno0B,1,8,input_fps[xk1]);
-					fread(&umis,1,8,input_fps[xk1]);
+					rrv = rrv && fread(&cellbcP0_geneno0B,1,8,input_fps[xk1]);
+					rrv = rrv && fread(&umis,1,8,input_fps[xk1]);
 
 					int cellbc_no = cellbcP0_geneno0B>>32;
 					int gene_no0B = (int)(cellbcP0_geneno0B&0xffffffffu);
@@ -6127,9 +6127,9 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 				if(genes & (1LLU<<63))genes = genes & 0x7fffffff;
 				else genes= 0;
 				
-				fread(last_rbin_buffer[xk1]+16, 1, 8*genes+ global_context -> scRNA_UMI_length + 4, input_fps[xk1]);
+				int rrv  = fread(last_rbin_buffer[xk1]+16, 1, 8*genes+ global_context -> scRNA_UMI_length + 4, input_fps[xk1]);
 				memcpy(&binlen, last_rbin_buffer[xk1] +16 +8*genes+ global_context -> scRNA_UMI_length  , 4);
-				fread(last_rbin_buffer[xk1] + 16+ 8*genes+ global_context -> scRNA_UMI_length + 4, 1, binlen, input_fps[xk1]);
+				rrv = rrv && fread(last_rbin_buffer[xk1] + 16+ 8*genes+ global_context -> scRNA_UMI_length + 4, 1, binlen, input_fps[xk1]);
 
 				srInt_64 sorting_key = *(int*)(last_rbin_buffer[xk1] + 16 +8*genes+global_context -> scRNA_UMI_length +4);
 				sorting_key = sorting_key << 32;
@@ -6187,10 +6187,10 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 				memcpy(&genes, last_rbin_buffer[selected_fp_no]+8, 8);
 				if(genes & (1LLU<<63))genes = genes & 0x7fffffff;
 				else genes= 0;
-				fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ global_context -> scRNA_UMI_length + 4, input_fps[selected_fp_no]);
+				int rrv = fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ global_context -> scRNA_UMI_length + 4, input_fps[selected_fp_no]);
 				memcpy(&binlen, last_rbin_buffer[selected_fp_no] +16 +8*genes+ global_context -> scRNA_UMI_length  , 4);
 
-				fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ global_context -> scRNA_UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
+				rrv = rrv && fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ global_context -> scRNA_UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
 				srInt_64 sorting_key = *(int*)(last_rbin_buffer[selected_fp_no] + 16+8*genes +global_context -> scRNA_UMI_length +4);
 				sorting_key = sorting_key << 32;
 				sorting_key |= *(int*)(last_rbin_buffer[selected_fp_no] + 16 +8*genes+global_context -> scRNA_UMI_length +8);
@@ -6237,10 +6237,10 @@ int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_co
 			int rlen = fread(&sample_id, 1, 4, notmapped_fp);
 			if(rlen < 4) break;
 			struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * global_context->scRNA_sample_sheet_table -> numOfElements +sample_id-1);
-			fread(&binlen, 1, 4, notmapped_fp);
+			int rrv = fread(&binlen, 1, 4, notmapped_fp);
 			memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
 			tofill -> inbin_len += 4;
-			fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
+			rrv = rrv && fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
 			tofill -> inbin_len += binlen;
 			if(tofill-> inbin_len > 60000){
 				struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
