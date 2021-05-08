@@ -2,6 +2,19 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+\section{Version 2.6.0}{\itemize{
+\item
+Improved the speed of cellCounts and also reduced its memory use.
+
+\item
+Added a parameter 'umi.cutoff' to cellCounts to call all the cells that had a total UMI count greater than the specified threshold.
+
+\item
+Added support for FASTQ-format read input in CellCounts.
+}}
+
+
+
 \section{Version 2.4.0}{\itemize{
 \item
 The 'isPairedEnd' parameter in featureCounts() is now used to check if the type of input reads (paired-end or single-end) is correctly specified.
