@@ -4471,7 +4471,8 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 
 				for(x2=0; x2<test_accs->numOfElements; x2++){
 					struct cell_gene_umi_supp * acc_str = ArrayListGet(test_accs, x2);
-					if(scRNA_hamming_max2_fixlen(acc_str -> umi, try_str -> umi, global_context -> scRNA_UMI_length)<2){
+					int hamming = scRNA_hamming_max2_fixlen(acc_str -> umi, try_str -> umi, global_context -> scRNA_UMI_length);
+					if(hamming<2){
 						found=1;
 						acc_str -> supp_reads += try_str -> supp_reads;
 						try_str -> cellbc = -1;
@@ -4519,7 +4520,7 @@ void scRNA_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2,
 	srInt_64 x1, sec_start = 0;
 	srInt_64 old_sec_key = -1;
 
-	for(x1=1; x1<=structs -> numOfElements; x1++){
+	for(x1=0; x1<=structs -> numOfElements; x1++){
 		srInt_64 sec_key = -1;
 		int is_umi_changed = 0;
 
@@ -4542,9 +4543,9 @@ void scRNA_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2,
 			if(x1 - sec_start>1 && str0->cellbc>=0) scRNA_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table);
 			else if(is_UMI_step2 && str0->cellbc>=0) ADD_count_hash(str0->cellbc,str0->gene_no,1);
 
-			old_sec_key = sec_key;
 			sec_start = x1;
 		}
+		old_sec_key = sec_key;
 	}
 }
 
