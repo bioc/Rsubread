@@ -5131,7 +5131,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 				else applied_fragment_minimum_overlapping_missing = 10000L * (total_frag_len - global_context -> max_missing_bases_in_read);
 			}
 
-			applied_fragment_minimum_overlapping_overlap = max( 10000L * global_context -> fragment_minimum_overlapping, 10000. * global_context -> fractional_minimum_overlapping * total_frag_len + 0.9999);
+			applied_fragment_minimum_overlapping_overlap = max( 10000L * global_context -> fragment_minimum_overlapping, 10000. * global_context -> fractional_minimum_overlapping * total_frag_len + 0.5);
 
 			applied_fragment_minimum_overlapping = max(applied_fragment_minimum_overlapping_overlap , applied_fragment_minimum_overlapping_missing);
 		}
