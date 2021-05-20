@@ -4278,7 +4278,7 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		print_in_box(80,0,0,"");
 	}
 
-	if(sample_id >0) thread_context -> scRNA_assigned_reads_per_sample[sample_id-1] ++; 
+	if(sample_id >0 && target_list && target_list->numOfElements>0) thread_context -> scRNA_assigned_reads_per_sample[sample_id-1] ++; 
 	//if(sample_id >0) SUBREADprintf("P1 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
 	if(sample_id >0){
 		int barcode_hashed_key;
