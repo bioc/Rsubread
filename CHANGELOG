@@ -1,5 +1,5 @@
-21 May 2021 - 2.7.1
-(1) Fixed a bug in cellCounts reporting wrong "assigned cell number" in the summarisation data-frame.
+24 May 2021 - 2.7.1
+(1) Fixed a bug in cellCounts reporting wrong "assigned cell number" in the summarisation data-frame, and fixed a bug in cellCounts that generated no results when the sample names are numbers.
 
 8 May 2021 - 2.5.9
 (1) Updated NEWS and cellCounts Rd files.
