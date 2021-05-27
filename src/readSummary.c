@@ -4278,10 +4278,11 @@ void add_scRNA_read_to_pool( fc_thread_global_context_t * global_context,  fc_th
 		print_in_box(80,0,0,"");
 	}
 
-	if(sample_id >0) thread_context -> scRNA_assigned_reads_per_sample[sample_id-1] ++; 
 	//if(sample_id >0) SUBREADprintf("P1 Cell=%s, Umi=%s, Lane=%d ==> sample %d\n", cell_barcode, umi_barcode, laneno, sample_id);
 	if(sample_id >0){
 		int barcode_hashed_key;
+
+		if(assign_target_number >=0 || target_list) thread_context -> scRNA_assigned_reads_per_sample[sample_id-1] ++; 
 
 		// has cell-bc, assigned : to hashed bin
 		// has cell-bc, not assigned, has mapping location: to hashed bin, with 0-len gene list
@@ -8885,7 +8886,6 @@ int readSummary(int argc,char *argv[]){
 		}
 	}
 	if(global_context.scRNA_cell_barcodes_array){
-		SUBREADprintf("DESTROYING global_context.scRNA_cell_barcodes_array : %p and %p, having %lld\n", global_context.scRNA_cell_barcodes_array, global_context.scRNA_cell_barcodes_array->elemDeallocator, global_context.scRNA_cell_barcodes_array-> numOfElements);
 		ArrayListDestroy(global_context.scRNA_cell_barcodes_array);
 		HashTableDestroy(global_context.scRNA_cell_barcode_head_tail_table);
 	}

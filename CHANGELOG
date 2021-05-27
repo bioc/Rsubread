@@ -1,3 +1,6 @@
+27 May 2021 - 2.6.1
+(1) Fixed two bugs in cellCounts: (I) the number of assigned reads reported in the "sample.info" data-frame was wrong; (II) cellCounts could not handle the sample names that are purely digits, eg "1001". 
+
 8 May 2021 - 2.5.9
 (1) Updated NEWS and cellCounts Rd files.
 (2) Updated users guide.
