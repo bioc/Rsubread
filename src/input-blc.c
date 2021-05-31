@@ -89,6 +89,7 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 							scancon -> read_is_index[my_index-1]=is_idx;
 							scancon -> reads_per_cluster = max(scancon -> reads_per_cluster, my_index);
 						}else assert( my_index >0 && is_idx >=0 && rlen>0 );
+						//SUBREADprintf("LOAD CLUSTER %d = %d\n", my_index, rlen);
 					}
 				}
 				fclose(fp);
@@ -430,8 +431,9 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 	#else
 	sprintf(read_name, "R%011llu:", rno);
 	#endif
+	int is_dual_index = srii[3]>0;
 	idx_offset  = srii[0];
-	base_offset = srii[1] + idx_offset;
+	base_offset = srii[1] + ( is_dual_index?srii[2]:0) + idx_offset;
 
 	read_name[13+idx_offset]='|';
 	read_name[14+2*idx_offset]='|';
@@ -450,22 +452,22 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 			nbase="ACGT"[nch%4];
 			nqual=33+(nch>>2);
 		}
-		if(nqual >= '/' && bii < srii[0] + srii[1]) nqual++;
+		if(nqual >= '/' && bii < base_offset ) nqual++;
 		if(bii < srii[0]){
 			read_name[13+bii] = nbase;
 			read_name[14+idx_offset+bii]= nqual;
-		}else if(bii < srii[0] + srii[1]){
+		}else if(bii < base_offset ){
 			read_name[15+idx_offset+bii] = nbase;
 			read_name[16+base_offset+bii]= nqual;
 		}else{
-			seq[bii - srii[0]-srii[1] ] = nbase;
-			qual[bii - srii[0]-srii[1] ] = nqual;
+			seq[bii - base_offset  ] = nbase;
+			qual[bii - base_offset  ] = nqual;
 		}
 	}
 
 	cache_input -> read_no_in_chunk++;
 	//SUBREADprintf("GOT READ #%d ; ret=%d\n" , cache_input -> read_no_in_chunk, srii[2]);
-	return srii[2];
+	return srii[2+is_dual_index];
 }
 
 

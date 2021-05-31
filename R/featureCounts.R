@@ -73,6 +73,8 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     BAM_is_ScRNA_Fastq <- FALSE
     BAM_is_ScRNA_BAM <- FALSE
     BAM_is_Rerun_Persample <- FALSE
+    Is_Dual_Index <- FALSE
+
     if("sampleSheet" %in% names(extra.params)) sampleSheet <- extra.params[["sampleSheet"]]
     if("generate.scRNA.BAM" %in% names(extra.params)) generate.scRNA.BAM <- extra.params[["generate.scRNA.BAM"]]
     if("cellBarcodeList" %in% names(extra.params)) cellBarcodeList <- extra.params[["cellBarcodeList"]]
@@ -80,6 +82,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     if("BAM_is_ScRNA_BAM" %in% names(extra.params)) BAM_is_ScRNA_BAM <- extra.params[["BAM_is_ScRNA_BAM"]]
     if("BAM_is_Rerun_Persample" %in% names(extra.params)) BAM_is_Rerun_Persample <- extra.params[["BAM_is_Rerun_Persample"]]
     if("umi.cutoff" %in% names(extra.params)) umi.cutoff <- extra.params[["umi.cutoff"]]
+    if("Is_Dual_Index" %in% names(extra.params)) Is_Dual_Index <- extra.params[["Is_Dual_Index"]]
 
     .check_string_param(annot.inbuilt, "annot.inbuilt")
     .check_string_param(GTF.featureType, "GTF.featureType")
@@ -234,7 +237,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
 
     #print(.flatten.and.numeric(countReadPairs))
     #print(.flatten.and.numeric(isPairedEnd))
-    cmd <- paste("readSummary",ann,files_C,fout,.flatten.and.numeric(countReadPairs),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize, sampleSheet, cellBarcodeList ,.flatten.and.numeric(isPairedEnd), as.numeric(generate.scRNA.BAM), ifelse(BAM_is_ScRNA_Fastq, 4, ifelse(BAM_is_ScRNA_BAM, 5,3)), as.numeric(BAM_is_Rerun_Persample), ifelse(is.null(umi.cutoff), -1, umi.cutoff),sep=.R_param_splitor)
+    cmd <- paste("readSummary",ann,files_C,fout,.flatten.and.numeric(countReadPairs),minFragLength,maxFragLength,0,as.numeric(allowMultiOverlap),as.numeric(useMetaFeatures),nthreads,as.numeric(isGTFAnnotationFile),strandSpecific,reportReads_C,as.numeric(requireBothEndsMapped),as.numeric(!countChimericFragments),as.numeric(checkFragLength),GTF.featureType,GTF.attrType,minMQS,as.numeric(countMultiMappingReads),chrAliases_C," ",as.numeric(FALSE),14,readExtension5,readExtension3,minOverlap,split_C,read2pos_C," ",as.numeric(ignoreDup),as.numeric(!autosort),as.numeric(fraction),as.numeric(largestOverlap),PE_orientation,as.numeric(juncCounts),genome_C,maxMOp,0,as.numeric(fracOverlap),as.character(tmpDir),"0",as.numeric(byReadGroup),as.numeric(isLongRead),as.numeric(verbose),as.numeric(fracOverlapFeature), as.numeric(do_detection_calls), as.numeric(max_missing_bases_in_read), as.numeric(max_missing_bases_in_feature), as.numeric(primaryOnly), reportReadsPath, GTF.attrType.extra_str, annot.screen.output, readShiftType,readShiftSize, sampleSheet, cellBarcodeList ,.flatten.and.numeric(isPairedEnd), as.numeric(generate.scRNA.BAM), ifelse(BAM_is_ScRNA_Fastq, 4, ifelse(BAM_is_ScRNA_BAM, 5,3)), as.numeric(BAM_is_Rerun_Persample), ifelse(is.null(umi.cutoff), -1, umi.cutoff,ifelse(Is_Dual_Index,"Dual-Index","Single-Index")),sep=.R_param_splitor)
     #print(cmd)
     n <- length(unlist(strsplit(cmd, .R_param_splitor )))
     C_args <- .C("R_readSummary_wrapper",as.integer(n),as.character(cmd),PACKAGE="Rsubread")

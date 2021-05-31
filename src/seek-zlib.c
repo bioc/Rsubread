@@ -757,7 +757,8 @@ int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char
 	int reclen=0;
 	parallel_gzip_writer_t * outR1fp = outfps[0];
 	parallel_gzip_writer_t * outI1fp = outfps[1];
-	parallel_gzip_writer_t * outR2fp = outfps[2];
+	parallel_gzip_writer_t * outI2fp = outfps[2];
+	parallel_gzip_writer_t * outR2fp = outfps[3];
 
 	memcpy(&reclen, bambin,4);
 	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0;
@@ -771,13 +772,17 @@ int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char
 	parallel_gzip_writer_add_text(outR2fp,"@",1,thread_no);
 	parallel_gzip_writer_add_text(outR1fp,"@",1,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"@",1,thread_no);
+	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,"@",1,thread_no);
 	char * readname = bambin+36;
 	parallel_gzip_writer_add_text(outR1fp,readname, 12,thread_no);
 	parallel_gzip_writer_add_text(outR2fp,readname, 12,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,readname, 12,thread_no);
+	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,readname, 12,thread_no);
+
 	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
 	parallel_gzip_writer_add_text(outR2fp,"\n",1,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
+	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,"\n",1,thread_no);
 
 	char * R1seq = bambin+36+13;
 	int R1len = 0;
@@ -789,13 +794,26 @@ int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char
 	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
 
 	char * I1seq = R1qual + R1len + 1;
-	int I1len = 0;
-	for(I1len=0; I1seq[I1len] && I1seq[I1len]!='|' ;I1len++);
-	char * I1qual = I1seq + I1len + 1;
+	int I1I2len = 0;
+	for(I1I2len=0; I1seq[I1I2len] && I1seq[I1I2len]!='|' ;I1I2len++);
+	int I1len = I1I2len;
+	if(outI2fp) I1len /=2;
+
+	char * I2seq = I1seq + I1len;
+	char * I1qual = I1seq + I1I2len + 1;
+	char * I2qual = I1seq + I1I2len + I1len + 1;
+
 	parallel_gzip_writer_add_text(outI1fp,I1seq, I1len,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"\n+\n",3,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,I1qual, I1len,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
+
+	if(outI2fp){
+		parallel_gzip_writer_add_text(outI2fp,I2seq, I1len,thread_no);
+		parallel_gzip_writer_add_text(outI2fp,"\n+\n",3,thread_no);
+		parallel_gzip_writer_add_text(outI2fp,I2qual, I1len,thread_no);
+		parallel_gzip_writer_add_text(outI2fp,"\n",1,thread_no);
+	}
 
 	char oseq[l_seq+1];
 	int seqbase = 36+l_read_name+n_cigar_ops*4;
