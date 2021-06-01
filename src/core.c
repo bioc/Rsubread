@@ -3697,6 +3697,17 @@ int read_chunk_circles(global_context_t *global_context)
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			// the indexes will be destroyed in destroy_global_context
 			break;
+		if(1){
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			SUBREADprintf("WARNING: EARLY BREAK!\n");
+			break;
+		}
 		
 		clean_context_after_chunk(global_context);
 		chunk_no++;
@@ -4058,6 +4069,15 @@ int load_global_context(global_context_t * context)
 		char * remove_beighbour = getenv("CC_REMOVE_NEIGHBOUR");
 		if(remove_beighbour) context -> config.do_remove_neighbour_for_scRNA = remove_beighbour[0]-'0';
 		if(reads_per_chunk) context -> config.reads_per_chunk = atoi(reads_per_chunk);
+		if(1){
+			SUBREADprintf("WARNING: small-chunk!\n");
+			SUBREADprintf("WARNING: small-chunk!\n");
+			SUBREADprintf("WARNING: small-chunk!\n");
+			SUBREADprintf("WARNING: small-chunk!\n");
+			SUBREADprintf("WARNING: small-chunk!\n");
+			SUBREADprintf("WARNING: small-chunk!\n");
+			context -> config.reads_per_chunk /= 5;
+		}
 	}
 	print_in_box(80,0,0,"Check the input reads.");
 	subread_init_lock(&context->input_reads.input_lock);

@@ -3855,7 +3855,8 @@ int scRNA_get_sample_id(fc_thread_global_context_t *global_context, char * sbc, 
 			int sample_no = lane_and_barcode[1]-(char*)NULL;
 			char * knownbar = lane_and_barcode[2];
 			if(lane_and_barcode[3]){
-				int hd = hamming_dist_ATGC_max2( sbc, knownbar );
+				int hd = hamming_dist_ATGC_max3( sbc, knownbar );
+				if(hd<=3) return sample_no;
 			}else{
 				int hd = hamming_dist_ATGC_max2( sbc, knownbar );
 				if(hd<=2) return sample_no;
@@ -4116,6 +4117,7 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 		global_context -> scRNA_UMI_length = umi_end_pos;
 	}
 
+	//SUBREADprintf("QQVT 01 %s   THR %d  SPID=%d\n", read_name, thread_context -> thread_id, sample_id);
 	if(sample_id>0){
 		if(step==0){
 			thread_context -> scRNA_reads_per_sample[sample_id-1] ++;
@@ -4137,7 +4139,7 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 						pthread_spin_lock(sample_bam_2fps[5]);
 						parallel_gzip_writer_flush(gz3fps[0], thread_context -> thread_id);
 						parallel_gzip_writer_flush(gz3fps[1], thread_context -> thread_id);
-						if(gz3fps[2]) parallel_gzip_zip_texts(gz3fps[2], thread_context -> thread_id, 0);
+						if(gz3fps[2]) parallel_gzip_writer_flush(gz3fps[2], thread_context -> thread_id);
 						parallel_gzip_writer_flush(gz3fps[3], thread_context -> thread_id);
 						pthread_spin_unlock(sample_bam_2fps[5]);
 					}
@@ -6730,6 +6732,7 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 			wtrptr[4]=gzipR2fq;
 			wtrptr[5]=gzfp_lock;
 			HashTablePut(fp_tab, NULL+x1+1 , wtrptr);
+				SUBREADprintf("QQVT 01 %d   %p %p\n", x1, gzipI1fq,gzipI2fq);
 			break;
 		}
 	}
@@ -8550,7 +8553,7 @@ int readSummary(int argc,char *argv[]){
 	if(argc>62) umi_cutoff = atof(argv[62]);
 	else umi_cutoff = -1;
 
-	if(argc>63) is_dual_index = strcmp(argv[63],"Dual-Index")==0;
+	if(argc>63) is_dual_index = (strcmp(argv[63],"Dual-Index")==0);
 	else is_dual_index =0; 
 
 	if(read_shift_size<0){
@@ -9604,7 +9607,7 @@ int feature_count_main(int argc, char ** argv)
 	if(scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ) Rargv[60] = "4";
 	if(scRNA_input_mode == GENE_INPUT_SCRNA_BAM) Rargv[60] = "5";
 	Rargv[61] = "0";
-	Rargv[62] = "0";
+	Rargv[62] = "-1";
 	Rargv[63] = "Single-Index";
 
 	int retvalue = -1;

@@ -784,6 +784,19 @@ int is_ATGC(char c){
 	return c=='A'||c=='C'||c=='G'||c=='T'||c=='N';
 }
 
+int hamming_dist_ATGC_max3(char* s1, char* s2 ){
+	int xx,ret=0;
+	for(xx=0;;xx++){
+		char nch1 = s1[xx];
+		char nch2 = s2[xx];
+		if(is_ATGC(nch1) && is_ATGC(nch2)){
+			ret += nch1==nch2;
+			if(xx -ret >3) return 999;
+		}else break;
+	}
+	return xx-ret;
+}
+
 int hamming_dist_ATGC_max2(char* s1, char* s2 ){
 	int xx,ret=0;
 	for(xx=0;;xx++){
