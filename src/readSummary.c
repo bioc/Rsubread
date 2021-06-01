@@ -6608,7 +6608,7 @@ void scRNA_convert_ss_to_arr( void * key, void * hashed_obj, HashTable * tab ){
 		push_arr[0] = NULL + lane_sample_int; 
 		push_arr[1] = NULL + global_context -> scRNA_sample_id_to_name -> numOfElements;
 		push_arr[2] = sbc_lane_sample[1]; // Sample Barcode
-		push_arr[3] = NULL + (strlen(sbc_lane_sample[1])>12);
+		push_arr[3] = NULL + (sbc_lane_sample[1]!=NULL && strlen(sbc_lane_sample[1])>12);
 
 		int line_no_in_sheet = sbc_lane_sample[2] - (char*)NULL;
 		HashTablePut(global_context -> scRNA_lineno1B_to_sampleno1B_tab , NULL+line_no_in_sheet, NULL + global_context -> scRNA_sample_id_to_name -> numOfElements);
@@ -6732,7 +6732,6 @@ void scRNA_sample_SamBam_writers_new_files(void *k, void *v, HashTable * tab){
 			wtrptr[4]=gzipR2fq;
 			wtrptr[5]=gzfp_lock;
 			HashTablePut(fp_tab, NULL+x1+1 , wtrptr);
-				SUBREADprintf("QQVT 01 %d   %p %p\n", x1, gzipI1fq,gzipI2fq);
 			break;
 		}
 	}
