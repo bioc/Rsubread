@@ -43,6 +43,8 @@ HashTable * input_BLC_parse_SampleSheet(char * fname);
 // It returns NULL if no list is found
 // The arraylist can be simply destroyed and all contents are deallocated automatically
 ArrayList * input_BLC_parse_CellBarcodes(char * fname);
+int hamming_dist_ATGC_max1_2p(char* s1, char* s2 );
+int hamming_dist_ATGC_max1(char* s1, char* s2 );
 int hamming_dist_ATGC_max2(char* s1, char* s2 );
 int hamming_dist_ATGC_max3(char* s1, char* s2 );
 

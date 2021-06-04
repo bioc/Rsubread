@@ -32,13 +32,13 @@
   index.names <- c()
   sample.names <- c()
   index.seq <- c()
-  is_dual_index <- FALSE
+  is_dual_index <- c() 
   for(cli in 1:nrow(nametab)){
     if(nametab$InputDirectory[cli]!=dirname)next
     if((!is.na(sample.name)) && as.character(nametab$SampleName[cli])!=sample.name)next
     seqs <- .convert.sample_index.id.to.seq(nametab$IndexSetName[cli])
     for(seq in seqs){
-      if(nchar(seq)>12) is_dual_index <- TRUE
+      is_dual_index <- c(is_dual_index , nchar(seq)>12)
       lanes <-c(lanes, nametab$Lane[cli])
       index.names <-c(index.names, nametab$IndexSetName[cli])
       sample.names <- c(sample.names, as.character(nametab$SampleName[cli]))
@@ -50,7 +50,8 @@
   lines <- paste( sdf$Lane, sdf$Sample_ID, sdf$Sample_Name, sdf$index, sdf$Sample_Project ,sep=",")
   writeLines(c("EMFileVersion,4","[data]","Lane,Sample_ID,Sample_Name,index,Sample_Project",lines), fileConn)
   close(fileConn)
-  return(is_dual_index)
+  if(any( is_dual_index != is_dual_index [1] )) stop("Dual-index and single-index samples cannot be mixed in the sample data-frame.")
+  return(is_dual_index[1])
 }
 
 .convert.sample_index.id.to.seq <- function(spid){
