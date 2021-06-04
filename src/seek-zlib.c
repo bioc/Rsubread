@@ -665,12 +665,25 @@ void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_fil
 	pzwtr -> CRC32 = crc32(0, NULL, 0);
 }
 
-void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no){
-	parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;
-	if(tlen + tho -> in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE){
-		SUBREADprintf("Insufficient gzip buffer.\n");
-		return;
+#define CHECK_SIZE parallel_gzip_writer_thread_t *tho = pzwtr -> thread_objs + thread_no;\
+  if(tlen + tho -> in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE){\
+    SUBREADprintf("Insufficient gzip buffer.\n"); return; \
+  }
+
+void parallel_gzip_writer_add_text_qual(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no){
+	CHECK_SIZE ;
+
+	int ii;
+	for(ii=0; ii<tlen; ii++){
+		int nch = text[ii];
+		if(nch >'/') nch--;
+		tho -> in_buffer[tho -> in_buffer_used +ii] = nch;
 	}
+	tho -> in_buffer_used += tlen;
+}
+void parallel_gzip_writer_add_text(parallel_gzip_writer_t * pzwtr, char * text, int tlen, int thread_no){
+	CHECK_SIZE ;
+
 	memcpy(tho -> in_buffer + tho -> in_buffer_used, text, tlen);
 	tho -> in_buffer_used += tlen;
 }
@@ -790,7 +803,7 @@ int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char
 	char * R1qual = R1seq + R1len + 1;
 	parallel_gzip_writer_add_text(outR1fp,R1seq, R1len,thread_no);
 	parallel_gzip_writer_add_text(outR1fp,"\n+\n",3,thread_no);
-	parallel_gzip_writer_add_text(outR1fp,R1qual, R1len,thread_no);
+	parallel_gzip_writer_add_text_qual(outR1fp,R1qual, R1len,thread_no);
 	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
 
 	char * I1seq = R1qual + R1len + 1;
@@ -805,13 +818,13 @@ int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char
 
 	parallel_gzip_writer_add_text(outI1fp,I1seq, I1len,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"\n+\n",3,thread_no);
-	parallel_gzip_writer_add_text(outI1fp,I1qual, I1len,thread_no);
+	parallel_gzip_writer_add_text_qual(outI1fp,I1qual, I1len,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
 
 	if(outI2fp){
 		parallel_gzip_writer_add_text(outI2fp,I2seq, I1len,thread_no);
 		parallel_gzip_writer_add_text(outI2fp,"\n+\n",3,thread_no);
-		parallel_gzip_writer_add_text(outI2fp,I2qual, I1len,thread_no);
+		parallel_gzip_writer_add_text_qual(outI2fp,I2qual, I1len,thread_no);
 		parallel_gzip_writer_add_text(outI2fp,"\n",1,thread_no);
 	}
 

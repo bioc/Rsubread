@@ -811,7 +811,7 @@ int hamming_dist_ATGC_max1_2p(char* s1, char* s2 ){
 			}
 		}else break;
 	}
-	if(p1_mm + p2_mm>0) return 999;
+	if(p1_mm + p2_mm>2) return 999;
 	return p1_mm+p2_mm;
 }
 

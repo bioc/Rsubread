@@ -3859,7 +3859,7 @@ int scRNA_get_sample_id(fc_thread_global_context_t *global_context, char * sbc, 
 			char * knownbar = lane_and_barcode[2];
 			if(lane_and_barcode[3]){
 				int hd = hamming_dist_ATGC_max1_2p( sbc, knownbar );
-				if(hd<=1) return sample_no;
+				if(hd<=2) return sample_no;
 			}else{
 				int hd = hamming_dist_ATGC_max1( sbc, knownbar );
 				if(hd<=1) return sample_no;
