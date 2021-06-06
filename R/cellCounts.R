@@ -1214,6 +1214,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
   
     for(dirname in dirs) .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx") # check files before the slow mapping/counting step.
 
+    dirno <- 1
     for(dirname in dirs){
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
@@ -1250,7 +1251,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         }else if(aligner=="subjunc"){
           subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
-        .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index))
+        .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
+        dirno <- dirno +1
         raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)

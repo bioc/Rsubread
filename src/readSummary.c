@@ -8320,7 +8320,7 @@ int readSummary(int argc,char *argv[]){
 	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping ,is_scRNA_BAM_FQ_out_generated, scRNA_rerun_on_persample_BAM;
 	char * isPEassign,  *is_paired_end_reads_expected;
 
-	int  isGTF, n_input_files=0,is_dual_index;
+	int  isGTF, n_input_files=0,is_dual_index, scrna_total_BAM_no;
 	char * alias_file_name = NULL, * cmd_rebuilt = NULL, * Rpath = NULL;
 
 	int isMultiOverlapAllowed, isGeneLevel;
@@ -8571,6 +8571,9 @@ int readSummary(int argc,char *argv[]){
 	if(argc>63) is_dual_index = (strcmp(argv[63],"Dual-Index")==0);
 	else is_dual_index =0; 
 
+	if(argc>64) scrna_total_BAM_no = atoi(argv[64]);
+	else scrna_total_BAM_no =0; 
+
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
 		return -1;
@@ -8766,7 +8769,7 @@ int readSummary(int argc,char *argv[]){
 				if(2==umfpi) ftype = "I1";
 				if(3==umfpi) ftype = "I2";
 				if(4==umfpi) ftype = "R2";
-				sprintf(fname, "UmassignedReads_%s.fastq.gz",ftype);
+				sprintf(fname, "UmassignedReads%03d_%s.fastq.gz", scrna_total_BAM_no, ftype);
 				parallel_gzip_writer_init(global_context.scRNA_fastq_unassigned_writer+(umfpi-1), fname, global_context.thread_number);
 			}
 			pthread_spin_init(&global_context.scRNA_fastq_unassigned_lock, PTHREAD_PROCESS_PRIVATE);
