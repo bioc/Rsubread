@@ -799,7 +799,10 @@ int hamming_dist_ATGC_max3(char* s1, char* s2 ){
 
 
 int hamming_dist_ATGC_max1_2p(char* s1, char* s2 ){
-	int xx,sl=strlen(s1)/2;
+	int xx,sl=0;
+	while(is_ATGC(s1[sl]) && is_ATGC(s2[sl])) sl++;
+	sl /=2;
+
 	int p1_mm=0, p2_mm=0;
 	for(xx=0;;xx++){
 		char nch1 = s1[xx];
@@ -811,7 +814,7 @@ int hamming_dist_ATGC_max1_2p(char* s1, char* s2 ){
 			}
 		}else break;
 	}
-	if(p1_mm + p2_mm>2) return 999;
+	if(p1_mm >1 || p2_mm>1 ) return 999;
 	return p1_mm+p2_mm;
 }
 
