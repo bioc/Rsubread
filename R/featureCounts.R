@@ -21,15 +21,15 @@
 }
 
 .check_and_NormPath<- function(files, mustWork=F, opt=NULL){
-  if(is.na(files) || is.null(files) || class(files) != "character"){
+  if(any(is.na(files)) || any(is.null(files)) || any(class(files)) != "character"){
     if( is.null(opt) ){
-      if(is.na(files) || is.null(files)){
+      if(any(is.na(files)) || any(is.null(files))){
         stop("Error: the file name is NA or NULL.")
       }else{
         stop(paste0("Error: the file name must be a character vector. The current input is ",class(files)))
       }
     }else{
-      if(is.na(files) || is.null(files)){
+      if(any(is.na(files)) || any(is.null(files))){
         stop(paste0("Error: the argument to '",opt,"' is NA or NULL."))
       }else{
         stop(paste0("Error: the argument to '",opt,"' must be a character vector. The current input is ",class(files)))

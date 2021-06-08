@@ -8769,7 +8769,7 @@ int readSummary(int argc,char *argv[]){
 				if(2==umfpi) ftype = "I1";
 				if(3==umfpi) ftype = "I2";
 				if(4==umfpi) ftype = "R2";
-				sprintf(fname, "UmassignedReads%03d_%s.fastq.gz", scrna_total_BAM_no, ftype);
+				sprintf(fname, "UnassignedReads%03d_%s.fastq.gz", scrna_total_BAM_no, ftype);
 				parallel_gzip_writer_init(global_context.scRNA_fastq_unassigned_writer+(umfpi-1), fname, global_context.thread_number);
 			}
 			pthread_spin_init(&global_context.scRNA_fastq_unassigned_lock, PTHREAD_PROCESS_PRIVATE);
