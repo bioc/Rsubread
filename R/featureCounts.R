@@ -21,7 +21,7 @@
 }
 
 .check_and_NormPath<- function(files, mustWork=F, opt=NULL){
-  if(any(is.na(files)) || any(is.null(files)) || any(class(files)) != "character"){
+  if(any(is.na(files)) || any(is.null(files)) || any(class(files) != "character")){
     if( is.null(opt) ){
       if(any(is.na(files)) || any(is.null(files))){
         stop("Error: the file name is NA or NULL.")
