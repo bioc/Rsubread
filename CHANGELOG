@@ -1,3 +1,6 @@
+12 Jun 2021 - 2.7.2
+(1) Fixed a bug in featureCounts that cannot process multiple BAM files when "_R_CHECK_LENGTH_1_CONDITION_" is set to "verbose".
+
 24 May 2021 - 2.7.1
 (1) Fixed a bug in cellCounts reporting wrong "assigned cell number" in the summarisation data-frame, and fixed a bug in cellCounts that generated no results when the sample names are numbers.
 
