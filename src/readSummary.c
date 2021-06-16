@@ -4129,7 +4129,7 @@ void add_scRNA_read_tota1_no( fc_thread_global_context_t * global_context,  fc_t
 	if(step == 0){
 		if(global_context -> is_scRNA_BAM_FQ_out_generated){
 			void * pps[6];
-			void ** sample_bam_2fps = &pps;
+			void ** sample_bam_2fps = (void**)&pps;
 
 			if(sample_id<=0){
 				pps[0]=NULL;
