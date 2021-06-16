@@ -1230,7 +1230,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         generate.scRNA.BAM <- FALSE 
         if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
         for(samplename in unique.samples){
-          .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1, samplename)
+          is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1, samplename)
           one.bam.name <- paste0(samplename, ".bam")
           .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM, BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
           one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, strandSpecific=1, ...)
