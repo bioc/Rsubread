@@ -8761,18 +8761,20 @@ int readSummary(int argc,char *argv[]){
 			global_context.scRNA_sample_sheet_table ->appendix3 = global_context.scRNA_sample_id_to_name;
 			HashTableIteration( global_context.scRNA_sample_sheet_table, scRNA_sample_SamBam_writers_new_files);
 
-			int umfpi;
-			for(umfpi=1; umfpi<=4; umfpi++){
-				char fname [MAX_FILE_NAME_LENGTH+20];
-				char * ftype = "R1";
-				if(3==umfpi && ! global_context.scRNA_dual_index) continue;
-				if(2==umfpi) ftype = "I1";
-				if(3==umfpi) ftype = "I2";
-				if(4==umfpi) ftype = "R2";
-				sprintf(fname, "UnassignedReads%03d_%s.fastq.gz", scrna_total_BAM_no, ftype);
-				parallel_gzip_writer_init(global_context.scRNA_fastq_unassigned_writer+(umfpi-1), fname, global_context.thread_number);
+			if(global_context.scRNA_input_mode == GENE_INPUT_BCL || global_context.scRNA_input_mode == GENE_INPUT_SCRNA_BAM){
+				int umfpi;
+				for(umfpi=1; umfpi<=4; umfpi++){
+					char fname [MAX_FILE_NAME_LENGTH+20];
+					char * ftype = "R1";
+					if(3==umfpi && ! global_context.scRNA_dual_index) continue;
+					if(2==umfpi) ftype = "I1";
+					if(3==umfpi) ftype = "I2";
+					if(4==umfpi) ftype = "R2";
+					sprintf(fname, "UnassignedReads%03d_%s.fastq.gz", scrna_total_BAM_no, ftype);
+					parallel_gzip_writer_init(global_context.scRNA_fastq_unassigned_writer+(umfpi-1), fname, global_context.thread_number);
+				}
+				pthread_spin_init(&global_context.scRNA_fastq_unassigned_lock, PTHREAD_PROCESS_PRIVATE);
 			}
-			pthread_spin_init(&global_context.scRNA_fastq_unassigned_lock, PTHREAD_PROCESS_PRIVATE);
 		}
 
 		if(global_context.do_junction_counting){
@@ -8945,7 +8947,10 @@ int readSummary(int argc,char *argv[]){
 			HashTableDestroy(global_context.scRNA_sample_BAM_writers);
 			pthread_spin_destroy(&global_context.scRNA_fastq_unassigned_lock);
 			int umfpi;
-			for(umfpi = 0; umfpi < 4; umfpi++) if(umfpi!=2 || global_context.scRNA_dual_index) parallel_gzip_writer_close(global_context.scRNA_fastq_unassigned_writer+umfpi);
+			if(global_context.scRNA_input_mode == GENE_INPUT_BCL || global_context.scRNA_input_mode == GENE_INPUT_SCRNA_BAM)
+				for(umfpi = 0; umfpi < 4; umfpi++)
+					if(umfpi!=2 || global_context.scRNA_dual_index)
+						parallel_gzip_writer_close(global_context.scRNA_fastq_unassigned_writer+umfpi);
 		}
 	}
 	if(global_context.scRNA_cell_barcodes_array){
