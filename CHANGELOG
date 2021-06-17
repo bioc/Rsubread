@@ -1,3 +1,7 @@
+18 Jun 2021 - 2.6.2
+(1) Fixed a bug in featureCounts: when there are multiple input BAM files and when R is run on the mode that disallows a Boolean vector as the condition of "if", the program will terminate with an error message.
+(2) Added support to dual-index samples in cellCounts and added output for reads that are not assigned to any sample in demultiplexing. 
+
 27 May 2021 - 2.6.1
 (1) Fixed two bugs in cellCounts: (I) the number of assigned reads reported in the "sample.info" data-frame was wrong; (II) cellCounts could not handle the sample names that are purely digits, eg "1001". 
 
