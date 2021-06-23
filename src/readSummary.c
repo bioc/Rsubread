@@ -1796,6 +1796,7 @@ void disallocate_RG_tables(void * pt){
 
 
 void process_pairer_reset(void * pairer_vp){
+//	SUBREADprintf("RESET COUNTERS\n");
 	SAM_pairer_context_t * pairer = (SAM_pairer_context_t *) pairer_vp;
 	fc_thread_global_context_t * global_context = (fc_thread_global_context_t * )pairer -> appendix1;
 	if(global_context -> sambam_chro_table) free(global_context -> sambam_chro_table);
@@ -7076,10 +7077,9 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	if(global_context -> use_stdin_file) sprintf(new_fn, "<%s",  global_context -> input_file_name );
 	else sprintf(new_fn, "%s",  global_context -> input_file_name );
 
-	//#warning " ===================== REMOVE ' 0 && ' FROM NEXT LINE !!!!!! =================="
-	SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, !( global_context -> is_read_details_out == FILE_TYPE_BAM ||global_context -> is_read_details_out == FILE_TYPE_SAM ) , !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort, global_context -> assign_reads_to_RG ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context,  global_context -> long_read_minimum_length);
+	int pairer_error = SAM_pairer_create(&global_context -> read_pairer, global_context -> thread_number , global_context -> max_BAM_header_size/1024/1024+2, !global_context-> is_SAM_file, !( global_context -> is_read_details_out == FILE_TYPE_BAM ||global_context -> is_read_details_out == FILE_TYPE_SAM ) , !global_context -> is_paired_end_mode_assign, global_context ->is_paired_end_mode_assign && global_context -> do_not_sort, global_context -> assign_reads_to_RG ,0, new_fn, process_pairer_reset, process_pairer_header, process_pairer_output, rand_prefix, global_context,  global_context -> long_read_minimum_length);
 
-	return 0;
+	return pairer_error;
 }
 
 void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_context)
@@ -8728,7 +8728,7 @@ int readSummary(int argc,char *argv[]){
 
 	for(x1 = 0;;x1++){
 		int orininal_isPE = global_context.is_paired_end_mode_assign;
-		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full) break;
+		if(next_fn==NULL || strlen(next_fn)<1 || global_context.disk_is_full || ret_int) break;
 		int this_file_isPEassign = isPEassign[1]?isPEassign[x1] == '1' :(isPEassign[0]=='1');
 		int this_file_isPEexpected = is_paired_end_reads_expected[1]?is_paired_end_reads_expected[x1]=='1' :(is_paired_end_reads_expected[0]=='1');
 		global_context.is_paired_end_reads_expected = this_file_isPEexpected;
@@ -8870,7 +8870,7 @@ int readSummary(int argc,char *argv[]){
 
 	if(global_context.is_input_bad_format){
 	//	SUBREADprintf("\nEEROR: The program has to terminate and no counting file is generated.\n\n");
-	}else if(!global_context.disk_is_full){
+	}else if(!(global_context.disk_is_full||ret_int)){
 		print_in_box(80,0,0,"Write the final count table.");
 		if(isGeneLevel){
 			char ** sorted_extra_columns = NULL;
@@ -8889,12 +8889,12 @@ int readSummary(int argc,char *argv[]){
 		} else
 			fc_write_final_results(&global_context, argv[3], nexons, table_columns, table_column_names, loaded_features, isCVersion);
 	}
-	if(global_context.do_junction_counting && global_context.is_input_bad_format == 0 && !global_context.disk_is_full){
+	if(global_context.do_junction_counting && global_context.is_input_bad_format == 0 && !(ret_int||global_context.disk_is_full)){
 		print_in_box(80,0,0,"Write the junction count table.");
 		fc_write_final_junctions(&global_context, argv[3], table_column_names, junction_global_table_list, splicing_global_table_list);
 	}
 
-	if(global_context.is_input_bad_format == 0 && !global_context.disk_is_full){
+	if(global_context.is_input_bad_format == 0 && !(ret_int||global_context.disk_is_full)){
 		print_in_box(80,0,0,"Write the read assignment summary.");
 		fc_write_final_counts(&global_context, argv[3], table_column_names,  read_counters, isCVersion);
 	}
@@ -9091,7 +9091,8 @@ int readSummary_single_file(fc_thread_global_context_t * global_context, read_co
 	// Open the SAM/BAM file
 	// Nothing is done if the file does not exist.
 
-	fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
+	int thread_error = fc_thread_start_threads(global_context, nexons, geneid, chr, start, stop, sorted_strand, anno_chr_2ch, anno_chrs, anno_chr_head, block_end_index, block_min_start , block_max_end, read_length);
+	if(thread_error) return -1;
 	fc_thread_wait_threads(global_context);
 	if(global_context -> is_paired_end_reads_expected && !global_context -> any_reads_are_PE){
 		SUBREADprintf("ERROR: No paired-end reads were detected in paired-end read library : %s\n", global_context -> input_file_name);

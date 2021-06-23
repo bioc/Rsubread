@@ -805,7 +805,7 @@
 }
 
 .dataURL <- function(uri){
-    sprintf("http://bioinf.wehi.edu.au/cellCounts/cell-barcodes/%s",uri)
+    sprintf("http://shilab-bioinformatics.github.io/cellCounts/Barcodes/%s",uri)
 }
 
 .find_best_cellbarcode <- function( input.directory, sample.sheet=NULL, input.mode="bcl"){
@@ -835,7 +835,8 @@
         }else{
           cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
         }
-        if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
+        # sample index isn't tested anymore
+        # if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
         if(cell.good.rate > 0.6){
             cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
             return(listfile)
@@ -1248,7 +1249,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         generate.scRNA.BAM <- TRUE
         .write.tmp.parameters(list(isBCLinput=TRUE))
         if(aligner=="align"){
-          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation=TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, ...)
+          drna.type <- "rna"
+          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, type=drna.type, useAnnotation=TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, ...)
         }else if(aligner=="subjunc"){
           subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
@@ -1336,7 +1338,26 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       }
     }else{
       .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
-      align(index, combined.fastq.names, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, nBestLocations = nBestLocations, unique=unique.mapping)
+
+      drna.type <- "rna"
+      max.MM <- 3
+      
+
+      if(F)for(iii in 1:17){
+         print("WARNING: USING DNA MODE align")
+         drna.type <- "dna"
+      }
+
+      if(F)for(iii in 1:17){
+         print("WARNING: USING Max.MM = 10 align")
+         max.MM <- 10
+      }
+
+      if(aligner == "align"){
+        align(index, combined.fastq.names, maxMismatches=max.MM, type=drna.type, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, nBestLocations = nBestLocations, unique=unique.mapping)
+      }else if(aligner=="subjunc"){
+        subjunc(index, combined.fastq.names, maxMismatches=max.MM, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, nBestLocations = nBestLocations, unique=unique.mapping)
+      }
       bam.for.FC <- temp.file.prefix
       generate.scRNA.BAM <- TRUE
       .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)

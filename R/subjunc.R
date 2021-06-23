@@ -27,7 +27,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   #out.table.cols <-gsub(" ", ".", out.table.cols)
 
   readfile1 <- as.character(readfile1)
-  readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
+  if(!isScRNAFastqinput)readfile1 <- .check_and_NormPath(readfile1, mustWork=TRUE, opt="readfile1")
   output_file <- .check_and_NormPath(output_file, mustWork=FALSE, opt="output_file")
   index <- .check_and_NormPath(index, mustWork=FALSE, opt="index")
   if((!is.null(annot.ext)) && is.character(annot.ext)) annot.ext = .check_and_NormPath(annot.ext, mustWork=TRUE, opt="annot.ext")
@@ -43,7 +43,7 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
       stop("The number of file names for the first reads is different from the number of file names for the second reads.")
   }
 
-  if(!all(file.exists(readfile1)))
+  if((!isScRNAFastqinput) && !all(file.exists(readfile1)))
     stop("One or more input files cannot be found (readfile1).")
 
   if(!is.null(readfile2)){
@@ -67,6 +67,9 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
   if(isBCLinput)
     opt <- paste(opt,"--BCLinput",sep=.R_param_splitor)
 	
+  if(isScRNAFastqinput)
+    opt <- paste(opt,"--scRNA_FQinput",sep=.R_param_splitor)
+
   opt <- paste(opt,"-n",nsubreads,"-m",TH1,"-p",TH2,"-M",maxMismatches,"-T",nthreads,"-I",indels,sep=.R_param_splitor)
 
   if(complexIndels)
