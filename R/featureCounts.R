@@ -9,10 +9,10 @@
 }
 
 .is.64bit.system <- function(){
-    if(grepl("[-_]64",Sys.info()[["machine"]]))return TRUE
-    if(grepl("aarch64",Sys.info()[["machine"]]))return TRUE
+    if(grepl("[-_]64",Sys.info()[["machine"]]))return(TRUE)
+    if(grepl("aarch64",Sys.info()[["machine"]]))return(TRUE)
     
-    return FALSE
+    return(FALSE)
 }
 
 .check_string_param <- function(argu, opt=NULL){
