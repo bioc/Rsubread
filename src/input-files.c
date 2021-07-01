@@ -2883,7 +2883,7 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
 		//SUBREADprintf("FETCHED BLOCK DECOMP=%d FROM COMP=%d\n", have, used_BAM);
 	} else {
 		if(ret == -5){
-			SUBREADprintf("Cannot parse the input BAM file. If the BAM file contains long reads, please run featureCounts on the long-read mode.\n");
+			SUBREADprintf("Cannot parse the input BAM file.\n");
 		}else{
 			SUBREADprintf("GZIP ERROR:%d\n", ret);
 		}

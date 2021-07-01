@@ -830,11 +830,9 @@
         sample.good.rate <- barcode_res[2]/barcode_res[1]
         cell.good.rate <- barcode_res[3]/barcode_res[1]
         max.cell.good <- max(max.cell.good, cell.good.rate)
-        if(input.mode == "fastq" || input.mode == "bam"){
-          cat(sprintf("Cell supporting rate : %.1f%%.\n", cell.good.rate*100.))
-        }else{
-          cat(sprintf("Sample supporting rate : %.1f%% ; cell supporting rate : %.1f%%.\n", sample.good.rate*100., cell.good.rate*100.))
-        }
+
+        cat(sprintf("Cell barcode supporting rate : %.1f%%.\n", cell.good.rate*100.))
+
         # sample index isn't tested anymore
         # if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
         if(cell.good.rate > 0.6){
