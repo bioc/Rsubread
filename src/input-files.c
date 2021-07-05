@@ -273,7 +273,7 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 			#ifdef __MINGW32__
 			if(ch == '\r') continue;
 			#endif
-			if(ch == '\n' || ch == EOF) break;
+			if(ch == '\n' || ch == EOF || ch == 255) break;
 			if(ret < max_read_len-1)
 				buff[ret++] = toupper(ch);
 		}
@@ -286,7 +286,7 @@ int read_line(int max_read_len, FILE * fp, char * buff, int must_upper)
 			#ifdef __MINGW32__
 			if(ch == '\r') continue;
 			#endif
-			if (ch == '\n' || ch == EOF) break;
+			if (ch == '\n' || ch == EOF || ch == 255) break;
 			if(ret < max_read_len-1)
 				buff[ret++] = ch;
 		}
@@ -549,7 +549,7 @@ int geinput_next_char(gene_input_t * input)
 		while (1)
 		{
 			char nch = fgetc((FILE *)input->input_fp);
-			if (nch <0 && feof((FILE *)input->input_fp))
+			if ((nch <0 || nch == 255) && feof((FILE *)input->input_fp))
 				return -2;
 			else if (nch < 0 || nch > 126)SUBREADprintf("\nUnrecognised char = #%d\n", nch);
 

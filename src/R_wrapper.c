@@ -69,6 +69,7 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args, int is_
     pthread_attr_destroy(&thread_attr);
     msgqu_destroy();
   }else{
+    //fprintf(stderr,"RUN_WITH_THR N=%d, ARGS=%p\n", n, args);
     func(n, args);
   }
 }

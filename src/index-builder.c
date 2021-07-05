@@ -359,12 +359,12 @@ int build_gene_index(const char index_prefix [], char ** chro_files, int chro_fi
 			for (i=0; i<GENE_SLIDING_STEP; i++)
 			{
 				next_char = geinput_next_char(ginp);
-				if(next_char < 0) {
+				if(next_char < 0 || next_char >= 253) {
 					if( 0 == for_measure_buckets ) gvindex_set(&value_array_index, offset - (IS_COLOR_SPACE?0:0), array_int_key, padding_around_contigs);
 
-					if (next_char == -1) status = NEXT_READ;
-					if (next_char == -2) status = NEXT_FILE;
-					if (next_char == -3) return 0;
+					if (next_char == -1 || next_char == 255) status = NEXT_READ;
+					if (next_char == -2 || next_char == 254) status = NEXT_FILE;
+					if (next_char == -3 || next_char == 253) return 0;
 					break;
 				}
 				//SUBREADprintf("NEXT_CH=%c\n", next_char);
@@ -599,11 +599,11 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 			for (i=0; i<GENE_SLIDING_STEP; i++)
 			{
 				next_char = geinput_next_char(ginp);
-				if(next_char < 0)
+				if(next_char < 0 || next_char >= 253)
 				{
-					if (next_char == -1) status = NEXT_READ;
-					if (next_char == -2) status = NEXT_FILE;
-					if (next_char == -3) return 0;
+					if (next_char == -1 || next_char == 255) status = NEXT_READ;
+					if (next_char == -2 || next_char == 254) status = NEXT_FILE;
+					if (next_char == -3 || next_char == 253) return 0;
 					break;
 				}
 
@@ -632,6 +632,7 @@ int scan_gene_index(const char index_prefix [], char ** chro_files, int chro_fil
 				}
 
 				offset ++;
+				//if(offset % 100000 == 0) SUBREADprintf("SCANNEDOF %d BASES; LLBASE %d\n", offset, next_char);
 				(*actual_total_bases_inc_marging)++;
 				read_len ++;
 
@@ -1037,8 +1038,8 @@ int main_buildindex(int argc,char ** argv)
 	SUBREADprintf("\n");
 
 	optind = 0;
-	
-	while ((c = getopt_long (argc, argv, "kvcBFM:o:f:Db?", ib_long_options, &optindex)) != -1)
+	while (c = getopt_long (argc, argv, "kvcBFM:o:f:Db?", ib_long_options, &optindex)){
+		if(c==-1 || c==255) break;
 		switch(c)
 		{
 			case 'b':
@@ -1074,8 +1075,10 @@ int main_buildindex(int argc,char ** argv)
 				MARK_NONINFORMATIVE_SUBREADS = 1;
 				break;	
 			case '?':
-				return -1 ;
+			default :
+				return -1;
 		}
+	}
 
 	if (argc == optind || !output_file[0])
 	{
