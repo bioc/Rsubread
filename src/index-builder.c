@@ -1038,7 +1038,8 @@ int main_buildindex(int argc,char ** argv)
 	SUBREADprintf("\n");
 
 	optind = 0;
-	while (c = getopt_long (argc, argv, "kvcBFM:o:f:Db?", ib_long_options, &optindex)){
+	while (1){
+		c = getopt_long (argc, argv, "kvcBFM:o:f:Db?", ib_long_options, &optindex);
 		if(c==-1 || c==255) break;
 		switch(c)
 		{
