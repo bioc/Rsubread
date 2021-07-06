@@ -1,3 +1,6 @@
+6 Jul 2021 - 2.6.3
+(1) Updated the user manual to include the "--countReadPairs" option in the example.
+
 18 Jun 2021 - 2.6.2
 (1) Fixed a bug in featureCounts: when there are multiple input BAM files and when R is run on the mode that disallows a Boolean vector as the condition of "if", the program will terminate with an error message.
 (2) Added support to dual-index samples in cellCounts and added output for reads that are not assigned to any sample in demultiplexing. 
