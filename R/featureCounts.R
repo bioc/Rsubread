@@ -63,9 +63,64 @@
     paste0(as.numeric(logicarr),collapse="")
 }
 
+.get.annotation.file <- function(annot.inbuilt, annot.ext, isGTFAnnotationFile){
+    delete.annot.file <- FALSE
+    annot.screen.output <- 'R data.frame'
+    if(is.null(annot.ext)){
+      switch(tolower(as.character(annot.inbuilt)),
+        mm9={
+          ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
+          annot.screen.output <- 'inbuilt (mm9)'
+          cat("NCBI RefSeq annotation for mm9 (build 37.2) is used.\n")
+        },
+        mm10={
+          ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
+          annot.screen.output <- 'inbuilt (mm10)'
+          cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
+         },
+        hg19={
+          ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
+          annot.screen.output <- 'inbuilt (hg19)'
+          cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
+           },
+        hg38={
+          ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
+          annot.screen.output <- 'inbuilt (hg38)'
+          cat("NCBI RefSeq annotation for hg38 (build 38.2) is used.\n")
+           },
+           {
+        stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
+           }
+      ) # end switch
+    }
+    else{
+      if(is.character(annot.ext)){
+        annot.ext <- .check_and_NormPath(annot.ext, mustWork=T, opt="external annotation")
+        ann <- annot.ext
+        annot.screen.output <- paste0(basename(ann), " (", ifelse(isGTFAnnotationFile, "GTF", "SAF"), ")");
+      }
+      else{
+        annot_df <- as.data.frame(annot.ext,stringsAsFactors=FALSE)
+        if(sum(c("geneid","chr","start","end", "strand") %in% tolower(colnames(annot_df))) != 5)
+          stop("One or more required columns are missing in the provided annotation data. Please refer to help page for annotation format.\n")
+        colnames(annot_df) <- tolower(colnames(annot_df))
+        annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)
+        annot_df$chr <- as.character(annot_df$chr)
+        fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
+        oldScipen <- options(scipen=999)
+        write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
+        options(oldScipen)
+        ann <- fout_annot
+        delete.annot.file <- TRUE
+      }
+    }
+    return(list(ann=ann, screen=annot.screen.output, delete=delete.annot.file))
+}
+
+
 featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,countReadPairs=TRUE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
-    flag <- FALSE
+    delete.annot.file <- FALSE
     if(!.is.64bit.system()) warning("your system seems to be 32-bit. Rsubread supports 32-bit systems to a limited level only.\nWe recommend that Rsubread be run on 64-bit systems to avoid any possible problems.\n\n",call.=FALSE)
 
     extra.params <- .retrieve.tmp.parameters()
@@ -108,7 +163,6 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
         if(!isPairedEnd) countReadPairs <- F
     }
 
-
     if(length(GTF.featureType)>1) GTF.featureType<-paste(GTF.featureType, collapse=",")
     out.base.names <- basename(files)
     if(any(duplicated(out.base.names))){
@@ -133,6 +187,11 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     strandSpecific<-paste(strandSpecific, collapse=".")
     strandSpecific<-gsub(",", ".", strandSpecific)
 
+    annlist <- .get.annotation.file(annot.inbuilt, annot.ext, isGTFAnnotationFile)
+    ann <- annlist$ann
+    annot.screen.output <- annlist$screen
+    delete.annot.file <- annlist$delete
+
     if(readShiftSize < 0){
         stop("The value of the readShiftSize parameter should not be negative.")
     }
@@ -144,55 +203,6 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
     }
     if(readExtension3 < 0){
         stop("The value of the readExtension3 parameter should not be negative.")
-    }
-
-    annot.screen.output <- 'R data.frame'
-    if(is.null(annot.ext)){
-      switch(tolower(as.character(annot.inbuilt)),
-        mm9={
-          ann <- system.file("annot","mm9_RefSeq_exon.txt",package="Rsubread")
-          annot.screen.output <- 'inbuilt (mm9)'
-          cat("NCBI RefSeq annotation for mm9 (build 37.2) is used.\n")
-        },
-        mm10={
-          ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
-          annot.screen.output <- 'inbuilt (mm10)'
-          cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
-         },
-        hg19={
-          ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
-          annot.screen.output <- 'inbuilt (hg19)'
-          cat("NCBI RefSeq annotation for hg19 (build 37.2) is used.\n")
-           },
-        hg38={
-          ann <- system.file("annot","hg38_RefSeq_exon.txt",package="Rsubread")
-          annot.screen.output <- 'inbuilt (hg38)'
-          cat("NCBI RefSeq annotation for hg38 (build 38.2) is used.\n")
-           },
-           {
-        stop("In-built annotation for ", annot.inbuilt, " is not available.\n")
-           }
-      ) # end switch
-    }
-    else{
-      if(is.character(annot.ext)){
-        ann <- annot.ext
-        annot.screen.output <- paste0(basename(ann), " (", ifelse(isGTFAnnotationFile, "GTF", "SAF"), ")");
-      }
-      else{
-        annot_df <- as.data.frame(annot.ext,stringsAsFactors=FALSE)
-        if(sum(c("geneid","chr","start","end", "strand") %in% tolower(colnames(annot_df))) != 5)
-          stop("One or more required columns are missing in the provided annotation data. Please refer to help page for annotation format.\n")
-        colnames(annot_df) <- tolower(colnames(annot_df))
-        annot_df <- data.frame(geneid=annot_df$geneid,chr=annot_df$chr,start=annot_df$start,end=annot_df$end,strand=annot_df$strand,stringsAsFactors=FALSE)
-        annot_df$chr <- as.character(annot_df$chr)
-        fout_annot <- file.path(".",paste(".Rsubread_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
-        oldScipen <- options(scipen=999)
-        write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
-        options(oldScipen)
-        ann <- fout_annot
-        flag <- TRUE
-      }
     }
 
     fout <- file.path(".",paste(".Rsubread_featureCounts_pid",Sys.getpid(),sep=""))
@@ -268,7 +278,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
         if(juncCounts)
             file.remove(paste(fout,".jcounts",sep=""))
         
-        if(flag) 
+        if(delete.annot.file) 
           file.remove(fout_annot)
 
         if(ncol(x) <= (6 + add_attr_numb)){

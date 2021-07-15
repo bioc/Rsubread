@@ -77,6 +77,7 @@ void R_child_thread_run(int (*func)(int , char *[]), int n, char **args, int is_
 
 extern void retrieve_sequence(char ** input, char ** output_seq);
 extern void atgcContent(char ** input, char ** output, int *basewise);
+extern int cellCounts_main(int argc, char ** argv);
 extern int detectionCall(int argc, char ** argv);
 extern int main_junction(int argc,char ** argv);
 extern int main_align(int argc,char ** argv);
@@ -139,6 +140,26 @@ void R_txUnique_wrapper(int * nargs, char ** argv){
 	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
 	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
 	R_child_thread_run(TxUniqueMain, n+1,c_argv, 0);
+	free(r_argv);
+	for(i=0;i<n+1;i++) free(c_argv[i]);
+	free(c_argv);
+}
+
+void R_cellCounts(int * nargs, char ** argv){
+	char * r_argv, ** c_argv;
+	int i,n;
+
+	n = *nargs;
+	r_argv = strdup(*argv);
+
+	c_argv = (char **) calloc(n+1,sizeof(char *));
+	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	strcpy(c_argv[0],"R_cellCounts");
+	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
+	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
+
+	R_child_thread_run(cellCounts_main, n,c_argv, 1);
+
 	free(r_argv);
 	for(i=0;i<n+1;i++) free(c_argv[i]);
 	free(c_argv);
@@ -509,6 +530,7 @@ void R_genSimReads_at_poses(char ** fasta_name, char ** output_name, char ** qua
 
 static const R_CMethodDef CEntries[] = {
   {"R_txUnique_wrapper",             (DL_FUNC) &R_txUnique_wrapper,             2},
+  {"R_cellCounts",                   (DL_FUNC) &R_cellCounts,                   2},
   {"R_mergeVCF",                     (DL_FUNC) &R_mergeVCF,                     2},
   {"R_sublong_wrapper",              (DL_FUNC) &R_sublong_wrapper,              2},
   {"R_repair_wrapper",               (DL_FUNC) &R_repair_wrapper,               2},

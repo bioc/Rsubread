@@ -1187,6 +1187,74 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
+new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
+  .remove.temp.files <- T
+  index <- .check_and_NormPath(index, mustWork=F, opt="index name")
+  if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
+  if(!is.null(umi.cutoff)){
+    umi.cutoff <- as.numeric(umi.cutoff)
+    if(umi.cutoff < 0.0) stop("UMI cutoff must be a positive number.")
+  }
+  BAM_is_Rerun_Persample <- is.null(aligner)
+  sample.info.idx <- sample
+  fc <- list()
+
+  temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
+  raw.fc.annot <- NA
+  df.sample.info <- data.frame(stringsAsFactors=F)
+  sample.1 <- paste0(temp.file.prefix,".samplesheet")
+
+  if(input.mode=="BCL"){
+    sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
+    if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
+
+    dirs <- unique( sample.info.idx$InputDirectory )
+    fc[["counts"]] <- list()
+  
+    for(dirname in dirs) .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx") # check files before the slow mapping/counting step.
+
+    dirno <- 1
+    for(dirname in dirs){
+      unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
+  
+      if(is.null(cell.barcode)){
+        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
+        cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
+      }else{
+        cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+      }
+  
+      full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
+      is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
+      generate.scRNA.BAM <- TRUE
+
+      annlist <- .get.annotation.file(annot.inbuilt, annot.ext, isGTFAnnotationFile)
+      ann <- annlist$ann
+      annot.screen.output <- annlist$screen
+      delete.annot.file <- annlist$delete
+
+      opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix)
+      if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
+      if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
+
+      cmd <- paste(opt,collapse=.R_param_splitor)
+      n <- length(unlist(strsplit(cmd,.R_param_splitor)))
+      C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+
+      dirno <- dirno +1
+      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+      for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      }
+      stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
+      df.sample.info <- rbind(df.sample.info, stt)
+    }
+  }
+}
+
 cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
   .remove.temp.files <- T
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 

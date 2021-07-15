@@ -357,15 +357,6 @@ chromosome_event_t * reallocate_event_space( global_context_t* global_context,th
 
 }
 
-int is_ambiguous_indel_score(chromosome_event_t * e)
-{
-	return 0;
-	//if(e -> indel_length == 1 && e->is_ambiguous>4)return 1;
-	//if(e -> indel_length <= 3 && e->is_ambiguous>3 && (e-> event_small_side % 7 < 3))return 1;
-	//if(e -> indel_length == 4) return e->is_ambiguous>4;
-	//return 0;
-}
-
 int event_neighbour_sort_compare(void * arr, int l, int r){
 	unsigned int ** sort_data = (unsigned int **) arr;
 	if(sort_data[1][l] > sort_data[1][r]) return 1;

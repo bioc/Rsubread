@@ -695,4 +695,5 @@ int exec_cmd(char * cmd, char * outstr, int out_limit);
 int is_pos_in_annotated_exon_regions(global_context_t * global_context, unsigned int pos);
 char * get_sam_chro_name_from_alias(HashTable * tab, char * anno_chro);
 void subread_rebuild_cmd(int argc, char ** argv, global_context_t * global_context);
+int get_soft_clipping_length(char* CIGAR);
 #endif
