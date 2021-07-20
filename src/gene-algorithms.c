@@ -2228,10 +2228,10 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 		{
 			if(!qual_txt)
 				ret += 1000000;
-			else if(FASTQ_PHRED64 == phred_version)
-				ret += (1000000-get_base_error_prob64i(qual_txt[i]));
-			else
+			else if(FASTQ_PHRED33 == phred_version)
 				ret += (1000000-get_base_error_prob33i(qual_txt[i]));
+			else
+				ret += (1000000-get_base_error_prob64i(qual_txt[i]));
 		}
 		else
 		{
@@ -2244,10 +2244,10 @@ float match_base_quality(gene_value_index_t *array_index, char * read_txt,  unsi
 			else
 			{
 				int ql ;
-				if(FASTQ_PHRED64 == phred_version)
-					ql = get_base_error_prob64i(qual_txt[i]);
-				else
+				if(FASTQ_PHRED33 == phred_version)
 					ql = get_base_error_prob33i(qual_txt[i]);
+				else
+					ql = get_base_error_prob64i(qual_txt[i]);
 				/*
 				#ifdef QUALITY_KILL
 					#if QUALITY_KILL > 196
@@ -2549,7 +2549,7 @@ float get_base_error_prob64(char v)
 static int PROB_QUAL_INT_TABLE[] = { 1000000 , 794328 , 630957 , 501187 , 398107 , 316227 , 251188 , 199526 , 158489 , 125892 , 100000 , 79432 , 63095 , 50118 , 39810 , 31622 , 25118 , 19952 , 15848 , 12589 , 10000 , 7943 , 6309 , 5011 , 3981 , 3162 , 2511 , 1995 , 1584 , 1258 , 1000 , 794 , 630 , 501 , 398 , 316 , 251 , 199 , 158 , 125 , 100 , 79 , 63 , 50 , 39 , 31 , 25 , 19 , 15 , 12 , 10 , 7 , 6 , 5 , 3 , 3 , 2 , 1 , 1 , 1 , 1 , 0 , 0 , 0 , };
 
 
-int get_base_error_prob33i(char v)
+int old_get_base_error_prob33i(char v)
 {
 	return PROB_QUAL_INT_TABLE[v-'!'];
 }

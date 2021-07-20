@@ -1242,7 +1242,7 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
       dirno <- dirno +1
-      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
+      if(any(is.na(raw.fc.annot))) raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
@@ -1253,6 +1253,7 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
       df.sample.info <- rbind(df.sample.info, stt)
     }
   }
+  fc
 }
 
 cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){

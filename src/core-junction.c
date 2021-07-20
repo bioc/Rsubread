@@ -214,7 +214,9 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						continue;
 					}
 					//if(explain_context -> pair_number == 23)
-					if(0 && FIXLENstrcmp("R010442852", explain_context -> read_name) == 0){
+					if(0 && FIXLENstrcmp("R00000001230", explain_context -> read_name) ==0){
+						char outpos1[100];
+						absoffset_to_posstr(global_context, read_head_abs_offset , outpos1);
 						SUBREADprintf("F_JUMP?%d > %d    %s (%u) ; SEARCH_TAG=%u\n", (1+matched_bases_to_site)*10000 / tested_read_pos , 9000, read_text, tested_chro_begin, potential_event_pos);
 						debug_show_event(global_context, tested_event);
 
@@ -674,8 +676,8 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 					}
 
 
-					if(0 && strcmp("S_chr901_565784_72M8D28M", explain_context -> read_name) == 0)
-						SUBREADprintf("B_JUMP?%d > %d TLEN=%d \n", (1+matched_bases_to_site)*10000 / (read_tail_pos - tested_read_pos) , 9000, read_tail_pos - tested_read_pos);
+					if(0 && FIXLENstrcmp("R00000001230", explain_context -> read_name) == 0)
+						SUBREADprintf("B_JUMP?%d  LOC %u   LEN %d EVT %p\n", (1+matched_bases_to_site)*10000 / (read_tail_pos - tested_read_pos) ,  tested_event-> event_large_side, tested_event-> indel_length, tested_event);
 					// note that read_tail_pos is the first unwanted base.
 					int new_read_tail_pos = tested_read_pos;
 					if(tested_event->event_type == CHRO_EVENT_TYPE_INDEL) new_read_tail_pos +=  min(0, tested_event -> indel_length);
@@ -2742,6 +2744,13 @@ unsigned int explain_read(global_context_t * global_context, thread_context_t * 
 	//#warning "SUBREAD_151 REMOVE THE ASSERT! "
 	//if(search_remain >= 102)SUBREADprintf("FATAL: RLEN=%d, SEARCH=%d\n", read_len, front_search_read_start);
 	//assert( search_remain < 102 );
+	//
+
+        if(0 && FIXLENstrcmp("R00000001230", explain_context.read_name) ==0){
+                char outpos1[100];
+                absoffset_to_posstr(global_context, front_search_start_position , outpos1);
+                SUBREADprintf("QFPOS %s : %s ,  %d ==> \n", read_name, outpos1, front_search_read_start);
+        }
 
 	search_events_to_front(global_context, thread_context, &explain_context, read_text + front_search_read_start, qual_text + front_search_read_start, front_search_start_position, search_remain , 0, 0, 1);
 	if(0 && FIXLENstrcmp("R_chr901_932716_91M1D9M",explain_context.read_name ) == 0)
@@ -3336,6 +3345,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 			if(is_exonic_read_fraction_OK)
 			{
+			if(0 && FIXLENstrcmp("R00000001230", explain_context -> read_name) ==0) SUBREADprintf("TSOFT_COVSTART %d\n",  result -> confident_coverage_start);
 				final_qual  = final_CIGAR_quality(global_context, thread_context, explain_context -> full_read_text, explain_context -> full_qual_text, explain_context -> full_read_len , tmp_cigar, final_position, is_first_section_negative != ((result->result_flags & CORE_IS_NEGATIVE_STRAND)?1:0), &mismatch_bases, result -> confident_coverage_start, result -> confident_coverage_end,  explain_context -> read_name, &non_clipped_length, &total_indel_length, & final_MATCH, & chromosomal_length, & full_section_clipped);
 				//#warning ">>>>>>> COMMENT THIS <<<<<<<"
 				//printf("OCT27-STEP2-%s:%d-POS%u-VOT%d-CIG-%s [ %d ]-INDELs=%llu; M/MM=%d,%d\n", explain_context -> read_name, explain_context  -> is_second_read + 1,  result -> selected_position, result -> selected_votes, tmp_cigar, is_cigar_overflow, ((indel_thread_context_t *)thread_context -> module_thread_contexts[MODULE_INDEL_ID]) -> event_entry_table -> numOfElements, final_MATCH, mismatch_bases);
@@ -3350,7 +3360,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 
 			//#warning " ========== COMMENT THIS LINE !! ========="
-			if(0 && FIXLENstrcmp("HWI-ST945:119:D0J2JACXX:1:1303:17374:199067", explain_context -> read_name) ==0){
+			if(1 && FIXLENstrcmp("R00000001122", explain_context -> read_name) ==0){
 				char outpos1[100];
 				absoffset_to_posstr(global_context, final_position, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS=%s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?  MASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1 , final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, global_context -> config.minimum_exonic_subread_fraction,result-> used_subreads_in_vote, result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);

@@ -121,7 +121,10 @@ float get_base_error_prob33(char v);
 float get_base_error_prob64(char v);
 
 
-int get_base_error_prob33i(char v);
+#define qv33s { 1000000 , 794328 , 630957 , 501187 , 398107 , 316227 , 251188 , 199526 , 158489 , 125892 , 100000 , 79432 , 63095 , 50118 , 39810 , 31622 , 25118 , 19952 , 15848 , 12589 , 10000 , 7943 , 6309 , 5011 , 3981 , 3162 , 2511 , 1995 , 1584 , 1258 , 1000 , 794 , 630 , 501 , 398 , 316 , 251 , 199 , 158 , 125 , 100 , 79 , 63 , 50 , 39 , 31 , 25 , 19 , 15 , 12 , 10 , 7 , 6 , 5 , 3 , 3 , 2 , 1 , 1 , 1 , 1 , 0 , 0 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+
+#define get_base_error_prob33i(v) (((int [])qv33s)[(v) -33])
+//int get_base_error_prob33i(char v);
 int get_base_error_prob64i(char v);
 
 void add_repeated_numbers(int qid, gene_vote_t * vote, unsigned char * repeated_regions);

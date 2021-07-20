@@ -595,6 +595,8 @@ void remove_neighbour(global_context_t * global_context)
 		if(deleted_event -> event_type == CHRO_EVENT_TYPE_INDEL && deleted_event -> inserted_bases)
 			free(deleted_event -> inserted_bases);
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
+                if(deleted_event -> event_small_side >= 232366259 -1 && deleted_event -> event_small_side <= 232366259 +61)SUBREADprintf("DELETED_THIS AT %u len=%d PTR %p\n", deleted_event -> event_small_side, deleted_event -> indel_length , deleted_event );
+
 	}
 
 	free(to_be_removed_ids);
@@ -1969,9 +1971,10 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								{
 									int  old_event_id = -1;
 
-									if(0)if(indel_left_boundary >= 46481340 + 1210 - 200 && indel_left_boundary  <= 46481340 + 1210 + 200 && abs(current_indel_len )==4){
-										SUBREADprintf("ADD AN INDEL: %s : %u ; len = %d\n", read_name, indel_left_boundary, current_indel_len);
-									}
+									if( indel_left_boundary >= 854782874 - 5 && indel_left_boundary <= 854782888 +5 )
+										SUBREADprintf("PCCINDEL by %s at %u  len=%d\n", read_name, indel_left_boundary , current_indel_len);
+
+
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0, &old_event_id);
 									mark_gapped_read(current_result);
 
