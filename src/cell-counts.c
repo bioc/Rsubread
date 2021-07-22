@@ -37,8 +37,8 @@ typedef struct {
 
 typedef struct {
 	int votes[MAX_SUBREADS_PER_READ];
+	int offsets[MAX_SUBREADS_PER_READ];
 	unsigned int * start_location_in_index [MAX_SUBREADS_PER_READ *2]; // * 2 because positive and negative strand votes are evaluated together.
-	unsigned int * stop_location_in_index [MAX_SUBREADS_PER_READ *2]; // last_index + 1
 } temp_votes_per_read_t;
 
 typedef struct{
@@ -230,18 +230,24 @@ static struct option cellCounts_long_options[]={
 	{0,0,0,0}
 };
 
-int prefill_votes(gehash_t * the_table, int temp_votes_per_read_t * pnts, unsigned int subread, int subread_no, int is_negative_strand){
+
+#define _gehash_hash(k) ((unsigned int)(k))
+#define _gehash_get_bucket(tab, key)  ( (tab) -> buckets + _gehash_hash( key ) % (tab) -> buckets_number )
+
+void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int applied_subreads, unsigned int subread, int offset, int subread_no, int is_negative_strand){
 	struct gehash_bucket * current_bucket;
 	current_bucket = _gehash_get_bucket (the_table, subread);
 	int items = current_bucket -> current_items;
-	if(!items) return 0;
+	if(!items) return ;
 
 	short *current_keys = current_bucket -> new_item_keys;
 	int imin=0, imax=items - 1;
 	int last_accepted_index;
-	int my_no = subread_no + MAX_SUBREADS_PER_READ * is_negative_strand;
+	int my_no = subread_no + applied_subreads * is_negative_strand;
 
 	pnts -> votes[my_no] = 0;
+	pnts -> offsets[my_no] = offset;
+	short key = subread / the_table->buckets_number;
 	while(1){
 		last_accepted_index=(imin+imax)/2;
 		short current_key = current_keys[last_accepted_index];
@@ -249,22 +255,23 @@ int prefill_votes(gehash_t * the_table, int temp_votes_per_read_t * pnts, unsign
 		else if(current_key<key) imin = last_accepted_index + 1;
 		else break;
 
-		if(imax<imin) return 0;
+		if(imax<imin) return;
 	}
 
-	int start_pos = last_accepted_index, scan_step = 0;
+	int start_scan_idx = last_accepted_index, scan_step = 0;
+	unsigned int * stoploc = NULL;
 	while(1){
 		if(scan_step){
 			last_accepted_index --;
 			if(last_accepted_index <0 || current_keys[last_accepted_index]!= key){
 				pnts -> start_location_in_index[my_no] = current_bucket->item_values + last_accepted_index  +1;
-				pnts -> votes[my_no] = pnts -> stop_location_in_index[my_no] - pnts -> start_location_in_index[my_no];
+				pnts -> votes[my_no] = stoploc - pnts -> start_location_in_index[my_no];
 				break;
 			}
 		}else{
 			last_accepted_index ++;
 			if(last_accepted_index == items || current_keys[last_accepted_index]!= key){
-				pnts -> stop_location_in_index[my_no] = current_bucket->item_values + last_accepted_index ; 
+				stoploc = current_bucket->item_values + last_accepted_index ; 
 				scan_step = 1;
 				last_accepted_index = start_scan_idx;
 			}
@@ -1870,21 +1877,27 @@ int cellCounts_get_sample_id(cellcounts_global_t * cct_context, char * sbc, int 
 	return -1;
 }
 
+
 void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, char * read_name, int rlen, char * read_text, char * qual_text, char * chro_name, int chro_pos, realignment_result_t * res, int nhits, int multi_mapping_number, int this_multi_mapping_i){
 	int batch_no;
 	
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
 	int rname_trimmed_len=0;
 	int fields = cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
-	assert(fields==5);
+	//assert(fields==5);
 
-	int laneno = 0;
-	for(testi = lane_str+1; *testi; testi++){
-		if(!isdigit(*testi))break;
-		laneno = laneno*10 + (*testi)-'0';
-	}
-
-	int sample_no = cellCounts_get_sample_id(cct_context, sample_seq, laneno); 
+	int sample_no = -1;
+	if(lane_str){
+		int laneno = 0;
+		for(testi = lane_str+1; *testi; testi++){
+			if(!isdigit(*testi))break;
+			laneno = laneno*10 + (*testi)-'0';
+		}
+		sample_no = cellCounts_get_sample_id(cct_context, sample_seq, laneno); 
+	}else if(memcmp("input#", sample_seq,6)==0){
+		int lineno = (sample_seq[6]-'0')*1000+(sample_seq[7]-'0')*100+(sample_seq[8]-'0')*10+(sample_seq[9]-'0') +1;
+		sample_no = HashTableGet(cct_context -> lineno1B_to_sampleno1B_tab, NULL+lineno)-NULL;
+	}else SUBREADprintf("Wrong read name: %s\n", read_name);
 
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq);
 
@@ -2999,16 +3012,154 @@ int cellCounts_process_voting_junction(cellcounts_global_t * cct_context, int th
 	return 0;
 }
 
-int cellCounts_genekey2int(char *key)
-{
+int cellCounts_genekey2int(char *key) {
 	int ret = 0;
 
-	char * keyc = key + 30;
-	for (; keyc >= key, keyc-=2) {
-		char c1 = *keyc;
+	char * keyc = key +16;
+	for (; key < keyc; key++) {
+		char c1 = *key;
 		ret = (ret << 2) | base2int(c1);
 	}
 	return ret;
+}
+
+
+int cellCounts_process_copy_ptrs_to_votes_compare(void * arrp, int i, int j){
+	void ** arr = arrp;
+	temp_votes_per_read_t * ptrs = arr[1];
+	int * trying_subread_no = arr[0];
+	if( ptrs -> votes[ trying_subread_no [i] ] > ptrs -> votes[trying_subread_no [j]] )return 1;
+	if( ptrs -> votes[ trying_subread_no [i] ] < ptrs -> votes[trying_subread_no [j]] )return -1;
+	return 0;
+}
+
+void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
+	void ** arr = arrp;
+	int * trying_subread_no = arr[0];
+	int tmpi = trying_subread_no [i];
+	trying_subread_no [i] = trying_subread_no [j];
+	trying_subread_no [j] = tmpi;
+}
+
+
+#define INDEL_SEGMENT_SIZE 5
+
+#define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
+#define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_VOTE_TABLE_SIZE)
+
+void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name){
+	int subreads = applied_subreads_per_strand*2;
+	int x1, trying_subread_no[subreads];
+	for(x1=0; x1<subreads; x1++) trying_subread_no[x1]=x1;
+	void * sort_arr[2];
+	sort_arr [0] = trying_subread_no;
+	sort_arr [1] = ptrs;
+	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
+
+	if(0){
+		SUBREADprintf("\n\n");
+		for(x1=subreads-1; x1>=0; x1--) SUBREADprintf("V%02d=%d\n", x1, ptrs->votes[trying_subread_no[x1]]);
+	}
+
+	init_gene_vote(vote);
+	for(x1=0; x1<subreads; x1++){
+		int myno = trying_subread_no[x1];
+		if(ptrs->votes[ myno] <1) continue;
+
+		int offset = ptrs->offsets[myno];
+		int of_p_16 = offset + 16;
+		int subread_number_P1 = 1+((myno >= applied_subreads_per_strand)?myno - applied_subreads_per_strand:myno);
+		int is_reversed = (myno >= applied_subreads_per_strand)?IS_NEGATIVE_STRAND:0;
+		unsigned int * index_ptr = ptrs->start_location_in_index [myno];
+		unsigned int * index_ptr_stop = index_ptr +ptrs->votes[myno];
+		for(; index_ptr < index_ptr_stop ; index_ptr ++){
+			unsigned int kv = (*index_ptr) - offset;
+			int iix, offsetX2, offsetX, datalen, datalen2;
+			offsetX = offsetX2 = _index_vote_tol(kv);
+	if(0&&FIXLENstrcmp("R00000000181", read_name)==0)	SUBREADprintf("KVPTR %u = %d\n", kv, offsetX);
+			datalen = datalen2 = vote -> items[offsetX];
+			unsigned int * dat2, *dat;
+			dat = dat2 = vote -> pos[offsetX];
+			int found_some = 0, i;
+			for(iix = 0; iix<=INDEL_SEGMENT_SIZE; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)) {
+				if(iix) {
+					offsetX = _index_vote_tol(kv+iix);
+					datalen = vote -> items[offsetX];
+					if(!datalen)continue;
+					dat = vote -> pos[offsetX];
+				} else if(!datalen) continue;
+				for (i=0;i<datalen;i++){
+					int dist0 = kv-dat[i];
+	if(0&&FIXLENstrcmp("R00000000181", read_name)==0)	SUBREADprintf("  MAPLOC of SR dist = %d and MAX_INDEX = %d; REV REV = %d  %d ; myno = %d; bools=%d %d %d\n", dist0,  cct_context -> max_indel_length, is_reversed , vote->masks[offsetX][i], myno, dist0 >= -cct_context -> max_indel_length, dist0 <= cct_context -> max_indel_length, is_reversed == vote->masks[offsetX][i]);
+					if( dist0 >= -cct_context -> max_indel_length  && dist0 <= cct_context -> max_indel_length  && is_reversed == vote->masks[offsetX][i]){
+						int toli =  vote -> toli[offsetX][i];
+
+						if( /*subread_number_P1 == vote -> last_subread_cluster[offsetX][i]  && */ toli >0){
+							int move_dist = 0;
+							if( toli >=3 ) move_dist = vote -> indel_recorder[offsetX][i][toli-3+2];
+							int new_dist = move_dist;
+							move_dist -= vote -> indel_recorder[offsetX][i][toli+2];
+							new_dist -= dist0;
+							if(abs(move_dist) > abs(new_dist)){
+								toli -= 3;
+								vote -> toli[offsetX][i] = toli;
+								vote -> last_subread_cluster[offsetX][i]--;
+								vote -> votes[offsetX][i] --;
+							}
+						}
+
+						//if(subread_number_P1 <= vote -> last_subread_cluster[offsetX][i]) continue;
+						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
+						test_max += 1;
+						vote -> votes[offsetX][i] = test_max;
+
+						if (offset +16 > vote->coverage_end [offsetX][i])
+							vote->coverage_end [offsetX][i] = of_p_16;
+
+						if (dist0 ==  vote->current_indel_cursor[offsetX][i]){
+							vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
+						} else {
+							toli +=3;
+							if (toli < MAX_INDEL_SECTIONS*3)
+							{
+								vote -> toli[offsetX][i] = toli;
+								vote -> indel_recorder[offsetX][i][toli] = subread_number_P1;
+								vote -> indel_recorder[offsetX][i][toli+1] = subread_number_P1;
+								vote -> indel_recorder[offsetX][i][toli+2] = dist0;
+
+								if(toli < MAX_INDEL_SECTIONS*3-3) vote -> indel_recorder[offsetX][i][toli+3]=0;
+							}
+							vote->current_indel_cursor [offsetX][i] = (char)dist0;
+						}
+
+						//vote -> last_subread_cluster[offsetX][i] = subread_number_P1;
+						if(vote->max_vote < test_max)vote->max_vote = test_max;
+						found_some = 1;
+						break;
+					}
+				}
+				if(found_some)break;
+			}
+			if ( (!found_some) && datalen2<GENE_VOTE_SPACE) {
+					vote -> items[offsetX2] ++;
+					dat2[datalen2] = kv;
+					vote -> masks[offsetX2][datalen2] = is_reversed;
+					vote -> votes[offsetX2][datalen2] = 1;
+					vote -> toli[offsetX2][datalen2] = 0;
+					vote -> marked_shift_indel[offsetX2][datalen2] = 0;
+					vote -> indel_recorder[offsetX2][datalen2][0] = vote -> indel_recorder[offsetX2][datalen2][1] = subread_number_P1;
+					vote -> indel_recorder[offsetX2][datalen2][2] = 0;
+					vote -> indel_recorder[offsetX2][datalen2][3] = 0;
+					vote->current_indel_cursor [offsetX2][datalen2] = 0;
+					vote->coverage_start [offsetX2][datalen2] = offset;
+					vote->coverage_end [offsetX2][datalen2] = of_p_16;
+					//vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
+
+					if (vote->max_vote==0)
+						vote->max_vote = 1;
+			}
+		}
+	}
 }
 
 int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
@@ -3018,12 +3169,13 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	char read_name_1[MAX_READ_NAME_LEN+1];
 	int read_len_1=0;
 	int min_first_read_votes = cct_context -> min_votes_per_mapped_read; 
-	int voting_max_indel_length = min(16, cct_context->max_indel_length);
 	int sqr_interval=10000;
 
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	read_text_1 = malloc(MAX_READ_LENGTH+1);
 	qual_text_1 = malloc(MAX_READ_LENGTH+1);
+
+	temp_votes_per_read_t prefill_ptrs;
 	gene_vote_t * vote_1 = malloc(sizeof(gene_vote_t));
 
 	if(vote_1==NULL) {
@@ -3038,54 +3190,46 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 	while(1) {
 		int subread_no;
-		int is_reversed, applied_subreads = 0, v1_all_subreads=0;
+		int is_reversed, applied_subreads = 0;
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len_1, read_name_1, read_text_1, qual_text_1, &current_read_number);
 		if(current_read_number < 0) break;
+		if(read_len_1< 16) continue;
+
+		int CR15GLS = (read_len_1 - 15 - index_gap_width)<<16;
+		int subread_step =  CR15GLS /(cct_context -> total_subreads_per_read -1);
+		if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
+		applied_subreads = 1 + CR15GLS / subread_step;
 
 		for(is_reversed = 0; is_reversed<2; is_reversed++) {
-			int subread_step;
-			if(read_len_1< 16) continue;
-			int CR15GLS = (read_rlen_1 - 15 - index_gap_width)<<16;
-			subread_step =  CR15GLS /(cct_context -> total_subreads_per_read -1);
-			if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
-
-			applied_subreads = 1 + CR15GLS / subread_step;
-			v1_all_subreads = applied_subreads;
-
-			unsigned int current_high_border = high_index_border -  read_rlen_1;
-
 			int allow_indel_i;
-			unsigned int shift_indel_locs[ GENE_VOTE_TABLE_SIZE * GENE_VOTE_SPACE ];
-			unsigned int shift_indel_NO = 0;
-			for(allow_indel_i = 0; allow_indel_i<2; allow_indel_i++){
-				if(is_reversed==0) init_gene_vote(vote_1);
 
-				for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
-					for(xk1=0; xk1<index_gap_width ; xk1++) {
+			for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
+				for(xk1=0; xk1<index_gap_width ; xk1++) {
 
-						int subread_offset = ((subread_step * subread_no) >> 16);
-						if(index_gap_width > 1) subread_offset -= subread_offset%(index_gap_width) - xk1; 
+					int subread_offset = ((subread_step * subread_no) >> 16);
+					if(index_gap_width > 1) subread_offset -= subread_offset%(index_gap_width) - xk1; 
 
-						char * subread_string = read_text_1 + subread_offset;
+					char * subread_string = read_text_1 + subread_offset;
 
-						gehash_key_t subread_integer = cellCountsgenekey2int(subread_string, GENE_SPACE_BASE);
-						prefill_votes(cct_context->current_index, prefill_ptrs, subread_integer , subread_no, is_reversed);
-					}
+					gehash_key_t subread_integer = cellCounts_genekey2int(subread_string);
+					prefill_votes(cct_context->current_index, &prefill_ptrs, applied_subreads, subread_integer, subread_offset, subread_no, is_reversed);
 				}
-				if(shift_indel_NO == 0)break;
 			}
 
 			if(is_reversed) {
+				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_1, applied_subreads, read_name_1 );
 				if(current_read_number % 500000 == 0) SUBREADprintf("voting step: %d\n", current_read_number);
-				if(0&&current_read_number == 4000){
+				if(0&&FIXLENstrcmp("R00000000181", read_name_1) == 0){
+					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name_1, vote_1 -> max_vote);
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, vote_1->max_vote, min_first_read_votes);
 					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name_1, current_read_number);
 					print_votes(vote_1, cct_context -> index_prefix);
 				}
 
+
 				if(vote_1->max_vote >= min_first_read_votes)
-					cellCounts_process_voting_junction(cct_context, thread_no, current_read_number, vote_1, read_name_1, read_text_1, read_len_1, is_reversed, v1_all_subreads);
+					cellCounts_process_voting_junction(cct_context, thread_no, current_read_number, vote_1, read_name_1, read_text_1, read_len_1, is_reversed, applied_subreads);
 			} else reverse_read(read_text_1, read_len_1, GENE_SPACE_BASE);
 		}
 
@@ -3507,7 +3651,7 @@ int cellCounts_match_chro(char * read, gene_value_index_t * index, unsigned int 
 }
 
 
-
+void cellCounts_absoffset_to_posstr(cellcounts_global_t * cct_context, unsigned int pos, char * res);
 
 #define MIN_EVENT_DISTANCE 16
 
@@ -4814,7 +4958,6 @@ void * cellCounts_merge_batches_worker(void * vp){
 void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
 	char * cellbc_seq=NULL,*umi_seq=NULL, * cellbc_qual=NULL,*umi_qual=NULL, *sample_seq=NULL, *sample_qual=NULL, *lane_str=NULL;
 	int rname_trimmed_len=0;
-	//SUBREADprintf("RBIN_NAME '%s'\n", rbin +36);
 	cellCounts_scan_read_name_str(cct_context, rbin, NULL, & sample_seq, & sample_qual, & cellbc_seq, & cellbc_qual, & umi_seq, & umi_qual, &lane_str, NULL, &rname_trimmed_len);
 	char new_rbin_stake[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
 	char * new_rbin = new_rbin_stake;

@@ -721,7 +721,7 @@
       xy.sim <- ( abs(GT-LGT) * (1:nobs) / SD ) > 1.65
       min.no.turing <- min(which(!xy.sim))
       r <- GT
-      if(min.no.turing>0)r[min.no.turing:nobs] <- LGT[min.no.turing:nobs]
+      if(any(!xy.sim))r[min.no.turing:nobs] <- LGT[min.no.turing:nobs]
       p_zero <- times[1] / total_observed
       rs <- (1-p_zero) * obs * r / sum(r*times*obs/total_observed)
       total_rs <- sum(rs * times)
@@ -1009,6 +1009,7 @@ library(Matrix)
   ambient.accumulate <- ambient.accumulate[ names(ambient.accumulate) %in%  nozero.anywhere.genes]
 
   resc.bc.fn <- paste0(fname,".RescCand")
+  #print(summary(ambient.accumulate))
   rstfq <- .simple.Good.Turing.Freq(ambient.accumulate)
   if(any(is.na(rstfq)) || .is.no.candBC(paste0(resc.bc.fn,".BCtab"))){
     return(NA)
@@ -1204,7 +1205,52 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
   df.sample.info <- data.frame(stringsAsFactors=F)
   sample.1 <- paste0(temp.file.prefix,".samplesheet")
 
-  if(input.mode=="BCL"){
+  annlist <- .get.annotation.file(annot.inbuilt, annot.ext, isGTFAnnotationFile)
+  ann <- annlist$ann
+  annot.screen.output <- annlist$screen
+  delete.annot.file <- annlist$delete
+
+  if(input.mode=="FASTQ"){
+    if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
+    print(sample.info.idx)
+    if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
+ 
+    combined.fastq.names <- ""
+    for(rowi in 1:nrow(sample.info.idx)){
+      df1 <- as.character(sample.info.idx[rowi,"BarcodeUMIFile"])
+      df2 <- as.character(sample.info.idx[rowi,"ReadFile"])
+      R1.file.name <- .check_and_NormPath(df1, mustWork=TRUE, "The barcode FASTQ file in sample.info.idx")
+      R2.file.name <- .check_and_NormPath(df2, mustWork=TRUE, "The genomic read FASTQ file in sample.info.idx")
+      combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
+    }
+    combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
+    if(is.null(cell.barcode)){
+      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, "N/A", input.mode="fastq")
+    }else{
+      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+    }
+
+     .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
+    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix)
+    if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
+    if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
+
+    cmd <- paste(opt,collapse=.R_param_splitor)
+    n <- length(unlist(strsplit(cmd,.R_param_splitor)))
+    C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+ 
+    bam.for.FC <- c()
+    raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
+    some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+
+    for(spi in 1:nrow(some.results[["Sample.Table"]])){
+      samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+      fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+      if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+    }
+    df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
+
+  }else if(input.mode=="BCL"){
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
     if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
 
@@ -1227,11 +1273,6 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
       full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
       is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
       generate.scRNA.BAM <- TRUE
-
-      annlist <- .get.annotation.file(annot.inbuilt, annot.ext, isGTFAnnotationFile)
-      ann <- annlist$ann
-      annot.screen.output <- annlist$screen
-      delete.annot.file <- annlist$delete
 
       opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix)
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")

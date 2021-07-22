@@ -3239,7 +3239,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
 //#warning "====== CHECK PRINTING !!! =========="
-				if(0 && FIXLENstrcmp("R00000000281", read_name_1) ==0){
+				if(1 && FIXLENstrcmp("R00000000181", read_name_1) ==0){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s  VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2, vote_1->max_vote, min_first_read_votes);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
@@ -3697,7 +3697,7 @@ int read_chunk_circles(global_context_t *global_context)
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			// the indexes will be destroyed in destroy_global_context
 			break;
-		if(0){
+		if(1){
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
@@ -4739,18 +4739,18 @@ void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * 
 
 	if(spot_high <= spot_low) return;
 	pivot = spot_high;
-	i = spot_low;
+	i = spot_low-1;
 
-	for(j = spot_low+1; j < spot_high; j++)
+	for(j = spot_low; j <spot_high; j++)
 		if(compare(arr, j, pivot)<=0) {
-			exchange(arr,i,j);
 			i++;
+			exchange(arr,i,j);
 		}
 
-	exchange(arr, i, spot_high);
+	exchange(arr, i+1, spot_high);
 
-	quick_sort_run(arr, spot_low, i-1, compare, exchange);
-	quick_sort_run(arr, i+1, spot_high, compare, exchange);
+	quick_sort_run(arr, spot_low, i, compare, exchange);
+	quick_sort_run(arr, i+2, spot_high, compare, exchange);
 	
 }
 void basic_sort_run(void * arr, int start, int items, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r)){
