@@ -3239,7 +3239,7 @@ int do_voting(global_context_t * global_context, thread_context_t * thread_conte
 			if(is_reversed==1 || !(global_context-> config.do_fusion_detection || global_context-> config.do_long_del_detection))
 			{
 //#warning "====== CHECK PRINTING !!! =========="
-				if(1 && FIXLENstrcmp("R00000000181", read_name_1) ==0){
+				if(0 && FIXLENstrcmp("R00000000181", read_name_1) ==0){
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s\n%s [%d]  %s  VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, read_name_2, read_len_2, read_text_2, vote_1->max_vote, min_first_read_votes);
 					SUBREADprintf(" ======= PAIR %s = %llu ; NON_INFORMATIVE = %d, %d =======\n", read_name_1, current_read_number, vote_1 -> noninformative_subreads, vote_2 -> noninformative_subreads);
 					print_votes(vote_1, global_context -> config.index_prefix);
@@ -4069,14 +4069,14 @@ int load_global_context(global_context_t * context)
 		char * remove_beighbour = getenv("CC_REMOVE_NEIGHBOUR");
 		if(remove_beighbour) context -> config.do_remove_neighbour_for_scRNA = remove_beighbour[0]-'0';
 		if(reads_per_chunk) context -> config.reads_per_chunk = atoi(reads_per_chunk);
-		if(0){
+		if(1){
 			SUBREADprintf("WARNINGqqq: small-chunk!\n");
 			SUBREADprintf("WARNINGqqq: small-chunk!\n");
 			SUBREADprintf("WARNINGqqq: small-chunk!\n");
 			SUBREADprintf("WARNINGqqq: small-chunk!\n");
 			SUBREADprintf("WARNINGqqq: small-chunk!\n");
 			SUBREADprintf("WARNINGqqq: small-chunk!\n");
-			context -> config.reads_per_chunk /= 5;
+			context -> config.reads_per_chunk /= 15;
 		}
 	}
 	print_in_box(80,0,0,"Check the input reads.");
