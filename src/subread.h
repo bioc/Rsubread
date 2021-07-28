@@ -107,7 +107,9 @@
 #define	IS_BREAKEVEN_READ (8192*4)
 #define IS_R1R2_EQUAL_LEN 1024
 
+#ifndef MAKE_CELLCOUNTS
 #define USE_POSIX_MUTEX_LOCK
+#endif
 
 #if defined(MACOS) || defined(FREEBSD) || defined(USE_POSIX_MUTEX_LOCK)
 typedef pthread_mutex_t subread_lock_t;
@@ -202,8 +204,8 @@ typedef short gene_vote_number_t;
 #else
 #warning "============ ADD '-19' from next line  ================"
 #define GENE_VOTE_SPACE (24 - 19)
-#warning "============ ADD '-17' from next line  ================"
-#define GENE_VOTE_TABLE_SIZE (30 - 17)
+#warning "============ ADD '-19' from next line  ================"
+#define GENE_VOTE_TABLE_SIZE (30 - 19)
 #endif
 
 #define MAX_ANNOTATION_EXONS 30000 

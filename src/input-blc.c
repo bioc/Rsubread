@@ -449,10 +449,11 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 		int nbase = 'N';
 		int nqual = '#';
 		if(nch > 0){
-			nbase="ACGT"[nch%4];
+			int ACGTi = nch%4;
+			nbase= ACGTi >1?( ACGTi==2?'G':'T' ):(ACGTi==0?'A':'C');
 			nqual=33+(nch>>2);
+			if(nqual >= '/' && bii < base_offset ) nqual++;
 		}
-		if(nqual >= '/' && bii < base_offset ) nqual++;
 		if(bii < srii[0]){
 			read_name[13+bii] = nbase;
 			read_name[14+idx_offset+bii]= nqual;

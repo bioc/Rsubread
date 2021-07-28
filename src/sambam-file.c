@@ -1911,15 +1911,14 @@ unsigned long long SamBam_writer_sort_bins_to_BAM_FP_pos(FILE * fp){
 
 
 int SamBam_writer_calc_cigar_span(char * bin){
-	int cops = 0, rname_len = 0, ret = 0;
-	memcpy(&cops, bin+12, 4);
-	memcpy(&rname_len, bin+8, 4);
-	rname_len = rname_len & 0xff;
-	cops = cops & 0xffff;
+	int cops, rname_len, ret = 0;
+	cops = *(short *)(bin+12);
+	rname_len = bin[8];
 	int ii;
+	char * binbase = bin+32+rname_len;
 	for(ii = 0; ii < cops ; ii++){
 		unsigned int copt = 0;
-		memcpy(&copt, bin+32+rname_len+4*ii, 4);
+		copt = *(int*)(binbase+4*ii);
 		int copt_char = copt & 0xf;
 		unsigned int copt_len = copt >> 4;
 		if(copt_char == 0 || copt_char == 2 || copt_char == 3 || copt_char == 7 || copt_char == 8) ret += copt_len;
@@ -1939,7 +1938,6 @@ void SamBam_writer_sort_bins_to_BAM_test_bins(SamBam_Writer * writer, HashTable 
 	binno = bin_mq_nl>>16;
 
 	int cigar_span = SamBam_writer_calc_cigar_span(writer -> chunk_buffer + inbin_pos);
-
 	int this_w16_no = (pos + cigar_span) >>14;	// WIN is calculated on 0-based pos.
 	unsigned long long this_Vpos = writer -> this_bam_block_no<<16 | (inbin_pos-4);
 
@@ -2529,9 +2527,9 @@ void simple_bam_writer_update_index(simple_bam_writer * writer, char * rbin, int
 	memcpy(&chro_no, rbin + 4, 4);
 	if(chro_no<0)return;
 
-	unsigned int pos=0, bin_mq_nl=0;
-	memcpy(&pos, rbin + 8, 4);
-	memcpy(&bin_mq_nl, rbin + 12, 4);
+	unsigned int pos, bin_mq_nl=0;
+	pos = *(unsigned int*)(rbin + 8);
+	bin_mq_nl = *(unsigned int*)(rbin + 12);
 
 	struct simple_bam_writer_index_per_chro * index_chro = HashTableGet(writer -> index_per_chro, NULL+chro_no+1);
 	if(NULL==index_chro){
