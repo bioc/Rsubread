@@ -4737,7 +4737,6 @@ void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * 
 
 	int pivot,j,i;
 
-	if(spot_high <= spot_low) return;
 	pivot = spot_high;
 	i = spot_low-1;
 
@@ -4748,10 +4747,8 @@ void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * 
 		}
 
 	exchange(arr, i+1, spot_high);
-
-	quick_sort_run(arr, spot_low, i, compare, exchange);
-	quick_sort_run(arr, i+2, spot_high, compare, exchange);
-	
+	if(i>spot_low) quick_sort_run(arr, spot_low, i, compare, exchange);
+	if(spot_high>i+2) quick_sort_run(arr, i+2, spot_high, compare, exchange);
 }
 void basic_sort_run(void * arr, int start, int items, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r)){
 	int i, j;

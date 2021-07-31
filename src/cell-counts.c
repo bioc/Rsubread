@@ -101,6 +101,8 @@ typedef struct{
 
 	int processed_reads_in_chunk;
 	int running_processed_reads_in_chunk;
+	srInt_64 all_processed_reads_before_chunk;
+	double program_start_time;
 	int is_final_voting_run;
 	int longest_chro_name;
 	int output_binfiles_are_full;
@@ -1804,10 +1806,10 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 
 	if(res && (res -> realign_flags & CORE_IS_BREAKEVEN)) mapping_quality = 0;
 	else if(res) mapping_quality = 40/res->MAPQ_adjustment;
-	else {
-		read_name[trimmed_rname_len]=0;
-		read_name_len = trimmed_rname_len+1;
-	}
+	//else {
+	//	read_name[trimmed_rname_len]=0;
+	//	read_name_len = trimmed_rname_len+1;
+	//}
 
 	int flags = 4;
 	if(res) flags = (res -> realign_flags & CORE_IS_NEGATIVE_STRAND)?16:0;
@@ -2185,7 +2187,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 			strcpy(qual_text, raw_qual_text);
 			cellCounts_write_read_in_batch_bin(cct_context, thread_no, &out_context, current_read_number, NULL, read_name, read_text, qual_text, read_len, 0, 0);
 		}
-		if(current_read_number % 500000 == 0) SUBREADprintf("realign step: %d\n", current_read_number);
+		if(current_read_number % 1000000 == 0) SUBREADprintf("realign step: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 	}
 
 	free(final_realignments);
@@ -2918,15 +2920,14 @@ int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number
 		return 0;
 	}
 
-	int offsets[applied_subreads_per_strand], sri, toli;
-	memset(offsets,0xdd, sizeof(int)*applied_subreads_per_strand);
+	char offsets[applied_subreads_per_strand], sri, toli;
+	memset(offsets,0x77, sizeof(char)*applied_subreads_per_strand);
 	for(toli=0; toli<tolimax; toli+=3){
 		for(sri=votrec[toli]; sri<=votrec[toli+1]; sri++) offsets[sri -1] = votrec[toli+2];
-//		SUBREADprintf("  Toli %d : %d ~ %d  %d\n", toli, votrec[toli], votrec[toli+1], votrec[toli+2]);
 	}
 
 	for(sri=0; sri < applied_subreads_per_strand ; sri++){
-		if(offsets[sri]!=0xdddddddd){
+		if(offsets[sri]!=0x77){
 			*read_pos_move=offsets[sri];
 			break;
 		}
@@ -2935,9 +2936,9 @@ int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number
 	int offset_cur = 0, subread0 =-1;
 	toli = 0;
 	for(sri=0; ; sri++){
-		if(offsets[sri]!=0xdddddddd){
+		if(offsets[sri]!=0x77){
 			offsets[sri] -= *read_pos_move;
-			if(subread0 == -1){
+			if(subread0 < 0){
 				subread0 = sri+1;
 				offset_cur = offsets[sri];
 			}
@@ -2955,7 +2956,7 @@ int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number
 				break;
 			}
 		}
-		if(offsets[sri]==0xdddddddd) subread0 =-1;
+		if(offsets[sri]==0x77) subread0 =-1;
 		if(sri == applied_subreads_per_strand-1){
 			if(subread0 >0){
 				alnrec[toli]= subread0;
@@ -3113,12 +3114,10 @@ int cellCounts_genekey2int(char *key) {
 
 
 int cellCounts_process_copy_ptrs_to_votes_compare(void * arrp, int i, int j){
-	void ** arr = arrp;
-	temp_votes_per_read_t * ptrs = arr[1];
-	int * trying_subread_no = arr[0];
-	if( ptrs -> votes[ trying_subread_no [i] ] > ptrs -> votes[trying_subread_no [j]] )return 1;
-	if( ptrs -> votes[ trying_subread_no [i] ] < ptrs -> votes[trying_subread_no [j]] )return -1;
-	return 0;
+	temp_votes_per_read_t * ptrs = ((void**)arrp)[1];
+	int * trying_subread_no = ((void**)arrp)[0];
+	int diffv = ptrs -> votes[ trying_subread_no [i] ] - ptrs -> votes[ trying_subread_no [j] ] ;
+	return diffv;
 }
 
 void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
@@ -3148,9 +3147,10 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 	init_gene_vote(vote);
 	for(x1=0; x1<subreads; x1++){
 		int myno = trying_subread_no[x1];
-		int has_votes = ptrs->votes[myno], mynoP1PStr=(myno%applied_subreads_per_strand)+1;
+		int has_votes = ptrs->votes[myno];
 		if(has_votes<1) continue;
 
+		int mynoP1PStr=(myno%applied_subreads_per_strand)+1;
 		int offset = ptrs->offsets[myno];
 		int of_p_16 = offset + 16;
 		int subread_number_P1 = 1+((myno >= applied_subreads_per_strand)?myno - applied_subreads_per_strand:myno);
@@ -3160,9 +3160,11 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		int ignore_creation_voteloc = 0;
 
 		#warning "======== THE NEXT BLOCK MAY MAKE IT FASTER AND ACCURATE ========="
-		if(x1 >= subreads - 8 && has_votes >10) {
+		#define X_SWITCH_TEST1 1
+		#warning "======== WITH -X means WITH X*1 =================="
+		if(x1 >= subreads - 8 && has_votes >10 - (2*X_SWITCH_TEST1)) {
 			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
-			else if(has_votes > 20 && vote->max_vote >= 3) ignore_creation_voteloc =1;
+			else if(has_votes > 20 - (5*X_SWITCH_TEST1) && vote->max_vote >= 3) ignore_creation_voteloc =1;
 		}
 
 		for(x2 = 0 ; x2 < has_votes; x2++){
@@ -3204,23 +3206,23 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 						}
 
 						gene_vote_number_t test_max = (vote->votes[offsetX][i]);
-						test_max += 1;
+						test_max ++;
 						vote -> votes[offsetX][i] = test_max;
+						if(vote->max_vote < test_max)vote->max_vote = test_max;
 
 						if (offset < vote->coverage_start [offsetX][i])
 							vote->coverage_start [offsetX][i] = offset;
 						if (of_p_16 > vote->coverage_end [offsetX][i])
 							vote->coverage_end [offsetX][i] = of_p_16;
 
-						if(vote->max_vote < test_max)vote->max_vote = test_max;
 						found_some = 1;
 						break;
 					}
 				}
 				if(found_some)break;
 			}
-			if ( (!found_some) && datalen2<GENE_VOTE_SPACE && !ignore_creation_voteloc ) {
-					vote -> items[offsetX2] ++;
+			if ( !ignore_creation_voteloc  &&  (!found_some) && datalen2<GENE_VOTE_SPACE ) {
+					vote -> items[offsetX2] = datalen2+1;
 					dat2[datalen2] = kv;
 					vote -> masks[offsetX2][datalen2] = is_reversed;
 					vote -> votes[offsetX2][datalen2] = 1;
@@ -3293,7 +3295,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_1, applied_subreads, read_name_1 );
-				if(current_read_number % 500000 == 0) SUBREADprintf("voting step: %d\n", current_read_number);
+				if(current_read_number % 1000000 == 0) SUBREADprintf("voting step: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 				if(0&&FIXLENstrcmp("R00000000181", read_name_1) == 0){
 					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name_1, vote_1 -> max_vote);
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, vote_1->max_vote, min_first_read_votes);
@@ -4626,6 +4628,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 	cct_context -> current_value_index = cct_context -> all_value_indexes;
 	cct_context -> running_processed_reads_in_chunk=0;
 	cct_context -> processed_reads_in_chunk=0;
+	cct_context -> all_processed_reads_before_chunk = 0;
 
 	while(1) {
 		int ret = 0;
@@ -4674,6 +4677,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 		ret = ret || cellCounts_run_maybe_threads(cct_context, STEP_ITERATION_TWO);
 
 		cellCounts_go_chunk_nextchunk(cct_context);
+		cct_context -> all_processed_reads_before_chunk += cct_context -> processed_reads_in_chunk ;
 
 		if(ret) return ret;
 
@@ -4704,8 +4708,8 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 }
 
 #define CELLCOUNTS_BAMBLOCK_SIZE 60000
-#define CELLCOUNTS_BAMBLOCK_COMP_NUMBER 6
-#define CELLRANGER_MERGER_WORKER_BINSIZE 61000
+#define CELLCOUNTS_BAMBLOCK_COMP_NUMBER 1
+#define CELLRANGER_MERGER_WORKER_BINSIZE 62000
 
 struct scRNA_merge_batches_worker_task{
 	int sample_id;
@@ -5038,6 +5042,7 @@ void * cellCounts_merge_batches_worker(void * vp){
 
 			deflate(&my_current_job -> strm, Z_FINISH);
 			my_current_job -> outbin_len [current_blk] = CELLRANGER_MERGER_WORKER_BINSIZE-my_current_job -> strm.avail_out;
+			//SUBREADprintf("PTR_WRITE [%d] len=%d  comp_len=%d\n", current_blk , inblock_size , my_current_job -> outbin_len [current_blk]);
 			my_current_job -> crc32 [current_blk] = SamBam_CRC32(inbin_blk, inblock_size);
 			deflateEnd(&my_current_job -> strm);
 		}
@@ -5356,12 +5361,16 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 		void ** fps = HashTableGet(cct_context -> sample_BAM_writers, NULL+sample_id);
 		simple_bam_writer * wtr = fps[0];
 		int inbin_pos = 0, outblocki = 0;
+		int nextoffset = finished_job -> task -> inbin_batch_start_offsets[1];
+		int block_number_this = finished_job -> task -> block_number - finished_job -> task -> inbin_number +1;
 		while(inbin_pos < finished_job -> task -> inbin_len){
 			int binlen = 0;
-			memcpy(&binlen, finished_job -> task -> inbin+inbin_pos, 4);
-			if(inbin_pos == finished_job -> task -> inbin_batch_start_offsets[outblocki +1]) outblocki ++;
-
-			int block_number_this = finished_job -> task -> block_number - (finished_job -> task -> inbin_number -1 - outblocki);
+			if(outblocki < finished_job -> task -> inbin_number -1 &&  inbin_pos == nextoffset ){
+				outblocki ++;
+				if(outblocki < finished_job -> task -> inbin_number -1)nextoffset = finished_job -> task -> inbin_batch_start_offsets[outblocki +1];
+				block_number_this = finished_job -> task -> block_number - (finished_job -> task -> inbin_number -1 - outblocki);
+			}
+			binlen=*(int*)(finished_job -> task -> inbin+inbin_pos);
 			simple_bam_writer_update_index(wtr, finished_job -> task -> inbin+inbin_pos, binlen, block_number_this, inbin_pos);
 			inbin_pos += 4+binlen;
 		}
@@ -5750,6 +5759,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		current_filling_worker_per_sample[xk1] = 0;
 		task_buffers[xk1].inbin_len = 0;
 		task_buffers[xk1].inbin_number = 0;
+		task_buffers[xk1].inbin_batch_start_offsets[0]=0;
 		block_numbers_current[xk1] = 0;
 	}
 
@@ -5860,6 +5870,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id-1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		memcpy(tofill->inbin + tofill-> inbin_len, last_rbin_buffer[selected_fp_no]+16+8*genes+cct_context -> UMI_length, binlen + 4);
 		tofill -> inbin_len += (binlen + 4);
+		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
 		//SUBREADprintf("ADDING BLOCKKK = %d  WKR = %d  IT THINK IT'S %d ; GENES=%d\n", tofill -> inbin_len, current_worker, tofill -> sample_id, genes);
 		if(tofill-> inbin_len > CELLCOUNTS_BAMBLOCK_SIZE * CELLCOUNTS_BAMBLOCK_COMP_NUMBER){
 			master_wait_for_job_done(&worker_mut, current_worker);
@@ -5874,6 +5885,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			tofill = task_buffers+(current_filling_worker_per_sample[sample_id-1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 			tofill -> inbin_len = 0;
 			tofill -> inbin_number = 0;
+			tofill -> inbin_batch_start_offsets[0]=0;
 			
 			current_worker ++;
 			if(current_worker == compress_workers) current_worker=0;
@@ -5945,6 +5957,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		tofill -> inbin_len += 4;
 		fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
 		tofill -> inbin_len += binlen;
+		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
 		if(tofill-> inbin_len > CELLCOUNTS_BAMBLOCK_SIZE * CELLCOUNTS_BAMBLOCK_COMP_NUMBER){
 			struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
 			if(my_finished_job -> task)master_wait_for_job_done(&worker_mut, current_worker);
@@ -5958,6 +5971,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			tofill = task_buffers+(current_filling_worker_per_sample[sample_id-1] * cct_context-> sample_sheet_table -> numOfElements +sample_id-1);
 			tofill -> inbin_len = 0;
 			tofill -> inbin_number = 0;
+			tofill -> inbin_batch_start_offsets[0]=0;
 			
 			current_worker ++;
 			if(current_worker == compress_workers) current_worker=0;
@@ -6035,9 +6049,9 @@ int cellCounts_run_counting(cellcounts_global_t * cct_context){
 #endif
 int cellCounts_main(int argc, char** argv){
 	cellcounts_global_t * cct_context = calloc(sizeof(cellcounts_global_t),1);
+	cct_context -> program_start_time = miltime();
 
 	int ret = 0;
-
 	ret = ret || cellCounts_args_context(cct_context, argc, argv);
 	ret = ret || cellCounts_load_context(cct_context);
 	ret = ret || cellCounts_run_mapping(cct_context);

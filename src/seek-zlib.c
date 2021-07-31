@@ -797,6 +797,7 @@ int parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char
 	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
 	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,"\n",1,thread_no);
 
+	//SUBREADprintf("WRITEFQ RNAME '%s'\n", bambin+36);
 	char * R1seq = bambin+36+13;
 	int R1len = 0;
 	for(R1len=0; R1seq[R1len] && R1seq[R1len]!='|' ;R1len++);
