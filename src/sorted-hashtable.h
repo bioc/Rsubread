@@ -27,7 +27,9 @@
 #include "gene-value-index.h"
 
 #define GEHASH_DEFAULT_SIZE	2000000000
-#define GEHASH_BUCKET_LENGTH 100
+
+#warning "REMOVE '-66' NEXT LINE "
+#define GEHASH_BUCKET_LENGTH (100 - 66)
 
 #define gehash_fast_t gehash_t
 #define gehash_destory_fast gehash_destory

@@ -3162,7 +3162,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		#warning "======== THE NEXT BLOCK MAY MAKE IT FASTER AND ACCURATE ========="
 		#define X_SWITCH_TEST1 1
 		#warning "======== WITH -X means WITH X*1 =================="
-		if(x1 >= subreads - 8 && has_votes >10 - (2*X_SWITCH_TEST1)) {
+		if(0)if(x1 >= subreads - 8 && has_votes >10 - (2*X_SWITCH_TEST1)) {
 			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
 			else if(has_votes > 20 - (5*X_SWITCH_TEST1) && vote->max_vote >= 3) ignore_creation_voteloc =1;
 		}
@@ -3281,14 +3281,19 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 			int allow_indel_i;
 
 			for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
+				int last_vote_rpos = -16;
+				gehash_key_t subread_integer = 0;
 				for(xk1=0; xk1<index_gap_width ; xk1++) {
 
 					int subread_offset = ((subread_step * subread_no) >> 16);
-					if(index_gap_width > 1) subread_offset -= subread_offset%(index_gap_width) - xk1; 
+					if(index_gap_width > 1){
+						subread_offset -= subread_offset%(index_gap_width) - xk1; 
+						//char * subread_string = read_text_1 + subread_offset;
+						//subread_integer = cellCounts_genekey2int(subread_string);
+					}
+					#define SHIFT_SUBREAD_INT(ii, pp) { int nch = read_text_1 [pp]; ii = (ii << 2) | base2int( nch ); }
+					for(; last_vote_rpos  < subread_offset ; last_vote_rpos ++) SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
 
-					char * subread_string = read_text_1 + subread_offset;
-
-					gehash_key_t subread_integer = cellCounts_genekey2int(subread_string);
 					prefill_votes(cct_context->current_index, &prefill_ptrs, applied_subreads, subread_integer, subread_offset, subread_no, is_reversed);
 				}
 			}
