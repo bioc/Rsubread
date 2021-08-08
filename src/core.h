@@ -412,7 +412,10 @@ typedef struct
 // THREE_TOP_UPDATE dictates the number of top-votes.
 
 typedef struct {
-	int is_vote_t_item;
+	union{
+		int is_vote_t_item;
+		int is_exon_item;
+	};
 	int item_index_i;
 	int item_index_j;
 	unsigned int mapping_position;

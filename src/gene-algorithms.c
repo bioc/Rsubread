@@ -2514,10 +2514,10 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		for(j=0; j< vote->items[i]; j++)
 		{
-			locate_gene_position(vote -> pos[i][j], &offsets, &chrname, &chrpos);
+			locate_gene_position(vote -> pos[i][j] +1, &offsets, &chrname, &chrpos);
 			int toli = vote->toli [i][j];
 			int last_offset = vote -> indel_recorder[i][j][toli+2];
-			SUBREADprintf("  %s\tVote = %d , Position is %s,%d (+%u) Coverage is (%d, %d) Indel %d %s (%d)\n", vote->votes[i][j] == vote->max_vote?"***":"   ", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j],last_offset, (vote -> masks[i][j])?"NEG":"POS", vote -> masks[i][j]);
+			SUBREADprintf("  %s\tVote = %d , Position is (1-base):%s,%d (+%u) Coverage is (%d, %d) Indel %d %s (%d)\n", vote->votes[i][j] == vote->max_vote?"***":"   ", vote->votes[i][j] , chrname, chrpos, vote -> pos[i][j], vote -> coverage_start[i][j], vote -> coverage_end[i][j],last_offset, (vote -> masks[i][j])?"NEG":"POS", vote -> masks[i][j]);
 
 			if(1){
 				int k;

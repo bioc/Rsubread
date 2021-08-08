@@ -28,8 +28,8 @@
 
 #define GEHASH_DEFAULT_SIZE	2000000000
 
-#warning "REMOVE '-66' NEXT LINE "
-#define GEHASH_BUCKET_LENGTH (100 - 66)
+#warning "REMOVE '- 69' NEXT LINE "
+#define GEHASH_BUCKET_LENGTH (100 - 69)
 
 #define gehash_fast_t gehash_t
 #define gehash_destory_fast gehash_destory

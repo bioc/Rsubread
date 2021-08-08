@@ -202,10 +202,10 @@ typedef short gene_vote_number_t;
 #define GENE_VOTE_SPACE 173 
 #define GENE_VOTE_TABLE_SIZE 331
 #else
-#warning "============ ADD '-19' from next line  ================"
-#define GENE_VOTE_SPACE (24 - 19)
-#warning "============ ADD '-19' from next line  ================"
-#define GENE_VOTE_TABLE_SIZE (30 - 19)
+#warning "============ ADD '-21' from next line  ================"
+#define GENE_VOTE_SPACE (24 - 21)
+#warning "============ ADD '-12' from next line  ================"
+#define GENE_VOTE_TABLE_SIZE (30 - 12)
 #endif
 
 #define MAX_ANNOTATION_EXONS 30000 
