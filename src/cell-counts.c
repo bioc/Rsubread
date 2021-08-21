@@ -18,7 +18,7 @@
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
-#define FC_MAX_CIGAR_SECTIONS 96
+#define FC_MAX_CIGAR_SECTIONS 7
 #define MAX_UMI_LEN 14
 #define MAX_SCRNA_SAMPLE_NUMBER 16
 #define MAX_SUBREADS_PER_READ 30
@@ -244,6 +244,7 @@ static struct option cellCounts_long_options[]={
 	{"maxMismatch", required_argument ,0,0},
 	{"subreadsPerRead",required_argument,0,0},
 	{"minVotesPerRead",required_argument,0,0},
+	{"reportedAlignmentsPerRead",required_argument,0,0},
 
 	{0,0,0,0}
 };
@@ -264,7 +265,6 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 	int my_no = subread_no + applied_subreads * is_negative_strand;
 
 	pnts -> votes[my_no] = 0;
-	pnts -> offsets[my_no] = offset;
 	short key = subread / the_table->buckets_number;
 	while(1){
 		last_accepted_index=(imin+imax)/2;
@@ -276,23 +276,24 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 		if(imax<imin) return;
 	}
 
-	int start_scan_idx = last_accepted_index, scan_step = 0;
+	int start_scan_idx = last_accepted_index;
 	unsigned int * stoploc = NULL;
 	while(1){
-		if(scan_step){
-			last_accepted_index --;
-			if(last_accepted_index <0 || current_keys[last_accepted_index]!= key){
-				pnts -> start_location_in_index[my_no] = current_bucket->item_values + last_accepted_index  +1;
-				pnts -> votes[my_no] = stoploc - pnts -> start_location_in_index[my_no];
-				break;
-			}
-		}else{
-			last_accepted_index ++;
-			if(last_accepted_index == items || current_keys[last_accepted_index]!= key){
-				stoploc = current_bucket->item_values + last_accepted_index ; 
-				scan_step = 1;
-				last_accepted_index = start_scan_idx;
-			}
+		last_accepted_index ++;
+		if(last_accepted_index == items || current_keys[last_accepted_index]!= key){
+			stoploc = current_bucket->item_values + last_accepted_index ; 
+			last_accepted_index = start_scan_idx;
+			break;
+		}
+	}
+
+	while(1){
+		last_accepted_index --;
+		if(last_accepted_index <0 || current_keys[last_accepted_index]!= key){
+			pnts -> start_location_in_index[my_no] = current_bucket->item_values + last_accepted_index  +1;
+			pnts -> votes[my_no] = stoploc - pnts -> start_location_in_index[my_no];
+			pnts -> offsets[my_no] = offset;
+			break;
 		}
 	}
 }
@@ -330,7 +331,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		cct_context -> reads_per_chunk /= 15;
+		cct_context -> reads_per_chunk /= 4;
 	}
 
 
@@ -358,6 +359,9 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 		if(strcmp("output", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> output_prefix, optarg, MAX_FILE_NAME_LENGTH -1);
+		}
+		if(strcmp("reportedAlignmentsPerRead", cellCounts_long_options[option_index].name)==0){
+			cct_context -> max_best_alignments = min(64, max(1, atoi(optarg)));
 		}
 		if(strcmp("threads", cellCounts_long_options[option_index].name)==0){
 			cct_context -> total_threads = min(64, max(1, atoi(optarg)));
@@ -387,6 +391,9 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 			strncpy(cct_context -> bcl_sample_sheet_file, optarg, MAX_FILE_NAME_LENGTH -1);
 		}
 	}
+
+	cct_context -> max_top_vote_simples = max(cct_context -> max_top_vote_simples, cct_context -> max_best_alignments);
+	cct_context -> max_voting_locations = max(cct_context -> max_voting_locations, cct_context -> max_best_alignments);
 	return 0;
 }
 
@@ -2049,9 +2056,9 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR  *  2 * cct_context -> max_best_alignments ; repeated_count ++)
 		repeated_buffer_cigars[repeated_count] = malloc(2*CORE_MAX_CIGAR_STR_LEN);
 
-	final_MATCH_buffer = malloc(sizeof(int) * 2 * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
-	final_MISMATCH_buffer = malloc(sizeof(int) * 2 * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
-	final_PENALTY_buffer = malloc(sizeof(int) * 2 * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
+	final_MATCH_buffer = malloc(sizeof(int) * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
+	final_MISMATCH_buffer = malloc(sizeof(int) * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
+	final_PENALTY_buffer = malloc(sizeof(int) * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
 	final_realignment_index = malloc(sizeof(int) * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
 
 	final_SCORE_buffer = malloc(sizeof(long long) * cct_context -> max_voting_locations * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR*MAX_ALIGNMENT_PER_ANCHOR);
@@ -2126,7 +2133,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 
 		if(candidate_locations > 0){
 			int read_record_i;
-			unsigned long long int best_score_highest = 0;
+			unsigned long long int reporting_alignment_score_cutoff = 0;
 			unsigned long long int scores_array [cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR];
 
 			for(read_record_i = 0; read_record_i < candidate_locations; read_record_i++){
@@ -2142,37 +2149,40 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 				this_SCORE =((100000llu * (500 - this_MISMATCH + 2*is_exonic_regions) + this_MATCH)*50llu - this_PENALTY)*20llu+ final_realignment_result -> known_junction_supp;
 
 				if(0&&FIXLENstrcmp("R00001999552", read_name)==0)SUBREADprintf("  FINALSCORE %s (%u) #%d : score=%llu ; in-EXON=%d\n", read_name, final_realignment_result -> first_base_position, read_record_i , this_SCORE , is_exonic_regions);
-				best_score_highest = max(best_score_highest, this_SCORE);
+				reporting_alignment_score_cutoff = max(reporting_alignment_score_cutoff, this_SCORE);
 				scores_array[read_record_i] = this_SCORE;
 			}
 
+			int skipped_locations = 0;
 			for(read_record_i = 0; read_record_i <  candidate_locations ; read_record_i++){
 				realignment_result_t * final_realignment_result = final_realignments + final_realignment_index[read_record_i];
-				if( scores_array[read_record_i] >= best_score_highest && (final_realignment_result -> realign_flags & CORE_TOO_MANY_MISMATCHES)==0) {
+				if(0==scores_array[read_record_i]) SUBREADprintf("ERROR: zero final SCORE before final score adjustment: %llu\n", scores_array[read_record_i]);
+				if((final_realignment_result -> realign_flags & CORE_TOO_MANY_MISMATCHES)==0) {
 					int is_repeated = 0;
 					is_repeated = cellCounts_add_repeated_buffer(cct_context, repeated_buffer_pos, repeated_buffer_cigars, &repeated_count, final_realignment_result);
-					if(is_repeated)
-						scores_array[read_record_i] = 0;
-					else
-						highest_score_occurence ++;
-				}
+					if(is_repeated)scores_array[read_record_i] = 0;
+				}else scores_array[read_record_i] = 0;
+				if(0==scores_array[read_record_i]) skipped_locations ++;
 			}
 
+			basic_sort(scores_array, candidate_locations, sorting_LL_array_compare, sorting_LL_array_exchange);
+			if(candidate_locations > cct_context -> max_best_alignments) reporting_alignment_score_cutoff = scores_array[candidate_locations - cct_context -> max_best_alignments];
+			else reporting_alignment_score_cutoff = scores_array[0];
+			highest_score_occurence = min(candidate_locations - skipped_locations, cct_context -> max_best_alignments);
+			reporting_alignment_score_cutoff = max(1, reporting_alignment_score_cutoff);
+
 			if(highest_score_occurence ==1 || cct_context -> report_multi_mapping_reads){
-				int is_break_even = 0;
-				if(highest_score_occurence>1)is_break_even = 1;
 				highest_score_occurence = min(highest_score_occurence, cct_context -> max_best_alignments);
 
 				for(read_record_i = 0; read_record_i <  candidate_locations ; read_record_i++){
 					if(output_cursor == highest_score_occurence)break;
 					realignment_result_t * final_realignment_result = final_realignments + final_realignment_index[read_record_i];
 
-					if( scores_array[read_record_i] >= best_score_highest && (final_realignment_result -> realign_flags & CORE_TOO_MANY_MISMATCHES)==0
-					  && output_cursor < cct_context -> max_best_alignments){
+					if( scores_array[read_record_i] >= reporting_alignment_score_cutoff && output_cursor < cct_context -> max_best_alignments){
 						strcpy(read_text, raw_read_text);
 						strcpy(qual_text, raw_qual_text);
 
-						if(is_break_even) final_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
+						if(highest_score_occurence>1) final_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
 						final_realignment_result -> MAPQ_adjustment = final_MISMATCH_buffer[read_record_i] + step2_locations;
 
 						cellCounts_write_read_in_batch_bin(cct_context, thread_no, &out_context , current_read_number, final_realignment_result, read_name, read_text, qual_text, read_len, highest_score_occurence, output_cursor);
@@ -2999,7 +3009,7 @@ int cellCounts_process_voting_junction(cellcounts_global_t * cct_context, int th
 	simple_mapping_t * vote_simple_buffer = (simple_mapping_t *) topbuf -> vote_simple_1_buffer;
 
 	int i,j;
-	int top_three_buff[9];
+	int top_three_buff[max(9, cct_context -> max_top_vote_simples)];
 	memset(top_three_buff, 0 , cct_context -> max_top_vote_simples * sizeof(int));
 
 	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++){
@@ -3128,9 +3138,9 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		int ignore_creation_voteloc = 0;
 
 		#warning "======== THE NEXT BLOCK MAY MAKE IT FASTER AND ACCURATE ========="
-		#define X_SWITCH_TEST1 1
+		#define X_SWITCH_TEST1 0
 		#warning "======== WITH -X means WITH X*1 =================="
-		if(0)if(x1 >= subreads - 8 && has_votes >10 - (2*X_SWITCH_TEST1)) {
+		if(1)if(x1 >= subreads - 8 && has_votes >10 - (2*X_SWITCH_TEST1)) {
 			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
 			else if(has_votes > 20 - (5*X_SWITCH_TEST1) && vote->max_vote >= 3) ignore_creation_voteloc =1;
 		}
@@ -3143,7 +3153,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 			datalen = datalen2 = vote -> items[offsetX];
 			unsigned int * dat2, *dat;
 			dat = dat2 = vote -> pos[offsetX];
-			int found_some = 0;
 			for(iix = 0; iix<=INDEL_SEGMENT_SIZE; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)) {
 				if(iix) {
 					offsetX = _index_vote_tol(kv+iix);
@@ -3183,13 +3192,11 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 						if (of_p_16 > vote->coverage_end [offsetX][datalen])
 							vote->coverage_end [offsetX][datalen] = of_p_16;
 
-						found_some = 1;
-						break;
+						goto foundend;
 					}
 				}
-				if(found_some)break;
 			}
-			if ( datalen2<GENE_VOTE_SPACE && !ignore_creation_voteloc  &&  (!found_some)){
+			if ( datalen2<GENE_VOTE_SPACE && !ignore_creation_voteloc){
 				vote -> items[offsetX2] = datalen2+1;
 				dat2[datalen2] = kv;
 				vote -> masks[offsetX2][datalen2] = is_reversed;
@@ -3205,6 +3212,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				if (vote->max_vote==0)
 					vote->max_vote = 1;
 			}
+			foundend:;
 		}
 	}
 }
@@ -3701,7 +3709,7 @@ int cellCounts_match_chro(char * read, gene_value_index_t * index, unsigned int 
 
 void cellCounts_absoffset_to_posstr(cellcounts_global_t * cct_context, unsigned int pos, char * res);
 
-#define MIN_EVENT_DISTANCE 10
+#define MIN_EVENT_DISTANCE 16
 
 void cellCounts_search_events_to_back(cellcounts_global_t * cct_context, int thread_no, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_tail_abs_offset, short read_tail_pos, short sofar_matched, int suggested_movement)
 {
@@ -4009,7 +4017,7 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	gene_value_index_t * current_value_index = thread_context->current_value_index;
 	int current_reversed = is_read_head_reversed;
-	int all_mismatched = 0;
+	int all_mismatched = 0, total_cigar_sections = 0;
 	int is_First_M = 1, is_wrong_cigar = 0;
 	int head_soft_clipped = -1, tail_soft_clipped = -1;
 	unsigned int tmp_int = 0;
@@ -4020,6 +4028,7 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 		if(isdigit(nch))
 			tmp_int = tmp_int*10+(nch-'0');
 		else{
+			total_cigar_sections ++;
 			if(tmp_int == 0)is_wrong_cigar = 1;
 			if(is_wrong_cigar) break;
 			if(nch == 'M' || nch == 'S') {
@@ -4043,10 +4052,6 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 
 						head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, current_value_index, reversed_first_section_text, current_perfect_section_abs, tmp_int, 1, 0);
 					} else	head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, current_value_index, read_text, current_perfect_section_abs, tmp_int, 0, adj_coverage_start);
-					//SUBREADprintf("SSHEAD:%d\n", head_soft_clipped);
-			if(0 && FIXLENstrcmp("R00000001230", read_name)==0)
-				SUBREADprintf("FSTMSOFT %s at %u : clp_len=%d ; REV=%d\n", read_name, read_head_abs_offset, head_soft_clipped , current_reversed);
-
 					if(head_soft_clipped == tmp_int){
 						(*full_section_clipped) = 1;
 						head_soft_clipped = 0;
@@ -4060,6 +4065,7 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 					if(reversed_first_section_text)
 						free(reversed_first_section_text);
 					reversed_first_section_text = NULL;
+					if(head_soft_clipped) total_cigar_sections ++;
 				}
 				if(is_Last_M) {
 					int adj_coverage_end = covered_end - read_cursor;
@@ -4085,6 +4091,7 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 
 					if(reversed_first_section_text)
 						free(reversed_first_section_text);
+					if(tail_soft_clipped) total_cigar_sections ++;
 				}
 
 				if(is_Last_M && is_First_M && tail_soft_clipped+head_soft_clipped >= tmp_int-1) {
@@ -4135,7 +4142,7 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 	my_non_clipped_length -= max(0,tail_soft_clipped);
 	my_non_clipped_length -= max(0,head_soft_clipped);
 
-	if(is_wrong_cigar || rebuilt_read_len != read_len){
+	if(is_wrong_cigar || rebuilt_read_len != read_len || total_cigar_sections> FC_MAX_CIGAR_SECTIONS ){
 		(*mismatched_bases)=99999;
 		all_matched_bases = 0;
 		sprintf(cigar_string, "%dM", read_len);
@@ -4316,7 +4323,7 @@ unsigned int cellCounts_finalise_explain_CIGAR(cellcounts_global_t * cct_context
 
 			applied_mismatch = cct_context->max_mismatching_bases_in_reads ;
 
-			if(0 && FIXLENstrcmp("R00017223176", explain_context ->  read_name)==0){
+			if(0 && FIXLENstrcmp("R00267085946", explain_context ->  read_name)==0){
 				char outpos1[100];
 				cellCounts_absoffset_to_posstr(cct_context, final_position +1, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS (One-Base) = %s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?\n%s %p\nMASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1, final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, 0.0 ,result-> used_subreads_in_vote, explain_context -> full_read_text, explain_context -> full_read_text , result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
@@ -5743,6 +5750,7 @@ void * delete_file_thread(void * arg){
 }
 
 int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
+	pthread_t *threads = malloc(sizeof(pthread_t)* cct_context-> total_threads);
 	int sample_i,xk2,xk1,compress_workers = max(1, cct_context-> total_threads-1);
 	HashTable * cellnoP1_to_genenoP1_to_UMIs[cct_context -> sample_sheet_table -> numOfElements];
 	struct scRNA_merge_batches_worker_task * task_buffers = malloc(sizeof(struct scRNA_merge_batches_worker_task) * (1+compress_workers)* cct_context->sample_sheet_table -> numOfElements);
@@ -5770,7 +5778,6 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		block_numbers_current[xk1] = 0;
 	}
 
-	pthread_t *threads = malloc(sizeof(pthread_t)* cct_context-> total_threads);
 	for(xk1=0; xk1<compress_workers+1; xk1++)for(xk2 = 0; xk2 < cct_context-> sample_sheet_table -> numOfElements; xk2++) task_buffers[xk1*cct_context->sample_sheet_table -> numOfElements + xk2].sample_id = xk2+1;
 
 	for(xk1=0; xk1< cct_context-> total_threads; xk1++){

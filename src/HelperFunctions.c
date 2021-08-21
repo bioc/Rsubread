@@ -59,6 +59,18 @@
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
+void sorting_LL_array_exchange(srInt_64 * arr, int i, int j){
+	srInt_64 t = arr[i];
+	arr[i]=arr[j];
+	arr[j]=t;
+}
+
+int sorting_LL_array_compare(srInt_64 * arr, int i, int j){
+	if(arr[i]>arr[j])return 1;
+	if(arr[i]<arr[j])return -1;
+	return 0;
+}
+
 size_t get_sys_mem_info(char * keyword){
 	FILE * mfp = fopen("/proc/meminfo","r");
 	if(mfp==NULL) return -1;

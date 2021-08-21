@@ -3697,7 +3697,7 @@ int read_chunk_circles(global_context_t *global_context)
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			// the indexes will be destroyed in destroy_global_context
 			break;
-		if(1){
+		if(0){
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
@@ -4724,11 +4724,9 @@ int chimeric_cigar_parts(global_context_t * global_context, unsigned int sel_pos
 
 void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r));
 
-void quick_sort(void * arr, int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r))
-{
+void quick_sort(void * arr, int arr_size, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r)) {
 	quick_sort_run(arr, 0, arr_size-1, compare, exchange);
 }
- 
  
 void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r))
 {
@@ -4747,9 +4745,11 @@ void quick_sort_run(void * arr, int spot_low,int spot_high, int compare (void * 
 		}
 
 	exchange(arr, i+1, spot_high);
-	if(i>spot_low) quick_sort_run(arr, spot_low, i, compare, exchange);
+
+	if(i > spot_low) quick_sort_run(arr, spot_low, i, compare, exchange);
 	if(spot_high>i+2) quick_sort_run(arr, i+2, spot_high, compare, exchange);
 }
+
 void basic_sort_run(void * arr, int start, int items, int compare (void * arr, int l, int r), void exchange(void * arr, int l, int r)){
 	int i, j;
 	for(i=start; i< start + items - 1; i++)

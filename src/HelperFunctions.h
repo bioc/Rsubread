@@ -271,4 +271,8 @@ void TNbignum_assign(struct bn* dst, struct bn* src);        /* Copy src into ds
 size_t get_sys_mem_info(char * keyword);
 int get_free_total_mem(size_t * total, size_t * free_mem);
 void *windows_memmem(const void *haystack_start, size_t haystack_len, const void *needle_start, size_t needle_len);
+
+void sorting_LL_array_exchange(srInt_64 * arr, int i, int j);
+int sorting_LL_array_compare(srInt_64 * arr, int i, int j);
+
 #endif
