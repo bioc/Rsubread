@@ -2153,7 +2153,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 				scores_array[read_record_i] = this_SCORE;
 			}
 
-			int skipped_locations = 0;
+			int skipped_locations = 0, has_breakeven = 0;
 			for(read_record_i = 0; read_record_i <  candidate_locations ; read_record_i++){
 				realignment_result_t * final_realignment_result = final_realignments + final_realignment_index[read_record_i];
 				if(0==scores_array[read_record_i]) SUBREADprintf("ERROR: zero final SCORE before final score adjustment: %llu\n", scores_array[read_record_i]);
@@ -2165,11 +2165,12 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 				if(0==scores_array[read_record_i]) skipped_locations ++;
 			}
 
-			basic_sort(scores_array, candidate_locations, sorting_LL_array_compare, sorting_LL_array_exchange);
+			quick_sort(scores_array, candidate_locations, sorting_LLU_array_compare, sorting_LLU_array_exchange);
 			if(candidate_locations > cct_context -> max_best_alignments) reporting_alignment_score_cutoff = scores_array[candidate_locations - cct_context -> max_best_alignments];
 			else reporting_alignment_score_cutoff = scores_array[0];
 			highest_score_occurence = min(candidate_locations - skipped_locations, cct_context -> max_best_alignments);
 			reporting_alignment_score_cutoff = max(1, reporting_alignment_score_cutoff);
+			if( candidate_locations >1 && scores_array[candidate_locations -1] == scores_array[candidate_locations -2] ) has_breakeven=1;
 
 			if(highest_score_occurence ==1 || cct_context -> report_multi_mapping_reads){
 				highest_score_occurence = min(highest_score_occurence, cct_context -> max_best_alignments);
@@ -2182,7 +2183,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 						strcpy(read_text, raw_read_text);
 						strcpy(qual_text, raw_qual_text);
 
-						if(highest_score_occurence>1) final_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
+						if(has_breakeven) final_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
 						final_realignment_result -> MAPQ_adjustment = final_MISMATCH_buffer[read_record_i] + step2_locations;
 
 						cellCounts_write_read_in_batch_bin(cct_context, thread_no, &out_context , current_read_number, final_realignment_result, read_name, read_text, qual_text, read_len, highest_score_occurence, output_cursor);
@@ -5744,8 +5745,9 @@ void * delete_file_thread(void * arg){
 			}else all_closed = 0;
 		}
 		if(all_closed ) break;
-		sleep(1);
+		sleep(2);
 	}
+	free(current_sorting_key);
 	return NULL;
 }
 
@@ -5806,7 +5808,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 
 	FILE * input_fps[CELLBC_BATCH_NUMBER+2];
 	char * last_rbin_buffer[CELLBC_BATCH_NUMBER+1];
-	srInt_64 current_sorting_key[CELLBC_BATCH_NUMBER+2];
+	srInt_64 * current_sorting_key = malloc(sizeof(srInt_64)*(CELLBC_BATCH_NUMBER+2));
 	
 	for(xk1=0; xk1< CELLBC_BATCH_NUMBER+2; xk1++){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
@@ -5880,7 +5882,6 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		if(genes & (1LLU<<63)) genes = genes & 0x7fffffff;
 		else genes = 0;
 		memcpy(&binlen,last_rbin_buffer[selected_fp_no]+16+8*genes+cct_context -> UMI_length,4);
-
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id-1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		memcpy(tofill->inbin + tofill-> inbin_len, last_rbin_buffer[selected_fp_no]+16+8*genes+cct_context -> UMI_length, binlen + 4);
 		tofill -> inbin_len += (binlen + 4);
@@ -5918,7 +5919,6 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			else genes= 0;
 			fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[selected_fp_no]);
 			memcpy(&binlen, last_rbin_buffer[selected_fp_no] +16 +8*genes+ cct_context -> UMI_length  , 4);
-
 			fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
 			srInt_64 sorting_key = *(int*)(last_rbin_buffer[selected_fp_no] + 16+8*genes +cct_context -> UMI_length +4);
 			sorting_key = sorting_key << 32;
@@ -5965,8 +5965,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		fread(&binlen, 1, 4, notmapped_fp);
-		assert(binlen <= READ_BIN_BUF_SIZE);
-		//SUBREADprintf("LOADEDbinlen=%d, tofil=%d", binlen, tofill -> inbin_len);
+		if(binlen > 1000) SUBREADprintf("Very long read [C]: %08x\n", binlen);
 		memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
 		tofill -> inbin_len += 4;
 		fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
@@ -6025,9 +6024,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 	free(task_buffers);
 	free(worker_current_jobs);
 
-	for(xk1=0; xk1< compress_workers; xk1++){
-		pthread_join(threads[xk1],NULL);
-	}
+	for(xk1=0; xk1< compress_workers; xk1++) pthread_join(threads[xk1],NULL);
 
 	worker_master_mutex_destroy(&worker_mut);
 

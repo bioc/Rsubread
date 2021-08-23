@@ -59,13 +59,15 @@
 #include "gene-algorithms.h"
 #include "HelperFunctions.h"
 
-void sorting_LL_array_exchange(srInt_64 * arr, int i, int j){
-	srInt_64 t = arr[i];
+void sorting_LLU_array_exchange(void * varr, int i, int j){
+	srUInt_64 *arr = varr;
+	srUInt_64 t = arr[i];
 	arr[i]=arr[j];
 	arr[j]=t;
 }
 
-int sorting_LL_array_compare(srInt_64 * arr, int i, int j){
+int sorting_LLU_array_compare(void * varr, int i, int j){
+	srUInt_64 *arr = varr;
 	if(arr[i]>arr[j])return 1;
 	if(arr[i]<arr[j])return -1;
 	return 0;
