@@ -203,7 +203,7 @@ typedef short gene_vote_number_t;
 #define GENE_VOTE_TABLE_SIZE 331
 #else
 #warning "============ ADD '-21' from next line  ================"
-#define GENE_VOTE_SPACE (24 - 19)
+#define GENE_VOTE_SPACE (24 - 21)
 #warning "============ ADD '-13' from next line  ================"
 #define GENE_VOTE_TABLE_SIZE (30 - 13)
 #endif

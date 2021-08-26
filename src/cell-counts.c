@@ -18,7 +18,7 @@
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
-#define FC_MAX_CIGAR_SECTIONS 7
+#define CIGAR_PERFECT_SECTIONS 12 
 #define MAX_UMI_LEN 14
 #define MAX_SCRNA_SAMPLE_NUMBER 16
 #define MAX_SUBREADS_PER_READ 30
@@ -45,8 +45,8 @@ typedef struct {
 } voting_location_t;
 
 typedef struct {
-	int votes[MAX_SUBREADS_PER_READ];
-	int offsets[MAX_SUBREADS_PER_READ];
+	int votes[MAX_SUBREADS_PER_READ *2];
+	int offsets[MAX_SUBREADS_PER_READ *2];
 	unsigned int * start_location_in_index [MAX_SUBREADS_PER_READ *2]; // * 2 because positive and negative strand votes are evaluated together.
 } temp_votes_per_read_t;
 
@@ -88,7 +88,7 @@ typedef struct{
 	int allow_multi_overlapping_reads;
 	int max_voting_simples;
 	int max_voting_locations;
-	int max_best_alignments;
+	int max_reported_alignments_per_read;
 	int max_indel_length;
 	int max_distinct_top_vote_numbers;
 	int max_differential_from_top_vote_number;
@@ -241,6 +241,7 @@ static struct option cellCounts_long_options[]={
 	{"sampleSheetFile",required_argument, 0,0},
 	{"reportMultiMappingReads", no_argument ,0,0},
 
+	{"maxDiffToTopVotes", required_argument ,0,0},
 	{"maxMismatch", required_argument ,0,0},
 	{"subreadsPerRead",required_argument,0,0},
 	{"minVotesPerRead",required_argument,0,0},
@@ -310,7 +311,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> total_threads = 10;
 	cct_context -> features_annotation_file_type = FILE_TYPE_RSUBREAD;
 	cct_context -> reads_per_chunk = 30000000;
-	cct_context -> max_best_alignments = 1;
+	cct_context -> max_reported_alignments_per_read = 1;
 	cct_context -> max_voting_simples = 3;
 	cct_context -> max_mismatching_bases_in_reads = 3;
 	cct_context -> max_voting_locations = 3;
@@ -324,7 +325,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> current_dataset_no = 1;
 	strcpy(cct_context -> temp_file_dir, "./");
 
-	if(1){
+	if(0){
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
@@ -351,6 +352,9 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		if(strcmp("dataset", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> input_dataset_name, optarg, MAX_FILE_NAME_LENGTH * MAX_SCRNA_FASTQ_FILES * 3 -1);
 		}
+		if(strcmp("maxDiffToTopVotes", cellCounts_long_options[option_index].name)==0){
+			cct_context -> max_differential_from_top_vote_number = min(30, max(1, atoi(optarg)));
+		}
 		if(strcmp("index", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> index_prefix, optarg, MAX_FILE_NAME_LENGTH -1);
 		}
@@ -361,7 +365,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 			strncpy(cct_context -> output_prefix, optarg, MAX_FILE_NAME_LENGTH -1);
 		}
 		if(strcmp("reportedAlignmentsPerRead", cellCounts_long_options[option_index].name)==0){
-			cct_context -> max_best_alignments = min(64, max(1, atoi(optarg)));
+			cct_context -> max_reported_alignments_per_read = min(64, max(1, atoi(optarg)));
 		}
 		if(strcmp("threads", cellCounts_long_options[option_index].name)==0){
 			cct_context -> total_threads = min(64, max(1, atoi(optarg)));
@@ -392,8 +396,8 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 	}
 
-	cct_context -> max_voting_simples = max(cct_context -> max_voting_simples, cct_context -> max_best_alignments);
-	cct_context -> max_voting_locations = max(cct_context -> max_voting_locations, cct_context -> max_best_alignments);
+	cct_context -> max_voting_simples = max(cct_context -> max_voting_simples, cct_context -> max_reported_alignments_per_read);
+	cct_context -> max_voting_locations = max(cct_context -> max_voting_locations, cct_context -> max_reported_alignments_per_read);
 	return 0;
 }
 
@@ -1076,7 +1080,7 @@ int cellCounts_load_context(cellcounts_global_t * cct_context){
 
 	int bitmap_size = (4096 / EXONIC_REGION_RESOLUTION / 8)*1024*1024;
 	rv = rv || ((cct_context -> exonic_region_bitmap = calloc(bitmap_size, 1))==NULL);
-	int voting_location_table_items = cct_context -> reads_per_chunk * max(cct_context -> max_voting_locations, cct_context -> max_best_alignments);
+	int voting_location_table_items = cct_context -> reads_per_chunk * max(cct_context -> max_voting_locations, cct_context -> max_reported_alignments_per_read);
 	rv = rv || ((cct_context->voting_location_table = calloc(sizeof(voting_location_t), voting_location_table_items))==NULL);
 	rv = rv || cellCounts_load_base_value_indexes(cct_context);
 	rv = rv || cellCounts_load_scRNA_tables(cct_context);
@@ -1160,7 +1164,7 @@ void cellCounts_go_chunk_nextchunk(cellcounts_global_t * cct_context){
 void cellCounts_clean_context_after_chunk(cellcounts_global_t * cct_context) {
 	cct_context -> running_processed_reads_in_chunk = 0;
 	cct_context -> processed_reads_in_chunk = 0;
-	int voting_location_table_items = cct_context -> reads_per_chunk * max(cct_context -> max_voting_locations, cct_context -> max_best_alignments);
+	int voting_location_table_items = cct_context -> reads_per_chunk * max(cct_context -> max_voting_locations, cct_context -> max_reported_alignments_per_read);
 	memset(cct_context -> voting_location_table ,0,sizeof(voting_location_t)*voting_location_table_items);
 
 	int event_id;
@@ -1515,8 +1519,6 @@ int cellCounts_remove_neighbour(cellcounts_global_t * cct_context){
 }
 
 
-#define CIGAR_PERFECT_SECTIONS 12
-
 typedef struct{
 	char current_cigar_decompress[CORE_MAX_CIGAR_STR_LEN + 1];
 	char cigar [CORE_MAX_CIGAR_STR_LEN];
@@ -1822,9 +1824,9 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	if(res) flags = (res -> realign_flags & CORE_IS_NEGATIVE_STRAND)?16:0;
 	if(this_multi_mapping_i>1) flags += 256;
 
-	int cigar_opts[FC_MAX_CIGAR_SECTIONS], xk1, cover_length = 0;
+	int cigar_opts[CIGAR_PERFECT_SECTIONS], xk1, cover_length = 0;
 	int cigar_opt_len = 0;
-	if(cigar) cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, FC_MAX_CIGAR_SECTIONS);
+	if(cigar) cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, CIGAR_PERFECT_SECTIONS);
 
 	int record_length = 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len;
 
@@ -2039,8 +2041,8 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 
 	char raw_read_text[MAX_READ_LENGTH+1], raw_qual_text[MAX_READ_LENGTH+1];
 	char read_name[MAX_READ_NAME_LEN+1];
-	char * repeated_buffer_cigars[MAX_ALIGNMENT_PER_ANCHOR *  2 * cct_context -> max_best_alignments];
-	unsigned int repeated_buffer_pos[MAX_ALIGNMENT_PER_ANCHOR *  2 * cct_context -> max_best_alignments];
+	char * repeated_buffer_cigars[MAX_ALIGNMENT_PER_ANCHOR *  2 * cct_context -> max_reported_alignments_per_read];
+	unsigned int repeated_buffer_pos[MAX_ALIGNMENT_PER_ANCHOR *  2 * cct_context -> max_reported_alignments_per_read];
 	int repeated_count, read_len=0;
 
 	int * final_MATCH_buffer, *final_MISMATCH_buffer, *final_PENALTY_buffer;
@@ -2053,7 +2055,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 
 	cellCounts_init_output_context(cct_context, &out_context);	
 
-	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR  *  2 * cct_context -> max_best_alignments ; repeated_count ++)
+	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR  *  2 * cct_context -> max_reported_alignments_per_read ; repeated_count ++)
 		repeated_buffer_cigars[repeated_count] = malloc(2*CORE_MAX_CIGAR_STR_LEN);
 
 	final_MATCH_buffer = malloc(sizeof(int) * cct_context -> max_voting_locations * MAX_ALIGNMENT_PER_ANCHOR);
@@ -2129,7 +2131,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 		}
 
 		int output_cursor = 0;
-		int highest_score_occurence =0;
+		int reported_aligns_for_this_read =0;
 
 		if((!cct_context -> report_multi_mapping_reads) && candidate_locations>1) candidate_locations=0;
 
@@ -2155,7 +2157,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 				scores_array[read_record_i] = this_SCORE;
 			}
 
-			int skipped_locations = 0, has_breakeven = 0;
+			int has_breakeven = 0;
 			for(read_record_i = 0; read_record_i <  candidate_locations ; read_record_i++){
 				realignment_result_t * final_realignment_result = final_realignments + final_realignment_index[read_record_i];
 				if(0==scores_array[read_record_i]) SUBREADprintf("ERROR: zero final SCORE before final score adjustment: %llu\n", scores_array[read_record_i]);
@@ -2172,7 +2174,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 			if(0)for(read_record_i =0; read_record_i <  candidate_locations ; read_record_i++){
 				SUBREADprintf("  VOTE #%d = %llu\n", read_record_i , tmp_arr[read_record_i]);
 			}
-			if(candidate_locations > cct_context -> max_best_alignments) reporting_alignment_score_cutoff = tmp_arr[candidate_locations - cct_context -> max_best_alignments];
+			if(candidate_locations > cct_context -> max_reported_alignments_per_read) reporting_alignment_score_cutoff = tmp_arr[candidate_locations - cct_context -> max_reported_alignments_per_read];
 			else reporting_alignment_score_cutoff = tmp_arr[0];
 			reporting_alignment_score_cutoff = max(1, reporting_alignment_score_cutoff);
 			if(candidate_locations >1 && tmp_arr[candidate_locations -1] == tmp_arr[candidate_locations -2] ) has_breakeven=1;
@@ -2184,33 +2186,33 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 			
 			for(read_record_i =0; read_record_i <  candidate_locations ; read_record_i++){
 				if(scores_array[read_record_i]== reporting_alignment_score_cutoff){
-					if(equal_score_locations + high_score_locations >= cct_context -> max_best_alignments) scores_array[read_record_i] =0;
+					if(equal_score_locations + high_score_locations >= cct_context -> max_reported_alignments_per_read) scores_array[read_record_i] =0;
 					else equal_score_locations ++;
 				}
-				if(scores_array[read_record_i] < reporting_alignment_score_cutoff){
-					skipped_locations ++;
+				if(scores_array[read_record_i] < reporting_alignment_score_cutoff)
 					scores_array[read_record_i] =0;
-				}
 			}
 
-			highest_score_occurence = equal_score_locations + high_score_locations;
-			if(0)SUBREADprintf("=== Having %d aligns with score >= %llu === \n", highest_score_occurence , reporting_alignment_score_cutoff );
+			reported_aligns_for_this_read = equal_score_locations + high_score_locations;
+			if(0)SUBREADprintf("=== Having %d aligns with score >= %llu === \n", reported_aligns_for_this_read , reporting_alignment_score_cutoff );
 
-			if(highest_score_occurence ==1 || cct_context -> report_multi_mapping_reads){
-				highest_score_occurence = min(highest_score_occurence, cct_context -> max_best_alignments);
+			if(reported_aligns_for_this_read ==1 || cct_context -> report_multi_mapping_reads){
+				if(reported_aligns_for_this_read >cct_context -> max_reported_alignments_per_read)
+					SUBREADprintf("ERROR: reported alignments %d > %d\n", reported_aligns_for_this_read , cct_context -> max_reported_alignments_per_read);
 
 				for(read_record_i = 0; read_record_i <  candidate_locations ; read_record_i++){
-					if(output_cursor == highest_score_occurence)break;
-					realignment_result_t * final_realignment_result = final_realignments + final_realignment_index[read_record_i];
+					if(output_cursor >reported_aligns_for_this_read)
+						SUBREADprintf("ERROR: written alignments %d > %d\n", output_cursor , reported_aligns_for_this_read);
 
 					if(scores_array[read_record_i]){
+						realignment_result_t * final_realignment_result = final_realignments + final_realignment_index[read_record_i];
 						strcpy(read_text, raw_read_text);
 						strcpy(qual_text, raw_qual_text);
 
 						if(has_breakeven) final_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
 						final_realignment_result -> MAPQ_adjustment = final_MISMATCH_buffer[read_record_i] + step2_locations;
 
-						cellCounts_write_read_in_batch_bin(cct_context, thread_no, &out_context , current_read_number, final_realignment_result, read_name, read_text, qual_text, read_len, highest_score_occurence, output_cursor);
+						cellCounts_write_read_in_batch_bin(cct_context, thread_no, &out_context , current_read_number, final_realignment_result, read_name, read_text, qual_text, read_len, reported_aligns_for_this_read, output_cursor);
 						output_cursor ++;
 					}
 				}
@@ -2234,7 +2236,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 
 	free(final_SCORE_buffer);
 
-	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR * cct_context -> max_best_alignments ; repeated_count ++ )
+	for(repeated_count = 0;repeated_count < MAX_ALIGNMENT_PER_ANCHOR * cct_context -> max_reported_alignments_per_read ; repeated_count ++ )
 		free(repeated_buffer_cigars[repeated_count]);
 
 	cellCounts_destroy_output_context(cct_context, &out_context);	
@@ -2393,7 +2395,7 @@ int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned i
 			break;
 		}
 
-	if((!is_repeated) && (*repeated_count) < MAX_ALIGNMENT_PER_ANCHOR * cct_context -> max_best_alignments){
+	if((!is_repeated) && (*repeated_count) < MAX_ALIGNMENT_PER_ANCHOR * cct_context -> max_reported_alignments_per_read){
 		repeated_buffer_position[*repeated_count] = r1_pos;
 		strcpy(repeated_buffer_cigar[*repeated_count], r1_cigar);
 		(*repeated_count) +=1;
@@ -3163,7 +3165,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		for(x2 = 0 ; x2 < has_votes; x2++){
 			unsigned int kv = index_ptr[ vote_prime_sum % has_votes ] - offset;
 			vote_prime_sum += VOTING_PRIME_NUMBER;
-			int iix, offsetX2, offsetX, datalen, datalen2;
+			int iix, offsetX2, offsetX, datalen, datalen2, found = 0;
 			offsetX = offsetX2 = _index_vote_tol(kv);
 			datalen = datalen2 = vote -> items[offsetX];
 			unsigned int * dat2, *dat;
@@ -3207,11 +3209,13 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 						if (of_p_16 > vote->coverage_end [offsetX][datalen])
 							vote->coverage_end [offsetX][datalen] = of_p_16;
 
-						goto foundend;
+						found = 1;
+						break;
 					}
 				}
+				if(found)break;
 			}
-			if ( datalen2<GENE_VOTE_SPACE && !ignore_creation_voteloc){
+			if ( datalen2<GENE_VOTE_SPACE && !ignore_creation_voteloc && !found){
 				vote -> items[offsetX2] = datalen2+1;
 				dat2[datalen2] = kv;
 				vote -> masks[offsetX2][datalen2] = is_reversed;
@@ -3227,7 +3231,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				if (vote->max_vote==0)
 					vote->max_vote = 1;
 			}
-			foundend:;
 		}
 	}
 }
@@ -3724,7 +3727,7 @@ int cellCounts_match_chro(char * read, gene_value_index_t * index, unsigned int 
 
 void cellCounts_absoffset_to_posstr(cellcounts_global_t * cct_context, unsigned int pos, char * res);
 
-#define MIN_EVENT_DISTANCE 16
+#define MIN_EVENT_DISTANCE 10 
 
 void cellCounts_search_events_to_back(cellcounts_global_t * cct_context, int thread_no, explain_context_t * explain_context, char * read_text , char * qual_text, unsigned int read_tail_abs_offset, short read_tail_pos, short sofar_matched, int suggested_movement)
 {
@@ -4157,7 +4160,7 @@ int cellCounts_final_CIGAR_quality(cellcounts_global_t * cct_context, int thread
 	my_non_clipped_length -= max(0,tail_soft_clipped);
 	my_non_clipped_length -= max(0,head_soft_clipped);
 
-	if(is_wrong_cigar || rebuilt_read_len != read_len || total_cigar_sections> FC_MAX_CIGAR_SECTIONS ){
+	if(is_wrong_cigar || rebuilt_read_len != read_len || total_cigar_sections> CIGAR_PERFECT_SECTIONS ){
 		(*mismatched_bases)=99999;
 		all_matched_bases = 0;
 		sprintf(cigar_string, "%dM", read_len);
@@ -4338,7 +4341,7 @@ unsigned int cellCounts_finalise_explain_CIGAR(cellcounts_global_t * cct_context
 
 			applied_mismatch = cct_context->max_mismatching_bases_in_reads ;
 
-			if(0 && FIXLENstrcmp("R00267085946", explain_context ->  read_name)==0){
+			if(1 && FIXLENstrcmp("R00005308587", explain_context ->  read_name)==0){
 				char outpos1[100];
 				cellCounts_absoffset_to_posstr(cct_context, final_position +1, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS (One-Base) = %s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?\n%s %p\nMASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1, final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, 0.0 ,result-> used_subreads_in_vote, explain_context -> full_read_text, explain_context -> full_read_text , result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
@@ -4715,7 +4718,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			break;
 
-		if(1) if(1+chunk_no){
+		if(0) if(1+chunk_no){
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
@@ -5686,7 +5689,7 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 	for(x1 = 0; x1 < cct_context -> sample_sheet_table -> numOfElements ; x1++){
 		srInt_64 mapped_reads = 0, all_reads = 0, assigned_reads = 0;
 		int thrid;
-		for(thrid=0; thrid< cct_context-> total_threads; thrid++){
+		if(0)for(thrid=0; thrid< cct_context-> total_threads; thrid++){
 			mapped_reads += cct_context -> all_thread_contexts[thrid].mapped_reads_per_sample[x1];
 			assigned_reads += cct_context -> all_thread_contexts[thrid].assigned_reads_per_sample[x1];
 			all_reads +=cct_context -> all_thread_contexts[thrid].reads_per_sample[x1];
@@ -5979,7 +5982,6 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		fread(&binlen, 1, 4, notmapped_fp);
-		if(binlen > 1000) SUBREADprintf("Very long read [C]: %08x\n", binlen);
 		memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
 		tofill -> inbin_len += 4;
 		fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
