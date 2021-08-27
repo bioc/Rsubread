@@ -325,14 +325,14 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> current_dataset_no = 1;
 	strcpy(cct_context -> temp_file_dir, "./");
 
-	if(0){
+	if(1){
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		cct_context -> reads_per_chunk /= 4;
+		cct_context -> reads_per_chunk /= 2;
 	}
 
 
@@ -2152,7 +2152,7 @@ int cellCounts_do_iteration_two(cellcounts_global_t * cct_context, int thread_no
 				cellCounts_calc_end_pos(final_realignment_result -> first_base_position, final_realignment_result -> cigar_string, &skip, &is_exonic_regions, cct_context);
 				this_SCORE =((100000llu * (500 - this_MISMATCH + 2*is_exonic_regions) + this_MATCH)*50llu - this_PENALTY)*20llu+ final_realignment_result -> known_junction_supp;
 
-				if(0&&FIXLENstrcmp("R00001999552", read_name)==0)SUBREADprintf("  FINALSCORE %s (%u) #%d : score=%llu ; in-EXON=%d\n", read_name, final_realignment_result -> first_base_position, read_record_i , this_SCORE , is_exonic_regions);
+				if(1&&FIXLENstrcmp("R00002494000", read_name)==0)SUBREADprintf("  FINALSCORE %s (%u) #%d : score=%llu ; in-EXON=%d\n", read_name, final_realignment_result -> first_base_position, read_record_i , this_SCORE , is_exonic_regions);
 				reporting_alignment_score_cutoff = max(reporting_alignment_score_cutoff, this_SCORE);
 				scores_array[read_record_i] = this_SCORE;
 			}
@@ -4341,7 +4341,7 @@ unsigned int cellCounts_finalise_explain_CIGAR(cellcounts_global_t * cct_context
 
 			applied_mismatch = cct_context->max_mismatching_bases_in_reads ;
 
-			if(1 && FIXLENstrcmp("R00005308587", explain_context ->  read_name)==0){
+			if(1 && FIXLENstrcmp("R00002494000", explain_context ->  read_name)==0){
 				char outpos1[100];
 				cellCounts_absoffset_to_posstr(cct_context, final_position +1, outpos1);
 				SUBREADprintf("FINALQUAL %s : FINAL_POS (One-Base) = %s ( %u )\tCIGAR=%s\tMM=%d / MAPLEN=%d > %d?\tVOTE=%d > %0.2f x %d ?\n%s %p\nMASK=%d\tQUAL=%d\tBRNO=%d\nKNOWN_JUNCS=%d PENALTY=%d\n\n", explain_context -> read_name, outpos1, final_position , tmp_cigar, mismatch_bases, non_clipped_length, applied_mismatch,  result -> selected_votes, 0.0 ,result-> used_subreads_in_vote, explain_context -> full_read_text, explain_context -> full_read_text , result->result_flags, final_qual, explain_context -> best_read_id, known_junction_supp, explain_context -> best_indel_penalty);
@@ -4718,7 +4718,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			break;
 
-		if(0) if(1+chunk_no){
+		if(1) if(1+chunk_no){
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
 			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
