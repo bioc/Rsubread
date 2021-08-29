@@ -2521,7 +2521,7 @@ void print_votes(gene_vote_t * vote, char *index_prefix)
 
 			if(1){
 				int k;
-				for(k=0; k<=toli; k+=3){
+				for(k=0; k<toli; k+=3){
 					SUBREADprintf("    %d - %d : D=%d    ",  vote -> indel_recorder[i][j][k], vote -> indel_recorder[i][j][k+1], vote -> indel_recorder[i][j][k+2]);
 				}
 				SUBREADputs("");
