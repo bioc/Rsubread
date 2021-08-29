@@ -2110,9 +2110,9 @@ int cellCounts_meet_in_the_middle(cellcounts_global_t * cct_context, int thread_
 			best_second_start_in_read = second_half_start_in_read;
 		}
 	}
-	(* gap_mismatch) = gap_length - max_matched_bases;
+	(* gap_mismatch) = gap_length - max_matched_bases + min(0, expected_indel_len);
 	if(0)SUBREADprintf("FOUND %d indel MEET at %d in %d gap ; %d matched,\n", expected_indel_len, best_second_start_in_read, gap_length, max_matched_bases );
-	return best_second_start_in_read;
+	return best_second_start_in_read + min(0, expected_indel_len);
 }
 
 // do: 
@@ -2155,6 +2155,7 @@ void cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_n
 			if(head_soft_clipped > 0)sprintf(thread_context -> reporting_cigars[thread_context -> reporting_count],"%dS", head_soft_clipped );
 			if(meet_start < head_soft_clipped + abs_pos ) meet_start= head_soft_clipped + abs_pos;
 			if(head_soft_clipped > last_correct_base) last_correct_base = head_soft_clipped;
+			in_cigar_readlen = head_soft_clipped;
 		}
 
 
@@ -2203,6 +2204,10 @@ void cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_n
 		sprintf(newcigar, "%dS", tail_soft_clipped);
 		strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
 	}
+
+	char tmp_new_cigar[MAX_SCRNA_READ_LENGTH+20];
+	cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar );
+	strcpy(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar);
 
 	if(1 || FIXLENstrcmp("R00000000013", read_name) == 0){
 		char posstr[100], posstr2[100];
