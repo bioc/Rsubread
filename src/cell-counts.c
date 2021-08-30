@@ -14,7 +14,7 @@
 #include "core-indel.h"
 #include "core-junction.h"
 
-#define MAX_SCRNA_READ_LENGTH 120
+#define MAX_SCRNA_READ_LENGTH 160
 #define CELLCOUNTS_REALIGNMENT_TRIES 15
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
@@ -80,6 +80,7 @@ typedef struct{
 	unsigned int reporting_positions[HIGHEST_REPORTED_ALIGNMENTS];
 	int reporting_mapq[HIGHEST_REPORTED_ALIGNMENTS];
 	char reporting_cigars[HIGHEST_REPORTED_ALIGNMENTS][MAX_SCRNA_READ_LENGTH+20];
+	int reporting_is_known_exon[HIGHEST_REPORTED_ALIGNMENTS];
 
 	short ** dynamic_align_table;
 	char ** dynamic_align_table_mask;
@@ -1386,8 +1387,8 @@ void cellCounts_destroy_output_context(cellcounts_global_t * cct_context, cellCo
 
 
 int cellCounts_is_pos_in_annotated_exon_regions(cellcounts_global_t * cct_context, unsigned int pos){ 
-	int range_start = (pos-5) / EXONIC_REGION_RESOLUTION;
-	int range_stop = (pos+5) / EXONIC_REGION_RESOLUTION;
+	int range_start = (pos-20) / EXONIC_REGION_RESOLUTION;
+	int range_stop = (pos+100) / EXONIC_REGION_RESOLUTION;
 	
 	for(; range_start <=range_stop; range_start++){
 		int exonic_map_byte= range_start / 8;
@@ -2129,7 +2130,7 @@ int cellCounts_find_new_indels(cellcounts_global_t * cct_context, int thread_no,
 }
 
 int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number_t * votrec, int tolimax, int applied_subreads_per_strand, int * read_pos_move, char * read_name, unsigned int absloc){
-	if(0 && FIXLENstrcmp("R00000000057", read_name)==0){
+	if(1 && FIXLENstrcmp("R00490986039", read_name)==0){
 		int toli;
 		SUBREADprintf("RAW Indel Record of %s mapped to %u\n", read_name, absloc);
 		for(toli = 0; toli < tolimax; toli +=3)
@@ -2224,9 +2225,9 @@ int cellCounts_meet_in_the_middle(cellcounts_global_t * cct_context, int thread_
 	return best_second_start_in_read + min(0, expected_indel_len);
 }
 
-srInt_64 cellCounts_test_score(cellcounts_global_t * cct_context, int thread_no, char * read_name, int read_len, unsigned int abs_pos, char * cigar, int head_soft_clipped, int tail_soft_clipped, int all_matched_bases, int all_mismatched_bases){
+srInt_64 cellCounts_test_score(cellcounts_global_t * cct_context, int thread_no, char * read_name, int read_len, unsigned int abs_pos, char * cigar, int head_soft_clipped, int tail_soft_clipped, int is_around_exon, int all_matched_bases, int all_mismatched_bases){
 	if(all_mismatched_bases > cct_context -> max_mismatching_bases_in_reads) return 0;
-	return ((MAX_SCRNA_READ_LENGTH - all_mismatched_bases) * 1LL * MAX_SCRNA_READ_LENGTH + all_matched_bases)*100LL;
+	return (is_around_exon?1LL:0LL)*1LL*MAX_SCRNA_READ_LENGTH*1LL*MAX_SCRNA_READ_LENGTH + ((MAX_SCRNA_READ_LENGTH - all_mismatched_bases) * 1LL * MAX_SCRNA_READ_LENGTH + all_matched_bases)*100LL;
 }
 
 // do: 
@@ -2251,7 +2252,7 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	int indels_in_highconf = cellCounts_indel_recorder_copy(indel_offsets, votetab -> indel_recorder[vote_i][vote_j], tolimax, all_subreads, &read_pos_move, read_name, abs_pos);
 	abs_pos += read_pos_move;
 	int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
-	if(0 && FIXLENstrcmp("R00000000057", read_name)==0)SUBREADprintf("\n%s\n%s\nTHREE_TOLI %d %d %d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2]);
+	if(1 && FIXLENstrcmp("R00490986039", read_name)==0)SUBREADprintf("\n%s\n%s\nTHREE_TOLI %d %d %d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2]);
 	thread_context -> reporting_cigars[thread_context -> reporting_count][0]=0;
 	for(toli = 3; toli < tolimax; toli+=3){
 		if(indel_offsets[toli]==0)break;
@@ -2260,6 +2261,7 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 		int indel_offset = indel_offsets[toli+2];
 		int indel_diff = indel_offset - last_indel;
 		int last_correct_base = find_subread_end(read_len, all_subreads , last_section_subread_no) - 9;
+		if(last_correct_base < in_cigar_readlen) last_correct_base= in_cigar_readlen;
 		int first_correct_base = find_subread_end(read_len, all_subreads , hiconf_vote_first) - 16 + 9;
 
 		unsigned int meet_start = abs_pos + last_correct_base + last_indel;
@@ -2274,7 +2276,7 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 
 
 		unsigned int meet_end = abs_pos + first_correct_base + indel_offset;
-		if(0 && FIXLENstrcmp("R00000000057", read_name)==0)SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base );
+		if(1 && FIXLENstrcmp("R00490986039", read_name)==0)SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base );
 		if(0)SUBREADprintf("\n%s\n", read_text);
 
 		int gap_mismatched = 0;
@@ -2323,22 +2325,27 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	}
 
 	char tmp_new_cigar[MAX_SCRNA_READ_LENGTH+20];
+	if(1 && FIXLENstrcmp("R00490986039", read_name) == 0)
+		SUBREADprintf("PRE-REDUCE CIGAR %s\n", thread_context -> reporting_cigars[thread_context -> reporting_count]);
+
 	cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar );
 	strcpy(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar);
 
-	if(0 && FIXLENstrcmp("R00000000013", read_name) == 0){
+	if(1 && FIXLENstrcmp("R00490986039", read_name) == 0){
 		char posstr[100], posstr2[100];
 		cellCounts_absoffset_to_posstr(cct_context, abs_pos , posstr);
 		cellCounts_absoffset_to_posstr(cct_context, abs_pos  + in_cigar_readlen + last_indel , posstr2);
 		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s ; TESTINGPOS=%s ; CIGAR=%s ; MATCH=%d ; MM=%d\n", read_name, read_text, posstr, posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], all_matched_bases, all_mismatched_bases );
 	}
 
-	srInt_64 score = cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> reporting_count], head_soft_clipped, tail_soft_clipped, all_matched_bases, all_mismatched_bases );
+	int is_exon = cellCounts_is_pos_in_annotated_exon_regions(cct_context, abs_pos);
+	srInt_64 score = cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> reporting_count], head_soft_clipped, tail_soft_clipped, is_exon, all_matched_bases, all_mismatched_bases );
 	thread_context -> reporting_scores[thread_context -> reporting_count] = score;
 	thread_context -> reporting_positions[thread_context -> reporting_count] = abs_pos;
 	thread_context -> reporting_flags[thread_context -> reporting_count] = this_is_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
 	#warning "============ IMPROVE THIS FORMULA AS Subread =========="
 	thread_context -> reporting_mapq[thread_context -> reporting_count] = 40 - all_mismatched_bases;
+	thread_context -> reporting_is_known_exon[thread_context -> reporting_count] = is_exon;
 	return score>0;
 }
 
@@ -2355,7 +2362,6 @@ int sort_readscore_compare(void * vp , int i , int j){
 
 void sort_readscore_exchange(void * vp , int i , int j){
 	void ** pp = vp;
-	cellcounts_align_thread_t * thread_context = pp[0];
 	int * sorting_index = pp[1];
 	int idxI = sorting_index [i];
 	sorting_index [i] = sorting_index [j];
@@ -2632,7 +2638,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_1, applied_subreads, read_name_1 );
 				if(current_read_number % 1000000 == 0) SUBREADprintf("voting step: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
-				if(0 && FIXLENstrcmp("R00000000057", read_name_1) == 0){
+				if(1 && FIXLENstrcmp("R00490986039", read_name_1) == 0){
 					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name_1, vote_1 -> max_vote);
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, vote_1->max_vote, cct_context -> min_votes_per_mapped_read);
 					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name_1, current_read_number);
