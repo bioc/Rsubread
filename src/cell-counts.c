@@ -188,10 +188,10 @@ typedef struct{
 
 
 
-void cellCounts_reduce_Cigar(char * cigar, char * cigarout){
+int cellCounts_reduce_Cigar(char * cigar, char * cigarout){
 	//LRMtest_move_buff( context, thread_context, iteration_context, thread_context -> dynamic_programming_indel_movement_buf, strlen(thread_context -> dynamic_programming_indel_movement_buf), iteration_context -> read_length);
 	int tmpi = -1;
-	int ci, nch, repeat_i = 0, old_opt = 0, wcur=0;
+	int ci, nch, repeat_i = 0, old_opt = 0, wcur=0, rlen=0;
 	for(ci = 0; ; ci++){
 		nch = cigar[ci];
 		if(!nch) break;
@@ -201,6 +201,7 @@ void cellCounts_reduce_Cigar(char * cigar, char * cigarout){
 		}else{
 			if(tmpi<0) tmpi = 1;
 			if(old_opt != nch && repeat_i>0){
+				if(old_opt=='M' || old_opt=='S' || old_opt=='I') rlen+=repeat_i;
 				wcur += sprintf( cigarout + wcur, "%d%c", repeat_i, old_opt );
 				repeat_i = 0;
 			}
@@ -209,7 +210,11 @@ void cellCounts_reduce_Cigar(char * cigar, char * cigarout){
 			old_opt = nch;
 		}
 	}
-	if(repeat_i>0) sprintf(cigarout + wcur, "%d%c", repeat_i, old_opt);
+	if(repeat_i>0){
+		sprintf(cigarout + wcur, "%d%c", repeat_i, old_opt);
+		if(old_opt=='M' || old_opt=='S' || old_opt=='I') rlen+=repeat_i;
+	}
+	return rlen;
 }
 
 void cellCounts_cell_barcode_tabel_destroy(void *a){
@@ -2130,7 +2135,7 @@ int cellCounts_find_new_indels(cellcounts_global_t * cct_context, int thread_no,
 }
 
 int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number_t * votrec, int tolimax, int applied_subreads_per_strand, int * read_pos_move, char * read_name, unsigned int absloc){
-	if(1 && FIXLENstrcmp("R00490986039", read_name)==0){
+	if(0 && FIXLENstrcmp("R00001325252", read_name)==0){
 		int toli;
 		SUBREADprintf("RAW Indel Record of %s mapped to %u\n", read_name, absloc);
 		for(toli = 0; toli < tolimax; toli +=3)
@@ -2202,7 +2207,7 @@ int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number
 	return high_conf_index;
 }
 
-#define MINM_INVALID_INDEL (-0x888888)
+#define MINM_INVALID_INDEL (-9999999)
 
 int cellCounts_meet_in_the_middle(cellcounts_global_t * cct_context, int thread_no, unsigned int first_half_abs_pos, char * read_text, int gap_length, int expected_indel_len, char * read_name, int * gap_mismatch){
 	int second_half_start_in_read; 
@@ -2227,7 +2232,7 @@ int cellCounts_meet_in_the_middle(cellcounts_global_t * cct_context, int thread_
 
 srInt_64 cellCounts_test_score(cellcounts_global_t * cct_context, int thread_no, char * read_name, int read_len, unsigned int abs_pos, char * cigar, int head_soft_clipped, int tail_soft_clipped, int is_around_exon, int all_matched_bases, int all_mismatched_bases){
 	if(all_mismatched_bases > cct_context -> max_mismatching_bases_in_reads) return 0;
-	return (is_around_exon?1LL:0LL)*1LL*MAX_SCRNA_READ_LENGTH*1LL*MAX_SCRNA_READ_LENGTH + ((MAX_SCRNA_READ_LENGTH - all_mismatched_bases) * 1LL * MAX_SCRNA_READ_LENGTH + all_matched_bases)*100LL;
+	return (is_around_exon?2LL:0LL)*MAX_SCRNA_READ_LENGTH*MAX_SCRNA_READ_LENGTH + ((MAX_SCRNA_READ_LENGTH - all_mismatched_bases) * 1LL * MAX_SCRNA_READ_LENGTH + all_matched_bases);
 }
 
 // do: 
@@ -2252,7 +2257,7 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	int indels_in_highconf = cellCounts_indel_recorder_copy(indel_offsets, votetab -> indel_recorder[vote_i][vote_j], tolimax, all_subreads, &read_pos_move, read_name, abs_pos);
 	abs_pos += read_pos_move;
 	int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
-	if(1 && FIXLENstrcmp("R00490986039", read_name)==0)SUBREADprintf("\n%s\n%s\nTHREE_TOLI %d %d %d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2]);
+	if(0 && FIXLENstrcmp("R00001325252", read_name)==0)SUBREADprintf("\n%s\n%s\n000V THREE_TOLI %d %d %d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2]);
 	thread_context -> reporting_cigars[thread_context -> reporting_count][0]=0;
 	for(toli = 3; toli < tolimax; toli+=3){
 		if(indel_offsets[toli]==0)break;
@@ -2260,9 +2265,13 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 		int hiconf_vote_last = indel_offsets[toli+1]-1;
 		int indel_offset = indel_offsets[toli+2];
 		int indel_diff = indel_offset - last_indel;
-		int last_correct_base = find_subread_end(read_len, all_subreads , last_section_subread_no) - 9;
+		if(abs(indel_diff)>= cct_context -> max_indel_length) continue;
+		int last_correct_base = find_subread_end(read_len, all_subreads , last_section_subread_no) - 8;
+		int first_correct_base = find_subread_end(read_len, all_subreads , hiconf_vote_first) - 16 + 8;
+		if(0 && FIXLENstrcmp("R00001325252", read_name)==0)
+			SUBREADprintf("TEST_2POSES LCB=%d [sr %d] FCB=%d [sr %d] INCIGAR=%d\n", last_correct_base, last_section_subread_no, first_correct_base, hiconf_vote_first, in_cigar_readlen);
+
 		if(last_correct_base < in_cigar_readlen) last_correct_base= in_cigar_readlen;
-		int first_correct_base = find_subread_end(read_len, all_subreads , hiconf_vote_first) - 16 + 9;
 
 		unsigned int meet_start = abs_pos + last_correct_base + last_indel;
 		if(head_soft_clipped <0){
@@ -2276,12 +2285,13 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 
 
 		unsigned int meet_end = abs_pos + first_correct_base + indel_offset;
-		if(1 && FIXLENstrcmp("R00490986039", read_name)==0)SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base );
-		if(0)SUBREADprintf("\n%s\n", read_text);
 
 		int gap_mismatched = 0;
 		int indel_pos = cellCounts_meet_in_the_middle(cct_context, thread_no, meet_start, read_text + last_correct_base, first_correct_base - last_correct_base, indel_diff, read_name, &gap_mismatched);
 		if(indel_pos == MINM_INVALID_INDEL) indel_pos = (first_correct_base - last_correct_base)/2;
+
+		if(0 && FIXLENstrcmp("R00001325252", read_name)==0) SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d, GAP=%d. FOUND_INDEL_POS=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base, first_correct_base - last_correct_base, indel_pos);
+
 		int section_matched = cellCounts_match_chro(read_text + in_cigar_readlen , cct_context -> value_index, abs_pos + in_cigar_readlen + last_indel , last_correct_base - in_cigar_readlen);
 
 		all_mismatched_bases += gap_mismatched + (last_correct_base - in_cigar_readlen - section_matched);
@@ -2296,24 +2306,16 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	}
 
 	if(head_soft_clipped <0){
-		int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1);
+		int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1) - 8;
 		head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_text, abs_pos /* this can only happen if no indel is in read */, first_mapped_base_in_read , 0, first_mapped_base_in_read);
-
-		if(0 && FIXLENstrcmp("R00000000057", read_name) == 0) SUBREADprintf("READ %s HEADCLP start=%d CLIPPED=%d\n", read_name, first_mapped_base_in_read , head_soft_clipped  );
 
 		if(head_soft_clipped > 0)sprintf(thread_context -> reporting_cigars[thread_context -> reporting_count],"%dS", head_soft_clipped );
 		in_cigar_readlen = head_soft_clipped;
-		last_mapped_base_in_read = find_subread_end(read_len, all_subreads, last_section_subread_no) - 16 + 9;
+		last_mapped_base_in_read = find_subread_end(read_len, all_subreads, last_section_subread_no) - 16 + 8;
 	}
 
 	int tail_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_text + last_mapped_base_in_read, abs_pos + last_mapped_base_in_read  + last_indel,  read_len - last_mapped_base_in_read , 1, 1);
-	if(0 && FIXLENstrcmp("R00000000087", read_name) == 0)
-		SUBREADprintf("Search len = %d, last_indel = %d , last_mapped_base_in_read = %d ==> clipped_tail %d\n", read_len - last_mapped_base_in_read , last_indel , last_mapped_base_in_read , tail_soft_clipped );
-
 	int section_matched = cellCounts_match_chro(read_text + in_cigar_readlen , cct_context -> value_index, abs_pos + in_cigar_readlen + last_indel, read_len - in_cigar_readlen - tail_soft_clipped);
-	if(0 && FIXLENstrcmp("R00000000087", read_name) == 0){
-		SUBREADprintf("Matched = %d in %d\n", section_matched , read_len - in_cigar_readlen - tail_soft_clipped);
-	}
 	all_mismatched_bases += (read_len - in_cigar_readlen - tail_soft_clipped  - section_matched);
 	all_matched_bases += section_matched;
 
@@ -2325,21 +2327,22 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	}
 
 	char tmp_new_cigar[MAX_SCRNA_READ_LENGTH+20];
-	if(1 && FIXLENstrcmp("R00490986039", read_name) == 0)
-		SUBREADprintf("PRE-REDUCE CIGAR %s\n", thread_context -> reporting_cigars[thread_context -> reporting_count]);
+	int rebuilt_rlen = cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar );
 
-	cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar );
-	strcpy(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar);
-
-	if(1 && FIXLENstrcmp("R00490986039", read_name) == 0){
+	if(0 && (FIXLENstrcmp("R00000003490", read_name) == 0|| rebuilt_rlen!=read_len)){
 		char posstr[100], posstr2[100];
 		cellCounts_absoffset_to_posstr(cct_context, abs_pos , posstr);
 		cellCounts_absoffset_to_posstr(cct_context, abs_pos  + in_cigar_readlen + last_indel , posstr2);
-		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s ; TESTINGPOS=%s ; CIGAR=%s ; MATCH=%d ; MM=%d\n", read_name, read_text, posstr, posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], all_matched_bases, all_mismatched_bases );
+		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s ; TESTINGPOS=%s ; CIGAR=%s -> %s / %d-bases ; MATCH=%d ; MM=%d\n", read_name, read_text, posstr, posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar, rebuilt_rlen, all_matched_bases, all_mismatched_bases );
 	}
 
+	strcpy(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar);
+
 	int is_exon = cellCounts_is_pos_in_annotated_exon_regions(cct_context, abs_pos);
-	srInt_64 score = cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> reporting_count], head_soft_clipped, tail_soft_clipped, is_exon, all_matched_bases, all_mismatched_bases );
+	srInt_64 score = 0;
+	if(rebuilt_rlen==read_len)score=cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> reporting_count], head_soft_clipped, tail_soft_clipped, is_exon, all_matched_bases, all_mismatched_bases);
+	//if(votetab -> vote[vote_i][vote_j] < is_exon+cct_context -> min_votes_per_mapped_read) score=0;
+	//SUBREADprintf("SCORE %lld from M=%d MM=%d isExon=%d\n", score, all_matched_bases, all_mismatched_bases, is_exon);
 	thread_context -> reporting_scores[thread_context -> reporting_count] = score;
 	thread_context -> reporting_positions[thread_context -> reporting_count] = abs_pos;
 	thread_context -> reporting_flags[thread_context -> reporting_count] = this_is_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
@@ -2418,10 +2421,11 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> reporting_count; distinct_vote_number_i ++){
 			int myno = sorting_index[distinct_vote_number_i ];
 			if(thread_context -> reporting_scores[ myno ] < 1)continue;
-			if(myno >= cct_context -> max_reported_alignments_per_read) break;
+			if(distinct_vote_number_i >= cct_context -> max_reported_alignments_per_read) break;
 			cellCounts_write_read_in_batch_bin(cct_context, thread_no, myno, read_name, read_text, read_qual, read_len, 0, 0);
 		}
-	}
+	} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, -1, read_name, read_text, read_qual, read_len, 0, 0);
+
 	return 0;
 }
 
@@ -2490,12 +2494,10 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
 		int ignore_creation_voteloc = 0;
 
-		#warning "======== THE NEXT BLOCK MAY MAKE IT FASTER AND ACCURATE ========="
-		#define X_SWITCH_TEST1 0
-		#warning "======== WITH -X means WITH X*1 =================="
-		if(0)if(x1 >= subreads - 8 && has_votes >10 - (2*X_SWITCH_TEST1)) {
+		#warning "======== IGNORED SOME NEW CANDIDATE LOCATIONS BY (1) =================="
+		if(1)if(x1 >= subreads - 5 && has_votes >10) {
 			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
-			else if(has_votes > 20 - (5*X_SWITCH_TEST1) && vote->max_vote >= 3) ignore_creation_voteloc =1;
+			else if(has_votes > 20 && vote->max_vote >= 3) ignore_creation_voteloc =1;
 		}
 
 		for(x2 = 0 ; x2 < has_votes; x2++){
@@ -2638,7 +2640,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_1, applied_subreads, read_name_1 );
 				if(current_read_number % 1000000 == 0) SUBREADprintf("voting step: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
-				if(1 && FIXLENstrcmp("R00490986039", read_name_1) == 0){
+				if(0 && FIXLENstrcmp("R00000003490", read_name_1) == 0){
 					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name_1, vote_1 -> max_vote);
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name_1, read_len_1, read_text_1, vote_1->max_vote, cct_context -> min_votes_per_mapped_read);
 					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name_1, current_read_number);
@@ -4207,7 +4209,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 
 	worker_master_mutex_destroy(&worker_mut);
 
-	cellCounts_merged_to_tables_write(cct_context , cellnoP1_to_genenoP1_to_UMIs , cct_context -> all_features_array, cct_context -> all_features_array->numOfElements);
+	if(!strstr(cct_context->index_prefix,"step5-rand"))cellCounts_merged_to_tables_write(cct_context , cellnoP1_to_genenoP1_to_UMIs , cct_context -> all_features_array, cct_context -> all_features_array->numOfElements);
 
 	for(xk1=0; xk1<cct_context -> sample_sheet_table -> numOfElements; xk1++)
 		HashTableDestroy(cellnoP1_to_genenoP1_to_UMIs[xk1]);
