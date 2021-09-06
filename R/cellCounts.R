@@ -1188,7 +1188,7 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
-new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, reportedAlignmentsPerRead =1, unique.mapping=FALSE, maxMismatchBases=3, minVotesPerRead=3, subreadsPerRead=10, maxDiffToTopVotes=2, ...){
+new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, reportedAlignmentsPerRead =1, unique.mapping=FALSE, maxMismatchBases=3, minVotesPerRead=3, subreadsPerRead=10, maxDiffToTopVotes=2, minMappedLength=40, ...){
   .remove.temp.files <- T
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
@@ -1231,7 +1231,7 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
     }
 
      .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
-    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", reportedAlignmentsPerRead, "--maxDiffToTopVotes", maxDiffToTopVotes)
+    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", reportedAlignmentsPerRead, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength)
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
@@ -1274,7 +1274,7 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
       is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
       generate.scRNA.BAM <- TRUE
 
-      opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes)
+      opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength)
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
