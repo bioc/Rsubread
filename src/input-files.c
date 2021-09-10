@@ -3456,7 +3456,7 @@ int SAP_pairer_skip_tag_body_len(char *bin){
 		else if(cell_type == 'i' || cell_type == 'f')skip_content *= 4;
 		skip_content += 4+1; // 32-bit count, 1 byte type
 	}else{
-		SUBREADprintf("UnknownTag=%c\n", bin[2]);
+		SUBREADprintf("UnknownTag=%c\n\n", bin[2]);
 		assert(0);
 	}
 	return skip_content+3;

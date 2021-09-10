@@ -1294,6 +1294,7 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
       df.sample.info <- rbind(df.sample.info, stt)
     }
   }
+  .del.temp.files(substr(temp.file.prefix,4,99))
   fc
 }
 

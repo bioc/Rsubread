@@ -75,12 +75,13 @@ typedef struct{
 	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 
 	int reporting_count;
+	int reporting_multi_alignment_no, reporting_this_alignment_no;
 	srInt_64 reporting_scores[HIGHEST_REPORTED_ALIGNMENTS];
 	srInt_64 reporting_flags[HIGHEST_REPORTED_ALIGNMENTS];
 	unsigned int reporting_positions[HIGHEST_REPORTED_ALIGNMENTS];
 	int reporting_mapq[HIGHEST_REPORTED_ALIGNMENTS];
 	char reporting_cigars[HIGHEST_REPORTED_ALIGNMENTS][MAX_SCRNA_READ_LENGTH+20];
-	int reporting_score_weight[HIGHEST_REPORTED_ALIGNMENTS];
+	int reporting_editing_distance[HIGHEST_REPORTED_ALIGNMENTS];
 
 } cellcounts_align_thread_t;
 
@@ -826,7 +827,7 @@ int features_load_one_line(char * gene_name, char * transcript_name, char * chro
 		int exonic_map_byte = exonpos_i/ 8;
 		int exonic_map_bit = exonpos_i % 8;
 
-		//if(strcmp("ENSMUSG00000024608", gene_name)==0)SUBREADprintf("LINE1ADD %s: %d > %d\n", gene_name, exonic_map_byte , exonic_map_bit );
+		//if(strcmp("IGKV3-31", gene_name)==0)SUBREADprintf("LINE1ADD %s of %d: %d > %d   (%s:%d ~ %d)\n", gene_name, exonpos_i, exonic_map_byte , exonic_map_bit, chro_name, start, end );
 		cct_context ->exonic_region_bitmap[exonic_map_byte] |= (1<<exonic_map_bit);
 	}
 
@@ -1375,6 +1376,8 @@ void cellCounts_destroy_output_context(cellcounts_global_t * cct_context, cellCo
 	free(out_context -> r1 );
 }
 
+#define SCORING_MAX_QUALITY_MAPPING  10000000ll
+
 srInt_64 cellCounts_calculate_pos_weight_1sec(cellcounts_global_t * cct_context, unsigned int pos, int len){
 	unsigned int pos_i;
 	srInt_64 ret = 10ll;
@@ -1382,7 +1385,7 @@ srInt_64 cellCounts_calculate_pos_weight_1sec(cellcounts_global_t * cct_context,
 		int exonic_map_byte= pos_i /8;
 		int exonic_map_bit = pos_i %8;
 		if (cct_context ->exonic_region_bitmap [exonic_map_byte] & (1<<exonic_map_bit))
-			return 10000000ll;
+			return SCORING_MAX_QUALITY_MAPPING;
 		exonic_map_byte +=  (4096 / 8)*1024*1024;
 		if (cct_context ->exonic_region_bitmap [exonic_map_byte] & (1<<exonic_map_bit))
 			ret = 13ll;
@@ -1401,7 +1404,8 @@ srInt_64 cellCounts_calculate_pos_weight(cellcounts_global_t * cct_context, unsi
 			if(nch=='M'){
 				toadd_chro = tmpi;
 				max_weight = max(max_weight, cellCounts_calculate_pos_weight_1sec(cct_context, pos, toadd_chro));
-			} else if(nch == 'D'){
+				if(max_weight >= SCORING_MAX_QUALITY_MAPPING)return max_weight;
+			} else if(nch == 'D' || nch == 'N' || nch == 'S'){ // At this step, the head-soft-clipped bases were not offset to the mapping position. 
 				toadd_chro = tmpi;
 			}
 			pos += toadd_chro;
@@ -1409,7 +1413,7 @@ srInt_64 cellCounts_calculate_pos_weight(cellcounts_global_t * cct_context, unsi
 		}
 	}
 
-	return 10llu;
+	return max_weight;
 }
 
 #define MAX_HIT_NUMBER (1000*1000)
@@ -1604,7 +1608,7 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 	return tb1;
 }
 
-void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i){
+void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i, int editing_dist){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	char * cigar = thread_context -> reporting_cigars[reporting_index];
 	int mapping_quality = thread_context -> reporting_mapq[reporting_index];
@@ -1617,7 +1621,7 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	int cigar_opt_len = 0;
 	if(cigar) cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, CIGAR_PERFECT_SECTIONS);
 
-	int record_length = 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len;
+	int record_length = 4 + 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len;
 
 	int bin = SamBam_reg2bin(chro_pos -1, chro_pos-1+cover_length);
 	int refID = -1;
@@ -1626,7 +1630,6 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	int fag_nc = (flags<<16) | cigar_opt_len;
 	int nextRefID = -1, temp_len = -1, next_chro_pos=-1;
 	chro_pos--;
-	memcpy(rbin     , & record_length , 4);
 	memcpy(rbin + 4 , & refID , 4);
 	memcpy(rbin + 8 , & chro_pos , 4);
 	memcpy(rbin +12 , & bin_mq_nl , 4);
@@ -1641,6 +1644,28 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 
 	int basev = 36 +read_name_len +cigar_opt_len*4+(read_len + 1) /2;
 	for(xk1=0; xk1<read_len; xk1++) *(rbin +basev+xk1) = qual_text[xk1]-33;
+	
+	if(editing_dist>=0){
+		rbin[record_length ++]='N';
+		rbin[record_length ++]='M';
+		rbin[record_length ++]='C';
+		rbin[record_length ++]=editing_dist;
+	}
+	if(multi_mapping_number>=0){
+		rbin[record_length ++]='N';
+		rbin[record_length ++]='H';
+		rbin[record_length ++]='C';
+		rbin[record_length ++]=multi_mapping_number;
+
+		rbin[record_length ++]='H';
+		rbin[record_length ++]='I';
+		rbin[record_length ++]='C';
+		rbin[record_length ++]=this_multi_mapping_i;
+	}
+
+	record_length -=4;
+
+	memcpy(rbin     , & record_length , 4);
 }
 
 void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread_no, FILE * binfp, int sample_no, int cellbarcode_no, char * umi_barcode, char * readbin, int nhits, int notmapped){
@@ -1695,7 +1720,83 @@ int cellCounts_get_sample_id(cellcounts_global_t * cct_context, char * sbc, int 
 }
 
 
-void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, char * read_name, int rlen, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int nhits, int multi_mapping_number, int this_multi_mapping_i){
+
+int cellCounts_parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char * bambin, int thread_no, char * read_text_raw, char * qual_text_raw){ // the text-raw variables are the reads in their input form (not potentially reversed form)
+	int reclen=0;
+	parallel_gzip_writer_t * outR1fp = outfps[0];
+	parallel_gzip_writer_t * outI1fp = outfps[1];
+	parallel_gzip_writer_t * outI2fp = outfps[2];
+	parallel_gzip_writer_t * outR2fp = outfps[3];
+
+	memcpy(&reclen, bambin,4);
+	int flag = 0, l_seq = 0, l_read_name = 0, n_cigar_ops = 0;
+	memcpy(&l_read_name, bambin+12,1);
+	memcpy(&n_cigar_ops, bambin+16,2);
+	memcpy(&flag, bambin+18,2);
+	memcpy(&l_seq, bambin+20,4);
+
+	int x1=0;
+
+	parallel_gzip_writer_add_text(outR2fp,"@",1,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"@",1,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"@",1,thread_no);
+	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,"@",1,thread_no);
+	char * readname = bambin+36;
+	parallel_gzip_writer_add_text(outR1fp,readname, 12,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,readname, 12,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,readname, 12,thread_no);
+	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,readname, 12,thread_no);
+
+	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,"\n",1,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
+	if(outI2fp) parallel_gzip_writer_add_text(outI2fp,"\n",1,thread_no);
+
+	//SUBREADprintf("WRITEFQ RNAME '%s'\n", bambin+36);
+	char * R1seq = bambin+36+13;
+	int R1len = 0;
+	for(R1len=0; R1seq[R1len] && R1seq[R1len]!='|' ;R1len++);
+	char * R1qual = R1seq + R1len + 1;
+	parallel_gzip_writer_add_text(outR1fp,R1seq, R1len,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"\n+\n",3,thread_no);
+	parallel_gzip_writer_add_text_qual(outR1fp,R1qual, R1len,thread_no);
+	parallel_gzip_writer_add_text(outR1fp,"\n",1,thread_no);
+
+	char * I1seq = R1qual + R1len + 1;
+	int I1I2len = 0;
+	for(I1I2len=0; I1seq[I1I2len] && I1seq[I1I2len]!='|' ;I1I2len++);
+	int I1len = I1I2len;
+	if(outI2fp) I1len /=2;
+
+	char * I2seq = I1seq + I1len;
+	char * I1qual = I1seq + I1I2len + 1;
+	char * I2qual = I1seq + I1I2len + I1len + 1;
+
+	parallel_gzip_writer_add_text(outI1fp,I1seq, I1len,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"\n+\n",3,thread_no);
+	parallel_gzip_writer_add_text_qual(outI1fp,I1qual, I1len,thread_no);
+	parallel_gzip_writer_add_text(outI1fp,"\n",1,thread_no);
+
+	if(outI2fp){
+		parallel_gzip_writer_add_text(outI2fp,I2seq, I1len,thread_no);
+		parallel_gzip_writer_add_text(outI2fp,"\n+\n",3,thread_no);
+		parallel_gzip_writer_add_text_qual(outI2fp,I2qual, I1len,thread_no);
+		parallel_gzip_writer_add_text(outI2fp,"\n",1,thread_no);
+	}
+
+	char * oseq = read_text_raw;
+	parallel_gzip_writer_add_text(outR2fp, oseq, l_seq,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,"\n+\n",3,thread_no);
+
+	oseq = qual_text_raw;
+	parallel_gzip_writer_add_text(outR2fp, oseq, l_seq,thread_no);
+	parallel_gzip_writer_add_text(outR2fp,"\n",1,thread_no);
+	return 0;
+}
+
+
+
+void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, char * read_name, int rlen, char * read_text, char * qual_text, char * raw_text, char * raw_qual, char * chro_name, int chro_pos, int reporting_index, int nhits, int multi_mapping_number, int this_multi_mapping_i, int editing_dist){
 	int batch_no;
 	
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
@@ -1725,7 +1826,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	}else batch_no = CELLBC_BATCH_NUMBER+1;
 	
 	char readbin[READ_BIN_BUF_SIZE];
-	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i);
+	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist);
 
 	if(sample_no>0){
 		cellCounts_lock_occupy(cct_context -> batch_file_locks + batch_no);
@@ -1748,7 +1849,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 
 	if(GENE_INPUT_SCRNA_FASTQ != cct_context -> input_mode){
 		parallel_gzip_writer_t **gz3fps = (parallel_gzip_writer_t **)sample_bam_2fps+1;
-		parallel_gzip_writer_add_read_fqs_scRNA(gz3fps, readbin, thread_no);
+		cellCounts_parallel_gzip_writer_add_read_fqs_scRNA(gz3fps, readbin, thread_no, raw_text, raw_qual);
 		// I2 always has the same length as I1, hence no test is required.
 		if( gz3fps[0]-> thread_objs[thread_no].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
 		    gz3fps[1]-> thread_objs[thread_no].in_buffer_used >= PARALLEL_GZIP_TXT_BUFFER_SIZE - PARALLEL_GZIP_TXT_BUFFER_MARGIN ||
@@ -1789,7 +1890,7 @@ void cellCounts_summarize_entrez_hits(cellcounts_global_t * cct_context, int thr
 	}
 }
 
-void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int thread_no, int reporting_index, char * read_name, char * read_text, char * qual_text, int rlen, int multi_mapping_number, int this_multi_mapping_i){
+void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int thread_no, int reporting_index, char * read_name, char * read_text, char * qual_text, char * raw_text, char * raw_qual, int rlen){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	char * chro_name = NULL;
 	int chro_pos = 0;
@@ -1813,9 +1914,9 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 			}
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
-		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, nhits, multi_mapping_number, this_multi_mapping_i);
+		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> reporting_multi_alignment_no, thread_context -> reporting_this_alignment_no +1, thread_context -> reporting_editing_distance[reporting_index]);
 	}else //unmapped
-		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, NULL, 0, -1, 0, 0, 0);
+		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1);
 }
 
 int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned int * repeated_buffer_position, char ** repeated_buffer_cigar, int * repeated_count, realignment_result_t * res1);
@@ -2174,7 +2275,7 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	int rbin_offset_for_reversed = (votetab -> masks[vote_i][vote_j] & IS_NEGATIVE_STRAND)? REVERSED_READ_BIN_OFFSET :0;
 
 	unsigned int abs_pos = votetab -> pos[vote_i][vote_j];
-	int tolimax = votetab -> toli[vote_i][vote_j];
+	int tolimax = votetab -> toli[vote_i][vote_j], all_indel_length=0;
 	int indels_in_highconf = cellCounts_indel_recorder_copy(indel_offsets, votetab -> indel_recorder[vote_i][vote_j], tolimax, all_subreads, &read_pos_move, read_name, abs_pos);
 	abs_pos += read_pos_move;
 	int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
@@ -2209,7 +2310,10 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 
 		int gap_mismatched = 0;
 		int indel_pos = cellCounts_meet_in_the_middle(cct_context, thread_no, meet_start, read_bin + rbin_offset_for_reversed, last_correct_base, first_correct_base - last_correct_base, indel_diff, read_name, &gap_mismatched);
-		if(indel_pos == MINM_INVALID_INDEL) indel_pos = (first_correct_base - last_correct_base)/2;
+		if(indel_pos == MINM_INVALID_INDEL){
+			indel_pos = (first_correct_base - last_correct_base)/2;
+			all_indel_length += abs(indel_diff);
+		}
 
 		if(0 && FIXLENstrcmp("R00001325252", read_name)==0) SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d, GAP=%d. FOUND_INDEL_POS=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base, first_correct_base - last_correct_base, indel_pos);
 
@@ -2252,29 +2356,31 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 	char tmp_new_cigar[MAX_SCRNA_READ_LENGTH+20];
 	int rebuilt_rlen = cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar );
 
-	if(0 && (FIXLENstrcmp("R00000003490", read_name) == 0|| rebuilt_rlen!=read_len)){
-		char posstr[100], posstr2[100];
-		cellCounts_absoffset_to_posstr(cct_context, abs_pos , posstr);
-		cellCounts_absoffset_to_posstr(cct_context, abs_pos  + in_cigar_readlen + last_indel , posstr2);
-		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s [%s]; TESTINGPOS=%s ; CIGAR=%s -> %s / %d-bases\n MAPPED=%d ;  MATCH=%d ; MM=%d\n", read_name, read_text, posstr, rbin_offset_for_reversed ?"NEG":"POS", posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar, rebuilt_rlen, all_mapped_bases, all_matched_bases, all_mismatched_bases );
-	}
-
 	strcpy(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar);
 
 	srInt_64 weight = cellCounts_calculate_pos_weight(cct_context, abs_pos, tmp_new_cigar);
 	srInt_64 score = 0;
 	if(rebuilt_rlen==read_len && all_mapped_bases >= cct_context -> min_mapped_length_for_mapped_read )score=cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> reporting_count], head_soft_clipped, tail_soft_clipped, all_matched_bases, all_mismatched_bases)*weight;
 
+	if(0 && (FIXLENstrcmp("R00000002478", read_name) == 0|| rebuilt_rlen!=read_len)){
+		char posstr[100], posstr2[100];
+		cellCounts_absoffset_to_posstr(cct_context, abs_pos , posstr);
+		cellCounts_absoffset_to_posstr(cct_context, abs_pos  + in_cigar_readlen + last_indel , posstr2);
+		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s [%s] %u; TESTINGPOS=%s ; CIGAR=%s -> %s / %d-bases\n MAPPED=%d ;  MATCH=%d ; MM=%d\nGOT Score=%lld ; at weight=%lld\n", read_name, read_text, posstr, rbin_offset_for_reversed ?"NEG":"POS", abs_pos , posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar, rebuilt_rlen, all_mapped_bases, all_matched_bases, all_mismatched_bases , score , weight );
+	}
+
+
+
 	thread_context -> reporting_scores[thread_context -> reporting_count] = score;
 	thread_context -> reporting_positions[thread_context -> reporting_count] = abs_pos;
 	thread_context -> reporting_flags[thread_context -> reporting_count] = rbin_offset_for_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
 	#warning "============ IMPROVE THIS FORMULA AS Subread =========="
 	thread_context -> reporting_mapq[thread_context -> reporting_count] = 40 - all_mismatched_bases;
-	thread_context -> reporting_score_weight[thread_context -> reporting_count] = weight;
-	return score>0;
+	thread_context -> reporting_editing_distance[thread_context -> reporting_count] = all_mismatched_bases + all_indel_length;
+	return score;
 }
 
-int sort_readscore_compare(void * vp , int i , int j){
+int sort_readscore_compare_LargeFirst(void * vp , int i , int j){
 	void ** pp = vp;
 	cellcounts_align_thread_t * thread_context = pp[0];
 	int * sorting_index = pp[1];
@@ -2308,7 +2414,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 		}
 	}
 
-	int distinct_vote_number_i, reportable_aligns = 0;
+	int distinct_vote_number_i;
 	thread_context-> reporting_count=0;
 
 	for(distinct_vote_number_i = 0 ; distinct_vote_number_i < cct_context -> max_distinct_top_vote_numbers; distinct_vote_number_i ++){
@@ -2323,35 +2429,41 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 
 				int vv = votetab->votes[i][j];
 				if(vv == this_vote_N && vv >= cct_context -> min_votes_per_mapped_read){
-					int worth_write = cellCounts_explain_one_read(cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j);
+					srInt_64 this_score = cellCounts_explain_one_read(cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j);
 					thread_context -> reporting_count ++;
-					if(worth_write)reportable_aligns ++;
+					if(this_score >0)thread_context -> reporting_multi_alignment_no ++;
 				}
 			}
 		}
 	}
 
-	if(reportable_aligns) {
+	thread_context -> reporting_multi_alignment_no = min(thread_context -> reporting_multi_alignment_no, cct_context -> max_reported_alignments_per_read);
+	if(thread_context -> reporting_multi_alignment_no) {
 		int sorting_index [thread_context -> reporting_count];
 		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> reporting_count; distinct_vote_number_i ++) sorting_index [distinct_vote_number_i ] = distinct_vote_number_i ;
 		void * sorting_ptr[2];
 		sorting_ptr[0] = thread_context;
 		sorting_ptr[1] = sorting_index;
 		//sort : large number first
-		quick_sort(sorting_ptr , thread_context -> reporting_count , sort_readscore_compare, sort_readscore_exchange);
+		quick_sort(sorting_ptr , thread_context -> reporting_count , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "reporting_multi_alignment_no" records ahead are worth writting (score > 0).
 
-		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> reporting_count; distinct_vote_number_i ++){
-			int myno = sorting_index[distinct_vote_number_i ];
+		for(thread_context -> reporting_this_alignment_no = 0 ; thread_context -> reporting_this_alignment_no < thread_context -> reporting_multi_alignment_no; thread_context -> reporting_this_alignment_no ++){
+			int myno = sorting_index[thread_context -> reporting_this_alignment_no ];
 			if(thread_context -> reporting_scores[ myno ] < 1)continue;
-			if(distinct_vote_number_i >= cct_context -> max_reported_alignments_per_read) break;
+			if(thread_context -> reporting_this_alignment_no >= cct_context -> max_reported_alignments_per_read) break;
 			reverse_text_offset = (thread_context -> reporting_flags[myno] & SAM_FLAG_REVERSE_STRAND_MATCHED)?MAX_SCRNA_READ_LENGTH+1:0;
 			if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
 				strcpy(read_qual+reverse_text_offset, read_qual);
 				reverse_quality(read_qual+reverse_text_offset, read_len);
 			}
-			cellCounts_write_read_in_batch_bin(cct_context, thread_no, myno, read_name, read_text + reverse_text_offset, read_qual+reverse_text_offset, read_len, 0, 0);
+			if(0 && FIXLENstrcmp("R00000002478", read_name)==0){
+				char posstr[100];
+				cellCounts_absoffset_to_posstr(cct_context, thread_context -> reporting_positions[myno] +1, posstr);
+				SUBREADprintf("\nFINAL WRITTEN %s BY score=%lld\n====================\n\n",posstr,thread_context -> reporting_scores[ myno ]);
+			}
+			cellCounts_write_read_in_batch_bin(cct_context, thread_no, myno, read_name, read_text + reverse_text_offset, read_qual+reverse_text_offset, read_text , read_qual , read_len);
 		}
-	} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, -1, read_name, read_text, read_qual, read_len, 0, 0);
+	} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, -1, read_name, read_text, read_qual , read_text, read_qual, read_len);
 
 	return 0;
 }
