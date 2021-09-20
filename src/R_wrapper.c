@@ -153,10 +153,10 @@ void R_cellCounts(int * nargs, char ** argv){
 	r_argv = strdup(*argv);
 
 	c_argv = (char **) calloc(n+1,sizeof(char *));
-	for(i=0;i<1+n;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
+	for(i=0;i<2;i++) c_argv[i] = (char *)calloc(MAX_FILE_NAME_LENGTH,sizeof(char));
 	strcpy(c_argv[0],"R_cellCounts");
 	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
-	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
+	for(i=2;i<n+1;i++) c_argv[i] = strdup(strtok(NULL,PARAM_SPLITTOR));
 
 	R_child_thread_run(cellCounts_main, n+1,c_argv, 1);
 

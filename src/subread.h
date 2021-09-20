@@ -488,11 +488,25 @@ typedef struct {
 	int is_EOF;
 } input_BLC_t;
 
+#define MAX_SCRNA_READ_LENGTH 128 
+
+typedef struct{
+	char read_text[MAX_SCRNA_READ_LENGTH];
+	char qual_text[MAX_SCRNA_READ_LENGTH];
+	srInt_64 read_number;
+	int read_len;
+	int is_last_read_in_dataset;
+} input_mFQ_cached_read_t ;
+
 typedef struct{
 	union{
 		srInt_64 pos_file1, pos_file2, pos_file3;
 		seekable_position_t zpos_file1;
 	};
+
+	input_mFQ_cached_read_t * cache_reads;
+	int cache_remaining;
+
 	seekable_position_t zpos_file2;
 	seekable_position_t zpos_file3;
 	int current_file_no;

@@ -1210,7 +1210,7 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
   annot.screen.output <- annlist$screen
   delete.annot.file <- annlist$delete
 
-  if(input.mode=="FASTQ"){
+  if(input.mode=="FASTQ" || input.mode == "FASTQ-dir"){
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
     print(sample.info.idx)
     if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")

@@ -1496,6 +1496,8 @@ int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fq
 		total_files++;
 	}
 
+	//fprintf(stderr, "INIT FQFS: %s\n\n%s\n%s\n%d\n\n", three_paired_fqnames, files1[0], files3[0], total_files);
+
 	int rv = input_mFQ_init(fqs_input, files1, no_file2?NULL:files2, files3, total_files);
 	free(fnames);
 	free(files1);

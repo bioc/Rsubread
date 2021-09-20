@@ -14,7 +14,6 @@
 #include "core-indel.h"
 #include "core-junction.h"
 
-#define MAX_SCRNA_READ_LENGTH 150
 #define CELLCOUNTS_REALIGNMENT_TRIES 15
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
@@ -2991,10 +2990,8 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 	return ret;
 }
 
-
-
 #define ADD_count_hash(bc,gn,no)   HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) )
-void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, int sec_end, int is_UMI_step2, HashTable * filtered_CGU_table){
+void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, int sec_end, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count){
 	int x1;
 	void ** app1 = structs -> appendix1;
 	cellcounts_global_t * cct_context = app1[0];
@@ -3010,10 +3007,11 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 				if(str1 -> supp_reads > str2 -> supp_reads){
 					ADD_count_hash(str1->cellbc, str1->gene_no,1);
 					continue;
-				}
+				} else if(remove_count)(*remove_count)++;
 			}
 
 			str1 -> cellbc = -1;
+
 			char replaced_key[40+MAX_UMI_LEN];
 #ifdef __MINGW32__
 			int keyptr = sprintf(replaced_key,"%d-%I64d-", str1 -> cellbc, str1 -> gene_no);
@@ -3116,7 +3114,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 	}
 }
 
-void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2, HashTable * filtered_CGU_table){
+void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count){
 	void ** app1 = structs -> appendix1;
 	cellcounts_global_t * cct_context = app1[0];
 	HashTable * cellBCp0_genep0_P1_to_UMIs = app1[2];
@@ -3143,7 +3141,7 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
-			if(x1 - sec_start>1 && str0->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table);
+			if(x1 - sec_start>1 && str0->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count);
 			else if(is_UMI_step2 && str0->cellbc>=0) ADD_count_hash(str0->cellbc,str0->gene_no,1);
 
 			old_sec_key = sec_key;
@@ -3433,6 +3431,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 	int me_max_genes = 0;
 	char ** bin_ptrs = malloc(sizeof(char*) * 1500000), * batch_content=NULL;
 	int bin_ptr_size = 1500000;
+	srInt_64 removed_UMIs = 0;
 	while(1){
 		int this_batch_no = -1;
 		cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
@@ -3532,12 +3531,13 @@ void * cellCounts_do_one_batch(void * paramsp1){
 						// 1 : sorted by cell_bc, then gene, then supported_reads, then UMIstr
 						// supported_reads : large -> small; the other: small -> large
 			ArrayListSort(cell_gene_umi_list[x1],  cellCounts_do_one_batch_tab_to_struct_list_compare);
-			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 0, filtered_SCGU_table);
+			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 0, filtered_SCGU_table, NULL);
 
 			app1[1] = NULL+0;
 			app1[2] = cellbcP0_to_geneno0B_P1_to_UMIs;
 			ArrayListSort(cell_gene_umi_list[x1], cellCounts_do_one_batch_tab_to_struct_list_compare);
-			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table);
+
+			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table, &removed_UMIs);
 
 			cellbcP0_to_geneno0B_P1_to_UMIs -> appendix1 = fp;
 			fwrite(&cellbcP0_to_geneno0B_P1_to_UMIs -> numOfElements,1,8,fp);
@@ -3597,7 +3597,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 	}
 	free(batch_content);
 	free(bin_ptrs);
-	return NULL;
+	return NULL + removed_UMIs;
 }
 
 void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_merge_batches_worker_current * finished_job){
@@ -4021,8 +4021,13 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		pthread_create(threads + xk1, NULL, cellCounts_do_one_batch, vpp);
 	}
 
-	for(xk1=0; xk1<cct_context-> total_threads; xk1++)
-		pthread_join(threads[xk1],NULL);
+	srInt_64 removed_umis = 0;
+	for(xk1=0; xk1<cct_context-> total_threads; xk1++){
+		void * pret = NULL;
+		pthread_join(threads[xk1], &pret);
+		removed_umis += (pret - NULL);
+	}
+	SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
 	ArrayListDestroy(file_size_list);
 
 	worker_master_mutex_t worker_mut;
