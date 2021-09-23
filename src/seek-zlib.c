@@ -560,7 +560,7 @@ void seekgz_close(seekable_zfile_t * fp){
 	subread_destroy_lock(&fp -> write_lock);
 }
 
-int autozip_open(const char * fname, autozip_fp * fp){
+int autozip_open(const char * fname, autozip_fp * fp, int need_seek){
 	int ret = -1;
 	memset(fp, 0, sizeof(autozip_fp));
 	strcpy(fp -> filename, fname);
@@ -575,7 +575,13 @@ int autozip_open(const char * fname, autozip_fp * fp){
 	if(cc2 == 0x8b && cc1 == 0x1f){
 		//fclose(tstfp);
 		fp -> is_plain = 0;
-		int iret = seekgz_open(fname, &fp -> gz_fp, tstfp);
+		fp -> zlib_fp = NULL;
+		int iret = 0;
+		if(need_seek) iret = seekgz_open(fname, &fp -> gz_fp, tstfp);
+		else{
+			fp -> zlib_fp = gzopen(fname, "rb");
+			if(fp -> zlib_fp == NULL) iret=-1;
+		}
 		if(iret >= 0) ret = 1;
 		else ret = -1;
 	}else{
@@ -594,8 +600,8 @@ int autozip_open(const char * fname, autozip_fp * fp){
 
 void autozip_close(autozip_fp * fp){
 	if(fp -> is_plain) fclose(fp -> plain_fp);
-	else
-		seekgz_close(&fp -> gz_fp);
+	else if(fp->zlib_fp) gzclose(fp -> zlib_fp);
+	else seekgz_close(&fp -> gz_fp);
 } 
 
 int autozip_gets(autozip_fp * fp, char * buf, int buf_size){
@@ -614,8 +620,14 @@ int autozip_gets(autozip_fp * fp, char * buf, int buf_size){
 		if(retc == NULL && base0 == 0) ret = 0;
 		else ret = strlen(buf);
 	}else{
-		seekgz_preload_buffer(&fp->gz_fp, NULL);
-		ret = seekgz_gets(&fp -> gz_fp, buf, buf_size);
+		if(fp -> zlib_fp){
+			char *rets = gzgets(fp -> zlib_fp, buf, buf_size);
+			if(rets) ret = strlen(buf);
+			else ret = 0;
+		}else{
+			seekgz_preload_buffer(&fp->gz_fp, NULL);
+			ret = seekgz_gets(&fp -> gz_fp, buf, buf_size);
+		}
 	}
 	//SUBREADprintf("READBUF '%s'\n", buf);
 	return ret;
@@ -628,17 +640,22 @@ int autozip_getch(autozip_fp * fp){
 		ret = fgetc(fp -> plain_fp);
 		if(ret==EOF)ret = -1;
 	}else{
-		ret = seekgz_next_int8(&fp -> gz_fp);
+		if(fp -> zlib_fp) ret = gzgetc (fp -> zlib_fp);
+		else ret = seekgz_next_int8(&fp -> gz_fp);
 	}
 	return ret;
 }
 
 void autozip_rewind(autozip_fp * fp){
 	char fname [MAX_FILE_NAME_LENGTH+1];
+	if(fp->zlib_fp){
+		SUBREADprintf("File opened as non-seekable.\n");
+		return;
+	}
 	strcpy(fname, fp -> filename);
 
 	autozip_close(fp);
-	autozip_open(fname, fp);
+	autozip_open(fname, fp, 1);
 }
 
 void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_filename, int total_threads){

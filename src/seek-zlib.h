@@ -67,7 +67,7 @@ int autozip_getch(autozip_fp * fp);
 void autozip_close(autozip_fp * fp);
 
 // return -1 if error, return 0 if plain text, return 1 if gzipped 
-int autozip_open(const char * fname, autozip_fp * fp);
+int autozip_open(const char * fname, autozip_fp * fp, int need_seek);
 
 void autozip_rewind(autozip_fp * fp);
 

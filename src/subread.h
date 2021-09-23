@@ -493,25 +493,11 @@ typedef struct {
 typedef struct{
 	char read_text[MAX_SCRNA_READ_LENGTH];
 	char qual_text[MAX_SCRNA_READ_LENGTH];
-	srInt_64 read_number;
 	int read_len;
 	int is_last_read_in_dataset;
-} input_mFQ_cached_read_t ;
-
-typedef struct{
-	union{
-		srInt_64 pos_file1, pos_file2, pos_file3;
-		seekable_position_t zpos_file1;
-	};
-
-	input_mFQ_cached_read_t * cache_reads;
-	int cache_remaining;
-
-	seekable_position_t zpos_file2;
-	seekable_position_t zpos_file3;
-	int current_file_no;
-	srInt_64 current_read_no;
-} input_mFQ_pos_t;
+	int file_no;
+	int guessed_lane_no;
+} input_mFQ_cached_read_t;
 
 typedef struct {
 	char filename[MAX_FILE_NAME_LENGTH+1];
@@ -519,20 +505,44 @@ typedef struct {
 	int is_plain;
 	FILE * plain_fp;
 	seekable_zfile_t gz_fp;
+	gzFile zlib_fp;
 	int is_first_chars;
 	unsigned char first_chars[2];
 } autozip_fp;
 
 
+typedef pthread_mutex_t  cellCounts_lock_t;
+#define cellCounts_init_lock(pp) pthread_mutex_init(pp, NULL)
+#define cellCounts_destroy_lock pthread_mutex_destroy
+#define cellCounts_lock_occupy pthread_mutex_lock
+#define cellCounts_lock_release pthread_mutex_unlock
+/*
+typedef pthread_spinlock_t cellCounts_lock_t;
+#define cellCounts_init_lock(pp) pthread_spin_init(pp,PTHREAD_PROCESS_SHARED)
+#define cellCounts_destroy_lock pthread_spin_destroy 
+#define cellCounts_lock_occupy pthread_spin_lock
+#define cellCounts_lock_release pthread_spin_unlock
+*/
 
 typedef struct {
 	char ** files1;
 	char ** files2;
 	char ** files3;
 	int total_files;
-	int current_file_no;
-	int current_guessed_lane_no;
+	int current_file_no[3];
+	int current_guessed_lane_no; // only for R1.
 	srInt_64 current_read_no;
+
+	input_mFQ_cached_read_t * cached_reads[3]; 
+	int cached_read_number[3];
+	int cached_read_fetch_ptr[3];
+	int cache_capacity[3];
+	int cache_lower_line[3];
+	int is_being_filled[3];
+
+	int all_reads_loaded_in_cache;
+	cellCounts_lock_t * lock;
+
 	autozip_fp autofp1;
 	autozip_fp autofp2;
 	autozip_fp autofp3;
@@ -601,7 +611,6 @@ typedef struct{
 		unsigned long long simple_file_position;
 		seekable_position_t seekable_gzip_position;
 		input_BLC_pos_t BCL_position;
-		input_mFQ_pos_t mFQ_position;
 		input_scBAM_pos_t scBAM_position;
 	};
 	char gzfa_last_name[MAX_READ_NAME_LEN];

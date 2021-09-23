@@ -24,13 +24,6 @@
 #define MAX_SUBREADS_PER_READ 30
 #define HIGHEST_REPORTED_ALIGNMENTS 30
 
-typedef pthread_spinlock_t cellCounts_lock_t;
-
-#define cellCounts_init_lock(pp) pthread_spin_init(pp,PTHREAD_PROCESS_PRIVATE)
-#define cellCounts_destroy_lock pthread_spin_destroy 
-#define cellCounts_lock_occupy pthread_spin_lock
-#define cellCounts_lock_release pthread_spin_unlock
-
 typedef struct {
 	unsigned int selected_position;
 	short result_flags;
@@ -1194,12 +1187,13 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
 
+	cellCounts_init_lock(&cct_context -> input_dataset_lock);
+	//SUBREADprintf("INIT LOCKER %d\n", cct_context -> input_dataset_lock);
 	if(cct_context -> input_mode == GENE_INPUT_BCL)
 		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
 	else if(cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ)
-		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads );
+		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads, &cct_context -> input_dataset_lock);
 	else 	rv = -1;
-	if(rv==0) cellCounts_init_lock(&cct_context -> input_dataset_lock);
 
 	rv = rv || load_offsets(& cct_context -> chromosome_table, cct_context -> index_prefix);
 	rv = rv || determine_total_index_blocks(cct_context);
@@ -1256,35 +1250,9 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	return 0;
 }
 
-void cellCounts_locate_read_files(cellcounts_global_t * cct_context, int type) {
-	// The BCL input module uses its own chunking algorithm.
-	if(cct_context -> input_mode == GENE_INPUT_BCL) return;
-
-	if(type==SEEK_SET) geinput_tell(&cct_context -> input_dataset, &cct_context -> current_circle_start_position);
-	else geinput_tell(&cct_context -> input_dataset, &cct_context -> current_circle_end_position);
-
-	return;
-}
-
-void cellCounts_rewind_read_files(cellcounts_global_t * cct_context, int type)
-{
-	if(type==SEEK_SET) geinput_seek(&cct_context -> input_dataset, &cct_context -> current_circle_start_position);
-	else geinput_seek(&cct_context -> input_dataset, &cct_context -> current_circle_end_position);
-}
-
-void cellCounts_go_chunk_start(cellcounts_global_t * cct_context){
-	if(cct_context -> input_mode == GENE_INPUT_BCL)
-		cacheBCL_go_chunk_start(&cct_context -> input_dataset.bcl_input);
-	else
-		cellCounts_rewind_read_files(cct_context, SEEK_SET);
-	cct_context -> running_processed_reads_in_chunk=0;
-}
-
 void cellCounts_go_chunk_nextchunk(cellcounts_global_t * cct_context){
 	if(cct_context -> input_mode == GENE_INPUT_BCL)
 		cacheBCL_go_chunk_end(&cct_context -> input_dataset.bcl_input);
-	else
-		cellCounts_rewind_read_files(cct_context, SEEK_END);
 	cct_context -> running_processed_reads_in_chunk=0;
 }
 
@@ -2016,7 +1984,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 	gene_input_t * ginp1 = &cct_context -> input_dataset;
 
 	geinput_preload_buffer(ginp1, &cct_context -> input_dataset_lock);
-	cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
+	int lockret1=cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
 	if(cct_context -> running_processed_reads_in_chunk < cct_context -> reads_per_chunk) {
 		do{
 			is_second_R1 = 0;
@@ -2029,8 +1997,9 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 			cct_context -> running_processed_reads_in_chunk ++;
 		}
 	}
-	cellCounts_lock_release(&cct_context -> input_dataset_lock); 
+	int lockret2=cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 
+	//if(this_number < 40) SUBREADprintf("FETCH_READ THR %d LOCK %p ret %d %d\n", thread_no, &cct_context -> input_dataset_lock, lockret1, lockret2);
 	if(rl1>0 && this_number>=0) {
 		*read_no_in_chunk = this_number;
 		*read_len = rl1;
@@ -2885,7 +2854,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 	while(1) {
 		int ret = 0;
 
-		cellCounts_locate_read_files(cct_context, SEEK_SET);
 		for(cct_context->current_index_block_number = 0; cct_context->current_index_block_number < cct_context->total_index_blocks; cct_context->current_index_block_number++) {	   
 			char tmp_fname[MAX_FILE_NAME_LENGTH+30];
 
@@ -2903,15 +2871,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			else	cct_context -> is_final_voting_run = 0;
 			
 			ret = cellCounts_run_maybe_threads(cct_context, STEP_VOTING);
-			
-			if(0 == cct_context->current_index_block_number) {
-				cellCounts_locate_read_files(cct_context, SEEK_END); 
-				cct_context -> processed_reads_in_chunk = cct_context -> running_processed_reads_in_chunk;
-			}
-			
-			if(cct_context->current_index_block_number < cct_context->total_index_blocks -1)
-				cellCounts_go_chunk_start(cct_context);
-			
+			cct_context -> processed_reads_in_chunk = cct_context -> running_processed_reads_in_chunk;
 			int is_last_chunk = cct_context -> processed_reads_in_chunk < cct_context-> reads_per_chunk;
 			
 			if(cct_context->total_index_blocks > 1 || is_last_chunk)

@@ -820,7 +820,7 @@ int check_and_convert_FastA(char ** input_fas, int fa_number, char * out_fa, uns
 	{
 		autozip_fp fafp;
 		memset(&fafp, 0, sizeof(fafp));
-		int faret = autozip_open(input_fas[inp_file_no], &fafp);
+		int faret = autozip_open(input_fas[inp_file_no], &fafp, 1);
 		fcc.filename = input_fas[inp_file_no];
 
 		if(faret <0) {

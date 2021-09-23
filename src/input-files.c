@@ -395,9 +395,9 @@ int geinput_open_scRNA_BAM(char * rfnames,  gene_input_t * input, int reads_per_
 	return rv;
 }
 
-int geinput_open_scRNA_fqs(char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
+int geinput_open_scRNA_fqs(char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads, cellCounts_lock_t * lock){
 	strcpy(input->filename,rfnames);
-	int rv = input_mFQ_init_by_one_string(&input -> scRNA_fq_input, rfnames);
+	int rv = input_mFQ_init_by_one_string(&input -> scRNA_fq_input, rfnames, lock);
 	input -> file_type = GENE_INPUT_SCRNA_FASTQ;
 	input -> space_type = GENE_SPACE_BASE;
 	return rv;
@@ -682,11 +682,11 @@ unsigned int read_numbers(gene_input_t * input)
 
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
 	if(input -> file_type == GENE_INPUT_SCRNA_BAM){
-		scBAM_tell(&input -> scBAM_input, &pos -> scBAM_position);
+		SUBREADprintf("ERROR: scRNA bam dataset doesn't support seeking!\n");
 	}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
-		input_mFQ_tell(&input -> scRNA_fq_input, &pos -> mFQ_position);
+		SUBREADprintf("ERROR: scRNA fq dataset doesn't support seeking!\n");
 	}else if(input -> file_type == GENE_INPUT_BCL){
-		assert(input -> file_type != GENE_INPUT_BCL);
+		SUBREADprintf("ERROR: scRNA dataset doesn't support seeking!\n");
 	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
 		if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
@@ -698,11 +698,11 @@ void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
 
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
 	if(input -> file_type == GENE_INPUT_SCRNA_BAM){
-		scBAM_seek(&input -> scBAM_input, &pos -> scBAM_position);
+		SUBREADprintf("ERROR: scRNA bam dataset doesn't support seeking!\n");
 	}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
-		input_mFQ_seek(&input -> scRNA_fq_input, &pos -> mFQ_position);
+		SUBREADprintf("ERROR: scRNA fq dataset doesn't support seeking!\n");
 	}else if(input -> file_type == GENE_INPUT_BCL){
-		assert(input -> file_type != GENE_INPUT_BCL);
+		SUBREADprintf("ERROR: scRNA dataset doesn't support seeking!\n");
 	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
 		seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
 		if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
@@ -1757,7 +1757,7 @@ void destroy_cigar_event_table(HashTable * event_table)
 void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_prefix, chromosome_t* known_chromosomes)
 {
 	autozip_fp vzfp;
-	int vret = autozip_open(vcf_file, &vzfp);
+	int vret = autozip_open(vcf_file, &vzfp, 1);
 	char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
 	int close_now = 0;
 
