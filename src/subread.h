@@ -33,6 +33,7 @@
 
 #include "hashtable.h" 
 
+#define SCRNA_HIGHEST_REPORTED_ALIGNMENTS 30
 #define MAX_SCRNA_FASTQ_FILES 256 
 #define SCRNA_FASTA_SPLIT1 "|Rsd:cCounts:mFQs|"
 #define SCRNA_FASTA_SPLIT2 "|Rsd:cCounts:1mFQ|"
@@ -202,10 +203,10 @@ typedef short gene_vote_number_t;
 #define GENE_VOTE_SPACE 173 
 #define GENE_VOTE_TABLE_SIZE 331
 #else
-#warning "============ ADD '-21' from next line  ================"
-#define GENE_VOTE_SPACE (24 - 21)
-#warning "============ ADD '-13' from next line  ================"
-#define GENE_VOTE_TABLE_SIZE (30 - 13)
+#warning "============ ADD '-19' from next line  ================"
+#define GENE_VOTE_SPACE (24 - 20)
+#warning "============ ADD '-18' from next line  ================"
+#define GENE_VOTE_TABLE_SIZE (30 - 15)
 #endif
 
 #define MAX_ANNOTATION_EXONS 30000 
@@ -312,9 +313,9 @@ typedef struct{
 	void * appendix2;
 } gene_value_index_t;
 
-
 typedef struct {
 	gene_vote_number_t max_vote;
+	int max_vote_IJ;
 	gehash_data_t max_position;
 	gene_quality_score_t max_quality;
 	gene_vote_number_t max_indel_recorder[MAX_INDEL_TOLERANCE*3];
@@ -332,6 +333,8 @@ typedef struct {
 	gene_vote_number_t indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
 	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	int topK_votes[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	int topK_IJ[SCRNA_HIGHEST_REPORTED_ALIGNMENTS ];
 
 	#ifdef MAKE_FOR_EXON
 	short coverage_start [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
@@ -488,7 +491,7 @@ typedef struct {
 	int is_EOF;
 } input_BLC_t;
 
-#define MAX_SCRNA_READ_LENGTH 128 
+#define MAX_SCRNA_READ_LENGTH 160 
 
 typedef struct{
 	char read_text[MAX_SCRNA_READ_LENGTH];

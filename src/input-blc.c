@@ -1585,7 +1585,7 @@ void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno){
 	//SUBREADprintf("PREFILL FILE #%d HAVING %d\n", fileno, x1);
 	// here decompress the next chunk of reads.
 	if(fqs_input -> lock)spinret = cellCounts_lock_occupy(fqs_input -> lock);
-	if(fqs_input -> lock) SUBREADprintf("RELEASED LOCK %p   FOR LOADING %d reads in %d file; LOCK RET %d ; REMAIN READS %d += %d , DONE=%d\n", fqs_input -> lock, reads_to_fill , fileno, spinret, fqs_input-> cached_read_number[fileno], x1, all_fq_done);
+	//if(fqs_input -> lock)SUBREADprintf("RELEASED LOCK %p   FOR LOADING %d reads in %d file; LOCK RET %d ; REMAIN READS %d += %d , DONE=%d\n", fqs_input -> lock, reads_to_fill , fileno, spinret, fqs_input-> cached_read_number[fileno], x1, all_fq_done);
 	fqs_input -> is_being_filled[fileno] = 0;
 	fqs_input -> cached_read_number[fileno] += x1;
 	if(all_fq_done) fqs_input -> all_reads_loaded_in_cache |= (1<<(4*fileno));

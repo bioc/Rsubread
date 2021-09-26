@@ -14,6 +14,7 @@
 #include "core-indel.h"
 #include "core-junction.h"
 
+//#define DO_STARSOLO_THING
 #define CELLCOUNTS_REALIGNMENT_TRIES 15
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
@@ -22,7 +23,7 @@
 #define MAX_UMI_LEN 14
 #define MAX_SCRNA_SAMPLE_NUMBER 16
 #define MAX_SUBREADS_PER_READ 30
-#define HIGHEST_REPORTED_ALIGNMENTS 30
+#define SCRNA_SUBREADS_HARD_LIMIT 20 
 
 typedef struct {
 	unsigned int selected_position;
@@ -66,14 +67,16 @@ typedef struct{
 	srInt_64 assigned_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 
+	srInt_64 hiconf_map;
+	srInt_64 loconf_map;
 	int reporting_count;
 	int reporting_multi_alignment_no, reporting_this_alignment_no;
-	srInt_64 reporting_scores[HIGHEST_REPORTED_ALIGNMENTS];
-	srInt_64 reporting_flags[HIGHEST_REPORTED_ALIGNMENTS];
-	unsigned int reporting_positions[HIGHEST_REPORTED_ALIGNMENTS];
-	int reporting_mapq[HIGHEST_REPORTED_ALIGNMENTS];
-	char reporting_cigars[HIGHEST_REPORTED_ALIGNMENTS][MAX_SCRNA_READ_LENGTH+20];
-	int reporting_editing_distance[HIGHEST_REPORTED_ALIGNMENTS];
+	srInt_64 reporting_scores[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	srInt_64 reporting_flags[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	unsigned int reporting_positions[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	int reporting_mapq[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	char reporting_cigars[SCRNA_HIGHEST_REPORTED_ALIGNMENTS][MAX_SCRNA_READ_LENGTH+20];
+	int reporting_editing_distance[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 
 } cellcounts_align_thread_t;
 
@@ -99,6 +102,8 @@ typedef struct{
 
 	int processed_reads_in_chunk;
 	int running_processed_reads_in_chunk;
+	srInt_64 hiconf_map;
+	srInt_64 loconf_map;
 	srInt_64 all_processed_reads_before_chunk;
 	double program_start_time;
 	int is_final_voting_run;
@@ -115,7 +120,7 @@ typedef struct{
 
 	int total_index_blocks;
 	int current_index_block_number;
-	gene_value_index_t value_index[1];
+	gene_value_index_t * value_index;
 	gehash_t * current_index;
 	gene_input_t input_dataset;
 	cellCounts_lock_t input_dataset_lock;
@@ -465,7 +470,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 			cct_context -> min_votes_per_mapped_read = min(64, max(1, atoi(optarg)));
 		}
 		if(strcmp("subreadsPerRead", cellCounts_long_options[option_index].name)==0){
-			cct_context -> total_subreads_per_read = min(64, max(1, atoi(optarg)));
+			cct_context -> total_subreads_per_read = min(SCRNA_SUBREADS_HARD_LIMIT, max(7, atoi(optarg)));
 		}
 		if(strcmp("dataset", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> input_dataset_name, optarg, MAX_FILE_NAME_LENGTH * MAX_SCRNA_FASTQ_FILES * 3 -1);
@@ -483,7 +488,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 			strncpy(cct_context -> output_prefix, optarg, MAX_FILE_NAME_LENGTH -1);
 		}
 		if(strcmp("reportedAlignmentsPerRead", cellCounts_long_options[option_index].name)==0){
-			cct_context -> max_reported_alignments_per_read = min(HIGHEST_REPORTED_ALIGNMENTS, max(1, atoi(optarg)));
+			cct_context -> max_reported_alignments_per_read = min(SCRNA_HIGHEST_REPORTED_ALIGNMENTS, max(1, atoi(optarg)));
 		}
 		if(strcmp("threads", cellCounts_long_options[option_index].name)==0){
 			cct_context -> total_threads = min(64, max(1, atoi(optarg)));
@@ -573,8 +578,8 @@ void cellCounts_close_sample_SamBam_writers(void *v){
 		parallel_gzip_writer_close(gzfp);
 	}
 
-	pthread_spinlock_t * gz_lock = vv[5];
-	pthread_spin_destroy(gz_lock);
+	cellCounts_lock_t * gz_lock = vv[5];
+	cellCounts_destroy_lock(gz_lock);
 	free(gz_lock);
 	
 	free(vv);
@@ -643,8 +648,8 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 		parallel_gzip_writer_init(gzipR2fq, fname, cct_context -> total_threads);
 	}
 
-	pthread_spinlock_t * gzfp_lock = malloc(sizeof(pthread_spinlock_t));
-	pthread_spin_init(gzfp_lock, PTHREAD_PROCESS_PRIVATE);
+	cellCounts_lock_t * gzfp_lock = malloc(sizeof(cellCounts_lock_t));
+	cellCounts_init_lock(gzfp_lock);
 	int x1;
 	for(x1=0; x1<scRNA_sample_id_to_name -> numOfElements; x1++){
 		char * sample_name = ArrayListGet( scRNA_sample_id_to_name, x1 );
@@ -703,7 +708,8 @@ int cellCounts_load_base_value_indexes(cellcounts_global_t * cct_context){
 	int rv=0;
 	char tmp_fname[MAX_FILE_NAME_LENGTH+ 30];
 	sprintf(tmp_fname, "%s.%02d.b.array", cct_context ->index_prefix, 0);
-	rv = rv || gvindex_load(&cct_context -> value_index, tmp_fname);
+	cct_context -> value_index = calloc(sizeof(gene_value_index_t),1);
+	rv = rv || gvindex_load(cct_context -> value_index, tmp_fname);
 	return rv;
 }
 
@@ -1235,7 +1241,8 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	HashTableDestroy(cct_context->gene_name_table);
 	HashTableDestroy(cct_context->cell_barcode_head_tail_table);
 	HashTableDestroy(cct_context -> chromosome_exons_table);
-	gvindex_destory(&cct_context -> value_index);
+	gvindex_destory(cct_context -> value_index);
+	free(cct_context -> value_index);
 	free(cct_context->exonic_region_bitmap);
 	free(cct_context -> features_sorted_chr);
 	free(cct_context -> features_sorted_geneid);
@@ -1577,12 +1584,16 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 
 void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i, int editing_dist){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	char * cigar = thread_context -> reporting_cigars[reporting_index];
-	int mapping_quality = thread_context -> reporting_mapq[reporting_index];
+	char * cigar = NULL;
+	int mapping_quality = 255;
 
 	int flags = 4;
-	if(reporting_index >=0) flags = thread_context -> reporting_flags[reporting_index];
-	if(this_multi_mapping_i>1) flags += 256;
+	if(reporting_index >=0){
+		flags = thread_context -> reporting_flags[reporting_index];
+		cigar = thread_context -> reporting_cigars[reporting_index];
+		mapping_quality = thread_context -> reporting_mapq[reporting_index];
+		if(this_multi_mapping_i>1) flags += 256;
+	}
 
 	int cigar_opts[CIGAR_PERFECT_SECTIONS], xk1, cover_length = 0;
 	int cigar_opt_len = 0;
@@ -1825,12 +1836,12 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 			parallel_gzip_zip_texts(gz3fps[1], thread_no, 0);
 			if(gz3fps[2]) parallel_gzip_zip_texts(gz3fps[2], thread_no, 0);
 			parallel_gzip_zip_texts(gz3fps[3], thread_no, 0);
-			pthread_spin_lock(sample_bam_2fps[5]);
+			cellCounts_lock_occupy(sample_bam_2fps[5]);
 			parallel_gzip_writer_flush(gz3fps[0], thread_no);
 			parallel_gzip_writer_flush(gz3fps[1], thread_no);
 			if(gz3fps[2]) parallel_gzip_writer_flush(gz3fps[2], thread_no);
 			parallel_gzip_writer_flush(gz3fps[3], thread_no);
-			pthread_spin_unlock(sample_bam_2fps[5]);
+			cellCounts_lock_release(sample_bam_2fps[5]);
 		}
 	}
 }
@@ -1940,11 +1951,14 @@ int cellCounts_run_maybe_threads(cellcounts_global_t * cct_context, int task){
 
 	for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 		pthread_join(thread_contexts[current_thread_no].thread, NULL);
+		cct_context -> loconf_map  +=thread_contexts[current_thread_no].loconf_map;
+		cct_context -> hiconf_map  +=thread_contexts[current_thread_no].hiconf_map;
 
 		if(STEP_VOTING == task) cellCounts_free_topKbuff(cct_context, current_thread_no);
 		ret_value += *(ret_values + current_thread_no);
 		if(ret_value)break;
 	}
+	SUBREADprintf("HICONF MAPPING (SIMPLE) = %lld, LOWCONF MAPPING (ALL SUBREADS, NOT SIMPLE) = %lld\n", cct_context -> hiconf_map , cct_context -> loconf_map );
 
 	free(thread_contexts);
 	return ret_value;
@@ -1983,7 +1997,6 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 	subread_read_number_t this_number = -1;
 	gene_input_t * ginp1 = &cct_context -> input_dataset;
 
-	geinput_preload_buffer(ginp1, &cct_context -> input_dataset_lock);
 	int lockret1=cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
 	if(cct_context -> running_processed_reads_in_chunk < cct_context -> reads_per_chunk) {
 		do{
@@ -2234,7 +2247,7 @@ srInt_64 cellCounts_test_score(cellcounts_global_t * cct_context, int thread_no,
 //   2, build CIGAR
 //   3, calculate matched/mismatched
 //   4, calculate and save scores in array
-int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no,char * read_name, char * read_bin, char * read_text, int read_len,  gene_vote_number_t all_subreads, gene_vote_t * votetab, int vote_i, int vote_j){
+srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no,char * read_name, char * read_bin, char * read_text, int read_len,  gene_vote_number_t all_subreads, gene_vote_t * votetab, int vote_i, int vote_j){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	gene_vote_number_t indel_offsets [MAX_INDEL_TOLERANCE*3];
 	int read_pos_move = 0, toli, in_cigar_readlen = 0, all_mismatched_bases = 0, all_matched_bases = 0, all_mapped_bases = 0;
@@ -2337,8 +2350,6 @@ int cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no
 		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s [%s] %u; TESTINGPOS=%s ; CIGAR=%s -> %s / %d-bases\n MAPPED=%d ;  MATCH=%d ; MM=%d\nGOT Score=%lld ; at weight=%lld\n", read_name, read_text, posstr, rbin_offset_for_reversed ?"NEG":"POS", abs_pos , posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar, rebuilt_rlen, all_mapped_bases, all_matched_bases, all_mismatched_bases , score , weight );
 	}
 
-
-
 	thread_context -> reporting_scores[thread_context -> reporting_count] = score;
 	thread_context -> reporting_positions[thread_context -> reporting_count] = abs_pos;
 	thread_context -> reporting_flags[thread_context -> reporting_count] = rbin_offset_for_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
@@ -2370,42 +2381,46 @@ void sort_readscore_exchange(void * vp , int i , int j){
 int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, int thread_no, subread_read_number_t pair_number, gene_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	topK_buffer_t * topbuf = &thread_context->topKbuff;
+	int i,j,reverse_text_offset, distinct_vote_number_i;
 
-	int i,j,reverse_text_offset;
-	int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
-	memset(top_distinct_vote_numbers, 0 , cct_context -> max_distinct_top_vote_numbers * sizeof(int));
-
-	for (i=0; i<GENE_VOTE_TABLE_SIZE; i++){
-		for (j=0; j< votetab->items[i]; j++){
-			int vv = votetab -> votes[i][j];
-			cellCounts_update_top_three(cct_context, top_distinct_vote_numbers, vv);
-		}
-	}
-
-	int distinct_vote_number_i;
-	thread_context-> reporting_count=0;
-
-	for(distinct_vote_number_i = 0 ; distinct_vote_number_i < cct_context -> max_distinct_top_vote_numbers; distinct_vote_number_i ++){
-		if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
-		int this_vote_N = top_distinct_vote_numbers[distinct_vote_number_i];
-		if(this_vote_N < 1 || (top_distinct_vote_numbers[0] - this_vote_N > cct_context -> max_differential_from_top_vote_number )) break;
+	thread_context -> reporting_multi_alignment_no = 0;
+	thread_context -> reporting_count=0;
+	if(votetab -> max_vote >= cct_context -> min_votes_per_mapped_read){
+		int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
+		memset(top_distinct_vote_numbers, 0 , cct_context -> max_distinct_top_vote_numbers * sizeof(int));
 
 		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++){
-			if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
 			for (j=0; j< votetab->items[i]; j++){
-				if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+				int vv = votetab -> votes[i][j];
+				if(vv>=cct_context -> min_votes_per_mapped_read)cellCounts_update_top_three(cct_context, top_distinct_vote_numbers, vv);
+			}
+		}
 
-				int vv = votetab->votes[i][j];
-				if(vv == this_vote_N && vv >= cct_context -> min_votes_per_mapped_read){
-					srInt_64 this_score = cellCounts_explain_one_read(cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j);
-					thread_context -> reporting_count ++;
-					if(this_score >0)thread_context -> reporting_multi_alignment_no ++;
+		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < cct_context -> max_distinct_top_vote_numbers; distinct_vote_number_i ++){
+			if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+			int this_vote_N = top_distinct_vote_numbers[distinct_vote_number_i];
+			if(this_vote_N < 1 || (top_distinct_vote_numbers[0] - this_vote_N > cct_context -> max_differential_from_top_vote_number )) break;
+
+			for (i=0; i<GENE_VOTE_TABLE_SIZE; i++){
+				if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+				for (j=0; j< votetab->items[i]; j++){
+					if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+
+					int vv = votetab->votes[i][j];
+					if(vv == this_vote_N){
+						srInt_64 this_score = cellCounts_explain_one_read(cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j);
+//						SUBREADprintf("READQV %s : VOTE=%d  SCORE=%lld\n", read_name, vv, this_score);
+						thread_context -> reporting_count ++;
+						if(this_score >0)thread_context -> reporting_multi_alignment_no ++;
+					}
 				}
 			}
 		}
+		thread_context -> reporting_multi_alignment_no = min(thread_context -> reporting_multi_alignment_no, cct_context -> max_reported_alignments_per_read);
 	}
 
-	thread_context -> reporting_multi_alignment_no = min(thread_context -> reporting_multi_alignment_no, cct_context -> max_reported_alignments_per_read);
+//	SUBREADprintf("READQV %s : VOTE %d , ALN %d\n\n", read_name, votetab->max_vote, thread_context -> reporting_multi_alignment_no);
+
 	if(thread_context -> reporting_multi_alignment_no) {
 		int sorting_index [thread_context -> reporting_count];
 		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> reporting_count; distinct_vote_number_i ++) sorting_index [distinct_vote_number_i ] = distinct_vote_number_i ;
@@ -2469,9 +2484,42 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 
 #define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
 #define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_VOTE_TABLE_SIZE)
+#define cellCounts_voting_update_topK(vt, vn, ij)  { \
+	int x3, x3done=0;\
+	for(x3= 0; x3 < cct_context -> max_voting_simples +1; x3++){\
+		if(ij == vt->topK_IJ[x3]){\
+			if(x3 > 0 && vn > vt->topK_votes[x3-1]){\
+				int x4;\
+				for(x4 = x3; x4< cct_context -> max_voting_simples; x4++){\
+					vt->topK_votes[x4] = vt->topK_votes[x4+1];\
+					vt->topK_IJ[x4] = vt->topK_IJ[x4+1];\
+				}\
+				vt->topK_votes[cct_context -> max_voting_simples]=0;\
+			}else{\
+				vt->topK_votes[x3] = vn;\
+				x3done=1;\
+			}\
+			break;\
+		}\
+	}\
+	if(!x3done)for(x3= 0; x3 < cct_context -> max_voting_simples +1; x3++){\
+		if(vn > vt->topK_votes[x3]){\
+			int x4;\
+			if(vt->topK_votes[x3]>0)for(x4 = cct_context -> max_voting_simples ; x4 > x3; x4--){\
+				vt->topK_votes[x4] = vt->topK_votes[x4-1];\
+				vt->topK_IJ[x4] = vt->topK_IJ[x4-1];\
+			}\
+			vt->topK_votes[x3]=vn;\
+			vt->topK_IJ[x3]=ij;\
+			break; \
+		}\
+	}\
+}
 
-void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name){
-	int subreads = applied_subreads_per_strand*2;
+
+
+void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name, int simple_mode){
+	int subreads = applied_subreads_per_strand*2, space_limit = GENE_VOTE_SPACE - (simple_mode?1:0);
 	int x1, x2, trying_subread_no[subreads];
 	for(x1=0; x1<subreads; x1++) trying_subread_no[x1]=x1;
 	void * sort_arr[2];
@@ -2485,7 +2533,13 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		}
 	}
 
-	init_gene_vote(vote);
+	if(simple_mode){
+		init_gene_vote(vote);
+		for(x1=0;x1<cct_context -> max_voting_simples +1; x1++){
+			vote -> topK_votes[x1]=0;
+			vote -> topK_IJ[x1]=0xffffffff;
+		}
+	}
 	int cct_indel_len = cct_context -> max_indel_length, cct_indel_neg = -cct_context -> max_indel_length;
 	for(x1=0; x1<subreads; x1++){
 		int myno = trying_subread_no[x1];
@@ -2522,12 +2576,14 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 					if(!datalen)continue;
 					dat = vote -> pos[offsetX];
 				} else if(!datalen) continue;
-				for (datalen--;datalen>=0;datalen--){
-					int dist0 = kv-dat[datalen];
-					if( dist0 >= cct_indel_neg  && dist0 <= cct_indel_len  && is_reversed == vote->masks[offsetX][datalen]){
-						int toli, tolimax=vote -> toli[offsetX][datalen], known_indel=0;
 
-						gene_vote_number_t * indelrec = vote -> indel_recorder[offsetX][datalen];
+				int itemidx;
+				for (itemidx=0;itemidx<datalen;itemidx++){
+					int dist0 = kv-dat[itemidx];
+					if( dist0 >= cct_indel_neg  && dist0 <= cct_indel_len  && is_reversed == vote->masks[offsetX][itemidx]){
+						int toli, tolimax=vote -> toli[offsetX][itemidx], known_indel=0;
+
+						gene_vote_number_t * indelrec = vote -> indel_recorder[offsetX][itemidx];
 						for(toli = 0; toli < tolimax; toli +=3){
 							if( indelrec [toli+2] == dist0 ){
 								if(indelrec [toli] > mynoP1PStr) indelrec [toli]  = mynoP1PStr;
@@ -2539,25 +2595,30 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 						
 						if(0 && FIXLENstrcmp("R00000000057",read_name)==0 && kv >= 1224149411-200 && kv <= 1224149411 +200){
 							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
-
 						}
 
 						if(tolimax < MAX_INDEL_TOLERANCE*3 && !known_indel){
 							indelrec [tolimax] = mynoP1PStr;
 							indelrec [tolimax+1] = mynoP1PStr;
 							indelrec [tolimax+2] = dist0;
-							vote -> toli[offsetX][datalen]+=3;
+							vote -> toli[offsetX][itemidx]+=3;
 						}
 
-						gene_vote_number_t test_max = (vote->votes[offsetX][datalen]);
+						gene_vote_number_t test_max = (vote->votes[offsetX][itemidx]);
 						test_max ++;
-						vote -> votes[offsetX][datalen] = test_max;
-						if(vote->max_vote < test_max)vote->max_vote = test_max;
+						vote -> votes[offsetX][itemidx] = test_max;
 
-						if (offset < vote->coverage_start [offsetX][datalen])
-							vote->coverage_start [offsetX][datalen] = offset;
-						if (of_p_16 > vote->coverage_end [offsetX][datalen])
-							vote->coverage_end [offsetX][datalen] = of_p_16;
+						if(simple_mode && test_max > vote->topK_votes[cct_context -> max_voting_simples]){
+							int myIJ = (offsetX << 16) | itemidx;
+							cellCounts_voting_update_topK(vote, test_max , myIJ);
+						}
+
+						if(vote->max_vote < test_max) vote->max_vote = test_max;
+
+						if (offset < vote->coverage_start [offsetX][itemidx])
+							vote->coverage_start [offsetX][itemidx] = offset;
+						if (of_p_16 > vote->coverage_end [offsetX][itemidx])
+							vote->coverage_end [offsetX][itemidx] = of_p_16;
 
 						found = 1;
 						break;
@@ -2565,7 +2626,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				}
 				if(found)break;
 			}
-			if ( datalen2<GENE_VOTE_SPACE && (!ignore_creation_voteloc) && (!found)){
+			if ( datalen2< space_limit && (!ignore_creation_voteloc) && (!found)){
 				vote -> items[offsetX2] = datalen2+1;
 				dat2[datalen2] = kv;
 				vote -> masks[offsetX2][datalen2] = is_reversed;
@@ -2578,12 +2639,59 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				vote->coverage_end [offsetX2][datalen2] = of_p_16;
 				//vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
 
-				if (vote->max_vote==0)
-					vote->max_vote = 1;
+				if (vote->max_vote==0) vote->max_vote = 1;
+
+				if(simple_mode){
+					int x3;
+					for(x3=0; x3< cct_context -> max_voting_simples+1;x3++) if(0==vote -> topK_votes[x3]){
+						vote -> topK_votes[x3]=1;
+						vote -> topK_IJ[x3] = (offsetX2 << 16) | datalen2;
+					}
+				}
 			}
 		}
 	}
 }
+int cellCounts_simple_mode_highconf(cellcounts_global_t * cct_context, int thread_no, int applied_subreads, gene_vote_t * vote, char * read_name){
+	int x1, vlast = vote -> max_vote;
+	for(x1 = 1; x1 < cct_context -> max_voting_simples +1; x1++){
+		int vdiff = vlast - vote->topK_votes[x1];
+		if(vdiff >= 3) return 1;
+
+		vlast = vote->topK_votes[x1];
+	}
+	return 0;
+
+/*
+	int max_I = vote -> max_vote_IJ >> 16;
+	int max_J = vote -> max_vote_IJ & 0xffff;
+
+	if(0){
+		int tolimax = vote -> toli[max_I][max_J];
+		if(tolimax >3)return 0;
+	}
+
+	int SRp1_start = vote -> indel_recorder[max_I][max_J][0];
+	int SRp1_end = vote -> indel_recorder[max_I][max_J][1];
+	return SRp1_start <= 4 && SRp1_end >= applied_subreads - 4 - ( applied_subreads>=12?1:0 );
+*/
+}
+
+int cellCounts_build_simple_mode_subread_masks(cellcounts_global_t * cct_context, int thread_no, int applied_subreads){
+	if(applied_subreads<9) return 0;
+	int last_sr_0B = applied_subreads-1;
+	int sr_step = (last_sr_0B -1) * 10000 / 4 + 1, sri, ret=0;
+	for(sri = 0 ; sri < last_sr_0B*10000+100; sri+= sr_step) ret |= 1<<( sri / 10000 );
+	return ret;
+}
+
+#define MAKE_SUBREAD_OFFSET	if(subread_no == applied_subreads -1) subread_offset= read_len-16; else subread_offset= ((subread_step * subread_no) >> 16);
+
+#define MAKE_SUBREAD_INTVAL	subread_integer =0; for(xk1 = 0; xk1 < 16; xk1++){\
+					int rbin_byte = (xk1+subread_offset)/4 + is_reversed * REVERSED_READ_BIN_OFFSET;\
+					int rbin_bit = (xk1+subread_offset) %4 *2;\
+					unsigned int vtmp = ( read_bin[ rbin_byte ] >> rbin_bit )&3;\
+					subread_integer |= vtmp<<(2*(15-xk1)); }
 
 int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	int xk1;
@@ -2593,13 +2701,15 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	char read_bin[REVERSED_READ_BIN_OFFSET * 2];
 	int read_len=0;
 	int sqr_interval=10000;
+	int subread_in_simple_mode_masks[SCRNA_SUBREADS_HARD_LIMIT];
 
+	memset(subread_in_simple_mode_masks, 0xff, sizeof(int)*SCRNA_SUBREADS_HARD_LIMIT);
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	read_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 
 	temp_votes_per_read_t prefill_ptrs;
-	gene_vote_t * vote_me = malloc(max(sizeof(gene_vote_t), 2*1024*1024));
+	gene_vote_t * vote_me = malloc(sizeof(gene_vote_t));
 
 	if(vote_me==NULL) {
 		SUBREADprintf("Cannot allocate voting memory.\n");
@@ -2624,48 +2734,78 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 		if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
 		applied_subreads = 1 + CR15GLS / subread_step;
 
-		int building_rbin_offset = 0, read_text_rev_offset =0;
-		for(is_reversed = 0; is_reversed<2; is_reversed++) {
-			gehash_key_t subread_integer = 0;
-			int last_vote_rpos = -16;
-			for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
-				int subread_offset = ((subread_step * subread_no) >> 16);
-				#define SHIFT_SUBREAD_INT(ii, pp) { int nch = read_text [pp+read_text_rev_offset]; ii = (ii << 2) | base2int( nch );}
-				#define BUILD_RBIN  {  int new2b = subread_integer & 3;\
-					int rbin_byte = building_rbin_offset + (last_vote_rpos +16)/4;\
-					int rbin_bit =(last_vote_rpos +16)%4 *2;\
-					if(rbin_bit ==0) read_bin[rbin_byte]=0;\
-					read_bin[rbin_byte] |= new2b<<rbin_bit;  }
-				for(; last_vote_rpos  < subread_offset ; last_vote_rpos ++){
-					SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
-					BUILD_RBIN;
+		if(1){
+			for(is_reversed = 0; is_reversed<2; is_reversed++) {
+				for(xk1=0; xk1<read_len ; xk1++){
+					int nch;
+					if(is_reversed){
+						nch = read_text[read_len - 1 - xk1];
+						if(nch == 'T') nch = 'A';
+						else if(nch == 'C') nch = 'G';
+						else if(nch == 'G') nch = 'C';
+						else nch = 'T';
+					}else nch = read_text[xk1];
+					int rbin_byte = xk1/4 + is_reversed * REVERSED_READ_BIN_OFFSET;
+					int rbin_bit = xk1%4 *2;
+					if(rbin_bit == 0) read_bin[ rbin_byte ] = 0;
+					read_bin[ rbin_byte ] |= (base2int(nch)) << rbin_bit;
 				}
-				prefill_votes(cct_context->current_index, &prefill_ptrs, applied_subreads, subread_integer, subread_offset, subread_no, is_reversed);
-			}
-			if(last_vote_rpos > read_len - 16)SUBREADprintf("ERROR: exceeded offset %d > %d\n", last_vote_rpos , read_len - 16);
-			for(; last_vote_rpos  < read_len - 16 ; last_vote_rpos ++){
-				SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
-				BUILD_RBIN;
 			}
 
-			if(is_reversed) {
-				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name );
-				if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
-				if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
-					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name, vote_me -> max_vote);
-					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
-					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
-					print_votes(vote_me, cct_context -> index_prefix);
-				}
+			if(subread_in_simple_mode_masks[applied_subreads] < 0)
+				subread_in_simple_mode_masks[applied_subreads] = cellCounts_build_simple_mode_subread_masks(cct_context, thread_no, applied_subreads);
 
-				if(vote_me->max_vote >= cct_context -> min_votes_per_mapped_read)
-					cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
-			} else {
-				building_rbin_offset = REVERSED_READ_BIN_OFFSET;
-				read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
-				strcpy(read_text+read_text_rev_offset, read_text);
-				reverse_read(read_text+read_text_rev_offset, read_len, GENE_SPACE_BASE);
-				qual_text[read_text_rev_offset] = 0;
+			int written = 0, simple_mode;
+			for(simple_mode = 1; simple_mode >=0; simple_mode --){
+				int building_rbin_offset = 0, read_text_rev_offset =0;
+				for(is_reversed = 0; is_reversed<2; is_reversed++) {
+					for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
+						int subread_offset;
+						gehash_key_t subread_integer;
+
+						int this_subread_used_in_simple;
+						if(is_reversed) this_subread_used_in_simple = subread_in_simple_mode_masks[applied_subreads] & (1<<( applied_subreads -1 - subread_no));
+						else this_subread_used_in_simple = subread_in_simple_mode_masks[applied_subreads] & (1<<subread_no);
+						if(( simple_mode && !this_subread_used_in_simple ) || ( 0==simple_mode  && this_subread_used_in_simple )){
+							int my_no = subread_no+ is_reversed*applied_subreads;
+							prefill_ptrs.votes[my_no] = 0;
+							continue;
+						}
+
+						MAKE_SUBREAD_OFFSET;
+						MAKE_SUBREAD_INTVAL;
+
+						prefill_votes(cct_context->current_index, &prefill_ptrs, applied_subreads, subread_integer, subread_offset, subread_no, is_reversed);
+					}
+
+					if(is_reversed) {
+						cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, simple_mode);
+
+						if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.3f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
+						if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
+							SUBREADprintf("MAXVOTES OF %s = %d\n", read_name, vote_me -> max_vote);
+							SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
+							SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
+							print_votes(vote_me, cct_context -> index_prefix);
+						}
+
+						if((simple_mode && cellCounts_simple_mode_highconf(cct_context, thread_no, applied_subreads, vote_me, read_name)) || (simple_mode == 0)){
+							cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
+							thread_context -> hiconf_map += simple_mode;
+							thread_context -> loconf_map += (0==simple_mode);
+							written =1;
+						}
+					} else {
+						building_rbin_offset = REVERSED_READ_BIN_OFFSET;
+						read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
+						if(simple_mode){
+							strcpy(read_text+read_text_rev_offset, read_text);
+							reverse_read(read_text+read_text_rev_offset, read_len, GENE_SPACE_BASE);
+							qual_text[read_text_rev_offset] = 0;
+						}
+					}
+				}
+				if(written) break;
 			}
 		}
 	}
@@ -3276,6 +3416,7 @@ void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context
 	new_rbin_len += 4*n_cigar_op + l_seq + (l_seq+1)/2;
 	char * ext_bin_ptr = rbin + 36 + l_read_name +4*n_cigar_op + l_seq + (l_seq+1)/2;
 
+#ifndef DO_STARSOLO_THING
 	int CR_found=0, CB_found=0, CY_found=0, UR_found=0, UY_found=0, UB_found=0;
 	while(ext_bin_ptr < rbin+binlen+4){
 		char * tagstr = NULL; 
@@ -3359,6 +3500,7 @@ void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context
 		*(new_rbin+new_rbin_len+cct_context -> UMI_length)=0;
 		new_rbin_len += cct_context -> UMI_length+1;
 	}
+#endif
 
 	new_rbin_len-=4;
 	memcpy(new_rbin, &new_rbin_len,4);
@@ -3560,6 +3702,12 @@ void * cellCounts_do_one_batch(void * paramsp1){
 	return NULL + removed_UMIs;
 }
 
+#ifdef DO_STARSOLO_THING
+#define DO_CREATE_BAI_FOR_BAM 0
+#else
+#define DO_CREATE_BAI_FOR_BAM 1
+#endif
+
 void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_merge_batches_worker_current * finished_job){
 	if(!finished_job -> task)return;
 	if(cct_context -> is_BAM_and_FQ_out_generated){
@@ -3569,7 +3717,7 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 		int inbin_pos = 0, outblocki = 0;
 		int nextoffset = finished_job -> task -> inbin_batch_start_offsets[1];
 		int block_number_this = finished_job -> task -> block_number - finished_job -> task -> inbin_number +1;
-		while(inbin_pos < finished_job -> task -> inbin_len){
+		if(DO_CREATE_BAI_FOR_BAM) while(inbin_pos < finished_job -> task -> inbin_len){
 			int binlen = 0;
 			if(outblocki < finished_job -> task -> inbin_number -1 &&  inbin_pos == nextoffset ){
 				outblocki ++;
