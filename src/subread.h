@@ -513,14 +513,26 @@ typedef struct {
 	unsigned char first_chars[2];
 } autozip_fp;
 
-
+/*
 typedef pthread_mutex_t  cellCounts_lock_t;
 #define cellCounts_init_lock(pp) pthread_mutex_init(pp, NULL)
 #define cellCounts_destroy_lock pthread_mutex_destroy
 #define cellCounts_lock_occupy pthread_mutex_lock
 #define cellCounts_lock_release pthread_mutex_unlock
+*/
+
+typedef struct{
+	int is_spin_lock;
+	pthread_spinlock_t spinlock;
+	pthread_mutex_t mutexlock;
+} cellCounts_lock_t;
+
+void cellCounts_init_lock(cellCounts_lock_t * lock, int is_spin);
+void cellCounts_destroy_lock(cellCounts_lock_t * lock);
+int cellCounts_lock_occupy(cellCounts_lock_t * lock);
+int cellCounts_lock_release(cellCounts_lock_t * lock);
+
 /*
-typedef pthread_spinlock_t cellCounts_lock_t;
 #define cellCounts_init_lock(pp) pthread_spin_init(pp,PTHREAD_PROCESS_SHARED)
 #define cellCounts_destroy_lock pthread_spin_destroy 
 #define cellCounts_lock_occupy pthread_spin_lock

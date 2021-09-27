@@ -1035,12 +1035,12 @@ int cacheBCL_qualTest_BAMmode(char * datadir, int testing_reads, int known_cell_
 
 int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
 	input_mFQ_t fqs_input;
-	int ret = input_mFQ_init_by_one_string(&fqs_input, datadir, NULL);
+	int ret = input_mFQ_init_by_one_string(&fqs_input, datadir);
 	if(ret)return ret;
 	while(1){
 		char base[MAX_READ_LENGTH], qual[MAX_READ_LENGTH], rname[MAX_READ_NAME_LEN];
 		base[0]=qual[0]=rname[0]=0;
-		ret = input_mFQ_next_read(&fqs_input, rname , base, qual);
+		ret = input_mFQ_next_read(&fqs_input, rname , base, qual, NULL);
 		if(ret<=0)break;
 
 		char *cell_barcode = NULL;
@@ -1484,7 +1484,7 @@ int input_mFQ_next_file(input_mFQ_t * fqs_input, int fileno){
 
 #define MFQ_CACHE_CAPACITY 800000
 #define MFQ_CACHE_LOW 500000
-int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames, cellCounts_lock_t * lock){
+int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames){
 	int total_files = 0;
 	char * fnames = strdup(three_paired_fqnames);
 	char ** files1 = malloc(sizeof(char*) * MAX_SCRNA_FASTQ_FILES);
@@ -1507,7 +1507,6 @@ int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fq
 	}
 
 	memset(fqs_input, 0, sizeof(input_mFQ_t));
-	fqs_input->lock = lock;
 	fqs_input->cached_read_number[0] = fqs_input->cached_read_number[1] = fqs_input->cached_read_number[2] = 0;
 	fqs_input->cached_read_fetch_ptr[0] = fqs_input->cached_read_fetch_ptr[1] = fqs_input->cached_read_fetch_ptr[2] = 0;
 	fqs_input->is_being_filled[0] = fqs_input->is_being_filled[1] = fqs_input->is_being_filled[2] = 0;
@@ -1546,7 +1545,7 @@ int input_mFQ_init_openfiles( input_mFQ_t * fqs_input, char ** files1, char ** f
 	return ret;
 }
 
-void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno){
+void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno,  cellCounts_lock_t * lock){
 	int x1, all_fq_done = 0, fqs_wtr_idx = fqs_input-> cached_read_fetch_ptr[fileno] + fqs_input-> cached_read_number[fileno];
 	int reads_to_fill = fqs_input-> cache_capacity[fileno] - fqs_input-> cached_read_number[fileno];
 	fqs_input -> is_being_filled[fileno] = 1;
@@ -1554,8 +1553,8 @@ void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno){
 	if(fileno==0) this_fp =&fqs_input -> autofp1;
 	else if(fileno==2) this_fp =&fqs_input -> autofp3;
 	else this_fp =&fqs_input -> autofp2;
-	int spinret =0;
-	if(fqs_input -> lock) spinret = cellCounts_lock_release(fqs_input -> lock);
+	int spinret =0, spinret2=0;
+	if(lock) spinret = cellCounts_lock_release(lock);
 
 	for(x1=0; x1<reads_to_fill ; x1++){
 		if(fqs_wtr_idx >= fqs_input-> cache_capacity[fileno]) fqs_wtr_idx -= fqs_input-> cache_capacity[fileno];
@@ -1584,32 +1583,32 @@ void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno){
 
 	//SUBREADprintf("PREFILL FILE #%d HAVING %d\n", fileno, x1);
 	// here decompress the next chunk of reads.
-	if(fqs_input -> lock)spinret = cellCounts_lock_occupy(fqs_input -> lock);
-	//if(fqs_input -> lock)SUBREADprintf("RELEASED LOCK %p   FOR LOADING %d reads in %d file; LOCK RET %d ; REMAIN READS %d += %d , DONE=%d\n", fqs_input -> lock, reads_to_fill , fileno, spinret, fqs_input-> cached_read_number[fileno], x1, all_fq_done);
+	if(lock)spinret2 = cellCounts_lock_occupy(lock);
+	if(lock)SUBREADprintf("RELEASED LOCK %p [%d = spin mode]  FOR LOADING %d reads in %d file; LOCK RET %d and %d ; REMAIN READS %d += %d , DONE=%d\n", lock, lock -> is_spin_lock, reads_to_fill , fileno, spinret, spinret2, fqs_input-> cached_read_number[fileno], x1, all_fq_done);
 	fqs_input -> is_being_filled[fileno] = 0;
 	fqs_input -> cached_read_number[fileno] += x1;
 	if(all_fq_done) fqs_input -> all_reads_loaded_in_cache |= (1<<(4*fileno));
 }
 
-int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual ){
+int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual, cellCounts_lock_t * lock){
 	int ret = -1,x1;
 	while(1){
 		//SUBREADprintf("%d < %d ? fill %d ? all load %d\n", fqs_input -> cached_read_number[0] , fqs_input -> cache_lower_line[0] , fqs_input -> is_being_filled[0] , fqs_input -> all_reads_loaded_in_cache);
 		if(fqs_input -> cached_read_number[0] < fqs_input -> cache_lower_line[0] && (!fqs_input -> is_being_filled[0]) && (fqs_input -> all_reads_loaded_in_cache & 1)==0)
-			input_mFQ_prefill(fqs_input, 0);
+			input_mFQ_prefill(fqs_input, 0, lock);
 
 		if(fqs_input->files2 && fqs_input -> cached_read_number[1] < fqs_input -> cache_lower_line[1] &&  (!fqs_input -> is_being_filled[1])&&  (fqs_input -> all_reads_loaded_in_cache & 0x10)==0)
-			input_mFQ_prefill(fqs_input, 1);
+			input_mFQ_prefill(fqs_input, 1, lock);
 
 		if(fqs_input -> cached_read_number[2] < fqs_input -> cache_lower_line[2] &&  (!fqs_input -> is_being_filled[2]) && (fqs_input -> all_reads_loaded_in_cache & 0x100)==0)
-			input_mFQ_prefill(fqs_input, 2);
+			input_mFQ_prefill(fqs_input, 2, lock);
 
 		if(fqs_input -> cached_read_number[0]>0 && fqs_input -> cached_read_number[2]>0 && ( fqs_input->files2== NULL || fqs_input -> cached_read_number[1] >0 )) break;
 		if((fqs_input -> all_reads_loaded_in_cache | (  fqs_input->files2?0:0x10 ) ) == 0x111) break;
-		if(fqs_input -> lock)cellCounts_lock_release(fqs_input -> lock);
+		if(lock)cellCounts_lock_release(lock);
 		//SUBREADprintf("EXAUSTED BUFFER  REM %d %d ; BEING %d %d ; ISFIN %04x\n", fqs_input -> cached_read_number[0], fqs_input -> cached_read_number[2], fqs_input -> is_being_filled[0], fqs_input -> is_being_filled[2], fqs_input -> all_reads_loaded_in_cache);
 		usleep(2000); // 2ms sleep for decoupling
-		if(fqs_input -> lock)cellCounts_lock_occupy(fqs_input -> lock);
+		if(lock)cellCounts_lock_occupy(lock);
 	}
 
 	if(fqs_input -> cached_read_number[0]>0){

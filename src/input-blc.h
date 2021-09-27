@@ -21,8 +21,8 @@ void scBAM_tell(input_scBAM_t * bam_input, input_scBAM_pos_t * pos);
 int scBAM_next_read(input_scBAM_t * bam_input, char * readname , char * read, char * qual );
 
 int input_mFQ_init_openfiles( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files);
-int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames, cellCounts_lock_t * lock);
-int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual );
+int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames);
+int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual, cellCounts_lock_t * lock);
 void input_mFQ_close(input_mFQ_t * fqs_input);
 
 // "cached BCL" maintains a chunk of reads; it decompresses 

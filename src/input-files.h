@@ -223,6 +223,7 @@ int geinput_readline_back(gene_input_t * input, char * linebuffer) ;
 // The memory space for read_string must be at least 512 bytes.
 int geinput_next_read(gene_input_t * input, char * read_name, char * read_string, char * quality_string);
 int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary);
+int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary, cellCounts_lock_t * lock);
 
 void geinput_jump_read(gene_input_t * input);
 
@@ -331,8 +332,8 @@ void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
 int geinput_preload_buffer(gene_input_t * input, subread_lock_t* read_lock);
-int geinput_open_scRNA_fqs(char * fnames,  gene_input_t * input, int reads_per_chunk, int threads, cellCounts_lock_t *lock );
-int geinput_open_scRNA_BAM(char * fnames,  gene_input_t * input, int reads_per_chunk, int threads );
-int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_in_chunk, int threads );
+int geinput_open_scRNA_fqs(char * fnames,  gene_input_t * input, int reads_per_chunk, int threads);
+int geinput_open_scRNA_BAM(char * fnames,  gene_input_t * input, int reads_per_chunk, int threads);
+int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_in_chunk, int threads);
 char *strtokmm(char *str, const char *delim, char ** next);
 #endif

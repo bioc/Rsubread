@@ -15,6 +15,7 @@
 #include "core-junction.h"
 
 //#define DO_STARSOLO_THING
+
 #define CELLCOUNTS_REALIGNMENT_TRIES 15
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
@@ -79,7 +80,6 @@ typedef struct{
 	int reporting_editing_distance[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 
 } cellcounts_align_thread_t;
-
 
 typedef struct{
 	int total_threads;
@@ -649,7 +649,7 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 	}
 
 	cellCounts_lock_t * gzfp_lock = malloc(sizeof(cellCounts_lock_t));
-	cellCounts_init_lock(gzfp_lock);
+	cellCounts_init_lock(gzfp_lock, 0);
 	int x1;
 	for(x1=0; x1<scRNA_sample_id_to_name -> numOfElements; x1++){
 		char * sample_name = ArrayListGet( scRNA_sample_id_to_name, x1 );
@@ -1173,7 +1173,7 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 		char fname[MAX_FILE_NAME_LENGTH];
 		sprintf(fname,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
 		cct_context -> batch_files[x1] = fopen(fname,"wb");
-		cellCounts_init_lock(cct_context -> batch_file_locks+x1);
+		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
 	}
 	int umfpi;
 	if(cct_context->input_mode == GENE_INPUT_BCL)for(umfpi=1; umfpi<=4; umfpi++){
@@ -1186,19 +1186,41 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 		sprintf(fname, "UnassignedReads%03d_%s.fastq.gz", cct_context ->current_dataset_no, ftype);
 		parallel_gzip_writer_init(cct_context-> fastq_unassigned_writer+(umfpi-1), fname, cct_context->total_threads);
 	}
-	cellCounts_init_lock(&cct_context->fastq_unassigned_lock);
+	cellCounts_init_lock(&cct_context->fastq_unassigned_lock, 0);
 	return 0;
+}
+
+void cellCounts_init_lock(cellCounts_lock_t * lock, int is_spin){
+	lock -> is_spin_lock = is_spin;
+	if(is_spin) pthread_spin_init(&lock->spinlock,PTHREAD_PROCESS_PRIVATE);
+	else pthread_mutex_init(&lock->mutexlock, NULL);
+}
+
+void cellCounts_destroy_lock(cellCounts_lock_t * lock){
+	if(lock -> is_spin_lock) pthread_spin_destroy(&lock->spinlock);
+	else pthread_mutex_destroy(&lock->mutexlock);
+}
+
+int cellCounts_lock_occupy(cellCounts_lock_t * lock){
+	if(lock -> is_spin_lock) return pthread_spin_lock(&lock->spinlock);
+	else return pthread_mutex_lock(&lock->mutexlock);
+}
+
+int cellCounts_lock_release(cellCounts_lock_t * lock){
+	if(lock -> is_spin_lock) return pthread_spin_unlock(&lock->spinlock);
+	else return pthread_mutex_unlock(&lock->mutexlock);
 }
 
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
 
-	cellCounts_init_lock(&cct_context -> input_dataset_lock);
-	//SUBREADprintf("INIT LOCKER %d\n", cct_context -> input_dataset_lock);
+	cellCounts_init_lock(&cct_context -> input_dataset_lock, 1 || (cct_context -> input_mode == GENE_INPUT_BCL));
+	SUBREADprintf("INIT LOCKER %d at %p\n", cct_context -> input_dataset_lock.is_spin_lock, &cct_context -> input_dataset_lock);
+
 	if(cct_context -> input_mode == GENE_INPUT_BCL)
 		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
 	else if(cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ)
-		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads, &cct_context -> input_dataset_lock);
+		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
 	else 	rv = -1;
 
 	rv = rv || load_offsets(& cct_context -> chromosome_table, cct_context -> index_prefix);
@@ -1220,6 +1242,7 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	for(x1=0;x1<CELLBC_BATCH_NUMBER+2; x1++)
 		cellCounts_destroy_lock(cct_context -> batch_file_locks+x1);
 	cellCounts_destroy_lock(&cct_context -> input_dataset_lock);
+
 	if(cct_context -> is_BAM_and_FQ_out_generated){
 		HashTableDestroy(cct_context->sample_BAM_writers);
 		cellCounts_destroy_lock(&cct_context->fastq_unassigned_lock);
@@ -1998,10 +2021,11 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 	gene_input_t * ginp1 = &cct_context -> input_dataset;
 
 	int lockret1=cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
+	//int lockret1=cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
 	if(cct_context -> running_processed_reads_in_chunk < cct_context -> reads_per_chunk) {
 		do{
 			is_second_R1 = 0;
-			rl1 = geinput_next_read_trim(ginp1, read_name, read_text , qual_text, 0, 0, &is_second_R1);
+			rl1 = geinput_next_read_with_lock(ginp1, read_name, read_text , qual_text, 0, 0, &is_second_R1, &cct_context -> input_dataset_lock);
 			if(rl1 <= 0) break;
 		}while(is_second_R1) ;
 
@@ -2011,6 +2035,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 		}
 	}
 	int lockret2=cellCounts_lock_release(&cct_context -> input_dataset_lock); 
+	//int lockret2=cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 
 	//if(this_number < 40) SUBREADprintf("FETCH_READ THR %d LOCK %p ret %d %d\n", thread_no, &cct_context -> input_dataset_lock, lockret1, lockret2);
 	if(rl1>0 && this_number>=0) {
@@ -2685,6 +2710,105 @@ int cellCounts_build_simple_mode_subread_masks(cellcounts_global_t * cct_context
 	return ret;
 }
 
+
+#define gap_cellCounts_do_voting cellCounts_do_voting
+
+int onepass_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
+	int xk1;
+	subread_read_number_t current_read_number=0;
+	char * read_text, * qual_text;
+	char read_name[MAX_READ_NAME_LEN+1];
+	char read_bin[REVERSED_READ_BIN_OFFSET * 2];
+	int read_len=0;
+	int sqr_interval=10000;
+
+	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+	read_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
+	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
+
+	temp_votes_per_read_t prefill_ptrs;
+	gene_vote_t * vote_me = malloc(max(sizeof(gene_vote_t), 2*1024*1024));
+
+	if(vote_me==NULL) {
+		SUBREADprintf("Cannot allocate voting memory.\n");
+		return -1;
+	}
+
+	unsigned int low_index_border = cct_context -> value_index -> start_base_offset;
+	unsigned int high_index_border = cct_context -> value_index -> start_base_offset + cct_context -> value_index -> length;
+
+	int index_gap_width = cct_context -> current_index -> index_gap;
+
+	while(1) {
+		int subread_no;
+		int is_reversed, applied_subreads = 0;
+
+		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
+		if(current_read_number < 0) break;
+		if(read_len< 16) continue;
+
+		int CR15GLS = (read_len - 15 - index_gap_width)<<16;
+		int subread_step =  CR15GLS /(cct_context -> total_subreads_per_read -1);
+		if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
+		applied_subreads = 1 + CR15GLS / subread_step;
+
+		int building_rbin_offset = 0, read_text_rev_offset =0;
+		for(is_reversed = 0; is_reversed<2; is_reversed++) {
+			gehash_key_t subread_integer = 0;
+			int last_vote_rpos = -16;
+			for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
+				int subread_offset = ((subread_step * subread_no) >> 16);
+				#define SHIFT_SUBREAD_INT(ii, pp) { int nch = read_text [pp+read_text_rev_offset]; ii = (ii << 2) | base2int( nch );}
+				#define BUILD_RBIN  {  int new2b = subread_integer & 3;\
+					int rbin_byte = building_rbin_offset + (last_vote_rpos +16)/4;\
+					int rbin_bit =(last_vote_rpos +16)%4 *2;\
+					if(rbin_bit ==0) read_bin[rbin_byte]=0;\
+					read_bin[rbin_byte] |= new2b<<rbin_bit;  }
+				for(; last_vote_rpos  < subread_offset ; last_vote_rpos ++){
+					SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
+					BUILD_RBIN;
+				}
+				prefill_votes(cct_context->current_index, &prefill_ptrs, applied_subreads, subread_integer, subread_offset, subread_no, is_reversed);
+			}
+			if(last_vote_rpos > read_len - 16)SUBREADprintf("ERROR: exceeded offset %d > %d\n", last_vote_rpos , read_len - 16);
+			for(; last_vote_rpos  < read_len - 16 ; last_vote_rpos ++){
+				SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
+				BUILD_RBIN;
+			}
+
+			if(is_reversed) {
+				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, 1);
+				if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
+				if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
+					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name, vote_me -> max_vote);
+					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
+					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
+					print_votes(vote_me, cct_context -> index_prefix);
+				}
+
+				cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
+			} else {
+				building_rbin_offset = REVERSED_READ_BIN_OFFSET;
+				read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
+				strcpy(read_text+read_text_rev_offset, read_text);
+				reverse_read(read_text+read_text_rev_offset, read_len, GENE_SPACE_BASE);
+				qual_text[read_text_rev_offset] = 0;
+			}
+		}
+	}
+
+	free(vote_me);
+	free(read_text);
+	free(qual_text);
+
+	return 0;
+}
+
+
+
+
+
+
 #define MAKE_SUBREAD_OFFSET	if(subread_no == applied_subreads -1) subread_offset= read_len-16; else subread_offset= ((subread_step * subread_no) >> 16);
 
 #define MAKE_SUBREAD_INTVAL	subread_integer =0; for(xk1 = 0; xk1 < 16; xk1++){\
@@ -2693,7 +2817,7 @@ int cellCounts_build_simple_mode_subread_masks(cellcounts_global_t * cct_context
 					unsigned int vtmp = ( read_bin[ rbin_byte ] >> rbin_bit )&3;\
 					subread_integer |= vtmp<<(2*(15-xk1)); }
 
-int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
+int gap_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	int xk1;
 	subread_read_number_t current_read_number=0;
 	char * read_text, * qual_text;
@@ -2781,7 +2905,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 					if(is_reversed) {
 						cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, simple_mode);
 
-						if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.3f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
+						if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.2f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 						if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
 							SUBREADprintf("MAXVOTES OF %s = %d\n", read_name, vote_me -> max_vote);
 							SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
@@ -3537,6 +3661,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 	while(1){
 		int this_batch_no = -1;
 		cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
+		//cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
 		if(cct_context -> do_one_batch_runner_current < CELLBC_BATCH_NUMBER +1){
 			int this_batch_sorted_idx = (cct_context -> do_one_batch_runner_current ++);
 			srInt_64 this_batch_size_and_no = ArrayListGet(file_size_list, file_size_list->numOfElements-1 -this_batch_sorted_idx)-NULL;
@@ -3545,6 +3670,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		if(me_max_genes > cct_context -> barcode_batched_max_genes) cct_context -> barcode_batched_max_genes = me_max_genes;
 		if(me_max_Rbin_len > cct_context-> barcode_batched_max_Rbin_len) cct_context-> barcode_batched_max_Rbin_len = me_max_Rbin_len;
 		cellCounts_lock_release(&cct_context -> input_dataset_lock);
+		//cellCounts_lock_release(&cct_context -> input_dataset_lock);
 		if(0>this_batch_no)break;
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", temp_dir, getpid(), this_batch_no);
