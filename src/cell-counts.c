@@ -16,6 +16,7 @@
 
 //#define DO_STARSOLO_THING
 
+
 #define CELLCOUNTS_REALIGNMENT_TRIES 15
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
@@ -2542,8 +2543,123 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 }
 
 
+void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name){
+	int subreads = applied_subreads_per_strand*2;
+	int x1, x2, trying_subread_no[subreads];
+	for(x1=0; x1<subreads; x1++) trying_subread_no[x1]=x1;
+	void * sort_arr[2];
+	sort_arr [0] = trying_subread_no;
+	sort_arr [1] = ptrs;
+	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
+	if(0 && FIXLENstrcmp("R00000000057",read_name)==0){
+		for(x1=0;x1<subreads ;x1++){
+			int myno = trying_subread_no[x1];
+			SUBREADprintf("SORTED-VOTES: #%d has %d votes ; subread_no=%d\n", x1, ptrs->votes[myno], myno);
+		}
+	}
 
-void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name, int simple_mode){
+	int cct_indel_len = cct_context -> max_indel_length, cct_indel_neg = -cct_context -> max_indel_length;
+	for(x1=0; x1<subreads; x1++){
+		int myno = trying_subread_no[x1];
+		int has_votes = ptrs->votes[myno];
+		if(has_votes<1) continue;
+
+		int mynoP1PStr=(myno%applied_subreads_per_strand)+1;
+		int offset = ptrs->offsets[myno];
+		int of_p_16 = offset + 16;
+		int subread_number_P1 = 1+((myno >= applied_subreads_per_strand)?myno - applied_subreads_per_strand:myno);
+		int is_reversed = (myno >= applied_subreads_per_strand)?IS_NEGATIVE_STRAND:0;
+		unsigned int * index_ptr = ptrs->start_location_in_index [myno];
+		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
+		int ignore_creation_voteloc = 0;
+
+		#warning "======== IGNORED SOME NEW CANDIDATE LOCATIONS BY (1) =================="
+		if(0)if(x1 >= subreads - 5 && has_votes >10) {
+			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
+			else if(has_votes > 20 && vote->max_vote >= 3) ignore_creation_voteloc =1;
+		}
+
+		for(x2 = 0 ; x2 < has_votes; x2++){
+			unsigned int kv = index_ptr[ vote_prime_sum % has_votes ] - offset;
+			vote_prime_sum += VOTING_PRIME_NUMBER;
+			int iix, offsetX2, offsetX, datalen, datalen2, found = 0;
+			offsetX = offsetX2 = _index_vote_tol(kv);
+			datalen = datalen2 = vote -> items[offsetX];
+			unsigned int * dat2, *dat;
+			dat = dat2 = vote -> pos[offsetX];
+			for(iix = 0; iix<=INDEL_SEGMENT_SIZE; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)) {
+				if(iix) {
+					offsetX = _index_vote_tol(kv+iix);
+					datalen = vote -> items[offsetX];
+					if(!datalen)continue;
+					dat = vote -> pos[offsetX];
+				} else if(!datalen) continue;
+
+				int itemidx;
+				for (itemidx=0;itemidx<datalen;itemidx++){
+					int dist0 = kv-dat[itemidx];
+					if( dist0 >= cct_indel_neg  && dist0 <= cct_indel_len  && is_reversed == vote->masks[offsetX][itemidx]){
+						int toli, tolimax=vote -> toli[offsetX][itemidx], known_indel=0;
+
+						gene_vote_number_t * indelrec = vote -> indel_recorder[offsetX][itemidx];
+						for(toli = 0; toli < tolimax; toli +=3){
+							if( indelrec [toli+2] == dist0 ){
+								if(indelrec [toli] > mynoP1PStr) indelrec [toli]  = mynoP1PStr;
+								if(indelrec [toli +1] < mynoP1PStr) indelrec [toli +1]  = mynoP1PStr;
+								known_indel=1;
+								break;
+							}
+						}
+						
+						if(0 && FIXLENstrcmp("R00000000057",read_name)==0 && kv >= 1224149411-200 && kv <= 1224149411 +200){
+							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
+						}
+
+						if(tolimax < MAX_INDEL_TOLERANCE*3 && !known_indel){
+							indelrec [tolimax] = mynoP1PStr;
+							indelrec [tolimax+1] = mynoP1PStr;
+							indelrec [tolimax+2] = dist0;
+							vote -> toli[offsetX][itemidx]+=3;
+						}
+
+						gene_vote_number_t test_max = (vote->votes[offsetX][itemidx]);
+						test_max ++;
+						vote -> votes[offsetX][itemidx] = test_max;
+						if(vote->max_vote < test_max) vote->max_vote = test_max;
+
+						if (offset < vote->coverage_start [offsetX][itemidx])
+							vote->coverage_start [offsetX][itemidx] = offset;
+						if (of_p_16 > vote->coverage_end [offsetX][itemidx])
+							vote->coverage_end [offsetX][itemidx] = of_p_16;
+
+						found = 1;
+						break;
+					}
+				}
+				if(found)break;
+			}
+			if(datalen2 < GENE_VOTE_SPACE && (!ignore_creation_voteloc) && (!found)){
+				vote -> items[offsetX2] = datalen2+1;
+				dat2[datalen2] = kv;
+				vote -> masks[offsetX2][datalen2] = is_reversed;
+				vote -> votes[offsetX2][datalen2] = 1;
+				vote -> indel_recorder[offsetX2][datalen2][0] = mynoP1PStr;
+				vote -> indel_recorder[offsetX2][datalen2][1] = mynoP1PStr;
+				vote -> indel_recorder[offsetX2][datalen2][2] = 0;
+				vote -> toli[offsetX2][datalen2] = 3;
+				vote->coverage_start [offsetX2][datalen2] = offset;
+				vote->coverage_end [offsetX2][datalen2] = of_p_16;
+				//vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
+
+				if (vote->max_vote==0) vote->max_vote = 1;
+			}
+		}
+	}
+}
+
+
+
+void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name, int simple_mode){
 	int subreads = applied_subreads_per_strand*2, space_limit = GENE_VOTE_SPACE - (simple_mode?1:0);
 	int x1, x2, trying_subread_no[subreads];
 	for(x1=0; x1<subreads; x1++) trying_subread_no[x1]=x1;
@@ -2711,9 +2827,7 @@ int cellCounts_build_simple_mode_subread_masks(cellcounts_global_t * cct_context
 }
 
 
-#define gap_cellCounts_do_voting cellCounts_do_voting
-
-int onepass_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
+int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	int xk1;
 	subread_read_number_t current_read_number=0;
 	char * read_text, * qual_text;
@@ -2777,7 +2891,7 @@ int onepass_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_n
 			}
 
 			if(is_reversed) {
-				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, 1);
+				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
 				if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 				if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
 					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name, vote_me -> max_vote);
@@ -2817,7 +2931,7 @@ int onepass_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_n
 					unsigned int vtmp = ( read_bin[ rbin_byte ] >> rbin_bit )&3;\
 					subread_integer |= vtmp<<(2*(15-xk1)); }
 
-int gap_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
+int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	int xk1;
 	subread_read_number_t current_read_number=0;
 	char * read_text, * qual_text;
@@ -2903,7 +3017,7 @@ int gap_cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 					}
 
 					if(is_reversed) {
-						cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, simple_mode);
+						simpleMode_cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, simple_mode);
 
 						if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.2f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 						if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
