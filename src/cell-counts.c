@@ -2558,6 +2558,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		}
 	}
 
+	init_gene_vote(vote);
 	int cct_indel_len = cct_context -> max_indel_length, cct_indel_neg = -cct_context -> max_indel_length;
 	for(x1=0; x1<subreads; x1++){
 		int myno = trying_subread_no[x1];
@@ -2841,7 +2842,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 
 	temp_votes_per_read_t prefill_ptrs;
-	gene_vote_t * vote_me = malloc(max(sizeof(gene_vote_t), 2*1024*1024));
+	gene_vote_t * vote_me = malloc(sizeof(gene_vote_t));
 
 	if(vote_me==NULL) {
 		SUBREADprintf("Cannot allocate voting memory.\n");
@@ -2893,7 +2894,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
 				if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
-				if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
+				if(1 && FIXLENstrcmp("R00000003490", read_name) == 0){
 					SUBREADprintf("MAXVOTES OF %s = %d\n", read_name, vote_me -> max_vote);
 					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
 					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
