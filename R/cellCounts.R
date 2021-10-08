@@ -1188,7 +1188,7 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
-new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, reportedAlignmentsPerRead =1, unique.mapping=FALSE, maxMismatchBases=3, minVotesPerRead=3, subreadsPerRead=10, maxDiffToTopVotes=2, minMappedLength=40, ...){
+.new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, reportedAlignmentsPerRead =1, unique.mapping=FALSE, maxMismatchBases=3, minVotesPerRead=3, subreadsPerRead=10, maxDiffToTopVotes=2, minMappedLength=40, onlyDetectBarcode=FALSE, ...){
   .remove.temp.files <- T
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
@@ -1229,6 +1229,10 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
+    if(onlyDetectBarcode){
+      cat("Barcode is",cell.barcode,"\n")
+      return(NA)
+    }
 
      .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
     opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", reportedAlignmentsPerRead, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength)
@@ -1268,6 +1272,11 @@ new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, al
         cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
       }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+      }
+
+      if(onlyDetectBarcode){
+        cat("Barcode is",cell.barcode,"\n")
+        return(NA)
       }
   
       full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
