@@ -279,7 +279,7 @@ featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotat
             file.remove(paste(fout,".jcounts",sep=""))
         
         if(delete.annot.file) 
-          file.remove(fout_annot)
+          file.remove(ann)
 
         if(ncol(x) <= (6 + add_attr_numb)){
           cat("No count data were generated.\n")
