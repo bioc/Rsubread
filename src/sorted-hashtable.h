@@ -30,6 +30,8 @@
 
 #if __WORDSIZE == 64 || _WIN64
 #define GEHASH_BUCKET_LENGTH (100 - 69)
+#else
+#define GEHASH_BUCKET_LENGTH 100
 #endif
 
 #define gehash_fast_t gehash_t
