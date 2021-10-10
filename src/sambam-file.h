@@ -255,7 +255,7 @@ typedef struct {
 	HashTable * index_per_chro;
 } simple_bam_writer;
 
-#define MAX_ALLOWED_GAP_IN_BAI_CHUNK 10  // 10 blocks
+//#define MAX_ALLOWED_GAP_IN_BAI_CHUNK 10  // 10 blocks
 
 unsigned int FC_CRC32(char * dat, int len);
 void simple_bam_writer_deallocate_index_per_chro(void * p);

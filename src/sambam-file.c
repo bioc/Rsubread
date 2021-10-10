@@ -2376,7 +2376,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 	SAMBAM_renew_BAItabs;
 
 	int chro_no = (int)(current_min >> 32);
-	int old_chro_no = -1, last_written_BAI_chro = -1;;
+	int old_chro_no = -1;
 
 	int wlen = fwrite("BAI\1", 4, 1, writer -> BAI_fp);
 	if(wlen < 1) assert(wlen >0);
