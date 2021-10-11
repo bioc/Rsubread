@@ -1,3 +1,6 @@
+12 Oct 2021 - 2.7.5
+(1) Fixed a bug that caused error when the programs are compiled in a 32-bit Windows platform.
+
 10 Oct 2021 - 2.7.4
 (1) Polished for the next release.
 
