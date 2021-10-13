@@ -1545,6 +1545,7 @@ int input_mFQ_init_openfiles( input_mFQ_t * fqs_input, char ** files1, char ** f
 	return ret;
 }
 
+<<<<<<< HEAD
 int cellCounts_lock_release(cellCounts_lock_t  * l){
 	return 0;
 }
@@ -1552,6 +1553,15 @@ int cellCounts_lock_release(cellCounts_lock_t  * l){
 
 int cellCounts_lock_occupy(cellCounts_lock_t  * l){
 	return 0;
+=======
+int cellCounts_lock_occupy(cellCounts_lock_t * lock){
+  return 0;
+}
+
+
+int cellCounts_lock_release(cellCounts_lock_t * lock){
+  return 0;
+>>>>>>> f49aee0b71a3716bc03f7d66e7702769d790ec0b
 }
 
 

@@ -1100,12 +1100,19 @@ int core_geinput_open(global_context_t * global_context, gene_input_t * fp, int 
 			if(convert_GZ_to_FQ(global_context, (half_number==2)? global_context ->config.second_read_file : global_context ->config.first_read_file, half_number)) return -1;
 		fname = (half_number == 2)?global_context -> config.second_read_file:global_context -> config.first_read_file;
 
+<<<<<<< HEAD
                 if(global_context->config.scRNA_input_mode == GENE_INPUT_BCL)
                         rv = geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
                 else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ)
                         rv = geinput_open_scRNA_fqs(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
+=======
+		if(global_context->config.scRNA_input_mode == GENE_INPUT_BCL)
+			rv = geinput_open_bcl(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
+		else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_FASTQ)
+			rv = geinput_open_scRNA_fqs(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
+>>>>>>> f49aee0b71a3716bc03f7d66e7702769d790ec0b
 		else if(global_context->config.scRNA_input_mode == GENE_INPUT_SCRNA_BAM)
-			SUBREADprintf("Align no longer do scRNA BAM\n");
+			rv = geinput_open_scRNA_BAM(fname , fp, global_context -> config.reads_per_chunk, global_context -> config.all_threads );
 		else
 			rv = geinput_open(fname, fp);
 

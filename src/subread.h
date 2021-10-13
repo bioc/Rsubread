@@ -203,6 +203,10 @@ typedef short gene_vote_number_t;
 #define GENE_VOTE_SPACE 173 
 #define GENE_VOTE_TABLE_SIZE 331
 #else
+<<<<<<< HEAD
+=======
+/*
+>>>>>>> f49aee0b71a3716bc03f7d66e7702769d790ec0b
 #warning "============ ADD '-21' from next line  ================"
 #define GENE_VOTE_SPACE (24 - 21)
 #warning "============ ADD '-13' from next line  ================"
@@ -212,6 +216,8 @@ typedef short gene_vote_number_t;
 #define GENE_VOTE_SPACE 24
 #define GENE_VOTE_TABLE_SIZE 30 
 */
+#define GENE_VOTE_SPACE 24
+#define GENE_VOTE_TABLE_SIZE 30 
 #endif
 
 #define MAX_ANNOTATION_EXONS 30000 
