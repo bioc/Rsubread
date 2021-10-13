@@ -1972,7 +1972,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 									int  old_event_id = -1;
 
 									if( indel_left_boundary >= 854782874 - 5 && indel_left_boundary <= 854782888 +5 )
-										SUBREADprintf("PCCINDEL by %s at %u  len=%d\n", read_name, indel_left_boundary , current_indel_len);
+//										SUBREADprintf("PCCINDEL by %s at %u  len=%d\n", read_name, indel_left_boundary , current_indel_len);
 
 
 									chromosome_event_t * new_event = local_add_indel_event(global_context, thread_context, event_table, read_text + cursor_on_read + min(0,current_indel_len), indel_left_boundary - 1, current_indel_len, 1, ambiguous_count, 0, &old_event_id);
