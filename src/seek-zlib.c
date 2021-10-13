@@ -560,8 +560,9 @@ void seekgz_close(seekable_zfile_t * fp){
 	subread_destroy_lock(&fp -> write_lock);
 }
 
-int autozip_open(const char * fname, autozip_fp * fp, int need_seek){
+int autozip_open(const char * fname, autozip_fp * fp){
 	int ret = -1;
+	int need_seek=1;
 	memset(fp, 0, sizeof(autozip_fp));
 	strcpy(fp -> filename, fname);
 
@@ -655,7 +656,7 @@ void autozip_rewind(autozip_fp * fp){
 	strcpy(fname, fp -> filename);
 
 	autozip_close(fp);
-	autozip_open(fname, fp, 1);
+	autozip_open(fname, fp);
 }
 
 void parallel_gzip_writer_init(parallel_gzip_writer_t * pzwtr, char * output_filename, int total_threads){

@@ -103,7 +103,7 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 				strcpy(testfile_name, data_dir);    
 				strcat(testfile_name, SR_PATH_SPLIT_STR);
 				strcat(testfile_name, dp->d_name);
-				int resop = autozip_open(testfile_name, &tfp, 1);
+				int resop = autozip_open(testfile_name, &tfp);
 				if(0 <= resop){
 					autozip_close(&tfp);
 					char * gen_fmt = str_replace(dp->d_name , "s_1.filter", "s_%d.filter");
@@ -126,7 +126,7 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 					strcat(testfile_name, SR_PATH_SPLIT_STR);
 					sprintf(testfile_name+strlen(testfile_name), gen_fmt, 1, 2+tti);
 					autozip_fp tfp;
-					int resop = autozip_open(testfile_name, &tfp, 1);
+					int resop = autozip_open(testfile_name, &tfp);
 					//printf("%d === %s    %s\n", resop, gen_fmt, testfile_name);
 					if(0<=resop){
 						scancon -> bcl_is_gzipped = resop;
@@ -319,7 +319,7 @@ int iCache_open_one_fp( cache_BCL_t * cache_input, int bcl_no, int lane_no){
 	else
 		sprintf(fname,  cache_input -> bcl_format_string, lane_no, bcl_no+1);
 
-	int rv = autozip_open(fname, tfp, 1);
+	int rv = autozip_open(fname, tfp);
 //	SUBREADprintf("OPEN_AUTO %s = %d\n", fname, rv);
 	if(rv>=0){
 		int sk = bcl_no<0?12:4;
@@ -449,11 +449,10 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 		int nbase = 'N';
 		int nqual = '#';
 		if(nch > 0){
-			int ACGTi = nch%4;
-			nbase= ACGTi >1?( ACGTi==2?'G':'T' ):(ACGTi==0?'A':'C');
+			nbase="ACGT"[nch%4];
 			nqual=33+(nch>>2);
-			if(nqual >= '/' && bii < base_offset ) nqual++;
 		}
+		if(nqual >= '/' && bii < base_offset ) nqual++;
 		if(bii < srii[0]){
 			read_name[13+bii] = nbase;
 			read_name[14+idx_offset+bii]= nqual;
@@ -757,7 +756,7 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 
 ArrayList * input_BLC_parse_CellBarcodes(char * fname){
 	autozip_fp fp;
-	int resop = autozip_open(fname, &fp, 1);
+	int resop = autozip_open(fname, &fp);
 	if(resop<0) return NULL;
 
 	ArrayList * ret = ArrayListCreate(10000000);
@@ -1040,7 +1039,7 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 	while(1){
 		char base[MAX_READ_LENGTH], qual[MAX_READ_LENGTH], rname[MAX_READ_NAME_LEN];
 		base[0]=qual[0]=rname[0]=0;
-		ret = input_mFQ_next_read(&fqs_input, rname , base, qual, NULL);
+		ret = input_mFQ_next_read(&fqs_input, rname , base, qual);
 		if(ret<=0)break;
 
 		char *cell_barcode = NULL;
@@ -1438,12 +1437,13 @@ void input_scBAM_close(input_scBAM_t * bam_input){
 	if(bam_input -> current_BAM_file_no < bam_input -> total_BAM_files)scBAM_inner_fclose(bam_input);
 }
 
-void input_mFQ_fp_close(input_mFQ_t * fqs_input, int fileno){
-	autozip_fp * fileptr;
-	if(fileno == 0) fileptr = &fqs_input -> autofp1;
-	else if(fileno == 2) fileptr = &fqs_input -> autofp3;
-	else fileptr = &fqs_input -> autofp2;
-	autozip_close(fileptr);
+void input_mFQ_fp_close(input_mFQ_t * fqs_input){
+	if(fqs_input -> autofp1.filename[0]){
+		autozip_close(&fqs_input -> autofp1);
+		if(fqs_input->files2)autozip_close(&fqs_input -> autofp2);
+		autozip_close(&fqs_input -> autofp3);
+	}
+	fqs_input -> autofp1.filename[0] = 0;
 }
 
 int input_mFQ_guess_lane_no(char * f1_name){
@@ -1457,33 +1457,22 @@ int input_mFQ_guess_lane_no(char * f1_name){
 	return 999;
 }
 
-int input_mFQ_open_file(input_mFQ_t * fqs_input, int fileno){
-	if(fileno==0) fqs_input -> current_guessed_lane_no = input_mFQ_guess_lane_no(fqs_input->files1[fqs_input-> current_file_no[0]]);
-
-	char * newfname;
-	if(fileno == 0) newfname = fqs_input->files1[fqs_input-> current_file_no[0]];
-	else if(fileno == 2) newfname = fqs_input->files3[fqs_input-> current_file_no[2]];
-	else newfname = fqs_input->files2[fqs_input-> current_file_no[1]];
-
-	autozip_fp * fileptr;
-	if(fileno == 0) fileptr = &fqs_input -> autofp1;
-	else if(fileno == 2) fileptr = &fqs_input -> autofp3;
-	else fileptr = &fqs_input -> autofp2;
-	
-	int gzipped_ret = autozip_open(newfname, fileptr, 0);
+int input_mFQ_open_files(input_mFQ_t * fqs_input){
+	fqs_input -> current_guessed_lane_no = input_mFQ_guess_lane_no(fqs_input->files1[fqs_input-> current_file_no]);
+	int gzipped_ret = autozip_open(fqs_input->files1[fqs_input-> current_file_no],&fqs_input -> autofp1);
+	if(fqs_input -> files2)gzipped_ret = gzipped_ret < 0 ?gzipped_ret:autozip_open(fqs_input->files2[fqs_input-> current_file_no],&fqs_input -> autofp2);
+	gzipped_ret = gzipped_ret < 0?gzipped_ret:autozip_open(fqs_input->files3[fqs_input-> current_file_no],&fqs_input -> autofp3);
 	return gzipped_ret < 0;
 }
 
-int input_mFQ_next_file(input_mFQ_t * fqs_input, int fileno){
-	input_mFQ_fp_close(fqs_input, fileno);
-	fqs_input-> current_file_no[fileno] ++;
+int input_mFQ_next_file(input_mFQ_t * fqs_input){
+	input_mFQ_fp_close(fqs_input);
+	fqs_input-> current_file_no ++;
 
-	if(fqs_input-> current_file_no[fileno] >= fqs_input-> total_files)return -1;
-	return input_mFQ_open_file(fqs_input, fileno);
+	if(fqs_input-> current_file_no >= fqs_input-> total_files)return -1;
+	return input_mFQ_open_files(fqs_input);
 }
 
-#define MFQ_CACHE_CAPACITY 800000
-#define MFQ_CACHE_LOW 500000
 int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fqnames){
 	int total_files = 0;
 	char * fnames = strdup(three_paired_fqnames);
@@ -1506,19 +1495,7 @@ int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fq
 		total_files++;
 	}
 
-	memset(fqs_input, 0, sizeof(input_mFQ_t));
-	fqs_input->cached_read_number[0] = fqs_input->cached_read_number[1] = fqs_input->cached_read_number[2] = 0;
-	fqs_input->cached_read_fetch_ptr[0] = fqs_input->cached_read_fetch_ptr[1] = fqs_input->cached_read_fetch_ptr[2] = 0;
-	fqs_input->is_being_filled[0] = fqs_input->is_being_filled[1] = fqs_input->is_being_filled[2] = 0;
-	fqs_input->cache_capacity[0] = fqs_input->cache_capacity[1] = fqs_input->cache_capacity[2] = MFQ_CACHE_CAPACITY;
-	fqs_input->cache_lower_line[0] = MFQ_CACHE_LOW;
-	fqs_input->cache_lower_line[1] = MFQ_CACHE_LOW * 11 / 10;
-	fqs_input->cache_lower_line[2] = MFQ_CACHE_LOW * 12 / 10; // the three lower lines differ to avoid a single thread doing all the three.
-	fqs_input->cached_reads[0] = malloc(sizeof(input_mFQ_cached_read_t) * fqs_input->cache_capacity[0]);
-	if(!no_file2)fqs_input->cached_reads[1] = malloc(sizeof(input_mFQ_cached_read_t) * fqs_input->cache_capacity[1]);
-	fqs_input->cached_reads[2] = malloc(sizeof(input_mFQ_cached_read_t) * fqs_input->cache_capacity[2]);
-
-	int rv = input_mFQ_init_openfiles(fqs_input, files1, no_file2?NULL:files2, files3, total_files);
+	int rv = input_mFQ_init(fqs_input, files1, no_file2?NULL:files2, files3, total_files);
 	free(fnames);
 	free(files1);
 	free(files2);
@@ -1527,8 +1504,9 @@ int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fq
 
 }
 
-int input_mFQ_init_openfiles( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files ){
+int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files ){
 	int x1;
+	memset(fqs_input, 0, sizeof(input_mFQ_t));
 	fqs_input->files1 = malloc(sizeof(char*)*total_files);
 	fqs_input->files2 = files2?malloc(sizeof(char*)*total_files):NULL;
 	fqs_input->files3 = malloc(sizeof(char*)*total_files);
@@ -1539,145 +1517,122 @@ int input_mFQ_init_openfiles( input_mFQ_t * fqs_input, char ** files1, char ** f
 		if(files2)fqs_input->files2[x1] = strdup(files2[x1]);
 		fqs_input->files3[x1] = strdup(files3[x1]);
 	}
-	int ret = input_mFQ_open_file(fqs_input,0);
-	ret = ret || input_mFQ_open_file(fqs_input,2);
-	if(files2) ret = ret || input_mFQ_open_file(fqs_input,1);
-	return ret;
+	fqs_input->current_file_no = 0;
+	fqs_input->current_read_no = 0;
+	return input_mFQ_open_files(fqs_input);
 }
-int cellCounts_lock_occupy(cellCounts_lock_t * lock){
-  return 0;
-}
-
-
-int cellCounts_lock_release(cellCounts_lock_t * lock){
-  return 0;
-}
-
-
-void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno,  cellCounts_lock_t * lock){
-	int x1, all_fq_done = 0, fqs_wtr_idx = fqs_input-> cached_read_fetch_ptr[fileno] + fqs_input-> cached_read_number[fileno];
-	int reads_to_fill = fqs_input-> cache_capacity[fileno] - fqs_input-> cached_read_number[fileno];
-	fqs_input -> is_being_filled[fileno] = 1;
-	autozip_fp * this_fp;
-	if(fileno==0) this_fp =&fqs_input -> autofp1;
-	else if(fileno==2) this_fp =&fqs_input -> autofp3;
-	else this_fp =&fqs_input -> autofp2;
-	int spinret =0, spinret2=0;
-	if(lock) spinret = cellCounts_lock_release(lock);
-
-	for(x1=0; x1<reads_to_fill ; x1++){
-		if(fqs_wtr_idx >= fqs_input-> cache_capacity[fileno]) fqs_wtr_idx -= fqs_input-> cache_capacity[fileno];
-		input_mFQ_cached_read_t * wrt_ptr = fqs_input->cached_reads[fileno] + fqs_wtr_idx;
-		int ret = 0;
-		while(1){
-			ret = autozip_gets(this_fp, wrt_ptr -> read_text, MAX_SCRNA_READ_LENGTH); // read_name
-			if(ret == 0) {
-				ret = input_mFQ_next_file(fqs_input, fileno);
-				if(ret){ // ret must be 0 if the next file was opened (no matter gzipped or not)
-					 // when ret != 0 : either error occured or end of all files.
-					all_fq_done =1;
-					break;
-				}
-			}else if(ret > 0) break; // has read something (the name)
-		}
-		if(all_fq_done) break;
-		ret = autozip_gets(this_fp, wrt_ptr -> read_text, MAX_SCRNA_READ_LENGTH);
-		wrt_ptr -> read_len = ret -1; // len with "\n"
-		autozip_gets(this_fp, wrt_ptr -> qual_text, MAX_SCRNA_READ_LENGTH); // "+"
-		autozip_gets(this_fp, wrt_ptr -> qual_text, MAX_SCRNA_READ_LENGTH); 
-		wrt_ptr -> guessed_lane_no = fqs_input -> current_guessed_lane_no;
-		wrt_ptr -> file_no = fqs_input -> current_file_no[0];
-		fqs_wtr_idx ++;
-	}
-
-	//SUBREADprintf("PREFILL FILE #%d HAVING %d\n", fileno, x1);
-	// here decompress the next chunk of reads.
-	if(lock)spinret2 = cellCounts_lock_occupy(lock);
-	if(lock)SUBREADprintf("RELEASED LOCK %p [%d = spin mode]  FOR LOADING %d reads in %d file; LOCK RET %d and %d ; REMAIN READS %d += %d , DONE=%d\n", lock, lock -> is_spin_lock, reads_to_fill , fileno, spinret, spinret2, fqs_input-> cached_read_number[fileno], x1, all_fq_done);
-	fqs_input -> is_being_filled[fileno] = 0;
-	fqs_input -> cached_read_number[fileno] += x1;
-	if(all_fq_done) fqs_input -> all_reads_loaded_in_cache |= (1<<(4*fileno));
-}
-
-int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual, cellCounts_lock_t * lock){
+int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, char * qual ){
+	char tmpline [MAX_READ_NAME_LEN+1];
 	int ret = -1,x1;
+	if(fqs_input -> current_file_no == fqs_input -> total_files) return -1;
 	while(1){
-		//SUBREADprintf("%d < %d ? fill %d ? all load %d\n", fqs_input -> cached_read_number[0] , fqs_input -> cache_lower_line[0] , fqs_input -> is_being_filled[0] , fqs_input -> all_reads_loaded_in_cache);
-		if(fqs_input -> cached_read_number[0] < fqs_input -> cache_lower_line[0] && (!fqs_input -> is_being_filled[0]) && (fqs_input -> all_reads_loaded_in_cache & 1)==0)
-			input_mFQ_prefill(fqs_input, 0, lock);
+		ret = autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
+		int write_ptr=0;
+		if(ret==0){
+			ret = input_mFQ_next_file(fqs_input);
+			if(ret >=0) continue;
+			return -1;
+		} else if(ret<0) return -1;
 
-		if(fqs_input->files2 && fqs_input -> cached_read_number[1] < fqs_input -> cache_lower_line[1] &&  (!fqs_input -> is_being_filled[1])&&  (fqs_input -> all_reads_loaded_in_cache & 0x10)==0)
-			input_mFQ_prefill(fqs_input, 1, lock);
-
-		if(fqs_input -> cached_read_number[2] < fqs_input -> cache_lower_line[2] &&  (!fqs_input -> is_being_filled[2]) && (fqs_input -> all_reads_loaded_in_cache & 0x100)==0)
-			input_mFQ_prefill(fqs_input, 2, lock);
-
-		if(fqs_input -> cached_read_number[0]>0 && fqs_input -> cached_read_number[2]>0 && ( fqs_input->files2== NULL || fqs_input -> cached_read_number[1] >0 )) break;
-		if((fqs_input -> all_reads_loaded_in_cache | (  fqs_input->files2?0:0x10 ) ) == 0x111) break;
-		if(lock)cellCounts_lock_release(lock);
-		//SUBREADprintf("EXAUSTED BUFFER  REM %d %d ; BEING %d %d ; ISFIN %04x\n", fqs_input -> cached_read_number[0], fqs_input -> cached_read_number[2], fqs_input -> is_being_filled[0], fqs_input -> is_being_filled[2], fqs_input -> all_reads_loaded_in_cache);
-		usleep(2000); // 2ms sleep for decoupling
-		if(lock)cellCounts_lock_occupy(lock);
-	}
-
-	if(fqs_input -> cached_read_number[0]>0){
-		input_mFQ_cached_read_t * r1ptr = fqs_input -> cached_reads[0] + fqs_input -> cached_read_fetch_ptr[0];
-		fqs_input -> cached_read_number[0]--;
-		if((++fqs_input -> cached_read_fetch_ptr[0])>= fqs_input -> cache_capacity[0]) fqs_input -> cached_read_fetch_ptr[0] -= fqs_input -> cache_capacity[0];
-
-		input_mFQ_cached_read_t * r2ptr = NULL;
-		if(fqs_input->files2){
-			r2ptr = fqs_input -> cached_reads[1] + fqs_input -> cached_read_fetch_ptr[1];
-			fqs_input -> cached_read_number[1]--;
-			if((++fqs_input -> cached_read_fetch_ptr[1])>= fqs_input -> cache_capacity[1]) fqs_input -> cached_read_fetch_ptr[1] -= fqs_input -> cache_capacity[1];
-		}
-
-		input_mFQ_cached_read_t * r3ptr = fqs_input -> cached_reads[2] + fqs_input -> cached_read_fetch_ptr[2];
-		fqs_input -> cached_read_number[2]--;
-		if((++fqs_input -> cached_read_fetch_ptr[2])>= fqs_input -> cache_capacity[2]) fqs_input -> cached_read_fetch_ptr[2] -= fqs_input -> cache_capacity[2];
-		// retrieve the next read from the three caches and build read names
 		#ifdef __MINGW32__
 		sprintf(readname, "R%011I64d", fqs_input -> current_read_no);
 		#else
 		sprintf(readname, "R%011lld", fqs_input -> current_read_no);
 		#endif
-
 		readname[12]='|';
-		memcpy(readname+13, r1ptr -> read_text, r1ptr -> read_len);
-		int write_ptr = 13+ r1ptr -> read_len;
+		ret = autozip_gets(&fqs_input -> autofp1, readname+13, MAX_READ_NAME_LEN);
+		readname[13+ret-1]='|';
+		write_ptr = 13+ret;
 
-		readname[write_ptr++]='|';
-		memcpy(readname+write_ptr, r1ptr -> qual_text, r1ptr -> read_len);
-		for(x1=write_ptr; x1<write_ptr+r1ptr -> read_len; x1++) if(readname[x1]>='/') readname[x1]++;
-		write_ptr += r1ptr -> read_len;
+		autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
+
+		ret = autozip_gets(&fqs_input -> autofp1, readname+write_ptr, MAX_READ_NAME_LEN);
+		ret --;
+		for(x1=write_ptr; x1<write_ptr+ret; x1++) if(readname[x1]>='/') readname[x1]++;
+		readname[write_ptr+ret]='|';
+		write_ptr += ret;
 
 		if(fqs_input->files2){
-			SUBREADprintf("INDEXED FASTQ INPUT NOT SUPPORTED\n");
-		}else  write_ptr+=sprintf(readname+write_ptr,"|input#%04d@L%03d", r1ptr -> file_no, r1ptr -> guessed_lane_no);
-		memcpy(read, r3ptr -> read_text, r3ptr -> read_len);
-		read[r3ptr -> read_len] = 0;
-		memcpy(qual, r3ptr -> qual_text, r3ptr -> read_len);
-		qual[r3ptr -> read_len] = 0;
-		fqs_input -> current_read_no++;
-		ret = r3ptr -> read_len;
+			ret = autozip_gets(&fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
+			if(ret<=0) return -1;
+			ret = autozip_gets(&fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
+			ret --;
+			readname[write_ptr+ret]='|';
+			write_ptr += ret;
+
+			autozip_gets(&fqs_input -> autofp2, tmpline, MAX_READ_NAME_LEN);
+			ret = autozip_gets(&fqs_input -> autofp2, readname+write_ptr, MAX_READ_NAME_LEN);
+			for(x1=write_ptr; x1<write_ptr+ret; x1++) if(readname[x1]>='/') readname[x1]++;
+			ret --;
+			readname[write_ptr+ret]=0;
+		}else write_ptr+=sprintf(readname+write_ptr,"|input#%04d@L%03d", fqs_input -> current_file_no, fqs_input  -> current_guessed_lane_no);
+
+		ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
+		if(ret<=0) return -1;
+		ret = autozip_gets(&fqs_input -> autofp3, read, MAX_READ_LENGTH);
+		ret --; // read length excludes "\n"
+		read[ret]=0;
+		autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
+		autozip_gets(&fqs_input -> autofp3, qual, MAX_READ_LENGTH);
+		qual[ret]=0;
+
+		break;
 	}
+	fqs_input->current_read_no ++;
 	return ret;
 }
+
 
 void input_mFQ_close(input_mFQ_t * fqs_input){
 	int x1;
 
+	input_mFQ_fp_close(fqs_input);
 	for(x1=0; x1<fqs_input -> total_files; x1++){
 		free(fqs_input->files1[x1]);
 		if(fqs_input->files2)free(fqs_input->files2[x1]);
 		free(fqs_input->files3[x1]);
 	}
-	free(fqs_input->cached_reads[0]);
-	if(fqs_input->files2)free(fqs_input->cached_reads[1]);
-	free(fqs_input->cached_reads[2]);
-
 	free(fqs_input->files1);
 	if(fqs_input->files2)free(fqs_input->files2);
 	free(fqs_input->files3);
 }
 
+int input_mFQ_seek(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
+	if(fqs_input -> current_file_no != pos -> current_file_no){
+		if(fqs_input -> current_file_no < fqs_input -> total_files)input_mFQ_fp_close(fqs_input);
+		fqs_input -> current_file_no = pos -> current_file_no;
+		if(fqs_input -> current_file_no < fqs_input -> total_files)input_mFQ_open_files(fqs_input);
+	}
+	if(fqs_input -> current_file_no < fqs_input -> total_files){
+		fqs_input -> current_read_no = pos -> current_read_no;
+		if(fqs_input -> autofp1.is_plain){
+			fseeko(fqs_input -> autofp1.plain_fp,  pos -> pos_file1, SEEK_SET);
+			if(fqs_input -> files2)fseeko(fqs_input -> autofp2.plain_fp,  pos -> pos_file2, SEEK_SET);
+			fseeko(fqs_input -> autofp3.plain_fp,  pos -> pos_file3, SEEK_SET);
+		}else{
+			seekgz_seek(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
+			if(fqs_input -> files2)seekgz_seek(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+			seekgz_seek(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
+		}
+	}
+	return 0;
+}
+
+int input_mFQ_tell(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
+	memset(pos, 0, sizeof(input_mFQ_pos_t));
+	pos -> current_file_no = fqs_input -> current_file_no;
+	pos -> current_read_no = fqs_input -> current_read_no;
+
+	if(fqs_input -> current_file_no < fqs_input -> total_files){
+		if(fqs_input -> autofp1.is_plain){
+			pos -> pos_file1 = ftello(fqs_input -> autofp1.plain_fp);
+			if(fqs_input -> files2)pos -> pos_file2 = ftello(fqs_input -> autofp2.plain_fp);
+			pos -> pos_file3 = ftello(fqs_input -> autofp3.plain_fp);
+		}else{
+			seekgz_tell(&fqs_input -> autofp1.gz_fp,&pos -> zpos_file1);
+			if(fqs_input -> files2)seekgz_tell(&fqs_input -> autofp2.gz_fp,&pos -> zpos_file2);
+			seekgz_tell(&fqs_input -> autofp3.gz_fp,&pos -> zpos_file3);
+		}
+	}
+	return 0;
+}

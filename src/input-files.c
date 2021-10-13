@@ -680,37 +680,38 @@ unsigned int read_numbers(gene_input_t * input)
 	return ret;
 }
 
+
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_SCRNA_BAM){
-		SUBREADprintf("ERROR: scRNA bam dataset doesn't support seeking!\n");
-	}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
-		SUBREADprintf("ERROR: scRNA fq dataset doesn't support seeking!\n");
-	}else if(input -> file_type == GENE_INPUT_BCL){
-		SUBREADprintf("ERROR: scRNA dataset doesn't support seeking!\n");
-	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
-		seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
-		if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
-		else pos -> gzfa_last_name[0]=0;
-	}else{
-		pos -> simple_file_position = ftello((FILE *)input -> input_fp);
-	}
+        if(input -> file_type == GENE_INPUT_SCRNA_BAM){
+                scBAM_tell(&input -> scBAM_input, &pos -> scBAM_position);
+        }else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+                input_mFQ_tell(&input -> scRNA_fq_input, &pos -> mFQ_position);
+        }else if(input -> file_type == GENE_INPUT_BCL){
+                assert(input -> file_type != GENE_INPUT_BCL);
+        }else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
+                seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
+                if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
+                else pos -> gzfa_last_name[0]=0;
+        }else{
+                pos -> simple_file_position = ftello((FILE *)input -> input_fp);
+        }
+}
+void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
+        if(input -> file_type == GENE_INPUT_SCRNA_BAM){
+                scBAM_seek(&input -> scBAM_input, &pos -> scBAM_position);
+        }else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+                input_mFQ_seek(&input -> scRNA_fq_input, &pos -> mFQ_position);
+        }else if(input -> file_type == GENE_INPUT_BCL){
+                assert(input -> file_type != GENE_INPUT_BCL);
+        }else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
+                seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
+                if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
+                else input -> gzfa_last_name[0]=0;
+        }else{
+                fseeko((FILE *)input -> input_fp, pos -> simple_file_position, SEEK_SET);
+        }
 }
 
-void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
-	if(input -> file_type == GENE_INPUT_SCRNA_BAM){
-		SUBREADprintf("ERROR: scRNA bam dataset doesn't support seeking!\n");
-	}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
-		SUBREADprintf("ERROR: scRNA fq dataset doesn't support seeking!\n");
-	}else if(input -> file_type == GENE_INPUT_BCL){
-		SUBREADprintf("ERROR: scRNA dataset doesn't support seeking!\n");
-	}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
-		seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
-		if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
-		else input -> gzfa_last_name[0]=0;
-	}else{
-		fseeko((FILE *)input -> input_fp, pos -> simple_file_position, SEEK_SET);
-	}
-}
 
 int trim_read_inner(char * read_text, char * qual_text, int rlen, short t_5, short t_3)
 {
