@@ -1546,15 +1546,12 @@ int input_mFQ_init_openfiles( input_mFQ_t * fqs_input, char ** files1, char ** f
 }
 
 int cellCounts_lock_occupy(cellCounts_lock_t * lock){
-	SUBREADprintf("REMOVE THIS FUNCTION. IT IS ONLY FOR TEMP RELEASE\n");
-	return 0;
+  return 0;
 }
 
 
-
 int cellCounts_lock_release(cellCounts_lock_t * lock){
-	SUBREADprintf("REMOVE THIS FUNCTION. IT IS ONLY FOR TEMP RELEASE\n");
-	return 0;
+  return 0;
 }
 
 void input_mFQ_prefill(input_mFQ_t * fqs_input, int fileno,  cellCounts_lock_t * lock){
