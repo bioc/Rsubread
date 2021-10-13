@@ -1971,7 +1971,7 @@ int find_new_indels(global_context_t * global_context, thread_context_t * thread
 								{
 									int  old_event_id = -1;
 
-									if( indel_left_boundary >= 854782874 - 5 && indel_left_boundary <= 854782888 +5 )
+									//if( indel_left_boundary >= 854782874 - 5 && indel_left_boundary <= 854782888 +5 )
 //										SUBREADprintf("PCCINDEL by %s at %u  len=%d\n", read_name, indel_left_boundary , current_indel_len);
 
 
