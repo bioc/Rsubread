@@ -164,7 +164,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   HashTable * seq_duplicate_tab = StringTableCreate(100000);
   HashTableSetDeallocationFunctions(seq_duplicate_tab, free, NULL);
 
-  int ret = autozip_open(fasta_name, &auto_FP, 1);
+  int ret = autozip_open(fasta_name, &auto_FP);
   while(1){
     char clinebuf[TRANSCRIPT_FASTA_LINE_WIDTH];
     int rlength = autozip_gets(&auto_FP, clinebuf, TRANSCRIPT_FASTA_LINE_WIDTH -1);
@@ -257,7 +257,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   HashTableDestroy(seq_duplicate_tab);
 
   if(qualstr_name && qualstr_name[0]){
-    ret = autozip_open(qualstr_name, &auto_FP, 1);
+    ret = autozip_open(qualstr_name, &auto_FP);
     if(ret){
       SUBREADprintf("Error: cannot open reference quality file '%s'\n", qualstr_name);
       return -1;

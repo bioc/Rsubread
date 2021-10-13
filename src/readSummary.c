@@ -986,7 +986,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	unsigned int features = 0, xk1 = 0, lineno=0;
 	char * file_line = malloc(MAX_ANNOT_LINE_LENGTH+1);
 	autozip_fp anno_fp;
-	int apret = autozip_open(annotation_file, &anno_fp, 1);
+	int apret = autozip_open(annotation_file, &anno_fp);
 	int is_GFF_warned = 0;
 	if(apret < 0) return -1;
 

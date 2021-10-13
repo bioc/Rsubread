@@ -260,7 +260,7 @@ void destroy_contig_fasta(fasta_contigs_t * tab){
 }
 int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 	autozip_fp fp;
-	int rv = autozip_open(fname, &fp, 1);
+	int rv = autozip_open(fname, &fp);
 	if(rv>=0){
 		tab -> contig_table = HashTableCreate(3943);
 		tab -> size_table = HashTableCreate(3943);
@@ -1079,7 +1079,7 @@ int load_features_annotation(char * file_name, int file_type, char * gene_id_col
 	char * file_line = malloc(MAX_LINE_LENGTH+1);
 	int lineno = 0, is_GFF_txid_warned = 0, is_GFF_geneid_warned = 0, loaded_features = 0;
 	autozip_fp afp;
-	int aret = autozip_open(file_name, &afp, 1);
+	int aret = autozip_open(file_name, &afp);
 
 	if(aret < 0){
 		SUBREADprintf("Error: unable to open the annotation file : %s\n", file_name);

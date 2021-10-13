@@ -482,7 +482,7 @@ int grc_summary_fasta(genRand_context_t * grc){
 	}
 
 	sprintf(outname,"%s.faSummary", grc->output_prefix);
-	int ret = autozip_open(grc->transcript_fasta_file, &auto_FP, 1);
+	int ret = autozip_open(grc->transcript_fasta_file, &auto_FP);
 	if(ret<0){
 		SUBREADprintf("Error: cannot open the fasta file as input\n");
 		return -1;
@@ -659,7 +659,7 @@ int grc_load_env(genRand_context_t *grc){
 
 	autozip_fp auto_FP;
 	int xk1;
-	int ret = autozip_open(grc->expression_level_file, &auto_FP, 1);
+	int ret = autozip_open(grc->expression_level_file, &auto_FP);
 	if(ret<0){
 		ret = 1;
 		SUBREADprintf("Error: unable to open the expression level file.\n");
@@ -708,7 +708,7 @@ int grc_load_env(genRand_context_t *grc){
 
 
 	if(grc->quality_string_file[0]){
-		ret = autozip_open(grc->quality_string_file, &auto_FP, 1);
+		ret = autozip_open(grc->quality_string_file, &auto_FP);
 		if(ret<0){
 			ret = 1;
 			SUBREADprintf("Error: unable to open the quality string file.\n");
@@ -736,7 +736,7 @@ int grc_load_env(genRand_context_t *grc){
 
 	if(ret) return ret;
 
-	ret = autozip_open(grc->transcript_fasta_file, &auto_FP, 1);
+	ret = autozip_open(grc->transcript_fasta_file, &auto_FP);
 	if(ret<0){
 		ret = 1;
 		SUBREADprintf("Error: unable to open the transcript file.\n");

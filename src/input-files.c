@@ -778,7 +778,7 @@ int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * r
 		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
-		int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string, lock);
+		int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
 		if(rv<=0) return -1;
 		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
@@ -795,7 +795,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
                 if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
                 return rv;
         } else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
-                int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string, NULL);
+                int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
                 if(rv<=0) return -1;
                 if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
                 return rv;
@@ -1774,7 +1774,7 @@ void destroy_cigar_event_table(HashTable * event_table)
 void break_VCF_file(char * vcf_file, HashTable * fp_table, char * temp_file_prefix, chromosome_t* known_chromosomes)
 {
 	autozip_fp vzfp;
-	int vret = autozip_open(vcf_file, &vzfp, 1);
+	int vret = autozip_open(vcf_file, &vzfp);
 	char temp_file_suffix[MAX_CHROMOSOME_NAME_LEN+20];
 	int close_now = 0;
 

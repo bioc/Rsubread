@@ -595,7 +595,7 @@ void remove_neighbour(global_context_t * global_context)
 		if(deleted_event -> event_type == CHRO_EVENT_TYPE_INDEL && deleted_event -> inserted_bases)
 			free(deleted_event -> inserted_bases);
 		deleted_event -> event_type = CHRO_EVENT_TYPE_REMOVED;
-                if(deleted_event -> event_small_side >= 232366259 -1 && deleted_event -> event_small_side <= 232366259 +61)SUBREADprintf("DELETED_THIS AT %u len=%d PTR %p\n", deleted_event -> event_small_side, deleted_event -> indel_length , deleted_event );
+   //             if(deleted_event -> event_small_side >= 232366259 -1 && deleted_event -> event_small_side <= 232366259 +61)SUBREADprintf("DELETED_THIS AT %u len=%d PTR %p\n", deleted_event -> event_small_side, deleted_event -> indel_length , deleted_event );
 
 	}
 
