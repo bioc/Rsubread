@@ -2543,7 +2543,7 @@ int BAM_check_EOF_block(char * in_file){
 	char testingbin [BAM_EOF_BLOCK_LEN];
 	FILE * fp = f_subr_open(in_file, "rb");
 	if(!fp) return 0; // this fuction doesn't care whether the file exists.
-	fseek(fp, -BAM_EOF_BLOCK_LEN, SEEK_END);
+	fseeko(fp, -BAM_EOF_BLOCK_LEN, SEEK_END);
 	int frl = fread(testingbin, BAM_EOF_BLOCK_LEN,1, fp);
 	fclose(fp);
 	if(frl<1) return -1;
