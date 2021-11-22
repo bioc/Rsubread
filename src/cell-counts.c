@@ -103,6 +103,11 @@ typedef struct{
 
 	int processed_reads_in_chunk;
 	int running_processed_reads_in_chunk;
+
+	srInt_64 mapped_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
+	srInt_64 assigned_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
+	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
+
 	srInt_64 hiconf_map;
 	srInt_64 loconf_map;
 	srInt_64 all_processed_reads_before_chunk;
@@ -365,6 +370,7 @@ static struct option cellCounts_long_options[]={
 	{"subreadsPerRead",required_argument,0,0},
 	{"minVotesPerRead",required_argument,0,0},
 	{"minMappedLength",required_argument,0,0},
+	{"umiCutoff",required_argument,0,0},
 	{"reportedAlignmentsPerRead",required_argument,0,0},
 
 	{0,0,0,0}
@@ -453,7 +459,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
 		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		cct_context -> reads_per_chunk /= 2;
+		cct_context -> reads_per_chunk /= 4;
 	}
 
 
@@ -484,6 +490,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 		if(strcmp("inputMode", cellCounts_long_options[option_index].name)==0){
 			if(strcmp("FASTQ", optarg)==0) cct_context -> input_mode = GENE_INPUT_SCRNA_FASTQ;
+			if(strcmp("BAM", optarg)==0) cct_context -> input_mode = GENE_INPUT_SCRNA_BAM;
 		}
 		if(strcmp("output", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> output_prefix, optarg, MAX_FILE_NAME_LENGTH -1);
@@ -517,6 +524,10 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 		if(strcmp("sampleSheetFile", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> bcl_sample_sheet_file, optarg, MAX_FILE_NAME_LENGTH -1);
+		}
+		if(strcmp("umiCutoff", cellCounts_long_options[option_index].name)==0){
+			cct_context -> umi_cutoff = atof(optarg);
+			SUBREADprintf("UMI_CUT=%.2f\n", cct_context -> umi_cutoff);
 		}
 	}
 
@@ -1222,6 +1233,8 @@ int cellCounts_load_context(cellcounts_global_t * cct_context){
 		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
 	else if(cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ)
 		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
+	else if(cct_context -> input_mode == GENE_INPUT_SCRNA_BAM)
+		rv = rv || geinput_open_scRNA_BAM(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
 	else 	rv = -1;
 
 	rv = rv || load_offsets(& cct_context -> chromosome_table, cct_context -> index_prefix);
@@ -1630,7 +1643,7 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	if(chro_name) refID = HashTableGet(cct_context -> chromosome_table.read_name_to_index, chro_name) - NULL - 1;
 	int bin_mq_nl = (bin<<16) | (mapping_quality << 8) | read_name_len ;
 	int fag_nc = (flags<<16) | cigar_opt_len;
-	int nextRefID = -1, temp_len = -1, next_chro_pos=-1;
+	int nextRefID = -1, temp_len = 0, next_chro_pos=-1;
 	chro_pos--;
 	memcpy(rbin + 4 , & refID , 4);
 	memcpy(rbin + 8 , & chro_pos , 4);
@@ -1647,26 +1660,26 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	int basev = 36 +read_name_len +cigar_opt_len*4+(read_len + 1) /2;
 	for(xk1=0; xk1<read_len; xk1++) *(rbin +basev+xk1) = qual_text[xk1]-33;
 	
+	if(multi_mapping_number>=0){
+		rbin[record_length ++]='H';
+		rbin[record_length ++]='I';
+		rbin[record_length ++]='C';
+		rbin[record_length ++]=this_multi_mapping_i;
+
+		rbin[record_length ++]='N';
+		rbin[record_length ++]='H';
+		rbin[record_length ++]='C';
+		rbin[record_length ++]=multi_mapping_number;
+	}
+
 	if(editing_dist>=0){
 		rbin[record_length ++]='N';
 		rbin[record_length ++]='M';
 		rbin[record_length ++]='C';
 		rbin[record_length ++]=editing_dist;
 	}
-	if(multi_mapping_number>=0){
-		rbin[record_length ++]='N';
-		rbin[record_length ++]='H';
-		rbin[record_length ++]='C';
-		rbin[record_length ++]=multi_mapping_number;
-
-		rbin[record_length ++]='H';
-		rbin[record_length ++]='I';
-		rbin[record_length ++]='C';
-		rbin[record_length ++]=this_multi_mapping_i;
-	}
 
 	record_length -=4;
-
 	memcpy(rbin     , & record_length , 4);
 }
 
@@ -1807,7 +1820,10 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	//assert(fields==5);
 
 	int sample_no = -1;
-	if(lane_str){
+	if(cct_context -> input_mode == GENE_INPUT_SCRNA_BAM){
+		sample_no = 1;  // Only one sample in the BAM mode. A sample may have multiple BAM file but they have the same sample_no.
+				// Multiple input samples are mapped/counted in multiple C_cellCounts calls. Each call only does one sample.
+	}else if(lane_str){
 		int laneno = 0;
 		for(testi = lane_str+1; *testi; testi++){
 			if(!isdigit(*testi))break;
@@ -1835,6 +1851,13 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 		FILE * binfp = cct_context -> batch_files [ batch_no ];
 		cellCounts_write_one_read_bin(cct_context, thread_no, binfp, sample_no, cell_barcode_no, UMI_seq, readbin, nhits, batch_no == CELLBC_BATCH_NUMBER+1);
 		cellCounts_lock_release(cct_context -> batch_file_locks + batch_no);
+		cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+
+		if(reporting_index >=0 && this_multi_mapping_i==1){
+			thread_context -> mapped_reads_per_sample[ sample_no -1 ]++;
+			thread_context -> reads_per_sample[ sample_no -1 ]++;
+			if(nhits >0) thread_context -> assigned_reads_per_sample[ sample_no -1 ]++;
+		}else thread_context -> reads_per_sample[ sample_no -1 ]++;
 	}
 
 	void * pps[6];
@@ -1980,6 +2003,12 @@ int cellCounts_run_maybe_threads(cellcounts_global_t * cct_context, int task){
 
 		if(STEP_VOTING == task) cellCounts_free_topKbuff(cct_context, current_thread_no);
 		ret_value += *(ret_values + current_thread_no);
+		int smpno;
+		for(smpno = 0; smpno < cct_context-> sample_sheet_table -> numOfElements; smpno ++){
+			cct_context -> mapped_reads_per_sample[smpno] += thread_contexts[current_thread_no].mapped_reads_per_sample[smpno];
+			cct_context -> assigned_reads_per_sample[smpno] += thread_contexts[current_thread_no].assigned_reads_per_sample[smpno];
+			cct_context -> reads_per_sample[smpno] += thread_contexts[current_thread_no].reads_per_sample[smpno];
+		}
 		if(ret_value)break;
 	}
 	SUBREADprintf("HICONF MAPPING (SIMPLE) = %lld, LOWCONF MAPPING (ALL SUBREADS, NOT SIMPLE) = %lld\n", cct_context -> hiconf_map , cct_context -> loconf_map );
@@ -2447,6 +2476,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 
 //	SUBREADprintf("READQV %s : VOTE %d , ALN %d\n\n", read_name, votetab->max_vote, thread_context -> reporting_multi_alignment_no);
 
+
 	if(thread_context -> reporting_multi_alignment_no) {
 		int sorting_index [thread_context -> reporting_count];
 		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> reporting_count; distinct_vote_number_i ++) sorting_index [distinct_vote_number_i ] = distinct_vote_number_i ;
@@ -2859,6 +2889,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 		int is_reversed, applied_subreads = 0;
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
+		//fprintf(stderr,"FETCH_BAM %llu '%s' '%s' '%s'\n", current_read_number, read_name, read_text, qual_text);
 		if(current_read_number < 0) break;
 		if(read_len< 16) continue;
 
@@ -3460,7 +3491,7 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 	srInt_64 x1, sec_start = 0;
 	srInt_64 old_sec_key = -1;
 
-	for(x1=1; x1<=structs -> numOfElements; x1++){
+	for(x1=0; x1<=structs -> numOfElements; x1++){
 		srInt_64 sec_key = -1;
 		int is_umi_changed = 0;
 
@@ -3477,15 +3508,20 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 				// gene_no itself is 64-bit, but it is nearly impossible to have two neighbouring
 				// structures that have the same last 32-bit of gene_no.
 		}
+		if(1){
+		struct cell_gene_umi_supp * strold = ArrayListGet(structs, sec_start);
+		SUBREADprintf("SECKEY_CHGD? %lld == %lld  of x1=%lld and secst=%lld   STEP2=%d\n", sec_key , old_sec_key, x1, sec_start, is_UMI_step2);
+		//SUBREADprintf("SECKEY_CHGD? %lld == %lld  of x1=%lld and secst=%lld   STEP2=%d    G1 vs G0 = %d, %d\n", sec_key , old_sec_key, x1, sec_start, is_UMI_step2, str1 -> gene_no , strold-> gene_no);
+		}
 
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
 			if(x1 - sec_start>1 && str0->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count);
 			else if(is_UMI_step2 && str0->cellbc>=0) ADD_count_hash(str0->cellbc,str0->gene_no,1);
 
-			old_sec_key = sec_key;
 			sec_start = x1;
 		}
+		old_sec_key = sec_key;
 	}
 }
 
@@ -3870,8 +3906,8 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			cell_gene_umi_list[x1] -> appendix1 = app1;
 			app1[0] = cct_context;
 			app1[1] = NULL+1;
-						// 0 : sorted by cell_bc, then UMIstr, then supported_reads, then gene
-						// 1 : sorted by cell_bc, then gene, then supported_reads, then UMIstr
+						// 1 : sorted by cell_bc, then gene, then supported_reads, then UMIstr (this is for step1 UMI merging)
+						// 0 : sorted by cell_bc, then UMIstr, then supported_reads, then gene (this is for step2 UMI merging)
 						// supported_reads : large -> small; the other: small -> large
 			ArrayListSort(cell_gene_umi_list[x1],  cellCounts_do_one_batch_tab_to_struct_list_compare);
 			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 0, filtered_SCGU_table, NULL);
@@ -4250,13 +4286,6 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 
 	fprintf(sample_tab_fp,"SampleName\tUMICutoff\tTotalReads\tMappedReads\tAssignedReads\tIndex\n");
 	for(x1 = 0; x1 < cct_context -> sample_sheet_table -> numOfElements ; x1++){
-		srInt_64 mapped_reads = 0, all_reads = 0, assigned_reads = 0;
-		int thrid;
-		if(0)for(thrid=0; thrid< cct_context-> total_threads; thrid++){
-			mapped_reads += cct_context -> all_thread_contexts[thrid].mapped_reads_per_sample[x1];
-			assigned_reads += cct_context -> all_thread_contexts[thrid].assigned_reads_per_sample[x1];
-			all_reads +=cct_context -> all_thread_contexts[thrid].reads_per_sample[x1];
-		}
 		ArrayList * high_confid_barcode_index_list = ArrayListCreate(20000);
 		ArrayList * this_sample_ambient_rescure_candi = ArrayListCreate(10000);
 		ArrayList * this_sample_45k_90k_barcode_no_P0 = ArrayListCreate(90000 - 45000 + 100);
@@ -4272,9 +4301,9 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 		int umi_cutoff = cct_context -> applied_umi_cut[x1];
 		char * this_sample_name = ArrayListGet( cct_context -> sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads,x1+1);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%d\n", this_sample_name, umi_cutoff,  cct_context -> reads_per_sample[x1],  cct_context -> mapped_reads_per_sample[x1],  cct_context -> assigned_reads_per_sample[x1] ,x1+1);
 #else
-		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads, x1+1);
+		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%d\n", this_sample_name, umi_cutoff, cct_context -> reads_per_sample[x1],  cct_context -> mapped_reads_per_sample[x1],  cct_context -> assigned_reads_per_sample[x1], x1+1);
 #endif
 		srInt_64 xk1;
 		HashTable * sorted_order_p1_to_i_p1_tab = HashTableCreate(nexons/4);
@@ -4612,7 +4641,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 
 	worker_master_mutex_destroy(&worker_mut);
 
-	if(!strstr(cct_context->index_prefix,"step5-rand"))cellCounts_merged_to_tables_write(cct_context , cellnoP1_to_genenoP1_to_UMIs , cct_context -> all_features_array, cct_context -> all_features_array->numOfElements);
+	if(!strstr(cct_context->index_prefix,".InternalTest.Rsr.step5@rand"))cellCounts_merged_to_tables_write(cct_context , cellnoP1_to_genenoP1_to_UMIs , cct_context -> all_features_array, cct_context -> all_features_array->numOfElements);
 
 	for(xk1=0; xk1<cct_context -> sample_sheet_table -> numOfElements; xk1++)
 		HashTableDestroy(cellnoP1_to_genenoP1_to_UMIs[xk1]);

@@ -158,7 +158,7 @@ void R_cellCounts(int * nargs, char ** argv){
 	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
 	for(i=2;i<n+1;i++) c_argv[i] = strdup(strtok(NULL,PARAM_SPLITTOR));
 
-//	R_child_thread_run(cellCounts_main, n+1,c_argv, 1);
+	R_child_thread_run(cellCounts_main, n+1,c_argv, 1);
 
 	free(r_argv);
 	for(i=0;i<n+1;i++) free(c_argv[i]);

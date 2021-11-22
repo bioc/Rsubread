@@ -1392,7 +1392,7 @@ int scBAM_next_read(input_scBAM_t * bam_input, char * read_name, char * seq, cha
 	char * extag_start = qual_start + l_seq;
 	char * tag_str_val=NULL, tag_type = 0;
 
-	for(x1=0;x1<5;x1++){
+	for(x1=0;x1<4;x1++){ // the "RG" isn't used for now
 		char * tagname = NULL;
 		if(x1==0)tagname ="CR";
 		if(x1==1)tagname ="UR";

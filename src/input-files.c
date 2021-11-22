@@ -782,7 +782,13 @@ int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * r
 		if(rv<=0) return -1;
 		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
-	} 
+	} else if(input -> file_type == GENE_INPUT_SCRNA_BAM) {
+		int rv = scBAM_next_read(&input -> scBAM_input, read_name, read_string, quality_string);
+		if(rv<=0) return -1;
+		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
+		return rv;
+	}
+
 	return 0;
 }
 
@@ -2543,7 +2549,7 @@ int BAM_check_EOF_block(char * in_file){
 	char testingbin [BAM_EOF_BLOCK_LEN];
 	FILE * fp = f_subr_open(in_file, "rb");
 	if(!fp) return 0; // this fuction doesn't care whether the file exists.
-	fseek(fp, -BAM_EOF_BLOCK_LEN, SEEK_END);
+	fseeko(fp, -BAM_EOF_BLOCK_LEN, SEEK_END);
 	int frl = fread(testingbin, BAM_EOF_BLOCK_LEN,1, fp);
 	fclose(fp);
 	if(frl<1) return -1;

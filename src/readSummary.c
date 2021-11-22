@@ -2704,7 +2704,11 @@ void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thr
 		ret [3] = splicing_point_table;
 	}else ret[2] = NULL;
 	
-	char * rg_name_mem = malloc(strlen(rg_name)+1);
+	char * rg_name_mem = strdup(rg_name);//malloc(strlen(rg_name)+1);
+	if(NULL == rg_name_mem){
+		SUBREADprintf("cannot allocate memory for %s (%d)\n", rg_name, strlen(rg_name));
+		return NULL;
+	}
 	strcpy(rg_name_mem, rg_name);
 	HashTablePut(thread_context->RG_table, rg_name_mem, ret);
 	return ret;

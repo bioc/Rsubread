@@ -1105,7 +1105,7 @@ library(Matrix)
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
-    sname <- as.character(sum.tab$SampleName[roiw])
+    #sname <- as.character(sum.tab$SampleName[roiw])
     sid <- sum.tab$Index[roiw]
     count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid, use.meta.features, annot.tab, umi.cutoff)
     ret[[sprintf("Sample.%d",sid)]] <- count.tab
@@ -1188,22 +1188,28 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
-.new_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, reportedAlignmentsPerRead =1, unique.mapping=FALSE, maxMismatchBases=3, minVotesPerRead=3, subreadsPerRead=10, maxDiffToTopVotes=2, minMappedLength=40, onlyDetectBarcode=FALSE, ...){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm10", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE){
+  maxDiffToTopVotes=2
+  onlyDetectBarcode=FALSE
+  maxMismatchBases <- maxMismatches
+  minVotesPerRead <- minVotes
+  subreadsPerRead <- nsubreads
+  unique.mapping <- uniqueMapping
   .remove.temp.files <- T
+
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
-  if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   if(!is.null(umi.cutoff)){
     umi.cutoff <- as.numeric(umi.cutoff)
     if(umi.cutoff < 0.0) stop("UMI cutoff must be a positive number.")
   }
-  BAM_is_Rerun_Persample <- is.null(aligner)
+
   sample.info.idx <- sample
   fc <- list()
 
   temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame(stringsAsFactors=F)
-  sample.1 <- paste0(temp.file.prefix,".samplesheet")
+  cc.sample.sheet.path <- paste0(temp.file.prefix,".samplesheet")
 
   annlist <- .get.annotation.file(annot.inbuilt, annot.ext, isGTFAnnotationFile)
   ann <- annlist$ann
@@ -1234,8 +1240,8 @@ library(Matrix)
       return(NA)
     }
 
-     .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
-    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", reportedAlignmentsPerRead, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength)
+     .index.names.to.sheet.FASTQ.mode(sample.info.idx, cc.sample.sheet.path)
+    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
@@ -1268,8 +1274,8 @@ library(Matrix)
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
       if(is.null(cell.barcode)){
-        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
-        cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
+        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
+        cell.barcode <- .find_best_cellbarcode(dirname, cc.sample.sheet.path)
       }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
@@ -1280,15 +1286,16 @@ library(Matrix)
       }
   
       full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
-      is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
+      is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
       generate.scRNA.BAM <- TRUE
 
-      opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", sample.1, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength)
+      opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
       cmd <- paste(opt,collapse=.R_param_splitor)
       n <- length(unlist(strsplit(cmd,.R_param_splitor)))
+      print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
       dirno <- dirno +1
@@ -1302,12 +1309,46 @@ library(Matrix)
       stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
       df.sample.info <- rbind(df.sample.info, stt)
     }
+  } else if(input.mode == "BAM"){
+    unique.samples <- unique(as.character(sample.info.idx$SampleName))
+    if(is.null(cell.barcode)){
+      cell.barcode <- .find_best_cellbarcode(sample$BAMFile, "N/A", input.mode="bam")
+    }else{
+      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
+    }
+
+    unique.samples <- unique(as.character(sample.info.idx$SampleName))
+    for(this.sample in unique.samples){
+      .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=as.character(this.sample),stringsAsFactors=F), cc.sample.sheet.path)
+      BAM.names <- paste(sample.info.idx$BAMFile[ as.character(sample.info.idx$SampleName) == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
+      generate.scRNA.BAM <- TRUE
+
+      opt <- c("--inputMode","BAM","--cellBarcodeFile", cell.barcode,"--dataset", BAM.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
+      if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
+      if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
+
+      cmd <- paste(opt,collapse=.R_param_splitor)
+      n <- length(unlist(strsplit(cmd,.R_param_splitor)))
+      print(cmd)
+      C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
+
+      raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+      for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      }
+      df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
+    }
   }
   .del.temp.files(substr(temp.file.prefix,4,99))
+  fc[["annotation"]] <- raw.fc.annot
+  fc[["sample.info"]] <- df.sample.info
   fc
 }
 
-cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
+.old_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
   .remove.temp.files <- T
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   if(!is.null(umi.cutoff)){
@@ -1321,7 +1362,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
   temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
   raw.fc.annot <- NA
   df.sample.info <- data.frame(stringsAsFactors=F)
-  sample.1 <- paste0(temp.file.prefix,".samplesheet")
+  cc.sample.sheet.path <- paste0(temp.file.prefix,".samplesheet")
 
   if(input.mode=="BCL"){
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
@@ -1338,8 +1379,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
       if(is.null(cell.barcode)){
-        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
-        cell.barcode <- .find_best_cellbarcode(dirname, sample.1)
+        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
+        cell.barcode <- .find_best_cellbarcode(dirname, cc.sample.sheet.path)
       }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
@@ -1349,9 +1390,9 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         generate.scRNA.BAM <- FALSE 
         if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
         for(samplename in unique.samples){
-          is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1, samplename)
+          is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path, samplename)
           one.bam.name <- paste0(samplename, ".bam")
-          .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM, BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
+          .write.tmp.parameters(list(sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM, BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
           one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, strandSpecific=1, ...)
           dirno <- dirno +1
           if(any(is.na(raw.fc.annot))) raw.fc.annot<- one.raw.fc$annotation
@@ -1363,7 +1404,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
           df.sample.info <- rbind(df.sample.info, stt)
         }
       }else{
-        is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, sample.1)
+        is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
         generate.scRNA.BAM <- TRUE
         .write.tmp.parameters(list(isBCLinput=TRUE))
         if(aligner=="align"){
@@ -1372,7 +1413,7 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
         }else if(aligner=="subjunc"){
           subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
         }
-        .write.tmp.parameters(list(sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
+        .write.tmp.parameters(list(sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
         dirno <- dirno +1
         raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
@@ -1395,13 +1436,13 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
 
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
     for(this.sample in unique.samples){
-      .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=as.character(this.sample),stringsAsFactors=F), sample.1)
+      .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=as.character(this.sample),stringsAsFactors=F), cc.sample.sheet.path)
       BAM.names <- paste(sample.info.idx$BAMFile[ as.character(sample.info.idx$SampleName) == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
       .write.tmp.parameters(list(isScRNABAMinput=TRUE))
       align(index, BAM.names, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE,annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType,...)
 
       generate.scRNA.BAM <- TRUE
-      .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
+      .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
       raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
 
       if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
@@ -1442,8 +1483,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       for(samplename in unique.samples){
         leftover.bam <- paste0(samplename, ".bam")
 
-        .index.names.to.sheet.FASTQ.mode(sample.info.idx[ as.character(sample.info.idx$SampleName) == samplename, ][1,], sample.1)
-        .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
+        .index.names.to.sheet.FASTQ.mode(sample.info.idx[ as.character(sample.info.idx$SampleName) == samplename, ][1,], cc.sample.sheet.path)
+        .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
         raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
 
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
@@ -1478,8 +1519,8 @@ cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligne
       }
       bam.for.FC <- temp.file.prefix
       generate.scRNA.BAM <- TRUE
-      .index.names.to.sheet.FASTQ.mode(sample.info.idx, sample.1)
-      .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=sample.1, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
+      .index.names.to.sheet.FASTQ.mode(sample.info.idx, cc.sample.sheet.path)
+      .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
       raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
 
      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
