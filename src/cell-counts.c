@@ -3508,11 +3508,6 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 				// gene_no itself is 64-bit, but it is nearly impossible to have two neighbouring
 				// structures that have the same last 32-bit of gene_no.
 		}
-		if(1){
-		struct cell_gene_umi_supp * strold = ArrayListGet(structs, sec_start);
-		SUBREADprintf("SECKEY_CHGD? %lld == %lld  of x1=%lld and secst=%lld   STEP2=%d\n", sec_key , old_sec_key, x1, sec_start, is_UMI_step2);
-		//SUBREADprintf("SECKEY_CHGD? %lld == %lld  of x1=%lld and secst=%lld   STEP2=%d    G1 vs G0 = %d, %d\n", sec_key , old_sec_key, x1, sec_start, is_UMI_step2, str1 -> gene_no , strold-> gene_no);
-		}
 
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
