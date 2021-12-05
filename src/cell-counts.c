@@ -16,14 +16,13 @@
 
 //#define DO_STARSOLO_THING
 
-
 #define CELLCOUNTS_REALIGNMENT_TRIES 15
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
 #define CIGAR_PERFECT_SECTIONS 12 
 #define MAX_UMI_LEN 14
-#define MAX_SCRNA_SAMPLE_NUMBER 16
+#define MAX_SCRNA_SAMPLE_NUMBER 40 
 #define MAX_SUBREADS_PER_READ 30
 #define SCRNA_SUBREADS_HARD_LIMIT 20 
 
@@ -2408,7 +2407,6 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 	thread_context -> reporting_scores[thread_context -> reporting_count] = score;
 	thread_context -> reporting_positions[thread_context -> reporting_count] = abs_pos;
 	thread_context -> reporting_flags[thread_context -> reporting_count] = rbin_offset_for_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
-	#warning "============ IMPROVE THIS FORMULA AS Subread =========="
 	thread_context -> reporting_mapq[thread_context -> reporting_count] = 40 - all_mismatched_bases;
 	thread_context -> reporting_editing_distance[thread_context -> reporting_count] = all_mismatched_bases + all_indel_length;
 	return score;
@@ -2604,7 +2602,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
 		int ignore_creation_voteloc = 0;
 
-		#warning "======== IGNORED SOME NEW CANDIDATE LOCATIONS BY (1) =================="
 		if(0)if(x1 >= subreads - 5 && has_votes >10) {
 			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
 			else if(has_votes > 20 && vote->max_vote >= 3) ignore_creation_voteloc =1;
