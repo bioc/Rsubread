@@ -1406,7 +1406,7 @@ srInt_64 cellCounts_calculate_pos_weight_1sec(cellcounts_global_t * cct_context,
 srInt_64 cellCounts_calculate_pos_weight(cellcounts_global_t * cct_context, unsigned int pos, char * cigar){ 
 	int tmpi=0, nch;
 	srInt_64 max_weight = 10;
-	while(nch = *(cigar++)){
+	while(0!=(nch = *(cigar++))){
 		if(isdigit(nch)){
 			tmpi = tmpi*10+nch-'0';
 		}else{
@@ -1927,7 +1927,7 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 		chro_pos += get_soft_clipping_length(thread_context -> reporting_cigars[reporting_index]);
 
 		int nch, nchi, add_curs, tmpi=0, chro_curs=chro_pos, nhits=0;
-		for(nchi=0; nch= thread_context -> reporting_cigars[reporting_index][nchi]; nchi++){
+		for(nchi=0; 0!=(nch= thread_context -> reporting_cigars[reporting_index][nchi]); nchi++){
 			if(isdigit(nch)){
 				tmpi = 10*tmpi + (nch-'0');
 			}else{
@@ -1961,6 +1961,7 @@ void * cellCounts_run_in_thread(void * params){
 		break;
 
 	}
+	return NULL;
 }
 
 #define MAX_EVENT_NUMBER_INIT 200000
@@ -2724,7 +2725,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
 		int ignore_creation_voteloc = 0;
 
-		#warning "======== IGNORED SOME NEW CANDIDATE LOCATIONS BY (1) =================="
+		//#warning "======== IGNORED SOME NEW CANDIDATE LOCATIONS BY (1) =================="
 		if(0)if(x1 >= subreads - 5 && has_votes >10) {
 			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
 			else if(has_votes > 20 && vote->max_vote >= 3) ignore_creation_voteloc =1;
@@ -3982,7 +3983,7 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 	if(cct_context -> is_BAM_and_FQ_out_generated){
 		int sample_id = finished_job -> task -> sample_id;
 		void ** fps = HashTableGet(cct_context -> sample_BAM_writers, NULL+sample_id);
-		simple_bam_writer * wtr = fps[0];
+		simple_bam_writer * wtr = (*fps);
 		int inbin_pos = 0, outblocki = 0;
 		int nextoffset = finished_job -> task -> inbin_batch_start_offsets[1];
 		int block_number_this = finished_job -> task -> block_number - finished_job -> task -> inbin_number +1;
@@ -4637,6 +4638,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 
 	for(xk1=0; xk1<cct_context -> sample_sheet_table -> numOfElements; xk1++)
 		HashTableDestroy(cellnoP1_to_genenoP1_to_UMIs[xk1]);
+	return 0;
 }
 
 int cellCounts_run_counting(cellcounts_global_t * cct_context){
