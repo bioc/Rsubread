@@ -3985,7 +3985,8 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 		void ** fps = HashTableGet(cct_context -> sample_BAM_writers, NULL+sample_id);
 		simple_bam_writer * wtr = (*fps);
 		int inbin_pos = 0, outblocki = 0;
-		int nextoffset = finished_job -> task -> inbin_batch_start_offsets[1];
+		int nextoffset = -1;
+		if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1)finished_job -> task -> inbin_batch_start_offsets[1];
 		int block_number_this = finished_job -> task -> block_number - finished_job -> task -> inbin_number +1;
 		if(DO_CREATE_BAI_FOR_BAM) while(inbin_pos < finished_job -> task -> inbin_len){
 			int binlen = 0;
