@@ -1,7 +1,7 @@
 promoterRegions <- function(annotation="mm10", upstream=3000L, downstream=2000L)
 #	Create a SAF data.frame of genewise promoter regions
 #	Gordon Smyth
-#	Created 24 April 2017. Last modified 22 Oct 2020.
+#	Created 24 April 2017. Last modified 17 March 2022.
 {
 #	annotation can be a SAF format data.frame or can be the name of a genome with built-in annotation
 	if(is.character(annotation)) {
@@ -14,7 +14,7 @@ promoterRegions <- function(annotation="mm10", upstream=3000L, downstream=2000L)
 
 #	Remove unassembled contigs
 	N <- grep("^N",annotation$Chr)
-	annotation <- annotation[-N,]
+	if(length(N)) annotation <- annotation[-N,]
 
 #	Check upstream and downstream limits
 	upstream <- max(upstream[1],0L)
