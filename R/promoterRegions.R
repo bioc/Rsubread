@@ -13,8 +13,8 @@ promoterRegions <- function(annotation="mm10", upstream=3000L, downstream=2000L)
 	}
 
 #	Remove unassembled contigs
-	N <- grep("^N",annotation$Chr)
-	if(length(N)) annotation <- annotation[-N,]
+#	N <- grep("^N",annotation$Chr)
+#	if(length(N)) annotation <- annotation[-N,]
 
 #	Check upstream and downstream limits
 	upstream <- max(upstream[1],0L)

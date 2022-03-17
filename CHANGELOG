@@ -1,3 +1,6 @@
+17 Mar 2022 - 2.9.3
+(1) promoterRegions() no longer attempts to remove unassembled contigs. Previously it assumed that any chrosomome name starting with "N" was an unassembled contig, as is true for the inbuilt annotation, and removed them from the output.
+
 17 Mar 2022 - 2.9.2
 (1) Fixed a bug in promoterRegions() when `annotation` is a data.frame and none of the chromosome names start with "N".
 (2) Import `stats::median` in NAMESPACE.
