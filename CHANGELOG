@@ -1,3 +1,7 @@
+17 Mar 2022 - 2.8.2
+(1) Fixed a bug in promoterRegions() when `annotation` is a data.frame and none of the chromosome names start with "N".
+(2) Import `stats::median` in NAMESPACE.
+
 6 Nov 2021 - 2.8.1
 (1) Fixed a bug that caused error when featureCounts runs in Windows on BAM files larger than 4GB.
 
