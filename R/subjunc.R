@@ -109,6 +109,10 @@ subjunc <- function(index,readfile1,readfile2=NULL,input_format="gzFASTQ",output
         ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
         annot.display <- "inbuilt (mm10)"
       },
+      mm39={
+        ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
+        annot.display <- "inbuilt (mm39)"
+      },
       hg19={
         ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
         annot.display <- "inbuilt (hg19)"

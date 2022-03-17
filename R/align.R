@@ -136,6 +136,10 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
         ann <- system.file("annot","mm10_RefSeq_exon.txt",package="Rsubread")
         annot.display <- "inbuilt (mm10)"
       },
+      mm39={
+        ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
+        annot.display <- "inbuilt (mm39)"
+      },
       hg19={
         ann <- system.file("annot","hg19_RefSeq_exon.txt",package="Rsubread")
         annot.display <- "inbuilt (hg19)"

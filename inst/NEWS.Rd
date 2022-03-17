@@ -2,6 +2,13 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+
+\section{Version 2.10.0}{\itemize{
+\item
+Added inbuilt RefSeq annotation for mm39 (mouse genome Build 39).
+}}
+
+
 \section{Version 2.6.0}{\itemize{
 \item
 Improved the speed of cellCounts and also reduced its memory use.
@@ -12,7 +19,6 @@ Added a parameter 'umi.cutoff' to cellCounts to call all the cells that had a to
 \item
 Added support for FASTQ-format read input in CellCounts.
 }}
-
 
 
 \section{Version 2.4.0}{\itemize{
