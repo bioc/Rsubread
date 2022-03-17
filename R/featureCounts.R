@@ -79,7 +79,13 @@
           cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
          },
         mm39={
-          ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
+          annot_df <- suppressMessages(getInBuiltAnnotation("mm39"))
+          fout_annot <- file.path(".",paste(".Rsubread_align_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
+          oldScipen <- options(scipen=999)
+          write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
+          options(oldScipen)
+          ann <- fout_annot
+          delete.annot.file <- TRUE
           annot.screen.output <- 'inbuilt (mm39)'
           cat("NCBI RefSeq annotation for mm39 (build 39) is used.\n")
          },

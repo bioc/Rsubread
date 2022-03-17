@@ -137,7 +137,13 @@ align <- function(index,readfile1,readfile2=NULL,type="rna",input_format="gzFAST
         annot.display <- "inbuilt (mm10)"
       },
       mm39={
-        ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
+        annot_df <- getInBuiltAnnotation("mm39")
+        fout_annot <- file.path(".",paste(".Rsubread_align_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
+        oldScipen <- options(scipen=999)
+        write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
+        options(oldScipen)
+        ann <- fout_annot
+        flag <- TRUE
         annot.display <- "inbuilt (mm39)"
       },
       hg19={

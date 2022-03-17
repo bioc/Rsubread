@@ -12,7 +12,7 @@ getInBuiltAnnotation <- function(annotation="mm10")
 	      message("NCBI RefSeq annotation for mm10 (build 38.1).")
 		 },
 	    mm39={
-	      ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
+	      ann <- system.file("annot","mm39_RefSeq_exon.txt.gz",package="Rsubread")
 	      message("NCBI RefSeq annotation for mm39 (build 39).")
 		 },
 	    hg19={
