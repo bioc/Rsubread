@@ -4,7 +4,7 @@ exportPattern("^[^\\.]")
 
 importFrom("grDevices", "dev.off", "pdf")
 importFrom("stats", "approxfun", "density", "dgamma", "dpois", "lowess",
-           "ppois", "runif", "rmultinom", "dmultinom", "p.adjust")
+           "median", "ppois", "runif", "rmultinom", "dmultinom", "p.adjust")
 importFrom("utils", "download.file", "read.csv", "read.delim",
            "write.table", "head", "read.table")
 importFrom("Matrix", "readMM")
