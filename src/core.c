@@ -4841,8 +4841,11 @@ void test_PE_and_same_chro_cigars(global_context_t * global_context , unsigned i
 
 		if(tlen >= global_context -> config.minimum_pair_distance && tlen <= global_context -> config.maximum_pair_distance)
 			(* is_PE_distance) = 1;
-		*res_tlen = tlen;
-	}else *res_tlen = 0x7fffffff;
+		(*res_tlen) = tlen;
+	}else{
+		(*res_tlen) = 0x7fffffff;
+		(*is_exonic_regions) = 0;
+	}
 }
 
 void test_PE_and_same_chro_align(global_context_t * global_context , realignment_result_t * res1, realignment_result_t * res2, int * is_exonic_regions, int * is_PE_distance, int * is_same_chromosome, int read_len_1, int read_len_2, char * read_name, int *res_tlen){

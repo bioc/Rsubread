@@ -18,7 +18,7 @@ cellCounts(
     minMappedLength = 1,
   
     # parameters used for assigning and counting UMIs
-    annot.inbuilt = "mm10",
+    annot.inbuilt = "mm39",
     annot.ext = NULL,
     isGTFAnnotationFile = FALSE,
     GTF.featureType = "exon",
@@ -46,7 +46,7 @@ cellCounts(
   \item{minVotes}{ numeric value giving the consensus threshold for reporting a hit. \code{1} by default.}
   \item{maxMismatches}{ numeric value giving the maximum number of mis-matched bases allowed in the alignment. \code{10} by default. Mis-matches found in soft-clipped bases are not counted.}
   \item{minMappedLength}{ numeric value giving the minimum mappable length in the read for reporting a hit. \code{1} by default.}
-  \item{annot.inbuilt}{ Specify an inbuilt annotation for UMI counting. See \code{\link{featureCounts}} for more details. \code{mm10} by default.}
+  \item{annot.inbuilt}{ Specify an inbuilt annotation for UMI counting. See \code{\link{featureCounts}} for more details. \code{mm39} by default.}
   \item{annot.ext}{ Specify an external annotation for UMI counting. See \code{\link{featureCounts}} for more details. \code{NULL} by default.}
   \item{isGTFAnnotationFile}{ See \code{\link{featureCounts}} for more details. \code{FALSE} by default.}
   \item{GTF.featureType}{ See \code{\link{featureCounts}} for more details. \code{exon} by default.}

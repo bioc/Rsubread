@@ -68,7 +68,7 @@ align(
     
     # gene annotation
     useAnnotation = FALSE,
-    annot.inbuilt = "mm10",
+    annot.inbuilt = "mm39",
     annot.ext = NULL,
     isGTF = FALSE,
     GTF.featureType = "exon",
@@ -138,7 +138,7 @@ subjunc(
     
     # gene annotation
     useAnnotation = FALSE,
-    annot.inbuilt = "mm10",
+    annot.inbuilt = "mm39",
     annot.ext = NULL,
     isGTF = FALSE,
     GTF.featureType = "exon",
@@ -180,7 +180,7 @@ subjunc(
   \item{detectSV}{ logical indicating if structural variants (SVs) will be detected during read mapping. See below for more details.}
   \item{reportAllJunctions}{ logical indicating if all discovered junctions will be reported. This includes exon-exon junctions and also gene fusions. Presence of donor/receptor sites is not required when \code{reportAllJunctions} is \code{TRUE}. This option should only be used for RNA-seq data.}
   \item{useAnnotation}{ logical indicating if gene annotation information will be used in the mapping. \code{FALSE} by default.}
-  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has five possible values \code{"mm39"}, \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm39`, `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm10"} by default. See \code{\link{featureCounts}} function for more details on the in-built annotations.}
+  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has five possible values \code{"mm39"}, \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm39`, `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm39"} by default. See \code{\link{featureCounts}} function for more details on the in-built annotations.}
   \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. The provided annotation file can be a uncompressed or gzip compressed file. If an annotation is provided via \code{annot.ext}, the \code{annot.inbuilt} parameter will be ignored. See \code{\link{featureCounts}} function for more details about this parameter.}
   \item{isGTF}{ logical indicating if the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string denoting the type of features that will be extracted from a GTF annotation. \code{"exon"} by default. This argument is only applicable when \code{isGTF} is \code{TRUE}.}

@@ -1039,7 +1039,6 @@ void cellCounts_sort_feature_info(cellcounts_global_t * cct_context, unsigned in
 	(*sorted_start) = ret_start;
 	(*sorted_end) = ret_end;
 	(*sorted_strand) = ret_strand;
-	int curr_chro_number = 0;
 
 	for(chro_pnt=0; chro_pnt < features; chro_pnt++) {
 		fc_feature_info_t * cur_feature = ArrayListGet(loaded_features, chro_pnt);
@@ -1181,7 +1180,7 @@ int cellCounts_load_annotations(cellcounts_global_t * cct_context){
 int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 	int x1;
 	for(x1=0;x1<CELLBC_BATCH_NUMBER+2; x1++){
-		char fname[MAX_FILE_NAME_LENGTH];
+		char fname[MAX_FILE_NAME_LENGTH+20];
 		sprintf(fname,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
 		cct_context -> batch_files[x1] = fopen(fname,"wb");
 		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
@@ -1749,8 +1748,6 @@ int cellCounts_parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**o
 	memcpy(&flag, bambin+18,2);
 	memcpy(&l_seq, bambin+20,4);
 
-	int x1=0;
-
 	parallel_gzip_writer_add_text(outR2fp,"@",1,thread_no);
 	parallel_gzip_writer_add_text(outR1fp,"@",1,thread_no);
 	parallel_gzip_writer_add_text(outI1fp,"@",1,thread_no);
@@ -1815,8 +1812,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
 	int rname_trimmed_len=0;
-	int fields = cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
-	//assert(fields==5);
+	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
 
 	int sample_no = -1;
 	if(cct_context -> input_mode == GENE_INPUT_SCRNA_BAM){
@@ -1967,7 +1963,6 @@ void * cellCounts_run_in_thread(void * params){
 #define MAX_EVENT_NUMBER_INIT 200000
 
 int cellCounts_prepare_context_for_align(cellcounts_global_t * cct_context, int thread_no, int task) {
-	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	return 0;
 }
 
@@ -2050,8 +2045,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 	subread_read_number_t this_number = -1;
 	gene_input_t * ginp1 = &cct_context -> input_dataset;
 
-	int lockret1=cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
-	//int lockret1=cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
+	cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
 	if(cct_context -> running_processed_reads_in_chunk < cct_context -> reads_per_chunk) {
 		do{
 			is_second_R1 = 0;
@@ -2064,10 +2058,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 			cct_context -> running_processed_reads_in_chunk ++;
 		}
 	}
-	int lockret2=cellCounts_lock_release(&cct_context -> input_dataset_lock); 
-	//int lockret2=cellCounts_lock_release(&cct_context -> input_dataset_lock); 
-
-	//if(this_number < 40) SUBREADprintf("FETCH_READ THR %d LOCK %p ret %d %d\n", thread_no, &cct_context -> input_dataset_lock, lockret1, lockret2);
+	cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 	if(rl1>0 && this_number>=0) {
 		*read_no_in_chunk = this_number;
 		*read_len = rl1;
@@ -3644,17 +3635,16 @@ void * cellCounts_merge_batches_worker(void * vp){
 			char * inbin_blk = current_input -> inbin + current_input -> inbin_batch_start_offsets[current_blk ];
 			int inblock_size;
 			if(current_blk == current_input -> inbin_number -1) inblock_size= current_input -> inbin_len - current_input -> inbin_batch_start_offsets[current_blk ];
-			else inblock_size= current_input  -> inbin_batch_start_offsets[current_blk +1] - current_input -> inbin_batch_start_offsets[current_blk ];
+			else if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1) inblock_size= current_input  -> inbin_batch_start_offsets[current_blk +1] - current_input -> inbin_batch_start_offsets[current_blk ];
 
 			deflateInit2(&my_current_job -> strm , SAMBAM_COMPRESS_LEVEL_NORMAL, Z_DEFLATED, SAMBAM_GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 			my_current_job -> strm.avail_in = inblock_size ;
-			my_current_job -> strm.next_in = inbin_blk ;
+			my_current_job -> strm.next_in = (unsigned char*)inbin_blk ;
 			my_current_job -> strm.avail_out = CELLRANGER_MERGER_WORKER_BINSIZE;
-			my_current_job -> strm.next_out = (unsigned char*)my_current_job -> outbin + CELLRANGER_MERGER_WORKER_BINSIZE * current_blk;
+			my_current_job -> strm.next_out = (unsigned char*)(my_current_job -> outbin + CELLRANGER_MERGER_WORKER_BINSIZE * current_blk);
 
 			deflate(&my_current_job -> strm, Z_FINISH);
 			my_current_job -> outbin_len [current_blk] = CELLRANGER_MERGER_WORKER_BINSIZE-my_current_job -> strm.avail_out;
-			//SUBREADprintf("PTR_WRITE [%d] len=%d  comp_len=%d\n", current_blk , inblock_size , my_current_job -> outbin_len [current_blk]);
 			my_current_job -> crc32 [current_blk] = SamBam_CRC32(inbin_blk, inblock_size);
 			deflateEnd(&my_current_job -> strm);
 		}
@@ -3992,7 +3982,7 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 			int binlen = 0;
 			if(outblocki < finished_job -> task -> inbin_number -1 &&  inbin_pos == nextoffset ){
 				outblocki ++;
-				if(outblocki < finished_job -> task -> inbin_number -1)nextoffset = finished_job -> task -> inbin_batch_start_offsets[outblocki +1];
+				if(outblocki < finished_job -> task -> inbin_number -1 && CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1)nextoffset = finished_job -> task -> inbin_batch_start_offsets[outblocki +1];
 				block_number_this = finished_job -> task -> block_number - (finished_job -> task -> inbin_number -1 - outblocki);
 			}
 			binlen=*(int*)(finished_job -> task -> inbin+inbin_pos);
@@ -4004,7 +3994,7 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 			int block_number_this = finished_job -> task -> block_number - (finished_job -> task -> inbin_number -1 - outblocki);
 			int inblock_size;
 			if(outblocki  == finished_job -> task -> inbin_number -1) inblock_size = finished_job -> task -> inbin_len - finished_job -> task -> inbin_batch_start_offsets[outblocki];
-			else inblock_size = finished_job -> task -> inbin_batch_start_offsets[outblocki +1] -  finished_job -> task -> inbin_batch_start_offsets[outblocki];
+			else if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1)inblock_size = finished_job -> task -> inbin_batch_start_offsets[outblocki +1] -  finished_job -> task -> inbin_batch_start_offsets[outblocki];
 			simple_bam_write_compressed_block(wtr, finished_job -> outbin + CELLRANGER_MERGER_WORKER_BINSIZE*outblocki , finished_job -> outbin_len[outblocki ], inblock_size, finished_job -> crc32[outblocki], block_number_this);
 		}
 	}
@@ -4342,7 +4332,7 @@ void * delete_file_thread(void * arg){
 		int x1;
 		for(x1=0; x1<CELLBC_BATCH_NUMBER +2; x1++){
 			if(current_sorting_key[x1] == 0x7fffffffffffffffLLU){
-				char tmp_fname[MAX_FILE_NAME_LENGTH+20];
+				char tmp_fname[MAX_FILE_NAME_LENGTH+50];
 				sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), x1);
 				if(bin_file_exists(tmp_fname)) unlink(tmp_fname);
 			}else all_closed = 0;
@@ -4426,11 +4416,11 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 
 		srInt_64 section1_items=0;
 		for(sample_i = 0; sample_i < cct_context -> sample_sheet_table -> numOfElements; sample_i++){
-			fread(&section1_items,1, 8, input_fps[xk1]);
+			size_t frret = fread(&section1_items,1, 8, input_fps[xk1]);
 			for(xk2 = 0; xk2 < section1_items; xk2++){
 				srInt_64 cellbcP0_geneno0B=0, umis=0;
-				fread(&cellbcP0_geneno0B,1,8,input_fps[xk1]);
-				fread(&umis,1,8,input_fps[xk1]);
+				frret += fread(&cellbcP0_geneno0B,1,8,input_fps[xk1]);
+				frret += fread(&umis,1,8,input_fps[xk1]);
 
 				int cellbc_no = cellbcP0_geneno0B>>32;
 				int gene_no0B = (int)(cellbcP0_geneno0B&0xffffffffu);
@@ -4451,9 +4441,9 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			if(genes & (1LLU<<63))genes = genes & 0x7fffffff;
 			else genes= 0;
 			
-			fread(last_rbin_buffer[xk1]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[xk1]);
+			size_t frret = fread(last_rbin_buffer[xk1]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[xk1]);
 			memcpy(&binlen, last_rbin_buffer[xk1] +16 +8*genes+ cct_context -> UMI_length  , 4);
-			fread(last_rbin_buffer[xk1] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[xk1]);
+			frret += fread(last_rbin_buffer[xk1] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[xk1]);
 
 			srInt_64 sorting_key = *(int*)(last_rbin_buffer[xk1] + 16 +8*genes+cct_context -> UMI_length +4);
 			sorting_key = sorting_key << 32;
@@ -4525,9 +4515,9 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			memcpy(&genes, last_rbin_buffer[selected_fp_no]+8, 8);
 			if(genes & (1LLU<<63))genes = genes & 0x7fffffff;
 			else genes= 0;
-			fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[selected_fp_no]);
+			size_t frret = fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[selected_fp_no]);
 			memcpy(&binlen, last_rbin_buffer[selected_fp_no] +16 +8*genes+ cct_context -> UMI_length  , 4);
-			fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
+			frret += fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
 			srInt_64 sorting_key = *(int*)(last_rbin_buffer[selected_fp_no] + 16+8*genes +cct_context -> UMI_length +4);
 			sorting_key = sorting_key << 32;
 			sorting_key |= *(int*)(last_rbin_buffer[selected_fp_no] + 16 +8*genes+cct_context -> UMI_length +8);
@@ -4572,10 +4562,10 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		int rlen = fread(&sample_id, 1, 4, notmapped_fp);
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
-		fread(&binlen, 1, 4, notmapped_fp);
+		size_t frret = fread(&binlen, 1, 4, notmapped_fp);
 		memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
 		tofill -> inbin_len += 4;
-		fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
+		frret += fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
 		tofill -> inbin_len += binlen;
 		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
 		if(tofill-> inbin_len > CELLCOUNTS_BAMBLOCK_SIZE * CELLCOUNTS_BAMBLOCK_COMP_NUMBER){

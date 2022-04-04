@@ -1188,7 +1188,7 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm10", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE){
   maxDiffToTopVotes=2
   onlyDetectBarcode=FALSE
   maxMismatchBases <- maxMismatches
@@ -1348,7 +1348,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   fc
 }
 
-.old_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
+.old_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm39",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
   .remove.temp.files <- T
   if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
   if(!is.null(umi.cutoff)){

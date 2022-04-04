@@ -6,7 +6,7 @@
 featureCounts(files,
 
     # annotation
-    annot.inbuilt = "mm10",
+    annot.inbuilt = "mm39",
     annot.ext = NULL,
     isGTFAnnotationFile = FALSE,
     GTF.featureType = "exon",
@@ -83,7 +83,7 @@ featureCounts(files,
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
-  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has five possible values \code{"mm39"}, \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm39`, `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm10"} by default. The in-built annotation has a SAF format (see below).}
+  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has five possible values \code{"mm39"}, \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm39`, `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm39"} by default. The in-built annotation has a SAF format (see below).}
   \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. See below for more details about SAF format annotation. If an annotation file is provided, it can be uncompressed or gzip compressed. Note that \code{annot.ext} will override \code{annot.inbuilt} if both provided.}
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string or a vector of character strings giving the feature type or types used to select rows in the GTF annotation which will be used for read summarization. \code{"exon"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. Feature types can be found in the third column of a GTF annotation.}
@@ -164,7 +164,7 @@ Columns can be in any order.
 Extra columns are allowed to be added into the annotation.
 
 In-built annotations, which were generated based on NCBI RefSeq gene annotations, are provided to faciliate convenient read summarization.
-We provide in-built annotations for the following genomes: \code{"hg38"}, \code{"hg19"}, \code{"mm10"} and \code{"mm9"}.
+We provide in-built annotations for the following genomes: \code{"hg38"}, \code{"hg19"}, \code{"mm39"}, \code{"mm10"} and \code{"mm9"}.
 The content of in-built annotations can be accessed via the \code{\link{getInBuiltAnnotation}} function.
 These annotations have a SAF format.
 
@@ -228,8 +228,8 @@ featureCounts: an efficient general-purpose program for assigning sequence reads
 \seealso{
 \code{\link{getInBuiltAnnotation}}}
 \examples{\dontrun{
-# Summarize SAM format single-end reads using built-in RefSeq annotation for mouse genome mm10:
-featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm10")
+# Summarize SAM format single-end reads using built-in RefSeq annotation for mouse genome mm39:
+featureCounts(files="mapping_results_SE.sam",annot.inbuilt="mm39")
 
 # Summarize single-end reads using a user-provided GTF annotation file:
 featureCounts(files="mapping_results_SE.sam",annot.ext="annotation.gtf",

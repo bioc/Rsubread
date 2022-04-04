@@ -79,13 +79,7 @@
           cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
          },
         mm39={
-          annot_df <- suppressMessages(getInBuiltAnnotation("mm39"))
-          fout_annot <- file.path(".",paste(".Rsubread_align_UserProvidedAnnotation_pid",Sys.getpid(),sep=""))
-          oldScipen <- options(scipen=999)
-          write.table(x=annot_df,file=fout_annot,sep="\t",row.names=FALSE,quote=FALSE)
-          options(oldScipen)
-          ann <- fout_annot
-          delete.annot.file <- TRUE
+          ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
           annot.screen.output <- 'inbuilt (mm39)'
           cat("NCBI RefSeq annotation for mm39 (build 39) is used.\n")
          },
@@ -129,7 +123,7 @@
 }
 
 
-featureCounts <- function(files,annot.inbuilt="mm10",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,countReadPairs=TRUE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
+featureCounts <- function(files,annot.inbuilt="mm39",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",GTF.attrType.extra=NULL,chrAliases=NULL,useMetaFeatures=TRUE,allowMultiOverlap=FALSE,minOverlap=1,fracOverlap=0,fracOverlapFeature=0,largestOverlap=FALSE,nonOverlap=NULL,nonOverlapFeature=NULL,readShiftType="upstream",readShiftSize=0,readExtension5=0,readExtension3=0,read2pos=NULL,countMultiMappingReads=TRUE,fraction=FALSE,isLongRead=FALSE,minMQS=0,splitOnly=FALSE,nonSplitOnly=FALSE,primaryOnly=FALSE,ignoreDup=FALSE,strandSpecific=0,juncCounts=FALSE,genome=NULL,isPairedEnd=FALSE,countReadPairs=TRUE,requireBothEndsMapped=FALSE,checkFragLength=FALSE,minFragLength=50,maxFragLength=600,countChimericFragments=TRUE,autosort=TRUE,nthreads=1,byReadGroup=FALSE,reportReads=NULL,reportReadsPath=NULL,maxMOp=10,tmpDir=".",verbose=FALSE)
 {
     delete.annot.file <- FALSE
     if(!.is.64bit.system()) warning("your system seems to be 32-bit. Rsubread supports 32-bit systems to a limited level only.\nWe recommend that Rsubread be run on 64-bit systems to avoid any possible problems.\n\n",call.=FALSE)
