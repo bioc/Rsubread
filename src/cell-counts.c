@@ -2141,7 +2141,8 @@ int cellCounts_indel_recorder_copy(gene_vote_number_t * alnrec, gene_vote_number
 		return 0;
 	}
 
-	char offsets[applied_subreads_per_strand], sri, toli;
+	char offsets[applied_subreads_per_strand];
+	int sri,toli;
 	memset(offsets,0x77, sizeof(char)*applied_subreads_per_strand);
 	for(toli=0; toli<tolimax; toli+=3)
 		for(sri=votrec[toli]; sri<=votrec[toli+1]; sri++) offsets[sri -1] = votrec[toli+2];
@@ -2303,7 +2304,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 
 	unsigned int abs_pos = votetab -> pos[vote_i][vote_j];
 	int tolimax = votetab -> toli[vote_i][vote_j], all_indel_length=0;
-	int indels_in_highconf = cellCounts_indel_recorder_copy(indel_offsets, votetab -> indel_recorder[vote_i][vote_j], tolimax, all_subreads, &read_pos_move, read_name, abs_pos);
+	cellCounts_indel_recorder_copy(indel_offsets, votetab -> indel_recorder[vote_i][vote_j], tolimax, all_subreads, &read_pos_move, read_name, abs_pos);
 	abs_pos += read_pos_move;
 	int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
 	if(0 && FIXLENstrcmp("R00001325252", read_name)==0)SUBREADprintf("\n%s\n%s\n000V THREE_TOLI %d %d %d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2]);
@@ -2332,8 +2333,6 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 			in_cigar_readlen = head_soft_clipped;
 		}
 
-
-		unsigned int meet_end = abs_pos + first_correct_base + indel_offset;
 
 		int gap_mismatched = 0;
 		int indel_pos = cellCounts_meet_in_the_middle(cct_context, thread_no, meet_start, read_bin + rbin_offset_for_reversed, last_correct_base, first_correct_base - last_correct_base, indel_diff, read_name, &gap_mismatched);
@@ -2425,7 +2424,6 @@ void sort_readscore_exchange(void * vp , int i , int j){
 
 int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, int thread_no, subread_read_number_t pair_number, gene_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	topK_buffer_t * topbuf = &thread_context->topKbuff;
 	int i,j,reverse_text_offset, distinct_vote_number_i;
 
 	thread_context -> reporting_multi_alignment_no = 0;
@@ -2588,7 +2586,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		int mynoP1PStr=(myno%applied_subreads_per_strand)+1;
 		int offset = ptrs->offsets[myno];
 		int of_p_16 = offset + 16;
-		int subread_number_P1 = 1+((myno >= applied_subreads_per_strand)?myno - applied_subreads_per_strand:myno);
 		int is_reversed = (myno >= applied_subreads_per_strand)?IS_NEGATIVE_STRAND:0;
 		unsigned int * index_ptr = ptrs->start_location_in_index [myno];
 		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
@@ -2669,7 +2666,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				vote -> toli[offsetX2][datalen2] = 3;
 				vote->coverage_start [offsetX2][datalen2] = offset;
 				vote->coverage_end [offsetX2][datalen2] = of_p_16;
-				//vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
 
 				if (vote->max_vote==0) vote->max_vote = 1;
 			}
@@ -2710,7 +2706,6 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 		int mynoP1PStr=(myno%applied_subreads_per_strand)+1;
 		int offset = ptrs->offsets[myno];
 		int of_p_16 = offset + 16;
-		int subread_number_P1 = 1+((myno >= applied_subreads_per_strand)?myno - applied_subreads_per_strand:myno);
 		int is_reversed = (myno >= applied_subreads_per_strand)?IS_NEGATIVE_STRAND:0;
 		unsigned int * index_ptr = ptrs->start_location_in_index [myno];
 		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
@@ -2798,7 +2793,6 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 				vote -> toli[offsetX2][datalen2] = 3;
 				vote->coverage_start [offsetX2][datalen2] = offset;
 				vote->coverage_end [offsetX2][datalen2] = of_p_16;
-				//vote -> last_subread_cluster[offsetX2][datalen2] = subread_number_P1;
 
 				if (vote->max_vote==0) vote->max_vote = 1;
 
@@ -2848,7 +2842,6 @@ int cellCounts_build_simple_mode_subread_masks(cellcounts_global_t * cct_context
 
 
 int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
-	int xk1;
 	subread_read_number_t current_read_number=0;
 	char * read_text, * qual_text;
 	char read_name[MAX_READ_NAME_LEN+1];
@@ -2856,7 +2849,6 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	int read_len=0;
 	int sqr_interval=10000;
 
-	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	read_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 
@@ -2867,9 +2859,6 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 		SUBREADprintf("Cannot allocate voting memory.\n");
 		return -1;
 	}
-
-	unsigned int low_index_border = cct_context -> value_index -> start_base_offset;
-	unsigned int high_index_border = cct_context -> value_index -> start_base_offset + cct_context -> value_index -> length;
 
 	int index_gap_width = cct_context -> current_index -> index_gap;
 
@@ -2974,9 +2963,6 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 		SUBREADprintf("Cannot allocate voting memory.\n");
 		return -1;
 	}
-
-	unsigned int low_index_border = cct_context -> value_index -> start_base_offset;
-	unsigned int high_index_border = cct_context -> value_index -> start_base_offset + cct_context -> value_index -> length; 
 
 	int index_gap_width = cct_context -> current_index -> index_gap;
 

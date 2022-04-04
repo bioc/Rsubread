@@ -2376,7 +2376,7 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 	SAMBAM_renew_BAItabs;
 
 	int chro_no = (int)(current_min >> 32);
-	int old_chro_no = -1, last_written_BAI_chro = -1;
+	int old_chro_no = -1;
 
 	int wlen = fwrite("BAI\1", 4, 1, writer -> BAI_fp);
 	if(wlen < 1) assert(wlen >0);
@@ -2411,7 +2411,6 @@ void SamBam_writer_sort_bins_to_BAM(SamBam_Writer * writer){
 		if(old_chro_no >=0 && chro_no != old_chro_no){ // if there is old_chro && if has to write. Note: old_chro_no<0 means we reached the "unmapped" part of the sorted temp files
 			//SUBREADprintf("\n====== W1CHR %d =====\n", old_chro_no);
 			SamBam_write_BAI_for_1chr(writer, &bin_chunks_table, &bins_list, &win16k_list);
-			last_written_BAI_chro = old_chro_no;
 			SAMBAM_write_empty_chros(old_chro_no +1, chro_no < 0?n_ref:chro_no);
 			SAMBAM_renew_BAItabs;
 			SAMBAM_reset_sorting_writer;
