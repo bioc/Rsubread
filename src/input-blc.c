@@ -1003,7 +1003,7 @@ int cacheBCL_qualTest_BAMmode(char * datadir, int testing_reads, int known_cell_
 		base[0]=qual[0]=rname[0]=0;
 		ret = scBAM_next_read(scBAM_input, rname , base, qual);
 		if(ret<=0)break;
-		char *cell_barcode = NULL, *sample_barcode=NULL, *lane_str=NULL;
+		char *cell_barcode = NULL;
 
 		int xx=0;
 		char *testi;
@@ -1012,10 +1012,7 @@ int cacheBCL_qualTest_BAMmode(char * datadir, int testing_reads, int known_cell_
 				xx++;
 				if(xx == 1) {
 					cell_barcode = testi +1;
-				}else if(xx == 2) {
-					sample_barcode = testi +1;
 				}else if(xx == 4){
-					lane_str = testi+1;
 					break;
 				}
 			}
