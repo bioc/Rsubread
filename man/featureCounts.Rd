@@ -168,12 +168,22 @@ We provide in-built annotations for the following genomes: \code{"hg38"}, \code{
 The content of in-built annotations can be accessed via the \code{\link{getInBuiltAnnotation}} function.
 These annotations have a SAF format.
 
-The in-built annotations are a modified version of NCBI RefSeq gene annotations.
-We downloaded the RefSeq gene annotations from NCBI ftp server (eg. RefSeq annotation for \code{mm10} was downloaded from \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.38.1/mapview/seq_gene.md.gz}).
-We then used these annotations to create our in-built annotations.
-For each gene, we used its CDS (coding DNA sequence) and UTR (untranslated) regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene.
-Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once (they might be included multiple times in the original CDSs and UTRs).
-Also, exons within the same gene do not overlap with each other.
+%%% === commented on 7 APR 2022, per Wei's Email at 4.26pm on 6 APR 2022 ===
+%%% commented on 7 APR 2022
+%%% The in-built annotations are a modified version of NCBI RefSeq gene annotations.
+%%%We downloaded the RefSeq gene annotations from NCBI ftp server (eg. RefSeq annotation for \code{mm10} was downloaded from \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.38.1/mapview/seq_gene.md.gz}).
+%%%
+%%% We then used these annotations to create our in-built annotations.
+%%% For each gene, we used its CDS (coding DNA sequence) and UTR (untranslated) regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene.
+%%% Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once (they might be included multiple times in the original CDSs and UTRs).
+%%% Also, exons within the same gene do not overlap with each other.
+%%% === end of comment ===
+
+%%% === replaced text === 
+The in-built annotations are a modified version of NCBI RefSeq gene annotations. For in-built annotations \code{"hg38"}, \code{"hg19"}, \code{"mm10"} and \code{"mm9"}, their original RefSeq annotations were downloaded from NCBI RefSeq MapView. For example, RefSeq annotation for mm10 was downloaded from \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.38.1/mapview/seq_gene.md.gz}. We then used these downloaded annotations to create in-built annotations. For each gene, we used its CDS (coding DNA sequence) and UTR (untranslated) regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene. Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once (they might be included multiple times in the original CDSs and UTRs). Also, exons within the same gene do not overlap with each other.
+
+For the in-built annotation \code{"mm39"}, its original RefSeq annotation was downloaded from \url{https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/10090/109/GCF_000001635.27_GRCm39/GCF_000001635.27_GRCm39_genomic.gtf.gz}. This is a GTF-format annotation. We changed the format of chromosome names from \code{"NC_xxxxxx"} to \code{"chr"} followed by a number (eg. \code{"NC_000067.7"} changed to \code{"chr1"}). The \code{\link{flattenGTF}} function was then used to merge overlapping exons within the same gene to generate the inbuilt annotation. Entrez gene identifiers were included in this annotation.
+%%% === end of replacement ===
 
 Users may provide an external annotation for read summarization via the \code{annot.ext} argument.
 If the external annotation is in SAF format, it can be provdied as either a \code{data.frame} or a tab-delimited text file with proper column names included.
