@@ -3356,7 +3356,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 			char replaced_key[40+MAX_UMI_LEN];
 #ifdef __MINGW32__
-			int keyptr = sprintf(replaced_key,"%d-%I64d-", str1 -> cellbc, str1 -> gene_no);
+			int keyptr = sprintf(replaced_key,"%d-%I64lld-", str1 -> cellbc, str1 -> gene_no);
 #else
 			int keyptr = sprintf(replaced_key,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
 #endif
@@ -3397,7 +3397,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 							char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
-							int keyptr = sprintf(replaced_key,"%d-%d-%I64d-", sample_id, try_str -> cellbc, try_str -> gene_no);
+							int keyptr = sprintf(replaced_key,"%d-%d-%I64lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #else
 							int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #endif
@@ -3422,7 +3422,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 						char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
-						int keyptr = sprintf(replaced_key,"%d-%d-%I64d-", sample_id, try_str -> cellbc, try_str -> gene_no);
+						int keyptr = sprintf(replaced_key,"%d-%d-%I64lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #else
 						int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #endif
@@ -3753,7 +3753,7 @@ void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context
 
 
 #ifdef __MINGW32__
-#define ADD_key_FMT1 "%d-%d-%I64d-%s"
+#define ADD_key_FMT1 "%d-%d-%I64lld-%s"
 #else
 #define ADD_key_FMT1 "%d-%d-%lld-%s"
 #endif
@@ -3912,7 +3912,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			char SCGU_key [40+MAX_UMI_LEN];
 
 #ifdef __MINGW32__
-			int keyptr = sprintf(SCGU_key,"%d-%d-%I64d-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
+			int keyptr = sprintf(SCGU_key,"%d-%d-%I64lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #else
 			int keyptr = sprintf(SCGU_key,"%d-%d-%lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #endif
@@ -4029,7 +4029,7 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 	ArrayListSort(unique_NZ_genenosP1_list, NULL);
 
 	#ifdef __MINGW32__
-	fprintf(ofp_mtx, "%I64d %I64d %I64d\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
+	fprintf(ofp_mtx, "%I64lld %I64lld %I64lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
 	#else
 	fprintf(ofp_mtx, "%lld %lld %lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
 	#endif
@@ -4266,7 +4266,7 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 		int umi_cutoff = cct_context -> applied_umi_cut[x1];
 		char * this_sample_name = ArrayListGet( cct_context -> sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%d\n", this_sample_name, umi_cutoff,  cct_context -> reads_per_sample[x1],  cct_context -> mapped_reads_per_sample[x1],  cct_context -> assigned_reads_per_sample[x1] ,x1+1);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64lld\t%I64lld\t%I64lld\t%d\n", this_sample_name, umi_cutoff,  cct_context -> reads_per_sample[x1],  cct_context -> mapped_reads_per_sample[x1],  cct_context -> assigned_reads_per_sample[x1] ,x1+1);
 #else
 		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%d\n", this_sample_name, umi_cutoff, cct_context -> reads_per_sample[x1],  cct_context -> mapped_reads_per_sample[x1],  cct_context -> assigned_reads_per_sample[x1], x1+1);
 #endif

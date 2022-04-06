@@ -4248,7 +4248,7 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 			str1 -> cellbc = -1;
 			char replaced_key[40+MAX_UMI_LEN];
 #ifdef __MINGW32__
-			int keyptr = sprintf(replaced_key,"%d-%I64d-", str1 -> cellbc, str1 -> gene_no);
+			int keyptr = sprintf(replaced_key,"%d-%I64lld-", str1 -> cellbc, str1 -> gene_no);
 #else
 			int keyptr = sprintf(replaced_key,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
 #endif
@@ -4289,7 +4289,7 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 
 							char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
-							int keyptr = sprintf(replaced_key,"%d-%d-%I64d-", sample_id, try_str -> cellbc, try_str -> gene_no);
+							int keyptr = sprintf(replaced_key,"%d-%d-%I64lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #else
 							int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #endif
@@ -4315,7 +4315,7 @@ void scRNA_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, in
 
 						char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
-						int keyptr = sprintf(replaced_key,"%d-%d-%I64d-", sample_id, try_str -> cellbc, try_str -> gene_no);
+						int keyptr = sprintf(replaced_key,"%d-%d-%I64lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #else
 						int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #endif
@@ -4457,7 +4457,7 @@ int two_long_compare(void * k1, void * k2){
 }
 
 #ifdef __MINGW32__
-#define ADD_key_FMT1 "%d-%d-%I64d-%s"
+#define ADD_key_FMT1 "%d-%d-%I64lld-%s"
 #else
 #define ADD_key_FMT1 "%d-%d-%lld-%s"
 #endif
@@ -4614,7 +4614,7 @@ void * scRNA_do_one_batch(void * paramsp1){
 			char SCGU_key [40+MAX_UMI_LEN];
 
 #ifdef __MINGW32__
-			int keyptr = sprintf(SCGU_key,"%d-%d-%I64d-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
+			int keyptr = sprintf(SCGU_key,"%d-%d-%I64lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #else
 			int keyptr = sprintf(SCGU_key,"%d-%d-%lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #endif
@@ -5496,7 +5496,7 @@ int scRNA_merged_write_sparse_matrix(fc_thread_global_context_t * global_context
 	ArrayListSort(unique_NZ_genenosP1_list, NULL);
 
 	#ifdef __MINGW32__
-	fprintf(ofp_mtx, "%I64d %I64d %I64d\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
+	fprintf(ofp_mtx, "%I64lld %I64lld %I64lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
 	#else
 	fprintf(ofp_mtx, "%lld %lld %lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
 	#endif
@@ -5671,7 +5671,7 @@ void scRNA_merged_to_tables_write( fc_thread_global_context_t * global_context, 
 		int umi_cutoff = global_context -> scRNA_applied_umi_cut[x1];
 		char * this_sample_name = ArrayListGet(global_context -> scRNA_sample_id_to_name, x1);
 #ifdef __MINGW32__
-		fprintf(sample_tab_fp,"%s\t%d\t%I64d\t%I64d\t%I64d\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads,x1+1);
+		fprintf(sample_tab_fp,"%s\t%d\t%I64lld\t%I64lld\t%I64lld\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads,x1+1);
 #else
 		fprintf(sample_tab_fp,"%s\t%d\t%lld\t%lld\t%lld\t%d\n", this_sample_name, umi_cutoff, all_reads, mapped_reads, assigned_reads, x1+1);
 #endif
@@ -7351,7 +7351,7 @@ void fc_write_final_results(fc_thread_global_context_t * global_context, const c
 				fprintf(fp_out,"\t%.2f", double_res);
 			}else{
 				#ifdef __MINGW32__
-				fprintf(fp_out,"\t%I64d", (srInt_64)longlong_res);
+				fprintf(fp_out,"\t%I64lld", (srInt_64)longlong_res);
 				#else
 				fprintf(fp_out,"\t%lld", (srInt_64)longlong_res);
 				#endif
@@ -7984,7 +7984,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			HashTable * junc_table = ArrayListGet(junction_global_table_list, infile_i);
 			srInt_64 count = HashTableGet(junc_table, key_list[ky_i]) - NULL;
 			#ifdef __MINGW32__
-			fprintf(ofp,"\t%I64d", count);
+			fprintf(ofp,"\t%I64lld", count);
 			#else
 			fprintf(ofp,"\t%lld", count);
 			#endif

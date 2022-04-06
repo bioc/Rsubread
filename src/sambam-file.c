@@ -734,7 +734,7 @@ int convert_BAM_binary_to_SAM( SamBam_Reference_Info * chro_table, char * bam_bi
 					memcpy(&tagval,  bam_bin + flex_ptr, type_bytes);
 					long long printv = is_signed?tagval:( (unsigned int) tagval );
 					#ifdef __MINGW32__
-					sam_ptr += sprintf(sam_txt + sam_ptr, "%I64d\t", printv);
+					sam_ptr += sprintf(sam_txt + sam_ptr, "%I64lld\t", printv);
 					#else
 					sam_ptr += sprintf(sam_txt + sam_ptr, "%lld\t", printv);
 					#endif
@@ -988,7 +988,7 @@ int PBam_chunk_gets(char * chunk, int *chunk_ptr, int chunk_limit, SamBam_Refere
 	//fprintf(stderr, "HN_TAG=%d\n", nh_val	);
 
 	#ifdef __MINGW32__
-	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%I64d\t%s\t%s%s\n%c", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, extra_tags, 0);
+	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%I64lld\t%s\t%s%s\n%c", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, extra_tags, 0);
 	#else
 	int plen = snprintf(buff, buff_len-1, "%s\t%u\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s\n%c", aln -> read_name, aln -> flags , chro_name, chro_offset, aln -> mapping_quality, cigar, mate_chro_name, mate_chro_offset, templete_length, aln -> sequence , aln -> seq_quality, extra_tags, 0);
 	#endif
