@@ -1180,7 +1180,7 @@ int cellCounts_load_annotations(cellcounts_global_t * cct_context){
 int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 	int x1;
 	for(x1=0;x1<CELLBC_BATCH_NUMBER+2; x1++){
-		char fname[MAX_FILE_NAME_LENGTH+20];
+		char fname[MAX_FILE_NAME_LENGTH+200];
 		sprintf(fname,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
 		cct_context -> batch_files[x1] = fopen(fname,"wb");
 		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
@@ -1452,7 +1452,7 @@ void cellCounts_find_hits_for_mapped_section(cellcounts_global_t * cct_context, 
 
 	//SUBREADprintf("CHROINF %s=%p ; PossibleLen = %d\n", chro_name, this_chro_info, this_chro_info?this_chro_info-> chro_possible_length:-1);
 	if(this_chro_info) {
-		int search_start, search_end, search_block_id;
+		unsigned int search_start, search_end, search_block_id;
 		assert(this_chro_info -> reverse_table_start_index);
 		start_reverse_table_index = min(start_reverse_table_index, this_chro_info-> chro_possible_length / REVERSE_TABLE_BUCKET_LENGTH);
 		end_reverse_table_index = min(end_reverse_table_index, this_chro_info-> chro_possible_length / REVERSE_TABLE_BUCKET_LENGTH+ 1);
@@ -2847,7 +2847,6 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	char read_name[MAX_READ_NAME_LEN+1];
 	char read_bin[REVERSED_READ_BIN_OFFSET * 2];
 	int read_len=0;
-	int sqr_interval=10000;
 
 	read_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
@@ -2948,7 +2947,6 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 	char read_name[MAX_READ_NAME_LEN+1];
 	char read_bin[REVERSED_READ_BIN_OFFSET * 2];
 	int read_len=0;
-	int sqr_interval=10000;
 	int subread_in_simple_mode_masks[SCRNA_SUBREADS_HARD_LIMIT];
 
 	memset(subread_in_simple_mode_masks, 0xff, sizeof(int)*SCRNA_SUBREADS_HARD_LIMIT);
@@ -3002,7 +3000,7 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 
 			int written = 0, simple_mode;
 			for(simple_mode = 1; simple_mode >=0; simple_mode --){
-				int building_rbin_offset = 0, read_text_rev_offset =0;
+				int read_text_rev_offset =0;
 				for(is_reversed = 0; is_reversed<2; is_reversed++) {
 					for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
 						int subread_offset;
@@ -3041,7 +3039,6 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 							written =1;
 						}
 					} else {
-						building_rbin_offset = REVERSED_READ_BIN_OFFSET;
 						read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
 						if(simple_mode){
 							strcpy(read_text+read_text_rev_offset, read_text);
@@ -3619,7 +3616,7 @@ void * cellCounts_merge_batches_worker(void * vp){
 		int current_blk;
 		for(current_blk =0; current_blk < current_input -> inbin_number ; current_blk ++){
 			char * inbin_blk = current_input -> inbin + current_input -> inbin_batch_start_offsets[current_blk ];
-			int inblock_size;
+			int inblock_size = -1;
 			if(current_blk == current_input -> inbin_number -1) inblock_size= current_input -> inbin_len - current_input -> inbin_batch_start_offsets[current_blk ];
 			else if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1) inblock_size= current_input  -> inbin_batch_start_offsets[current_blk +1] - current_input -> inbin_batch_start_offsets[current_blk ];
 
@@ -3962,7 +3959,7 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 		simple_bam_writer * wtr = (*fps);
 		int inbin_pos = 0, outblocki = 0;
 		int nextoffset = -1;
-		if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1)finished_job -> task -> inbin_batch_start_offsets[1];
+		if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1)nextoffset = finished_job -> task -> inbin_batch_start_offsets[1];
 		int block_number_this = finished_job -> task -> block_number - finished_job -> task -> inbin_number +1;
 		if(DO_CREATE_BAI_FOR_BAM) while(inbin_pos < finished_job -> task -> inbin_len){
 			int binlen = 0;
@@ -3978,7 +3975,7 @@ void cellCounts_save_BAM_result(cellcounts_global_t * cct_context, struct scRNA_
 
 		for(outblocki=0; outblocki < finished_job -> task -> inbin_number ; outblocki ++){
 			int block_number_this = finished_job -> task -> block_number - (finished_job -> task -> inbin_number -1 - outblocki);
-			int inblock_size;
+			int inblock_size = -1;
 			if(outblocki  == finished_job -> task -> inbin_number -1) inblock_size = finished_job -> task -> inbin_len - finished_job -> task -> inbin_batch_start_offsets[outblocki];
 			else if(CELLCOUNTS_BAMBLOCK_COMP_NUMBER>1)inblock_size = finished_job -> task -> inbin_batch_start_offsets[outblocki +1] -  finished_job -> task -> inbin_batch_start_offsets[outblocki];
 			simple_bam_write_compressed_block(wtr, finished_job -> outbin + CELLRANGER_MERGER_WORKER_BINSIZE*outblocki , finished_job -> outbin_len[outblocki ], inblock_size, finished_job -> crc32[outblocki], block_number_this);
@@ -4086,8 +4083,6 @@ void cellCounts_merged_45K_to_90K_sum_WRT(void * kyGeneID, void * valUMIs, HashT
 	
 	FILE * ofp = me -> appendix2;
 	void ** vp2 = me->appendix3;
-	ArrayList * loaded_features = vp2[0];
-	HashTable * sorted_order_p1_to_i_p1_tab = vp2[1];
 
 	unsigned char * gene_name = cct_context -> gene_name_array[ kyGeneID - NULL-1 ];
 	fprintf(ofp, "%s\t%u\n", gene_name, (unsigned int) (valUMIs-NULL));
