@@ -1458,8 +1458,8 @@ void cellCounts_find_hits_for_mapped_section(cellcounts_global_t * cct_context, 
 		end_reverse_table_index = min(end_reverse_table_index, this_chro_info-> chro_possible_length / REVERSE_TABLE_BUCKET_LENGTH+ 1);
 
 		while(start_reverse_table_index<=end_reverse_table_index) {
-			search_start = this_chro_info -> reverse_table_start_index [start_reverse_table_index];
-			if(search_start<0xffffff00)break;
+			if((*(this_chro_info -> reverse_table_start_index +start_reverse_table_index))<0xffffff00)break;
+			search_start = *(this_chro_info -> reverse_table_start_index +start_reverse_table_index);
 			start_reverse_table_index++;
 		}
 		//SUBREADprintf("REV_TAB RANGE: %d ~ %d for CHRO %s => SEARCH_START %d ; SEARCH_BLOCK_ID %d\n", start_reverse_table_index, end_reverse_table_index, chro_name, search_start, search_block_id);
@@ -4082,7 +4082,6 @@ void cellCounts_merged_45K_to_90K_sum_WRT(void * kyGeneID, void * valUMIs, HashT
 	cellcounts_global_t * cct_context = me -> appendix1;
 	
 	FILE * ofp = me -> appendix2;
-	void ** vp2 = me->appendix3;
 
 	unsigned char * gene_name = cct_context -> gene_name_array[ kyGeneID - NULL-1 ];
 	fprintf(ofp, "%s\t%u\n", gene_name, (unsigned int) (valUMIs-NULL));
@@ -4117,7 +4116,6 @@ void cellCounts_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me)
 	FILE * fp = me->appendix1;
 	cellcounts_global_t * cct_context = me->appendix2;
 	void ** tv2 = me->appendix3;
-	HashTable * sorted_order_p1_to_i_p1_tab = tv2[1];
 	unsigned char* gene_symbol = cct_context -> gene_name_array [k-NULL-1];
 	fprintf(fp, "%s\n", gene_symbol);
 }
