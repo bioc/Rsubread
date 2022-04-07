@@ -713,7 +713,7 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 					delta_d = 0;
 	
 					#ifdef __MINGW32__
-					sprintf(cigar_piece,"%I64lld%c", last_tmpv, last_operation); 
+					sprintf(cigar_piece,"%" PRId64 "%c", last_tmpv, last_operation); 
 					#else
 					sprintf(cigar_piece,"%lld%c", last_tmpv, last_operation); 
 					#endif
@@ -764,7 +764,7 @@ void compress_cigar(char *cigar, int total_length, char * read, int * pos_offset
 		if(last_operation =='M' || last_operation =='S')
 		{
 			#ifdef __MINGW32__
-			sprintf(cigar_piece,"%I64lld%c", tmpv+last_tmpv, last_operation); 
+			sprintf(cigar_piece,"%" PRId64 "%c", tmpv+last_tmpv, last_operation); 
 			#else
 			sprintf(cigar_piece,"%lld%c", tmpv+last_tmpv, last_operation); 
 			#endif
@@ -2472,7 +2472,7 @@ float final_mapping_quality(gene_value_index_t *array_index, unsigned int pos, c
 					{
 						if(begin_copy)
 							#ifdef __MINGW32__
-							sprintf(refined_cigar+strlen(refined_cigar), "%I64lld%c", x, cigar_txt[cigar_cursor]);
+							sprintf(refined_cigar+strlen(refined_cigar), "%" PRId64 "%c", x, cigar_txt[cigar_cursor]);
 							#else
 							sprintf(refined_cigar+strlen(refined_cigar), "%lld%c", x, cigar_txt[cigar_cursor]);
 							#endif
@@ -2576,7 +2576,7 @@ void bad_reverse_cigar(char * cigar)
 		{
 			char ncg2[103];
 			#ifdef __MINGW32__
-			sprintf(ncg2, "%I64lld%c", tmpv, cc);
+			sprintf(ncg2, "%" PRId64 "%c", tmpv, cc);
 			#else
 			sprintf(ncg2, "%lld%c", tmpv, cc);
 			#endif

@@ -427,7 +427,7 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 	int * srii = cache_input -> single_read_lengths;
 
 	#ifdef __MINGW32__
-	sprintf(read_name, "R%011I64u:", rno);
+	sprintf(read_name, "R%011" PRIu64 ":", rno);
 	#else
 	sprintf(read_name, "R%011llu:", rno);
 	#endif
@@ -502,7 +502,7 @@ int iBLC_current_lane_next_read(input_BLC_t * blc_input, char * readname , char 
 	int bii, idx_offset, base_offset;
 
 	#ifdef __MINGW32__
-	sprintf(readname, "R%011I64u:", blc_input -> read_number +1);
+	sprintf(readname, "R%011" PRIu64 ":", blc_input -> read_number +1);
 	#else
 	sprintf(readname, "R%011llu:", blc_input -> read_number +1);
 	#endif
@@ -1532,7 +1532,7 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		} else if(ret<0) return -1;
 
 		#ifdef __MINGW32__
-		sprintf(readname, "R%011I64d", fqs_input -> current_read_no);
+		sprintf(readname, "R%011" PRId64, fqs_input -> current_read_no);
 		#else
 		sprintf(readname, "R%011lld", fqs_input -> current_read_no);
 		#endif

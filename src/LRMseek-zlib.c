@@ -1,4 +1,5 @@
 #include <assert.h> 
+#include <inttypes.h>
 #include "LRMconfig.h"
 #include "LRMseek-zlib.h"
 
@@ -218,7 +219,7 @@ int LRMseekgz_decompress_next_chunk(seekable_zfile_t * fp){
 		//fprintf(stderr,"INFLATING: INLEN=%d , OLEN=%d, POS=%lld, RET=%d, TOOL=%s\n", inlen , have, LRMseekgz_ftello(fp), ret, zlibVersion());
 		if(ret != Z_OK && ret != Z_STREAM_END){ //any error
 			#ifdef __MINGW32__
-			SEEKZLIBprintf("FATAL: INFLATE-ERROR=%d   POS=%I64lld\n", ret, LRMseekgz_ftello(fp));
+			SEEKZLIBprintf("FATAL: INFLATE-ERROR=%d   POS=%" PRId64 "\n", ret, LRMseekgz_ftello(fp));
 			#else
 			SEEKZLIBprintf("FATAL: INFLATE-ERROR=%d   POS=%lld\n", ret, LRMseekgz_ftello(fp));
 			#endif

@@ -1553,7 +1553,7 @@ void md5txt(char *s){
 		SUBREADprintf("%02X", md5v[x]);
 	}
 	#ifdef __MINGW32__
-	SUBREADprintf("\t'%s'\t%016I64X\t%I64u\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
+	SUBREADprintf("\t'%s'\t%016" PRIX64 "\t%" PRIu64 "\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
 	#else
 	SUBREADprintf("\t'%s'\t%016llX\t%llu\t%.9f\n", s, randv, randv, randv*1./0xffffffffffffffffllu);
 	#endif
