@@ -350,7 +350,7 @@ int show_summary(global_context_t * global_context)
 	sprintf(sumname, "%s.summary", global_context->config.output_prefix);
 	FILE * sumfp = fopen(sumname,"w");
 	#ifdef __MINGW32__
-	fprintf(sumfp, "Total_%s\t%I64u\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
+	fprintf(sumfp, "Total_%s\t%" PRIu64 "\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
 	#else
 	fprintf(sumfp, "Total_%s\t%llu\n", global_context->input_reads.is_paired_end_reads?"fragments":"reads" , global_context -> all_processed_reads);
 	#endif
@@ -361,7 +361,7 @@ int show_summary(global_context_t * global_context)
 
 	if(global_context->input_reads.is_paired_end_reads){
 		#ifdef __MINGW32__
-		fprintf(sumfp, "Properly_paired_fragments\t%I64u\n",global_context -> all_correct_PE_reads);
+		fprintf(sumfp, "Properly_paired_fragments\t%" PRIu64 "\n",global_context -> all_correct_PE_reads);
 		#else
 		fprintf(sumfp, "Properly_paired_fragments\t%llu\n",global_context -> all_correct_PE_reads);
 		#endif
@@ -400,9 +400,9 @@ int show_summary(global_context_t * global_context)
 
 	#ifdef __MINGW32__
 	if(global_context->input_reads.is_paired_end_reads)
-		print_in_box(80, 0,0,"            Total fragments : %I64lld" , global_context -> all_processed_reads);
+		print_in_box(80, 0,0,"            Total fragments : %" PRId64 , global_context -> all_processed_reads);
 	else
-		print_in_box(80, 0,0,"                Total reads : %I64lld" , global_context -> all_processed_reads);
+		print_in_box(80, 0,0,"                Total reads : %" PRId64 , global_context -> all_processed_reads);
 
 	print_in_box(81, 0,0,"                     Mapped : %u (%.1f%%%%)", global_context -> all_mapped_reads,  global_context -> all_mapped_reads*100.0 / global_context -> all_processed_reads);
 	print_in_box(80, 0,0,"            Uniquely mapped : %u",  global_context -> all_uniquely_mapped_reads);
@@ -411,8 +411,8 @@ int show_summary(global_context_t * global_context)
 	print_in_box(80, 0,0,"                   Unmapped : %u",  global_context -> all_unmapped_reads);
 	if(global_context->input_reads.is_paired_end_reads){
 		print_in_box(80, 0,1,"      ");
-		print_in_box(80, 0,0,"            Properly paired : %I64lld", global_context -> all_correct_PE_reads);
-		print_in_box(80, 0,0,"        Not properly paired : %I64lld", global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"            Properly paired : %" PRId64, global_context -> all_correct_PE_reads);
+		print_in_box(80, 0,0,"        Not properly paired : %" PRId64, global_context -> all_mapped_reads -  global_context -> all_correct_PE_reads);
 		print_in_box(80, 0,0,"                  Singleton : %u", global_context -> not_properly_pairs_only_one_end_mapped);
 		print_in_box(80, 0,0,"                   Chimeric : %u", global_context -> not_properly_pairs_different_chro);
 		print_in_box(80, 0,0,"      Unexpected strandness : %u", global_context -> not_properly_different_strands);
@@ -1029,7 +1029,7 @@ int convert_BAM_to_SAM(global_context_t * global_context, char * fname, int is_b
 			int ret = sort_SAM_finalise(&writer);
 			if(writer.unpaired_reads)
 				#ifdef __MINGW32__
-				print_in_box(80,0,0,"%I64lld single-end mapped reads in reordering.", writer.unpaired_reads);
+				print_in_box(80,0,0,"%" PRId64 " single-end mapped reads in reordering.", writer.unpaired_reads);
 				#else
 				print_in_box(80,0,0,"%lld single-end mapped reads in reordering.", writer.unpaired_reads);
 				#endif
@@ -2191,13 +2191,13 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		{
 			int write_len_2 = 100, 
 			#ifdef __MINGW32__
-			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%I64lld\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
+			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%", PRId64 ,"\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
 			#else
 			write_len = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_1, flag1, out_chro1, out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1, out_offset2, out_tlen1, read_text_1 + display_offset1, qual_text_1, extra_additional_1[0]?"\t":"", extra_additional_1);
 			#endif
 			if(global_context->input_reads.is_paired_end_reads)
 			#ifdef __MINGW32__
-				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%I64lld\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
+				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%" PRId64 "\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
 			#else
 				write_len_2 = sambamout_fprintf(global_context -> output_sam_fp , "%s\t%d\t%s\t%u\t%d\t%s\t%s\t%u\t%lld\t%s\t%s%s%s\n", read_name_2, flag2, out_chro2, out_offset2, out_mapping_quality2, out_cigar2, mate_chro_for_2, out_offset1, out_tlen2, read_text_2 + display_offset2, qual_text_2, extra_additional_2[0]?"\t":"", extra_additional_2);
 			#endif
