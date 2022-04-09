@@ -79,7 +79,7 @@
           cat("NCBI RefSeq annotation for mm10 (build 38.1) is used.\n")
          },
         mm39={
-          ann <- system.file("annot","mm39_RefSeq_exon.txt",package="Rsubread")
+          ann <- system.file("annot","mm39_RefSeq_exon.txt.gz",package="Rsubread")
           annot.screen.output <- 'inbuilt (mm39)'
           cat("NCBI RefSeq annotation for mm39 (build 39) is used.\n")
          },
