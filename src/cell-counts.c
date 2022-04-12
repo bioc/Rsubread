@@ -3792,9 +3792,9 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", temp_dir, getpid(), this_batch_no);
 		FILE * fp = fopen(tmp_fname, "rb");
-		fseek(fp, 0, SEEK_END);
+		fseeko(fp, 0, SEEK_END);
 		srInt_64 batch_fsize = ftello(fp);
-		fseek(fp, 0, SEEK_SET);
+		fseeko(fp, 0, SEEK_SET);
 		if(batch_content==NULL) batch_content = malloc(batch_fsize);
 		srInt_64 batch_content_len = fread(batch_content, 1, batch_fsize, fp);
 		fclose(fp);
