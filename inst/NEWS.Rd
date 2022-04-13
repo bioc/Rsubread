@@ -6,6 +6,12 @@
 \section{Version 2.10.0}{\itemize{
 \item
 Added inbuilt RefSeq annotation for mm39 (mouse genome Build 39).
+
+\item
+Streamlined the mapping and counting processes in cellCounts.
+
+\item
+Added support for processing dual-index 10x data in cellCounts.
 }}
 
 
