@@ -24,7 +24,7 @@ A data frame with five columns including \code{GeneID}, \code{Chr}, \code{Start}
 \code{\link{featureCounts}}}
 \examples{
 x <- getInBuiltAnnotation("hg38")
-x[1:5,]
+head(x)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
