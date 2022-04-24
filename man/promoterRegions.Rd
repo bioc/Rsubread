@@ -5,7 +5,7 @@
 \usage{
 promoterRegions(
 
-    annotation = "mm10",
+    annotation = "mm39",
     upstream = 3000L,
     downstream = 2000L)
 }
@@ -31,7 +31,7 @@ A SAF format \code{data.frame} with columns \code{GeneID}, \code{Chr}, \code{Sta
 \seealso{
 \code{\link{featureCounts}}, \code{\link{getInBuiltAnnotation}}}
 \examples{
-# To get whole gene bodies for the mouse genome:
-x <- promoterRegions("mm10", upstream = 0, downstream = Inf)
+# To get whole gene bodies (from TSS to TES) for the latest mouse genome:
+x <- promoterRegions("mm39", upstream = 0, downstream = Inf)
 head(x)
 }
