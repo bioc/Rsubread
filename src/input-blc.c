@@ -747,6 +747,7 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 			stat1_line = 0;
 		}
 	}
+	fclose(fp);
 	if(state <1){
 		SUBREADprintf("ERROR: the sample sheet doesn't contain any sample.\n");
 		return NULL;
