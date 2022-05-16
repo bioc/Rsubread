@@ -1,3 +1,6 @@
+16 May 2022 - 2.11.1
+(1) Fixed a bug that caused cellCounts() not able to delete a temporary file in Windows.
+
 24 Apr 2022 - 2.9.5
 (1) promoterRegions() now defaults to mm39.
 (2) New version of mm39 annotation based on NCBI RefSeq GTF file.
