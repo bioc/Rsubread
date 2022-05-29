@@ -1,3 +1,6 @@
+30 May 2022 - 2.11.2
+(1) Amended document for cellCounts() with a small example provided.
+
 16 May 2022 - 2.11.1
 (1) Fixed a bug that caused cellCounts() not able to delete a temporary file in Windows.
 
