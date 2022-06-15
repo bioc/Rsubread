@@ -846,7 +846,7 @@
 
 library(Matrix)
 .read.sparse.mat <- function (fn){
-  cat("Loading matrix from",fn,"\n")
+  #cat("Loading matrix from",fn,"\n")
   mtx <- readMM(paste0(fn, ".spmtx"))
   coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
   rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
@@ -928,9 +928,9 @@ library(Matrix)
   
     if(any(is.na(N10000.LLH))){
       N10000 <- .get.multi.nomial(n=times, size=bcsize_one, prob=gene.profile.freq )
-      print("======== N10000 and PROF DIM =======")
-      print(dim(N10000))
-      print(length(gene.profile.freq))
+      #print("======== N10000 and PROF DIM =======")
+      #print(dim(N10000))
+      #print(length(gene.profile.freq))
       N10000.LLH <- apply(N10000, 2, function(x) dmultinom(x, prob=gene.profile.freq, log =T ))
     }else if(UMI_step_diff >= 1000){
       UMI_step_diff_N10000 <- .get.multi.nomial(n=times, size=UMI_step_diff, prob=gene.profile.freq )
@@ -1074,7 +1074,8 @@ library(Matrix)
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab, umi.cutoff){
   set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
-  cat("Loading high-conf matrix from '",fname,"'\n")
+  #cat("Loading high-conf matrix from '",fname,"'\n")
+  cat("Process the UMI table for sample",sample.no,"...\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- NA
   if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
@@ -1119,7 +1120,8 @@ library(Matrix)
   if(nchar(pfx)<16) stop("Prefix should be longer.")
   flist <- dir(".", "^[.]Rsubread", all.files=TRUE)
   to.delete <- flist[grepl(pfx, flist)]
-  cat(paste(flist,";"),"Delete temporary files :", paste(to.delete, collapse=","),"\nthat have a prefix of",pfx,"\n")
+  #cat(paste(flist,";"),"Delete temporary files :", paste(to.delete, collapse=","),"\nthat have a prefix of",pfx,"\n")
+  cat("Temporary files generated for read mapping and counting have been deleted.\n")
   for(df in to.delete){
     if(grepl(pfx, df)){
       file.remove(df)
@@ -1218,7 +1220,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
   if(input.mode=="FASTQ" || input.mode == "FASTQ-dir"){
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
-    print(sample.info.idx)
+    #print(sample.info.idx)
     if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
  
     combined.fastq.names <- ""
@@ -1295,7 +1297,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
       cmd <- paste(opt,collapse=.R_param_splitor)
       n <- length(unlist(strsplit(cmd,.R_param_splitor)))
-      print(cmd)
+      #print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
       dirno <- dirno +1
@@ -1329,7 +1331,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
       cmd <- paste(opt,collapse=.R_param_splitor)
       n <- length(unlist(strsplit(cmd,.R_param_splitor)))
-      print(cmd)
+      #print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
       raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
@@ -1345,6 +1347,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   .del.temp.files(substr(temp.file.prefix,4,99))
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
+  cat("\nThe cellCounts program has finished successfully.\n\n")
   fc
 }
 
@@ -1456,7 +1459,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     df.sample.info <- .extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff)
   } else if(input.mode == "FASTQ" || input.mode == "FASTQ-dir"){
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
-    print(sample.info.idx)
+    #print(sample.info.idx)
     if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
  
     combined.fastq.names <- ""

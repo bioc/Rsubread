@@ -376,6 +376,7 @@ static struct option cellCounts_long_options[]={
 };
 
 
+void cellCounts_print_config(cellcounts_global_t * cct_context);
 #define _gehash_hash(k) ((unsigned int)(k))
 #define _gehash_get_bucket(tab, key)  ( (tab) -> buckets + _gehash_hash( key ) % (tab) -> buckets_number )
 
@@ -426,7 +427,7 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 
 int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** argv){
 	int c , option_index=0;
-	for(c=0; c<argc; c++) SUBREADprintf("Param #%d = '%s'\n", c, argv[c]);
+	//for(c=0; c<argc; c++) SUBREADprintf("Param #%d = '%s'\n", c, argv[c]);
 
 	optind = 0;
 	opterr = 1;
@@ -526,13 +527,33 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 		if(strcmp("umiCutoff", cellCounts_long_options[option_index].name)==0){
 			cct_context -> umi_cutoff = atof(optarg);
-			SUBREADprintf("UMI_CUT=%.2f\n", cct_context -> umi_cutoff);
+//			SUBREADprintf("UMI_CUT=%.2f\n", cct_context -> umi_cutoff);
 		}
 	}
 
 	cct_context -> max_voting_simples = max(cct_context -> max_voting_simples, cct_context -> max_reported_alignments_per_read);
 	cct_context -> max_voting_locations = max(cct_context -> max_voting_locations, cct_context -> max_reported_alignments_per_read);
+
+	cellCounts_print_config(cct_context);
 	return 0;
+}
+
+void cellCounts_print_config(cellcounts_global_t * cct_context){
+	SUBREADputs(  "                _ _   ___                  _       ");
+	SUBREADputs(  "        ___ ___| | | / __\\___  _   _ _ __ | |_ ___ ");
+	SUBREADputs(  "       / __/ _ \\ | |/ /  / _ \\| | | | '_ \\| __/ __|");
+	SUBREADputs(  "      | (_|  __/ | / /__| (_) | |_| | | | | |_\\__ \\");
+	SUBREADputs(  "       \\___\\___|_|_\\____/\\___/ \\__,_|_| |_|\\__|___/");
+	SUBREADprintf("       %s\n",SUBREAD_VERSION);
+	SUBREADputs(  "");
+	print_in_box(80,1,PRINT_BOX_CENTER,"cellCounts settings");
+	print_in_box(80,0,0,"");
+	print_in_box(80,0,0,"         Index : %s", cct_context -> index_prefix);
+	print_in_box(80,0,0,"    Input mode : %s", cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ?"FASTQ files":(
+            cct_context -> input_mode == GENE_INPUT_SCRNA_BAM?"BAM files":"Raw BCL files"));
+	print_in_box(80,0,0,"");
+	print_in_box(80,2,PRINT_BOX_CENTER,"");
+	SUBREADputs(  "");
 }
 
 
@@ -1224,8 +1245,11 @@ int cellCounts_lock_release(cellCounts_lock_t * lock){
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
 
+	print_in_box(80,1,0,"");
+	print_in_box(80,0,0,"");
+	print_in_box(80,0,PRINT_BOX_CENTER,"Started running.");
+	print_in_box(80,0,0,"");
 	cellCounts_init_lock(&cct_context -> input_dataset_lock, 1 || (cct_context -> input_mode == GENE_INPUT_BCL));
-	SUBREADprintf("INIT LOCKER %d at %p\n", cct_context -> input_dataset_lock.is_spin_lock, &cct_context -> input_dataset_lock);
 
 	if(cct_context -> input_mode == GENE_INPUT_BCL)
 		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
@@ -1289,6 +1313,12 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	free(cct_context -> block_max_end);
 	free(cct_context -> gene_name_array);
 	free(cct_context -> unistr_buffer_space);
+
+	print_in_box(80,0,0,"");
+	print_in_box(80,0,PRINT_BOX_CENTER,"Read mapping finished successfully.");
+	print_in_box(80,0,0,"");
+	print_in_box(80,2,0,"");
+	SUBREADputs("");
 	return 0;
 }
 
@@ -2006,7 +2036,7 @@ int cellCounts_run_maybe_threads(cellcounts_global_t * cct_context, int task){
 		}
 		if(ret_value)break;
 	}
-	SUBREADprintf("HICONF MAPPING (SIMPLE) = %lld, LOWCONF MAPPING (ALL SUBREADS, NOT SIMPLE) = %lld\n", cct_context -> hiconf_map , cct_context -> loconf_map );
+	//SUBREADprintf("HICONF MAPPING (SIMPLE) = %lld, LOWCONF MAPPING (ALL SUBREADS, NOT SIMPLE) = %lld\n", cct_context -> hiconf_map , cct_context -> loconf_map );
 
 	free(thread_contexts);
 	return ret_value;
@@ -2901,13 +2931,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
-				if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
-				if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
-					SUBREADprintf("MAXVOTES (normal) OF %s = %d\n", read_name, vote_me -> max_vote);
-					SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
-					SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
-					print_votes(vote_me, cct_context -> index_prefix);
-				}
+				if(current_read_number % 1000000 == 0) print_in_box(80,0,0,"  Mapping and counting : % 10lld reads; time elapsed : % 4.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 
 				cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 			} else {
@@ -3244,7 +3268,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 				print_in_box(80,0,0, "Load the %d-th index block...",1+ cct_context->current_index_block_number);
 				
 				if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
-				print_in_box(80,0,0, "The index block has been loaded.");
+				print_in_box(80,0,0, "The index block has been loaded. Now map the reads...");
 				sprintf(tmp_fname, "%s.%02d.b.array", cct_context->index_prefix, cct_context->current_index_block_number);
 			}
 			
@@ -4368,7 +4392,8 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		pthread_join(threads[xk1], &pret);
 		removed_umis += (pret - NULL);
 	}
-	SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
+	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
+	print_in_box(80,0,0,"Generate UMI counts...");
 	ArrayListDestroy(file_size_list);
 
 	worker_master_mutex_t worker_mut;
