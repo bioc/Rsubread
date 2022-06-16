@@ -918,7 +918,7 @@ library(Matrix)
     }
     Old_bs_one <- bcsize_one
   }
-  if(5000 <= all.steps.len)print("WARNING: SMALL STEPS >= 5000!")
+  #if(5000 <= all.steps.len)print("WARNING: SMALL STEPS >= 5000!")
 
   Old_bs_one <- NA
   M50.in.loop.K <- 0
