@@ -1,3 +1,6 @@
+20 Jun 2022 - 2.10.3
+(1) Amended the screen output from cellCounts().
+
 30 May 2022 - 2.10.2
 (1) Amended document for cellCounts() with a small example provided.
 
