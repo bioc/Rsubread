@@ -26,6 +26,41 @@
 #define MAX_SUBREADS_PER_READ 30
 #define SCRNA_SUBREADS_HARD_LIMIT 20 
 
+
+// the configurations used in our cellCounts paper
+#define GENE_SCRNA_VOTE_SPACE 3
+#define GENE_SCRNA_VOTE_TABLE_SIZE 17 
+
+
+typedef struct{
+	gene_vote_number_t max_vote;
+	int max_vote_IJ;
+	gehash_data_t max_position;
+	gene_quality_score_t max_quality;
+	gene_vote_number_t max_indel_recorder[MAX_INDEL_TOLERANCE*3];
+	gene_vote_number_t * max_tmp_indel_recorder;
+	int max_mask;
+	gene_vote_number_t noninformative_subreads;
+
+	unsigned short items[GENE_SCRNA_VOTE_TABLE_SIZE];
+	unsigned int pos [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	int masks [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	int marked_shift_indel[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	gene_vote_number_t votes [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	gene_quality_score_t quality [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	gene_vote_number_t last_subread_cluster [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	gene_vote_number_t indel_recorder [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
+	char current_indel_cursor[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	char toli[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	int topK_votes[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	int topK_IJ[SCRNA_HIGHEST_REPORTED_ALIGNMENTS ];
+
+	short coverage_start [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	short coverage_end [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	short max_coverage_start;
+	short max_coverage_end;
+} gene_sc_vote_t;
+
 typedef struct {
 	unsigned int selected_position;
 	short result_flags;
@@ -2324,7 +2359,7 @@ srInt_64 cellCounts_test_score(cellcounts_global_t * cct_context, int thread_no,
 //   2, build CIGAR
 //   3, calculate matched/mismatched
 //   4, calculate and save scores in array
-srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no,char * read_name, char * read_bin, char * read_text, int read_len,  gene_vote_number_t all_subreads, gene_vote_t * votetab, int vote_i, int vote_j){
+srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no,char * read_name, char * read_bin, char * read_text, int read_len,  gene_vote_number_t all_subreads, gene_sc_vote_t * votetab, int vote_i, int vote_j){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	gene_vote_number_t indel_offsets [MAX_INDEL_TOLERANCE*3];
 	int read_pos_move = 0, toli, in_cigar_readlen = 0, all_mismatched_bases = 0, all_matched_bases = 0, all_mapped_bases = 0;
@@ -2452,7 +2487,7 @@ void sort_readscore_exchange(void * vp , int i , int j){
 	sorting_index [j] = idxI ;
 }
 
-int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, int thread_no, subread_read_number_t pair_number, gene_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
+int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, int thread_no, subread_read_number_t pair_number, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	int i,j,reverse_text_offset, distinct_vote_number_i;
 
@@ -2462,7 +2497,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 		int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
 		memset(top_distinct_vote_numbers, 0 , cct_context -> max_distinct_top_vote_numbers * sizeof(int));
 
-		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++){
+		for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
 			for (j=0; j< votetab->items[i]; j++){
 				int vv = votetab -> votes[i][j];
 				if(vv>=cct_context -> min_votes_per_mapped_read)cellCounts_update_top_three(cct_context, top_distinct_vote_numbers, vv);
@@ -2474,7 +2509,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 			int this_vote_N = top_distinct_vote_numbers[distinct_vote_number_i];
 			if(this_vote_N < 1 || (top_distinct_vote_numbers[0] - this_vote_N > cct_context -> max_differential_from_top_vote_number )) break;
 
-			for (i=0; i<GENE_VOTE_TABLE_SIZE; i++){
+			for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
 				if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
 				for (j=0; j< votetab->items[i]; j++){
 					if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
@@ -2556,8 +2591,8 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 #define INDEL_SEGMENT_SIZE 5
 #define VOTING_PRIME_NUMBER 66889
 
-#define _index_vote(key) (((unsigned int)(key))%GENE_VOTE_TABLE_SIZE)
-#define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_VOTE_TABLE_SIZE)
+#define _index_vote(key) (((unsigned int)(key))%GENE_SCRNA_VOTE_TABLE_SIZE)
+#define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_SCRNA_VOTE_TABLE_SIZE)
 #define cellCounts_voting_update_topK(vt, vn, ij)  { \
 	int x3, x3done=0;\
 	for(x3= 0; x3 < cct_context -> max_voting_simples +1; x3++){\
@@ -2591,7 +2626,7 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 }
 
 
-void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name){
+void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_sc_vote_t * vote, int applied_subreads_per_strand, char * read_name){
 	int subreads = applied_subreads_per_strand*2;
 	int x1, x2, trying_subread_no[subreads];
 	for(x1=0; x1<subreads; x1++) trying_subread_no[x1]=x1;
@@ -2685,7 +2720,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				}
 				if(found)break;
 			}
-			if(datalen2 < GENE_VOTE_SPACE && (!ignore_creation_voteloc) && (!found)){
+			if(datalen2 < GENE_SCRNA_VOTE_SPACE && (!ignore_creation_voteloc) && (!found)){
 				vote -> items[offsetX2] = datalen2+1;
 				dat2[datalen2] = kv;
 				vote -> masks[offsetX2][datalen2] = is_reversed;
@@ -2705,8 +2740,8 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 
 
 
-void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_vote_t * vote, int applied_subreads_per_strand, char * read_name, int simple_mode){
-	int subreads = applied_subreads_per_strand*2, space_limit = GENE_VOTE_SPACE - (simple_mode?1:0);
+void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, int thread_no, temp_votes_per_read_t * ptrs, gene_sc_vote_t * vote, int applied_subreads_per_strand, char * read_name, int simple_mode){
+	int subreads = applied_subreads_per_strand*2, space_limit = GENE_SCRNA_VOTE_SPACE - (simple_mode?1:0);
 	int x1, x2, trying_subread_no[subreads];
 	for(x1=0; x1<subreads; x1++) trying_subread_no[x1]=x1;
 	void * sort_arr[2];
@@ -2837,7 +2872,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 		}
 	}
 }
-int cellCounts_simple_mode_highconf(cellcounts_global_t * cct_context, int thread_no, int applied_subreads, gene_vote_t * vote, char * read_name){
+int cellCounts_simple_mode_highconf(cellcounts_global_t * cct_context, int thread_no, int applied_subreads, gene_sc_vote_t * vote, char * read_name){
 	int x1, vlast = vote -> max_vote;
 	for(x1 = 1; x1 < cct_context -> max_voting_simples +1; x1++){
 		int vdiff = vlast - vote->topK_votes[x1];
@@ -2882,7 +2917,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 
 	temp_votes_per_read_t prefill_ptrs;
-	gene_vote_t * vote_me = malloc(sizeof(gene_vote_t));
+	gene_sc_vote_t * vote_me = malloc(sizeof(gene_sc_vote_t));
 
 	if(vote_me==NULL) {
 		SUBREADprintf("Cannot allocate voting memory.\n");
@@ -2979,7 +3014,7 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 	qual_text = malloc(MAX_SCRNA_READ_LENGTH * 2+2);
 
 	temp_votes_per_read_t prefill_ptrs;
-	gene_vote_t * vote_me = malloc(sizeof(gene_vote_t));
+	gene_sc_vote_t * vote_me = malloc(sizeof(gene_sc_vote_t));
 
 	if(vote_me==NULL) {
 		SUBREADprintf("Cannot allocate voting memory.\n");
