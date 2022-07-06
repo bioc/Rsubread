@@ -3088,7 +3088,7 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 							SUBREADprintf("MAXVOTES (simple) OF %s = %d\n", read_name, vote_me -> max_vote);
 							SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
 							SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
-							print_votes(vote_me, cct_context -> index_prefix);
+							//print_votes(vote_me, cct_context -> index_prefix);
 						}
 
 						if((simple_mode && cellCounts_simple_mode_highconf(cct_context, thread_no, applied_subreads, vote_me, read_name)) || (simple_mode == 0)){
