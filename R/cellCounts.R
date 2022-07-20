@@ -848,11 +848,14 @@ library(Matrix)
 .read.sparse.mat <- function (fn){
   #cat("Loading matrix from",fn,"\n")
   mtx <- readMM(paste0(fn, ".spmtx"))
-  coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
-  rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
-  colnames(mtx) <- coln
-  rownames(mtx) <- rown
-
+  if(file.size(paste0(fn, ".BCtab"))>0){
+    coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
+    colnames(mtx) <- coln
+  }
+  if(file.size(paste0(fn, ".GENEtab"))>0){
+    rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
+    rownames(mtx) <- rown
+  }
   mtx
 }
 
@@ -999,7 +1002,10 @@ library(Matrix)
 
 .cellCounts.rescue <- function( BAM.name, FC.gene.ids, sample.no ){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
-  nozero.anywhere.genes <- read.delim(paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1
+  nozero.anywhere.genes <- c()
+  if(file.size(paste0(fname,".no0Genes"))>0) nozero.anywhere.genes <- read.delim(
+     paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1 else return(NA)
+
   ambient.accumulate <- read.delim(paste0(fname,".AmbSum"), stringsAsFactors=F)
   ambient.accumulate <- ambient.accumulate[ match(FC.gene.ids , ambient.accumulate$GeneID), ]
   ambient.accumulate$UMIs[is.na(ambient.accumulate$UMIs)] <- 0
@@ -1146,7 +1152,9 @@ library(Matrix)
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
     cell.umis <- colSums(smr[[sampleno]][["Counts"]])
     umis <- c(umis,sum(cell.umis))
-    umi.statistics <- rbind(umi.statistics, list(MinUMI=min(cell.umis), MedianUMI=median(cell.umis), MaxUMI=max(cell.umis), MeanUMI=mean(cell.umis)))
+    if(length(cell.umis)==0){
+       umi.statistics <- rbind(umi.statistics, list(MinUMI=NA, MedianUMI=NA, MaxUMI=NA, MeanUMI=NA))
+    }else umi.statistics <- rbind(umi.statistics, list(MinUMI=min(cell.umis), MedianUMI=median(cell.umis), MaxUMI=max(cell.umis), MeanUMI=mean(cell.umis)))
   }
   ret <- NULL
   if(is.null(umi.cutoff)){

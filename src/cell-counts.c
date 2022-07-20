@@ -4316,7 +4316,8 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 		cellP1_to_geneP1_to_umis[x1] -> appendix1 = cellbcP1_to_umis_tab;
 		HashTableIteration(cellP1_to_geneP1_to_umis[x1], cellCounts_merged_to_tables_write_build_UMIcounts);
 
-		int applied_umi_cut = cellCounts_merged_bootstrap_a_sample(cct_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, high_confid_barcode_index_list);
+		int applied_umi_cut = -1;
+		if(cellbcP1_to_umis_tab -> numOfElements >0) applied_umi_cut = cellCounts_merged_bootstrap_a_sample(cct_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, high_confid_barcode_index_list);
 		cct_context -> applied_umi_cut[x1] = applied_umi_cut;
 		cellCounts_merged_ambient_rescure(cct_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, this_sample_45k_90k_barcode_no_P0, this_sample_ambient_rescure_candi, high_confid_barcode_index_list);
 
