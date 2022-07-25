@@ -1201,6 +1201,7 @@ library(Matrix)
 cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE){
   maxDiffToTopVotes=2
   onlyDetectBarcode=FALSE
+  has.error <- FALSE
   maxMismatchBases <- maxMismatches
   minVotesPerRead <- minVotes
   subreadsPerRead <- nsubreads
@@ -1259,17 +1260,19 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     n <- length(unlist(strsplit(cmd,.R_param_splitor)))
     C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
  
-    bam.for.FC <- c()
-    raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
-    some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+    annot.file <- paste0(temp.file.prefix,".Annot")
+    if(file.exists(annot.file)){
+      bam.for.FC <- c()
+      raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
 
-    for(spi in 1:nrow(some.results[["Sample.Table"]])){
-      samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-      fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-      if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-    }
-    df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
-
+      for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      }
+      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
+    } else has.error <- T
   }else if(input.mode=="BCL"){
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
     if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
@@ -1308,16 +1311,19 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       #print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
+      annot.file <- paste0(temp.file.prefix,".Annot")
       dirno <- dirno +1
-      if(any(is.na(raw.fc.annot))) raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
-      df.sample.info <- rbind(df.sample.info, stt)
+      if(file.exists(annot.file)){
+        if(any(is.na(raw.fc.annot))) raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+        for(spi in 1:nrow(some.results[["Sample.Table"]])){
+          samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+          fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+          if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        }
+        stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
+        df.sample.info <- rbind(df.sample.info, stt)
+      } else has.error <-T
     }
   } else if(input.mode == "BAM"){
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
@@ -1342,20 +1348,23 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       #print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
-      raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
+      annot.file <- paste0(temp.file.prefix,".Annot")
+      if(file.exists(annot.file)){
+        raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+        for(spi in 1:nrow(some.results[["Sample.Table"]])){
+          samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+          fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+          if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        }
+        df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
+      }else has.error<-T
     }
   }
   .del.temp.files(substr(temp.file.prefix,4,99))
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
-  cat("\nThe cellCounts program has finished successfully.\n\n")
+  if(!has.error) cat("\nThe cellCounts program has finished successfully.\n\n")
   fc
 }
 

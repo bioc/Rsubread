@@ -330,7 +330,7 @@ int SAM_pairer_warning_file_open_limit();
 int SAM_pairer_get_tag_bin_start(char * bin);
 void *delay_realloc(void * old_pntr, size_t old_size, size_t new_size);
 int is_comment_line(const char * l, int file_type, unsigned int lineno);
-void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
+void warning_array_hash(ArrayList * t1, HashTable * t2, char * msg);
 // it returns 0 if any chromosome names in t1 and t2 matched, otherwise it returns non-zero.
 // // this function doesn't do chrX=>X conversion nor alias conversion because these conversions have been done when the annotations were loaded from GTF/SAF files.
 int warning_hash_hash_numbers(HashTable * t1, HashTable * t2, int * matched);

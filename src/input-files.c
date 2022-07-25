@@ -6741,28 +6741,25 @@ int probe_file_type_EX(char * fname, int * is_first_read_PE, srInt_64 * SAMBAM_h
 }
 
 // this function doesn't do chrX=>X conversion nor alias conversion because these conversions have been done when the annotations were loaded from GTF/SAF files.
-int warning_hash_hash_numbers(HashTable * t1, HashTable * t2, int * matched){
-	int buck_i, shown = 0, all_mismatched=1;
-	for(buck_i = 0; buck_i < t1 -> numOfBuckets; buck_i++){
-		KeyValuePair * cursor = t1 -> bucketArray[buck_i];
-		while(cursor){
-			char * t1chro = (char *) cursor -> key;
-			int found = HashTableGet(t2, t1chro) != NULL;
-			if(found){
-				(*matched)++;
-				all_mismatched = 0;
-			}
-			cursor = cursor -> next;
+int warning_array_hash_numbers(ArrayList * t1, HashTable * t2, int * matched){
+	int ti_i, all_mismatched=1;
+	for(ti_i = 0; ti_i < t1 -> numOfElements; ti_i++){
+		char * t1chro = (char *) ArrayListGet(t1, ti_i);
+		if(!t1chro) continue;
+		char * t2chro = HashTableGet(t2, t1chro);
+		int found = t2chro != NULL;
+		if(found){
+			(*matched)++;
+			all_mismatched = 0;
 		}
 	}
-	if(shown) print_in_box(80,0,0,"");
 	return all_mismatched;
 }
 
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg){
-	int buck_i, shown = 0;
-	for(buck_i = 0; buck_i < t1 -> numOfBuckets; buck_i++){
-		KeyValuePair * cursor = t1 -> bucketArray[buck_i];
+	int ti_i, shown = 0;
+	for(ti_i = 0; ti_i < t1 -> numOfBuckets; ti_i++){
+		KeyValuePair * cursor = t1 -> bucketArray[ti_i];
 		while(cursor){
 			char * t1chro = (char *) cursor -> key;
 			int found = HashTableGet(t2, t1chro) != NULL;

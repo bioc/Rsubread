@@ -1231,8 +1231,15 @@ int cellCounts_load_annotations(cellcounts_global_t * cct_context){
 
 		if(!rv){
 			int anno_index_matched=0;
-			int all_chro_unmatched = warning_hash_hash_numbers(cct_context -> chromosome_exons_table, cct_context-> chromosome_table.read_name_to_index, & anno_index_matched);
+			ArrayList * annot_chros = HashTableKeys(cct_context -> chromosome_exons_table);
+			for(x1=0; x1<annot_chros -> numOfElements; x1++){
+				char * t1chro = (char*)ArrayListGet(annot_chros,x1);
+				fc_chromosome_index_info * chro_stub = HashTableGet(cct_context -> chromosome_exons_table, t1chro);
+				if(chro_stub -> chro_features<1) ArrayListSet(annot_chros,x1,NULL);
+			}
+			int all_chro_unmatched = warning_array_hash_numbers(annot_chros, cct_context-> chromosome_table.read_name_to_index, & anno_index_matched);
 			rv=all_chro_unmatched;
+			ArrayListDestroy(annot_chros);
 
 			print_in_box(80,0,0,"");
 			print_in_box(80,0,0,"Number of chromosomes/contigs matched between reference sequences");
@@ -3313,10 +3320,12 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 
 			if(cct_context->total_index_blocks > 1 || chunk_no == 0) {	   
 				sprintf(tmp_fname, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
-				print_in_box(80,0,0, "Load the %d-th index block...",1+ cct_context->current_index_block_number);
+				print_in_box(80,0,0, "Load the %d-%s index block...",1+ cct_context->current_index_block_number, cct_context->current_index_block_number==0?"st":(cct_context->current_index_block_number==1?"nd":"th"));
+				print_in_box(80,0,0, "");
 				
 				if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
 				print_in_box(80,0,0, "The index block has been loaded. Now map the reads...");
+				print_in_box(80,0,0, "");
 				sprintf(tmp_fname, "%s.%02d.b.array", cct_context->index_prefix, cct_context->current_index_block_number);
 			}
 			
