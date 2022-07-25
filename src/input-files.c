@@ -6740,6 +6740,25 @@ int probe_file_type_EX(char * fname, int * is_first_read_PE, srInt_64 * SAMBAM_h
 	return ret;
 }
 
+// this function doesn't do chrX=>X conversion nor alias conversion because these conversions have been done when the annotations were loaded from GTF/SAF files.
+int warning_hash_hash_numbers(HashTable * t1, HashTable * t2, int * matched){
+	int buck_i, shown = 0, all_mismatched=1;
+	for(buck_i = 0; buck_i < t1 -> numOfBuckets; buck_i++){
+		KeyValuePair * cursor = t1 -> bucketArray[buck_i];
+		while(cursor){
+			char * t1chro = (char *) cursor -> key;
+			int found = HashTableGet(t2, t1chro) != NULL;
+			if(found){
+				(*matched)++;
+				all_mismatched = 0;
+			}
+			cursor = cursor -> next;
+		}
+	}
+	if(shown) print_in_box(80,0,0,"");
+	return all_mismatched;
+}
+
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg){
 	int buck_i, shown = 0;
 	for(buck_i = 0; buck_i < t1 -> numOfBuckets; buck_i++){

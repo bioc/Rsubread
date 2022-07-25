@@ -1228,7 +1228,20 @@ int cellCounts_load_annotations(cellcounts_global_t * cct_context){
 		ArrayListSetDeallocationFunction(cct_context -> all_features_array, free);
 		int loaded_features = load_features_annotation(cct_context->features_annotation_file, cct_context->features_annotation_file_type, cct_context->features_annotation_gene_id_column, NULL, cct_context-> features_annotation_feature_type, cct_context, features_load_one_line);
 		if(loaded_features<1) rv = 1;
-		if(!rv) cellCounts_sort_feature_info(cct_context, loaded_features, cct_context -> all_features_array, &cct_context -> features_sorted_chr, &cct_context -> features_sorted_geneid, &cct_context -> features_sorted_start, &cct_context -> features_sorted_stop, &cct_context -> features_sorted_strand, &cct_context -> block_end_index, &cct_context -> block_min_start, &cct_context -> block_max_end);
+
+		if(!rv){
+			int anno_index_matched=0;
+			int all_chro_unmatched = warning_hash_hash_numbers(cct_context -> chromosome_exons_table, cct_context-> chromosome_table.read_name_to_index, & anno_index_matched);
+			rv=all_chro_unmatched;
+
+			print_in_box(80,0,0,"");
+			print_in_box(80,0,0,"Number of chromosomes/contigs matched between reference sequences");
+			print_in_box(80,0,0,"  and gene annotation is %d.", anno_index_matched);
+			print_in_box(80,0,0,"");
+			if(all_chro_unmatched) SUBREADprintf("ERROR: no matched chromosomes/contigs found between reference sequences and gene annotation.\n");
+
+			if(!rv) cellCounts_sort_feature_info(cct_context, loaded_features, cct_context -> all_features_array, &cct_context -> features_sorted_chr, &cct_context -> features_sorted_geneid, &cct_context -> features_sorted_start, &cct_context -> features_sorted_stop, &cct_context -> features_sorted_strand, &cct_context -> block_end_index, &cct_context -> block_min_start, &cct_context -> block_max_end);
+		}
 	}
 	return rv;
 }
