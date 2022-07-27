@@ -189,6 +189,7 @@ typedef struct{
 	float umi_cutoff;
 	int applied_umi_cut[MAX_SCRNA_SAMPLE_NUMBER];
 	int do_one_batch_runner_current;
+	int has_error;
 	
 	char features_annotation_file[MAX_FILE_NAME_LENGTH];
 	char features_annotation_alias_file[MAX_FILE_NAME_LENGTH];
@@ -259,7 +260,7 @@ void cellCounts_cell_barcode_tabel_destroy(void *a){
 	ArrayListDestroy((ArrayList*)a);
 }
 
-void cellCounts_make_barcode_HT_table(cellcounts_global_t * cct_context){
+int cellCounts_make_barcode_HT_table(cellcounts_global_t * cct_context){
 	int xx1,xx2;
 	cct_context -> cell_barcode_head_tail_table = StringTableCreate(600000);
 	HashTableSetDeallocationFunctions(cct_context -> cell_barcode_head_tail_table, free, cellCounts_cell_barcode_tabel_destroy);
@@ -268,8 +269,10 @@ void cellCounts_make_barcode_HT_table(cellcounts_global_t * cct_context){
 		char * bc = ArrayListGet(cct_context-> cell_barcodes_array, xx1);
 		int bcl =strlen(bc);
 		if(cct_context -> known_cell_barcode_length==0) cct_context -> known_cell_barcode_length=bcl;
-		if(bcl!=cct_context -> known_cell_barcode_length)
+		if(bcl!=cct_context -> known_cell_barcode_length){
 			SUBREADprintf("ERROR: the cell barcode list must contain equal-length strings!\n");
+			return 1;
+		}
 
 		char bctmp[20];
 		HashTablePut(cct_context -> cell_barcode_head_tail_table, strdup(bc), NULL+xx1+IMPOSSIBLE_MEMORY_SPACE);
@@ -288,6 +291,7 @@ void cellCounts_make_barcode_HT_table(cellcounts_global_t * cct_context){
 			ArrayListPush(array_of_codes, NULL+xx1);
 		}
 	}
+	return 0;
 }
 
 
@@ -738,34 +742,39 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 	int rv = 0;
 
 	cct_context-> cell_barcodes_array = input_BLC_parse_CellBarcodes( cct_context-> cell_barcode_list_file );
-	if(NULL == cct_context-> cell_barcodes_array) rv = 1;
+	if(NULL == cct_context-> cell_barcodes_array){
+		SUBREADprintf("ERROR: cannot find valid cell barcodes from the cell barcode list. Please check the content and the accessibility of the file.\n");
+		rv = 1;
+	}
 	if(!rv){
-		cellCounts_make_barcode_HT_table( cct_context );
-		cct_context-> sample_sheet_table = input_BLC_parse_SampleSheet( cct_context -> bcl_sample_sheet_file);
-		if(NULL == cct_context-> sample_sheet_table) rv = 1;
-		if(rv==0 && cct_context-> sample_sheet_table -> numOfElements > MAX_SCRNA_SAMPLE_NUMBER){
-			SUBREADprintf("ERROR: too many samples in the sample sheet.\n");
-			rv = 1;
-		}
+		rv = cellCounts_make_barcode_HT_table( cct_context );
 		if(!rv){
-			cct_context -> sample_id_to_name = ArrayListCreate(64);
-			cct_context -> lineno1B_to_sampleno1B_tab = HashTableCreate(40);
-
-			cct_context -> sample_sheet_table -> appendix1 = cct_context;
-			cct_context -> sample_barcode_list = ArrayListCreate(64);
-
-			ArrayListSetDeallocationFunction(cct_context -> sample_barcode_list, free);
-			HashTableIteration(cct_context-> sample_sheet_table, sheet_convert_ss_to_arr);
-
-			if(cct_context -> is_BAM_and_FQ_out_generated){
-				cct_context -> sample_BAM_writers = HashTableCreate(cct_context -> sample_sheet_table -> numOfElements);
-				HashTableSetDeallocationFunctions(cct_context -> sample_BAM_writers, NULL, cellCounts_close_sample_SamBam_writers);
-				cct_context -> sample_sheet_table ->appendix1 = cct_context -> sample_BAM_writers;
-				cct_context -> sample_sheet_table ->appendix2 = cct_context;
-				cct_context -> sample_sheet_table ->appendix3 = cct_context -> sample_id_to_name;
-				HashTableIteration( cct_context -> sample_sheet_table, cellCounts_sample_SamBam_writers_new_files);
+			cct_context-> sample_sheet_table = input_BLC_parse_SampleSheet( cct_context -> bcl_sample_sheet_file);
+			if(NULL == cct_context-> sample_sheet_table) rv = 1;
+			if(rv==0 && cct_context-> sample_sheet_table -> numOfElements > MAX_SCRNA_SAMPLE_NUMBER){
+				SUBREADprintf("ERROR: too many samples in the sample sheet.\n");
+				rv = 1;
 			}
+			if(!rv){
+				cct_context -> sample_id_to_name = ArrayListCreate(64);
+				cct_context -> lineno1B_to_sampleno1B_tab = HashTableCreate(40);
 
+				cct_context -> sample_sheet_table -> appendix1 = cct_context;
+				cct_context -> sample_barcode_list = ArrayListCreate(64);
+
+				ArrayListSetDeallocationFunction(cct_context -> sample_barcode_list, free);
+				HashTableIteration(cct_context-> sample_sheet_table, sheet_convert_ss_to_arr);
+
+				if(cct_context -> is_BAM_and_FQ_out_generated){
+					cct_context -> sample_BAM_writers = HashTableCreate(cct_context -> sample_sheet_table -> numOfElements);
+					HashTableSetDeallocationFunctions(cct_context -> sample_BAM_writers, NULL, cellCounts_close_sample_SamBam_writers);
+					cct_context -> sample_sheet_table ->appendix1 = cct_context -> sample_BAM_writers;
+					cct_context -> sample_sheet_table ->appendix2 = cct_context;
+					cct_context -> sample_sheet_table ->appendix3 = cct_context -> sample_id_to_name;
+					HashTableIteration( cct_context -> sample_sheet_table, cellCounts_sample_SamBam_writers_new_files);
+				}
+
+			}
 		}
 	}
 	return rv;
@@ -1622,9 +1631,14 @@ int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin
 		}
 	}
 	if(cct_context -> UMI_length <1){ // no locking is needed because it can be safely done many times.
-	    int umi_end_pos=0,nch;
-	    for(umi_end_pos=0; 0!=(nch = (*UMI_seq) [umi_end_pos]); umi_end_pos++) if(!isalpha(nch))break;
-	    cct_context -> UMI_length = umi_end_pos;
+		int umi_end_pos=0,nch;
+		for(umi_end_pos=0; 0!=(nch = (*UMI_seq) [umi_end_pos]); umi_end_pos++) if(!isalpha(nch))break;
+		if(umi_end_pos > MAX_UMI_LEN){
+			SUBREADprintf("ERROR: the UMI length is abnormaly long (%d bases). This can be caused by an incorrect cell barcode file.\n", umi_end_pos);
+		  	umi_end_pos = MAX_UMI_LEN;
+			cct_context -> has_error = 1;
+		}
+		cct_context -> UMI_length = umi_end_pos;
 	}
 
 	return field_i;
@@ -1926,6 +1940,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	char readbin[READ_BIN_BUF_SIZE];
 	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist);
 
+	//if(batch_no < CELLBC_BATCH_NUMBER) SUBREADprintf("WRITE_FP_BTCH %d \n", batch_no);
 	if(sample_no>0){
 		cellCounts_lock_occupy(cct_context -> batch_file_locks + batch_no);
 		FILE * binfp = cct_context -> batch_files [ batch_no ];
@@ -2946,7 +2961,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 	int index_gap_width = cct_context -> current_index -> index_gap;
 
-	while(1) {
+	while(!cct_context -> has_error) {
 		int subread_no;
 		int is_reversed, applied_subreads = 0;
 
@@ -3003,7 +3018,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	free(read_text);
 	free(qual_text);
 
-	return 0;
+	return cct_context -> has_error;
 }
 
 
@@ -3907,7 +3922,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			if(gene_no & (1LLU<<63)){
 				int genes = (int)(gene_no & 0x7fffffffllu);
 				if(genes > me_max_genes)me_max_genes=genes;
-
+//fprintf(stderr, "BTH %d  USTR '%s'  GENES %d  PTR %d   UMILEN %d  TLEN %lld\n", this_batch_no, UMI_str, genes, scanptr, cct_context -> UMI_length, batch_content_len);
 				memcpy(UMI_str, batch_content+scanptr+8*genes, cct_context -> UMI_length);
 				UMI_str[cct_context -> UMI_length]=0;
 
@@ -3966,6 +3981,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table, &removed_UMIs);
 
 			cellbcP0_to_geneno0B_P1_to_UMIs -> appendix1 = fp;
+//			fprintf(stderr,"BATCH %d SAMPLE %d RBINS %d ULEN %d LEN %lld\n", this_batch_no, x1, rbin_no, cct_context -> UMI_length, batch_content_len);
 			fwrite(&cellbcP0_to_geneno0B_P1_to_UMIs -> numOfElements,1,8,fp);
 			HashTableIteration(cellbcP0_to_geneno0B_P1_to_UMIs, cellCounts_do_one_batch_write_UMIs);
 			HashTableDestroy(cellbcP0_to_geneno0B_P1_to_UMIs);
