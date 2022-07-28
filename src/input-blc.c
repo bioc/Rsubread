@@ -1041,7 +1041,6 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 		if(ret<=0)break;
 
 		char *cell_barcode = NULL;
-		//SUBREADprintf("RETV=%d, RN=%s\n" ,ret, rname);
 		int xx=0;
 		char *testi;
 		for(testi = rname+1; * testi; testi ++){
@@ -1055,7 +1054,8 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 		}
 
 		int cell_no = iCache_get_cell_no(cell_barcode_table, cell_barcode_list, cell_barcode, known_cell_barcode_length);
-		if(cell_no>0) (*valid_cell_barcode)++;
+		//fprintf(stderr,"RETV=%d, RN=%s, CNO=%d, KCBL=%d\n" ,ret, rname, cell_no, known_cell_barcode_length);
+		if(cell_no>=0) (*valid_cell_barcode)++;
 
 		(*tested_reads)++;
 		if((*tested_reads) >= testing_reads)break;
