@@ -1364,10 +1364,10 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	ArrayListDestroy(cct_context->all_features_array);
 	HashTableDestroy(cct_context->gene_name_table);
 	HashTableDestroy(cct_context->cell_barcode_head_tail_table);
-	HashTableDestroy(cct_context -> chromosome_exons_table);
-	gvindex_destory(cct_context -> value_index);
+	HashTableDestroy(cct_context->chromosome_exons_table);
+	gvindex_destory(cct_context->value_index);
 	free(cct_context -> value_index);
-	free(cct_context->exonic_region_bitmap);
+	free(cct_context -> exonic_region_bitmap);
 	free(cct_context -> features_sorted_chr);
 	free(cct_context -> features_sorted_geneid);
 	free(cct_context -> features_sorted_start);
@@ -1378,7 +1378,6 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	free(cct_context -> block_max_end);
 	free(cct_context -> gene_name_array);
 	free(cct_context -> unistr_buffer_space);
-	if(cct_context -> has_error) delete_file_thread(NULL);
 
 	print_in_box(80,0,0,"");
 	print_in_box(80,0,PRINT_BOX_CENTER,"Read mapping finished successfully.");
@@ -4407,16 +4406,14 @@ void * delete_file_thread(void * arg){
 	void ** ptrs =arg;
 	srInt_64 *current_sorting_key = NULL;
 	cellcounts_global_t * cct_context = NULL;
-	if(ptrs){
-		current_sorting_key = ptrs[0];
-		cct_context = ptrs[1];
-	}
+	current_sorting_key = ptrs[0];
+	cct_context = ptrs[1];
 	
 	while(1){
 		int all_closed = 1;
 		int x1;
 		for(x1=0; x1<CELLBC_BATCH_NUMBER +2; x1++){
-			if(NULL== cct_context || current_sorting_key[x1] == 0x7fffffffffffffffLLU){
+			if(NULL== current_sorting_key || current_sorting_key[x1] == 0x7fffffffffffffffLLU){
 				char tmp_fname[MAX_FILE_NAME_LENGTH+50];
 				sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), x1);
 				if(bin_file_exists(tmp_fname)) unlink(tmp_fname);
@@ -4425,7 +4422,7 @@ void * delete_file_thread(void * arg){
 		if(all_closed ) break;
 		sleep(2);
 	}
-	if(cct_context)free(current_sorting_key);
+	if(current_sorting_key)free(current_sorting_key);
 	return NULL;
 }
 
@@ -4725,6 +4722,13 @@ int cellCounts_run_counting(cellcounts_global_t * cct_context){
 	return ret;
 }
 
+void cellCounts_finalise_error_run(cellcounts_global_t * cct_context){
+	void * argsv[2];
+	argsv[0]=NULL;
+	argsv[1]=cct_context;
+	delete_file_thread(argsv);
+}
+
 #ifdef MAKE_STANDALONE
 	#define cellCounts_main main
 #endif
@@ -4738,6 +4742,7 @@ int cellCounts_main(int argc, char** argv){
 	ret = ret || cellCounts_run_mapping(cct_context);
 	ret = ret || cellCounts_run_counting(cct_context);
 	ret = ret || cellCounts_destroy_context(cct_context);
+	if(cct_context -> has_error) cellCounts_finalise_error_run(cct_context);
 
 	free(cct_context);
 	if(ret) SUBREADprintf("cellCounts terminates with errors.\n");

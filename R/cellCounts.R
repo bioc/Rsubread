@@ -1126,8 +1126,6 @@ library(Matrix)
   if(nchar(pfx)<16) stop("Prefix should be longer.")
   flist <- dir(".", "^[.]Rsubread", all.files=TRUE)
   to.delete <- flist[grepl(pfx, flist)]
-  #cat(paste(flist,";"),"Delete temporary files :", paste(to.delete, collapse=","),"\nthat have a prefix of",pfx,"\n")
-  cat("Temporary files generated for read mapping and counting have been deleted.\n")
   for(df in to.delete){
     if(grepl(pfx, df)){
       file.remove(df)
@@ -1385,7 +1383,12 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   .del.temp.files(substr(temp.file.prefix,4,99))
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
-  if(!has.error) cat("\nThe cellCounts program has finished successfully.\n\n")
-  fc
+  if(has.error) { 
+    cat("No results were generated.\n\n")
+    return(NULL)
+  } else {
+    cat("\nThe cellCounts program has finished successfully.\n\n")
+    return(fc)
+  }
 }
 
