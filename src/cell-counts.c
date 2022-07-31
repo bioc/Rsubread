@@ -2166,6 +2166,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 		return 0;
 	} else {
 		*read_no_in_chunk = -1;
+		if(rl1 == -2) cct_context -> has_error=1;
 		return 1;
 	}
 }
@@ -3319,6 +3320,8 @@ int cellCounts_write_gene_list(cellcounts_global_t * cct_context){
 }
 
 
+void * delete_file_thread(void * arg);
+
 int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 	int chunk_no = 0;
 
@@ -3386,6 +3389,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 		chunk_no++;
 	}
 
+	if(cct_context -> has_error) delete_file_thread(NULL);
 	free(cct_context -> current_index);
 	return 0;
 }
@@ -4401,14 +4405,18 @@ int bin_file_exists(char *filename) {
 
 void * delete_file_thread(void * arg){
 	void ** ptrs =arg;
-	srInt_64 *current_sorting_key = ptrs[0];
-	cellcounts_global_t * cct_context = ptrs[1];
+	srInt_64 *current_sorting_key = NULL;
+	cellcounts_global_t * cct_context = NULL;
+	if(ptrs){
+		current_sorting_key = ptrs[0];
+		cct_context = ptrs[1];
+	}
 	
 	while(1){
 		int all_closed = 1;
 		int x1;
 		for(x1=0; x1<CELLBC_BATCH_NUMBER +2; x1++){
-			if(current_sorting_key[x1] == 0x7fffffffffffffffLLU){
+			if(NULL== cct_context || current_sorting_key[x1] == 0x7fffffffffffffffLLU){
 				char tmp_fname[MAX_FILE_NAME_LENGTH+50];
 				sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), x1);
 				if(bin_file_exists(tmp_fname)) unlink(tmp_fname);
@@ -4417,7 +4425,7 @@ void * delete_file_thread(void * arg){
 		if(all_closed ) break;
 		sleep(2);
 	}
-	free(current_sorting_key);
+	if(cct_context)free(current_sorting_key);
 	return NULL;
 }
 

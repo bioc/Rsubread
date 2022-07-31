@@ -4263,9 +4263,9 @@ int load_global_context(global_context_t * context)
 	context -> sam_chro_to_anno_chr_alias = NULL;
 	if(context->config.exon_annotation_file[0]){ 
 		print_in_box(80,0,0,"Load the annotation file.");
-		if( load_annotated_exon_regions( context ) ) return -1;
 		if(context->config.exon_annotation_alias_file[0])
 			 context -> sam_chro_to_anno_chr_alias = load_alias_table(context->config.exon_annotation_alias_file);
+		if( load_annotated_exon_regions( context ) ) return -1;
 		warning_anno_vs_index(context -> annotation_chro_table, &context -> chromosome_table, context -> sam_chro_to_anno_chr_alias);
 		HashTableDestroy(context -> annotation_chro_table);
 	} else context -> exonic_region_bitmap = NULL;
