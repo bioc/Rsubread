@@ -603,6 +603,7 @@ void autozip_close(autozip_fp * fp){
 	if(fp -> is_plain) fclose(fp -> plain_fp);
 	else if(fp->zlib_fp) gzclose(fp -> zlib_fp);
 	else seekgz_close(&fp -> gz_fp);
+	fp -> plain_fp = NULL;
 } 
 
 int autozip_gets(autozip_fp * fp, char * buf, int buf_size){
@@ -617,9 +618,11 @@ int autozip_gets(autozip_fp * fp, char * buf, int buf_size){
 		}
 		buf[2]=0;
 
-		char * retc = fgets(buf + base0, buf_size, fp -> plain_fp);
-		if(retc == NULL && base0 == 0) ret = 0;
-		else ret = strlen(buf);
+		if(fp -> plain_fp) {
+			char * retc = fgets(buf + base0, buf_size, fp -> plain_fp);
+			if(retc == NULL && base0 == 0) ret = 0;
+			else ret = strlen(buf);
+		}
 	}else{
 		if(fp -> zlib_fp){
 			char *rets = gzgets(fp -> zlib_fp, buf, buf_size);

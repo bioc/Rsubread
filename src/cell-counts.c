@@ -2167,6 +2167,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 		return 0;
 	} else {
 		*read_no_in_chunk = -1;
+		*read_len = -1;
 		if(rl1 == -2) cct_context -> has_error=1;
 		return 1;
 	}
@@ -2968,7 +2969,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 		int is_reversed, applied_subreads = 0;
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
-		//fprintf(stderr,"FETCH_BAM %llu '%s' '%s' '%s'\n", current_read_number, read_name, read_text, qual_text);
+		//fprintf(stderr,"FETCH_1READ %lld LEN=%d '%s' '%s' '%s'\n", current_read_number, read_len, read_name, read_text, qual_text);
 		if(current_read_number < 0) break;
 		if(read_len< 16) continue;
 
