@@ -1530,7 +1530,7 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 			ret = input_mFQ_next_file(fqs_input);
 			if(ret >=0) continue;
 			int R2ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
-			if(R2ret >=0){
+			if(R2ret >0){
 				SUBREADprintf("ERROR: the cell barcode and UMI reads exhausted before the genomic reads exhausted. The two FASTQ files seem to have different numbers of reads\n");
 				return -2;
 			}else return -1;
