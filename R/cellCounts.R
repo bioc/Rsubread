@@ -1303,6 +1303,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
     dirno <- 1
     for(dirname in dirs){
+      if(has.error) break
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
       if(is.null(cell.barcode)){
@@ -1354,6 +1355,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
     for(this.sample in unique.samples){
+      if(has.error) break
       .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=as.character(this.sample),stringsAsFactors=F), cc.sample.sheet.path)
       BAM.names <- paste(sample.info.idx$BAMFile[ as.character(sample.info.idx$SampleName) == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
       generate.scRNA.BAM <- TRUE
