@@ -1336,6 +1336,7 @@ int cellCounts_load_context(cellcounts_global_t * cct_context){
 	return rv;
 }
 
+void * delete_file_thread(void * arg);
 int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	int x1;
 	pthread_join(cct_context ->thread_delete_files,NULL);
@@ -1377,6 +1378,7 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	free(cct_context -> block_max_end);
 	free(cct_context -> gene_name_array);
 	free(cct_context -> unistr_buffer_space);
+	if(cct_context -> has_error) delete_file_thread(NULL);
 
 	print_in_box(80,0,0,"");
 	print_in_box(80,0,PRINT_BOX_CENTER,"Read mapping finished successfully.");
@@ -3320,7 +3322,6 @@ int cellCounts_write_gene_list(cellcounts_global_t * cct_context){
 }
 
 
-void * delete_file_thread(void * arg);
 
 int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 	int chunk_no = 0;
@@ -3389,7 +3390,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 		chunk_no++;
 	}
 
-	if(cct_context -> has_error) delete_file_thread(NULL);
 	free(cct_context -> current_index);
 	return 0;
 }
