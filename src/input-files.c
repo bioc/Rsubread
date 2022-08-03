@@ -779,7 +779,7 @@ int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * r
 		return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
 		int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
-		if(rv<=0) return -1;
+		if(rv<=0) return rv;
 		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_BAM) {
@@ -802,7 +802,7 @@ int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_s
                 return rv;
         } else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
                 int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
-                if(rv<=0) return -1;
+                if(rv<=0) return rv;
                 if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
                 return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_BAM) {
@@ -6740,10 +6740,26 @@ int probe_file_type_EX(char * fname, int * is_first_read_PE, srInt_64 * SAMBAM_h
 	return ret;
 }
 
+// this function doesn't do chrX=>X conversion nor alias conversion because these conversions have been done when the annotations were loaded from GTF/SAF files.
+int warning_array_hash_numbers(ArrayList * t1, HashTable * t2, int * matched){
+	int ti_i, all_mismatched=1;
+	for(ti_i = 0; ti_i < t1 -> numOfElements; ti_i++){
+		char * t1chro = (char *) ArrayListGet(t1, ti_i);
+		if(!t1chro) continue;
+		char * t2chro = HashTableGet(t2, t1chro);
+		int found = t2chro != NULL;
+		if(found){
+			(*matched)++;
+			all_mismatched = 0;
+		}
+	}
+	return all_mismatched;
+}
+
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg){
-	int buck_i, shown = 0;
-	for(buck_i = 0; buck_i < t1 -> numOfBuckets; buck_i++){
-		KeyValuePair * cursor = t1 -> bucketArray[buck_i];
+	int ti_i, shown = 0;
+	for(ti_i = 0; ti_i < t1 -> numOfBuckets; ti_i++){
+		KeyValuePair * cursor = t1 -> bucketArray[ti_i];
 		while(cursor){
 			char * t1chro = (char *) cursor -> key;
 			int found = HashTableGet(t2, t1chro) != NULL;

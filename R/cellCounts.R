@@ -671,9 +671,9 @@
 
 
 
-  if(is.na(spseqs ) && !is.na(dualseqs )){
+  if(is.na(spseqs) && !is.na(dualseqs )){
     return(c(paste0(dualseqs[1], dualseqs[2]),paste0(dualseqs[1], dualseqs[3])) )
-  }else return(spseqs)
+  }else if(!any(is.na(spseqs))) return(spseqs) else stop(paste("Unknown sample index name:", spid))
 }
 
 .rstest <- function(r, coef) r * (1 + 1/r)^(1 + coef)
@@ -848,11 +848,14 @@ library(Matrix)
 .read.sparse.mat <- function (fn){
   #cat("Loading matrix from",fn,"\n")
   mtx <- readMM(paste0(fn, ".spmtx"))
-  coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
-  rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
-  colnames(mtx) <- coln
-  rownames(mtx) <- rown
-
+  if(file.size(paste0(fn, ".BCtab"))>0){
+    coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
+    colnames(mtx) <- coln
+  }
+  if(file.size(paste0(fn, ".GENEtab"))>0){
+    rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
+    rownames(mtx) <- rown
+  }
   mtx
 }
 
@@ -999,7 +1002,10 @@ library(Matrix)
 
 .cellCounts.rescue <- function( BAM.name, FC.gene.ids, sample.no ){
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
-  nozero.anywhere.genes <- read.delim(paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1
+  nozero.anywhere.genes <- c()
+  if(file.size(paste0(fname,".no0Genes"))>0) nozero.anywhere.genes <- read.delim(
+     paste0(fname,".no0Genes"), stringsAsFactors=F, header=F)$V1 else return(NA)
+
   ambient.accumulate <- read.delim(paste0(fname,".AmbSum"), stringsAsFactors=F)
   ambient.accumulate <- ambient.accumulate[ match(FC.gene.ids , ambient.accumulate$GeneID), ]
   ambient.accumulate$UMIs[is.na(ambient.accumulate$UMIs)] <- 0
@@ -1120,8 +1126,6 @@ library(Matrix)
   if(nchar(pfx)<16) stop("Prefix should be longer.")
   flist <- dir(".", "^[.]Rsubread", all.files=TRUE)
   to.delete <- flist[grepl(pfx, flist)]
-  #cat(paste(flist,";"),"Delete temporary files :", paste(to.delete, collapse=","),"\nthat have a prefix of",pfx,"\n")
-  cat("Temporary files generated for read mapping and counting have been deleted.\n")
   for(df in to.delete){
     if(grepl(pfx, df)){
       file.remove(df)
@@ -1146,7 +1150,9 @@ library(Matrix)
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
     cell.umis <- colSums(smr[[sampleno]][["Counts"]])
     umis <- c(umis,sum(cell.umis))
-    umi.statistics <- rbind(umi.statistics, list(MinUMI=min(cell.umis), MedianUMI=median(cell.umis), MaxUMI=max(cell.umis), MeanUMI=mean(cell.umis)))
+    if(length(cell.umis)==0){
+       umi.statistics <- rbind(umi.statistics, list(MinUMI=NA, MedianUMI=NA, MaxUMI=NA, MeanUMI=NA))
+    }else umi.statistics <- rbind(umi.statistics, list(MinUMI=min(cell.umis), MedianUMI=median(cell.umis), MaxUMI=max(cell.umis), MeanUMI=mean(cell.umis)))
   }
   ret <- NULL
   if(is.null(umi.cutoff)){
@@ -1184,15 +1190,37 @@ library(Matrix)
 
     sample.sheet <- rbind(sample.sheet, data.frame( SampleName=as.character(sample.name), BarcodeUMIFile=df1, ReadFile=df2, stringsAsFactors=F))
   }
+  if(nrow(sample.sheet) < 1) stop(paste0("ERROR: no valid FASTQ files were found in directory '",dirname,"'."))
   sample.sheet
 }
 
 .SCRNA_FASTA_SPLIT1 <- "|Rsd:cCounts:mFQs|"
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
+.validate.sample.sheet <- function(sheet, input.mode){
+  if(is.na(sheet) || is.null(sheet)) stop("A sample sheet must be provided.")
+  if(input.mode == "BCL"){
+    if(nrow(sheet)<1) stop("The sample sheet cannot be empty.")
+    if(!("Lane" %in% colnames(sheet) && "IndexSetName" %in% colnames(sheet) && "SampleName" %in% colnames(sheet) && "InputDirectory" %in% colnames(sheet)))
+      stop("The sample sheet must contain four columns with column headers named InputDirectory, Lane, SampleName and IndexSetName.")
+    files.to.test <- sheet[, "InputDirectory"]
+    for(f in files.to.test)
+      if(!dir.exists(f))stop(paste0("ERROR: input directory '",f,"' does not exist."))
+  }else if(input.mode == "FASTQ"){
+    if(nrow(sheet)<1) stop("The sample sheet cannot be empty")
+    if(!("BarcodeUMIFile"  %in% colnames(sheet) && "ReadFile"  %in% colnames(sheet) && "SampleName"  %in% colnames(sheet) ))
+      stop("The sample sheet must contain three columns with column headers named BarcodeUMIFile, ReadFile and SampleName.")
+    files.to.test <-  c(sheet[,"BarcodeUMIFile"], sheet[,"ReadFile"])
+    for(f in files.to.test)
+      if(!file.exists(f))stop(paste0("ERROR: fastq file '",f,"' does not exist."))
+  } # The "FASTQ-dir" mode should always be correct unless no FASTQ files are found. The error message is given in the dir-scan function.
+  return(sheet)
+}
+
 cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE){
   maxDiffToTopVotes=2
   onlyDetectBarcode=FALSE
+  has.error <- FALSE
   maxMismatchBases <- maxMismatches
   minVotesPerRead <- minVotes
   subreadsPerRead <- nsubreads
@@ -1205,7 +1233,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(umi.cutoff < 0.0) stop("UMI cutoff must be a positive number.")
   }
 
-  sample.info.idx <- sample
+  sample.info.idx <- .validate.sample.sheet(sample, input.mode)
   fc <- list()
 
   temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
@@ -1251,17 +1279,19 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     n <- length(unlist(strsplit(cmd,.R_param_splitor)))
     C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
  
-    bam.for.FC <- c()
-    raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
-    some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+    annot.file <- paste0(temp.file.prefix,".Annot")
+    if(file.exists(annot.file)){
+      bam.for.FC <- c()
+      raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
 
-    for(spi in 1:nrow(some.results[["Sample.Table"]])){
-      samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-      fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-      if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-    }
-    df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
-
+      for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+      }
+      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
+    } else has.error <- T
   }else if(input.mode=="BCL"){
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
     if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
@@ -1273,6 +1303,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
     dirno <- 1
     for(dirname in dirs){
+      if(has.error) break
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
       if(is.null(cell.barcode)){
@@ -1300,16 +1331,19 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       #print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
+      annot.file <- paste0(temp.file.prefix,".Annot")
       dirno <- dirno +1
-      if(any(is.na(raw.fc.annot))) raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
-      df.sample.info <- rbind(df.sample.info, stt)
+      if(file.exists(annot.file)){
+        if(any(is.na(raw.fc.annot))) raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+        for(spi in 1:nrow(some.results[["Sample.Table"]])){
+          samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+          fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+          if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
+        }
+        stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
+        df.sample.info <- rbind(df.sample.info, stt)
+      } else has.error <-T
     }
   } else if(input.mode == "BAM"){
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
@@ -1321,6 +1355,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
     for(this.sample in unique.samples){
+      if(has.error) break
       .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=as.character(this.sample),stringsAsFactors=F), cc.sample.sheet.path)
       BAM.names <- paste(sample.info.idx$BAMFile[ as.character(sample.info.idx$SampleName) == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
       generate.scRNA.BAM <- TRUE
@@ -1334,212 +1369,28 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       #print(cmd)
       C_args <- .C("R_cellCounts",as.integer(n),as.character(cmd),PACKAGE="Rsubread")
 
-      raw.fc.annot<-read.delim(paste0(temp.file.prefix,".Annot"), header=T, stringsAsFactors=F)
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
-    }
-  }
-  .del.temp.files(substr(temp.file.prefix,4,99))
-  fc[["annotation"]] <- raw.fc.annot
-  fc[["sample.info"]] <- df.sample.info
-  cat("\nThe cellCounts program has finished successfully.\n\n")
-  fc
-}
-
-.old_cellCounts <- function(index, sample,input.mode="BCL", cell.barcode=NULL, aligner="align", annot.inbuilt="mm39",annot.ext=NULL,isGTFAnnotationFile=FALSE,GTF.featureType="exon",GTF.attrType="gene_id",useMetaFeatures=TRUE, umi.cutoff=NULL, nthreads=10, nBestLocations =1, unique.mapping=FALSE, ...){
-  .remove.temp.files <- T
-  if(!is.null(aligner)) aligner <- match.arg(aligner,c("subjunc","align")) 
-  if(!is.null(umi.cutoff)){
-    umi.cutoff <- as.numeric(umi.cutoff)
-    if(umi.cutoff < 0.0) stop("UMI cutoff must be a positive number.")
-  }
-  BAM_is_Rerun_Persample <- is.null(aligner)
-  sample.info.idx <- sample
-  fc <- list()
-
-  temp.file.prefix <- file.path(".",paste(".Rsubread_cCounts_Tmp_for_Pid_",Sys.getpid(),"_Rproc",sep=""))
-  raw.fc.annot <- NA
-  df.sample.info <- data.frame(stringsAsFactors=F)
-  cc.sample.sheet.path <- paste0(temp.file.prefix,".samplesheet")
-
-  if(input.mode=="BCL"){
-    sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
-    if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
-
-    dirs <- unique( sample.info.idx$InputDirectory )
-    fc[["counts"]] <- list()
-#    if(is.null(umi.cutoff))fc[["cell.confidence"]] <- list()
-  
-    for(dirname in dirs) .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx") # check files before the slow mapping/counting step.
-
-    dirno <- 1
-    for(dirname in dirs){
-      unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
-  
-      if(is.null(cell.barcode)){
-        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
-        cell.barcode <- .find_best_cellbarcode(dirname, cc.sample.sheet.path)
-      }else{
-        cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
-      }
-  
-      full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
-      if(is.null(aligner)){
-        generate.scRNA.BAM <- FALSE 
-        if(!all(file.exists(paste0( unique.samples,".bam" )))) stop("No aligner is specified but the BAM file does not exist. Please specify 'align' or 'subjunc' as the aligner.")
-        for(samplename in unique.samples){
-          is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path, samplename)
-          one.bam.name <- paste0(samplename, ".bam")
-          .write.tmp.parameters(list(sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM, BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
-          one.raw.fc <- featureCounts(one.bam.name, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures, nthreads=nthreads, strandSpecific=1, ...)
-          dirno <- dirno +1
-          if(any(is.na(raw.fc.annot))) raw.fc.annot<- one.raw.fc$annotation
-          cat("Processing sample '",samplename,"'\n")
-          one.result <- .load.all.scSamples(paste0(samplename,".bam"), as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-          fc[["counts"]][[samplename]] <- one.result[["Sample.1"]][["Counts"]] # only one sample.
-          if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- one.result[["Sample.1"]][["HighConfidneceCell"]]
-          stt <- .extract.sample.table.cols(full_dirname,one.result, umi.cutoff=umi.cutoff)
-          df.sample.info <- rbind(df.sample.info, stt)
-        }
-      }else{
-        is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
-        generate.scRNA.BAM <- TRUE
-        .write.tmp.parameters(list(isBCLinput=TRUE))
-        if(aligner=="align"){
-          drna.type <- "rna"
-          align(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, type=drna.type, useAnnotation=TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, ...)
-        }else if(aligner=="subjunc"){
-          subjunc(index, full_dirname, output_file=temp.file.prefix, nthreads=nthreads, ...)
-        }
-        .write.tmp.parameters(list(sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample,Is_Dual_Index=is_dual_index, BAM_file_no = dirno))
-        dirno <- dirno +1
-        raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
-        if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
+      annot.file <- paste0(temp.file.prefix,".Annot")
+      if(file.exists(annot.file)){
+        raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
           if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
         }
-        stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
-        df.sample.info <- rbind(df.sample.info, stt)
-      }
-    }
-  } else if(input.mode == "BAM"){
-    if(is.null(cell.barcode)){
-      cell.barcode <- .find_best_cellbarcode(sample$BAMFile, "N/A", input.mode="bam")
-    }else{
-      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
-    }
-
-    unique.samples <- unique(as.character(sample.info.idx$SampleName))
-    for(this.sample in unique.samples){
-      .index.names.to.sheet.BAM.mode(data.frame(BAMFile="COMBINED.INPUT",SampleName=as.character(this.sample),stringsAsFactors=F), cc.sample.sheet.path)
-      BAM.names <- paste(sample.info.idx$BAMFile[ as.character(sample.info.idx$SampleName) == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
-      .write.tmp.parameters(list(isScRNABAMinput=TRUE))
-      align(index, BAM.names, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE,annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType,...)
-
-      generate.scRNA.BAM <- TRUE
-      .write.tmp.parameters(list(BAM_is_ScRNA_BAM=TRUE, sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-      raw.fc<-featureCounts(temp.file.prefix, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
-
-      if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-    }
-    df.sample.info <- .extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff)
-  } else if(input.mode == "FASTQ" || input.mode == "FASTQ-dir"){
-    if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
-    #print(sample.info.idx)
-    if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
- 
-    combined.fastq.names <- ""
-    for(rowi in 1:nrow(sample.info.idx)){
-      df1 <- as.character(sample.info.idx[rowi,"BarcodeUMIFile"])
-      df2 <- as.character(sample.info.idx[rowi,"ReadFile"])
-      R1.file.name <- .check_and_NormPath(df1, mustWork=TRUE, "The barcode FASTQ file in sample.info.idx")
-      R2.file.name <- .check_and_NormPath(df2, mustWork=TRUE, "The genomic read FASTQ file in sample.info.idx")
-      combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
-    }
-    combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
-    if(is.null(cell.barcode)){
-      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, "N/A", input.mode="fastq")
-    }else{
-      cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
-    }
- 
-    bam.for.FC <- c()
-    if(is.null(aligner)){
-      unique.samples <- unique(as.character(sample.info.idx$SampleName))
-      bam.for.FC <- paste0(sample.info.idx$SampleName,".bam")
-      generate.scRNA.BAM <- FALSE
-      
-      for(samplename in unique.samples){
-        leftover.bam <- paste0(samplename, ".bam")
-
-        .index.names.to.sheet.FASTQ.mode(sample.info.idx[ as.character(sample.info.idx$SampleName) == samplename, ][1,], cc.sample.sheet.path)
-        .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-        raw.fc<-featureCounts(leftover.bam, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
-
-        if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-        some.results <- .load.all.scSamples(leftover.bam, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["Counts"]] # featureCounts treats each left-over BAM file as a single run and has only one sample 
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", 1)]][["HighConfidneceCell"]]
-
-        newrow<- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
-        df.sample.info <- rbind(df.sample.info,newrow)
-      }
-    }else{
-      .write.tmp.parameters(list(isScRNAFastqinput=TRUE))
-
-      drna.type <- "rna"
-      max.MM <- 3
-      
-
-      if(F)for(iii in 1:17){
-         print("WARNING: USING DNA MODE align")
-         drna.type <- "dna"
-      }
-
-      if(F)for(iii in 1:17){
-         print("WARNING: USING Max.MM = 10 align")
-         max.MM <- 10
-      }
-
-      if(aligner == "align"){
-        align(index, combined.fastq.names, maxMismatches=max.MM, type=drna.type, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, nBestLocations = nBestLocations, unique=unique.mapping)
-      }else if(aligner=="subjunc"){
-        subjunc(index, combined.fastq.names, maxMismatches=max.MM, output_file=temp.file.prefix, nthreads=nthreads, useAnnotation =TRUE, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTF=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, nBestLocations = nBestLocations, unique=unique.mapping)
-      }
-      bam.for.FC <- temp.file.prefix
-      generate.scRNA.BAM <- TRUE
-      .index.names.to.sheet.FASTQ.mode(sample.info.idx, cc.sample.sheet.path)
-      .write.tmp.parameters(list(BAM_is_ScRNA_Fastq=TRUE, sampleSheet=cc.sample.sheet.path, umi.cutoff=umi.cutoff, cellBarcodeList=cell.barcode, generate.scRNA.BAM=generate.scRNA.BAM,BAM_is_Rerun_Persample=BAM_is_Rerun_Persample))
-      raw.fc<-featureCounts(bam.for.FC, annot.inbuilt=annot.inbuilt, annot.ext=annot.ext, isGTFAnnotationFile=isGTFAnnotationFile, GTF.featureType=GTF.featureType, GTF.attrType=GTF.attrType, useMetaFeatures=useMetaFeatures,nthreads=nthreads,strandSpecific=1, ...)
-
-     if(any(is.na(raw.fc.annot))) raw.fc.annot<-raw.fc$annotation
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
-
-      for(spi in 1:nrow(some.results[["Sample.Table"]])){
-        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
-        fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
-        if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
-      }
-      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
+        df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
+      }else has.error<-T
     }
   }
-
+  .del.temp.files(substr(temp.file.prefix,4,99))
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
-  if(.remove.temp.files).del.temp.files(substr(temp.file.prefix,4,99))
-  fc
+  if(has.error) { 
+    cat("No results were generated.\n\n")
+    return(NULL)
+  } else {
+    cat("\nThe cellCounts program has finished successfully.\n\n")
+    return(fc)
+  }
 }
+

@@ -1,3 +1,7 @@
+3 Aug 2022 - 2.10.5
+(1) Added many checks in cellCounts() to avoid it from crashing caused by invalid settings.
+(2) Made the screen output from cellCounts() more meaningful when error occured.
+
 28 Jun 2022 - 2.10.4
 (1) Improved speed and accuracy of cellCounts() by using a new voting location data structure.
 

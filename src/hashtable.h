@@ -59,6 +59,7 @@ ArrayList * ArrayListCreate(int init_capacity);
 ArrayList * ArrayListDuplicate(ArrayList * ori);
 void ArrayListDestroy(ArrayList * list);
 void * ArrayListGet(ArrayList * list, srInt_64 n);
+void * ArrayListSet(ArrayList * list, srInt_64 n, void * new_elem);
 void * ArrayListRandom(ArrayList * list);
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);

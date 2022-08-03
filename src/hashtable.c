@@ -59,6 +59,13 @@ void * ArrayListShift(ArrayList * list){
 	return ret;
 }
 
+void * ArrayListSet(ArrayList * list, srInt_64 n, void * new_elem){
+	if(list->numOfElements<=n) return NULL;
+	void * ret = list->elementList [n];
+	list->elementList [n] = new_elem;
+	return ret;
+}
+
 void * ArrayListPop(ArrayList * list){
 	if(list->numOfElements<1) return NULL;
 	return list->elementList [ -- list->numOfElements];

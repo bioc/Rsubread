@@ -1041,7 +1041,6 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 		if(ret<=0)break;
 
 		char *cell_barcode = NULL;
-		//SUBREADprintf("RETV=%d, RN=%s\n" ,ret, rname);
 		int xx=0;
 		char *testi;
 		for(testi = rname+1; * testi; testi ++){
@@ -1055,7 +1054,8 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 		}
 
 		int cell_no = iCache_get_cell_no(cell_barcode_table, cell_barcode_list, cell_barcode, known_cell_barcode_length);
-		if(cell_no>0) (*valid_cell_barcode)++;
+		//fprintf(stderr,"RETV=%d, RN=%s, CNO=%d, KCBL=%d\n" ,ret, rname, cell_no, known_cell_barcode_length);
+		if(cell_no>=0) (*valid_cell_barcode)++;
 
 		(*tested_reads)++;
 		if((*tested_reads) >= testing_reads)break;
@@ -1529,7 +1529,12 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		if(ret==0){
 			ret = input_mFQ_next_file(fqs_input);
 			if(ret >=0) continue;
-			return -1;
+			int R2ret = 0;
+			//R2ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
+			if(R2ret >0){
+				SUBREADprintf("ERROR: the cell barcode and UMI reads exhausted before the genomic reads exhausted. The two FASTQ files seem to have different numbers of reads\n");
+				return -2;
+			}else return -1;
 		} else if(ret<0) return -1;
 
 		#ifdef __MINGW32__
@@ -1566,7 +1571,10 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		}else write_ptr+=sprintf(readname+write_ptr,"|input#%04d@L%03d", fqs_input -> current_file_no, fqs_input  -> current_guessed_lane_no);
 
 		ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
-		if(ret<=0) return -1;
+		if(ret<=0){
+			SUBREADprintf("ERROR: the genomic reads exhausted before the cell barcode and UMI reads exhausted. The two FASTQ files seem to have different numbers of reads\n");
+			return -2;
+		}
 		ret = autozip_gets(&fqs_input -> autofp3, read, MAX_READ_LENGTH);
 		ret --; // read length excludes "\n"
 		read[ret]=0;
