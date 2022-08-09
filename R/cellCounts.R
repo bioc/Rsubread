@@ -673,7 +673,9 @@
 
   if(is.na(spseqs) && !is.na(dualseqs )){
     return(c(paste0(dualseqs[1], dualseqs[2]),paste0(dualseqs[1], dualseqs[3])) )
-  }else if(!any(is.na(spseqs))) return(spseqs) else stop(paste("Unknown sample index name:", spid))
+  }else{
+    if(!any(is.na(spseqs))) return(spseqs) else return(NA)
+  }
 }
 
 .rstest <- function(r, coef) r * (1 + 1/r)^(1 + coef)

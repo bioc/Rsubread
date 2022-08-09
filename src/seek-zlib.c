@@ -25,7 +25,6 @@ void seekgz_try_read_some_zipped_data(seekable_zfile_t * fp, int * is_eof){
 		return;
 	}
 
-	assert(fp -> stem.avail_in >= 0);
 	if(fp -> stem.avail_in < SEEKGZ_BINBUFF_SIZE / 2 ) {
 		if(fp -> in_zipped_buff_read_ptr > 0 && fp -> stem.avail_in > 0){
 			int i;
@@ -301,6 +300,7 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 		while(1){
 			seekgz_try_read_some_zipped_data(fp, &is_eof);
 			if(fp -> stem.avail_in < 1 && is_eof)break;
+			if(fp -> stem.avail_in < 1) continue;
 
 			if(out_txt_size < out_txt_used *4/3){
 				out_txt_size *= 2;
@@ -313,17 +313,13 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 
 			void * old_next_in = fp -> stem.next_in;
 				
-				//SUBREADprintf("i  INFLATINHG: FILEPOS=%llu  IN_AVAIL=%d  OUT_AVAIL=%d\n", seekgz_ftello(fp), fp -> stem.avail_in, fp -> stem.avail_out);
 			int ret_ifl = inflate(&(fp -> stem), Z_BLOCK);
 			int have = (out_txt_size - out_txt_used) - fp -> stem.avail_out;
 			if(ret_ifl != Z_OK && ret_ifl != Z_STREAM_END){
-				SUBREADprintf("ERR  INFLATINHG: RET=%d BY IN %d zipped bytes  ==>  %d PLAIN TXT\n", ret_ifl, old_avail_in - fp -> stem.avail_in, have);
+				SUBREADprintf("ERR  INFLATINHG: RET=%d BY IN %d (%d - %d) zipped bytes  ==>  %d PLAIN TXT\n", ret_ifl, old_avail_in - fp -> stem.avail_in, old_avail_in, fp -> stem.avail_in, have);
 				SUBREADprintf("ERR  INFLATINHG: BEND=%d\n", ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64));
 			}
 
-			//if(ret_ifl != Z_STREAM_END){
-			//	SUBREADprintf("INF: STREAM_END\n");
-			//}
 			if(ret_ifl != Z_OK && ret_ifl != Z_STREAM_END){
 				is_data_error = 1;
 				break;
@@ -334,11 +330,7 @@ int seekgz_load_1_block( seekable_zfile_t * fp , int empty_block_no){
 			if( ( fp -> stem.data_type & 128 )&& !(fp -> stem.data_type & 64)) is_block_end = 1;
 			if(ret_ifl == Z_STREAM_END) is_gzip_unit_end = 1;
 
-			//if(is_block_end)
-			//	fp -> rolling_dict_window_used = 0;
-			//else
 			seekgz_update_current_window(fp, out_txt + out_txt_used, have);
-
 			out_txt_used += have;
 
 			if(is_block_end){

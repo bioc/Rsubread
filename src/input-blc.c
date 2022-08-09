@@ -1527,13 +1527,15 @@ int input_mFQ_next_read(input_mFQ_t * fqs_input, char * readname , char * read, 
 		ret = autozip_gets(&fqs_input -> autofp1, tmpline, MAX_READ_NAME_LEN);
 		int write_ptr=0;
 		if(ret==0){
-			ret = input_mFQ_next_file(fqs_input);
-			if(ret >=0) continue;
 			int R2ret = autozip_gets(&fqs_input -> autofp3, tmpline, MAX_READ_NAME_LEN);
 			if(R2ret >0){
-				SUBREADprintf("ERROR: the cell barcode and UMI reads exhausted before the genomic reads exhausted. The two FASTQ files seem to have different numbers of reads\n");
+				SUBREADprintf("ERROR: the cell barcode and UMI reads exhausted before the genomic reads exhausted. The two FASTQ files seem to have different numbers of reads.\n");
 				return -2;
-			}else return -1;
+			}
+
+			ret = input_mFQ_next_file(fqs_input);
+			if(ret >=0) continue;
+			else return -1;
 		} else if(ret<0) return -1;
 
 		#ifdef __MINGW32__
