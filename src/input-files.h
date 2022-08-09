@@ -334,6 +334,7 @@ void warning_array_hash(ArrayList * t1, HashTable * t2, char * msg);
 // it returns 0 if any chromosome names in t1 and t2 matched, otherwise it returns non-zero.
 // // this function doesn't do chrX=>X conversion nor alias conversion because these conversions have been done when the annotations were loaded from GTF/SAF files.
 int warning_hash_hash_numbers(HashTable * t1, HashTable * t2, int * matched);
+int warning_array_hash_numbers(ArrayList * t1, HashTable * t2, int * matched);
 void warning_hash_hash(HashTable * t1, HashTable * t2, char * msg);
 int geinput_preload_buffer(gene_input_t * input, subread_lock_t* read_lock);
 int geinput_open_scRNA_fqs(char * fnames,  gene_input_t * input, int reads_per_chunk, int threads);
