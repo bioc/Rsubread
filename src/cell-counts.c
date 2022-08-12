@@ -3122,13 +3122,6 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 						simpleMode_cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name, simple_mode);
 
 						if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.2f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
-						if(0 && FIXLENstrcmp("R00000003490", read_name) == 0){
-							SUBREADprintf("MAXVOTES (simple) OF %s = %d\n", read_name, vote_me -> max_vote);
-							SUBREADprintf(">>>%llu<<<\n%s [%d]  %s VOTE1_MAX=%d >= %d\n", current_read_number, read_name, read_len, read_text, vote_me->max_vote, cct_context -> min_votes_per_mapped_read);
-							SUBREADprintf(" ======= PAIR %s = %llu =======\n", read_name, current_read_number);
-							print_votes(vote_me, cct_context -> index_prefix);
-						}
-
 						if((simple_mode && cellCounts_simple_mode_highconf(cct_context, thread_no, applied_subreads, vote_me, read_name)) || (simple_mode == 0)){
 							cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 							thread_context -> hiconf_map += simple_mode;
