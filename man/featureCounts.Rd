@@ -83,7 +83,7 @@ featureCounts(files,
 }
 \arguments{
   \item{files}{ a character vector giving names of input files containing read mapping results. The files can be in either SAM format or BAM format. The file format is automatically detected by the function.}
-  \item{annot.inbuilt}{ a character string specifying an in-built annotation used for read summarization. It has five possible values \code{"mm39"}, \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm39`, `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm39"} by default. The in-built annotation has a SAF format (see below).}
+  \item{annot.inbuilt}{ a character string specifying an inbuilt gene annotation used for read summarization. It has five possible values \code{"mm39"}, \code{"mm10"}, \code{"mm9"}, \code{"hg38"} and \code{"hg19"}, corresponding to the NCBI RefSeq annotations for genomes `mm39`, `mm10', `mm9', `hg38' and `hg19', respectively. \code{"mm39"} by default. The inbuilt annotation has a SAF format (see below).}
   \item{annot.ext}{ A character string giving name of a user-provided annotation file or a data frame including user-provided annotation data. If the annotation is in GTF format, it can only be provided as a file. If it is in SAF format, it can be provided as a file or a data frame. See below for more details about SAF format annotation. If an annotation file is provided, it can be uncompressed or gzip compressed. Note that \code{annot.ext} will override \code{annot.inbuilt} if both provided.}
   \item{isGTFAnnotationFile}{ logical indicating whether the annotation provided via the \code{annot.ext} argument is in GTF format or not. \code{FALSE} by default. This option is only applicable when \code{annot.ext} is not \code{NULL}.}
   \item{GTF.featureType}{ a character string or a vector of character strings giving the feature type or types used to select rows in the GTF annotation which will be used for read summarization. \code{"exon"} by default. This argument is only applicable when \code{isGTFAnnotationFile} is \code{TRUE}. Feature types can be found in the third column of a GTF annotation.}
@@ -163,32 +163,27 @@ Column names in a SAF annotation should be the same as those shown in the above 
 Columns can be in any order.
 Extra columns are allowed to be added into the annotation.
 
-In-built annotations, which were generated based on NCBI RefSeq gene annotations, are provided to faciliate convenient read summarization.
-We provide in-built annotations for the following genomes: \code{"hg38"}, \code{"hg19"}, \code{"mm39"}, \code{"mm10"} and \code{"mm9"}.
-The content of in-built annotations can be accessed via the \code{\link{getInBuiltAnnotation}} function.
+Inbuilt annotations, which were generated based on NCBI RefSeq gene annotations, are provided to faciliate convenient read summarization.
+We provide inbuilt annotations for the following genomes: \code{"hg38"}, \code{"hg19"}, \code{"mm39"}, \code{"mm10"} and \code{"mm9"}.
+The content of inbuilt annotations can be accessed via the \code{\link{getInBuiltAnnotation}} function.
 These annotations have a SAF format.
+ 
+The inbuilt annotations are a modified version of NCBI RefSeq gene annotations. 
+For inbuilt annotations \code{"hg38"}, \code{"hg19"}, \code{"mm10"} and \code{"mm9"}, their original RefSeq annotations were downloaded from NCBI RefSeq MapView.
+We then used these downloaded annotations to create inbuilt annotations. 
+For each gene, we used its CDS and UTR regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene. 
+Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once. 
+Also, exons within the same gene in the inbuilt annotation do not overlap with each other.
 
-%%% === commented on 7 APR 2022, per Wei's Email at 4.26pm on 6 APR 2022 ===
-%%% commented on 7 APR 2022
-%%% The in-built annotations are a modified version of NCBI RefSeq gene annotations.
-%%%We downloaded the RefSeq gene annotations from NCBI ftp server (eg. RefSeq annotation for \code{mm10} was downloaded from \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.38.1/mapview/seq_gene.md.gz}).
-%%%
-%%% We then used these annotations to create our in-built annotations.
-%%% For each gene, we used its CDS (coding DNA sequence) and UTR (untranslated) regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene.
-%%% Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once (they might be included multiple times in the original CDSs and UTRs).
-%%% Also, exons within the same gene do not overlap with each other.
-%%% === end of comment ===
+For the inbuilt annotation \code{"mm39"}, its original RefSeq annotation was downloaded from \url{https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/10090/109/GCF_000001635.27_GRCm39/GCF_000001635.27_GRCm39_genomic.gtf.gz}. 
+This is a GTF-format annotation. 
+We changed the format of chromosome names in this annotation from \code{"NC_xxxxxx"} to \code{"chr"} followed by a number. 
+For example, \code{"NC_000067.7"} was changed to \code{"chr1"}. 
+The \code{\link{flattenGTF}} function was then used to merge overlapping exons within the same gene to generate the inbuilt annotation. 
+Entrez gene identifiers were used in this annotation.
 
-%%% === replaced text === 
-The in-built annotations are a modified version of NCBI RefSeq gene annotations. For in-built annotations \code{"hg38"}, \code{"hg19"}, \code{"mm10"} and \code{"mm9"}, their original RefSeq annotations were downloaded from NCBI RefSeq MapView.
-% For example, RefSeq annotation for mm10 was downloaded from \url{ftp://ftp.ncbi.nlm.nih.gov/genomes/M_musculus/ARCHIVE/BUILD.38.1/mapview/seq_gene.md.gz}. # commented out per Email at 11.44am 7 APR 2022
-We then used these downloaded annotations to create in-built annotations. For each gene, we used its CDS (coding DNA sequence) and UTR (untranslated) regions provided in the original annotation to construct a list of exons, by merging and concatenating all CDSs and UTRs belonging to the same gene. Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once (they might be included multiple times in the original CDSs and UTRs). Also, exons within the same gene do not overlap with each other.
-
-For the in-built annotation \code{"mm39"}, its original RefSeq annotation was downloaded from \url{https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/10090/109/GCF_000001635.27_GRCm39/GCF_000001635.27_GRCm39_genomic.gtf.gz}. This is a GTF-format annotation. We changed the format of chromosome names from \code{"NC_xxxxxx"} to \code{"chr"} followed by a number (eg. \code{"NC_000067.7"} changed to \code{"chr1"}). The \code{\link{flattenGTF}} function was then used to merge overlapping exons within the same gene to generate the inbuilt annotation. Entrez gene identifiers were included in this annotation.
-%%% === end of replacement ===
-
-Users may provide an external annotation for read summarization via the \code{annot.ext} argument.
-If the external annotation is in SAF format, it can be provdied as either a \code{data.frame} or a tab-delimited text file with proper column names included.
+Users may provide an external annotation to \code{featureCounts} for read summarization via the \code{annot.ext} parameter.
+If the provided external annotation is in SAF format, it can be provided as either a \code{data.frame} or a tab-delimited text file with proper column names included.
 If it is in GTF/GFF format, it should be provided as a file only (and \code{isGTFAnnotationFile} should be set to \code{TRUE}).
 
 \code{featureCounts} function uses the \code{GTF.attrType} attribute in a GTF/GFF annotation to group features to form meta-features when performing read summarization at meta-feature level.
@@ -220,7 +215,7 @@ When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of re
 A list with the following components:
 \item{counts}{ a data matrix containing read counts for each feature or meta-feature for each library.}
 \item{counts_junction (optional)}{ a data frame including primary and secondary genes overlapping an exon junction, position information for the left splice site (`Site1') and the right splice site (`Site2') of a junction (including chromosome name, coordinate and strand) and number of supporting reads for each junction in each library. Both primary and secondary genes overlap at least one of the two splice sites of a junction. Secondary genes do not overlap more splice sites than the primary gene. When the primary and secondary genes overlap same number of splice sites, the gene with the smallest leftmost base position is selected as the primary gene. For each junction, no more than one primary gene is reported but there might be more than one secondary genes reported. If a junction does not overlap any genes, it has a missing value in the fields of primary gene and secondary gene. Note that this data frame is only generated when \code{juncCounts} is \code{TRUE}.}
-\item{annotation}{ a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the in-built annotations are used.}
+\item{annotation}{ a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the inbuilt annotations are used.}
 \item{targets}{ a character vector giving sample information.}
 \item{stat}{ a data frame giving number of successfully assigned reads in each library and also number of unassigned reads falling in each filtering category (unmapped, read type, singleton, mapping quality, chimera, fragment length, duplicate, multi-mapping, secondary alignment, split alignment, no features, overlapping length and assignment ambiguity). See Users Guide for more details.}
 }
