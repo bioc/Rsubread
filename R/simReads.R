@@ -63,7 +63,7 @@
 
 simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1000000, read.length=75, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE){
   expression.levels[ is.na(expression.levels) ]<-0
-  if(paired.end && fragment.length.min < read.length)stop("The minimum fragment length cannot be lower than the output read length.")
+  if(fragment.length.min < read.length)stop("The minimum fragment length cannot be lower than the output read length.")
   if(read.length<1 || read.length>250)stop("The output read length must be between 1 and 250.")
   if(library.size<1) stop("At least one read should be generated.")
   if(any(expression.levels<0))stop("No negative expression values are allowed.")
