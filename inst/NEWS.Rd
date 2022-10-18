@@ -2,6 +2,16 @@
 \title{Rsubread News}
 \encoding{UTF-8}
 
+\section{Version 2.12.0}{\itemize{
+\item
+Improve the data structure used by cellCounts to further improve its speed.
+
+\item
+More checks for input parameters to prevent cellCounts from crashing.
+
+\item
+Improve the screen output of cellCounts.
+}}
 
 \section{Version 2.10.0}{\itemize{
 \item
