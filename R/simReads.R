@@ -93,7 +93,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
     if(is.null(quality.reference)){
       if(read.length==75) quality.reference <- system.file("qualf","ref-quality-strings-20k-75bp-ERR1_59-SRR3649332.txt",package="Rsubread")
       if(read.length==100) quality.reference <- system.file("qualf","ref-quality-strings-20k-100bp-ERR2_70-SRR3045231.txt",package="Rsubread")
-      stop("To simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings of the same length as the output reads.")
+      if(is.null(quality.reference)) stop("To simulate sequencing errors in reads that are neither 100-bp nor 75-bp long, you need to provide a file containing reference quality strings of the same length as the output reads.")
     }else{
       quality.reference <- .check_and_NormPath(quality.reference,  mustWork=TRUE, opt="quality.reference")
     }
