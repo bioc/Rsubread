@@ -145,6 +145,45 @@ fc_PE
 @
 \end{scriptsize}
 
+\section{Quantifying 10x scRNA-seq data}
+
+We provide the \code{cellCounts} for quantifying 10x scRNA-seq data.
+
+\begin{scriptsize}
+<<>>=
+md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
+URL <- paste0("https://shilab-bioinformatics.github.io/",
+  "cellCounts-Example/cellCounts-Example.zip")
+
+temp.file <- tempfile()
+temp.dir <- tempdir()
+downloaded <- tryCatch(
+  {
+    download.file(URL, destfile = temp.file)
+    tools::md5sum(temp.file) %in% md5.zip
+  },
+  error = function(cond){
+    return(FALSE)
+  }
+)
+
+if(downloaded){
+  unzip(temp.file, exdir=paste0(temp.dir,"/cellCounts-Example"))
+
+  library(Rsubread)
+  buildindex(paste0(temp.dir,"/chr1"), 
+    paste0(temp.dir,"/cellCounts-Example/hg38_chr1.fa.gz"))
+  sample.sheet <- data.frame(
+    BarcodeUMIFile = paste0(temp.dir,"/cellCounts-Example/reads_R1.fastq.gz"), 
+    ReadFile = paste0(temp.dir,"/cellCounts-Example/reads_R2.fastq.gz"),
+	SampleName="Example", stringsAsFactors=FALSE
+  )
+  counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet, 
+    input.mode="FASTQ", annot.inbuilt="hg38")
+} else cat("Unable to download the file.\n")
+@
+\end{scriptsize}
+
 \section{Finding exon junctions}
 
 The RNA-seq technology provides a unique opportunity to identify the alternative splicing events that occur during the gene transcription process.
