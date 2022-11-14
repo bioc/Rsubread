@@ -147,7 +147,7 @@ fc_PE
 
 \section{Quantifying 10x scRNA-seq data}
 
-We provide the \code{cellCounts} for quantifying 10x scRNA-seq data.
+We provide the \R{cellCounts} for quantifying 10x scRNA-seq data.
 
 \begin{scriptsize}
 <<>>=
