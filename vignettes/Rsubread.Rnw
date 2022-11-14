@@ -144,10 +144,10 @@ fc_PE <- featureCounts("alignResultsPE.BAM",annot.ext=ann,isPairedEnd=TRUE)
 fc_PE
 @
 \end{scriptsize}
-
+\pagebreak
 \section{Quantifying 10x scRNA-seq data}
 
-We provide the \R{cellCounts} for quantifying 10x scRNA-seq data.
+We provide the \R{cellCounts} function for quantifying 10x scRNA-seq data.
 
 \begin{scriptsize}
 <<>>=
