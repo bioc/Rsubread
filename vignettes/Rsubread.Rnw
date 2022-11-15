@@ -184,7 +184,9 @@ if(downloaded){
     input.mode="FASTQ", annot.inbuilt="hg38")
   print(counts$sample.info)
   dim(counts$counts$Example)
-} else cat("Unable to download the file.\n")
+} else {
+  cat("Unable to download the file.\n")
+}
 @
 \end{scriptsize}
 
