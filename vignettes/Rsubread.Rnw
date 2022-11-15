@@ -147,7 +147,9 @@ fc_PE
 \pagebreak
 \section{Quantifying 10x scRNA-seq data}
 
-We provide the \R{cellCounts} function for quantifying 10x scRNA-seq data.
+We provide the \R{cellCounts} function for quantifying 10x scRNA-seq data. This function takes either raw sequencing results (the BCL input) or FASTQ (gzipped or not) as input. It is also capable to scan through the outcome directory from ``cellranger mkfastq" or bcl2fastq commands to find all the fastq files for each sample. The output of this function is a list object containing the gene annotation, the UMI tables for samples and the summary information for quantification.
+
+Below gives the example code of quantifying a scRNA-seq sample with two gzipped FASTQ files:
 
 \begin{scriptsize}
 <<>>=
@@ -180,6 +182,8 @@ if(downloaded){
   )
   counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet, 
     input.mode="FASTQ", annot.inbuilt="hg38")
+  counts$sample.info
+  dim(counts$counts$Example)
 } else cat("Unable to download the file.\n")
 @
 \end{scriptsize}
