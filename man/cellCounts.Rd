@@ -125,7 +125,7 @@ Each row in the data frame is a sample.}
 }
 
 \examples{
-# Data used in this example (71MB) can be downloaded from https://cloudstor.aarnet.edu.au/plus/s/BhXfdhUXlR34nuZ
+# Data used in this example (71MB) can be downloaded from https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip
 \dontrun{
 library(Rsubread)
 buildindex("chr1", "hg38_chr1.fa.gz")
