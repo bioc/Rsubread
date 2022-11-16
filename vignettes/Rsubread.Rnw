@@ -171,10 +171,13 @@ downloaded <- tryCatch(
 
 if(downloaded){
   unzip(temp.file, exdir=paste0(temp.dir,"/cellCounts-Example"))
-
   library(Rsubread)
   buildindex(paste0(temp.dir,"/chr1"), 
     paste0(temp.dir,"/cellCounts-Example/hg38_chr1.fa.gz"))
+}
+@
+<<>>=
+if(downloaded){
   sample.sheet <- data.frame(
     BarcodeUMIFile = paste0(temp.dir,"/cellCounts-Example/reads_R1.fastq.gz"), 
     ReadFile = paste0(temp.dir,"/cellCounts-Example/reads_R2.fastq.gz"),
@@ -182,11 +185,16 @@ if(downloaded){
   )
   counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet, 
     input.mode="FASTQ", annot.inbuilt="hg38")
+}
+@
+<<>>=
+if(downloaded){
   print(counts$sample.info)
   dim(counts$counts$Example)
-} else {
-  cat("Unable to download the file.\n")
 }
+@
+<<>>=
+if(!downloaded) cat("Unable to download the file.\n") 
 @
 \end{scriptsize}
 
