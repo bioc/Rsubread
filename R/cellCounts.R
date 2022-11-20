@@ -1200,7 +1200,7 @@ library(Matrix)
 .SCRNA_FASTA_SPLIT2 <- "|Rsd:cCounts:1mFQ|"
 
 .validate.sample.sheet <- function(sheet, input.mode){
-  if(is.na(sheet) || is.null(sheet)) stop("A sample sheet must be provided.")
+  if(any(is.na(sheet)) || is.null(sheet)) stop("A sample sheet must be provided.")
   if(input.mode == "BCL"){
     if(nrow(sheet)<1) stop("The sample sheet cannot be empty.")
     if(!("Lane" %in% colnames(sheet) && "IndexSetName" %in% colnames(sheet) && "SampleName" %in% colnames(sheet) && "InputDirectory" %in% colnames(sheet)))
