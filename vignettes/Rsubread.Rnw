@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread package: high-performance read alignment, quantification and mutation discovery}
 \author{Wei Shi}
-\date{2 January 2019}
+\date{21 November 2022}
 \maketitle
 
 \section{Introduction}
@@ -154,13 +154,10 @@ Below gives the example code of quantifying a scRNA-seq sample that has two gzip
 \begin{scriptsize}
 <<>>=
 md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
-URL <- paste0("https://shilab-bioinformatics.github.io/",
-  "cellCounts-Example/cellCounts-Example.zip")
-
+URL <- "https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip"
 temp.file <- tempfile()
 temp.dir <- tempdir()
-downloaded <- tryCatch(
-  {
+downloaded <- tryCatch({
     download.file(URL, destfile = temp.file)
     tools::md5sum(temp.file) %in% md5.zip
   },
@@ -181,17 +178,17 @@ if(downloaded){
   sample.sheet <- data.frame(
     BarcodeUMIFile = paste0(temp.dir,"/cellCounts-Example/reads_R1.fastq.gz"), 
     ReadFile = paste0(temp.dir,"/cellCounts-Example/reads_R2.fastq.gz"),
-	SampleName="Example", stringsAsFactors=FALSE
+    SampleName="Example", stringsAsFactors=FALSE
   )
   counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet, 
     input.mode="FASTQ", annot.inbuilt="hg38")
 }
 @
 <<>>=
-if(downloaded){
-  print(counts$sample.info)
-  dim(counts$counts$Example)
-}
+if(downloaded) print(counts$sample.info)
+@
+<<>>=
+if(downloaded) print(dim(counts$counts$Example))
 @
 <<>>=
 if(!downloaded) cat("Unable to download the file.\n") 

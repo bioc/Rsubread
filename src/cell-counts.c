@@ -578,18 +578,22 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 }
 
 void cellCounts_print_config(cellcounts_global_t * cct_context){
-	SUBREADputs(  "                _ _   ___                  _       ");
-	SUBREADputs(  "        ___ ___| | | / __\\___  _   _ _ __ | |_ ___ ");
-	SUBREADputs(  "       / __/ _ \\ | |/ /  / _ \\| | | | '_ \\| __/ __|");
-	SUBREADputs(  "      | (_|  __/ | / /__| (_) | |_| | | | | |_\\__ \\");
-	SUBREADputs(  "       \\___\\___|_|_\\____/\\___/ \\__,_|_| |_|\\__|___/");
+
+	SUBREADputs("        ==========     _____ _    _ ____  _____  ______          _____  ");
+	SUBREADputs("        =====         / ____| |  | |  _ \\|  __ \\|  ____|   /\\   |  __ \\ ");
+	SUBREADputs("          =====      | (___ | |  | | |_) | |__) | |__     /  \\  | |  | |");
+	SUBREADputs("            ====      \\___ \\| |  | |  _ <|  _  /|  __|   / /\\ \\ | |  | |");
+	SUBREADputs("              ====    ____) | |__| | |_) | | \\ \\| |____ / ____ \\| |__| |");
+	SUBREADputs("        ==========   |_____/ \\____/|____/|_|  \\_\\______/_/    \\_\\_____/");
 	SUBREADprintf("       %s\n",SUBREAD_VERSION);
-	SUBREADputs(  "");
+	SUBREADputs("");
+
+
 	print_in_box(80,1,PRINT_BOX_CENTER,"cellCounts settings");
 	print_in_box(80,0,0,"");
 	print_in_box(80,0,0,"         Index : %s", cct_context -> index_prefix);
 	print_in_box(80,0,0,"    Input mode : %s", cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ?"FASTQ files":(
-            cct_context -> input_mode == GENE_INPUT_SCRNA_BAM?"BAM files":"Raw BCL files"));
+	    cct_context -> input_mode == GENE_INPUT_SCRNA_BAM?"BAM files":"Raw BCL files"));
 	print_in_box(80,0,0,"");
 	print_in_box(80,2,PRINT_BOX_CENTER,"");
 	SUBREADputs(  "");
@@ -1308,10 +1312,10 @@ int cellCounts_lock_release(cellCounts_lock_t * lock){
 
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
+	char tbuf[90];
+	char_strftime(tbuf);
 
-	print_in_box(80,1,0,"");
-	print_in_box(80,0,0,"");
-	print_in_box(80,0,PRINT_BOX_CENTER,"Started running.");
+	print_in_box(80,1,1,"Running (%s, pid=%d)", tbuf, getpid());
 	print_in_box(80,0,0,"");
 	cellCounts_init_lock(&cct_context -> input_dataset_lock, 1 || (cct_context -> input_mode == GENE_INPUT_BCL));
 
@@ -3004,7 +3008,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
-				if(current_read_number % 1000000 == 0) print_in_box(80,0,0,"  Mapping and counting : % 10lld reads; time elapsed : % 4.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
+				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapping and counting : % 10lld reads; time elapsed : % 4.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 
 				cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 			} else {

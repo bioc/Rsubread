@@ -697,7 +697,7 @@
 
   nobs <- length(obs)
   if(nobs < .min_mySGT_input_size){
-    cat(sprintf("Warning: not enough element in the observation array : %d < %d.\nThe `Rescued' element in the returned object will be set to NA.\n",  nobs, .min_mySGT_input_size))
+    #cat(sprintf("Warning: not enough element in the observation array : %d < %d.\nThe `Rescued' element in the returned object will be set to NA.\n",  nobs, .min_mySGT_input_size))
     return(NA)
   }else{
       if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
