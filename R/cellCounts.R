@@ -671,7 +671,7 @@
 
 
 
-  if(is.na(spseqs) && !is.na(dualseqs )){
+  if(any(is.na(spseqs)) && !is.na(dualseqs )){
     return(c(paste0(dualseqs[1], dualseqs[2]),paste0(dualseqs[1], dualseqs[3])) )
   }else{
     if(!any(is.na(spseqs))) return(spseqs) else return(NA)
@@ -1230,6 +1230,8 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   .remove.temp.files <- T
 
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
+  index.file.1 <- paste0(index, ".00.b.array")
+  if(!file.exists(index.file.1))stop(sprintf("Error: index '%s' is not found.", index))
   if(!is.null(umi.cutoff)){
     umi.cutoff <- as.numeric(umi.cutoff)
     if(umi.cutoff < 0.0) stop("UMI cutoff must be a positive number.")

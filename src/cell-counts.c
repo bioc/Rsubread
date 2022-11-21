@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <locale.h>
 #include <getopt.h>
 #include <math.h>
 #include <sys/stat.h>
@@ -1127,6 +1128,7 @@ void cellCounts_sort_feature_info(cellcounts_global_t * cct_context, unsigned in
 		chro_feature_ptr[this_chro_number]++;
 	}
 
+	print_in_box(80,0,0,"Sort the %'d genes...", cct_context -> gene_name_table -> numOfElements);
 	for(xk1 = 0; xk1 < cct_context -> chromosome_exons_table -> numOfElements; xk1++) {
 		fc_chromosome_index_info * tmp_chro_inf = tmp_chro_info_ptrs[xk1];
 		int bins_in_chr = ( tmp_chro_inf->chro_possible_length / REVERSE_TABLE_BUCKET_LENGTH +2);
@@ -3002,7 +3004,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
-				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapping and counting : % 10lld reads; time elapsed : % 4.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
+				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : %' 13lld reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 
 				cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 			} else {
@@ -3331,8 +3333,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			if(cct_context->total_index_blocks > 1 || chunk_no == 0) {	   
 				sprintf(tmp_fname, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
 				print_in_box(80,0,0, "Load the %d-%s index block...",1+ cct_context->current_index_block_number, cct_context->current_index_block_number==0?"st":(cct_context->current_index_block_number==1?"nd":"th"));
-				print_in_box(80,0,0, "");
-				
 				if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
 				print_in_box(80,0,0, "The index block has been loaded. Now map the reads...");
 				print_in_box(80,0,0, "");
@@ -4464,7 +4464,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		removed_umis += (pret - NULL);
 	}
 	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
-	print_in_box(80,0,0,"Generating UMI count tables...");
+	print_in_box(80,0,0,"Generate UMI count tables...");
 	ArrayListDestroy(file_size_list);
 
 	worker_master_mutex_t worker_mut;
@@ -4725,6 +4725,7 @@ void cellCounts_finalise_error_run(cellcounts_global_t * cct_context){
 	#define cellCounts_main main
 #endif
 int cellCounts_main(int argc, char** argv){
+	setlocale(LC_ALL,"");
 	cellcounts_global_t * cct_context = calloc(sizeof(cellcounts_global_t),1);
 	cct_context -> program_start_time = miltime();
 
