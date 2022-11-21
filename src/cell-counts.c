@@ -573,7 +573,6 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> max_voting_simples = max(cct_context -> max_voting_simples, cct_context -> max_reported_alignments_per_read);
 	cct_context -> max_voting_locations = max(cct_context -> max_voting_locations, cct_context -> max_reported_alignments_per_read);
 
-	cellCounts_print_config(cct_context);
 	return 0;
 }
 
@@ -1254,12 +1253,14 @@ int cellCounts_load_annotations(cellcounts_global_t * cct_context){
 			rv=all_chro_unmatched;
 			ArrayListDestroy(annot_chros);
 
-			print_in_box(80,0,0,"");
-			print_in_box(80,0,0,"Number of chromosomes/contigs matched between reference sequences");
-			print_in_box(80,0,0,"  and gene annotation is %d.", anno_index_matched);
-			print_in_box(80,0,0,"");
-			if(all_chro_unmatched) SUBREADprintf("ERROR: no matched chromosomes/contigs found between reference sequences and gene annotation.\n");
-
+			if(all_chro_unmatched) SUBREADprintf("ERROR: no matched chromosomes/contigs found between reference sequences and gene annotation.\n"); else{
+				char tbuf[90];
+				char_strftime(tbuf);
+				SUBREADprintf("Number of chromosomes/contigs matched between reference sequences and gene annotation is %d.\n\n", anno_index_matched);
+				cellCounts_print_config(cct_context);
+				print_in_box(80,1,1,"Running (%s, pid=%d)", tbuf, getpid());
+				print_in_box(80,0,0,"");
+			}
 			if(!rv) cellCounts_sort_feature_info(cct_context, loaded_features, cct_context -> all_features_array, &cct_context -> features_sorted_chr, &cct_context -> features_sorted_geneid, &cct_context -> features_sorted_start, &cct_context -> features_sorted_stop, &cct_context -> features_sorted_strand, &cct_context -> block_end_index, &cct_context -> block_min_start, &cct_context -> block_max_end);
 		}
 	}
@@ -1312,11 +1313,6 @@ int cellCounts_lock_release(cellCounts_lock_t * lock){
 
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
-	char tbuf[90];
-	char_strftime(tbuf);
-
-	print_in_box(80,1,1,"Running (%s, pid=%d)", tbuf, getpid());
-	print_in_box(80,0,0,"");
 	cellCounts_init_lock(&cct_context -> input_dataset_lock, 1 || (cct_context -> input_mode == GENE_INPUT_BCL));
 
 	if(cct_context -> input_mode == GENE_INPUT_BCL)
@@ -1383,8 +1379,6 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	free(cct_context -> gene_name_array);
 	free(cct_context -> unistr_buffer_space);
 
-	print_in_box(80,0,0,"");
-	print_in_box(80,0,PRINT_BOX_CENTER,"Read mapping finished successfully.");
 	print_in_box(80,0,0,"");
 	print_in_box(80,2,0,"");
 	SUBREADputs("");
@@ -4470,7 +4464,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		removed_umis += (pret - NULL);
 	}
 	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
-	print_in_box(80,0,0,"Generate UMI counts...");
+	print_in_box(80,0,0,"Generating UMI count tables...");
 	ArrayListDestroy(file_size_list);
 
 	worker_master_mutex_t worker_mut;

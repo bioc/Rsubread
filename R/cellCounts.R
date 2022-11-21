@@ -697,7 +697,7 @@
 
   nobs <- length(obs)
   if(nobs < .min_mySGT_input_size){
-    #cat(sprintf("Warning: not enough element in the observation array : %d < %d.\nThe `Rescued' element in the returned object will be set to NA.\n",  nobs, .min_mySGT_input_size))
+    cat("Note: not enough cells in the data for performing cell rescuing.\n")
     return(NA)
   }else{
       if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
@@ -1083,7 +1083,7 @@ library(Matrix)
   set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   #cat("Loading high-conf matrix from '",fname,"'\n")
-  cat("Process the UMI table for sample",sample.no,"...\n")
+  cat("Performing cell rescuing for sample",sample.no,"...\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- NA
   if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
