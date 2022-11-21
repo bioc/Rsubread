@@ -144,7 +144,6 @@ fc_PE <- featureCounts("alignResultsPE.BAM",annot.ext=ann,isPairedEnd=TRUE)
 fc_PE
 @
 \end{scriptsize}
-\pagebreak
 \section{Quantifying 10x scRNA-seq data}
 
 We provide the \R{cellCounts} function for quantifying 10x scRNA-seq data. This function takes either raw sequencing results or FASTQ files (gzipped or not) as input. It is also capable to directly take the output directory from the \R{cellranger mkfastq} or \R{bcl2fastq} command as the input. The output of this function is a list object containing the gene annotation, the UMI tables each for a sample, and the summary information of quantification.
