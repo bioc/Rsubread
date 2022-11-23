@@ -4464,6 +4464,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		removed_umis += (pret - NULL);
 	}
 	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
+	print_in_box(80,0,0,"");
 	print_in_box(80,0,0,"Generate UMI count tables...");
 	ArrayListDestroy(file_size_list);
 
