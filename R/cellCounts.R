@@ -697,7 +697,7 @@
 
   nobs <- length(obs)
   if(nobs < .min_mySGT_input_size){
-    cat("Note: not enough cells in the data for performing cell rescuing.\n",nobs, .min_mySGT_input_size,"\n")
+    cat("Note: not enough cells in the data for performing cell rescuing.\n")
     return(NA)
   }else{
       if(nobs != length(times)) stop("The oservation array doesn't match the frequency array.")
