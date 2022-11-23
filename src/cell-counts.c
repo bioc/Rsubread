@@ -1128,7 +1128,7 @@ void cellCounts_sort_feature_info(cellcounts_global_t * cct_context, unsigned in
 		chro_feature_ptr[this_chro_number]++;
 	}
 
-	print_in_box(80,0,0,"Sort the %'d genes...", cct_context -> gene_name_table -> numOfElements);
+	print_in_box(80,0,0,"Sort the %d genes...", cct_context -> gene_name_table -> numOfElements);
 	for(xk1 = 0; xk1 < cct_context -> chromosome_exons_table -> numOfElements; xk1++) {
 		fc_chromosome_index_info * tmp_chro_inf = tmp_chro_info_ptrs[xk1];
 		int bins_in_chr = ( tmp_chro_inf->chro_possible_length / REVERSE_TABLE_BUCKET_LENGTH +2);
@@ -3004,7 +3004,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
-				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : %' 13lld reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
+				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : % 13lld reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 
 				cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 			} else {
