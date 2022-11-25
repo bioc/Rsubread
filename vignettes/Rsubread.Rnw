@@ -179,7 +179,7 @@ if(downloaded){
     ReadFile = paste0(temp.dir,"/cellCounts-Example/reads_R2.fastq.gz"),
     SampleName="Example", stringsAsFactors=FALSE
   )
-  counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet, 
+  counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet,  nthreads=1,
     input.mode="FASTQ", annot.inbuilt="hg38")
 }
 @
