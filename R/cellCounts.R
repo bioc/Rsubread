@@ -1083,7 +1083,7 @@ library(Matrix)
   set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   #cat("Loading high-conf matrix from '",fname,"'\n")
-  cat("Performing cell rescuing for sample",sample.no,"...\n")
+  cat("Perform cell rescuing for sample",sample.no,"...\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   rescued <- NA
   if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
