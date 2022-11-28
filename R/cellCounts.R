@@ -1085,6 +1085,9 @@ library(Matrix)
   #cat("Loading high-conf matrix from '",fname,"'\n")
   cat("Performing cell rescuing for sample",sample.no,"...\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
+  raw.fname <- paste0(fname,".RawOut.spmtx")
+  if(file.exists(raw.fname))rawout <- as.matrix(.read.sparse.mat(paste0(fname,".RawOut")))
+  else rawout <- NULL
   rescued <- NA
   if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
 
@@ -1102,12 +1105,15 @@ library(Matrix)
     ret[rownames(highconf), colnames(highconf) ] <- highconf
     if(!any(is.na(rescued)))ret[rownames(rescued), colnames(rescued) ] <- rescued
 
-    list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
+    retc<- list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
+    if(!is.null(rawout))ret[["ExcludedCells"]]=rawout[,!( colnames(rawout) %in% colnames(ret) )]
   }else{
     fcmat <- .match.exons(annot.tab,highconf)
     rownames(fcmat)<-NULL
-    list(Counts=fcmat, HighConfidneceCell=rep(T, ncol(highconf))) 
+    retc<- list(Counts=fcmat, HighConfidneceCell=rep(T, ncol(highconf)))
+    if(!is.null(rawout))ret[["ExcludedCells"]]=rawout[,!( colnames(rawout) %in% colnames(fcmat) )]
   }
+  return(retc)
 }
 
 .load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab, umi.cutoff){
@@ -1219,7 +1225,7 @@ library(Matrix)
   return(sheet)
 }
 
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE){
   maxDiffToTopVotes=2
   onlyDetectBarcode=FALSE
   has.error <- FALSE
@@ -1254,7 +1260,6 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
     #print(sample.info.idx)
     if(!("BarcodeUMIFile" %in%  colnames(sample.info.idx) && "ReadFile" %in%  colnames(sample.info.idx) )) stop("You need to provide BC+UMI and Genomic sequence files")
- 
     combined.fastq.names <- ""
     for(rowi in 1:nrow(sample.info.idx)){
       df1 <- as.character(sample.info.idx[rowi,"BarcodeUMIFile"])
@@ -1275,7 +1280,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     }
 
      .index.names.to.sheet.FASTQ.mode(sample.info.idx, cc.sample.sheet.path)
-    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
+    opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
@@ -1289,9 +1294,12 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
       some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
 
+      fc[["counts"]] <- list()
+      if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]] <- list()
       for(spi in 1:nrow(some.results[["Sample.Table"]])){
         samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
         fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+        if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["ExcludedCells"]] # only one sample.
         if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
       df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
@@ -1302,6 +1310,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
     dirs <- unique( sample.info.idx$InputDirectory )
     fc[["counts"]] <- list()
+    if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]] <- list()
   
     for(dirname in dirs) .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx") # check files before the slow mapping/counting step.
 
@@ -1326,7 +1335,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
       generate.scRNA.BAM <- TRUE
 
-      opt <- c("--cellBarcodeFile", cell.barcode,"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
+      opt <- c("--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
@@ -1343,6 +1352,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+          if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["ExcludedCells"]] # only one sample.
           if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
         }
         stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
@@ -1364,7 +1374,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       BAM.names <- paste(sample.info.idx$BAMFile[ as.character(sample.info.idx$SampleName) == this.sample ], collapse=.SCRNA_FASTA_SPLIT1)
       generate.scRNA.BAM <- TRUE
 
-      opt <- c("--inputMode","BAM","--cellBarcodeFile", cell.barcode,"--dataset", BAM.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
+      opt <- c("--inputMode","BAM","--cellBarcodeFile", cell.barcode, "--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", BAM.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
 
@@ -1375,18 +1385,23 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
       annot.file <- paste0(temp.file.prefix,".Annot")
       if(file.exists(annot.file)){
+        fc[["counts"]] <- list()
+        if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]] <- list()
+
         raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
         some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
+          if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["ExcludedCells"]] # only one sample.
           if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
         }
         df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
       }else has.error<-T
     }
   }
-  .del.temp.files(substr(temp.file.prefix,4,99))
+  if(T).del.temp.files(substr(temp.file.prefix,4,99)) else warning("NOT DELETING TEMP FILES !!!!")
+
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
   if(has.error) { 

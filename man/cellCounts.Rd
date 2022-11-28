@@ -33,8 +33,10 @@ cellCounts(
 
     # parameters for alignment of multi-mapping reads
     nBestLocations = 1,
-    uniqueMapping = FALSE
+    uniqueMapping = FALSE,
 
+    # report UMI counts for cell barcodes that were filtered out
+    reportExcludedBarcodes = FALSE
     )
 }
 \arguments{
@@ -56,6 +58,7 @@ cellCounts(
   \item{nthreads}{ A numeric value giving the number of threads used for read mapping and counting. \code{10} by default.}
   \item{nBestLocations}{A numeric value giving the maximum number of reported alignments for each multi-mapping read. \code{1} by default.}
   \item{uniqueMapping}{A logical value specifying if the multi-mapping reads should not be reported as mapped (i.e. reporting uniquely mapped reads only). \code{FALSE} by default.}
+  \item{reportExcludedBarcodes}{If \code{TRUE}, report UMI counts for those cell barcodes that were filtered out during cell calling. \code{FALSE} by default.}
 }
 
 \details{
@@ -116,6 +119,8 @@ It includes the following columns: \code{SampleName}, \code{InputDirectory} (if 
 Each row in the data frame is a sample.}
 
 \item{cell.confidence}{a \code{List} object indicating if a cell is a high-confidence cell or a rescued cell (low confidence). Each component in the object is a logical vector indicating which cells in a sample are high-confidence cells. \code{cell.confidence} is included in the output only if \code{umi.cutoff} is \code{NULL}.}
+
+\item{counts.excluded.barcodes}{a \code{List} object including UMI counts for excluded cell barcodes for each sample.}
 }
 
 \author{Yang Liao and Wei Shi}

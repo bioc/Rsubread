@@ -190,6 +190,7 @@ typedef struct{
 	float umi_cutoff;
 	int applied_umi_cut[MAX_SCRNA_SAMPLE_NUMBER];
 	int do_one_batch_runner_current;
+	int report_excluded_barcodes;
 	int has_error;
 	
 	char features_annotation_file[MAX_FILE_NAME_LENGTH];
@@ -207,6 +208,8 @@ typedef struct{
 	char * unistr_buffer_space;
 	srInt_64 unistr_buffer_size;
 	srInt_64 unistr_buffer_used;
+	char * cmd_rebuilt;
+
 
 	unsigned char 	* features_sorted_strand;
 	srInt_64 	* features_sorted_start, * features_sorted_stop;
@@ -399,6 +402,7 @@ static struct option cellCounts_long_options[]={
 	{"geneIdColumn", required_argument ,0,0},
 	{"annotationType", required_argument ,0,0},
 	{"annotationChroAlias", required_argument ,0,0},
+	{"reportExcludedBarcodes", required_argument ,0,0},
 
 	{"cellBarcodeFile",required_argument, 0,0},
 	{"sampleSheetFile",required_argument, 0,0},
@@ -467,11 +471,24 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 
 int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** argv){
 	int c , option_index=0;
-	//for(c=0; c<argc; c++) SUBREADprintf("Param #%d = '%s'\n", c, argv[c]);
 
 	optind = 0;
 	opterr = 1;
 	optopt = 63;
+
+	int cmd_rebuilt_size = 2000;
+	char * cmd_rebuilt = malloc(cmd_rebuilt_size);
+
+	cmd_rebuilt[0]=0;
+	for(c = 0; c<argc;c++)
+	{
+		if(strlen(cmd_rebuilt) + 100+strlen(argv[c]) > cmd_rebuilt_size)
+		{
+			cmd_rebuilt_size*=2;
+			cmd_rebuilt = realloc(cmd_rebuilt, cmd_rebuilt_size);
+		}
+		sprintf(cmd_rebuilt+strlen(cmd_rebuilt), "\"%s\" ", argv[c]);
+	}
 
 	cct_context -> input_mode = GENE_INPUT_BCL;
 	cct_context -> total_threads = 10;
@@ -490,6 +507,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> is_BAM_and_FQ_out_generated = 1;
 	cct_context -> current_dataset_no = 1;
 	cct_context -> min_mapped_length_for_mapped_read = 40;
+	cct_context -> cmd_rebuilt = cmd_rebuilt;
 	strcpy(cct_context -> temp_file_dir, "./");
 
 	if(0){
@@ -518,6 +536,9 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 		if(strcmp("subreadsPerRead", cellCounts_long_options[option_index].name)==0){
 			cct_context -> total_subreads_per_read = min(SCRNA_SUBREADS_HARD_LIMIT, max(7, atoi(optarg)));
+		}
+		if(strcmp("reportExcludedBarcodes", cellCounts_long_options[option_index].name)==0){
+			cct_context -> report_excluded_barcodes = atoi(optarg);
 		}
 		if(strcmp("dataset", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> input_dataset_name, optarg, MAX_FILE_NAME_LENGTH * MAX_SCRNA_FASTQ_FILES * 3 -1);
@@ -664,6 +685,7 @@ void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simp
 	int x1, outcapa=3000, outsize=0;
 	unsigned int last_end = 0;
 	char * outbuff = malloc(outcapa);
+	outsize += sprintf(outbuff, "@HD\tVN:1.0\tSO:%s\n", "coordinate");
 	for(x1=0;x1<cct_context->chromosome_table.total_offsets; x1++){
 		if(outsize >= outcapa -MAX_CHROMOSOME_NAME_LEN -40){
 			outcapa *=2;
@@ -675,7 +697,10 @@ void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simp
 		last_end = this_end;
 		outsize += sprintf(outbuff+outsize,"@SQ\tSN:%s\tLN:%d\n",chro_name,this_size);
 	}
-	outsize++;
+	// if the command line is longer than 16K the remaining part is omitted.
+	outsize += snprintf(outbuff+outsize,1024*32, "@PG\tID:cellCounts\tPN:cellCounts\tVN:%s\tCL:%s", SUBREAD_VERSION, cct_context->cmd_rebuilt);
+	outbuff[outsize++]='\n';
+	outbuff[outsize++]='\0';
 	simple_bam_write(&outsize,4,wtr,0);
 	simple_bam_write(outbuff, outsize, wtr, 1);
 	free(outbuff);
@@ -1368,6 +1393,7 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	HashTableDestroy(cct_context->cell_barcode_head_tail_table);
 	HashTableDestroy(cct_context->chromosome_exons_table);
 	gvindex_destory(cct_context->value_index);
+	free(cct_context -> cmd_rebuilt);
 	free(cct_context -> value_index);
 	free(cct_context -> exonic_region_bitmap);
 	free(cct_context -> features_sorted_chr);
@@ -4088,7 +4114,7 @@ void cellCounts_merged_write_sparse_unique_genes(void * ky, void * va, HashTable
 	for(x1=0; x1<g2ul->numOfElements; x1++){
 		void *geneno1B_ptr = ArrayListGet(g2ul,x1);
 		if(!HashTableGet(unique_geneno1B_tab, ArrayListGet(g2ul,x1))) HashTablePut(unique_geneno1B_tab, geneno1B_ptr, NULL+1);
-		tab -> counter1 += HashTableGet(g2u, geneno1B_ptr)-NULL;
+		tab -> counter1 += HashTableGet(g2u, geneno1B_ptr)?1:0;
 	}
 	ArrayListDestroy(g2ul);
 }
@@ -4114,16 +4140,16 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 	cellP1_to_geneP1_to_umis_tab -> appendix1 = unique_NZ_geneno1B_table;
 	cellP1_to_geneP1_to_umis_tab -> appendix2 = used_cellnoP1_tab;
 	HashTableIteration(cellP1_to_geneP1_to_umis_tab, cellCounts_merged_write_sparse_unique_genes);
-	srInt_64 total_UMIs = cellP1_to_geneP1_to_umis_tab -> counter1;
+	srInt_64 total_lines = cellP1_to_geneP1_to_umis_tab -> counter1;
 	ArrayList * unique_NZ_genenosP1_list = HashTableKeys(unique_NZ_geneno1B_table);
 	HashTableDestroy(unique_NZ_geneno1B_table);
 	HashTableDestroy(used_cellnoP1_tab);
 	ArrayListSort(unique_NZ_genenosP1_list, NULL);
 
 	#ifdef __MINGW32__
-	fprintf(ofp_mtx, "%" PRId64 " %" PRId64 " %" PRId64 "\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
+	fprintf(ofp_mtx, "%" PRId64 " %" PRId64 " %" PRId64 "\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_lines );
 	#else
-	fprintf(ofp_mtx, "%lld %lld %lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_UMIs );
+	fprintf(ofp_mtx, "%lld %lld %lld\n", unique_NZ_genenosP1_list -> numOfElements , used_cell_barcodes -> numOfElements,  total_lines );
 	#endif
 
 	for(x2=0; x2 < unique_NZ_genenosP1_list -> numOfElements; x2++){
@@ -4368,6 +4394,12 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 			HashTablePut(sorted_order_p1_to_i_p1_tab, NULL+ feature1->sorted_order+1 , NULL+xk1+1 );
 		}
 
+		if(cct_context -> report_excluded_barcodes){
+			ArrayList * all_barcode_index_list = HashTableKeys(cellbcP1_to_umis_tab);
+			for(xk1=0; xk1<all_barcode_index_list->numOfElements; xk1++) all_barcode_index_list->elementList[xk1]--;
+			cellCounts_merged_write_sparse_matrix(cct_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, all_barcode_index_list, x1, "RawOut", loaded_features, sorted_order_p1_to_i_p1_tab);
+			ArrayListDestroy(all_barcode_index_list);
+		}
 		cellCounts_merged_write_sparse_matrix(cct_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, high_confid_barcode_index_list, x1, "HighConf",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		cellCounts_merged_write_sparse_matrix(cct_context, cellP1_to_geneP1_to_umis[x1], cellbcP1_to_umis_tab, this_sample_ambient_rescure_candi, x1, "RescCand",  loaded_features, sorted_order_p1_to_i_p1_tab);
 		cellCounts_merged_45K_to_90K_sum( cct_context, cellP1_to_geneP1_to_umis[x1], this_sample_45k_90k_barcode_no_P0, x1 , loaded_features, sorted_order_p1_to_i_p1_tab);

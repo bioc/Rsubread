@@ -77,6 +77,7 @@ void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void *
 
 // A simple comparison function if you want to sort unsigned long long ints.
 int ArrayListLLUComparison(void * L_elem, void * R_elem);
+int ArrayListStringComparison(void * L_elem, void * R_elem);
 
 // This function returns the index of the value in the list that is the minumum value greater than "value_less_than_dent".
 // The elements in the list are all zero-based unsigned long long ints. The list must be sorted (small -> large) before calling this function.
