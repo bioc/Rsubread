@@ -682,12 +682,15 @@ void cellCounts_close_sample_SamBam_writers(void *v){
 }
 
 void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simple_bam_writer * wtr){
-	int x1, outcapa=3000, outsize=0;
+	int x1, outcapa, outsize=0;
 	unsigned int last_end = 0;
+	int rebuilt_len = strlen(cct_context->cmd_rebuilt) + 200;
+	outcapa = rebuilt_len + MAX_CHROMOSOME_NAME_LEN *2 + 200;
 	char * outbuff = malloc(outcapa);
+
 	outsize += sprintf(outbuff, "@HD\tVN:1.0\tSO:%s\n", "coordinate");
 	for(x1=0;x1<cct_context->chromosome_table.total_offsets; x1++){
-		if(outsize >= outcapa -MAX_CHROMOSOME_NAME_LEN -40){
+		if(outsize + rebuilt_len >= outcapa -MAX_CHROMOSOME_NAME_LEN -40){
 			outcapa *=2;
 			outbuff = realloc(outbuff, outcapa);
 		}
