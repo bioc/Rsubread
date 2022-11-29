@@ -1082,11 +1082,10 @@ library(Matrix)
 .load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab, umi.cutoff){
   set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
-  #cat("Loading high-conf matrix from '",fname,"'\n")
   cat("Perform cell rescuing for sample",sample.no,"...\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   raw.fname <- paste0(fname,".RawOut.spmtx")
-  if(file.exists(raw.fname))rawout <- as.matrix(.read.sparse.mat(paste0(fname,".RawOut")))
+  if(file.exists(raw.fname))rawout <- .read.sparse.mat(paste0(fname,".RawOut"))
   else rawout <- NULL
   rescued <- NA
   if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
@@ -1106,12 +1105,13 @@ library(Matrix)
     if(!any(is.na(rescued)))ret[rownames(rescued), colnames(rescued) ] <- rescued
 
     retc<- list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
-    if(!is.null(rawout))ret[["ExcludedCells"]]=rawout[,!( colnames(rawout) %in% colnames(ret) )]
+    exclout <-  rawout[,!( colnames(rawout) %in% colnames(ret) )]
+    if(!is.null(rawout))retc[["ExcludedCells"]] <- exclout
   }else{
     fcmat <- .match.exons(annot.tab,highconf)
     rownames(fcmat)<-NULL
     retc<- list(Counts=fcmat, HighConfidneceCell=rep(T, ncol(highconf)))
-    if(!is.null(rawout))ret[["ExcludedCells"]]=rawout[,!( colnames(rawout) %in% colnames(fcmat) )]
+    if(!is.null(rawout))retc[["ExcludedCells"]] <- rawout[,!( colnames(rawout) %in% colnames(fcmat) )]
   }
   return(retc)
 }
