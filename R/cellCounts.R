@@ -846,10 +846,18 @@
     stop(sprintf("ERROR: no known cell barcode set was found for the data set. The highest percentage of cell-barcode matched reads is %.1f%%\n", max.cell.good*100.))
 }
 
-library(Matrix)
+.read.sparse.mat.by.genes <- function (fn, genes){
+  mtxrows <- read.delim(paste0(fn,".spmtx"), skip=2, header=F, sep=' ')
+  coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
+  rown <- read.delim(paste0(fn, ".GENEtab"), stringsAsFactors=F, header=F)$V1
+  out.gene.idx <- match(rown ,genes )
+  gene.ranks <- out.gene.idx[as.numeric(mtxrows[,1])]
+  cell.ranks <- as.numeric(mtxrows[,2])
+  Matrix::sparseMatrix(i=gene.ranks, j=cell.ranks , x=as.numeric(mtxrows[,3]))
+}
 .read.sparse.mat <- function (fn){
   #cat("Loading matrix from",fn,"\n")
-  mtx <- readMM(paste0(fn, ".spmtx"))
+  mtx <- Matrix::readMM(paste0(fn, ".spmtx"))
   if(file.size(paste0(fn, ".BCtab"))>0){
     coln <- read.delim(paste0(fn, ".BCtab"), stringsAsFactors=F, header=F)$V1
     colnames(mtx) <- coln
@@ -923,7 +931,6 @@ library(Matrix)
     }
     Old_bs_one <- bcsize_one
   }
-  #if(5000 <= all.steps.len)print("WARNING: SMALL STEPS >= 5000!")
 
   Old_bs_one <- NA
   M50.in.loop.K <- 0
@@ -1085,8 +1092,9 @@ library(Matrix)
   cat("Perform cell rescuing for sample",sample.no,"...\n")
   highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   raw.fname <- paste0(fname,".RawOut.spmtx")
-  if(file.exists(raw.fname))rawout <- .read.sparse.mat(paste0(fname,".RawOut"))
-  else rawout <- NULL
+  if(file.exists(raw.fname)){
+    rawout <- .read.sparse.mat.by.genes(paste0(fname,".RawOut"), FC.gene.ids)
+  }else rawout <- NULL
   rescued <- NA
   if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
 
@@ -1105,8 +1113,7 @@ library(Matrix)
     if(!any(is.na(rescued)))ret[rownames(rescued), colnames(rescued) ] <- rescued
 
     retc<- list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
-    exclout <-  rawout[,!( colnames(rawout) %in% colnames(ret) )]
-    if(!is.null(rawout))retc[["ExcludedCells"]] <- exclout
+    if(!is.null(rawout)) retc[["ExcludedCells"]] <- rawout[,!( colnames(rawout) %in% colnames(ret) )]
   }else{
     fcmat <- .match.exons(annot.tab,highconf)
     rownames(fcmat)<-NULL
@@ -1233,7 +1240,6 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   minVotesPerRead <- minVotes
   subreadsPerRead <- nsubreads
   unique.mapping <- uniqueMapping
-  .remove.temp.files <- T
 
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
   index.file.1 <- paste0(index, ".00.b.array")
