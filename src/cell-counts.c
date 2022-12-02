@@ -2761,7 +2761,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 							}
 						}
 						
-						if(1 && FIXLENstrcmp("R00004925364",read_name)==0){
+						if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
 							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
 						}
 
@@ -2816,7 +2816,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 	sort_arr [0] = trying_subread_no;
 	sort_arr [1] = ptrs;
 	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
-	if(1 && FIXLENstrcmp("R00004925364",read_name)==0){
+	if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
 		for(x1=0;x1<subreads ;x1++){
 			int myno = trying_subread_no[x1];
 			SUBREADprintf("SORTED-VOTES: %s #%d has %d votes ; subread_no=%d\n", read_name, x1, ptrs->votes[myno], myno);
@@ -2882,7 +2882,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 							}
 						}
 						
-						if(1 && FIXLENstrcmp("R00004925364",read_name)==0){ 
+						if(0 && FIXLENstrcmp("R00004925364",read_name)==0){ 
 							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
 						}
 
