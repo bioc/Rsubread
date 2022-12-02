@@ -428,14 +428,13 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 	struct gehash_bucket * current_bucket;
 	current_bucket = _gehash_get_bucket (the_table, subread);
 	int items = current_bucket -> current_items;
+	int my_no = subread_no + applied_subreads * is_negative_strand;
+	pnts -> votes[my_no] = 0;
 	if(!items) return ;
 
 	short *current_keys = current_bucket -> new_item_keys;
 	int imin=0, imax=items - 1;
 	int last_accepted_index;
-	int my_no = subread_no + applied_subreads * is_negative_strand;
-
-	pnts -> votes[my_no] = 0;
 	short key = subread / the_table->buckets_number;
 	while(1){
 		last_accepted_index=(imin+imax)/2;
@@ -1958,7 +1957,9 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 		int lineno = (sample_seq[6]-'0')*1000+(sample_seq[7]-'0')*100+(sample_seq[8]-'0')*10+(sample_seq[9]-'0') +1;
 		sample_no = HashTableGet(cct_context -> lineno1B_to_sampleno1B_tab, NULL+lineno)-NULL;
 	}else SUBREADprintf("Wrong read name: %s\n", read_name);
-
+	if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
+		SUBREADprintf("WRITE-INTO %s:: %s : %d\n", read_name, chro_name, chro_pos) ;
+	}
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq);
 
 	if(nhits > 1 && !cct_context -> allow_multi_overlapping_reads) nhits = 0;
@@ -2700,13 +2701,13 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 	void * sort_arr[2];
 	sort_arr [0] = trying_subread_no;
 	sort_arr [1] = ptrs;
-	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
-	if(0 && FIXLENstrcmp("R00000000057",read_name)==0){
+	if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
 		for(x1=0;x1<subreads ;x1++){
 			int myno = trying_subread_no[x1];
-			SUBREADprintf("SORTED-VOTES: #%d has %d votes ; subread_no=%d\n", x1, ptrs->votes[myno], myno);
+			SUBREADprintf("SORTED-VOTES: %s:: #%d has %d votes ; offset=%d ; loc=%d\n", read_name, x1, ptrs -> votes[x1], ptrs -> offsets[x1], ptrs -> start_location_in_index[x1] );
 		}
 	}
+	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
 
 	init_gene_vote(vote);
 	int cct_indel_len = cct_context -> max_indel_length, cct_indel_neg = -cct_context -> max_indel_length;
@@ -2760,7 +2761,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 							}
 						}
 						
-						if(0 && FIXLENstrcmp("R00000000057",read_name)==0 && kv >= 1224149411-200 && kv <= 1224149411 +200){
+						if(1 && FIXLENstrcmp("R00004925364",read_name)==0){
 							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
 						}
 
@@ -2815,10 +2816,10 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 	sort_arr [0] = trying_subread_no;
 	sort_arr [1] = ptrs;
 	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
-	if(0 && FIXLENstrcmp("R00000000057",read_name)==0){
+	if(1 && FIXLENstrcmp("R00004925364",read_name)==0){
 		for(x1=0;x1<subreads ;x1++){
 			int myno = trying_subread_no[x1];
-			SUBREADprintf("SORTED-VOTES: #%d has %d votes ; subread_no=%d\n", x1, ptrs->votes[myno], myno);
+			SUBREADprintf("SORTED-VOTES: %s #%d has %d votes ; subread_no=%d\n", read_name, x1, ptrs->votes[myno], myno);
 		}
 	}
 
@@ -2881,7 +2882,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 							}
 						}
 						
-						if(0 && FIXLENstrcmp("R00000000057",read_name)==0 && kv >= 1224149411-200 && kv <= 1224149411 +200){
+						if(1 && FIXLENstrcmp("R00004925364",read_name)==0){ 
 							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
 						}
 

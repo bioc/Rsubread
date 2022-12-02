@@ -853,7 +853,10 @@
   out.gene.idx <- match(rown ,genes )
   gene.ranks <- out.gene.idx[as.numeric(mtxrows[,1])]
   cell.ranks <- as.numeric(mtxrows[,2])
-  Matrix::sparseMatrix(i=gene.ranks, j=cell.ranks , x=as.numeric(mtxrows[,3]))
+  ret <- Matrix::sparseMatrix(i=gene.ranks, j=cell.ranks , x=as.numeric(mtxrows[,3]))
+  rownames(ret) <- genes 
+  colnames(ret) <- coln 
+  ret
 }
 .read.sparse.mat <- function (fn){
   #cat("Loading matrix from",fn,"\n")
