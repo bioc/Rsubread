@@ -19,7 +19,7 @@
 \begin{document}
 \title{Rsubread package: high-performance read alignment, quantification and mutation discovery}
 \author{Wei Shi}
-\date{2 January 2019}
+\date{21 November 2022}
 \maketitle
 
 \section{Introduction}
@@ -142,6 +142,55 @@ Assign fragments (read pairs) to the two genes:
 <<>>=
 fc_PE <- featureCounts("alignResultsPE.BAM",annot.ext=ann,isPairedEnd=TRUE)
 fc_PE
+@
+\end{scriptsize}
+\section{Quantifying 10x scRNA-seq data}
+
+We provide the \R{cellCounts} function for quantifying 10x scRNA-seq data. This function takes either raw sequencing results or FASTQ files (gzipped or not) as input. It is also capable to directly take the output directory from the \R{cellranger mkfastq} or \R{bcl2fastq} command as the input. The output of this function is a list object containing the gene annotation, the UMI tables each for a sample, and the summary information of quantification.
+
+Below gives the example code of quantifying a scRNA-seq sample that has two gzipped FASTQ files:
+
+\begin{scriptsize}
+<<>>=
+md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
+URL <- "https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip"
+temp.file <- tempfile()
+temp.dir <- tempdir()
+downloaded <- tryCatch({
+    download.file(URL, destfile = temp.file)
+    tools::md5sum(temp.file) %in% md5.zip
+  },
+  error = function(cond){
+    return(FALSE)
+  }
+)
+
+if(downloaded){
+  unzip(temp.file, exdir=paste0(temp.dir,"/cellCounts-Example"))
+  library(Rsubread)
+  buildindex(paste0(temp.dir,"/chr1"), 
+    paste0(temp.dir,"/cellCounts-Example/hg38_chr1.fa.gz"))
+}
+@
+<<>>=
+if(downloaded){
+  sample.sheet <- data.frame(
+    BarcodeUMIFile = paste0(temp.dir,"/cellCounts-Example/reads_R1.fastq.gz"), 
+    ReadFile = paste0(temp.dir,"/cellCounts-Example/reads_R2.fastq.gz"),
+    SampleName="Example", stringsAsFactors=FALSE
+  )
+  counts <- cellCounts(paste0(temp.dir,"/chr1"), sample.sheet,  nthreads=1,
+    input.mode="FASTQ", annot.inbuilt="hg38")
+}
+@
+<<>>=
+if(downloaded) print(counts$sample.info)
+@
+<<>>=
+if(downloaded) print(dim(counts$counts$Example))
+@
+<<>>=
+if(!downloaded) cat("Unable to download the file.\n") 
 @
 \end{scriptsize}
 
