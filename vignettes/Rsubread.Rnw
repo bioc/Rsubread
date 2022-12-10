@@ -150,18 +150,21 @@ The \R{cellCounts} function can be used to quantify the scRNA-seq data generated
 
 \begin{scriptsize}
 <<>>=
-md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
-URL <- "https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip"
-temp.file <- tempfile()
-temp.dir <- tempdir()
-downloaded <- tryCatch({
-    download.file(URL, destfile = temp.file)
-    tools::md5sum(temp.file) %in% md5.zip
-  },
-  error = function(cond){
-    return(FALSE)
-  }
-)
+if(.Platform$OS.type != "windows") {
+  md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
+  URL <- "https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip"
+  temp.file <- tempfile()
+  temp.dir <- tempdir()
+  downloaded <- tryCatch({
+      download.file(URL, destfile = temp.file)
+      tools::md5sum(temp.file) %in% md5.zip
+    },
+    error = function(cond){
+      return(FALSE)
+    }
+  )
+  if(!downloaded) cat("Unable to download the file.\n") 
+} else downloaded <- FALSE
 
 if(downloaded){
   unzip(temp.file, exdir=paste0(temp.dir,"/cellCounts-Example"))
@@ -186,9 +189,6 @@ if(downloaded) print(counts$sample.info)
 @
 <<>>=
 if(downloaded) print(dim(counts$counts$Example))
-@
-<<>>=
-if(!downloaded) cat("Unable to download the file.\n") 
 @
 \end{scriptsize}
 
