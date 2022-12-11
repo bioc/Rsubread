@@ -1,3 +1,7 @@
+12 Dec 2022 - 2.12.2
+(1) Updated the manual page for cellCounts and the users' guide.
+(2) Fixed the error when the vignettes are compiled in Windows.
+
 8 Dec 2022 - 2.12.1
 (1) Fixed a bug in cellCounts that caused uncertainty in mapping results.
 (2) Added an option for cellCounts to report UMI counts for the excluded cell barcodes in filtering.
