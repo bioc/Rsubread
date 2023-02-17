@@ -810,6 +810,7 @@
     sprintf("http://shilab-bioinformatics.github.io/cellCounts/Barcodes/%s",uri)
 }
 
+.reads.for.find.barcode <- 10000
 .find_best_cellbarcode <- function( input.directory, sample.sheet=NULL, input.mode="bcl"){
     barcode.database.file <- path.expand("~/.Rsubread/cellCounts/known_barcode_sets.txt")
     if(!file.exists(barcode.database.file)){
@@ -827,7 +828,7 @@
             if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
         }
         cat(sprintf("Testing the cell barcodes in %s.\n", libf))
-        barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, 30000, input.mode)
+        barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, .reads.for.find.barcode, input.mode)
         if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
         sample.good.rate <- barcode_res[2]/barcode_res[1]
         cell.good.rate <- barcode_res[3]/barcode_res[1]

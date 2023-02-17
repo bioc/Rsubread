@@ -527,11 +527,15 @@ typedef pthread_mutex_t  cellCounts_lock_t;
 #define cellCounts_lock_release pthread_mutex_unlock
 */
 
+/*
 typedef struct{
 	int is_spin_lock;
 	pthread_spinlock_t spinlock;
 	pthread_mutex_t mutexlock;
 } cellCounts_lock_t;
+*/
+
+typedef pthread_mutex_t cellCounts_lock_t;
 
 void cellCounts_init_lock(cellCounts_lock_t * lock, int is_spin);
 void cellCounts_destroy_lock(cellCounts_lock_t * lock);

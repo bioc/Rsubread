@@ -421,6 +421,14 @@ int cacheBCL_next_chunk(cache_BCL_t * cache_input){
 	return 0;
 }
 
+void iCache_copy_readbin(cache_BCL_t * cache_input, int * readlane, char * readbin, srInt_64 rno){
+	int bii, readno = cache_input -> read_no_in_chunk, blen=cache_input -> total_bases_in_each_cluster; 
+	for(bii = 0; bii < blen; bii++) readbin[bii] = cache_input -> bcl_bin_cache[bii][readno];
+
+	(* readlane) = cache_input -> lane_no_in_chunk[readno];
+	cache_input -> read_no_in_chunk=1+readno;
+	return;
+}
 
 int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, srInt_64 rno){
 	int bii, idx_offset, base_offset;
@@ -470,7 +478,19 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 	return srii[2+is_dual_index];
 }
 
+int * cacheBCL_next_readbin(cache_BCL_t * cache_input, int * readlane, char * readbin, srInt_64 * read_number_in_all){
+	if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk){
+		if(cache_input -> last_chunk_in_cache) return NULL;
+		cacheBCL_next_chunk(cache_input);
+		if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk) // no reads are loaded in the previous step
+			return NULL;
+	}
 
+	srInt_64 rnumb =(cache_input -> chunk_no -1)*1ll * cache_input -> reads_per_chunk +(cache_input -> read_no_in_chunk);
+	(*read_number_in_all) = rnumb;
+	iCache_copy_readbin(cache_input, readlane, readbin, rnumb);
+	return cache_input -> single_read_lengths;
+}
 
 int cacheBCL_next_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, srInt_64 * read_number_in_all){
 	if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk){

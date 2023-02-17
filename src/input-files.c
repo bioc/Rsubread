@@ -770,22 +770,28 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0, NULL);
 }
 
+int * geinput_next_readbin_with_lock(gene_input_t * input, int * read_lane, char * readbin, subread_read_number_t * total_number){
+	if(input -> file_type == GENE_INPUT_BCL) {
+		int * rv = cacheBCL_next_readbin(&input -> bcl_input, read_lane, readbin, total_number);
+		return rv;
+	}else{
+		SUBREADprintf("Binary read can only be retrieved for BCL input!\n");
+		return -1;
+	}
+}
 // returns read length if OK 
-int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary, cellCounts_lock_t * lock){
+int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * read_string, char * quality_string){
 	if(input -> file_type == GENE_INPUT_BCL) {
 		int rv = cacheBCL_next_read(&input -> bcl_input, read_name, read_string, quality_string, NULL);
 		if(rv<=0) return -1;
-		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
 		int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
 		if(rv<=0) return rv;
-		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_BAM) {
 		int rv = scBAM_next_read(&input -> scBAM_input, read_name, read_string, quality_string);
 		if(rv<=0) return -1;
-		if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
 		return rv;
 	}
 

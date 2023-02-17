@@ -267,7 +267,7 @@ typedef struct {
 	int do_scRNA_table;
 	float fractional_minimum_overlapping; 
 	float fractional_minimum_feature_overlapping;
-	int use_overlapping_break_tie;
+	int only_want_largest_overlap;
 	int max_missing_bases_in_read, max_missing_bases_in_feature;
 
 	srInt_64 all_reads;
@@ -638,17 +638,6 @@ int print_FC_configuration(fc_thread_global_context_t * global_context, char * a
 	int nfiles=1, nBAMfiles = 0, nNonExistFiles = 0, x1;
 	char MAC_or_random[13];
 	mac_or_rand_str(MAC_or_random);
-
-	/*
-	if(global_context -> max_missing_bases_in_read >= 0 && global_context -> fractional_minimum_overlapping > 0.000001){
-		SUBREADprintf("\nERROR: multiple filtering conditions on overlapping bases in reads\n");
-		return 1;
-	}
-
-	if(global_context -> max_missing_bases_in_feature >= 0 && global_context -> fractional_minimum_feature_overlapping > 0.000001){
-		SUBREADprintf("\nERROR: multiple filtering conditions on overlapping bases in features\n");
-		return 1;
-	}*/
 
 	sprintf(sam_used, "%s/featureCounts_test_file_writable-%06d-%s.tmp", global_context -> temp_file_dir, getpid(), MAC_or_random);
 	FILE * fp = fopen(sam_used,"w");
@@ -1707,9 +1696,8 @@ int strcmp_slash(char * s1, char * s2)
 
 #define NH_FRACTION_INT 65536
 
-unsigned int calculate_multi_overlap_fraction(fc_thread_global_context_t * global_context, unsigned int fixed_fractional_count, int maximum_total_count){
-	//SUBREADprintf("SSSSFRAC = %d ; FIXED / MAX = %u , %d\n", global_context -> use_fraction_multi_mapping, fixed_fractional_count, maximum_total_count);
-	if(global_context -> use_fraction_multi_mapping) return fixed_fractional_count / maximum_total_count;
+unsigned int calculate_multi_overlap_fraction(fc_thread_global_context_t * global_context, unsigned int fixed_fractional_count, int passed_filters_count){
+	if(global_context -> use_fraction_multi_mapping) return fixed_fractional_count / passed_filters_count;
 	else return fixed_fractional_count;
 }
 
@@ -2747,7 +2735,7 @@ int process_pairer_output(void * pairer_vp, int thread_no, char * bin1, char * b
 	}
 
 	process_line_buffer(global_context, thread_context, bin1, bin2);
-	if(0 && global_context -> do_junction_counting){
+	if(global_context -> do_junction_counting){// We decided to use all reads for junction counting on 08FEB2023. All reads with "N" in them will be counted against junctions, no matter whether they were used in read counting. 
 		process_line_junctions(global_context, thread_context, bin1, bin2);
 	}
 	return 0;
@@ -3532,7 +3520,7 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	}	// loop for is_second_read
 
 
-	if(global_context -> do_junction_counting)// junction reads that passed the basic filters will be considered with the junction counting. Filters: Unmapped, Singleton, MAPQ, TemplateLength, Chimeric, Duplicate, Multimapping, Secondary alignment, Junction-containing status, 
+	if(0&&global_context -> do_junction_counting)// junction reads that passed the basic filters will be considered with the junction counting. Filters: Unmapped, Singleton, MAPQ, TemplateLength, Chimeric, Duplicate, Multimapping, Secondary alignment, Junction-containing status. But this was reversed on 08FEB2023. Hence it isn't executed here. 
 	        process_line_junctions(global_context, thread_context, bin1, bin2);
 
 	if(global_context -> need_calculate_fragment_len )
@@ -4762,14 +4750,14 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		unsigned int * scoring_flags = thread_context -> scoring_buff_flags;		// size is : MAX_HIT_NUMBER *2
 		unsigned int * scoring_overlappings = thread_context -> scoring_buff_overlappings;		// size is : MAX_HIT_NUMBER *2
 		srInt_64 * scoring_exon_ids = thread_context -> scoring_buff_exon_ids;		// size is : MAX_HIT_NUMBER *2
-		int scoring_count = 0,  score_x1;
-
+		int scoring_count = 0,  score_x1, longest_overlap_score;
 
 		if( global_context -> need_calculate_overlap_len ){
 			int end1, end2, hit_x1, hit_x2;
 			char ** scoring_gap_chros = thread_context -> scoring_buff_gap_chros;
 			unsigned int * scoring_gap_starts = thread_context -> scoring_buff_gap_starts; // size is : MAX_HIT_NUMBER *2;
 			unsigned short * scoring_gap_lengths = thread_context -> scoring_buff_gap_lengths; 	// size is : MAX_HIT_NUMBER *2*  global_context -> max_M*2
+			longest_overlap_score = 0;
 
 			char used_hit1 [nhits1];
 			char used_hit2 [nhits2];
@@ -4792,10 +4780,13 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						srInt_64 applied_overlapping_threshold_frac = 0, applied_overlapping_threshold_missing = 0; 
 						if(global_context -> max_missing_bases_in_feature >= 0){
 							if(exon_span <= global_context -> max_missing_bases_in_feature) applied_overlapping_threshold_missing = 0;
-							else applied_overlapping_threshold_missing = 10000L * (exon_span - global_context -> max_missing_bases_in_feature);
+							else applied_overlapping_threshold_missing = exon_span - global_context -> max_missing_bases_in_feature;
 						}
 
-						applied_overlapping_threshold_frac = (srInt_64)(exon_span *10000.* global_context ->  fractional_minimum_feature_overlapping + 0.9999);
+						double applied_overlapping_threshold_frac_float = exon_span * global_context ->  fractional_minimum_feature_overlapping;
+						applied_overlapping_threshold_frac = (srInt_64)(applied_overlapping_threshold_frac_float);
+						// use the first 3 digits after decimal point to round-up: if the first 3 digits is 001, 002, ..., 999 then add 1.
+						if(applied_overlapping_threshold_frac_float - applied_overlapping_threshold_frac >=0.001) applied_overlapping_threshold_frac++;
 
 						srInt_64 applied_overlapping_threshold = max(applied_overlapping_threshold_frac , applied_overlapping_threshold_missing);
 
@@ -4824,10 +4815,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						}
 
 
-						srInt_64 tested_exon_overlap_any_read = 10000L*calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps, read_name);
+						srInt_64 tested_exon_overlap_any_read = calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps, read_name);
 						if(applied_overlapping_threshold > tested_exon_overlap_any_read){
 							// remove this exon from lists
-
 							for(end2 = 0; end2 < global_context -> is_paired_end_mode_assign + 1 ; end2++){
 								int allhits2 = end2?nhits2:nhits1;
 								srInt_64 * hits_indices_X2 = end2?hits_indices2:hits_indices1;
@@ -4896,7 +4886,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 								scoring_gap_starts[ gaps ] = (end2?hits_start_pos2:hits_start_pos1)[hit_x2]; 
 								scoring_gap_lengths[ gaps ] = (end2?hits_length2:hits_length1)[hit_x2]; 
 
-								if((scoring_flags[scoring_count] & (end2?2:1))== 0 ){
+								if(!global_context -> is_multi_overlap_allowed)if((scoring_flags[scoring_count] & (end2?2:1))== 0 ){// when "-O" is specified: no preference toward two-end overlapping.
 									scoring_flags[scoring_count] |= end2?2:1;
 									scoring_numbers[scoring_count] ++;
 								}
@@ -4906,8 +4896,11 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 					}
 
 					scoring_overlappings [scoring_count] = calc_score_overlaps(global_context, thread_context, scoring_gap_chros, scoring_gap_starts, scoring_gap_lengths, gaps, read_name);
-					if( global_context -> use_overlapping_break_tie )
-						scoring_numbers[scoring_count] = scoring_overlappings [scoring_count];
+					if( global_context -> only_want_largest_overlap ) {
+						int this_overlap_score = scoring_overlappings [scoring_count] *2 + (scoring_flags[scoring_count] ==3?1:0); // after a discussion on 15FEB2023, we still prefer paired-end overlapping if largest-overlap is enabled.
+						longest_overlap_score = max(longest_overlap_score,this_overlap_score);
+						scoring_numbers[scoring_count] = this_overlap_score;
+					}
 					scoring_count++;
 				}
 			}
@@ -4932,7 +4925,8 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						else	score_x1_key = scoring_exon_ids[score_x1] ;
 
 						if( score_x1_key == score_merge_key ){
-							if((scoring_flags[score_x1] & ( ends?2:1 )) == 0) {
+							if(!global_context -> is_multi_overlap_allowed)if((scoring_flags[score_x1] & ( ends?2:1 )) == 0) {
+								// when "-O" is specified: no preference toward two-end overlapping. SEE the Email on 15FEB2023
 								scoring_flags[score_x1] |= (ends?2:1);
 								scoring_numbers[score_x1] ++;
 							}
@@ -4954,24 +4948,9 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		}
 
 
-		int maximum_score = 0;
-		int maximum_total_count = 0;
-		int maximum_score_x1 = 0;
-		srInt_64 applied_fragment_minimum_overlapping_overlap = 1, applied_fragment_minimum_overlapping_missing = 1;
-		srInt_64 applied_fragment_minimum_overlapping = 1;
-		int overlapping_total_count = 0;
-
-		if( global_context -> fragment_minimum_overlapping > 1 ||  global_context -> need_calculate_fragment_len || global_context -> max_missing_bases_in_read >= 0){
-			if(global_context -> max_missing_bases_in_read >=0){
-				if(total_frag_len <= global_context -> max_missing_bases_in_read) applied_fragment_minimum_overlapping_missing = 0;
-				else applied_fragment_minimum_overlapping_missing = 10000L * (total_frag_len - global_context -> max_missing_bases_in_read);
-			}
-
-			applied_fragment_minimum_overlapping_overlap = max( 10000L * global_context -> fragment_minimum_overlapping, 10000. * global_context -> fractional_minimum_overlapping * total_frag_len + 0.5);
-
-			applied_fragment_minimum_overlapping = max(applied_fragment_minimum_overlapping_overlap , applied_fragment_minimum_overlapping_missing);
-		}
-
+		int passed_filters_score = 0;
+		int passed_filters_count = 0;
+		int passed_filters_first_index = 0;
 		if(scoring_count == 0){
 			if(global_context -> read_details_out_FP)
 				write_read_details_FP(global_context, thread_context,"Unassigned_NoFeatures",-1, NULL, bin1, bin2);
@@ -4983,146 +4962,160 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 
 			if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
 		}else{
-				for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
-//					#warning "======= DEBUG OUT ================"
-					if(0 && FIXLENstrcmp("V0112_0155:7:1101:20072:12961", read_name)==0)
-						SUBREADprintf("READ: %s  FRAG_LEN=%d,  THIS_OVERLAP=%d\n", read_name, total_frag_len, scoring_overlappings[score_x1]);
-					if( applied_fragment_minimum_overlapping > 1 )
-						if( applied_fragment_minimum_overlapping > 10000L*scoring_overlappings[score_x1] ){
-							scoring_numbers[score_x1] = 0;
-							continue;
-						}
-					
-					if( maximum_score < scoring_numbers[score_x1] ){
-						maximum_total_count = 1;
-						maximum_score = scoring_numbers[score_x1];
-						maximum_score_x1 = score_x1;
-					}else if( maximum_score == scoring_numbers[score_x1] )
-						maximum_total_count++;
-					overlapping_total_count ++;
+			if(global_context -> need_calculate_overlap_len) { 
+				// Apply filters against overlap lengths. 
+				srInt_64 applied_fragment_minimum_overlapping_overlap = 1, applied_fragment_minimum_overlapping_missing = 1;
+				srInt_64 applied_fragment_minimum_overlapping = 1;
+
+				if(global_context -> max_missing_bases_in_read >=0){
+					if(total_frag_len <= global_context -> max_missing_bases_in_read) applied_fragment_minimum_overlapping_missing = 0;
+					else applied_fragment_minimum_overlapping_missing = total_frag_len - global_context -> max_missing_bases_in_read;
 				}
 
-				if(maximum_total_count == 0){
-					if(global_context -> read_details_out_FP)
-						write_read_details_FP(global_context, thread_context,"Unassigned_Overlapping_Length", -1, NULL, bin1, bin2);
+				double fractional_minimum_overlapping_float = global_context -> fractional_minimum_overlapping * total_frag_len;
+				srInt_64 applied_fractional_minimum_overlapping = (srInt_64) fractional_minimum_overlapping_float;
+				// use the first 3 digits after decimal point to round-up: if the first 3 digits is 001, 002, ..., 999 then add 1.
+				if(fractional_minimum_overlapping_float - applied_fractional_minimum_overlapping >= 0.001) applied_fractional_minimum_overlapping++;
+
+				applied_fragment_minimum_overlapping_overlap = max( global_context -> fragment_minimum_overlapping, applied_fractional_minimum_overlapping);
+				applied_fragment_minimum_overlapping = max(applied_fragment_minimum_overlapping_overlap , applied_fragment_minimum_overlapping_missing);
+
+				for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
+					if(applied_fragment_minimum_overlapping > scoring_overlappings[score_x1]) scoring_numbers[score_x1] = 0;
+					if(longest_overlap_score > scoring_numbers[score_x1]) scoring_numbers[score_x1] = 0;
+						//"It is the largest overlap" is a filter step. Discussed on 15FEB2023.
+						// longest_overlap_score is 0 if largestOverlap isn't enabled.
+				}
+			}
+
+			for(score_x1 = 0; score_x1 < scoring_count ; score_x1++){
+				if(scoring_numbers[score_x1]<1) continue;
+				if(passed_filters_score < scoring_numbers[score_x1]){
+					passed_filters_count = 1;
+					passed_filters_score = scoring_numbers[score_x1];
+					passed_filters_first_index = score_x1;
+				}else if(passed_filters_score == scoring_numbers[score_x1])
+					passed_filters_count++;
+			}
+		
+			if(passed_filters_count == 0){
+				if(global_context -> read_details_out_FP)
+					write_read_details_FP(global_context, thread_context,"Unassigned_Overlapping_Length", -1, NULL, bin1, bin2);
+				
+				if(RG_name){
+					void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
+					fc_read_counters * sumtab = tab4s[1];
+					sumtab -> unassigned_overlapping_length++;
+				}else thread_context->read_counters.unassigned_overlapping_length ++;
+
+				if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
+			}else{
+				if(1 == passed_filters_count && !global_context -> is_multi_overlap_allowed) {
+					// some undesired scoring_numbers may be >0.
+					// but we saved passed_filters_first_index so we just add score to it.
+					srInt_64 max_exon_id = scoring_exon_ids[passed_filters_first_index];
 					
 					if(RG_name){
 						void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
 						fc_read_counters * sumtab = tab4s[1];
-						sumtab -> unassigned_overlapping_length++;
-					}else thread_context->read_counters.unassigned_overlapping_length ++;
+						sumtab -> assigned_reads++;
+						
+						read_count_type_t * count_table = tab4s[0];
+						count_table[max_exon_id] += fixed_fractional_count;
+					}else{
+						thread_context->count_table[max_exon_id] += fixed_fractional_count;
+						thread_context->read_counters.assigned_reads ++;
+					}
+					thread_context->nreads_mapped_to_exon++;
+					if(global_context -> read_details_out_FP) {
+						int final_gene_number = global_context -> exontable_geneid[max_exon_id];
+						char * final_feture_name = (char *)global_context -> gene_name_array[final_gene_number];
+						write_read_details_FP(global_context, thread_context,"Assigned", 1, final_feture_name, bin1, bin2);
+					}
+
+					if(global_context -> do_scRNA_table){
+						srInt_64 assignment_target_number = max_exon_id;
+						if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[max_exon_id];
+						add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name, bin1, NULL);
+					}
+				}else if(global_context -> is_multi_overlap_allowed) {
+					for(score_x1 = 0; score_x1 < scoring_count ; score_x1++)
+						if(scoring_numbers[score_x1]<passed_filters_score) scoring_numbers[score_x1] = 0;
+	
+					#define GENE_NAME_LIST_BUFFER_SIZE (FEATURE_NAME_LENGTH * 50) 
+
+					char final_feture_names[GENE_NAME_LIST_BUFFER_SIZE];
+					int assigned_no = 0, xk1;
+					final_feture_names[0]=0;
+					int is_etc = 0;
+
+					ArrayList * assigned_list = NULL;
+					if(global_context -> do_scRNA_table)assigned_list = ArrayListCreate(20);
+					for(xk1 = 0; xk1 < scoring_count; xk1++) {
+
+						// This change was made on 31/MAR/2016
+						if( scoring_numbers[xk1] < 1 ) continue ;
+
+						srInt_64 tmp_voter_id = scoring_exon_ids[xk1];
+						srInt_64 assignment_target_number = tmp_voter_id;
+						if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[tmp_voter_id];
+
+						if(global_context -> do_scRNA_table)ArrayListPush(assigned_list, NULL+assignment_target_number);
+						if(RG_name){
+							void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
+							read_count_type_t * count_table = tab4s[0];
+							count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, passed_filters_count);
+						}else thread_context->count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, passed_filters_count);
+
+						if(global_context -> read_details_out_FP) {
+							if(strlen(final_feture_names)< (GENE_NAME_LIST_BUFFER_SIZE - 40 - FEATURE_NAME_LENGTH)) {
+								int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
+								unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
+								strncat(final_feture_names, (char *)final_feture_name, GENE_NAME_LIST_BUFFER_SIZE-1);
+								strncat(final_feture_names, ",", GENE_NAME_LIST_BUFFER_SIZE-1);
+							}else{
+								is_etc ++;
+							}
+							assigned_no++;
+						}
+					}
+
+					if(global_context -> do_scRNA_table && assigned_list->numOfElements>0)
+						add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, assigned_list);
+
+					if(assigned_list)ArrayListDestroy(assigned_list);
+
+					if(is_etc) sprintf(final_feture_names + strlen(final_feture_names), "... (%d names ommited),", is_etc);
+					final_feture_names[GENE_NAME_LIST_BUFFER_SIZE-1]=0;
+
+					if(RG_name){
+						void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
+						fc_read_counters * sumtab = tab4s[1];
+						sumtab -> assigned_reads++;
+					}else{
+						thread_context->read_counters.assigned_reads ++;
+					}
+					thread_context->nreads_mapped_to_exon++;
+					
+					if(global_context -> read_details_out_FP) {
+						int ffnn = strlen(final_feture_names);
+						if(ffnn>0) final_feture_names[ffnn-1]=0;
+						// overlapped but still assigned 
+						write_read_details_FP(global_context, thread_context, "Assigned", assigned_no, final_feture_names, bin1, bin2);
+					}
+				} else {
+					if(global_context -> read_details_out_FP)
+						write_read_details_FP(global_context, thread_context,"Unassigned_Ambiguity", -1, NULL, bin1, bin2);
+					if(RG_name){
+						fc_read_counters * sumtab = get_RG_tables(global_context, thread_context, RG_name)[1];
+						sumtab -> unassigned_ambiguous++;
+					}else{
+						thread_context->read_counters.unassigned_ambiguous ++;
+					}
 
 					if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
-				}else{
-
-					// final adding votes.
-					if(1 == maximum_total_count && !global_context -> is_multi_overlap_allowed) {
-						// simple add to the exon ( EXON_ID = decision_table_exon_ids[maximum_decision_no])
-						srInt_64 max_exon_id = scoring_exon_ids[maximum_score_x1];
-						
-						if(RG_name){
-							void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
-							fc_read_counters * sumtab = tab4s[1];
-							sumtab -> assigned_reads++;
-							
-							read_count_type_t * count_table = tab4s[0];
-							count_table[max_exon_id] += fixed_fractional_count;
-						}else{
-							thread_context->count_table[max_exon_id] += fixed_fractional_count;
-							thread_context->read_counters.assigned_reads ++;
-						}
-						thread_context->nreads_mapped_to_exon++;
-						if(global_context -> read_details_out_FP) {
-							int final_gene_number = global_context -> exontable_geneid[max_exon_id];
-							char * final_feture_name = (char *)global_context -> gene_name_array[final_gene_number];
-							write_read_details_FP(global_context, thread_context,"Assigned", 1, final_feture_name, bin1, bin2);
-						}
-
-						if(global_context -> do_scRNA_table){
-							srInt_64 assignment_target_number = max_exon_id;
-							if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[max_exon_id];
-							add_scRNA_read_to_pool(global_context, thread_context, assignment_target_number, read_name, bin1, NULL);
-						}
-					}else if(global_context -> is_multi_overlap_allowed) {
-						#define GENE_NAME_LIST_BUFFER_SIZE (FEATURE_NAME_LENGTH * 50) 
-
-						char final_feture_names[GENE_NAME_LIST_BUFFER_SIZE];
-						int assigned_no = 0, xk1;
-						final_feture_names[0]=0;
-						int is_etc = 0;
-
-						ArrayList * assigned_list = NULL;
-						if(global_context -> do_scRNA_table)assigned_list = ArrayListCreate(20);
-						for(xk1 = 0; xk1 < scoring_count; xk1++)
-						{
-
-							// This change was made on 31/MAR/2016
-							if( scoring_numbers[xk1] < 1 ) continue ;
-							if( scoring_numbers[xk1] < maximum_score && global_context -> use_overlapping_break_tie ) continue ; 
-
-							srInt_64 tmp_voter_id = scoring_exon_ids[xk1];
-
-							srInt_64 assignment_target_number = tmp_voter_id;
-							if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[tmp_voter_id];
-
-							if(global_context -> do_scRNA_table)ArrayListPush(assigned_list, NULL+assignment_target_number);
-							//if(1 && FIXLENstrcmp( read_name , "V0112_0155:7:1101:5467:23779#ATCACG" )==0)
-							//	SUBREADprintf("CountsFrac = %d ; add=%d\n", overlapping_total_count, calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count) );
-							if(RG_name){
-								void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
-								read_count_type_t * count_table = tab4s[0];
-								count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count);
-							}else thread_context->count_table[tmp_voter_id] += calculate_multi_overlap_fraction(global_context, fixed_fractional_count, overlapping_total_count);
-
-							if(global_context -> read_details_out_FP) {
-								if(strlen(final_feture_names)< (GENE_NAME_LIST_BUFFER_SIZE - 40 - FEATURE_NAME_LENGTH)) {
-									int final_gene_number = global_context -> exontable_geneid[tmp_voter_id];
-									unsigned char * final_feture_name = global_context -> gene_name_array[final_gene_number];
-									strncat(final_feture_names, (char *)final_feture_name, GENE_NAME_LIST_BUFFER_SIZE-1);
-									strncat(final_feture_names, ",", GENE_NAME_LIST_BUFFER_SIZE-1);
-								}else{
-									is_etc ++;
-								}
-								assigned_no++;
-							}
-						}
-
-						if(global_context -> do_scRNA_table && assigned_list->numOfElements>0)
-							add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, assigned_list);
-
-						if(assigned_list)ArrayListDestroy(assigned_list);
-
-						if(is_etc) sprintf(final_feture_names + strlen(final_feture_names), "... (%d names ommited),", is_etc);
-						final_feture_names[GENE_NAME_LIST_BUFFER_SIZE-1]=0;
-
-						if(RG_name){
-							void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
-							fc_read_counters * sumtab = tab4s[1];
-							sumtab -> assigned_reads++;
-						}else{
-							thread_context->read_counters.assigned_reads ++;
-						}
-						thread_context->nreads_mapped_to_exon++;
-						
-						if(global_context -> read_details_out_FP) {
-							int ffnn = strlen(final_feture_names);
-							if(ffnn>0) final_feture_names[ffnn-1]=0;
-							// overlapped but still assigned 
-							write_read_details_FP(global_context, thread_context, "Assigned", assigned_no, final_feture_names, bin1, bin2);
-						}
-					} else {
-						if(global_context -> read_details_out_FP)
-							write_read_details_FP(global_context, thread_context,"Unassigned_Ambiguity", -1, NULL, bin1, bin2);
-						if(RG_name){
-							fc_read_counters * sumtab = get_RG_tables(global_context, thread_context, RG_name)[1];
-							sumtab -> unassigned_ambiguous++;
-						}else{
-							thread_context->read_counters.unassigned_ambiguous ++;
-						}
-
-						if(global_context -> do_scRNA_table) add_scRNA_read_to_pool(global_context, thread_context, -1, read_name, bin1, NULL);
-					}
 				}
+			}
 		}
 	}
 }
@@ -6618,9 +6611,9 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 	global_context -> fractional_minimum_feature_overlapping = frac_feature_overlap;
 	global_context -> max_missing_bases_in_read = max_missing_bases_in_read;
 	global_context -> max_missing_bases_in_feature = max_missing_bases_in_feature;
-	global_context -> use_overlapping_break_tie = useOverlappingBreakTie;
+	global_context -> only_want_largest_overlap = useOverlappingBreakTie;
 	global_context -> need_calculate_fragment_len = ( global_context -> fractional_minimum_overlapping > 1E-10 ) || (global_context -> fractional_minimum_feature_overlapping > 1E-10) || ( global_context -> max_missing_bases_in_read >= 0 ) || ( global_context -> max_missing_bases_in_feature >= 0 );
-	global_context -> need_calculate_overlap_len = (global_context -> fractional_minimum_overlapping > 1E-10) || (global_context -> fragment_minimum_overlapping > 1) || global_context -> use_overlapping_break_tie || (global_context -> fractional_minimum_feature_overlapping > 1E-10) || ( global_context -> max_missing_bases_in_read >= 0 ) || ( global_context -> max_missing_bases_in_feature >= 0 );
+	global_context -> need_calculate_overlap_len = (global_context -> fractional_minimum_overlapping > 1E-10) || (global_context -> fragment_minimum_overlapping > 1) || global_context -> only_want_largest_overlap || (global_context -> fractional_minimum_feature_overlapping > 1E-10) || ( global_context -> max_missing_bases_in_read >= 0 ) || ( global_context -> max_missing_bases_in_feature >= 0 );
 	global_context -> debug_command = debug_command;
 	global_context -> max_M = max_M;
 	global_context -> max_BAM_header_size = buffer_size;
@@ -8990,7 +8983,7 @@ int feature_count_main(int argc, char ** argv)
 	int use_fraction_multimapping = 0;
 	int threads = 1;
 	int isGTF = 1;
-	int use_overlapping_length_break_tie = 0;
+	int only_want_largest_overlap = 0;
 	char nthread_str[4];
 	int option_index = 0;
 	int max_missing_bases_in_feature = -1;
@@ -9278,7 +9271,7 @@ int feature_count_main(int argc, char ** argv)
 
 				if(strcmp("largestOverlap", long_options[option_index].name)==0)
 				{
-					use_overlapping_length_break_tie = 1;
+					only_want_largest_overlap = 1;
 				}
 
 				if(strcmp("detectionCall", long_options[option_index].name)==0)
@@ -9425,7 +9418,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[31] = is_duplicate_ignored?"1":"0";
 	Rargv[32] = do_not_sort?"1":"0";
 	Rargv[33] = use_fraction_multimapping?"1":"0";
-	Rargv[34] = use_overlapping_length_break_tie?"1":"0";
+	Rargv[34] = only_want_largest_overlap?"1":"0";
 	Rargv[35] = Pair_Orientations;
 	Rargv[36] = do_junction_cnt?"1":"0";
 	Rargv[37] = fasta_contigs_name;
