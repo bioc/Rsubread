@@ -769,16 +769,6 @@ int geinput_next_read(gene_input_t * input, char * read_name, char * read_string
 {
 	return geinput_next_read_trim( input, read_name, read_string,  quality_string, 0, 0, NULL);
 }
-
-int * geinput_next_readbin_with_lock(gene_input_t * input, int * read_lane, char * readbin, subread_read_number_t * total_number){
-	if(input -> file_type == GENE_INPUT_BCL) {
-		int * rv = cacheBCL_next_readbin(&input -> bcl_input, read_lane, readbin, total_number);
-		return rv;
-	}else{
-		SUBREADprintf("Binary read can only be retrieved for BCL input!\n");
-		return -1;
-	}
-}
 // returns read length if OK 
 int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * read_string, char * quality_string){
 	if(input -> file_type == GENE_INPUT_BCL) {

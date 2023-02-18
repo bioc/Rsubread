@@ -478,18 +478,22 @@ int iCache_copy_read(cache_BCL_t * cache_input, char * read_name, char * seq, ch
 	return srii[2+is_dual_index];
 }
 
-int * cacheBCL_next_readbin(cache_BCL_t * cache_input, int * readlane, char * readbin, srInt_64 * read_number_in_all){
-	if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk){
-		if(cache_input -> last_chunk_in_cache) return NULL;
-		cacheBCL_next_chunk(cache_input);
-		if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk) // no reads are loaded in the previous step
-			return NULL;
-	}
+int cacheBCL_next_readbin(cache_BCL_t * cache_input, int * readlane, char rbin[BCL_READBIN_ITEMS_LOCAL][BCL_READBIN_SIZE], int max_readbin_buffer, srInt_64 * start_allread_no){
+	int ii;
+	srInt_64 rnumb;
+	for(ii=0; ii< max_readbin_buffer; ii++){
+		if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk){
+			if(cache_input -> last_chunk_in_cache) break; 
+			cacheBCL_next_chunk(cache_input);
+			if(cache_input -> read_no_in_chunk >= cache_input -> reads_available_in_chunk) // no reads are loaded in the previous step
+				break;
+		}
 
-	srInt_64 rnumb =(cache_input -> chunk_no -1)*1ll * cache_input -> reads_per_chunk +(cache_input -> read_no_in_chunk);
-	(*read_number_in_all) = rnumb;
-	iCache_copy_readbin(cache_input, readlane, readbin, rnumb);
-	return cache_input -> single_read_lengths;
+		rnumb =(cache_input -> chunk_no -1)*1ll * cache_input -> reads_per_chunk +(cache_input -> read_no_in_chunk);
+		if(!ii) (*start_allread_no) = rnumb;
+		iCache_copy_readbin(cache_input, readlane+ii, rbin[ii], rnumb);
+	}
+	return ii;
 }
 
 int cacheBCL_next_read(cache_BCL_t * cache_input, char * read_name, char * seq, char * qual, srInt_64 * read_number_in_all){

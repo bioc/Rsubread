@@ -104,6 +104,10 @@ typedef struct{
 	srInt_64 mapped_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 	srInt_64 assigned_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
+	srInt_64 bcl_input_local_start_no;
+	int bcl_input_local_filled, bcl_input_local_cached;
+	char bcl_input_local_readbin[BCL_READBIN_ITEMS_LOCAL][BCL_READBIN_SIZE];
+	int bcl_input_local_readlane[BCL_READBIN_ITEMS_LOCAL];
 
 	srInt_64 hiconf_map;
 	srInt_64 loconf_map;
@@ -2241,24 +2245,29 @@ int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readl
 	return sread_len;
 }
 
-#define BCL_READBIN_SIZE (2*MAX_SCRNA_READ_LENGTH) 
 int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int thread_no,int *read_len, char * read_name, char * read_text, char * qual_text, subread_read_number_t * read_no_in_chunk) {
 	int rl1=0;
-	subread_read_number_t this_number = -1, total_number;
+	subread_read_number_t this_number = -1;
 	gene_input_t * ginp1 = &cct_context -> input_dataset;
-	int readlane =0, * read_lengths=NULL;
-	unsigned char readbin[BCL_READBIN_SIZE];
 
 	if( ginp1 -> file_type == GENE_INPUT_BCL ){
-		total_number=0;
-
-		cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
-		read_lengths = cacheBCL_next_readbin(&ginp1 -> bcl_input,&readlane, readbin,&total_number);
-		if(read_lengths) this_number = total_number - cct_context -> all_processed_reads_before_chunk;
-		else cct_context -> running_processed_reads_in_chunk = (ginp1 -> bcl_input.read_no_in_chunk);
-		cellCounts_lock_release(&cct_context -> input_dataset_lock); 
-
-		if(read_lengths) rl1 = cellCounts_copy_bin_to_textread(cct_context, readlane, readbin, read_name, read_text , qual_text, read_lengths, total_number);
+		int * read_lengths = ginp1 -> bcl_input.single_read_lengths;
+		cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+		if(thread_context -> bcl_input_local_cached<1){
+			cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
+			int new_reads = cacheBCL_next_readbin(&ginp1 -> bcl_input, thread_context -> bcl_input_local_readlane , thread_context -> bcl_input_local_readbin, BCL_READBIN_ITEMS_LOCAL, &thread_context -> bcl_input_local_start_no);
+			if(new_reads)
+				thread_context -> bcl_input_local_cached = thread_context -> bcl_input_local_filled = new_reads;
+			else if(!cct_context -> running_processed_reads_in_chunk)
+				cct_context -> running_processed_reads_in_chunk = (ginp1 -> bcl_input.read_no_in_chunk);
+			cellCounts_lock_release(&cct_context -> input_dataset_lock); 
+		}
+		if(thread_context -> bcl_input_local_cached>0){
+			this_number = thread_context -> bcl_input_local_start_no + thread_context -> bcl_input_local_filled - thread_context -> bcl_input_local_cached;
+			thread_context -> bcl_input_local_cached --;
+			rl1 = cellCounts_copy_bin_to_textread(cct_context, thread_context -> bcl_input_local_readlane [thread_context -> bcl_input_local_cached], thread_context -> bcl_input_local_readbin[thread_context -> bcl_input_local_cached],
+				read_name, read_text , qual_text, read_lengths, this_number);
+		}
 		else rl1=0;
 
 	}else{
