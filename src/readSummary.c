@@ -7566,7 +7566,7 @@ void print_usage()
 	SUBREADputs("# Exon-exon junctions");
 	SUBREADputs("");
 	SUBREADputs("  -J                  Count number of reads supporting each exon-exon junction.");
-	SUBREADputs("                      Junctions were identified from those exon-spanning reads");
+	SUBREADputs("                      Junctions were identified from all the exon-spanning reads");
 	SUBREADputs("                      in the input (containing 'N' in CIGAR string). Counting");
 	SUBREADputs("                      results are saved to a file named '<output_file>.jcounts'");
 	SUBREADputs("");

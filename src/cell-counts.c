@@ -501,9 +501,10 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cmd_rebuilt[0]=0;
 	for(c = 0; c<argc;c++)
 	{
-		if(strlen(cmd_rebuilt) + 100+strlen(argv[c]) > cmd_rebuilt_size)
+		int needed_buff_len = strlen(cmd_rebuilt) + 100+strlen(argv[c]);
+		if(needed_buff_len > cmd_rebuilt_size)
 		{
-			cmd_rebuilt_size*=2;
+			cmd_rebuilt_size = max(cmd_rebuilt_size *2, needed_buff_len);
 			cmd_rebuilt = realloc(cmd_rebuilt, cmd_rebuilt_size);
 		}
 		sprintf(cmd_rebuilt+strlen(cmd_rebuilt), "\"%s\" ", argv[c]);
@@ -2263,9 +2264,10 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 			cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 		}
 		if(thread_context -> bcl_input_local_cached>0){
-			this_number = thread_context -> bcl_input_local_start_no + thread_context -> bcl_input_local_filled - thread_context -> bcl_input_local_cached;
+			int posnumb = thread_context -> bcl_input_local_filled - thread_context -> bcl_input_local_cached;
+			this_number = thread_context -> bcl_input_local_start_no + posnumb;
 			thread_context -> bcl_input_local_cached --;
-			rl1 = cellCounts_copy_bin_to_textread(cct_context, thread_context -> bcl_input_local_readlane [thread_context -> bcl_input_local_cached], thread_context -> bcl_input_local_readbin[thread_context -> bcl_input_local_cached],
+			rl1 = cellCounts_copy_bin_to_textread(cct_context, thread_context -> bcl_input_local_readlane [posnumb], thread_context -> bcl_input_local_readbin[posnumb],
 				read_name, read_text , qual_text, read_lengths, this_number);
 		}
 		else rl1=0;
