@@ -4734,7 +4734,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		size_t frret = fread(&binlen, 1, 4, notmapped_fp);
 		char old_bin[binlen+1];
 		frret += fread(old_bin, 1, binlen, notmapped_fp);
-		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len +4, binlen, NULL, NULL, -1, NULL);
+		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len, binlen, NULL, NULL, -1, NULL);
 		tofill -> inbin_len += 4+ new_binlen; // block size: Total length of the alignment record, excluding this field. Then, the alignment record.
 
 		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
