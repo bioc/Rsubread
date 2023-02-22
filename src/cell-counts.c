@@ -530,17 +530,6 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> cmd_rebuilt = cmd_rebuilt;
 	strcpy(cct_context -> temp_file_dir, "./");
 
-	if(0){
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		cct_context -> reads_per_chunk /= 4;
-	}
-
-
 	while (1){
 		c = getopt_long(argc, argv, "", cellCounts_long_options, &option_index);
 		if(c<0 || c==255)break;
@@ -3477,19 +3466,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			break;
 
-		if(0) if(1+chunk_no){
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			break;
-		}
-
-
 		cellCounts_clean_context_after_chunk(cct_context);
 		chunk_no++;
 	}
@@ -3946,13 +3922,13 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 #endif
 
 	new_rbin_len-=4;
+	memcpy(new_rbin, &new_rbin_len,4);
 	return new_rbin_len;
 }
 
 void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
 	char new_rbin[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
 	int new_rbin_len = cellCounts_make_barcode_bam_bin( cct_context, rbin, new_rbin, binlen, fixedbc_seq, fixedumi_seq, gene_no, genes );
-	memcpy(new_rbin, &new_rbin_len,4);
 	fwrite(new_rbin, 1, new_rbin_len+4, fp);
 }
 
@@ -4759,8 +4735,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		char old_bin[binlen+1];
 		frret += fread(old_bin, 1, binlen, notmapped_fp);
 		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len +4, binlen, NULL, NULL, -1, NULL);
-		memcpy(tofill -> inbin + tofill -> inbin_len, &new_binlen, 4);
-		tofill -> inbin_len += 4+ new_binlen;
+		tofill -> inbin_len += 4+ new_binlen; // block size: Total length of the alignment record, excluding this field. Then, the alignment record.
 
 		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
 		if(tofill-> inbin_len > CELLCOUNTS_BAMBLOCK_SIZE * CELLCOUNTS_BAMBLOCK_COMP_NUMBER){
