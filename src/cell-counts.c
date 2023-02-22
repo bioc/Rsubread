@@ -3839,12 +3839,10 @@ void * cellCounts_merge_batches_worker(void * vp){
 	return NULL;
 }
 
-void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
+int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rbin, char * new_rbin, int binlen, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes) {
 	char * cellbc_seq=NULL,*umi_seq=NULL, * cellbc_qual=NULL,*umi_qual=NULL, *sample_seq=NULL, *sample_qual=NULL, *lane_str=NULL;
 	int rname_trimmed_len=0;
 	cellCounts_scan_read_name_str(cct_context, rbin, NULL, & sample_seq, & sample_qual, & cellbc_seq, & cellbc_qual, & umi_seq, & umi_qual, &lane_str, NULL, &rname_trimmed_len);
-	char new_rbin_stake[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
-	char * new_rbin = new_rbin_stake;
 	int new_rbin_len = 0, n_cigar_op =0, l_read_name=0, l_seq=0;
 
 	memcpy(new_rbin, rbin, 36);
@@ -3948,13 +3946,15 @@ void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context
 #endif
 
 	new_rbin_len-=4;
-	memcpy(new_rbin, &new_rbin_len,4);
-	fwrite(new_rbin, 1, new_rbin_len+4, fp);
-
-	if(new_rbin!=new_rbin_stake)free(new_rbin);
+	return new_rbin_len;
 }
 
-
+void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
+	char new_rbin[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
+	int new_rbin_len = cellCounts_make_barcode_bam_bin( cct_context, rbin, new_rbin, binlen, fixedbc_seq, fixedumi_seq, gene_no, genes );
+	memcpy(new_rbin, &new_rbin_len,4);
+	fwrite(new_rbin, 1, new_rbin_len+4, fp);
+}
 
 #ifdef __MINGW32__
 #define ADD_key_FMT1 "%d-%d-%" PRId64 "-%s"
@@ -4030,7 +4030,6 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			if(gene_no & (1LLU<<63)){
 				int genes = (int)(gene_no & 0x7fffffffllu);
 				if(genes > me_max_genes)me_max_genes=genes;
-//fprintf(stderr, "BTH %d  USTR '%s'  GENES %d  PTR %d   UMILEN %d  TLEN %lld\n", this_batch_no, UMI_str, genes, scanptr, cct_context -> UMI_length, batch_content_len);
 				memcpy(UMI_str, batch_content+scanptr+8*genes, cct_context -> UMI_length);
 				UMI_str[cct_context -> UMI_length]=0;
 
@@ -4044,16 +4043,11 @@ void * cellCounts_do_one_batch(void * paramsp1){
 				memcpy(UMI_str, batch_content+scanptr, cct_context -> UMI_length);
 				ADD_key_struct;
 			}
-
 			scanptr += cct_context -> UMI_length ; // UMI str
-
 			int rbinlen = 0;
 			memcpy(&rbinlen, batch_content+scanptr, 4);
-
 			if(me_max_Rbin_len < rbinlen) me_max_Rbin_len = rbinlen;
 			scanptr += rbinlen +4; // read_bin
-
-//			if(sample_id <0 || sample_id > 1000) SUBREADprintf("Wrong Sample: RNO=%d; ptr=%lld\n", rbin_no, scanptr);
 			rbin_no++;
 		}
 		ArrayList ** cell_gene_umi_list = malloc(sizeof(void*)*cct_context -> sample_sheet_table -> numOfElements);
@@ -4089,7 +4083,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table, &removed_UMIs);
 
 			cellbcP0_to_geneno0B_P1_to_UMIs -> appendix1 = fp;
-//			fprintf(stderr,"BATCH %d SAMPLE %d RBINS %d ULEN %d LEN %lld\n", this_batch_no, x1, rbin_no, cct_context -> UMI_length, batch_content_len);
+
 			fwrite(&cellbcP0_to_geneno0B_P1_to_UMIs -> numOfElements,1,8,fp);
 			HashTableIteration(cellbcP0_to_geneno0B_P1_to_UMIs, cellCounts_do_one_batch_write_UMIs);
 			HashTableDestroy(cellbcP0_to_geneno0B_P1_to_UMIs);
@@ -4762,10 +4756,12 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		size_t frret = fread(&binlen, 1, 4, notmapped_fp);
-		memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
-		tofill -> inbin_len += 4;
-		frret += fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
-		tofill -> inbin_len += binlen;
+		char old_bin[binlen+1];
+		frret += fread(old_bin, 1, binlen, notmapped_fp);
+		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len +4, binlen, NULL, NULL, -1, NULL);
+		memcpy(tofill -> inbin + tofill -> inbin_len, &new_binlen, 4);
+		tofill -> inbin_len += 4+ new_binlen;
+
 		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
 		if(tofill-> inbin_len > CELLCOUNTS_BAMBLOCK_SIZE * CELLCOUNTS_BAMBLOCK_COMP_NUMBER){
 			struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;
