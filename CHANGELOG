@@ -1,3 +1,9 @@
+22 Feb 2023 - 2.13.3
+(1) Changed spinlock to mutex in cellCounts.
+(2) Fixed fractional counting and fractional overlapping bug in featureCounts.
+(3) Reversed the order of applying filters / junction counting.
+(4) Fixed a bug of not creating UMI/barcode tags for unmapped reads in cellCounts.
+
 18 Dec 2022 - 2.13.2
 (1) Enabled vignettes of cellCounts in Windows.
 
