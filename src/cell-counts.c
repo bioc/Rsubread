@@ -2187,7 +2187,7 @@ int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned i
 }
 
 static int is_dual_index, idx_offset, base_offset, sread_len, total_bin_len;
-int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readlane, unsigned char* readbin, char * read_name, char * seq, char *qual, int * psread_lens, subread_read_number_t rno){
+int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readlane, char* readbin, char * read_name, char * seq, char *qual, int * psread_lens, subread_read_number_t rno){
 	int  bii;
 	if(sread_len < 1){
 		is_dual_index = psread_lens[3]>0;
