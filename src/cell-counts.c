@@ -4732,8 +4732,9 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		size_t frret = fread(&binlen, 1, 4, notmapped_fp);
-		char old_bin[binlen+1];
-		frret += fread(old_bin, 1, binlen, notmapped_fp);
+		char old_bin[binlen+4];
+		memcpy(old_bin, &binlen,4);
+		frret += fread(old_bin+4, 1, binlen, notmapped_fp);
 		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len, binlen, NULL, NULL, -1, NULL);
 		tofill -> inbin_len += 4+ new_binlen; // block size: Total length of the alignment record, excluding this field. Then, the alignment record.
 
