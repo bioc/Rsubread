@@ -168,7 +168,7 @@ void print_in_box(int line_width, int is_boundary, int options, char * pattern,.
 	is_wrapped = (options & PRINT_BOX_WRAPPED)?1:0;
 	
 	content= malloc(1200);
-	int content_len = snprintf(content, 1199, pattern, args);
+	int content_len = vsnprintf(content, 1199, pattern, args);
 	out_line_buff= malloc(1200);
 	out_line_buff[0]=0;
 
