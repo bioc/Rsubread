@@ -1,3 +1,6 @@
+27 Feb 2023 - 2.13.4
+(1) Changed sprintf to snprintf in all C code for removing warnings.
+
 22 Feb 2023 - 2.13.3
 (1) Changed spinlock to mutex in cellCounts.
 (2) Fixed fractional counting and fractional overlapping bug in featureCounts.
