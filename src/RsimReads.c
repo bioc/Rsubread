@@ -178,7 +178,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
       if(NULL != seq_name){
         char * md5mem = malloc(33); unsigned char md5res[16];
         HelpFuncMD5_Final(md5res, &md5ctx);
-        int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+        int md5i;for(md5i=0;md5i<16;md5i++)SUBreadSprintf(md5mem+2*md5i, 3, "%02X", 0xff&(int)md5res[md5i]);
         char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
         long seq_exp = HashTableGet(grc->expression_levels, seq_name)-NULL;
         if(had_tab && seq_exp>1) total_dup++;//SUBREADprintf("Warning: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
@@ -237,7 +237,7 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   if(NULL != seq_name && lbuf_used >0){
     char * md5mem = malloc(33); unsigned char md5res[16];
     HelpFuncMD5_Final(md5res, &md5ctx);
-    int md5i;for(md5i=0;md5i<16;md5i++)sprintf(md5mem+2*md5i, "%02X", 0xff&(int)md5res[md5i]);
+    int md5i;for(md5i=0;md5i<16;md5i++)SUBreadSprintf(md5mem+2*md5i,3, "%02X", 0xff&(int)md5res[md5i]);
     long seq_exp = HashTableGet(grc->expression_levels, seq_name)-NULL;
     char * had_tab = HashTableGet(seq_duplicate_tab, md5mem);
     if(had_tab && seq_exp>1)total_dup++;// SUBREADprintf("Warning: duplicate sequence was found in '%s' and '%s'.\n", seq_name, had_tab);
@@ -281,11 +281,11 @@ int init_grc_by_file(RsimReads_context_t *grc, char *fasta_name, char *output_na
   }
 
   char outname[MAX_FILE_NAME_LENGTH+30];
-  sprintf(outname,"%s_R1.fastq.gz", output_name);
+  SUBreadSprintf(outname, MAX_FILE_NAME_LENGTH+30,"%s_R1.fastq.gz", output_name);
   grc->out_fps[0] = gzopen(outname, "wb");
 
   if(grc->is_paired_end){
-    sprintf(outname,"%s_R2.fastq.gz", output_name);
+    SUBreadSprintf(outname, MAX_FILE_NAME_LENGTH+30,"%s_R2.fastq.gz", output_name);
     grc->out_fps[1] = gzopen(outname, "wb");
   }else grc->out_fps[1]=NULL;
 
@@ -347,5 +347,4 @@ int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int
   retv = retv || destroy_Rsim_context(&grc);
   return 0;
 }
-
 

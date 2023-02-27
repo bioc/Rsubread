@@ -320,7 +320,7 @@ int LRMsoftclipping_moves(LRMcontext_t* context, LRMthread_context_t* thread_con
 		}else{
 			for(ii = last_M - 1; ii >= 0; ii--)
 				move_buff[ii]='.';
-			int splen = sprintf(move_buff + last_M - 10, "%dS", Ss);
+			int splen = SUBreadSprintf(move_buff + last_M - 10, 11, "%dS", Ss);
 			if(to_large){
 				for(ii = 0; ii < splen/2; ii++){
 					int tv;
@@ -543,9 +543,6 @@ int LRMdynamic_to_ends(LRMcontext_t* context, LRMthread_context_t* thread_contex
 	//LRMprintf("SEARCH_END_01 %s : start=%d, moves=%d\n", iteration_context -> read_name , this_movement_start, moves);
 	char * indel_movement_buff = (char *) thread_context -> dynamic_programming_indel_movement_buf;
 	int bases_in_read_no_SS = first_correct_base - last_correct_base;
-	//if(bases_in_read_no_SS<3){
-	//	return sprintf(indel_movement_buff + this_movement_start,"%dS/",bases_in_read_no_SS);
-	//}
 
 	if((!search_to_3end) && first_correct_base >= LRMDYNAMIC_MAXIMUM_GAP_LENGTH){
 		last_correct_base = first_correct_base - LRMDYNAMIC_MAXIMUM_GAP_LENGTH;
@@ -768,7 +765,7 @@ int LRMdynamic_to_ends(LRMcontext_t* context, LRMthread_context_t* thread_contex
 		LRMprintf("MOVE_ENDS [ %s E=%d] = %s\n",iteration_context  -> read_name , error_in, indel_movement_buff);
 	}
 	if(error_in){
-			moves = sprintf(indel_movement_buff + this_movement_start, "%dS", bases_in_read);
+			moves = SUBreadSprintf(indel_movement_buff + this_movement_start, 11, "%dS", bases_in_read);
 			return moves;
 	}
 
@@ -802,10 +799,10 @@ int LRMdynamic_to_ends(LRMcontext_t* context, LRMthread_context_t* thread_contex
 		}
 		for(iii = 0; iii < 10; iii++) indel_movement_buff[ this_movement_start + iii] = '.';
 		moves += 10;
-		iii = sprintf(indel_movement_buff + this_movement_start, "%dS",head_SS);
+		iii = SUBreadSprintf(indel_movement_buff + this_movement_start, 11, "%dS",head_SS);
 		indel_movement_buff[this_movement_start + iii] = '.';
 	}
-	if(tail_SS>0)moves += sprintf(indel_movement_buff + this_movement_start + moves, "%dS",tail_SS);
+	if(tail_SS>0)moves += SUBreadSprintf(indel_movement_buff + this_movement_start + moves, 11, "%dS",tail_SS);
 	indel_movement_buff[ this_movement_start + (moves++)]='/';
 	indel_movement_buff[this_movement_start + moves] = 0;
 	LRMtest_move_buff( context,  thread_context, iteration_context , indel_movement_buff + this_movement_start, moves , bases_in_read_no_SS );
