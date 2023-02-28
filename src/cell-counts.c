@@ -2187,7 +2187,7 @@ int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned i
 }
 
 static int is_dual_index, idx_offset, base_offset, sread_len, total_bin_len, rname_tail_pos;
-int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readlane, char* readbin, char * read_name, char * seq, char *qual, int * psread_lens, subread_read_number_t rno){
+int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readlane, unsigned char* readbin, char * read_name, char * seq, char *qual, int * psread_lens, subread_read_number_t rno){
 	int  bii;
 	if(sread_len < 1){
 		is_dual_index = psread_lens[3]>0;
@@ -2216,7 +2216,7 @@ int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readl
 		if(nch > 0){
 			int nch1 = nch & 0x3;
 			nbase = (1413956417) >> (nch1*8); // 1413956417 = 'TGCA'
-			nqual=33+(nch>>2);
+			nqual=33+(nch >>2);
 		}else{
 			nqual='#';
 			nbase='N';
@@ -2257,7 +2257,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 			int posnumb = thread_context -> bcl_input_local_filled - thread_context -> bcl_input_local_cached;
 			this_number = thread_context -> bcl_input_local_start_no + posnumb;
 			thread_context -> bcl_input_local_cached --;
-			rl1 = cellCounts_copy_bin_to_textread(cct_context, thread_context -> bcl_input_local_readlane [posnumb], thread_context -> bcl_input_local_readbin[posnumb],
+			rl1 = cellCounts_copy_bin_to_textread(cct_context, thread_context -> bcl_input_local_readlane [posnumb], (unsigned char*)thread_context -> bcl_input_local_readbin[posnumb],
 				read_name, read_text , qual_text, read_lengths, this_number);
 		}
 		else rl1=0;
@@ -3068,7 +3068,6 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 		int is_reversed, applied_subreads = 0;
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
-		//fprintf(stderr,"FETCH_1READ %lld LEN=%d '%s' '%s' '%s'\n", current_read_number, read_len, read_name, read_text, qual_text);
 		if(current_read_number < 0) break;
 		if(read_len< 16) continue;
 
@@ -4291,7 +4290,6 @@ void cellCounts_merged_45K_to_90K_sum(cellcounts_global_t * cct_context, HashTab
 void cellCounts_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me){
 	FILE * fp = me->appendix1;
 	cellcounts_global_t * cct_context = me->appendix2;
-	void ** tv2 = me->appendix3;
 	unsigned char* gene_symbol = cct_context -> gene_name_array [k-NULL-1];
 	fprintf(fp, "%s\n", gene_symbol);
 }
