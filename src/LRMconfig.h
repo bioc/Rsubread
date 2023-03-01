@@ -316,5 +316,6 @@ int LRMwrite_chunk_add_buffered_output(LRMcontext_t * context, LRMthread_context
 
 
 int LRMFIXLENstrcmp(char * fixed_len, char * rname);
+size_t SUBreadSprintf(char * content, size_t bufflen, char * pattern,...);
 
 #endif

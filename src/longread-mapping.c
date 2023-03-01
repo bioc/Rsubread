@@ -184,7 +184,7 @@ int LRMvalidate_and_init_context(LRMcontext_t ** context, int argc, char ** argv
 
 	(*context) -> user_command_line[0]=0;
 	for(c = 0; c<argc;c++)
-		sprintf((*context) -> user_command_line+strlen( (*context) -> user_command_line), "\"%s\" ", argv[c]);
+		SUBreadSprintf((*context) -> user_command_line+strlen( (*context) -> user_command_line), 10000-strlen( (*context) -> user_command_line), "\"%s\" ", argv[c]);
 	
 
 	LRMthread_lockinit(&(*context) -> input_lock);
@@ -326,10 +326,10 @@ int LRMload_index(LRMcontext_t * context){
 	int retv = 0;
 	char indextab_fname[LRMMAX_FILENAME_LENGTH + 20];
 
-	sprintf(indextab_fname, "%s.00.b.tab", context -> index_prefix);
+	SUBreadSprintf(indextab_fname, LRMMAX_FILENAME_LENGTH + 20, "%s.00.b.tab", context -> index_prefix);
 	retv = retv || LRMgehash_load(&(context -> current_index), indextab_fname);
 
-	sprintf(indextab_fname, "%s.00.b.array", context -> index_prefix);
+	SUBreadSprintf(indextab_fname, LRMMAX_FILENAME_LENGTH + 20, "%s.00.b.array", context -> index_prefix);
 	retv = retv || LRMgvindex_load(&(context -> current_base_index), indextab_fname);
 	
 	return retv;
@@ -975,7 +975,7 @@ void LRMbuild_chains(LRMcontext_t * context, LRMthread_context_t * thread_contex
 
 void LRMfill_gaps_addNM(LRMcontext_t * context, LRMthread_context_t * thread_context, LRMread_iteration_context_t * iteration_context, int window_no, int subread_no){
 	int middle_delta = subread_no?1:1;
-	thread_context -> dynamic_programming_indel_movement_start += sprintf( thread_context -> dynamic_programming_indel_movement_buf + thread_context -> dynamic_programming_indel_movement_start, "%dM/",  iteration_context -> chain_cov_end[subread_no] - iteration_context -> chain_cov_start[subread_no] - middle_delta);
+	thread_context -> dynamic_programming_indel_movement_start += SUBreadSprintf( thread_context -> dynamic_programming_indel_movement_buf + thread_context -> dynamic_programming_indel_movement_start, 12, "%dM/",  iteration_context -> chain_cov_end[subread_no] - iteration_context -> chain_cov_start[subread_no] - middle_delta);
 	//LRMprintf("NORMAL MS: %dM\n",  iteration_context -> chain_cov_end[subread_no] - iteration_context -> chain_cov_start[subread_no] - middle_delta);
 }
 
@@ -1021,7 +1021,7 @@ void LRMfill_gaps_reduce_Cigar(LRMcontext_t * context, LRMthread_context_t * thr
 		}else{
 			if(tmpi<0) tmpi = 1;
 			if(old_opt != nch && repeat_i>0){
-				wcur += sprintf( thread_context -> final_cigar_string + wcur, "%d%c", repeat_i, old_opt );
+				wcur += SUBreadSprintf( thread_context -> final_cigar_string + wcur, 11, "%d%c", repeat_i, old_opt );
 				if( old_opt == 'M' || old_opt == 'I' || old_opt == 'S' ) r_rebuilt_len += repeat_i;
 				if( old_opt == 'M' ) mapped_length += repeat_i;
 				repeat_i = 0;
@@ -1034,7 +1034,7 @@ void LRMfill_gaps_reduce_Cigar(LRMcontext_t * context, LRMthread_context_t * thr
 	if(repeat_i>0){
 		if( old_opt == 'M' || old_opt == 'I' || old_opt == 'S' ) r_rebuilt_len += repeat_i;
 		if( old_opt == 'M' ) mapped_length += repeat_i;
-		sprintf( thread_context -> final_cigar_string + wcur, "%d%c", repeat_i, old_opt );
+		SUBreadSprintf( thread_context -> final_cigar_string + wcur,11, "%d%c", repeat_i, old_opt );
 	}
 	//LRMprintf("Rebuild Rlen of %s = %d\n", iteration_context -> read_name, r_rebuilt_len);
 	if(r_rebuilt_len != iteration_context -> read_length)
@@ -1094,7 +1094,7 @@ void LRMfill_gaps(LRMcontext_t * context, LRMthread_context_t * thread_context, 
 			int gap_read_M_L = gap_read_M/2;
 			int gap_read_M_R = gap_read_M - gap_read_M_L;
 			int indel_move = indel_after_M<0?'I':'D';
-			thread_context -> dynamic_programming_indel_movement_start += sprintf( thread_context -> dynamic_programming_indel_movement_buf + thread_context -> dynamic_programming_indel_movement_start, "%dM%d%c%dM/", gap_read_M_L,abs(indel_after_M), indel_move, gap_read_M_R);
+			thread_context -> dynamic_programming_indel_movement_start += SUBreadSprintf( thread_context -> dynamic_programming_indel_movement_buf + thread_context -> dynamic_programming_indel_movement_start, 33, "%dM%d%c%dM/", gap_read_M_L,abs(indel_after_M), indel_move, gap_read_M_R);
 			LRMprintf("LONG GAP %s : %d\n", iteration_context -> read_name, this_subread_start - last_subread_end );
 			LRMprintf("LONG GAP CIGAR : %dM%d%c\n", gap_read_M,abs(indel_after_M), indel_move);
 		}

@@ -258,10 +258,10 @@ int LRMgehash_load_option(const char fname [], int option_no, int * result){
 	char tabname[LRMMAX_FILENAME_LENGTH];
 	char magic_chars[8];
 	int found = 0;
-	sprintf(tabname, "%s.00.b.tab", fname);
+	SUBreadSprintf(tabname, LRMMAX_FILENAME_LENGTH, "%s.00.b.tab", fname);
 	FILE * fp = fopen(tabname, "rb");
 	if(fp == NULL){
-		sprintf(tabname, "%s.00.c.tab", fname);
+		SUBreadSprintf(tabname, LRMMAX_FILENAME_LENGTH, "%s.00.c.tab", fname);
 		fp = fopen(tabname, "rb");
 	}
 	if(fp){	

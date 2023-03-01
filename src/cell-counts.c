@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <getopt.h>
 #include <math.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include "subread.h"
 #include "gene-algorithms.h"
@@ -103,6 +104,10 @@ typedef struct{
 	srInt_64 mapped_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 	srInt_64 assigned_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
+	srInt_64 bcl_input_local_start_no;
+	int bcl_input_local_filled, bcl_input_local_cached;
+	char bcl_input_local_readbin[BCL_READBIN_ITEMS_LOCAL][BCL_READBIN_SIZE];
+	int bcl_input_local_readlane[BCL_READBIN_ITEMS_LOCAL];
 
 	srInt_64 hiconf_map;
 	srInt_64 loconf_map;
@@ -244,7 +249,7 @@ int cellCounts_reduce_Cigar(char * cigar, char * cigarout){
 			if(tmpi<0) tmpi = 1;
 			if(old_opt != nch && repeat_i>0){
 				if(old_opt=='M' || old_opt=='S' || old_opt=='I') rlen+=repeat_i;
-				wcur += sprintf( cigarout + wcur, "%d%c", repeat_i, old_opt );
+				wcur += SUBreadSprintf( cigarout + wcur, 11, "%d%c", repeat_i, old_opt );
 				repeat_i = 0;
 			}
 			repeat_i += tmpi;
@@ -253,7 +258,7 @@ int cellCounts_reduce_Cigar(char * cigar, char * cigarout){
 		}
 	}
 	if(repeat_i>0){
-		sprintf(cigarout + wcur, "%d%c", repeat_i, old_opt);
+		SUBreadSprintf(cigarout + wcur, 11, "%d%c", repeat_i, old_opt);
 		if(old_opt=='M' || old_opt=='S' || old_opt=='I') rlen+=repeat_i;
 	}
 	return rlen;
@@ -430,7 +435,7 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 	int items = current_bucket -> current_items;
 	int my_no = subread_no + applied_subreads * is_negative_strand;
 	pnts -> votes[my_no] = 0;
-	if(!items) return ;
+	if(!items) return;
 
 	short *current_keys = current_bucket -> new_item_keys;
 	int imin=0, imax=items - 1;
@@ -446,25 +451,40 @@ void prefill_votes(gehash_t * the_table, temp_votes_per_read_t * pnts, int appli
 		if(imax<imin) return;
 	}
 
-	int start_scan_idx = last_accepted_index;
-	unsigned int * stoploc = NULL;
+	imax -= imin;
+	int start_scan_idx = last_accepted_index, tl_last_accepted_index, prefill_big_search_step = imax/4;
+	int stoploc;
+	
+	for(; prefill_big_search_step > 1 ; prefill_big_search_step /= 3)while(1){
+		tl_last_accepted_index = last_accepted_index + prefill_big_search_step;
+		if(tl_last_accepted_index >= items || current_keys[tl_last_accepted_index]!=key)break;
+		last_accepted_index = tl_last_accepted_index;
+	}
+
 	while(1){
 		last_accepted_index ++;
-		if(last_accepted_index == items || current_keys[last_accepted_index]!= key){
-			stoploc = current_bucket->item_values + last_accepted_index ; 
+		if(last_accepted_index == items|| current_keys[last_accepted_index]!= key){
+			stoploc = last_accepted_index ; 
 			last_accepted_index = start_scan_idx;
 			break;
 		}
 	}
 
+	prefill_big_search_step = imax /4;
+	for(; prefill_big_search_step > 1 ; prefill_big_search_step /= 3)while(1){
+		tl_last_accepted_index = last_accepted_index - prefill_big_search_step;
+		if(tl_last_accepted_index < imin|| current_keys[tl_last_accepted_index]!=key)break;
+		last_accepted_index = tl_last_accepted_index;
+	}
+
 	while(1){
-		last_accepted_index --;
-		if(last_accepted_index <0 || current_keys[last_accepted_index]!= key){
-			pnts -> start_location_in_index[my_no] = current_bucket->item_values + last_accepted_index  +1;
-			pnts -> votes[my_no] = stoploc - pnts -> start_location_in_index[my_no];
+		if(last_accepted_index == imin || current_keys[last_accepted_index -1]!= key){
+			pnts -> start_location_in_index[my_no] = current_bucket->item_values + last_accepted_index;
+			pnts -> votes[my_no] = stoploc - last_accepted_index;
 			pnts -> offsets[my_no] = offset;
 			break;
 		}
+		last_accepted_index --;
 	}
 }
 
@@ -481,12 +501,13 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cmd_rebuilt[0]=0;
 	for(c = 0; c<argc;c++)
 	{
-		if(strlen(cmd_rebuilt) + 100+strlen(argv[c]) > cmd_rebuilt_size)
+		int needed_buff_len = strlen(cmd_rebuilt) + 100+strlen(argv[c]);
+		if(needed_buff_len > cmd_rebuilt_size)
 		{
-			cmd_rebuilt_size*=2;
+			cmd_rebuilt_size = max(cmd_rebuilt_size *2, needed_buff_len);
 			cmd_rebuilt = realloc(cmd_rebuilt, cmd_rebuilt_size);
 		}
-		sprintf(cmd_rebuilt+strlen(cmd_rebuilt), "\"%s\" ", argv[c]);
+		SUBreadSprintf(cmd_rebuilt+strlen(cmd_rebuilt), cmd_rebuilt_size - strlen(cmd_rebuilt), "\"%s\" ", argv[c]);
 	}
 
 	cct_context -> input_mode = GENE_INPUT_BCL;
@@ -508,17 +529,6 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> min_mapped_length_for_mapped_read = 40;
 	cct_context -> cmd_rebuilt = cmd_rebuilt;
 	strcpy(cct_context -> temp_file_dir, "./");
-
-	if(0){
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		SUBREADprintf("WARNINGqqq: small-chunk!\n");
-		cct_context -> reads_per_chunk /= 4;
-	}
-
 
 	while (1){
 		c = getopt_long(argc, argv, "", cellCounts_long_options, &option_index);
@@ -624,7 +634,7 @@ int determine_total_index_blocks(cellcounts_global_t * cct_context){
 	char tmp_fname[MAX_FILE_NAME_LENGTH+ 30];
 	cct_context-> total_index_blocks = 0;
 	while(1){
-		sprintf(tmp_fname, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->total_index_blocks);
+		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+ 30, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->total_index_blocks);
 		if(!does_file_exist(tmp_fname))break;
 		cct_context->total_index_blocks ++;
 	}
@@ -687,7 +697,7 @@ void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simp
 	outcapa = rebuilt_len + MAX_CHROMOSOME_NAME_LEN *2 + 200;
 	char * outbuff = malloc(outcapa);
 
-	outsize += sprintf(outbuff, "@HD\tVN:1.0\tSO:%s\n", "coordinate");
+	outsize += SUBreadSprintf(outbuff, outcapa, "@HD\tVN:1.0\tSO:%s\n", "coordinate");
 	for(x1=0;x1<cct_context->chromosome_table.total_offsets; x1++){
 		if(outsize + rebuilt_len >= outcapa -MAX_CHROMOSOME_NAME_LEN -40){
 			outcapa *=2;
@@ -697,7 +707,7 @@ void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simp
 		unsigned int this_end = cct_context->chromosome_table.read_offsets[x1];
 		int this_size = this_end - last_end;
 		last_end = this_end;
-		outsize += sprintf(outbuff+outsize,"@SQ\tSN:%s\tLN:%d\n",chro_name,this_size);
+		outsize += SUBreadSprintf(outbuff+outsize, outcapa-outsize,"@SQ\tSN:%s\tLN:%d\n",chro_name,this_size);
 	}
 	// if the command line is longer than 16K the remaining part is omitted.
 	outsize += snprintf(outbuff+outsize,1024*32, "@PG\tID:cellCounts\tPN:cellCounts\tVN:%s\tCL:%s", SUBREAD_VERSION, cct_context->cmd_rebuilt);
@@ -729,8 +739,8 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 
 	char * samplename = k;
 	char fname [MAX_FILE_NAME_LENGTH+20], fnamet[MAX_FILE_NAME_LENGTH+20];
-	sprintf(fname, "%s.bam", samplename);
-	sprintf(fnamet, "del4-cC-tmp0-%s.del", samplename);
+	SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+20, "%s.bam", samplename);
+	SUBreadSprintf(fnamet,MAX_FILE_NAME_LENGTH+20, "del4-cC-tmp0-%s.del", samplename);
 	simple_bam_writer * wtr = simple_bam_create(fname);
 	cellCounts_add_simple_writer_header(cct_context, wtr);
 	parallel_gzip_writer_t * gzipR1fq=NULL, * gzipI1fq=NULL, * gzipR2fq=NULL, * gzipI2fq=NULL;
@@ -740,13 +750,13 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 		gzipI1fq = calloc(sizeof(parallel_gzip_writer_t),1);
 		if(cct_context -> is_dual_index)gzipI2fq = calloc(sizeof(parallel_gzip_writer_t),1);
 		gzipR2fq = calloc(sizeof(parallel_gzip_writer_t),1);
-		sprintf(fname, "%s_R1.fastq.gz", samplename);
+		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+20, "%s_R1.fastq.gz", samplename);
 		parallel_gzip_writer_init(gzipR1fq, fname, cct_context -> total_threads);
-		sprintf(fname, "%s_I1.fastq.gz", samplename);
+		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+20, "%s_I1.fastq.gz", samplename);
 		parallel_gzip_writer_init(gzipI1fq, fname, cct_context -> total_threads);
-		sprintf(fname, "%s_I2.fastq.gz", samplename);
+		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+20, "%s_I2.fastq.gz", samplename);
 		if(gzipI2fq)parallel_gzip_writer_init(gzipI2fq, fname, cct_context -> total_threads);
-		sprintf(fname, "%s_R2.fastq.gz", samplename);
+		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+20, "%s_R2.fastq.gz", samplename);
 		parallel_gzip_writer_init(gzipR2fq, fname, cct_context -> total_threads);
 	}
 
@@ -814,7 +824,7 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 int cellCounts_load_base_value_indexes(cellcounts_global_t * cct_context){
 	int rv=0;
 	char tmp_fname[MAX_FILE_NAME_LENGTH+ 30];
-	sprintf(tmp_fname, "%s.%02d.b.array", cct_context ->index_prefix, 0);
+	SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.array", cct_context ->index_prefix, 0);
 	cct_context -> value_index = calloc(sizeof(gene_value_index_t),1);
 	rv = rv || gvindex_load(cct_context -> value_index, tmp_fname);
 	return rv;
@@ -1300,7 +1310,7 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 	int x1;
 	for(x1=0;x1<CELLBC_BATCH_NUMBER+2; x1++){
 		char fname[MAX_FILE_NAME_LENGTH+200];
-		sprintf(fname,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
+		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+200,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
 		cct_context -> batch_files[x1] = fopen(fname,"wb");
 		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
 	}
@@ -1312,33 +1322,40 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 		if(2==umfpi) ftype = "I1";
 		if(3==umfpi) ftype = "I2";
 		if(4==umfpi) ftype = "R2";
-		sprintf(fname, "UnassignedReads%03d_%s.fastq.gz", cct_context ->current_dataset_no, ftype);
+		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+20, "UnassignedReads%03d_%s.fastq.gz", cct_context ->current_dataset_no, ftype);
 		parallel_gzip_writer_init(cct_context-> fastq_unassigned_writer+(umfpi-1), fname, cct_context->total_threads);
 	}
 	cellCounts_init_lock(&cct_context->fastq_unassigned_lock, 0);
 	return 0;
 }
 
+// we will never use spin-lock.
 void cellCounts_init_lock(cellCounts_lock_t * lock, int is_spin){
-	lock -> is_spin_lock = is_spin;
-	if(is_spin) pthread_spin_init(&lock->spinlock,PTHREAD_PROCESS_PRIVATE);
-	else pthread_mutex_init(&lock->mutexlock, NULL);
+	pthread_mutex_init(lock, NULL);
 }
 
 void cellCounts_destroy_lock(cellCounts_lock_t * lock){
-	if(lock -> is_spin_lock) pthread_spin_destroy(&lock->spinlock);
-	else pthread_mutex_destroy(&lock->mutexlock);
+	//if(lock -> is_spin_lock) pthread_spin_destroy(&lock->spinlock);
+	//	else
+	 pthread_mutex_destroy(lock);
 }
 
+/*
 int cellCounts_lock_occupy(cellCounts_lock_t * lock){
-	if(lock -> is_spin_lock) return pthread_spin_lock(&lock->spinlock);
-	else return pthread_mutex_lock(&lock->mutexlock);
+	//if(lock -> is_spin_lock)
+	//	return pthread_spin_lock(&lock->spinlock);
+	//else
+	return pthread_mutex_lock(lock);
 }
 
 int cellCounts_lock_release(cellCounts_lock_t * lock){
-	if(lock -> is_spin_lock) return pthread_spin_unlock(&lock->spinlock);
-	else return pthread_mutex_unlock(&lock->mutexlock);
+	//if(lock -> is_spin_lock) return pthread_spin_unlock(&lock->spinlock);
+	//else
+	return pthread_mutex_unlock(lock);
 }
+*/
+#define cellCounts_lock_occupy pthread_mutex_lock
+#define cellCounts_lock_release pthread_mutex_unlock
 
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
@@ -1674,7 +1691,7 @@ int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin
 }
 
 
-unsigned int cellCounts_explain_read(cellcounts_global_t * cct_context, int thread_no, realignment_result_t * realigns, subread_read_number_t pair_number,int read_len, char * read_name , char *read_text, char *qual,  int voting_loc_no, int is_negative_strand);
+unsigned int cellCounts_explain_read(cellcounts_global_t * cct_context, int thread_no, realignment_result_t * realigns, int read_len, char * read_name , char *read_text, char *qual,  int voting_loc_no, int is_negative_strand);
 
 int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_no, char * cbc){
 	//return -1;
@@ -2169,27 +2186,95 @@ int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned i
 	return is_repeated;
 }
 
+static int is_dual_index, idx_offset, base_offset, sread_len, total_bin_len, rname_tail_pos;
+int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readlane, unsigned char* readbin, char * read_name, char * seq, char *qual, int * psread_lens, subread_read_number_t rno){
+	int  bii;
+	if(sread_len < 1){
+		is_dual_index = psread_lens[3]>0;
+		idx_offset  = psread_lens[0];
+		total_bin_len = psread_lens[0]+psread_lens[1]+psread_lens[2]+psread_lens[3];
+		base_offset = psread_lens[1] + ( is_dual_index?psread_lens[2]:0) + idx_offset;
+		rname_tail_pos = 16 +2*base_offset;
+		sread_len = psread_lens[2+is_dual_index];
+	}
+
+	//SUBREADprintf("RLENs=%d, idx=%d, base=%d\n", total_bin_len, idx_offset, base_offset);
+	#ifdef __MINGW32__
+	SUBreadSprintf(read_name, 15, "R%011" PRIu64 ":", rno);
+	#else
+	SUBreadSprintf(read_name, 15, "R%011llu:", rno);
+	#endif
+
+	read_name[13+idx_offset]='|';
+	read_name[14+2*idx_offset]='|';
+	read_name[15+base_offset+idx_offset]='|';
+	SUBreadSprintf(read_name + rname_tail_pos, MAX_READ_NAME_LEN +1- rname_tail_pos , "|@RgLater@L%03d" , readlane);
+
+	for(bii = 0; bii < total_bin_len; bii++){
+		unsigned int nch = readbin[bii];
+		char nbase, nqual;
+		if(nch > 0){
+			int nch1 = nch & 0x3;
+			nbase = (1413956417) >> (nch1*8); // 1413956417 = 'TGCA'
+			nqual=33+(nch >>2);
+		}else{
+			nqual='#';
+			nbase='N';
+		}
+		if(nqual >= '/' && bii < base_offset ) nqual++;
+		if(bii < idx_offset){
+			read_name[13+bii] = nbase;
+			read_name[14+idx_offset+bii]= nqual;
+		}else if(bii < base_offset ){
+			read_name[15+idx_offset+bii] = nbase;
+			read_name[16+base_offset+bii]= nqual;
+		}else{
+			seq[bii - base_offset] = nbase;
+			qual[bii - base_offset] = nqual;
+		}
+	}
+	return sread_len;
+}
 
 int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int thread_no,int *read_len, char * read_name, char * read_text, char * qual_text, subread_read_number_t * read_no_in_chunk) {
 	int rl1=0;
-	int is_second_R1;
 	subread_read_number_t this_number = -1;
 	gene_input_t * ginp1 = &cct_context -> input_dataset;
 
-	cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
-	if(cct_context -> running_processed_reads_in_chunk < cct_context -> reads_per_chunk) {
-		do{
-			is_second_R1 = 0;
-			rl1 = geinput_next_read_with_lock(ginp1, read_name, read_text , qual_text, 0, 0, &is_second_R1, &cct_context -> input_dataset_lock);
-			if(rl1 <= 0) break;
-		}while(is_second_R1) ;
-
-		if(rl1 >0){
-			this_number = cct_context -> running_processed_reads_in_chunk;
-			cct_context -> running_processed_reads_in_chunk ++;
+	if( ginp1 -> file_type == GENE_INPUT_BCL ){
+		int * read_lengths = ginp1 -> bcl_input.single_read_lengths;
+		cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+		if(thread_context -> bcl_input_local_cached<1){
+			cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
+			int new_reads = cacheBCL_next_readbin(&ginp1 -> bcl_input, thread_context -> bcl_input_local_readlane , thread_context -> bcl_input_local_readbin, BCL_READBIN_ITEMS_LOCAL, &thread_context -> bcl_input_local_start_no);
+			if(new_reads)
+				thread_context -> bcl_input_local_cached = thread_context -> bcl_input_local_filled = new_reads;
+			else if(!cct_context -> running_processed_reads_in_chunk)
+				cct_context -> running_processed_reads_in_chunk = (ginp1 -> bcl_input.read_no_in_chunk);
+			cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 		}
+		if(thread_context -> bcl_input_local_cached>0){
+			int posnumb = thread_context -> bcl_input_local_filled - thread_context -> bcl_input_local_cached;
+			this_number = thread_context -> bcl_input_local_start_no + posnumb;
+			thread_context -> bcl_input_local_cached --;
+			rl1 = cellCounts_copy_bin_to_textread(cct_context, thread_context -> bcl_input_local_readlane [posnumb], (unsigned char*)thread_context -> bcl_input_local_readbin[posnumb],
+				read_name, read_text , qual_text, read_lengths, this_number);
+		}
+		else rl1=0;
+
+	}else{
+		cellCounts_lock_occupy(&cct_context -> input_dataset_lock); 
+		if(cct_context -> running_processed_reads_in_chunk < cct_context -> reads_per_chunk) {
+			rl1 = geinput_next_read_with_lock(ginp1, read_name, read_text , qual_text);
+
+			if(rl1 > 0){
+				this_number = cct_context -> running_processed_reads_in_chunk;
+				cct_context -> running_processed_reads_in_chunk ++;
+			}
+		}
+		cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 	}
-	cellCounts_lock_release(&cct_context -> input_dataset_lock); 
+
 	if(rl1>0 && this_number>=0) {
 		*read_no_in_chunk = this_number;
 		*read_len = rl1;
@@ -2255,7 +2340,7 @@ typedef struct {
 } scanning_events_record_t;
 
 
-int cellCounts_find_new_indels(cellcounts_global_t * cct_context, int thread_no, int pair_number, char * read_name, char * read_text, char * qual_text, int read_len, int voting_loc_no) {
+int cellCounts_find_new_indels(cellcounts_global_t * cct_context, int thread_no, char * read_name, char * read_text, char * qual_text, int read_len, int voting_loc_no) {
 	return 0;
 }
 
@@ -2460,7 +2545,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 		if(head_soft_clipped <0){
 			int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1);
 			head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed, 0, abs_pos /* this can only happen if no indel is in read */, first_mapped_base_in_read , 0, first_mapped_base_in_read);
-			if(head_soft_clipped > 0)sprintf(thread_context -> reporting_cigars[thread_context -> reporting_count],"%dS", head_soft_clipped );
+			if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> reporting_count], 11,"%dS", head_soft_clipped );
 			if(meet_start < head_soft_clipped + abs_pos ) meet_start= head_soft_clipped + abs_pos;
 			if(head_soft_clipped > last_correct_base) last_correct_base = head_soft_clipped;
 			in_cigar_readlen = head_soft_clipped;
@@ -2481,7 +2566,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 		all_mismatched_bases += gap_mismatched + (last_correct_base - in_cigar_readlen - section_matched);
 		all_matched_bases += section_matched + first_correct_base - last_correct_base - gap_mismatched + min(0, indel_diff);
 
-		sprintf(newcigar, "%dM%dM%d%c%dM", last_correct_base - in_cigar_readlen , indel_pos, abs(indel_diff), indel_diff>0?'D':'I', first_correct_base - last_correct_base - indel_pos + min(0, indel_diff) );
+		SUBreadSprintf(newcigar, 45, "%dM%dM%d%c%dM", last_correct_base - in_cigar_readlen , indel_pos, abs(indel_diff), indel_diff>0?'D':'I', first_correct_base - last_correct_base - indel_pos + min(0, indel_diff) );
 		all_mapped_bases += first_correct_base - in_cigar_readlen + min(0, indel_diff);
 		strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
 		in_cigar_readlen = first_correct_base;
@@ -2494,7 +2579,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 		int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1) - 8;
 		head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed,0, abs_pos /* this can only happen if no indel is in read */, first_mapped_base_in_read , 0, first_mapped_base_in_read);
 
-		if(head_soft_clipped > 0)sprintf(thread_context -> reporting_cigars[thread_context -> reporting_count],"%dS", head_soft_clipped );
+		if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> reporting_count], 11,"%dS", head_soft_clipped );
 		in_cigar_readlen = head_soft_clipped;
 		last_mapped_base_in_read = find_subread_end(read_len, all_subreads, last_section_subread_no) - 16 + 8;
 	}
@@ -2504,11 +2589,11 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 	all_mismatched_bases += (read_len - in_cigar_readlen - tail_soft_clipped  - section_matched);
 	all_matched_bases += section_matched;
 
-	sprintf(newcigar, "%dM", read_len - in_cigar_readlen - tail_soft_clipped);
+	SUBreadSprintf(newcigar, 11, "%dM", read_len - in_cigar_readlen - tail_soft_clipped);
 	all_mapped_bases += read_len - in_cigar_readlen - tail_soft_clipped;
 	strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
 	if(tail_soft_clipped){
-		sprintf(newcigar, "%dS", tail_soft_clipped);
+		SUBreadSprintf(newcigar, 11, "%dS", tail_soft_clipped);
 		strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
 	}
 
@@ -2555,7 +2640,7 @@ void sort_readscore_exchange(void * vp , int i , int j){
 	sorting_index [j] = idxI ;
 }
 
-int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, int thread_no, subread_read_number_t pair_number, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
+int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, int thread_no, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	int i,j,reverse_text_offset, distinct_vote_number_i;
 
@@ -2641,15 +2726,14 @@ int cellCounts_genekey2int(char *key) {
 
 
 int cellCounts_process_copy_ptrs_to_votes_compare(void * arrp, int i, int j){
-	temp_votes_per_read_t * ptrs = ((void**)arrp)[1];
-	int * trying_subread_no = ((void**)arrp)[0];
-	int diffv = ptrs -> votes[ trying_subread_no [i] ] - ptrs -> votes[ trying_subread_no [j] ] ;
+	int * Xptrs = ((temp_votes_per_read_t**)arrp)[1] -> votes;
+	int * trying_subread_no = ((int**)arrp)[0];
+	int diffv = Xptrs[ trying_subread_no [i] ] - Xptrs[ trying_subread_no [j] ] ;
 	return diffv;
 }
 
 void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
-	void ** arr = arrp;
-	int * trying_subread_no = arr[0];
+	int * trying_subread_no = ((int**)arrp)[0];
 	int tmpi = trying_subread_no [i];
 	trying_subread_no [i] = trying_subread_no [j];
 	trying_subread_no [j] = tmpi;
@@ -2659,7 +2743,7 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 #define INDEL_SEGMENT_SIZE 5
 #define VOTING_PRIME_NUMBER 66889
 
-#define _index_vote(key) (((unsigned int)(key))%GENE_SCRNA_VOTE_TABLE_SIZE)
+//#define _index_vote(key) (((unsigned int)(key))%GENE_SCRNA_VOTE_TABLE_SIZE)
 #define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_SCRNA_VOTE_TABLE_SIZE)
 #define cellCounts_voting_update_topK(vt, vn, ij)  { \
 	int x3, x3done=0;\
@@ -2701,12 +2785,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 	void * sort_arr[2];
 	sort_arr [0] = trying_subread_no;
 	sort_arr [1] = ptrs;
-	if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
-		for(x1=0;x1<subreads ;x1++){
-			int myno = trying_subread_no[x1];
-			SUBREADprintf("SORTED-VOTES: %s:: #%d has %d votes ; offset=%d ; loc=%d\n", read_name, x1, ptrs -> votes[x1], ptrs -> offsets[x1], ptrs -> start_location_in_index[x1] );
-		}
-	}
 	quick_sort(sort_arr , subreads , cellCounts_process_copy_ptrs_to_votes_compare, cellCounts_process_copy_ptrs_to_votes_exchange);
 
 	init_gene_vote(vote);
@@ -2722,12 +2800,6 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 		int is_reversed = (myno >= applied_subreads_per_strand)?IS_NEGATIVE_STRAND:0;
 		unsigned int * index_ptr = ptrs->start_location_in_index [myno];
 		int vote_prime_sum = ptrs->votes[trying_subread_no[subreads-1]];
-		int ignore_creation_voteloc = 0;
-
-		if(0)if(x1 >= subreads - 5 && has_votes >10) {
-			if(vote->max_vote >= 4) ignore_creation_voteloc =1;
-			else if(has_votes > 20 && vote->max_vote >= 3) ignore_creation_voteloc =1;
-		}
 
 		for(x2 = 0 ; x2 < has_votes; x2++){
 			unsigned int kv = index_ptr[ vote_prime_sum % has_votes ] - offset;
@@ -2737,7 +2809,8 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 			datalen = datalen2 = vote -> items[offsetX];
 			unsigned int * dat2, *dat;
 			dat = dat2 = vote -> pos[offsetX];
-			for(iix = 0; iix<=INDEL_SEGMENT_SIZE; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)) {
+
+			for(iix = 0; iix<=INDEL_SEGMENT_SIZE; iix = iix>0?-iix:(-iix+INDEL_SEGMENT_SIZE)){
 				if(iix) {
 					offsetX = _index_vote_tol(kv+iix);
 					datalen = vote -> items[offsetX];
@@ -2760,11 +2833,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 								break;
 							}
 						}
-						
-						if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
-							SUBREADprintf("  ADDING VOTE #%d : dist0=%d , rev=%d , known=%d , toli=%d tolirec = %d %d %d\n", myno, dist0 , is_reversed , known_indel, tolimax, indelrec [tolimax-3], indelrec [tolimax-2], indelrec [tolimax-1]);
-						}
-
+					
 						if(tolimax < MAX_INDEL_TOLERANCE*3 && !known_indel){
 							indelrec [tolimax] = mynoP1PStr;
 							indelrec [tolimax+1] = mynoP1PStr;
@@ -2788,7 +2857,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 				}
 				if(found)break;
 			}
-			if(datalen2 < GENE_SCRNA_VOTE_SPACE && (!ignore_creation_voteloc) && (!found)){
+			if((!found) && datalen2 < GENE_SCRNA_VOTE_SPACE){
 				vote -> items[offsetX2] = datalen2+1;
 				dat2[datalen2] = kv;
 				vote -> masks[offsetX2][datalen2] = is_reversed;
@@ -2999,7 +3068,6 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 		int is_reversed, applied_subreads = 0;
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
-		//fprintf(stderr,"FETCH_1READ %lld LEN=%d '%s' '%s' '%s'\n", current_read_number, read_len, read_name, read_text, qual_text);
 		if(current_read_number < 0) break;
 		if(read_len< 16) continue;
 
@@ -3039,7 +3107,7 @@ int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 #else
 				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : % 13lld reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 #endif
-				cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
+				cellCounts_select_and_write_alignments(cct_context, thread_no, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 			} else {
 				building_rbin_offset = REVERSED_READ_BIN_OFFSET;
 				read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
@@ -3156,7 +3224,7 @@ int simpleMode_cellCounts_do_voting(cellcounts_global_t * cct_context, int threa
 
 						if(current_read_number % 1000000 == 0) SUBREADprintf("Mapping and counting: %lld  ; %.2f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 						if((simple_mode && cellCounts_simple_mode_highconf(cct_context, thread_no, applied_subreads, vote_me, read_name)) || (simple_mode == 0)){
-							cellCounts_select_and_write_alignments(cct_context, thread_no, current_read_number, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
+							cellCounts_select_and_write_alignments(cct_context, thread_no, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 							thread_context -> hiconf_map += simple_mode;
 							thread_context -> loconf_map += (0==simple_mode);
 							written =1;
@@ -3187,7 +3255,7 @@ void cellCounts_absoffset_to_posstr(cellcounts_global_t * cct_context, unsigned 
 	char * ch;
 	int off;
 	locate_gene_position(pos, &cct_context -> chromosome_table, &  ch, &off);
-	sprintf(res, "%s:%u", ch, off);
+	SUBreadSprintf(res, 100 , "%s:%u", ch, off);
 }
 
 void known_pointer_strcat(char * targ, char * src, char ** buf){
@@ -3203,7 +3271,7 @@ void known_pointer_strcat(char * targ, char * src, char ** buf){
 int cellCounts_write_gene_list(cellcounts_global_t * cct_context){
 	int xk1;
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
-	sprintf(ofname,"%s.Annot",cct_context->output_prefix);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.Annot",cct_context->output_prefix);
 	FILE * fp_out = fopen( ofname , "w" );
 	fprintf(fp_out,"GeneID\tChr\tStart\tEnd\tStrand\tLength\n");
 
@@ -3299,11 +3367,11 @@ int cellCounts_write_gene_list(cellcounts_global_t * cct_context){
 							known_pointer_strcat(out_chr_list, matched_chr, &tmp_chr_list);
 							known_pointer_strcat(out_chr_list, ";", &tmp_chr_list);
 
-							sprintf(numbbuf,"%u;", input_start_stop_list[xk3 * 2]);
+							SUBreadSprintf(numbbuf,12,"%u;", input_start_stop_list[xk3 * 2]);
 							known_pointer_strcat(out_start_list, numbbuf, &tmp_start_list);
-							sprintf(numbbuf,"%u;", input_start_stop_list[xk3 * 2 + 1] - 1);
+							SUBreadSprintf(numbbuf,12,"%u;", input_start_stop_list[xk3 * 2 + 1] - 1);
 							known_pointer_strcat(out_end_list, numbbuf, &tmp_end_list);
-							sprintf(numbbuf,"%c;", (matched_strand==1)?'-':( ( matched_strand==0 )? '+':'.'));
+							SUBreadSprintf(numbbuf,12,"%c;", (matched_strand==1)?'-':( ( matched_strand==0 )? '+':'.'));
 							known_pointer_strcat(out_strand_list, numbbuf, &tmp_strand_list);
 
 						}
@@ -3356,6 +3424,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 	cct_context -> running_processed_reads_in_chunk=0;
 	cct_context -> processed_reads_in_chunk=0;
 	cct_context -> all_processed_reads_before_chunk = 0;
+	sread_len = 0;
 
 	while(1) {
 		int ret = 0;
@@ -3364,12 +3433,12 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			char tmp_fname[MAX_FILE_NAME_LENGTH+30];
 
 			if(cct_context->total_index_blocks > 1 || chunk_no == 0) {	   
-				sprintf(tmp_fname, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
+				SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
 				print_in_box(80,0,0, "Load the %d-%s index block...",1+ cct_context->current_index_block_number, cct_context->current_index_block_number==0?"st":(cct_context->current_index_block_number==1?"nd":"th"));
 				if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
 				print_in_box(80,0,0, "The index block has been loaded. Now map the reads...");
 				print_in_box(80,0,0, "");
-				sprintf(tmp_fname, "%s.%02d.b.array", cct_context->index_prefix, cct_context->current_index_block_number);
+				SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.array", cct_context->index_prefix, cct_context->current_index_block_number);
 			}
 			
 			if(cct_context->total_index_blocks == cct_context->current_index_block_number + 1)
@@ -3396,19 +3465,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 		  (cct_context -> output_binfiles_are_full))
 			// base value indexes loaded in the last circle are not destroyed and are used in writting the indel VCF.
 			break;
-
-		if(0) if(1+chunk_no){
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			SUBREADprintf("WARNINGqqq: EARLY BREAK!\n");
-			break;
-		}
-
 
 		cellCounts_clean_context_after_chunk(cct_context);
 		chunk_no++;
@@ -3480,9 +3536,9 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 			char replaced_key[40+MAX_UMI_LEN];
 #ifdef __MINGW32__
-			int keyptr = sprintf(replaced_key,"%d-%" PRId64 "-", str1 -> cellbc, str1 -> gene_no);
+			int keyptr = SUBreadSprintf(replaced_key, 40+MAX_UMI_LEN,"%d-%" PRId64 "-", str1 -> cellbc, str1 -> gene_no);
 #else
-			int keyptr = sprintf(replaced_key,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
+			int keyptr = SUBreadSprintf(replaced_key, 40+MAX_UMI_LEN,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
 #endif
 			memcpy(replaced_key+keyptr, str1 -> umi, cct_context -> UMI_length);
 			replaced_key[keyptr+cct_context -> UMI_length]=0;
@@ -3521,9 +3577,9 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 							char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
-							int keyptr = sprintf(replaced_key,"%d-%d-%" PRId64 "-", sample_id, try_str -> cellbc, try_str -> gene_no);
+							int keyptr = SUBreadSprintf(replaced_key, 55+MAX_UMI_LEN,"%d-%d-%" PRId64 "-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #else
-							int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
+							int keyptr = SUBreadSprintf(replaced_key, 55+MAX_UMI_LEN,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #endif
 
 							memcpy(replaced_key+keyptr, try_str -> umi, cct_context -> UMI_length);
@@ -3546,9 +3602,9 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 						char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
-						int keyptr = sprintf(replaced_key,"%d-%d-%" PRId64 "-", sample_id, try_str -> cellbc, try_str -> gene_no);
+						int keyptr = SUBreadSprintf(replaced_key, 55+MAX_UMI_LEN,"%d-%d-%" PRId64 "-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #else
-						int keyptr = sprintf(replaced_key,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
+						int keyptr = SUBreadSprintf(replaced_key, 55+MAX_UMI_LEN,"%d-%d-%lld-", sample_id, try_str -> cellbc, try_str -> gene_no);
 #endif
 						memcpy(replaced_key+keyptr, try_str -> umi, cct_context -> UMI_length);
 						replaced_key[keyptr+cct_context -> UMI_length]=0;
@@ -3759,12 +3815,10 @@ void * cellCounts_merge_batches_worker(void * vp){
 	return NULL;
 }
 
-void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
+int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rbin, char * new_rbin, int binlen, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes) {
 	char * cellbc_seq=NULL,*umi_seq=NULL, * cellbc_qual=NULL,*umi_qual=NULL, *sample_seq=NULL, *sample_qual=NULL, *lane_str=NULL;
 	int rname_trimmed_len=0;
 	cellCounts_scan_read_name_str(cct_context, rbin, NULL, & sample_seq, & sample_qual, & cellbc_seq, & cellbc_qual, & umi_seq, & umi_qual, &lane_str, NULL, &rname_trimmed_len);
-	char new_rbin_stake[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
-	char * new_rbin = new_rbin_stake;
 	int new_rbin_len = 0, n_cigar_op =0, l_read_name=0, l_seq=0;
 
 	memcpy(new_rbin, rbin, 36);
@@ -3869,12 +3923,14 @@ void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context
 
 	new_rbin_len-=4;
 	memcpy(new_rbin, &new_rbin_len,4);
-	fwrite(new_rbin, 1, new_rbin_len+4, fp);
-
-	if(new_rbin!=new_rbin_stake)free(new_rbin);
+	return new_rbin_len;
 }
 
-
+void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
+	char new_rbin[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
+	int new_rbin_len = cellCounts_make_barcode_bam_bin( cct_context, rbin, new_rbin, binlen, fixedbc_seq, fixedumi_seq, gene_no, genes );
+	fwrite(new_rbin, 1, new_rbin_len+4, fp);
+}
 
 #ifdef __MINGW32__
 #define ADD_key_FMT1 "%d-%d-%" PRId64 "-%s"
@@ -3882,7 +3938,7 @@ void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context
 #define ADD_key_FMT1 "%d-%d-%lld-%s"
 #endif
 #define ADD_key_struct { char my_key [50+MAX_UMI_LEN]; \
-	sprintf(my_key,ADD_key_FMT1, sample_id, cell_no, gene_no, UMI_str); \
+	SUBreadSprintf(my_key, 50+MAX_UMI_LEN,ADD_key_FMT1, sample_id, cell_no, gene_no, UMI_str); \
 	srInt_64 supp_reads = HashTableGet(supp_reads_SCGU, my_key)-NULL; \
 	if(1>supp_reads) HashTablePut(supp_reads_SCGU, strdup(my_key), NULL+1); \
 	else HashTablePutReplaceEx(supp_reads_SCGU, my_key, NULL+supp_reads+1, 0,0,0); }
@@ -3914,7 +3970,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		//cellCounts_lock_release(&cct_context -> input_dataset_lock);
 		if(0>this_batch_no)break;
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
-		sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", temp_dir, getpid(), this_batch_no);
+		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", temp_dir, getpid(), this_batch_no);
 		FILE * fp = fopen(tmp_fname, "rb");
 		fseeko(fp, 0, SEEK_END);
 		srInt_64 batch_fsize = ftello(fp);
@@ -3950,7 +4006,6 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			if(gene_no & (1LLU<<63)){
 				int genes = (int)(gene_no & 0x7fffffffllu);
 				if(genes > me_max_genes)me_max_genes=genes;
-//fprintf(stderr, "BTH %d  USTR '%s'  GENES %d  PTR %d   UMILEN %d  TLEN %lld\n", this_batch_no, UMI_str, genes, scanptr, cct_context -> UMI_length, batch_content_len);
 				memcpy(UMI_str, batch_content+scanptr+8*genes, cct_context -> UMI_length);
 				UMI_str[cct_context -> UMI_length]=0;
 
@@ -3964,16 +4019,11 @@ void * cellCounts_do_one_batch(void * paramsp1){
 				memcpy(UMI_str, batch_content+scanptr, cct_context -> UMI_length);
 				ADD_key_struct;
 			}
-
 			scanptr += cct_context -> UMI_length ; // UMI str
-
 			int rbinlen = 0;
 			memcpy(&rbinlen, batch_content+scanptr, 4);
-
 			if(me_max_Rbin_len < rbinlen) me_max_Rbin_len = rbinlen;
 			scanptr += rbinlen +4; // read_bin
-
-//			if(sample_id <0 || sample_id > 1000) SUBREADprintf("Wrong Sample: RNO=%d; ptr=%lld\n", rbin_no, scanptr);
 			rbin_no++;
 		}
 		ArrayList ** cell_gene_umi_list = malloc(sizeof(void*)*cct_context -> sample_sheet_table -> numOfElements);
@@ -4009,7 +4059,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table, &removed_UMIs);
 
 			cellbcP0_to_geneno0B_P1_to_UMIs -> appendix1 = fp;
-//			fprintf(stderr,"BATCH %d SAMPLE %d RBINS %d ULEN %d LEN %lld\n", this_batch_no, x1, rbin_no, cct_context -> UMI_length, batch_content_len);
+
 			fwrite(&cellbcP0_to_geneno0B_P1_to_UMIs -> numOfElements,1,8,fp);
 			HashTableIteration(cellbcP0_to_geneno0B_P1_to_UMIs, cellCounts_do_one_batch_write_UMIs);
 			HashTableDestroy(cellbcP0_to_geneno0B_P1_to_UMIs);
@@ -4037,9 +4087,9 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			char SCGU_key [40+MAX_UMI_LEN];
 
 #ifdef __MINGW32__
-			int keyptr = sprintf(SCGU_key,"%d-%d-%" PRId64 "-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
+			int keyptr = SUBreadSprintf(SCGU_key, 40+MAX_UMI_LEN,"%d-%d-%" PRId64 "-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #else
-			int keyptr = sprintf(SCGU_key,"%d-%d-%lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
+			int keyptr = SUBreadSprintf(SCGU_key, 40+MAX_UMI_LEN,"%d-%d-%lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #endif
 			memcpy(SCGU_key+keyptr, umi, cct_context -> UMI_length);
 			SCGU_key[keyptr+ cct_context -> UMI_length] = 0;
@@ -4132,12 +4182,12 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 	int x1,x2;
 
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
-	sprintf(ofname,"%s.scRNA.%03d.%s.summary",cct_context->output_prefix, sample_index+1,tabtype);
-	sprintf(ofname,"%s.scRNA.%03d.%s.BCtab",cct_context->output_prefix, sample_index+1,tabtype);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.scRNA.%03d.%s.summary",cct_context->output_prefix, sample_index+1,tabtype);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.scRNA.%03d.%s.BCtab",cct_context->output_prefix, sample_index+1,tabtype);
 	FILE * ofp_bcs = fopen( ofname , "w" );
-	sprintf(ofname,"%s.scRNA.%03d.%s.GENEtab",cct_context->output_prefix, sample_index+1,tabtype);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.scRNA.%03d.%s.GENEtab",cct_context->output_prefix, sample_index+1,tabtype);
 	FILE * ofp_genes = fopen( ofname , "w" );
-	sprintf(ofname,"%s.scRNA.%03d.%s.spmtx",cct_context->output_prefix, sample_index+1,tabtype);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.scRNA.%03d.%s.spmtx",cct_context->output_prefix, sample_index+1,tabtype);
 	FILE * ofp_mtx = fopen( ofname , "w" );
 	fprintf(ofp_mtx,"%%%%MatrixMarket matrix coordinate integer general\n");
 
@@ -4221,7 +4271,7 @@ void cellCounts_merged_45K_to_90K_sum(cellcounts_global_t * cct_context, HashTab
 	HashTableIteration( cellP1_geneP1_UMIs_tab, cellCounts_merged_45K_to_90K_sum_SUM );
 
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
-	sprintf(ofname,"%s.scRNA.%03d.AmbSum",cct_context->output_prefix, sample_no+1);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.scRNA.%03d.AmbSum",cct_context->output_prefix, sample_no+1);
 	FILE * write_fp = fopen(ofname,"w");
 	fprintf(write_fp,"GeneID\tUMIs\n");
 	summed_gene_to_umis -> appendix1 = cct_context;
@@ -4240,14 +4290,13 @@ void cellCounts_merged_45K_to_90K_sum(cellcounts_global_t * cct_context, HashTab
 void cellCounts_merged_write_nozero_geneids_WRT(void *k, void *v, HashTable* me){
 	FILE * fp = me->appendix1;
 	cellcounts_global_t * cct_context = me->appendix2;
-	void ** tv2 = me->appendix3;
 	unsigned char* gene_symbol = cct_context -> gene_name_array [k-NULL-1];
 	fprintf(fp, "%s\n", gene_symbol);
 }
 
 void cellCounts_merged_write_nozero_geneids(cellcounts_global_t * cct_context, HashTable * no0genes, int samplenno, ArrayList * loaded_features, HashTable * sorted_order_p1_to_i_p1_tab){
 	char ofname[MAX_FILE_NAME_LENGTH + 100];
-	sprintf(ofname,"%s.scRNA.%03d.no0Genes", cct_context->output_prefix, samplenno+1);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 100,"%s.scRNA.%03d.no0Genes", cct_context->output_prefix, samplenno+1);
 	FILE * fp = fopen( ofname , "w" );
 	no0genes -> appendix1 =fp;
 	void * tv2[2];
@@ -4275,6 +4324,7 @@ void cellCounts_merged_to_tables_write_build_UMIcounts(void * ky, void * val, Ha
 
 #define MIN_UMIS_FOR_CANDIDATE_RESCUE 500
 #define SCRNA_AMBIENT_RESCURE_MEDIAN_FRACTION 0.01
+#define MAX_CANDIDATE_CELLS 20000
 void cellCounts_merged_ambient_rescure(cellcounts_global_t * cct_context, HashTable * cellP1_to_geneP1_to_umis_tab, HashTable * cellnoP1_to_umis_tab, ArrayList * this_sample_45k_90k_barcode_no_P0, ArrayList * this_sample_ambient_rescure_candi, ArrayList * highconf_cellbc_list){
 	ArrayList * sorted_bcno_p1 = HashTableSortedIndexes( cellnoP1_to_umis_tab, 1);
 	HashTable * highconf_cellbc_list_tab = ArrayListToLookupTable_Int(highconf_cellbc_list);
@@ -4296,7 +4346,10 @@ void cellCounts_merged_ambient_rescure(cellcounts_global_t * cct_context, HashTa
 			if(this_bc_umis < median_umis_001_cut) break;
 			if(this_bc_umis < MIN_UMIS_FOR_CANDIDATE_RESCUE) break;
 			if(x1 >= 45000) break;
-			ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt_p1-1);
+
+			// The MAX_CANDIDATE_CELLS was added on 31 JAN 2023 when I realised that Cell Ranger only tests 20,000 candidates.
+			if(this_sample_ambient_rescure_candi -> numOfElements < MAX_CANDIDATE_CELLS)
+				ArrayListPush(this_sample_ambient_rescure_candi, this_bc_pnt_p1-1);
 		}
 	}
 	for(x1=45000; x1 < sorted_bcno_p1 -> numOfElements; x1++){
@@ -4368,7 +4421,7 @@ int cellCounts_merged_bootstrap_a_sample(cellcounts_global_t * cct_context, Hash
 
 void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTable ** cellP1_to_geneP1_to_umis, ArrayList * loaded_features, srInt_64 nexons){
 	char ofname[MAX_FILE_NAME_LENGTH + 20];
-	sprintf(ofname,"%s.scRNA.SampleTable",cct_context->output_prefix);
+	SUBreadSprintf(ofname,MAX_FILE_NAME_LENGTH + 20,"%s.scRNA.SampleTable",cct_context->output_prefix);
 	FILE * sample_tab_fp = fopen( ofname , "w" );
 	int x1;
 
@@ -4446,7 +4499,7 @@ void * delete_file_thread(void * arg){
 		for(x1=0; x1<CELLBC_BATCH_NUMBER +2; x1++){
 			if(NULL== current_sorting_key || current_sorting_key[x1] == 0x7fffffffffffffffLLU){
 				char tmp_fname[MAX_FILE_NAME_LENGTH+50];
-				sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), x1);
+				SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+50, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), x1);
 				if(bin_file_exists(tmp_fname)) unlink(tmp_fname);
 			}else all_closed = 0;
 		}
@@ -4525,7 +4578,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 	
 	for(xk1=0; xk1< CELLBC_BATCH_NUMBER+2; xk1++){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
-		sprintf(tmp_fname, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), xk1);
+		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), xk1);
 		input_fps[xk1] = fopen(tmp_fname,"rb");
 		if(xk1 == CELLBC_BATCH_NUMBER+1)break;
 
@@ -4678,10 +4731,12 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
 		size_t frret = fread(&binlen, 1, 4, notmapped_fp);
-		memcpy(tofill -> inbin + tofill -> inbin_len, &binlen, 4);
-		tofill -> inbin_len += 4;
-		frret += fread(tofill -> inbin + tofill -> inbin_len, 1, binlen, notmapped_fp);
-		tofill -> inbin_len += binlen;
+		char old_bin[binlen+4];
+		memcpy(old_bin, &binlen,4);
+		frret += fread(old_bin+4, 1, binlen, notmapped_fp);
+		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len, binlen, NULL, NULL, -1, NULL);
+		tofill -> inbin_len += 4+ new_binlen; // block size: Total length of the alignment record, excluding this field. Then, the alignment record.
+
 		if(tofill -> inbin_number ==0) tofill -> inbin_number =1;
 		if(tofill-> inbin_len > CELLCOUNTS_BAMBLOCK_SIZE * CELLCOUNTS_BAMBLOCK_COMP_NUMBER){
 			struct scRNA_merge_batches_worker_current * my_finished_job = worker_current_jobs+current_worker;

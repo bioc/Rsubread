@@ -401,7 +401,7 @@ int LRMload_offsets(LRMcontext_t * context){
 	LRMgehash_load_option(context -> index_prefix, LRMSUBREAD_INDEX_OPTION_INDEX_PADDING , &padding);
 	assert(padding>16);
 	
-	sprintf(fn, "%s.reads", context->index_prefix);
+	SUBreadSprintf(fn, LRMMAX_FILENAME_LENGTH+20, "%s.reads", context->index_prefix);
 	fp = fopen(fn, "r");
 
 	if(!fp){
@@ -476,11 +476,11 @@ void LRMsambam_write_header(LRMcontext_t * context, LRMthread_context_t * thread
 			char * chro_name = LRMArrayListGet(context -> sam_bam_chromosome_list, chro_no);
 			int chro_length = LRMHashTableGet(context -> chromosome_size_table, chro_name) - NULL;
 						
-			wrlen = sprintf(header_line, "@SQ\tSN:%s\tLN:%d\n",chro_name,chro_length);
+			wrlen = SUBreadSprintf(header_line, 10100, "@SQ\tSN:%s\tLN:%d\n",chro_name,chro_length);
 		}else if(chro_no == -1){
-			wrlen = sprintf(header_line, "@HD\tVN:1.0\tSO:unsorted\n");
+			wrlen = SUBreadSprintf(header_line, 10100, "@HD\tVN:1.0\tSO:unsorted\n");
 		}else if(chro_no == context -> sam_bam_chromosome_list->numOfElements ){
-			wrlen = sprintf(header_line, "@PG\tID:subread-long-read-mapping\tPN:subread-long-read-mapping\tCL:%s\n", context -> user_command_line);
+			wrlen = SUBreadSprintf(header_line, 10100, "@PG\tID:subread-long-read-mapping\tPN:subread-long-read-mapping\tCL:%s\n", context -> user_command_line);
 		}
 		if(context -> is_SAM_output){
 			fwrite( header_line, 1, wrlen, context -> sam_bam_file);
@@ -544,7 +544,7 @@ int LRMwrite_chunk_add_buffered_output(LRMcontext_t * context, LRMthread_context
 	if(context -> is_Phred_64) LRMquality_64_to_33(iteration_context->qual_text) ;
 	
 	if(context->is_SAM_output){
-		actural_target_len = sprintf(target_ptr,"%s\t%d\t%s\t%u\t%d\t%s\t*\t0\t0\t%s\t%s\tNM:%d\n", iteration_context -> read_name, flags, chro_name, chro_pos + 1, map_quality, cigar, iteration_context->read_text, iteration_context->qual_text, mis_matched);
+		actural_target_len = SUBreadSprintf(target_ptr, thread_context -> out_buff_capacity - thread_context->out_buff_used ,"%s\t%d\t%s\t%u\t%d\t%s\t*\t0\t0\t%s\t%s\tNM:%d\n", iteration_context -> read_name, flags, chro_name, chro_pos + 1, map_quality, cigar, iteration_context->read_text, iteration_context->qual_text, mis_matched);
 	}else{
 		actural_target_len = LRMgenerate_bam_record(context, thread_context, iteration_context, target_ptr, flags, chro_pos, chro_name, map_quality,  cigar, mis_matched);
 	}
@@ -593,7 +593,7 @@ void LRMpos2txt(LRMcontext_t * context, unsigned int linear, char * txt){
 
 	int retv = LRMlocate_gene_position(context, linear, &chro_name, &pos);
 	if(chro_name && !retv)
-		sprintf(txt, "%s:%d", chro_name, pos+1);
+		SUBreadSprintf(txt, 100, "%s:%d", chro_name, pos+1);
 	else	strcpy(txt, "*");
 }
 

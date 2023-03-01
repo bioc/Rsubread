@@ -39,6 +39,8 @@
 #define SCRNA_FASTA_SPLIT1 "|Rsd:cCounts:mFQs|"
 #define SCRNA_FASTA_SPLIT2 "|Rsd:cCounts:1mFQ|"
 
+#define BCL_READBIN_ITEMS_LOCAL 50
+#define BCL_READBIN_SIZE (2*MAX_SCRNA_READ_LENGTH)
 
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
@@ -527,11 +529,15 @@ typedef pthread_mutex_t  cellCounts_lock_t;
 #define cellCounts_lock_release pthread_mutex_unlock
 */
 
+/*
 typedef struct{
 	int is_spin_lock;
 	pthread_spinlock_t spinlock;
 	pthread_mutex_t mutexlock;
 } cellCounts_lock_t;
+*/
+
+typedef pthread_mutex_t cellCounts_lock_t;
 
 void cellCounts_init_lock(cellCounts_lock_t * lock, int is_spin);
 void cellCounts_destroy_lock(cellCounts_lock_t * lock);
@@ -723,5 +729,6 @@ int myrand_rand();
 #define max(a,b)  ((a)<(b)?(b):(a))
 #define min(a,b)  ((a)>(b)?(b):(a))
 
+size_t SUBreadSprintf(char * content, size_t bufflen, char * pattern,...);
 
 #endif
