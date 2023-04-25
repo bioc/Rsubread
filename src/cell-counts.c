@@ -638,6 +638,10 @@ int determine_total_index_blocks(cellcounts_global_t * cct_context){
 		if(!does_file_exist(tmp_fname))break;
 		cct_context->total_index_blocks ++;
 	}
+	if(cct_context->total_index_blocks> 1){
+		SUBREADprintf("ERROR: cellCounts can only run with one-block index. Please build the index with indexSplit=FALSE.\n");
+		return 1;
+	}
 	return 0;
 }
 
@@ -1361,9 +1365,10 @@ int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
 	cellCounts_init_lock(&cct_context -> input_dataset_lock, 1 || (cct_context -> input_mode == GENE_INPUT_BCL));
 
-	if(cct_context -> input_mode == GENE_INPUT_BCL)
+	if(cct_context -> input_mode == GENE_INPUT_BCL){
 		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
-	else if(cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ)
+		if(!rv)cct_context -> is_dual_index = cct_context -> input_dataset.bcl_input.is_dual_index;
+	} else if(cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ)
 		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
 	else if(cct_context -> input_mode == GENE_INPUT_SCRNA_BAM)
 		rv = rv || geinput_open_scRNA_BAM(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);

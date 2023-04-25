@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <dirent.h>
 
 #include "subread.h"
@@ -21,20 +22,24 @@
 struct iBLC_scan_t{
 	char out_format_string[MAX_FILE_NAME_LENGTH];
 	char filter_format_string[MAX_FILE_NAME_LENGTH];
-	int found_answer;
-	int filter_is_gzipped;
 	int bcl_is_gzipped;
 	int reads_per_cluster;
 	int read_lengths[INPUT_BLC_MAX_READS];
 	int read_is_index[INPUT_BLC_MAX_READS];
+	int is_cbcl_mode;
+	int filter_found;
+	int filter_is_gzipped;
+	int bcl_found;
+	int cbcl_total_tiles;
+	int * cbcl_tile_numbers;
 };
 
 int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 	DIR * this_level = opendir(data_dir);
 	if(this_level == NULL) return -1;
 	struct dirent *dp;
-	int filter_found = 0, bcl_found = 0;
 	char testfile_name[MAX_FILE_NAME_LENGTH];
+	int ii;
 	while ((dp = readdir (this_level)) != NULL) {
 		#ifdef __MINGW32__
 		if(1){
@@ -44,7 +49,6 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 			strcpy(testfile_name,data_dir);
 			strcat(testfile_name, SR_PATH_SPLIT_STR);
 			strcat(testfile_name, dp->d_name);
-			//SUBREADprintf("DIG: %s\n", testfile_name);
 		#ifdef __MINGW32__
 			if(strcmp( dp->d_name, ".") && strcmp( dp->d_name,".."))
 				if(0==iBLC_guess_scan( scancon, testfile_name)) continue;
@@ -52,7 +56,7 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 			if(iBLC_guess_scan( scancon, testfile_name))return -1;
 		}else if(dp -> d_type == DT_REG){
 		#endif
-			//SUBREADprintf( "%s  %s  %p  %p\n" , data_dir, dp->d_name , strstr( dp->d_name , "0001.bcl." ) , strstr( dp->d_name , ".bci") );
+			//SUBREADprintf( "DIG SCAN BCL: %s  %s\n" , data_dir, dp->d_name);
 			if(0==strcmp(dp->d_name, "RunInfo.xml")){
 				if(scancon->reads_per_cluster > 0){
 					SUBREADprintf("ERROR: the root directory contains multiple scRNA data sets.\n");
@@ -66,12 +70,14 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 				if(NULL == fp){
 					SUBREADprintf("ERROR: cannot open the run info file: %s\n", testfile_name);
 				}
+				ArrayList * tilelist = ArrayListCreate(400);
 				while(1){
 					char inbuf[MAX_READ_LENGTH];
 					if(!fgets( inbuf, MAX_READ_LENGTH-1, fp))break;
 					if(strstr( inbuf, "<Read Number=\"" )){
 						char * rbuf=NULL;
-						int my_index = -1, is_idx = -1, rlen = -1, ii=0;
+						int my_index = -1, is_idx = -1, rlen = -1;
+						ii=0;
 						strtok_r(inbuf, "\"", &rbuf);
 
 						while(rbuf){
@@ -91,13 +97,69 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 						}else assert( my_index >0 && is_idx >=0 && rlen>0 );
 						//SUBREADprintf("LOAD CLUSTER %d = %d\n", my_index, rlen);
 					}
+					if(strstr( inbuf, "<Tiles>" )){
+						while(1){
+							if(!fgets( inbuf, MAX_READ_LENGTH-1, fp)){
+								SUBREADprintf("ERROR: the tile list in RunInfo.xml does not have a proper end.\n");
+								return -1;
+							}
+							if(strstr(inbuf,"</Tile>")){
+								char * t0 = strstr(inbuf,"<Tile>");
+								if(!t0) {
+									SUBREADprintf("ERROR: the tile list in RunInfo.xml has a wrong format\n");
+									return -1;
+								}
+								int tmpi=0;
+								for(t0+=6; (*t0)!='<'; t0++){
+									int nch = *t0;
+									if(nch == '_'){
+										tmpi *= 100;
+									} else if(isdigit(nch)){
+										tmpi = tmpi* 10 + nch-'0';
+									} else{
+										SUBREADprintf("ERROR: tile name ''%s'' in RunInfo.xml has a wrong char.\n", inbuf);
+										return -1;
+									}
+								}
+								if(tmpi < 1000000){
+									SUBREADprintf("ERROR: tile name ''%s'' in RunInfo.xml has a wrong format = %d.\n", inbuf, tmpi);
+									return -1;
+								}
+								ArrayListPush(tilelist, NULL+tmpi);
+							}
+							if(strstr(inbuf,"</Tiles>"))break;
+							//<Tile>1_1303</Tile>
+						}
+					}
 				}
 				fclose(fp);
+
 				if(scancon -> reads_per_cluster <1){
-					SUBREADprintf("ERROR: the format of RunInfo.xml is unknown\n");
+					SUBREADprintf("ERROR: the format of RunInfo.xml is unknown.\n");
 					return -1;
 				}
+				if(tilelist -> numOfElements<1){
+					SUBREADprintf("ERROR: no tiles were found in RunInfo,xml.\n");
+					return -1;
+				}
+				scancon -> cbcl_total_tiles = tilelist -> numOfElements;
+				scancon -> cbcl_tile_numbers = malloc(sizeof(int)*scancon -> cbcl_total_tiles);
+				for(ii=0; ii < scancon -> cbcl_total_tiles; ii++){
+					//SUBREADprintf("Tile list %d/%lld : %lld\n", ii , scancon -> cbcl_total_tiles , ArrayListGet(tilelist,ii) - NULL);
+					scancon -> cbcl_tile_numbers[ii] = ArrayListGet(tilelist,ii) - NULL;
+				}
+				ArrayListDestroy(tilelist);
 			}
+			// 1_1101: lane 1, surface 1, swath 1 and tile 01. 
+			if(0==memcmp(data_dir+ strlen(data_dir)-5, SR_PATH_SPLIT_STR "L001",5 ) && strstr( dp->d_name , "s_1_1101.filter")){
+				char * gen_fmt = str_replace(dp->d_name , "s_1_1001.filter", "s_%d_%04d.filter");
+				char * gen_fmt2 = str_replace(data_dir , SR_PATH_SPLIT_STR "L001", SR_PATH_SPLIT_STR "L%03d");
+				strcpy(scancon -> filter_format_string, gen_fmt2);
+				free(gen_fmt2);
+				free(gen_fmt);
+				scancon -> filter_found = 1;
+			}
+
 			if(0==memcmp(data_dir+ strlen(data_dir)-5, SR_PATH_SPLIT_STR "L001",5 ) && strstr( dp->d_name , "s_1.filter")){
 				autozip_fp tfp;
 				strcpy(testfile_name, data_dir);    
@@ -113,12 +175,13 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 					strcat(scancon -> filter_format_string, gen_fmt);
 					free(gen_fmt2);
 					free(gen_fmt);
-					filter_found = resop + 1;
+					scancon -> filter_found = 1;
+					scancon -> filter_is_gzipped = resop;
 				}
 			}
 			if(0==memcmp(data_dir+ strlen(data_dir)-5, SR_PATH_SPLIT_STR "L001",5 ) && strstr( dp->d_name , "0001.bcl." ) && !strstr( dp->d_name , ".bci") ){
 				int tti;
-				bcl_found = 1;
+				scancon -> bcl_found = 1;
 				char * gen_fmt = str_replace(dp->d_name , "0001.bcl.", "%04d.bcl.");
 				
 				for(tti = 0; tti<22; tti++){
@@ -131,9 +194,9 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 					if(0<=resop){
 						scancon -> bcl_is_gzipped = resop;
 						autozip_close(&tfp);
-					}else bcl_found=0;
+					}else scancon -> bcl_found=0;
 				}
-				if(bcl_found){
+				if(scancon ->bcl_found){
 					char * gen_fmt2 = str_replace(data_dir , SR_PATH_SPLIT_STR "L001", SR_PATH_SPLIT_STR "L%03d");
 					strcpy(scancon -> out_format_string, gen_fmt2);	
 					free(gen_fmt2);
@@ -143,36 +206,51 @@ int iBLC_guess_scan(struct iBLC_scan_t * scancon, char * data_dir ){
 
 				free(gen_fmt);
 			}
-		}
-	}
+			// BaseCalls/L002/C21.1/L002_2.cbcl
+			if(strstr(data_dir, SR_PATH_SPLIT_STR "BaseCalls" SR_PATH_SPLIT_STR  "L001"SR_PATH_SPLIT_STR  "C10.1") && strcmp(dp->d_name ,"L001_1.cbcl")==0){
+				scancon -> is_cbcl_mode = 1;
+				scancon -> bcl_found = 1;
+				char * gen_fmt2 = str_replace(data_dir , SR_PATH_SPLIT_STR "L001", SR_PATH_SPLIT_STR "L%03d");
+				char * gen_fmt3 = str_replace(gen_fmt2 , SR_PATH_SPLIT_STR "C10.1", SR_PATH_SPLIT_STR "C%d.1");
+				free(gen_fmt2);
 
-	if(bcl_found && filter_found){
-		scancon -> found_answer = 1;
-		scancon -> filter_is_gzipped = filter_found - 1;
+				strcpy(scancon -> out_format_string, gen_fmt3);	
+				free(gen_fmt3);
+			}
+		}
 	}
 
 	closedir(this_level);
 	return 0;
 }
 
-int iBLC_guess_format_string(char * data_dir, int * cluster_bases, char * format_string, char * filter_format, int * bcl_is_gzipped, int * filter_is_gzipped, int * read_lens, int * is_index){
+int iBLC_guess_format_string(char * data_dir, int * cluster_bases, char * format_string, char * filter_format, int * bcl_is_gzipped, int * filter_is_gzipped, int * read_lens, int * is_index, int * is_cbcl_mode, int * cbcl_total_tiles, int** cbcl_tile_numbers, int * dual_index){
 	struct iBLC_scan_t sct;
 	memset(&sct, 0, sizeof(sct));
 	int tii = iBLC_guess_scan(&sct, data_dir);
-
-	if(tii || ! sct.found_answer) return -1;
+	if(tii || (! sct.bcl_found) || (! sct.filter_found)) return -1;
 	strcpy(format_string, sct.out_format_string);
 	strcpy(filter_format, sct.filter_format_string);
 	*filter_is_gzipped = sct.filter_is_gzipped;
 	*bcl_is_gzipped = sct.bcl_is_gzipped;
-	*cluster_bases=0;
+	*cluster_bases = 0;
+	*is_cbcl_mode = sct.is_cbcl_mode;
+	*cbcl_total_tiles = sct.cbcl_total_tiles;
+	*cbcl_tile_numbers = sct.cbcl_tile_numbers;
+	*dual_index = -1;
 
 	for(tii=0; tii<sct.reads_per_cluster; tii++){
-		if(sct.read_lengths[tii]<1) return -1;
+		if(sct.read_lengths[tii]<1) return -2 - tii;
 		read_lens[tii] = sct.read_lengths[tii];
 		is_index[tii] = sct.read_is_index[tii];
+		if(is_index[tii]) (*dual_index)++;
 		(*cluster_bases) += sct.read_lengths[tii];
+		//SUBREADprintf("IDX_INF %d : len=%d  idx=%d\n", tii, read_lens[tii], is_index[tii]);
 		read_lens[tii+1]=0;
+	}
+	if((*dual_index)<0){
+		SUBREADprintf("ERROR: no index read was found\n");
+		return -1;
 	}
 		
 	return 0;
@@ -261,6 +339,7 @@ int iBLC_open_batch(input_BLC_t * blc_input ){
 
 int iCache_open_batch( cache_BCL_t * cache_input){
 	cache_input -> bcl_gzip_fps = calloc(sizeof(autozip_fp), cache_input -> total_bases_in_each_cluster);
+	cache_input -> cbcl_indexes = calloc(sizeof(int), cache_input -> total_bases_in_each_cluster);
 	return 0;
 }
 
@@ -272,22 +351,36 @@ int cacheBCL_go_chunk_start( cache_BCL_t * cache_input ){
 	cache_input -> read_no_in_chunk=0;
 	return 0;
 }
+
+void cbcl_close(cbcl_fp * fp){
+	close(fp->cbcl_bin_fd);
+	memset(fp, 0,sizeof(cbcl_fp ));
+}
+
 void cacheBCL_close(cache_BCL_t * cache_input){
 	int x1;
 	for(x1=0;x1<cache_input -> total_bases_in_each_cluster;x1++){
-		if( cache_input -> bcl_gzip_fps[x1]. plain_fp || cache_input -> bcl_gzip_fps[x1].gz_fp.gz_fp )autozip_close(&cache_input -> bcl_gzip_fps[x1]);
+		if(cache_input -> is_cbcl_mode == 0 &&
+		     (cache_input -> bcl_gzip_fps[x1]. plain_fp || cache_input -> bcl_gzip_fps[x1].gz_fp.gz_fp))
+			autozip_close(& cache_input -> bcl_gzip_fps[x1]);
+
+		if(cache_input -> is_cbcl_mode && (cache_input -> cbcl_binary_fps[x1].cbcl_bin_fd))
+			cbcl_close(& cache_input -> cbcl_binary_fps[x1]); 
 		free(cache_input -> bcl_bin_cache[x1]);
 	}
 	free(cache_input -> bcl_gzip_fps);
+	free(cache_input -> cbcl_indexes);
 	if(cache_input -> filter_fp. plain_fp || cache_input -> filter_fp.gz_fp.gz_fp )autozip_close(&cache_input -> filter_fp);
 	free(cache_input -> lane_no_in_chunk);
 	free(cache_input -> flt_bin_cache);
+	free(cache_input -> cbcl_tile_numbers);
 }
 
 int cacheBCL_init( cache_BCL_t * cache_input, char * data_dir, int reads_in_chunk, int all_threads ){
 	memset(cache_input, 0, sizeof( cache_BCL_t));
 	subread_init_lock(&cache_input -> read_lock);
-	int rv = iBLC_guess_format_string(data_dir, &cache_input -> total_bases_in_each_cluster, cache_input -> bcl_format_string, cache_input -> filter_format_string, &cache_input -> bcl_is_gzipped, &cache_input -> filter_is_gzipped, cache_input -> single_read_lengths, cache_input -> single_read_is_index);
+	int rv = iBLC_guess_format_string(data_dir, &cache_input -> total_bases_in_each_cluster, cache_input -> bcl_format_string, cache_input -> filter_format_string, &cache_input -> bcl_is_gzipped, &cache_input -> filter_is_gzipped, cache_input -> single_read_lengths, cache_input -> single_read_is_index, &cache_input -> is_cbcl_mode, &cache_input -> cbcl_total_tiles, &cache_input-> cbcl_tile_numbers, &cache_input-> is_dual_index);
+	//SUBREADprintf("INIT_BCL_CACHE %d : %d %d / %d\n", rv, cache_input -> is_cbcl_mode, cache_input -> cbcl_total_tiles);
 	if(rv) return -1;
 	cache_input -> current_lane = 1;
 	cache_input -> reads_per_chunk = reads_in_chunk;
@@ -335,51 +428,215 @@ int iCache_open_one_fp( cache_BCL_t * cache_input, int bcl_no, int lane_no){
 
 // it returns the number of bytes loaded. 0 if no bytes are available.
 int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
-	autozip_fp * tfp = bcl_no<0?&cache_input-> filter_fp :(cache_input -> bcl_gzip_fps + bcl_no);
 	int my_lane = cache_input -> chunk_start_lane ,wptr=0;
 	char * wpt =  bcl_no<0?cache_input-> flt_bin_cache:cache_input -> bcl_bin_cache[bcl_no];
 	int total_valid_reads = 0;
-	int raw_ptr = 0;
+	int readno_may_badqual = 0,ii;
 	while(1){
-		if(!(tfp -> plain_fp || tfp -> gz_fp.gz_fp)){
-			int fpr = iCache_open_one_fp( cache_input, bcl_no, my_lane );
-			if(fpr){
-				if(bcl_no<0)cache_input -> last_chunk_in_cache = 1;
-				break;
-			}
-		}
-		while(1){
-			int nch = autozip_getch( tfp );
-			//if(bcl_no>=0)SUBREADprintf("NCH=%d\n", nch);
-			if(nch>=0){
-				if( bcl_no < 0 || cache_input -> flt_bin_cache [raw_ptr] ){
-					if(bcl_no <0){
-						if(nch>0) cache_input -> lane_no_in_chunk[total_valid_reads ++] = my_lane;
+		if(cache_input -> is_cbcl_mode){
+			if(-1 == bcl_no){
+				if(cache_input-> filter_fp.filename[0] ==0){
+					if(cache_input -> cbcl_filter_tile_idx < cache_input -> cbcl_total_tiles){
+						int filter_tile_7d = cache_input -> cbcl_tile_numbers[ cache_input -> cbcl_filter_tile_idx ];
+						int filter_lane = filter_tile_7d / 1000000;
+						int filter_4d = filter_tile_7d % 10000;
+						
+						char fname[MAX_FILE_NAME_LENGTH];
+						SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH, cache_input -> filter_format_string, filter_lane );
+						SUBreadSprintf(fname+strlen(fname),MAX_FILE_NAME_LENGTH,"%ss_%d_%04d.filter", SR_PATH_SPLIT_STR, filter_lane , filter_4d );
+						autozip_open(fname, &cache_input-> filter_fp);
+						for(ii=0;ii<12; ii++)  autozip_getch( &cache_input-> filter_fp ); //  skipping the first 12 bytes of header.
+					}
+				}
+				if(cache_input->filter_fp.filename[0]){
+					while(1){
+						int nch = autozip_getch( &cache_input-> filter_fp );
+						if(nch>=0){
+							if(nch>0) cache_input -> lane_no_in_chunk[total_valid_reads ++] = my_lane;
+						}else break;
+
 						if(wptr == cache_input ->  flt_bin_cache_size){
 							cache_input ->  flt_bin_cache_size *= 1.6;
 							wpt = cache_input-> flt_bin_cache = realloc( wpt, cache_input ->  flt_bin_cache_size );
 						}
-					}else total_valid_reads++;
-
-					//if(wptr == 1000000)SUBREADprintf("BaseNo=%d; Nch=%d\n", bcl_no, nch);
-					wpt[wptr++] = nch&0xff;
+						wpt[wptr++] = nch&0xff;
+						if(total_valid_reads == cache_input -> reads_per_chunk) break;
+					}
 					if(total_valid_reads == cache_input -> reads_per_chunk) break;
+					autozip_close(&cache_input-> filter_fp); 
+					memset(&cache_input-> filter_fp,0,sizeof(autozip_fp));
+					cache_input -> cbcl_filter_tile_idx++;
+				}else{
+					cache_input -> last_chunk_in_cache = 1;
+					break;
 				}
 			}else{
-//				SUBREADprintf("CONTINUOUSLY [%d-th base] BREAK : %d\n", bcl_no, nch);
-				break;
+				cbcl_fp * tfp = cache_input -> cbcl_binary_fps + bcl_no;
+				if(tfp -> gzblock_fp==NULL && cache_input -> cbcl_indexes[bcl_no]< cache_input -> cbcl_total_tiles){
+					int cbcl_tile_7d = cache_input -> cbcl_tile_numbers[ cache_input -> cbcl_indexes[bcl_no] ];
+					int cbcl_lane = cbcl_tile_7d / 1000000;
+					int cbcl_surface = (cbcl_tile_7d % 10000)/1000;
+					if(0 == tfp -> cbcl_bin_fd){
+						char fname[MAX_FILE_NAME_LENGTH];
+						SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH, cache_input -> bcl_format_string, cbcl_lane , bcl_no+1);
+						SUBreadSprintf(fname+strlen(fname),MAX_FILE_NAME_LENGTH,"%sL%03d_%d.cbcl", SR_PATH_SPLIT_STR, cbcl_lane, cbcl_surface );
+						tfp -> cbcl_bin_fd = open(fname, O_RDONLY);
+						tfp -> digit4_to_total_read_no_P1 = HashTableCreate(100); 
+						tfp -> digit4_to_compressed_start_of_next = HashTableCreate(100); 
+						tfp -> list_mapped_qscore = ArrayListCreate(80); 
+						lseek(tfp -> cbcl_bin_fd, 6, SEEK_CUR);// ver and header_size. Not needed.
+						int btmp = 0, ii;
+						read(tfp -> cbcl_bin_fd,&btmp,1);// bits per call.
+						tfp -> bits_per_bitscore = 0;
+						read(tfp -> cbcl_bin_fd,&tfp -> bits_per_bitscore,1);// bits per qscore.
+						if((tfp -> bits_per_bitscore != 2 && tfp -> bits_per_bitscore != 6) || btmp != 2){
+							SUBREADprintf("Bitwidth of calls unsupported %d %d!\n" , tfp -> bits_per_bitscore, btmp);
+							cache_input -> last_chunk_in_cache = 1;
+							break;
+						}
+						btmp = 0;
+						read(tfp -> cbcl_bin_fd,&btmp,4);// Number of bins 
+						for(ii=0; ii<btmp; ii++){
+							int fromv=0, tov=0;
+							read(tfp -> cbcl_bin_fd,&fromv,4);
+							read(tfp -> cbcl_bin_fd,&tov,4);
+							if(fromv != tfp -> list_mapped_qscore->numOfElements){
+								SUBREADprintf("ERROR: # bits of calls unsupported %d %d!\n" , tfp -> bits_per_bitscore, btmp);
+								cache_input -> last_chunk_in_cache = 1;
+								break;
+							}
+							ArrayListPush(tfp -> list_mapped_qscore, NULL+tov);
+						}
+						btmp = 0;
+						read(tfp -> cbcl_bin_fd,&btmp,4);// Number of tiles (gzipped blocks) in this file 
+						srInt_64 seek_start = lseek(tfp -> cbcl_bin_fd, 0 , SEEK_CUR) + 1 + 16*btmp; 
+						for(ii=0; ii<btmp; ii++){
+							int tile_4digit=0, reads_in_tile=0, data_size=0, compressed_size=0;
+							read(tfp -> cbcl_bin_fd,&tile_4digit,4);
+							read(tfp -> cbcl_bin_fd,&reads_in_tile,4);
+							read(tfp -> cbcl_bin_fd,&data_size,4);
+							read(tfp -> cbcl_bin_fd,&compressed_size,4);
+							seek_start += compressed_size;
+							HashTablePut(tfp -> digit4_to_compressed_start_of_next, NULL+tile_4digit, NULL+seek_start);
+							HashTablePut(tfp -> digit4_to_total_read_no_P1, NULL+tile_4digit, NULL+1+reads_in_tile);
+						}
+						btmp = 0;
+						read(tfp -> cbcl_bin_fd,&btmp,1); // excluding non-FP?
+						tfp -> cbcl_only_has_good_reads = btmp;
+					}
+
+if(0){
+		unsigned char nbin [4];
+		read(tfp -> cbcl_bin_fd, nbin, 4);
+		if(bcl_no<1)SUBREADprintf("NREAD %d : %02x %02x %02x %02x\n", cbcl_tile_7d , nbin[0], nbin[1], nbin[2], nbin[3]);
+		lseek(tfp -> cbcl_bin_fd, -4,  SEEK_CUR);
+}
+
+					tfp -> gzblock_fp=gzdopen(dup(tfp -> cbcl_bin_fd),"rb");
+					tfp -> last_char_from_gzip=-1;
+					tfp -> tile_read_bytes = 0;
+					tfp -> current_tile_read_ptr = 0;
+				}
+				if(tfp -> gzblock_fp){
+					int cbcl_tile_7d = cache_input -> cbcl_tile_numbers[ cache_input -> cbcl_indexes[bcl_no]];
+					int tile_4digit = cbcl_tile_7d %10000;
+					int this_tile_reads = HashTableGet(tfp -> digit4_to_total_read_no_P1, NULL+tile_4digit) - NULL -1;
+					srInt_64 next_tile_start_off = HashTableGet(tfp -> digit4_to_compressed_start_of_next, NULL+tile_4digit) - NULL;
+					//to load bins until end_of_decompressed_data or until having chunk_size of reads. 
+					int nch;
+					while(1){
+						if(tfp -> current_tile_read_ptr == this_tile_reads) break;
+						if(total_valid_reads == cache_input -> reads_per_chunk) break;
+
+						if(tfp -> last_char_from_gzip== -1 || 6==tfp->bits_per_bitscore){
+							tfp->last_char_from_gzip= gzgetc( tfp -> gzblock_fp );
+							if(tfp->last_char_from_gzip<0){
+								SUBREADprintf("ERROR: tile terminated before all clusters extracted. MINUS_CH %d at %d [%d in chunk; # %d read in tile #%d ; total read here: %d] plain_bytes=%d in tile.\n", tfp->last_char_from_gzip, bcl_no, readno_may_badqual, tfp -> current_tile_read_ptr, cbcl_tile_7d , this_tile_reads, tfp->tile_read_bytes);
+								cache_input -> last_chunk_in_cache = 1;
+								break;
+							}else tfp->tile_read_bytes ++;
+							nch=tfp->last_char_from_gzip&((2==tfp->bits_per_bitscore)?0xf:0xff);
+						}else{
+							nch= tfp->last_char_from_gzip>>4 ;
+							tfp->last_char_from_gzip=-1;
+						}
+						if(tfp -> bits_per_bitscore==2){
+							nch = (nch & 3) | (4*(tfp -> list_mapped_qscore -> elementList[ nch >>2 ]-NULL));
+						}
+						if(1 == tfp -> cbcl_only_has_good_reads || cache_input -> flt_bin_cache [readno_may_badqual]){
+							wpt[wptr++] = nch&0xff;
+							total_valid_reads ++;
+						}
+						readno_may_badqual ++;
+						tfp -> current_tile_read_ptr ++;
+					}
+					if(total_valid_reads == cache_input -> reads_per_chunk) break;
+					gzclose(tfp -> gzblock_fp);
+					tfp -> gzblock_fp = NULL;
+
+					cache_input -> cbcl_indexes[bcl_no] ++;
+
+					int new_4digit = 0;
+					void * np1 = NULL;
+					if(cache_input -> cbcl_indexes[bcl_no] < cache_input -> cbcl_total_tiles){
+						new_4digit = cache_input -> cbcl_tile_numbers[ cache_input -> cbcl_indexes[bcl_no] ]%10000;
+						np1 = HashTableGet(tfp -> digit4_to_compressed_start_of_next, NULL+new_4digit);
+					}
+					if(np1){
+						long long npos = lseek(tfp -> cbcl_bin_fd, next_tile_start_off , SEEK_SET);
+					}else{
+						close(tfp -> cbcl_bin_fd);
+						HashTableDestroy(tfp -> digit4_to_total_read_no_P1);
+						HashTableDestroy(tfp -> digit4_to_compressed_start_of_next);
+						ArrayListDestroy(tfp -> list_mapped_qscore);
+						memset(tfp, 0, sizeof(cbcl_fp));
+					}
+				}else{
+					cache_input -> last_chunk_in_cache = 1;
+					break;
+				}
 			}
-			raw_ptr ++;
+		}else{
+			autozip_fp * tfp = bcl_no<0?&cache_input-> filter_fp :(cache_input -> bcl_gzip_fps + bcl_no);
+			if(!(tfp -> plain_fp || tfp -> gz_fp.gz_fp)){
+				int fpr = iCache_open_one_fp( cache_input, bcl_no, my_lane );
+				if(fpr){
+					if(bcl_no<0)cache_input -> last_chunk_in_cache = 1;
+					break;
+				}
+			}
+			while(1){
+				int nch = autozip_getch( tfp );
+				//if(bcl_no>=0)SUBREADprintf("NCH=%d\n", nch);
+				if(nch>=0){
+					if( bcl_no < 0 || cache_input -> flt_bin_cache [readno_may_badqual] ){
+						if(bcl_no <0){
+							if(nch>0) cache_input -> lane_no_in_chunk[total_valid_reads ++] = my_lane;
+							if(wptr == cache_input ->  flt_bin_cache_size){
+								cache_input ->  flt_bin_cache_size *= 1.6;
+								wpt = cache_input-> flt_bin_cache = realloc( wpt, cache_input ->  flt_bin_cache_size );
+							}
+						}else total_valid_reads++;
+
+						//if(wptr == 1000000)SUBREADprintf("BaseNo=%d; Nch=%d\n", bcl_no, nch);
+						wpt[wptr++] = nch&0xff;
+						if(total_valid_reads == cache_input -> reads_per_chunk) break;
+					}
+				}else{
+	//				SUBREADprintf("CONTINUOUSLY [%d-th base] BREAK : %d\n", bcl_no, nch);
+					break;
+				}
+				readno_may_badqual ++;
+			}
+			if(total_valid_reads == cache_input -> reads_per_chunk) break;
+			iCache_close_one_fp(cache_input, bcl_no);
+			my_lane++;
 		}
-		if(total_valid_reads == cache_input -> reads_per_chunk) break;
-		iCache_close_one_fp(cache_input, bcl_no);
-		my_lane++;
 	}
 	if(bcl_no <0){
 		cache_input -> reads_available_in_chunk = total_valid_reads;
 		cache_input -> chunk_end_lane = my_lane;
 	}
-	//if(bcl_no<0) SUBREADprintf("CONTINUOUSLY [%d-th base] READ %d reads into the %d-th lanel fpntr = %ld\n", bcl_no,  total_valid_reads, my_lane, tfp -> plain_fp ? ftello(tfp -> plain_fp ): -1);
 	return total_valid_reads;
 }
 
@@ -509,17 +766,6 @@ int cacheBCL_next_read(cache_BCL_t * cache_input, char * read_name, char * seq, 
 	return iCache_copy_read(cache_input, read_name, seq, qual, rnumb);
 }
 
-int input_BLC_init( input_BLC_t * blc_input , char * data_dir ){
-	memset(blc_input, 0, sizeof(input_BLC_t));
-	subread_init_lock(&blc_input -> read_lock);
-
-	int rv = iBLC_guess_format_string(data_dir, &blc_input -> total_bases_in_each_cluster, blc_input -> bcl_format_string, blc_input -> filter_format_string, &blc_input -> bcl_is_gzipped, &blc_input -> filter_is_gzipped, blc_input -> single_read_lengths, blc_input -> single_read_is_index);
-	if(rv) return -1;
-
-	blc_input -> current_lane = 1;
-
-	return iBLC_open_batch(blc_input)?1:0;
-}
 // load the next read W/O switch lane. 
 // Return 0 if EOF, -1 if error or bases if loaded correctly.
 int iBLC_current_lane_next_read(input_BLC_t * blc_input, char * readname , char * read, char * qual){
@@ -1219,49 +1465,6 @@ int main(int argc, char ** argv){
 	cacheBCL_close(&blc_input);
 }
 #endif
-
-#ifdef MAKE_TEST_IBLC
-int main(int argc, char ** argv){
-	assert(argc>1);
-	input_BLC_t blc_input;
-	input_BLC_pos_t poses[12];
-	int orv = input_BLC_init(&blc_input, argv[1]), total_poses = 0;
-	printf("orv=%d, bases=%d, filter_gzip=%d, data_gzip=%d\n", orv, blc_input.total_bases_in_each_cluster, blc_input.filter_is_gzipped, blc_input.bcl_is_gzipped);
-
-	while(1){
-		char base[1000], qual[1000], rname[200];
-		base[0]=qual[0]=rname[0]=0;
-		orv = input_BLC_next_read(&blc_input, rname, base, qual);
-		assert(orv>=0);
-		if(0==orv) break;
-		if(blc_input.read_number%1000000==1)printf("%s %s %s\n", rname, base, qual);
-		if(blc_input.read_number % 20000000 == 1){
-			input_BLC_tell(&blc_input, poses + total_poses);
-			total_poses++;
-		}
-		if(blc_input.read_number > 180000010) break;
-	}
-
-	int ii;
-	for(ii = 0; ii < total_poses; ii++){
-		srInt_64 jj;
-		printf("\n\n========== SEEKING %d OF %d ================\n", ii,total_poses);
-		input_BLC_seek( &blc_input, poses+ii );
-		input_BLC_destroy_pos( &blc_input, poses+ii );
-		for(jj = 0 ; jj < 3000011; jj++){
-			char base[1000], qual[1000], rname[200];
-			orv = input_BLC_next_read(&blc_input, rname, base, qual);
-			assert(orv>=0);
-			if(blc_input.read_number%1000000==2)printf("%s %s %s\n", rname, base, qual);
-		}
-	} 
-	
-	printf("END CORRECTLY  R=%llu\n", blc_input.read_number);
-	input_BLC_close(&blc_input);
-	return 0;
-}
-#endif
-
 void scBAM_tell(input_scBAM_t * bam_input, input_scBAM_pos_t * pos){
 	pos -> current_BAM_file_no = bam_input -> current_BAM_file_no;
 	pos -> section_start_pos = bam_input -> section_start_pos;
