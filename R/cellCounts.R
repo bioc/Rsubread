@@ -672,7 +672,9 @@
 
 
   if(any(is.na(spseqs)) && !is.na(dualseqs )){
-    return(c(paste0(dualseqs[1], dualseqs[2]),paste0(dualseqs[1], dualseqs[3])) )
+    for(i in 1:10)cat("WARNING: ONLY #1 and #3 index sequences were used!\n")
+    return(c(paste0(dualseqs[1], dualseqs[3])))
+    #return(c(paste0(dualseqs[1], dualseqs[2]),paste0(dualseqs[1], dualseqs[3])) )
   }else{
     if(!any(is.na(spseqs))) return(spseqs) else return(NA)
   }

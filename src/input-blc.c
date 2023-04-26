@@ -525,13 +525,6 @@ int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
 						tfp -> cbcl_only_has_good_reads = btmp;
 					}
 
-if(0){
-		unsigned char nbin [4];
-		read(tfp -> cbcl_bin_fd, nbin, 4);
-		if(bcl_no<1)SUBREADprintf("NREAD %d : %02x %02x %02x %02x\n", cbcl_tile_7d , nbin[0], nbin[1], nbin[2], nbin[3]);
-		lseek(tfp -> cbcl_bin_fd, -4,  SEEK_CUR);
-}
-
 					tfp -> gzblock_fp=gzdopen(dup(tfp -> cbcl_bin_fd),"rb");
 					tfp -> last_char_from_gzip=-1;
 					tfp -> tile_read_bytes = 0;
