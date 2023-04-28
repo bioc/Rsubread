@@ -928,7 +928,7 @@ find.dual.index.I2.reversed <- function(raw.dir){
     if(recipe.new.ver) is.Rev.I2 <- .get.novaseq.i2.rounded(recipeOne.txt)
     else is.Rev.I2 <- .get.novaseq.i2.BP14.used(recipeOne.txt)
   }else stop("Wrong dev name was detected.")
-  cat("Had dev ",illumina.dev.name,illumina.dev.ver,"\n")
+  if(F)cat("Had dev ",illumina.dev.name,illumina.dev.ver,"\n")
   return(is.Rev.I2)
 }
 
@@ -972,7 +972,6 @@ find.dual.index.I2.reversed <- function(raw.dir){
         # sample index isn't tested anymore
         # if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
         if(cell.good.rate > cell.bc.sup.rate && (any(is.null(A_and_B.dual.index.list))|| F==is.na(dual.index.verAB))){
-            print(A_and_B.dual.index.list)
             if(any(is.null(A_and_B.dual.index.list))) metadata.I2Reversed<-NA else metadata.I2Reversed <- find.dual.index.I2.reversed(input.directory[1]) 
             meta.data.verAB <- NA
             if(metadata.I2Reversed%in% c(T,F)) meta.data.verAB <- ifelse(metadata.I2Reversed,"B","A")
