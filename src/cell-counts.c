@@ -650,23 +650,23 @@ void sheet_convert_ss_to_arr( void * key, void * hashed_obj, HashTable * tab ){
 	cellcounts_global_t * cct_context = tab->appendix1;
 	ArrayListPush(cct_context -> sample_id_to_name, key);
 	hashed_arr -> appendix1 = NULL+ cct_context -> sample_id_to_name -> numOfElements; // One-based
-
-	srInt_64 xx1;
+					
+	srInt_64 xx1;		   
 	for(xx1 =0; xx1< hashed_arr -> numOfElements; xx1++){
-		char ** push_arr = malloc(sizeof(char*)*4);
+		char ** push_arr = malloc(sizeof(char*)*4); 
 		char ** sbc_lane_sample = ArrayListGet(hashed_arr, xx1);
 		srInt_64 lane_sample_int = sbc_lane_sample[0]-(char*)NULL;
-
+			
 		ArrayListPush(cct_context -> sample_barcode_list, push_arr);
-		push_arr[0] = NULL + lane_sample_int; 
+		push_arr[0] = NULL + lane_sample_int;
 		push_arr[1] = NULL + cct_context -> sample_id_to_name -> numOfElements;
 		push_arr[2] = sbc_lane_sample[1]; // Sample Barcode
 		push_arr[3] = NULL + (sbc_lane_sample[1]!=NULL && strlen(sbc_lane_sample[1])>12);
-
 		int line_no_in_sheet = sbc_lane_sample[2] - (char*)NULL;
 		HashTablePut(cct_context -> lineno1B_to_sampleno1B_tab , NULL+line_no_in_sheet, NULL + cct_context -> sample_id_to_name -> numOfElements);
 	}
-}
+}       
+
 
 void cellCounts_close_sample_SamBam_writers(void *v){
 	void ** vv = v;
@@ -1861,13 +1861,10 @@ void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread
 
 int cellCounts_get_sample_id(cellcounts_global_t * cct_context, char * sbc, int read_laneno){
 	int x1;
-
-	//SUBREADprintf("TOTAL_SBC=%ld\n", global_context -> scRNA_sample_barcode_list -> numOfElements);
 	for(x1=0; x1 < cct_context -> sample_barcode_list -> numOfElements ; x1++ ){
 		char ** lane_and_barcode = ArrayListGet(cct_context -> sample_barcode_list, x1);
-		int lane_no = lane_and_barcode[0]-(char*)NULL;
-	//	SUBREADprintf("KNOWN_LANE=%d, IN_LANE=%d, to\n", lane_no, read_laneno);
-		if(read_laneno == lane_no){
+		int sheet_lane_no = lane_and_barcode[0]-(char*)NULL;
+		if(sheet_lane_no == LANE_FOR_ALL_LANES || read_laneno == sheet_lane_no){
 			int sample_no = lane_and_barcode[1]-(char*)NULL;
 			char * knownbar = lane_and_barcode[2];
 			if(lane_and_barcode[3]){
@@ -1881,8 +1878,6 @@ int cellCounts_get_sample_id(cellcounts_global_t * cct_context, char * sbc, int 
 	}
 	return -1;
 }
-
-
 
 int cellCounts_parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**outfps, char * bambin, int thread_no, char * read_text_raw, char * qual_text_raw){ // the text-raw variables are the reads in their input form (not potentially reversed form)
 	int reclen=0;
@@ -1966,7 +1961,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 
 	int sample_no = -1;
 	if(cct_context -> input_mode == GENE_INPUT_SCRNA_BAM){
-		sample_no = 1;  // Only one sample in the BAM mode. A sample may have multiple BAM file but they have the same sample_no.
+		sample_no = 1;  // Only one sample in the BAM mode. A sample may have multiple BAM files but they have the same sample_no.
 				// Multiple input samples are mapped/counted in multiple C_cellCounts calls. Each call only does one sample.
 	}else if(lane_str){
 		int laneno = 0;

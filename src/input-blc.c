@@ -978,7 +978,13 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 			char * sample_index = NULL;
 
 			if(file_format == SHEET_FORMAT_RAWDIR_INPUT){
-				lane_no = atoi(strtok_r(linebuf, ",", &tokp));
+				char * lanestr = strtok_r(linebuf, ",", &tokp);
+				if(strstr(lanestr,"*")) lane_no = LANE_FOR_ALL_LANES;
+				else lane_no = atoi(lanestr);
+				if(lane_no < 1) {
+					SUBREADprintf("ERROR: cannot parse the lane number of ''%s''.\n" , lanestr);
+					return NULL;
+				}
 				strtok_r(NULL, ",", &tokp);
 				sample_name = strtok_r(NULL, ",", &tokp);
 				sample_index = strdup(strtok_r(NULL, ",", &tokp));
@@ -1112,23 +1118,10 @@ int hamming_dist_ATGC_max2(char* s1, char* s2 ){
 	return xx-ret;
 }
 
-int iCache_get_sample_id(ArrayList * sample_sheet_list, char * sbc, int read_laneno){
-	int x1;
-
-	//SUBREADprintf("TOTAL_SBC=%ld\n", global_context -> scRNA_sample_barcode_list -> numOfElements);
-	for(x1=0; x1 < sample_sheet_list -> numOfElements ; x1++ ){
-		char ** lane_and_barcode = ArrayListGet(sample_sheet_list, x1);
-		int lane_no = lane_and_barcode[0]-(char*)NULL;
-		if(read_laneno == lane_no){
-			int sample_no = lane_and_barcode[1]-(char*)NULL;
-			char * knownbar = lane_and_barcode[2];
-			int hd = hamming_dist_ATGC_max2( sbc, knownbar );
-			if(hd<=2) return sample_no;
-		}
-	}
-	return -1;
+void iCache_write_supIdx_result(void* ky, void* va, HashTable* tab){
+	FILE * ofp = tab -> appendix1;
+	fprintf(ofp, "%s\t%lld\n", ky, va-NULL);
 }
-
 void iCache_copy_sample_table_2_list(void* ky, void* va, HashTable* tab){
 	ArrayList * cbclist = tab -> appendix1;
 	ArrayList * hashed_arr = va ;
@@ -1222,7 +1215,7 @@ void iCache_delete_bcb_key(void *k){
 	if(((k-NULL) & 0xFFFFFFFFF0000000llu)!= IMPOSSIBLE_MEMORY_ADDRESS) ArrayListDestroy(k);
 }
 
-int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode);
+int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode, char * result_prefix);
 #ifdef MAKE_TEST_QUALITY_TEST
 int main(int argc,char ** argv){
 #else
@@ -1237,21 +1230,22 @@ int do_R_try_cell_barcode_files(int argc, char ** argv){
 	SUBREADprintf("Loaded %lld cell barcodes from %s\n", cell_barcode_list -> numOfElements, argv[3]);
 
 	HashTable * sample_sheet = NULL;
-	if(input_mode==GENE_INPUT_BCL) input_BLC_parse_SampleSheet(argv[2]);
+	if(input_mode==GENE_INPUT_BCL) sample_sheet = input_BLC_parse_SampleSheet(argv[2]);
 	char * input_BCL_raw_dir = argv[1];
+	char * result_prefix = argv[6];
 
 	int tested_reads=0, valid_sample_index=0, valid_cell_barcode=0;
-	int rv = cacheBCL_quality_test(input_mode, input_BCL_raw_dir, sample_sheet, cell_barcode_list, testing_reads, &tested_reads, &valid_sample_index, &valid_cell_barcode );
+	int rv = cacheBCL_quality_test(input_mode, input_BCL_raw_dir, sample_sheet, cell_barcode_list, testing_reads, &tested_reads, &valid_sample_index, &valid_cell_barcode, result_prefix);
 
 #ifdef MAKE_TEST_QUALITY_TEST
 	printf("Samples = %ld loaded\n", sample_sheet -> numOfElements);
 	printf("Cell barcodes = %ld loaded\n", cell_barcode_list -> numOfElements);
 	printf("QUALITY-TEST : rv=%d , tested = %d , good-sample = %d , good-cell = %d\n", rv, tested_reads, valid_sample_index, valid_cell_barcode);
 #else
-	argv[6]=NULL+rv;
-	argv[7]=NULL+tested_reads;
-	argv[8]=NULL+valid_sample_index;
-	argv[9]=NULL+valid_cell_barcode;
+	argv[7]=NULL+rv;
+	argv[8]=NULL+tested_reads;
+	argv[9]=NULL+valid_sample_index;
+	argv[10]=NULL+valid_cell_barcode;
 #endif
 	ArrayListDestroy(cell_barcode_list);
 	return 0;
@@ -1327,8 +1321,35 @@ int cacheBCL_qualTest_FQmode(char * datadir, int testing_reads, int known_cell_b
 	return 0;
 }
 
+int cacheBCL_get_sample_id(ArrayList * sample_barcode_list, char * sbc, int read_laneno, char **which_index){
+	int x1; 
+	for(x1=0; x1 < sample_barcode_list -> numOfElements ; x1++ ){
+		char ** lane_and_barcode = ArrayListGet(sample_barcode_list, x1);
+		int sheet_lane_no = lane_and_barcode[0]-(char*)NULL;
+		if(sheet_lane_no == LANE_FOR_ALL_LANES || read_laneno == sheet_lane_no){
+			int sample_no = lane_and_barcode[1]-(char*)NULL;
+			char * knownbar = lane_and_barcode[2];
+			if(lane_and_barcode[3]){
+				int hd = hamming_dist_ATGC_max1_2p( sbc, knownbar );
+				//SUBREADprintf("SPN : %d to %s\n", hd, knownbar );
+				if(hd<=2){
+					*which_index = knownbar;
+					return sample_no;
+				}
+			}else{
+				int hd = hamming_dist_ATGC_max1( sbc, knownbar );
+				//SUBREADprintf("SPX : %d to %s\n", hd, knownbar );
+				if(hd<=1){
+					*which_index = knownbar;
+					return sample_no;
+				}
+			}
+		}	       
+	}		       
+	return -1;
+} 
 
-int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
+int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_barcode_length, ArrayList * sample_sheet_list, ArrayList * cell_barcode_list, HashTable * cell_barcode_table, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode, HashTable * index_seq_supp_tab){
 	cache_BCL_t blc_input;
 	int orv = cacheBCL_init(&blc_input, datadir,testing_reads+1, 1);
 	if(orv)return -1;
@@ -1339,7 +1360,7 @@ int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_
 		orv = cacheBCL_next_read(&blc_input, rname, base, qual, &readno);
 		if(0==orv) break;
 
-		char * testi, *lane_str = NULL, * sample_barcode = NULL, * cell_barcode, * umi_barcode; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
+		char * testi, *lane_str = NULL, * sample_index = NULL, * cell_barcode, * umi_barcode; // cell_barcode MUST be 16-bp long, see https://community.10xgenomics.com/t5/Data-Sharing/Cell-barcode-and-UMI-with-linked-reads/td-p/68376
 		cell_barcode = rname + 13;
 		umi_barcode = cell_barcode + known_cell_barcode_length;
 		int xx=0, laneno=0;
@@ -1347,7 +1368,7 @@ int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_
 			if( * testi=='|'){
 				xx++;
 				if(xx == 2) {
-					sample_barcode = testi +1;
+					sample_index = testi +1;
 				}else if(xx == 4){
 					lane_str = testi+1;
 					break;
@@ -1360,11 +1381,14 @@ int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_
 			laneno = laneno*10 + (*testi)-'0';
 		}
 
-		int sample_no = -1;
-		if(sample_sheet_list->numOfElements)iCache_get_sample_id(sample_sheet_list, sample_barcode, laneno);
+		char * which_index=NULL;
+		int sample_no = cacheBCL_get_sample_id(sample_sheet_list, sample_index, laneno, &which_index);
 		int cell_no = iCache_get_cell_no(cell_barcode_table, cell_barcode_list, cell_barcode, known_cell_barcode_length);
 		//printf("CELL_CALL %d = %s\n", cell_no, cell_barcode);
-		if(sample_no>0) (*valid_sample_index)++;
+		if(sample_no>0){
+			HashTableInc(index_seq_supp_tab, which_index);
+			(*valid_sample_index)++;
+		}
 		if(cell_no>0) (*valid_cell_barcode)++;
 
 		(*tested_reads)++;
@@ -1375,7 +1399,7 @@ int cacheBCL_qualTest_BCLmode(char * datadir, int testing_reads, int known_cell_
 	return 0;
 }
 
-int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode){
+int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_sheet_table, ArrayList * cell_barcode_list, int testing_reads, int * tested_reads, int * valid_sample_index, int * valid_cell_barcode, char * result_prefix){
 	ArrayList * sample_sheet_list = ArrayListCreate(100);
 	ArrayListSetDeallocationFunction(sample_sheet_list, free);
 	if(sample_sheet_table){
@@ -1419,12 +1443,24 @@ int cacheBCL_quality_test(int input_mode, char * datadir, HashTable * sample_she
 	}
 
 	int ret = -1;
+	HashTable * barcode_sup_table = StringTableCreate(100);
 	if(input_mode == GENE_INPUT_SCRNA_FASTQ)
 		ret=cacheBCL_qualTest_FQmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode);
 	else if(input_mode == GENE_INPUT_SCRNA_BAM)
 		ret=cacheBCL_qualTest_BAMmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode);
 	else
-		ret=cacheBCL_qualTest_BCLmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode);
+		ret=cacheBCL_qualTest_BCLmode(datadir, testing_reads, known_cell_barcode_length, sample_sheet_list, cell_barcode_list, cell_barcode_table,  tested_reads,  valid_sample_index,  valid_cell_barcode, barcode_sup_table);
+	
+
+	char out_subTab_fn[MAX_FILE_NAME_LENGTH];
+	SUBreadSprintf(out_subTab_fn, MAX_FILE_NAME_LENGTH, "%s.idx_verAB_sup", result_prefix);
+	FILE * result_supTab_fp = fopen(out_subTab_fn,"w");
+	fprintf(result_supTab_fp , "IndexStr\tnSupp\n");
+	barcode_sup_table -> appendix1 = result_supTab_fp; 
+	HashTableIteration(barcode_sup_table, iCache_write_supIdx_result);
+	fclose(result_supTab_fp);
+	HashTableDestroy(barcode_sup_table);
+
 	ArrayListDestroy(sample_sheet_list);
 	HashTableDestroy(cell_barcode_table);
 	return ret;

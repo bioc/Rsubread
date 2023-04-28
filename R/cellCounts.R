@@ -27,22 +27,32 @@
   close(fileConn)
 }
 
-.index.names.to.sheet.raw.dir.mode<-function(dirname, nametab, fname, sample.name=NA){
+.index.names.to.sheet.raw.dir.mode<-function(dirname, nametab, fname, sample.name=NA, which.dual.index=NULL){
   lanes <- c()
   index.names <- c()
   sample.names <- c()
   index.seq <- c()
   is_dual_index <- c() 
+  Aarr <- c()
+  Barr <- c()
+  if(F==is.null(which.dual.index) && is.na(which.dual.index))which.dual.index<-NULL
   for(cli in 1:nrow(nametab)){
     if(nametab$InputDirectory[cli]!=dirname)next
     if((!is.na(sample.name)) && as.character(nametab$SampleName[cli])!=sample.name)next
-    seqs <- .convert.sample_index.id.to.seq(nametab$IndexSetName[cli])
-    for(seq in seqs){
+    seqs.list <- .convert.sample_index.id.to.seq(nametab$IndexSetName[cli])
+    if(!is.null(which.dual.index)){
+       seqs.list <- seqs.list[[which.dual.index]]
+    }
+    for(seq in unlist(seqs.list)){
       is_dual_index <- c(is_dual_index , nchar(seq)>12)
       lanes <-c(lanes, nametab$Lane[cli])
       index.names <-c(index.names, nametab$IndexSetName[cli])
       sample.names <- c(sample.names, as.character(nametab$SampleName[cli]))
       index.seq <- c(index.seq, seq)
+    }
+    if(any(is_dual_index) && is.null(which.dual.index)){
+      Aarr <- c(Aarr, seqs.list$A)
+      Barr <- c(Barr, seqs.list$B)
     }
   }
   sdf<-data.frame(Lane=lanes, Sample_ID=index.names, Sample_Name=sample.names, index=index.seq, Sample_Project=rep("cellCounts", length(lanes)), stringsAsFactors=F)
@@ -50,8 +60,9 @@
   lines <- paste( sdf$Lane, sdf$Sample_ID, sdf$Sample_Name, sdf$index, sdf$Sample_Project ,sep=",")
   writeLines(c("EMFileVersion,4","[data]","Lane,Sample_ID,Sample_Name,index,Sample_Project",lines), fileConn)
   close(fileConn)
-  if(any( is_dual_index != is_dual_index [1] )) stop("Dual-index and single-index samples cannot be mixed in the sample data-frame.")
-  return(is_dual_index[1])
+  if(any(is_dual_index != is_dual_index[1])) stop("Dual-index and single-index samples cannot be mixed in the sample data-frame.")
+  if(is_dual_index[1]) return(list(A=Aarr, B=Barr))
+  return(NULL)
 }
 
 .convert.sample_index.id.to.seq <- function(spid){
@@ -672,11 +683,11 @@
 
 
   if(any(is.na(spseqs)) && !is.na(dualseqs )){
-    for(i in 1:10)cat("WARNING: ONLY #1 and #3 index sequences were used!\n")
-    return(c(paste0(dualseqs[1], dualseqs[3])))
-    #return(c(paste0(dualseqs[1], dualseqs[2]),paste0(dualseqs[1], dualseqs[3])) )
+    #for(i in 1:10)cat("WARNING: ONLY #1 and #3 index sequences were used!\n")
+    #return(c(paste0(dualseqs[1], dualseqs[3])))
+    return(list(A=paste0(dualseqs[1], dualseqs[2]), B=paste0(dualseqs[1], dualseqs[3])))
   }else{
-    if(!any(is.na(spseqs))) return(spseqs) else return(NA)
+    if(!any(is.na(spseqs))) return(as.list(spseqs)) else return(NA)
   }
 }
 
@@ -793,11 +804,11 @@
 }
 
 
-.cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing, input.mode ){ # the three parameters can only be one string, not strings!
+.cellCounts_try_cellbarcode <- function( input.directory, sample.sheet, cell.barcode.list, nreads.testing, input.mode, result.prefix.fname){ # the three parameters can only be one string, not strings!
     if(is.null(sample.sheet)) sample.sheet<-"."
-    cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing), input.mode), collapse=.R_param_splitor)
+    cmd <- paste0(c(input.directory, sample.sheet, cell.barcode.list, as.character(nreads.testing), input.mode, result.prefix.fname), collapse=.R_param_splitor)
     rvs <- as.integer(rep(0,5))
-    C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(5),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
+    C_args <- .C("R_try_cell_barcode_wrapper",nargs=as.integer(6),argv=as.character(cmd),retv=rvs ,PACKAGE="Rsubread")
     return_val <- ifelse(C_args$retv[1]==0,"FINISHED","ERROR")
     tested_reads <- C_args$retv[2]
     good_sample <- C_args$retv[3]
@@ -812,8 +823,117 @@
     sprintf("http://shilab-bioinformatics.github.io/cellCounts/Barcodes/%s",uri)
 }
 
+.get.illumina.dev <- function(lns){
+  for(lnn in lns){
+    if(grepl("<ApplicationName>", lnn) && grepl("</ApplicationName>", lnn))return(
+      ifelse(grepl("HiSeq", lnn),"HiSeq",
+      ifelse(grepl("MiSeq", lnn),"MiSeq",
+      ifelse(grepl("iSeq", lnn),"iSeq",
+      ifelse(grepl("NextSeq", lnn),"NextSeq",
+      ifelse(grepl("NovaSeq", lnn),"NovaSeq","Unsupported"))))))
+  }
+  return(NA)
+}
+.get.illumina.ver <- function(lns){
+  for(lnn in lns){
+    if(grepl("<ApplicationVersion>", lnn) && grepl("</ApplicationVersion>", lnn)) {
+      spns <- unlist(strsplit(lnn, "Version>"))[2]
+      spns <- unlist(strsplit(spns, "<"))[1]
+      return(as.numeric(unlist(strsplit(spns,"[.]"))))
+    }
+  }
+  return(NA)
+}
+
+# It only returns T or F when PETurnaround happens exactly once and IndexRead2 happens exactly once.
+# Or it returns NA. 
+.get.novaseq.i2.rounded <- function(lns){
+  peround.no <- NA
+  lnnno <- 1
+  for(lnn in lns){
+    if(grepl("PETurnaround", lnn) || grepl("PairedEndTurnaround", lnn)){
+      if(!is.na(peround.no))return(NA)
+      peround.no <- lnnno
+    }
+    lnnno <- 1+lnnno
+  }
+  if(is.na(peround.no)) return(NA) # no "PE turnaaround" at all 
+
+  lnnno <- 1
+  ret <- NA
+  for(lnn in lns){
+    if(grepl("IndexRead2", lnn)){
+      if(!is.na(ret))return(NA)
+      ret <- ( lnnno > peround.no ) # if IndexRead2 happend before PEturned, then I2 is stright. 
+    }
+    lnnno <- 1+lnnno
+  }
+  return(ret)
+}
+
+.get.novaseq.i2.BP14.used <- function(lns){
+  looking <- F
+  ret <- F
+  for(lnn in lns){
+    if(grepl("<ChemistryStep", lnn) && grepl('Description="Index', lnn)) looking <- T
+    if(grepl("</ChemistryStep>", lnn)) looking <- F
+    if(looking && gepl('ReagentName="BP14"', lnn))ret <- T
+  }
+  return(ret)
+}
+
+.get.illumina.flowcell <- function(lns){
+  for(lnn in lns){
+    if(grepl("<Flowcell>", lnn) && grepl("</Flowcell>", lnn)) {
+      spns <- unlist(strsplit(lnn, "Flowcell>"))[2]
+      spns <- unlist(strsplit(spns, "<"))[1]
+      return(as.numeric(unlist(strsplit(spns,"[.]"))))
+    } 
+  }
+  return(NA)
+}
+
+find.dual.index.I2.reversed <- function(raw.dir){
+  run.param.file <- paste0(raw.dir,"/RunParameters.xml")
+  if(!file.exists(run.param.file))stop("No run parameter file is found in the raw dataset.")
+  run.param.txt <- readLines(run.param.file)
+  illumina.dev.name <- .get.illumina.dev(run.param.txt)
+  illumina.dev.ver <- .get.illumina.ver(run.param.txt)
+  if(is.na(illumina.dev.name))stop("No Illumina device info is available in the run parameter file.")
+
+  if(illumina.dev.name %in% c("HiSeq")) {
+    if(is.na(illumina.dev.ver)) stop("No Illumina version info is available in the run parameter file.")
+    is.Rev.I2 <-(illumina.dev.ver[1] >2)
+  }else if(illumina.dev.name %in% c("MiSeq"))
+    is.Rev.I2 <- F
+  else if(illumina.dev.name %in% c("NextSeq","iSeq"))
+    is.Rev.I2 <- T
+  else if(illumina.dev.name %in% c("NovaSeq")){
+    run.info.file <- paste0(raw.dir,"/RunInfo.xml")
+    if(!file.exists(run.info.file))stop("No run info file is found in the raw dataset.")
+    run.info.txt <- readLines(run.info.file)
+    flowcell.id <- .get.illumina.flowcell(run.info.txt)
+    if(is.na(flowcell.id))stop("No flowcell id was found in run info file.")
+    recipe.new.ver <- (illumina.dev.ver[1] >1) || ( illumina.dev.ver[1] >=1 && illumina.dev.ver[2] >7)
+    resp.files <- list.files(paste(raw.dir,"Recipe",sep="/"), pattern="[.]xml$", full.names=T)
+    resp.file <- NA
+    for(testi in 1:3){ # the last round: any file is good. 
+      for(rp1 in resp.files){
+        if(testi==1 && grepl(paste0("/",flowcell.id,".xml"), resp.file)) break
+        if(testi==2 && grepl(flowcell.id, resp.file)) break
+      }
+    }
+    if(is.na(resp.file))stop("No recipe file was found for this dataset.")
+    recipeOne.txt <- readLines(resp.file)
+    if(recipe.new.ver) is.Rev.I2 <- .get.novaseq.i2.rounded(recipeOne.txt)
+    else is.Rev.I2 <- .get.novaseq.i2.BP14.used(recipeOne.txt)
+  }else stop("Wrong dev name was detected.")
+  cat("Had dev ",illumina.dev.name,illumina.dev.ver,"\n")
+  return(is.Rev.I2)
+}
+
 .reads.for.find.barcode <- 10000
-.find_best_cellbarcode <- function( input.directory, sample.sheet=NULL, input.mode="bcl"){
+.find_best_CellBC_and_DualIdx <- function( input.directory, result.prefix.fname, sample.sheet=NULL, input.mode="bcl", A_and_B.dual.index.list=NULL, cell.bc.sup.rate=0.6){
     barcode.database.file <- path.expand("~/.Rsubread/cellCounts/known_barcode_sets.txt")
     if(!file.exists(barcode.database.file)){
         dir.create("~/.Rsubread/cellCounts", recursive=TRUE)
@@ -830,22 +950,39 @@
             if(rr!=0)stop("ERROR: the barcode list cannot be retrieved from the Internet. You may still run cellCounts by specifying a local barcode list file to the `cell.barcode.list` option.")
         }
         cat(sprintf("Testing the cell barcodes in %s.\n", libf))
-        barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, .reads.for.find.barcode, input.mode)
+        barcode_res <- .cellCounts_try_cellbarcode(input.directory[1], sample.sheet[1], listfile, .reads.for.find.barcode, input.mode, result.prefix.fname)
         if(length(barcode_res)<3)stop("ERROR: the input sample cannot be processed.")
-        sample.good.rate <- barcode_res[2]/barcode_res[1]
-        cell.good.rate <- barcode_res[3]/barcode_res[1]
+	tested.all.reads <- barcode_res[1]
+	dual.index.verAB <- NA
+	if("bcl" == input.mode && F==any(is.null(A_and_B.dual.index.list))){
+		idx.supp.tab.fn <- paste0(result.prefix.fname,".idx_verAB_sup")
+		idx.supp.tab <- read.delim(idx.supp.tab.fn, header=T, stringsAsFactors=F)
+		Asupp <- sum( idx.supp.tab$nSupp[ idx.supp.tab$IndexStr %in% A_and_B.dual.index.list$A ] )/tested.all.reads
+		Bsupp <- sum( idx.supp.tab$nSupp[ idx.supp.tab$IndexStr %in% A_and_B.dual.index.list$B ] )/tested.all.reads
+		if(Asupp > Bsupp * 2) dual.index.verAB <- "A" 
+		if(Asupp * 2 < Bsupp) dual.index.verAB <- "B" 
+	}
+
+        sample.good.rate <- barcode_res[2]/tested.all.reads
+        cell.good.rate <- barcode_res[3]/tested.all.reads
         max.cell.good <- max(max.cell.good, cell.good.rate)
 
         cat(sprintf("Cell barcode supporting rate : %.1f%%.\n", cell.good.rate*100.))
 
         # sample index isn't tested anymore
         # if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
-        if(cell.good.rate > 0.6){
-            cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads.\n", libf, cell.good.rate*100.))
-            return(listfile)
+        if(cell.good.rate > cell.bc.sup.rate && (any(is.null(A_and_B.dual.index.list))|| F==is.na(dual.index.verAB))){
+            print(A_and_B.dual.index.list)
+            if(any(is.null(A_and_B.dual.index.list))) metadata.I2Reversed<-NA else metadata.I2Reversed <- find.dual.index.I2.reversed(input.directory[1]) 
+            meta.data.verAB <- NA
+            if(metadata.I2Reversed%in% c(T,F)) meta.data.verAB <- ifelse(metadata.I2Reversed,"B","A")
+            if(cell.bc.sup.rate>0)cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads. \n", libf, cell.good.rate*100.))
+
+            if(!identical(dual.index.verAB, meta.data.verAB))stop("The dual index workflow versions of A/B inferred from reads and from dataset meta-data are inconsistant!")
+            if(!any(is.null(A_and_B.dual.index.list)))cat(sprintf("The dual index version is likely %s by scanning the reads. The dual index version is likely %s by examining the meta-data in the dataset.\n", dual.index.verAB, meta.data.verAB))
+            return(list(cell.barcode=listfile, dual.index=dual.index.verAB, meta=meta.data.verAB))
         }
     }
-
     stop(sprintf("ERROR: no known cell barcode set was found for the data set. The highest percentage of cell-barcode matched reads is %.1f%%\n", max.cell.good*100.))
 }
 
@@ -1280,12 +1417,15 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       R2.file.name <- .check_and_NormPath(df2, mustWork=TRUE, "The genomic read FASTQ file in sample.info.idx")
       combined.fastq.names <- paste0( combined.fastq.names,.SCRNA_FASTA_SPLIT1, R1.file.name, .SCRNA_FASTA_SPLIT2,".",.SCRNA_FASTA_SPLIT2, R2.file.name)
     }
+
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
+    guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(combined.fastq.names, temp.file.prefix, "N/A", input.mode="fastq", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
     if(is.null(cell.barcode)){
-      cell.barcode <- .find_best_cellbarcode(combined.fastq.names, "N/A", input.mode="fastq")
+      cell.barcode <- guess.cellbc.and.idx$cell.barcode
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
+
     if(onlyDetectBarcode){
       cat("Barcode is",cell.barcode,"\n")
       return(NA)
@@ -1331,20 +1471,22 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(has.error) break
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
+      dual.index.ABlist <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
+      guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(dirname, temp.file.prefix, cc.sample.sheet.path, A_and_B.dual.index.list=dual.index.ABlist, cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       if(is.null(cell.barcode)){
-        .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
-        cell.barcode <- .find_best_cellbarcode(dirname, cc.sample.sheet.path)
+        cell.barcode <- guess.cellbc.and.idx$cell.barcode
       }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
-
+      
       if(onlyDetectBarcode){
         cat("Barcode is",cell.barcode,"\n")
         return(NA)
       }
   
       full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
-      is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
+      is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path, which.dual.index=guess.cellbc.and.idx$dual.index)
+      is_dual_index <- (F==any(is.null(is_dual_index)))
       generate.scRNA.BAM <- TRUE
 
       opt <- c("--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
@@ -1373,8 +1515,9 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     }
   } else if(input.mode == "BAM"){
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
+    guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(sample$BAMFile, temp.file.prefix, "N/A", input.mode="bam", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
     if(is.null(cell.barcode)){
-      cell.barcode <- .find_best_cellbarcode(sample$BAMFile, "N/A", input.mode="bam")
+      cell.barcode <- guess.cellbc.and.idx$cell.barcode
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
