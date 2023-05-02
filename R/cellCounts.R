@@ -864,7 +864,11 @@
   for(lnn in lns){
     if(grepl("IndexRead2", lnn)){
       if(!is.na(ret))return(NA)
+      if(F)cat("REV_DEBUG NovaSeq-New Idx2 line",lnnno," ; Rev line", peround.no,".\n")
+
       ret <- ( lnnno > peround.no ) # if IndexRead2 happend before PEturned, then I2 is stright. 
+           # If PEturned is before IndexRead2, then I2 is reversed.
+           # If not both IndexRead2 and PEturned were found, it is not right.
     }
     lnnno <- 1+lnnno
   }
@@ -877,7 +881,7 @@
   for(lnn in lns){
     if(grepl("<ChemistryStep", lnn) && grepl('Description="Index', lnn)) looking <- T
     if(grepl("</ChemistryStep>", lnn)) looking <- F
-    if(looking && gepl('ReagentName="BP14"', lnn))ret <- T
+    if(looking && grepl('ReagentName="BP14"', lnn))ret <- T
   }
   return(ret)
 }
@@ -887,7 +891,7 @@
     if(grepl("<Flowcell>", lnn) && grepl("</Flowcell>", lnn)) {
       spns <- unlist(strsplit(lnn, "Flowcell>"))[2]
       spns <- unlist(strsplit(spns, "<"))[1]
-      return(as.numeric(unlist(strsplit(spns,"[.]"))))
+      return(spns)
     } 
   }
   return(NA)
@@ -902,8 +906,10 @@ find.dual.index.I2.reversed <- function(raw.dir){
   if(is.na(illumina.dev.name))stop("No Illumina device info is available in the run parameter file.")
 
   if(illumina.dev.name %in% c("HiSeq")) {
-    if(is.na(illumina.dev.ver)) stop("No Illumina version info is available in the run parameter file.")
+    if(any(is.na(illumina.dev.ver)))stop("No Illumina version info is available in the run parameter file.")
     is.Rev.I2 <-(illumina.dev.ver[1] >2)
+
+    if(F)cat("REV_DEBUG HiSeq had new version",illumina.dev.ver," and Rev I2 =",is.Rev.I2,".\n") 
   }else if(illumina.dev.name %in% c("MiSeq"))
     is.Rev.I2 <- F
   else if(illumina.dev.name %in% c("NextSeq","iSeq"))
@@ -914,11 +920,11 @@ find.dual.index.I2.reversed <- function(raw.dir){
     run.info.txt <- readLines(run.info.file)
     flowcell.id <- .get.illumina.flowcell(run.info.txt)
     if(is.na(flowcell.id))stop("No flowcell id was found in run info file.")
-    recipe.new.ver <- (illumina.dev.ver[1] >1) || ( illumina.dev.ver[1] >=1 && illumina.dev.ver[2] >7)
+    recipe.new.ver <- (illumina.dev.ver[1] >1) || ( illumina.dev.ver[1] ==1 && illumina.dev.ver[2] >7)
     resp.files <- list.files(paste(raw.dir,"Recipe",sep="/"), pattern="[.]xml$", full.names=T)
     resp.file <- NA
     for(testi in 1:3){ # the last round: any file is good. 
-      for(rp1 in resp.files){
+      for(resp.file in resp.files){
         if(testi==1 && grepl(paste0("/",flowcell.id,".xml"), resp.file)) break
         if(testi==2 && grepl(flowcell.id, resp.file)) break
       }
@@ -927,8 +933,10 @@ find.dual.index.I2.reversed <- function(raw.dir){
     recipeOne.txt <- readLines(resp.file)
     if(recipe.new.ver) is.Rev.I2 <- .get.novaseq.i2.rounded(recipeOne.txt)
     else is.Rev.I2 <- .get.novaseq.i2.BP14.used(recipeOne.txt)
+    if(is.na(is.Rev.I2)) stop("The recipe file has a unexpected format.") 
+    if(F)cat("REV_DEBUG NovaSeq had new version = ",recipe.new.ver," and recipe file = ",resp.file,". Rev I2 = ",is.Rev.I2,"\n")
   }else stop("Wrong dev name was detected.")
-  if(F)cat("Had dev ",illumina.dev.name,illumina.dev.ver,"\n")
+  if(F)cat("REV_DEBUG Sample had device = ",illumina.dev.name,illumina.dev.ver,".\n")
   return(is.Rev.I2)
 }
 
