@@ -2605,10 +2605,6 @@ void process_line_junctions(fc_thread_global_context_t * global_context, fc_thre
 		int * njunc_current = is_second_read?&njunc2:&njunc1;
 		fc_junction_info_t * junctions_current = is_second_read?supported_junctions2:supported_junctions1;
 		(*njunc_current) = calc_junctions_from_cigarInts(global_context, alignment_masks , cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, junctions_current);
-
-		//if(0 && FIXLENstrcmp("HWI-ST212:219:C0C1TACXX:1:1101:13391:171460", read_name)==0){
-		//	SUBREADprintf("JUNC_FOUND_IN_READ OF %s : %d\n", read_name , *njunc_current);
-		//}
 	}
 	if(njunc1 >0 || njunc2>0)
 		add_fragment_supported_junction(global_context, thread_context, supported_junctions1, njunc1, supported_junctions2, njunc2, RG_ptr);

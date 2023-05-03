@@ -897,10 +897,15 @@
   return(NA)
 }
 
-find.dual.index.I2.reversed <- function(raw.dir){
+.find.DS.in.path <- function(d){
+  d # assume that the dir is here.
+}
+
+.find.dual.index.I2.reversed <- function(raw.dir, verbose=F){
+  raw.dir <- .find.DS.in.path(raw.dir)
   run.param.file <- paste0(raw.dir,"/RunParameters.xml")
   if(!file.exists(run.param.file))stop("No run parameter file is found in the raw dataset.")
-  run.param.txt <- readLines(run.param.file)
+  run.param.txt <- readLines(run.param.file ,warn=F)
   illumina.dev.name <- .get.illumina.dev(run.param.txt)
   illumina.dev.ver <- .get.illumina.ver(run.param.txt)
   if(is.na(illumina.dev.name))stop("No Illumina device info is available in the run parameter file.")
@@ -909,7 +914,7 @@ find.dual.index.I2.reversed <- function(raw.dir){
     if(any(is.na(illumina.dev.ver)))stop("No Illumina version info is available in the run parameter file.")
     is.Rev.I2 <-(illumina.dev.ver[1] >2)
 
-    if(F)cat("REV_DEBUG HiSeq had new version",illumina.dev.ver," and Rev I2 =",is.Rev.I2,".\n") 
+    if(verbose)cat("REV_DEBUG HiSeq had new version",illumina.dev.ver," and Rev I2 =",is.Rev.I2,".\n") 
   }else if(illumina.dev.name %in% c("MiSeq"))
     is.Rev.I2 <- F
   else if(illumina.dev.name %in% c("NextSeq","iSeq"))
@@ -917,7 +922,7 @@ find.dual.index.I2.reversed <- function(raw.dir){
   else if(illumina.dev.name %in% c("NovaSeq")){
     run.info.file <- paste0(raw.dir,"/RunInfo.xml")
     if(!file.exists(run.info.file))stop("No run info file is found in the raw dataset.")
-    run.info.txt <- readLines(run.info.file)
+    run.info.txt <- readLines(run.info.file,,warn =F)
     flowcell.id <- .get.illumina.flowcell(run.info.txt)
     if(is.na(flowcell.id))stop("No flowcell id was found in run info file.")
     recipe.new.ver <- (illumina.dev.ver[1] >1) || ( illumina.dev.ver[1] ==1 && illumina.dev.ver[2] >7)
@@ -930,13 +935,13 @@ find.dual.index.I2.reversed <- function(raw.dir){
       }
     }
     if(is.na(resp.file))stop("No recipe file was found for this dataset.")
-    recipeOne.txt <- readLines(resp.file)
+    recipeOne.txt <- readLines(resp.file, warn =F)
     if(recipe.new.ver) is.Rev.I2 <- .get.novaseq.i2.rounded(recipeOne.txt)
     else is.Rev.I2 <- .get.novaseq.i2.BP14.used(recipeOne.txt)
     if(is.na(is.Rev.I2)) stop("The recipe file has a unexpected format.") 
-    if(F)cat("REV_DEBUG NovaSeq had new version = ",recipe.new.ver," and recipe file = ",resp.file,". Rev I2 = ",is.Rev.I2,"\n")
+    if(verbose)cat("REV_DEBUG NovaSeq had new version = ",recipe.new.ver," and recipe file = ",resp.file,". Rev I2 = ",is.Rev.I2,"\n")
   }else stop("Wrong dev name was detected.")
-  if(F)cat("REV_DEBUG Sample had device = ",illumina.dev.name,illumina.dev.ver,".\n")
+  if(verbose)cat("REV_DEBUG Sample had device = ",illumina.dev.name,illumina.dev.ver,".\n")
   return(is.Rev.I2)
 }
 
@@ -980,13 +985,13 @@ find.dual.index.I2.reversed <- function(raw.dir){
         # sample index isn't tested anymore
         # if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
         if(cell.good.rate > cell.bc.sup.rate && (any(is.null(A_and_B.dual.index.list))|| F==is.na(dual.index.verAB))){
-            if(any(is.null(A_and_B.dual.index.list))) metadata.I2Reversed<-NA else metadata.I2Reversed <- find.dual.index.I2.reversed(input.directory[1]) 
+            if(any(is.null(A_and_B.dual.index.list))) metadata.I2Reversed<-NA else metadata.I2Reversed <- .find.dual.index.I2.reversed(input.directory[1]) 
             meta.data.verAB <- NA
             if(metadata.I2Reversed%in% c(T,F)) meta.data.verAB <- ifelse(metadata.I2Reversed,"B","A")
             if(cell.bc.sup.rate>0)cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads. \n", libf, cell.good.rate*100.))
 
-            if(!identical(dual.index.verAB, meta.data.verAB))stop("The dual index workflow versions of A/B inferred from reads and from dataset meta-data are inconsistant!")
-            if(!any(is.null(A_and_B.dual.index.list)))cat(sprintf("The dual index version is likely %s by scanning the reads. The dual index version is likely %s by examining the meta-data in the dataset.\n", dual.index.verAB, meta.data.verAB))
+            if(F)if(!identical(dual.index.verAB, meta.data.verAB))stop("The dual index workflow versions of A/B inferred from reads and from dataset meta-data are inconsistant!")
+            if(F)if(!any(is.null(A_and_B.dual.index.list)))cat(sprintf("The dual index version is likely %s by scanning the reads. The dual index version is likely %s by examining the meta-data in the dataset.\n", dual.index.verAB, meta.data.verAB))
             return(list(cell.barcode=listfile, dual.index=dual.index.verAB, meta=meta.data.verAB))
         }
     }

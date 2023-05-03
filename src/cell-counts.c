@@ -103,7 +103,7 @@ typedef struct{
 
 	srInt_64 mapped_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
 	srInt_64 assigned_reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
-	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER];
+	srInt_64 reads_per_sample[MAX_SCRNA_SAMPLE_NUMBER+1];
 	srInt_64 bcl_input_local_start_no;
 	int bcl_input_local_filled, bcl_input_local_cached;
 	char bcl_input_local_readbin[BCL_READBIN_ITEMS_LOCAL][BCL_READBIN_SIZE];
@@ -1989,19 +1989,19 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist);
 
 	//if(batch_no < CELLBC_BATCH_NUMBER) SUBREADprintf("WRITE_FP_BTCH %d \n", batch_no);
+	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	if(sample_no>0){
 		cellCounts_lock_occupy(cct_context -> batch_file_locks + batch_no);
 		FILE * binfp = cct_context -> batch_files [ batch_no ];
 		cellCounts_write_one_read_bin(cct_context, thread_no, binfp, sample_no, cell_barcode_no, UMI_seq, readbin, nhits, batch_no == CELLBC_BATCH_NUMBER+1);
 		cellCounts_lock_release(cct_context -> batch_file_locks + batch_no);
-		cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 
 		if(reporting_index >=0 && this_multi_mapping_i==1){
 			thread_context -> mapped_reads_per_sample[ sample_no -1 ]++;
 			thread_context -> reads_per_sample[ sample_no -1 ]++;
 			if(nhits >0) thread_context -> assigned_reads_per_sample[ sample_no -1 ]++;
 		}else thread_context -> reads_per_sample[ sample_no -1 ]++;
-	}
+	}else thread_context -> reads_per_sample[ cct_context-> sample_sheet_table -> numOfElements ]++; // unassigned reads in NO+1:
 
 	void * pps[6];
 	void ** sample_bam_2fps = (void**)pps;
@@ -2152,6 +2152,7 @@ int cellCounts_run_maybe_threads(cellcounts_global_t * cct_context, int task){
 			cct_context -> assigned_reads_per_sample[smpno] += thread_contexts[current_thread_no].assigned_reads_per_sample[smpno];
 			cct_context -> reads_per_sample[smpno] += thread_contexts[current_thread_no].reads_per_sample[smpno];
 		}
+		cct_context -> reads_per_sample[smpno+1] += thread_contexts[current_thread_no].reads_per_sample[smpno+1]; //  for non-assigned
 		if(ret_value)break;
 	}
 	//SUBREADprintf("HICONF MAPPING (SIMPLE) = %lld, LOWCONF MAPPING (ALL SUBREADS, NOT SIMPLE) = %lld\n", cct_context -> hiconf_map , cct_context -> loconf_map );
@@ -4557,6 +4558,21 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 	}
 	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
 	print_in_box(80,0,0,"");
+	if(cct_context -> input_mode = GENE_INPUT_BCL){
+		srInt_64 all_extracted_reads = 0;
+		for(xk1 = 0; xk1 < cct_context-> sample_sheet_table -> numOfElements+1; xk1++) 
+			all_extracted_reads += cct_context-> reads_per_sample[xk1];
+
+		for(xk1 = 0; xk1 < cct_context-> sample_sheet_table -> numOfElements; xk1++) {
+			srInt_64 extracted_reads = cct_context-> reads_per_sample[xk1];
+			char * sample_name = ArrayListGet(cct_context-> sample_id_to_name, xk1);
+			print_in_box(81,0,0,"  %'13lld (%4.1f%%%%) reads were assigned to %s.\n", extracted_reads, extracted_reads*100./all_extracted_reads, sample_name);
+		}
+		print_in_box(80,0,0,"");
+		if(cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements] < 0.005*all_extracted_reads) print_in_box(81,0,0,"  %'l3d (%4.0f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
+		else print_in_box(81,0,0,"  %'l3d (%4.1f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
+	print_in_box(80,0,0,"");
+	}
 	print_in_box(80,0,0,"Generate UMI count tables...");
 	ArrayListDestroy(file_size_list);
 

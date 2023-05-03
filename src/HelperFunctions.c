@@ -282,11 +282,11 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 
 		while(1){
 			int nch = autozip_getch(&fp);
-			if(nch<0)break;
-			if(status == 0){
+			if(nch<=0) assert(status == 0 || status == 3); // file can only end with no chro at all, or when the last base value of last chro is reached. 
+			if(status == 0){ // was before the start of fastq file
 				assert(nch == '>');
 				status = 1;
-			}else if(status == 1){
+			}else if(status == 1){ // was in chro name
 				if(inner_cursor == 0){
 					bin_block = calloc(sizeof(char),10000);
 					current_bin_space = 10000;
@@ -299,12 +299,12 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 					chro_name[inner_cursor++] = nch;
 					chro_name[inner_cursor] = 0;
 				}
-			}else if(status == 2){
+			}else if(status == 2){ // was in the unneeded part in chro name
 				if(nch == '\n'){
 					status = 3;
 					inner_cursor = 0;
 				}
-			}else if(status == 3){
+			}else if(status == 3){ // was in base values mode
 				if(nch == '>' || nch <= 0){
 					char * mem_chro = malloc(strlen(chro_name)+1);
 					strcpy(mem_chro, chro_name);
@@ -330,8 +330,9 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 					}
 					bin_block[bin_bytes] |= (base_int << bin_bits);
 					inner_cursor++;
-				}
+				} // '\n' isn't needed if last status was base value.
 			}
+			if(nch<0)break;
 		}
 
 		autozip_close(&fp);
