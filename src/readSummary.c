@@ -165,6 +165,9 @@ typedef struct {
 	char * bam_compressed_buff;
 	int read_details_buff_used;
 
+	fc_junction_info_t * memory_supported_junctions1;
+	fc_junction_info_t * memory_supported_junctions2;
+
 	unsigned int * scoring_buff_numbers;
 	unsigned int * scoring_buff_flags;
 	unsigned int * scoring_buff_overlappings;
@@ -2581,7 +2584,8 @@ int calc_junctions_from_cigarInts(fc_thread_global_context_t * global_context, i
 void add_fragment_supported_junction(	fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, fc_junction_info_t * supported_junctions1, int njunc1, fc_junction_info_t * supported_junctions2, int njunc2, char * RG_name);
 
 void process_line_junctions(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2) {
-	fc_junction_info_t supported_junctions1[global_context -> max_M], supported_junctions2[global_context -> max_M];
+	fc_junction_info_t * supported_junctions1 = thread_context -> memory_supported_junctions1;
+	fc_junction_info_t * supported_junctions2 = thread_context -> memory_supported_junctions2;
 	int is_second_read, njunc1=0, njunc2=0, is_junction_read, cigar_sections;
 	int alignment_masks, mapping_qual, NH_value;
 	char *RG_ptr=NULL;
@@ -2599,6 +2603,7 @@ void process_line_junctions(fc_thread_global_context_t * global_context, fc_thre
 		int me_refID, mate_refID;
 
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M, NULL, NULL, global_context -> assign_reads_to_RG, &RG_ptr_one, &me_refID, &mate_refID);
+		//fprintf(stderr,"SECS_N %d   <=   %d (asserted)\n", cigar_sections, global_context->max_M);
 		assert(cigar_sections <= global_context -> max_M);
 		if(RG_ptr_one) RG_ptr = RG_ptr_one;
 
@@ -3520,7 +3525,7 @@ int count_bitmap_overlapping(char * x1_bitmap, unsigned short rl){
 	return ret;
 }
 
-void add_fragment_supported_junction(	fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, fc_junction_info_t * supported_junctions1, int njunc1, fc_junction_info_t * supported_junctions2, int njunc2, char * RG_name){
+void add_fragment_supported_junction(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, fc_junction_info_t * supported_junctions1, int njunc1, fc_junction_info_t * supported_junctions2, int njunc2, char * RG_name){
 	assert(njunc1 >= 0 && njunc1 <= global_context -> max_M -1 );
 	assert(njunc2 >= 0 && njunc2 <= global_context -> max_M -1 );
 	int x1,x2, in_total_junctions = njunc2 + njunc1;
@@ -3557,10 +3562,6 @@ void add_fragment_supported_junction(	fc_thread_global_context_t * global_contex
 		void * count_ptr = HashTableGet(junction_counting_table, this_key);
 		srInt_64 count_junc = count_ptr - NULL;
 		HashTablePut(junction_counting_table, this_key, NULL+count_junc + 1);
-
-//		#warning "CONTINUE SHOULD BE REMOVED!!!."
-//			continue;
-
 		size_t left_keysize = strlen(j_one->chromosome_name_left) + 16;
 		size_t right_keysize = strlen(j_one->chromosome_name_right) + 16;
 		char * left_key = malloc(left_keysize);
@@ -6773,8 +6774,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 			global_context -> thread_contexts[xk1].scoring_buff_gap_lengths = malloc( sizeof(unsigned short) * global_context -> thread_contexts[xk1].hits_number_capacity * 2 * global_context -> max_M *2);
 		} else global_context -> thread_contexts[xk1].scoring_buff_gap_chros = NULL;
 
-		if(global_context -> do_junction_counting)
-		{
+		if(global_context -> do_junction_counting){
 			global_context -> thread_contexts[xk1].junction_counting_table = HashTableCreate(131317);
 			HashTableSetHashFunction(global_context -> thread_contexts[xk1].junction_counting_table,HashTableStringHashFunction);
 			HashTableSetDeallocationFunctions(global_context -> thread_contexts[xk1].junction_counting_table, free, NULL);
@@ -6784,6 +6784,9 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 			HashTableSetHashFunction(global_context -> thread_contexts[xk1].splicing_point_table,HashTableStringHashFunction);
 			HashTableSetDeallocationFunctions(global_context -> thread_contexts[xk1].splicing_point_table, free, NULL);
 			HashTableSetKeyComparisonFunction(global_context -> thread_contexts[xk1].splicing_point_table, fc_strcmp_chro);
+
+			global_context ->  thread_contexts[xk1].memory_supported_junctions1 = malloc(sizeof(fc_junction_info_t) * 65536);
+			global_context ->  thread_contexts[xk1].memory_supported_junctions2 = malloc(sizeof(fc_junction_info_t) * 65536);
 		}
 		
 		if(global_context -> assign_reads_to_RG){
@@ -6811,7 +6814,6 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 			global_context -> thread_contexts[xk1].scRNA_has_valid_sample_index  =0;
 			global_context -> thread_contexts[xk1].scRNA_has_valid_cell_barcode  =0;
 		}
-
 		if(!global_context ->  thread_contexts[xk1].count_table) return 1;
 	}
 
@@ -6873,6 +6875,8 @@ void fc_thread_destroy_thread_context(fc_thread_global_context_t * global_contex
 		if(global_context -> do_junction_counting){
 			HashTableDestroy(global_context -> thread_contexts[xk1].junction_counting_table);
 			HashTableDestroy(global_context -> thread_contexts[xk1].splicing_point_table);
+			free(global_context ->  thread_contexts[xk1].memory_supported_junctions1);
+			free(global_context ->  thread_contexts[xk1].memory_supported_junctions2);
 		}
 		if(global_context -> assign_reads_to_RG)
 			HashTableDestroy(global_context -> thread_contexts[xk1].RG_table);
@@ -7823,7 +7827,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			}else if(!global_context ->is_junction_no_chro_shown){
 				global_context ->is_junction_no_chro_shown = 1;
 				print_in_box(80,0,0, "   WARNING contig '%s' is not found in the", chro_small);
-				print_in_box(80,0,0, "   provided genome file.");
+				print_in_box(80,0,0, "   provided genome file or its length is too short in it.");
 				print_in_box(80,0,0,"");
 
 			}
@@ -8216,7 +8220,7 @@ int readSummary(int argc,char *argv[]){
 			fasta_contigs_fname = argv[37];
 
 	if(argc>38)
-		max_M = atoi(argv[38]);
+		max_M = min(65535, max(1,atoi(argv[38])));
 	else	max_M = 10;
 
 	if(argc>39)

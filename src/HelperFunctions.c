@@ -306,11 +306,10 @@ int read_contig_fasta(fasta_contigs_t * tab, char * fname){
 				}
 			}else if(status == 3){ // was in base values mode
 				if(nch == '>' || nch <= 0){
-					char * mem_chro = malloc(strlen(chro_name)+1);
-					strcpy(mem_chro, chro_name);
+					char * mem_chro = strdup(chro_name);
 					HashTablePut(tab -> size_table , mem_chro, NULL + inner_cursor);
 					HashTablePut(tab -> contig_table , mem_chro, bin_block);
-		//			SUBREADprintf("Read '%s' : %u bases\n", chro_name, inner_cursor);
+					//SUBREADprintf("Read '%s' : %u bases\n", chro_name, inner_cursor);
 					inner_cursor = 0;
 					status = 1;
 					if(nch <= 0) break;

@@ -2218,6 +2218,10 @@ int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readl
 			int nch1 = nch & 0x3;
 			nbase = (1413956417) >> (nch1*8); // 1413956417 = 'TGCA'
 			nqual=33+(nch >>2);
+			if(nqual <='!'){
+				nbase='N';
+				nqual='#';
+			}
 		}else{
 			nqual='#';
 			nbase='N';
