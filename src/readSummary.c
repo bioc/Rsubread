@@ -131,8 +131,6 @@ typedef struct {
 	unsigned short thread_id;
 	srInt_64 nreads_mapped_to_exon;
 	srInt_64 all_reads;
-	//unsigned short current_read_length1;
-	//unsigned short current_read_length2;
 	unsigned int count_table_size;
 	read_count_type_t * count_table;
 	unsigned int chunk_read_ptr;
@@ -231,6 +229,7 @@ typedef struct {
 	int is_read_details_out;
 	int is_junction_no_chro_shown;
 	int is_unpaired_warning_shown;
+	int is_cigar_overflow_warning_shown;
 	int is_stake_warning_shown;
 	int is_read_too_long_to_SAM_BAM_shown;
 	int is_split_or_exonic_only;
@@ -2361,7 +2360,7 @@ void get_readname_from_bin(char * bin, char ** read_name){
 	(*read_name) = bin + 36;
 }
 
-void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin2, char ** read_name, int * flag, char ** chro, srInt_64 * pos, int * mapq, char ** mate_chro, srInt_64 * mate_pos, srInt_64 * tlen, int * is_junction_read, int * cigar_sect, unsigned int * Starting_Chro_Points_1BASE, unsigned short * Starting_Read_Points, unsigned short * Section_Read_Lengths, char ** ChroNames, char * Event_After_Section, int * NH_value, int max_M, CIGAR_interval_t * intervals_buffer, int * intervals_i, int assign_reads_to_RG, char ** RG_ptr, int * ret_me_refID, int * ret_mate_refID){
+void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin2, char ** read_name, int * flag, char ** chro, srInt_64 * pos, int * mapq, char ** mate_chro, srInt_64 * mate_pos, srInt_64 * tlen, int * is_junction_read, int * cigar_sect, int * cigar_overflow, unsigned int * Starting_Chro_Points_1BASE, unsigned short * Starting_Read_Points, unsigned short * Section_Read_Lengths, char ** ChroNames, char * Event_After_Section, int * NH_value, int max_M, CIGAR_interval_t * intervals_buffer, int * intervals_i, int assign_reads_to_RG, char ** RG_ptr, int * ret_me_refID, int * ret_mate_refID){
 	int x1, len_of_S1 = 0;
 	*cigar_sect = 0;
 	*NH_value = 1;
@@ -2420,11 +2419,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 				chro_cursor += optval;
 				read_cursor += optval;
 				this_section_length += optval;
-/*			}else if(optype == 1){ // 'I'
-				read_cursor += optval;
-			}else if(optype == 2){ // 'D'
-				chro_cursor += optval;
-*/			}else if(optype == 1 || optype == 2 || optype == 3){ // 'I', 'D' or 'N'
+			}else if(optype == 1 || optype == 2 || optype == 3){ // 'I', 'D' or 'N'
 				if(3 == optype)
 					(*is_junction_read) = 1;
 				char event_char=0;
@@ -2451,7 +2446,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 						intervals_buffer[ *intervals_i ].chromosomal_length = chro_cursor - intervals_buffer[ *intervals_i ].start_pos;
 						(*intervals_i) ++;
 					}
-				}
+				} else (*cigar_overflow)=1;
 
 				if(optype == 2 || optype == 3)// N or D
 					chro_cursor += optval;
@@ -2491,7 +2486,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 				Section_Read_Lengths[*cigar_sect] = this_section_length ;
 				ChroNames[*cigar_sect] = (*chro);
 				(*cigar_sect)++;
-			}
+			} else (*cigar_overflow)=1;
 		}
 		
 		int bin_ptr = 36 + l_read_name + seq_len + (seq_len+1)/2 + 4 * cigar_opts;
@@ -2586,7 +2581,7 @@ void add_fragment_supported_junction(	fc_thread_global_context_t * global_contex
 void process_line_junctions(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * bin1, char * bin2) {
 	fc_junction_info_t * supported_junctions1 = thread_context -> memory_supported_junctions1;
 	fc_junction_info_t * supported_junctions2 = thread_context -> memory_supported_junctions2;
-	int is_second_read, njunc1=0, njunc2=0, is_junction_read, cigar_sections;
+	int is_second_read, njunc1=0, njunc2=0, is_junction_read, cigar_sections, cigar_overflow=1;
 	int alignment_masks, mapping_qual, NH_value;
 	char *RG_ptr=NULL;
 
@@ -2602,9 +2597,7 @@ void process_line_junctions(fc_thread_global_context_t * global_context, fc_thre
 		char * RG_ptr_one = NULL;
 		int me_refID, mate_refID;
 
-		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M, NULL, NULL, global_context -> assign_reads_to_RG, &RG_ptr_one, &me_refID, &mate_refID);
-		//fprintf(stderr,"SECS_N %d   <=   %d (asserted)\n", cigar_sections, global_context->max_M);
-		assert(cigar_sections <= global_context -> max_M);
+		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, &cigar_overflow, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M, NULL, NULL, global_context -> assign_reads_to_RG, &RG_ptr_one, &me_refID, &mate_refID);
 		if(RG_ptr_one) RG_ptr = RG_ptr_one;
 
 		int * njunc_current = is_second_read?&njunc2:&njunc1;
@@ -2935,13 +2928,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	srInt_64 read_pos, fragment_length = 0, mate_pos;
 	unsigned int search_start = 0, search_end;
 	int nhits1 = 0, nhits2 = 0, alignment_masks, search_block_id, search_item_id, mapping_qual;
-
-
-	//long * hits_indices1 = thread_context -> hits_indices1, * hits_indices2 = thread_context -> hits_indices2;
-	//unsigned int * hits_start_pos1 = thread_context -> hits_start_pos1 ,  * hits_start_pos2 = thread_context -> hits_start_pos2;
-	//unsigned short * hits_length1 = thread_context -> hits_length1 ,  * hits_length2 = thread_context -> hits_length2;
-	//char ** hits_chro1 = thread_context -> hits_chro1 , **hits_chro2 = thread_context -> hits_chro2;
-
 	unsigned int  total_frag_len =0;
 
 	int cigar_sections, is_junction_read;
@@ -2969,8 +2955,6 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	}
 
 	thread_context->all_reads++;
-	//if(thread_context->all_reads>1000000) printf("TA=%llu\n%s\n",thread_context->all_reads, thread_context -> line_buffer1);
-
 
 	char * RG_ptr;
 	int me_refID =-1, mate_refID =-1, this_is_inconsistent_read_type = 0;
@@ -2979,15 +2963,16 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
 
 		RG_ptr = NULL;
-		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
+		int cigar_overflow=0;
+		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, &cigar_overflow, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
+
+		if(cigar_overflow && 0==global_context -> is_cigar_overflow_warning_shown) {
+			SUBREADprintf("WARNING: read %s has more than %d 'M' segments in CIGAR string. The exceeding sections are not considered. Please consider to increase maxMOps.\n", read_name, global_context -> max_M);
+			global_context -> is_cigar_overflow_warning_shown = 1;
+		}
 
 		// this will be done in the other function.
 		if(global_context -> is_paired_end_mode_assign && (alignment_masks&1)==0) alignment_masks|=8;
-
-		//#warning "========= DEBUG OUTPUT =============="
-		if(0 && FIXLENstrcmp("SEV0112_0155:7:1303:14436:74270", read_name)==0){
-			SUBREADprintf("RTEST:%s R_%d   %p, %p    FLAGS %d\n", read_name, 1+is_second_read, bin1, bin2, alignment_masks);
-		}
 
 		if(global_context -> assign_reads_to_RG && NULL == RG_ptr)return;
 
