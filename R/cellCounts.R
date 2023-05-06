@@ -1431,8 +1431,8 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     }
 
     combined.fastq.names <- substr(combined.fastq.names, nchar(.SCRNA_FASTA_SPLIT1)+1, 9999999)
-    guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(combined.fastq.names, temp.file.prefix, "N/A", input.mode="fastq", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
     if(is.null(cell.barcode)){
+      guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(combined.fastq.names, temp.file.prefix, "N/A", input.mode="fastq", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       cell.barcode <- guess.cellbc.and.idx$cell.barcode
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
@@ -1527,8 +1527,8 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     }
   } else if(input.mode == "BAM"){
     unique.samples <- unique(as.character(sample.info.idx$SampleName))
-    guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(sample$BAMFile, temp.file.prefix, "N/A", input.mode="bam", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
     if(is.null(cell.barcode)){
+      guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(sample$BAMFile, temp.file.prefix, "N/A", input.mode="bam", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       cell.barcode <- guess.cellbc.and.idx$cell.barcode
     }else{
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")

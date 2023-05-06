@@ -4562,7 +4562,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 	}
 	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
 	print_in_box(80,0,0,"");
-	if(cct_context -> input_mode = GENE_INPUT_BCL){
+	if(cct_context -> input_mode== GENE_INPUT_BCL){
 		srInt_64 all_extracted_reads = 0;
 		for(xk1 = 0; xk1 < cct_context-> sample_sheet_table -> numOfElements+1; xk1++) 
 			all_extracted_reads += cct_context-> reads_per_sample[xk1];

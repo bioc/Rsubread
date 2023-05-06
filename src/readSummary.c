@@ -2967,7 +2967,10 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 		parse_bin(global_context -> sambam_chro_table, is_second_read?bin2:bin1, is_second_read?bin1:bin2 , &read_name,  &alignment_masks , &read_chr, &read_pos, &mapping_qual, &mate_chr, &mate_pos, &fragment_length, &is_junction_read, &cigar_sections, &cigar_overflow, Starting_Chro_Points_1BASE, Starting_Read_Points, Section_Read_Lengths, ChroNames, Event_After_Section, &NH_value, global_context -> max_M , global_context -> need_calculate_overlap_len?(is_second_read?CIGAR_intervals_R2:CIGAR_intervals_R1):NULL, is_second_read?&CIGAR_intervals_R2_sections:&CIGAR_intervals_R1_sections, global_context -> assign_reads_to_RG, &RG_ptr, &me_refID, &mate_refID);
 
 		if(cigar_overflow && 0==global_context -> is_cigar_overflow_warning_shown) {
-			SUBREADprintf("WARNING: read %s has more than %d 'M' segments in CIGAR string. The exceeding sections are not considered. Please consider to increase maxMOps.\n", read_name, global_context -> max_M);
+			print_in_box(80,0,0,"");
+			print_in_box(80,0,0,"WARNING: more than %d 'M' segments were found in CIGAR string.", global_context -> max_M);
+			print_in_box(80,0,0,"The exceeding sections are not useed. Please consider to increase maxMOp.");
+			print_in_box(80,0,0,"");
 			global_context -> is_cigar_overflow_warning_shown = 1;
 		}
 
