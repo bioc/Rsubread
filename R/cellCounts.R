@@ -984,10 +984,13 @@
 
         # sample index isn't tested anymore
         # if(input.mode=="bcl" && sample.good.rate < 0.5)cat(sprintf("WARNING: there are only %.1f%% reads having known sample indices. Please check if the sample sheet is correct.\n", sample.good.rate*100.))
-        if(cell.good.rate > cell.bc.sup.rate && (any(is.null(A_and_B.dual.index.list))|| F==is.na(dual.index.verAB))){
-            if(any(is.null(A_and_B.dual.index.list))) metadata.I2Reversed<-NA else metadata.I2Reversed <- .find.dual.index.I2.reversed(input.directory[1]) 
+        if(cell.good.rate > cell.bc.sup.rate){
             meta.data.verAB <- NA
-            if(metadata.I2Reversed%in% c(T,F)) meta.data.verAB <- ifelse(metadata.I2Reversed,"B","A")
+            if(!any(is.null(A_and_B.dual.index.list))){
+               metadata.I2Reversed <- .find.dual.index.I2.reversed(input.directory[1]) 
+               meta.data.verAB <- ifelse(metadata.I2Reversed,"B","A")
+            }
+
             if(cell.bc.sup.rate>0)cat(sprintf("Found cell-barcode list '%s' for the input data: supported by %.1f%% reads. \n", libf, cell.good.rate*100.))
 
             if(F)if(!identical(dual.index.verAB, meta.data.verAB))stop("The dual index workflow versions of A/B inferred from reads and from dataset meta-data are inconsistant!")
