@@ -4573,8 +4573,17 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			print_in_box(81,0,0,"  %'13lld (%4.1f%%%%) reads were assigned to %s.\n", extracted_reads, extracted_reads*100./all_extracted_reads, sample_name);
 		}
 		print_in_box(80,0,0,"");
+
+#ifdef __MINGW32__
+		if(cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements] < 0.005*all_extracted_reads) print_in_box(81,0,0,"  %" PRId64 "(%4.0f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
+		else print_in_box(81,0,0,"  %" PRId64 " (%4.1f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
+#fi
+#else
 		if(cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements] < 0.005*all_extracted_reads) print_in_box(81,0,0,"  %'13lld (%4.0f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
 		else print_in_box(81,0,0,"  %'13lld (%4.1f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
+#endif
+
+
 	print_in_box(80,0,0,"");
 	}
 	print_in_box(80,0,0,"Generate UMI count tables...");
