@@ -4570,7 +4570,11 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		for(xk1 = 0; xk1 < cct_context-> sample_sheet_table -> numOfElements; xk1++) {
 			srInt_64 extracted_reads = cct_context-> reads_per_sample[xk1];
 			char * sample_name = ArrayListGet(cct_context-> sample_id_to_name, xk1);
+#ifdef __MINGW32__
+			print_in_box(81,0,0,"  % 13" PRId64 " (%4.1f%%%%) reads were assigned to %s.\n", extracted_reads, extracted_reads*100./all_extracted_reads, sample_name);
+#else
 			print_in_box(81,0,0,"  %'13lld (%4.1f%%%%) reads were assigned to %s.\n", extracted_reads, extracted_reads*100./all_extracted_reads, sample_name);
+#endif
 		}
 		print_in_box(80,0,0,"");
 
