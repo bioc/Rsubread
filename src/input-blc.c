@@ -485,21 +485,21 @@ int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
 						tfp -> digit4_to_compressed_start_of_next = HashTableCreate(100); 
 						tfp -> list_mapped_qscore = ArrayListCreate(80); 
 						lseek(tfp -> cbcl_bin_fd, 6, SEEK_CUR);// ver and header_size. Not needed.
-						int btmp = 0, ii;
-						read(tfp -> cbcl_bin_fd,&btmp,1);// bits per call.
+						int btmp = 0, ii, rrv;
+						rrv=read(tfp -> cbcl_bin_fd,&btmp,1);// bits per call.
 						tfp -> bits_per_bitscore = 0;
-						read(tfp -> cbcl_bin_fd,&tfp -> bits_per_bitscore,1);// bits per qscore.
+						rrv+=read(tfp -> cbcl_bin_fd,&tfp -> bits_per_bitscore,1);// bits per qscore.
 						if((tfp -> bits_per_bitscore != 2 && tfp -> bits_per_bitscore != 6) || btmp != 2){
 							SUBREADprintf("Bitwidth of calls unsupported %d %d!\n" , tfp -> bits_per_bitscore, btmp);
 							cache_input -> last_chunk_in_cache = 1;
 							break;
 						}
 						btmp = 0;
-						read(tfp -> cbcl_bin_fd,&btmp,4);// Number of bins 
+						rrv+=read(tfp -> cbcl_bin_fd,&btmp,4);// Number of bins 
 						for(ii=0; ii<btmp; ii++){
 							int fromv=0, tov=0;
-							read(tfp -> cbcl_bin_fd,&fromv,4);
-							read(tfp -> cbcl_bin_fd,&tov,4);
+							rrv+=read(tfp -> cbcl_bin_fd,&fromv,4);
+							rrv+=read(tfp -> cbcl_bin_fd,&tov,4);
 							if(fromv != tfp -> list_mapped_qscore->numOfElements){
 								SUBREADprintf("ERROR: # bits of calls unsupported %d %d!\n" , tfp -> bits_per_bitscore, btmp);
 								cache_input -> last_chunk_in_cache = 1;
@@ -508,20 +508,21 @@ int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
 							ArrayListPush(tfp -> list_mapped_qscore, NULL+tov);
 						}
 						btmp = 0;
-						read(tfp -> cbcl_bin_fd,&btmp,4);// Number of tiles (gzipped blocks) in this file 
+						rrv+=read(tfp -> cbcl_bin_fd,&btmp,4);// Number of tiles (gzipped blocks) in this file 
 						srInt_64 seek_start = lseek(tfp -> cbcl_bin_fd, 0 , SEEK_CUR) + 1 + 16*btmp; 
 						for(ii=0; ii<btmp; ii++){
 							int tile_4digit=0, reads_in_tile=0, data_size=0, compressed_size=0;
-							read(tfp -> cbcl_bin_fd,&tile_4digit,4);
-							read(tfp -> cbcl_bin_fd,&reads_in_tile,4);
-							read(tfp -> cbcl_bin_fd,&data_size,4);
-							read(tfp -> cbcl_bin_fd,&compressed_size,4);
+							rrv+=read(tfp -> cbcl_bin_fd,&tile_4digit,4);
+							rrv+=read(tfp -> cbcl_bin_fd,&reads_in_tile,4);
+							rrv+=read(tfp -> cbcl_bin_fd,&data_size,4);
+							rrv+=read(tfp -> cbcl_bin_fd,&compressed_size,4);
 							seek_start += compressed_size;
 							HashTablePut(tfp -> digit4_to_compressed_start_of_next, NULL+tile_4digit, NULL+seek_start);
 							HashTablePut(tfp -> digit4_to_total_read_no_P1, NULL+tile_4digit, NULL+1+reads_in_tile);
 						}
 						btmp = 0;
-						read(tfp -> cbcl_bin_fd,&btmp,1); // excluding non-FP?
+						rrv+=read(tfp -> cbcl_bin_fd,&btmp,1); // excluding non-FP?
+						if(rrv<1) break;
 						tfp -> cbcl_only_has_good_reads = btmp;
 					}
 
@@ -1120,7 +1121,7 @@ int hamming_dist_ATGC_max2(char* s1, char* s2 ){
 
 void iCache_write_supIdx_result(void* ky, void* va, HashTable* tab){
 	FILE * ofp = tab -> appendix1;
-	fprintf(ofp, "%s\t%lld\n", (char*)ky, va-NULL);
+	fprintf(ofp, "%s\t%d\n", (char*)ky, (intO(va-NULL));
 }
 void iCache_copy_sample_table_2_list(void* ky, void* va, HashTable* tab){
 	ArrayList * cbclist = tab -> appendix1;
