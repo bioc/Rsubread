@@ -1,3 +1,7 @@
+9 May 2023 - 2.15.2
+(1) Added automatic workflow probing for dual-index samples in cellCounts.
+(2) Added warnings in featureCounts if the "maxMOp" value is insufficient for the sample.
+
 26 Apr 2023 - 2.15.1
 (1) Added Illumina CBCL format support in cellCounts.
 
