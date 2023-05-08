@@ -1121,7 +1121,7 @@ int hamming_dist_ATGC_max2(char* s1, char* s2 ){
 
 void iCache_write_supIdx_result(void* ky, void* va, HashTable* tab){
 	FILE * ofp = tab -> appendix1;
-	fprintf(ofp, "%s\t%d\n", (char*)ky, (intO(va-NULL));
+	fprintf(ofp, "%s\t%d\n", (char*)ky, (int)(va-NULL));
 }
 void iCache_copy_sample_table_2_list(void* ky, void* va, HashTable* tab){
 	ArrayList * cbclist = tab -> appendix1;
