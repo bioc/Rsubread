@@ -99,8 +99,8 @@ extern int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_na
 
 void R_try_cell_barcode_wrapper(int * nargs, char ** argv, int * retv){
 	int i,n = *nargs;
-	if(n!=5) {
-		SUBREADprintf("ERROR: must be 5 arguments, not %d.\n" ,n);
+	if(n!=6) {
+		SUBREADprintf("ERROR: must be 6 arguments, not %d.\n" ,n);
 		retv[0]=-1;
 		return;
 	}
@@ -111,15 +111,15 @@ void R_try_cell_barcode_wrapper(int * nargs, char ** argv, int * retv){
 	strcpy(c_argv[0],"R_cell_barcode");
 	strcpy(c_argv[1],strtok(r_argv,PARAM_SPLITTOR));
 	for(i=2;i<n+1;i++) strcpy(c_argv[i],strtok(NULL,PARAM_SPLITTOR));
-	R_child_thread_run(do_R_try_cell_barcode_files, 9, c_argv, 0);
+	R_child_thread_run(do_R_try_cell_barcode_files, 11 /* 1 cmd + 6 param + 4 retv*/, c_argv, 0);
 	free(r_argv);
 	for(i=0;i<n+1;i++){
 		free(c_argv[i]);
 	}
-	int rv = (void*)c_argv[6]-NULL;
-	int tested_reads = (void*)c_argv[7]-NULL;
-	int sample_good_reads = (void*)c_argv[8]-NULL;
-	int cell_good_reads = (void*)c_argv[9]-NULL;
+	int rv = (void*)c_argv[7]-NULL;
+	int tested_reads = (void*)c_argv[8]-NULL;
+	int sample_good_reads = (void*)c_argv[9]-NULL;
+	int cell_good_reads = (void*)c_argv[10]-NULL;
 	retv[0] = rv;
 	retv[1] = tested_reads;
 	retv[2] = sample_good_reads;

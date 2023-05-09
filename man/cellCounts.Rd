@@ -67,20 +67,16 @@ It also performs sample demultiplexing, cell barcode demultiplexing and read ded
 It can process multiple datasets at the same time.
 
 Sample information can be provided to \code{cellCounts} via the \code{sample} parameter.
-If the input format is \code{BCL} (ie. \code{input.mode="BCL"}), the provided sample information should include the location where the read data are stored, flowcell lanes used for sequencing, sample names and names of index sets used for indexing samples.
+If the input format is \code{BCL} (ie. \code{input.mode="BCL"}), the provided sample information should include the location where the read data are stored, flowcell lanes used for sequencing, sample names and names of index sets used for indexing samples. An \code{*} in the \code{Lane} column indicates that this sample is sequenced in all lanes.
 These information should be saved to a \code{data.frame} object and then provided to the \code{sample} parameter.
 Below shows an example of this data frame:
 
 \preformatted{
 InputDirectory		Lane		SampleName	IndexSetName
-/path/to/dataset1	1		Sample1		SI-GA-E1
-/path/to/dataset1	1		Sample2		SI-GA-E2
-/path/to/dataset1	2		Sample1		SI-GA-E1
-/path/to/dataset1	2		Sample2		SI-GA-E2
-/path/to/dataset2	1		Sample3		SI-GA-E3
-/path/to/dataset2	1		Sample4		SI-GA-E4
-/path/to/dataset2	2		Sample3		SI-GA-E3
-/path/to/dataset2	2		Sample4		SI-GA-E4
+/path/to/dataset1	*		Sample1		SI-GA-E1
+/path/to/dataset1	*		Sample2		SI-GA-E2
+/path/to/dataset2	*		Sample3		SI-GA-E3
+/path/to/dataset2	*		Sample4		SI-GA-E4
 ...
 }
 

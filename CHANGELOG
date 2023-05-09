@@ -1,3 +1,7 @@
+9 May 2023 - 2.14.1
+(1) Added support to CBCL-format input data in cellCounts. 
+(2) Added automatic dual-index version inference in cellCounts.
+
 14 Apr 2023 - 2.13.6
 (1) Updated the inbuilt mm39 annotation.
 
