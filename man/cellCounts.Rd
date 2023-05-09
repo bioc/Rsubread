@@ -67,7 +67,7 @@ It also performs sample demultiplexing, cell barcode demultiplexing and read ded
 It can process multiple datasets at the same time.
 
 Sample information can be provided to \code{cellCounts} via the \code{sample} parameter.
-If the input format is \code{BCL} (ie. \code{input.mode="BCL"}), the provided sample information should include the location where the read data are stored, flowcell lanes used for sequencing, sample names and names of index sets used for indexing samples. An \code{*} in the \code{Lane} column indicates that this sample is sequenced in all lanes.
+If the input format is \code{BCL} (ie. \code{input.mode="BCL"}), the provided sample information should include the location where the read data are stored, flowcell lanes used for sequencing (one row for each lane), sample names and names of index sets used for indexing samples. An \code{*} in the \code{Lane} column indicates that this sample is sequenced in all lanes.
 These information should be saved to a \code{data.frame} object and then provided to the \code{sample} parameter.
 Below shows an example of this data frame:
 
