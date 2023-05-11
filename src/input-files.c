@@ -2895,8 +2895,12 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
 			int test_read_bin = SAM_pairer_find_start(pairer, thread_context);
 			if(test_read_bin<1 && thread_context -> input_buff_BIN_used >= 32  ){
 				pairer -> is_bad_format = 1;
+				pairer -> is_single_end_mode = 1;
+				pairer -> tiny_mode = 1;
+				pairer -> long_cigar_mode = 1;
+
 				//SUBREADprintf("ERROR: cannot find the start of the next BAM block.\n");
-				print_in_box(80,0,0,"   Switch to the safe mode.");
+				//print_in_box(80,0,0,"   Switch to the safe mode.");
 			}
 		}
 		//SUBREADprintf("FETCHED BLOCK DECOMP=%d FROM COMP=%d\n", have, used_BAM);
