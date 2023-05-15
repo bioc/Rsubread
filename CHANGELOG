@@ -1,3 +1,6 @@
+15 May 2023 - 2.15.3
+(1) Updated manuals for cellCounts and featureCounts.
+
 9 May 2023 - 2.15.2
 (1) Added automatic workflow probing for dual-index samples in cellCounts.
 (2) Added warnings in featureCounts if the "maxMOp" value is insufficient for the sample.
