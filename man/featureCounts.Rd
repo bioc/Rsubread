@@ -175,7 +175,7 @@ For each gene, we used its CDS and UTR regions provided in the original annotati
 Exons within each gene include all chromosomal bases included in the original CDS and UTR regions, but they include each base only once. 
 Also, exons within the same gene in the inbuilt annotation do not overlap with each other.
 
-For the inbuilt annotation \code{"mm39"}, its original RefSeq annotation was downloaded from \url{https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/10090/109/GCF_000001635.27_GRCm39/GCF_000001635.27_GRCm39_genomic.gtf.gz}. 
+For the inbuilt annotation \code{"mm39"}, its original RefSeq annotation was downloaded from \url{https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/10090/GCF_000001635.27-RS_2023_04/GCF_000001635.27_GRCm39_genomic.gtf.gz}. 
 This is a GTF-format annotation. 
 We changed the format of chromosome names in this annotation from \code{"NC_xxxxxx"} to \code{"chr"} followed by a number. 
 For example, \code{"NC_000067.7"} was changed to \code{"chr1"}. 
