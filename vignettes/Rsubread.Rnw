@@ -150,7 +150,7 @@ The \R{cellCounts} function can be used to quantify the scRNA-seq data generated
 
 \begin{scriptsize}
 <<>>=
-if(.Platform$OS.type != "windows") {
+if(grepl("linux", R.version$os)) {
   md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
   URL <- "https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip"
   temp.file <- tempfile()

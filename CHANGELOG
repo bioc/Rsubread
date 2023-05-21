@@ -1,3 +1,6 @@
+22 May 2023 - 2.14.2
+(1) Disabled the cellCounts code from vignettes for macOS. The Bioconductor building system had a TIMEOUT error with this part of code when it built the package for macOS.
+
 9 May 2023 - 2.14.1
 (1) Added support to CBCL-format input data in cellCounts. 
 (2) Added automatic dual-index version inference in cellCounts.
