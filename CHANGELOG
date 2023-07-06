@@ -1,3 +1,6 @@
+6 Jul 2023 - 2.15.4
+(1) Disabled cellCounts in vignettes for arm64 platforms. 
+
 15 May 2023 - 2.15.3
 (1) Updated manuals for cellCounts and featureCounts.
 
