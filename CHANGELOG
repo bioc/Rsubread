@@ -1,3 +1,6 @@
+3 Aug 2023 - 2.15.5
+(1) Made changes to allow programs running in arm64 platforms.
+
 6 Jul 2023 - 2.15.4
 (1) Disabled cellCounts in vignettes for arm64 platforms. 
 
