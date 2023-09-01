@@ -2529,19 +2529,19 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 	int tolimax = votetab -> toli[vote_i][vote_j], all_indel_length=0;
 	cellCounts_indel_recorder_copy(indel_offsets, votetab -> indel_recorder[vote_i][vote_j], tolimax, all_subreads, &read_pos_move, read_name, abs_pos);
 	abs_pos += read_pos_move;
-	int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
-	if(0 && FIXLENstrcmp("R00001325252", read_name)==0)SUBREADprintf("\n%s\n%s\n000V THREE_TOLI %d %d %d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2]);
+	signed int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
+	if(0 && FIXLENstrcmp("R00000075029", read_name)==0)SUBREADprintf("\n%s\n%s\n000V THREE_TOLI %d %d %d  MAXN=%d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2], tolimax);
 	thread_context -> reporting_cigars[thread_context -> reporting_count][0]=0;
 	for(toli = 3; toli < tolimax; toli+=3){
 		if(indel_offsets[toli]==0)break;
 		int hiconf_vote_first = indel_offsets[toli]-1;
 		int hiconf_vote_last = indel_offsets[toli+1]-1;
-		int indel_offset = indel_offsets[toli+2];
-		int indel_diff = indel_offset - last_indel;
+		signed int indel_offset = indel_offsets[toli+2];
+		signed int indel_diff = indel_offset - last_indel;
 		if(abs(indel_diff)>= cct_context -> max_indel_length) continue;
 		int last_correct_base = find_subread_end(read_len, all_subreads , last_section_subread_no) - 8;
 		int first_correct_base = find_subread_end(read_len, all_subreads , hiconf_vote_first) - 16 + 8;
-		if(0 && FIXLENstrcmp("R00001325252", read_name)==0)
+		if(0 && FIXLENstrcmp("R00000075029", read_name)==0)
 			SUBREADprintf("TEST_2POSES LCB=%d [sr %d] FCB=%d [sr %d] INCIGAR=%d\n", last_correct_base, last_section_subread_no, first_correct_base, hiconf_vote_first, in_cigar_readlen);
 
 		if(last_correct_base < in_cigar_readlen) last_correct_base= in_cigar_readlen;
@@ -2564,7 +2564,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 			all_indel_length += abs(indel_diff);
 		}
 
-		if(0 && FIXLENstrcmp("R00001325252", read_name)==0) SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d, GAP=%d. FOUND_INDEL_POS=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base, first_correct_base - last_correct_base, indel_pos);
+		if(0 && FIXLENstrcmp("R00000075029", read_name)==0) SUBREADprintf("THREE_TOLI %d %d %d\nTESTING PARAM: LAST_CORR=%d ; FIRST_CORR=%d, GAP=%d. FOUND_INDEL_POS=%d\n", indel_offsets[toli], indel_offsets[toli+1], indel_offsets[toli+2], last_correct_base, first_correct_base, first_correct_base - last_correct_base, indel_pos);
 
 		int section_matched = cellCounts_matchBin_chro(read_bin +rbin_offset_for_reversed , in_cigar_readlen , cct_context -> value_index, abs_pos + in_cigar_readlen + last_indel , last_correct_base - in_cigar_readlen);
 
