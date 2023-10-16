@@ -2910,8 +2910,6 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 	int head_soft_clipped = -1, tail_soft_clipped = -1;
 	unsigned int tmp_int = 0;
 
-	//SUBREADprintf("Coverage : %d ~ %d\n", covered_start, covered_end);
-
 	if(0){
 		char posout1[100];
 		int chro_max = get_offset_maximum_chro_pos(global_context,thread_context,read_head_abs_offset);
@@ -2998,7 +2996,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 					else
 						tail_soft_clipped = find_soft_clipping(global_context, thread_context, current_value_index, read_text + read_cursor, current_perfect_section_abs, tmp_int, 1, adj_coverage_end);
 
-					if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
+					if(0 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
 						SUBREADprintf("SSTAIL:%d\n", tail_soft_clipped);
 
 					if(1 && tail_soft_clipped == tmp_int){
@@ -3140,7 +3138,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 			}
 		}
 
-		if(1 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
+		if(0 && FIXLENstrcmp("NS500643:556:HGTMTBGXB:4:13403:18179:8012", read_name)==0) 
 			SUBREADprintf("NEW_CIGAR_2 : %s\n", new_cigar_tmp);
 		strcpy(cigar_string, new_cigar_tmp);
 	}
@@ -3323,8 +3321,6 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 			int mismatch_bases = 0;
 
-			//#warning ">>>>>>>>>>>>>>>> COMMENT NEXT LINE <<<<<<<<<<<<<<<<<<<<<<<"
-			//SUBREADprintf("ReadDebug:%s\t%s\n", explain_context -> read_name , tmp_cigar);
 			if(is_cigar_overflow) SUBreadSprintf(tmp_cigar,11, "%dM",  explain_context -> full_read_len);
 
 			unsigned int final_position;

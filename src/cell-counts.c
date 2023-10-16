@@ -2825,7 +2825,7 @@ void cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_context, in
 
 				int itemidx;
 				for (itemidx=0;itemidx<datalen;itemidx++){
-					int dist0 = kv-dat[itemidx];
+					signed int dist0 = kv-dat[itemidx];
 					if( dist0 >= cct_indel_neg  && dist0 <= cct_indel_len  && is_reversed == vote->masks[offsetX][itemidx]){
 						int toli, tolimax=vote -> toli[offsetX][itemidx], known_indel=0;
 

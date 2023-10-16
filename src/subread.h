@@ -339,8 +339,9 @@ typedef struct {
 	gene_quality_score_t quality [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t last_subread_cluster [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
 	gene_vote_number_t indel_recorder [GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
-	char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
-	char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	signed char current_indel_cursor[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+	signed char toli[GENE_VOTE_TABLE_SIZE][GENE_VOTE_SPACE];
+
 	int topK_votes[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 	int topK_IJ[SCRNA_HIGHEST_REPORTED_ALIGNMENTS ];
 
