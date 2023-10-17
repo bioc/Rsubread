@@ -1,7 +1,14 @@
 \name{Rsubreadnews}
 \title{Rsubread News}
 \encoding{UTF-8}
+\section{Version 2.16.0}{\itemize{
 
+\item
+Add support for ARM64 platforms.
+
+\item
+Add support for CBCL format in cellCounts.
+}}
 \section{Version 2.12.0}{\itemize{
 \item
 Improve the data structure used by cellCounts to further improve its speed.
