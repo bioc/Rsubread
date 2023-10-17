@@ -78,7 +78,7 @@ typedef struct{
 extern message_queue_t mt_message_queue;
 #endif
 
-void msgqu_init();
+void msgqu_init(int thread_mode);
 void msgqu_destroy();
 void msgqu_main_loop();
 void msgqu_notifyFinish();
