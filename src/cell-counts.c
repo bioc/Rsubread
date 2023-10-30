@@ -309,13 +309,13 @@ void cellCounts_absoffset_to_posstr(cellcounts_global_t * cct_context, unsigned 
 #define SOFT_CLIPPING_WINDOW_SIZE 5
 #define SOFT_CLIPPING_MAX_ERROR   1
 #define gvindex_baseno2offset_m(base_number, index, offset_byte, offset_bit)    {offset_byte =  ((base_number) - index -> start_base_offset) >>2; offset_bit = (base_number) % 4 * 2;}
-inline int cellCounts_get_index_int(gene_value_index_t * value_index, unsigned int pos){
+int cellCounts_get_index_int(gene_value_index_t * value_index, unsigned int pos){
 	int offset_byte , offset_bit;
 	gvindex_baseno2offset_m(pos, value_index,  offset_byte , offset_bit);
 	return (value_index ->values [offset_byte] >> offset_bit)&3;
 }
 
-inline int cellCounts_get_read_int(char * read_bin, int read_offset){
+int cellCounts_get_read_int(char * read_bin, int read_offset){
 	int read_byte , read_bit ;
 	read_byte = read_offset/4;
 	read_bit = read_offset%4 *2;

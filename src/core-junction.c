@@ -3023,8 +3023,10 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 
 				if(global_context -> config.space_type == GENE_SPACE_COLOR)
 					section_qual =  match_base_quality_cs(current_value_index, read_text+read_cursor, current_perfect_section_abs, qual_text_cur, tmp_int, global_context->config.phred_score_format , mismatched_bases, &all_mismatched, global_context -> config.high_quality_base_threshold, mismatch_calculation_start, mismatch_calculation_end);
-				else
+				else {
+					//if(FIXLENstrcmp("HWI-ST212:219:C0C1TACXX:1:1101:2133:53562", read_name)==0)fprintf(stderr,"QMAP : at %u : match_len %d [%s]\n",current_perfect_section_abs, tmp_int , cigar_string);
 					section_qual =  match_base_quality(current_value_index, read_text+read_cursor, current_perfect_section_abs, qual_text_cur, tmp_int, current_reversed, global_context->config.phred_score_format , mismatched_bases, &all_mismatched, global_context -> config.high_quality_base_threshold, mismatch_calculation_start, mismatch_calculation_end);
+				}
 				all_matched_bases += section_qual;
 				rebuilt_read_len += tmp_int;
 				is_First_M=0;
@@ -3086,7 +3088,7 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 	if(is_wrong_cigar || rebuilt_read_len != read_len || my_non_clipped_length < global_context->config.min_mapped_fraction){
 		(*mismatched_bases)=99999;
 		all_matched_bases = 0;
-		SUBreadSprintf(cigar_string, 11, "%dM", read_len);
+		SUBreadSprintf(cigar_string, 12, "%dM", read_len);
 	}
 	else if((head_soft_clipped>0 || tail_soft_clipped>0))
 	{
@@ -3112,25 +3114,25 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 					if(is_First_M && head_soft_clipped>0)
 					{
 						tmp_int -= head_soft_clipped;
-						SUBreadSprintf(cigar_tiny, 11,"%dS",head_soft_clipped);
+						SUBreadSprintf(cigar_tiny, 12,"%dS",head_soft_clipped);
 						strcat(cigar_piece, cigar_tiny);
 					}
 					if(is_Last_M && tail_soft_clipped>0)
 					{
 						tmp_int -= tail_soft_clipped;
 					}
-					SUBreadSprintf(cigar_tiny, 11,"%dM",tmp_int);
+					SUBreadSprintf(cigar_tiny, 12,"%dM",tmp_int);
 					strcat(cigar_piece, cigar_tiny);
 					if(is_Last_M && tail_soft_clipped>0)
 					{
-						SUBreadSprintf(cigar_tiny, 11,"%dS",tail_soft_clipped);
+						SUBreadSprintf(cigar_tiny, 12,"%dS",tail_soft_clipped);
 						strcat(cigar_piece, cigar_tiny);
 					}
 					is_First_M = 0;
 				}
 				else
 				{
-					SUBreadSprintf(cigar_piece ,11, "%u%c", tmp_int, nch);
+					SUBreadSprintf(cigar_piece ,12, "%u%c", tmp_int, nch);
 				}
 
 				strcat(new_cigar_tmp, cigar_piece);
@@ -3250,7 +3252,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 				read_pos_end = current_section -> read_pos_end;
 				chromosome_event_t *event_after = current_section -> event_after_section;
 
-				SUBreadSprintf(piece_cigar, 11, "%dM", (read_pos_end - read_pos_start));
+				SUBreadSprintf(piece_cigar, 12, "%dM", (read_pos_end - read_pos_start));
 				total_perfect_matched_sections += (read_pos_end - read_pos_start);
 				flanking_size_left[xk1] = (read_pos_end - read_pos_start);
 
@@ -3263,7 +3265,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 				if(event_after)
 				{
 					if(event_after -> event_type == CHRO_EVENT_TYPE_INDEL)
-						SUBreadSprintf(piece_cigar+strlen(piece_cigar), 11, "%d%c", abs(event_after->indel_length), event_after->indel_length>0?'D':'I');
+						SUBreadSprintf(piece_cigar+strlen(piece_cigar), 12, "%d%c", abs(event_after->indel_length), event_after->indel_length>0?'D':'I');
 					else if(event_after -> event_type == CHRO_EVENT_TYPE_JUNCTION||event_after -> event_type == CHRO_EVENT_TYPE_FUSION) {
 						// the distance in CIGAR is the NEXT UNWANTED BASE of piece#1 to the FIRST WANTED BASE in piece#2
 						int delta_one ;
@@ -3304,9 +3306,9 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 						
 						if(event_after -> is_strand_jumped) jump_mode = tolower(jump_mode);
 						fusions_in_read += (event_after -> event_type == CHRO_EVENT_TYPE_FUSION);
-						SUBreadSprintf(piece_cigar+strlen(piece_cigar),11, "%u%c", (int)movement, jump_mode);
+						SUBreadSprintf(piece_cigar+strlen(piece_cigar),12, "%u%c", (int)movement, jump_mode);
 						
-						if(event_after -> indel_at_junction) SUBreadSprintf(piece_cigar+strlen(piece_cigar),11, "%dI", event_after -> indel_at_junction);
+						if(event_after -> indel_at_junction) SUBreadSprintf(piece_cigar+strlen(piece_cigar),12, "%dI", event_after -> indel_at_junction);
 						is_junction_read ++;
 						if(event_after -> is_donor_found_or_annotation & 64 ) known_junction_supp ++;
 					}
@@ -3321,7 +3323,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 			int mismatch_bases = 0;
 
-			if(is_cigar_overflow) SUBreadSprintf(tmp_cigar,11, "%dM",  explain_context -> full_read_len);
+			if(is_cigar_overflow) SUBreadSprintf(tmp_cigar,12, "%dM",  explain_context -> full_read_len);
 
 			unsigned int final_position;
 

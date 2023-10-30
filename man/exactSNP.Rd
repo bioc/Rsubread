@@ -23,7 +23,7 @@ exactSNP(
     nthreads = 1)
 }
 \arguments{
-  \item{readFile}{ a character string giving the name of a file including read mapping results. This function takes as input a SAM file by default. If a BAM file is provided, the \code{isBAM} argument should be set to \code{TRUE}. }
+  \item{readFile}{ a character string giving the name of a file including read mapping results. This function takes as input a SAM file by default. If a BAM file is provided, the \code{isBAM} argument should be set to \code{TRUE}. If the input is paired-end data, the reads have to be name sorted.}
   \item{isBAM}{ logical indicating if the file provided via \code{readFile} is a BAM file. \code{FALSE} by default.}
   \item{refGenomeFile}{ a character string giving the name of a file that includes reference sequences (FASTA format).}
   \item{SNPAnnotationFile}{ a character string giving the name of a VCF-format file that includes annotated SNPs (the file can be uncompressed or gzip compressed). Such annotation can be downloaded from public databases such as dbSNP. Incorporating known SNPs into SNP calling has been found to be helpful. However note that the annotated SNPs may or may not be called for the sample being analyzed.}

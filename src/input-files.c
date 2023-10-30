@@ -2899,7 +2899,7 @@ int SAM_pairer_fetch_BAM_block(SAM_pairer_context_t * pairer , SAM_pairer_thread
 				pairer -> tiny_mode = 1;
 				pairer -> long_cigar_mode = 1;
 
-				//SUBREADprintf("ERROR: cannot find the start of the next BAM block.\n");
+				//SUBREADprintf("WARNING: cannot find the start of the next BAM block.\n");
 				//print_in_box(80,0,0,"   Switch to the safe mode.");
 			}
 		}

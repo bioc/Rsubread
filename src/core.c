@@ -2133,8 +2133,6 @@ void write_single_fragment(global_context_t * global_context, thread_context_t *
 		mate_chro_for_2="=";
 	}
 
-	//if(pair_number<10)SUBREADprintf("FIN_ADD #%d: %s in %p \n", pair_number, read_name_1, thread_context);
-
 	if(thread_context)
 		add_buffered_fragment(global_context, thread_context, pair_number,
 			read_name_1, flag1,  out_chro1 , out_offset1, out_mapping_quality1, out_cigar1, mate_chro_for_1 , out_offset2, out_tlen1, read_len_1,
@@ -4463,7 +4461,7 @@ int OLD_bincigar2cigar(char * cigar, int cigar_len, char * bincigar, int binciga
 		int bincigar_move = 0;
 		int cigar_sec_len = write_cigar_part(bincigar + bincigar_cursor, cigar+cigar_cursor, cigar_len-cigar_cursor-1, &bincigar_move);
 		if(cigar_sec_len<0){
-			SUBreadSprintf(cigar, 11,"%dM", read_len);
+			SUBreadSprintf(cigar, 12,"%dM", read_len);
 			return -1;
 		}
 		//printf("NPC=%s\n", cigar);
