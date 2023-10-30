@@ -1523,7 +1523,7 @@ void check_exactSNP_input(char * in_SAM_file,struct SNP_Calling_Parameters * par
 		int flags=0, pos=0, mapq=0, rl=0, repeated=0, pairdist=0;
 		char read_name[MAX_READ_NAME_LEN], chro[MAX_CHROMOSOME_NAME_LEN], seq[MAX_READ_LENGTH], qual[MAX_READ_LENGTH];
 		parse_SAM_line(linebuf, read_name, &flags, chro, &pos, cigar, &mapq, &pairdist, seq, qual, &rl, &repeated);
-		if(flags & 1 == 0)break;
+		if((flags & 1) == 0)break;
 		if(read_no%2 == 1 && (0!=strcmp(old_read_name, read_name)|| (  (flags & 0xC0) + (old_flag & 0xC0))!=0xC0 )){ // 0x40 + 0x80 = 0xC0
 			*error_message="ERROR: the input paired-end read data are not name-sorted or have two reads in a pair not next to each other. "
 				"We suggest to use output from the Subread/Rsubread aligner for SNP calling.";
