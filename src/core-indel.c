@@ -2788,9 +2788,6 @@ int rectify_read_text(global_context_t * global_context, reassembly_by_voting_bl
 	int read_offset,i,j;
 	int read_len = strlen(next_read_txt);
 
-	//int is_test_target = (strcmp("AATGGAACAACCGCCTCAAATGGAATGGAATGGCCTCCAAAGGAAGGGAGTGACATTTAATGAATGCATTCTAATGGAATGGCATGGAATGGACTGGAA", next_read_txt)==0);
-	int is_test_target = 0;
-
 	init_gene_vote(block_context -> vote_list_rectify);
 	for(read_offset = 0; read_offset < read_len - global_context -> config.reassembly_subread_length+1; read_offset += 1)
 	{
@@ -2829,11 +2826,6 @@ int rectify_read_text(global_context_t * global_context, reassembly_by_voting_bl
 				this_read_mapping_start = -neighbour_read_mapped_start;
 				neighbour_read_mapped_start = 0;
 				overlapped_length = min(read_len - this_read_mapping_start, neighbour_read_len);
-				if(is_test_target)
-				{
-					for(xk1 = 0; xk1 < 3+this_read_mapping_start; xk1++) fputc(' ',stdout );
-					printf("%s\n", neighbour_read_text);
-				}
 			}
 			
 
@@ -2845,16 +2837,12 @@ int rectify_read_text(global_context_t * global_context, reassembly_by_voting_bl
 			}
 		}
 
-	if(is_test_target)
-		printf("   %s\n", next_read_txt);
 	char ori[2000];
 	strcpy(ori, next_read_txt);
 	is_bad_read(ori, read_len, "RECT");
 	int rectified = 0;
 
 
-	if(is_test_target)
-		printf("R0=%s\n", next_read_txt);
 	char changed[200];
 //	memset(changed, ' ', 200);
 	for(i=0; i<read_len; i++)
@@ -2883,8 +2871,6 @@ int rectify_read_text(global_context_t * global_context, reassembly_by_voting_bl
 
 	changed[i]=0;
 
-	if(is_test_target)
-		printf("R1=%s\n   %s\n\n", next_read_txt, changed);
 	is_bad_read(next_read_txt, read_len, "REC2");
 	return rectified<=2;
 }
@@ -3644,14 +3630,6 @@ int put_long_indel_event(global_context_t * global_context, unsigned int best_po
 		if(found)break;
 	}
 
-/*
-				if(best_pos >= 1124357402&& best_pos < 1124359402)
-				{
-					fprintf(stderr, "LLLX-BB: %u :: FOUND=%p\n", best_pos, found);
-				}
-
-*/
-
 	if(found)
 	{
 		found -> supporting_reads ++;
@@ -4036,16 +4014,6 @@ int finalise_pileup_file_by_voting(global_context_t * global_context , char * te
 				memcpy(first_half_alleles, block_context.final_alleles, global_context -> config.reassembly_window_alleles * sizeof(struct reassmebly_window_allele ));
 				search_window(global_context, &block_context, xk1, this_start_read_no,  1);
 				memcpy(second_half_alleles, block_context.final_alleles, global_context -> config.reassembly_window_alleles * sizeof(struct reassmebly_window_allele));
-
-				/*
-				if(window_start_pos >= 1124357402&& window_start_pos < 1124359402)
-				{
-					fprintf(stderr, "LLLX: %u [%d] :: START READ = %u ; FN=%s ; BASES=%u\n", window_start_pos, xk1, this_start_read_no, temp_file_name , window_base_number[xk1]);
-					char fname [100];
-					SUBreadSprintf(fname, "DP-%d-%d", getpid(), xk1);
-					gehash_dump(&block_context.voting_indexes[xk1], fname);
-				}*/
-
 				unsigned long long int starter_read_key = (xk1 * 1llu +1)<<32 ;
 				starter_read_key |=  ( (this_start_read_no)& 0xfffff)<<12; 
 
