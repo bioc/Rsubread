@@ -126,10 +126,10 @@ typedef struct {
 	int input_is_BAM;
 	int tiny_mode;
 	int display_progress;
-	int is_bad_format;
+	int format_need_fixing;
 	int is_single_end_mode;
 	int force_do_not_sort;
-	int long_cigar_mode;
+	int using_long_read_parser;
 	int long_read_minimum_length;
 	int is_finished;
 	int merge_level_finished;

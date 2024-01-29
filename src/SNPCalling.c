@@ -1520,7 +1520,8 @@ void check_exactSNP_input(char * in_SAM_file,struct SNP_Calling_Parameters * par
 		linebuf = SamBam_fgets(bfp, linebuf, MAX_READ_LENGTH*2, 0);
 		if(!linebuf)break;
 		if(linebuf[0]=='@')continue;
-		int flags=0, pos=0, mapq=0, rl=0, repeated=0, pairdist=0;
+		int flags=0, mapq=0, rl=0, repeated=0;
+		unsigned int pos=0, pairdist=0; 
 		char read_name[MAX_READ_NAME_LEN], chro[MAX_CHROMOSOME_NAME_LEN], seq[MAX_READ_LENGTH], qual[MAX_READ_LENGTH];
 		parse_SAM_line(linebuf, read_name, &flags, chro, &pos, cigar, &mapq, &pairdist, seq, qual, &rl, &repeated);
 		if((flags & 1) == 0)break;

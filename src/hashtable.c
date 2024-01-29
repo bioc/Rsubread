@@ -198,11 +198,11 @@ void ArrayListSort(ArrayList * list, int compare_L_minus_R(void * L_elem, void *
 		basic_sort(sortdata, list -> numOfElements, ArrayListSort_compare, ArrayListSort_exchange);
 }
 
-int ArrayListStringComparison(void * L_elem, void * R_elem){
+int ArrayListStringComparison(void * L_elem, void * R_elem, ArrayList * me){
 	return strcmp((char*)L_elem, (char*)R_elem);
 }
 
-int ArrayListLLUComparison(void * L_elem, void * R_elem){
+int ArrayListLLUComparison(void * L_elem, void * R_elem, ArrayList * me){
 	srUInt_64 lint = L_elem-NULL;
 	srUInt_64 rint = R_elem-NULL;
 	if(lint<rint)return -1;

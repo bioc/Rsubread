@@ -66,8 +66,6 @@ int SamBam_fetch_next_chunk(SamBam_FILE *fp)
 				return -2;
 			}
 
-			//printf("RET=%d; CHK=%d\n", ret, nchunk);
-
 			if(nchunk>0)
 				have += nchunk; 
 			if(have > 3000) break;
@@ -378,7 +376,7 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 		{
 			SamBam_Alignment *aln = &fp->aln_buff;
 			int chunk_ptr = 0;
-			SB_FETCH(fp);
+			SB_FETCH_ONEREAD(fp);
 			if(SB_EOF(fp)) return NULL;
 
 			fp -> is_paired_end = 10 + ((*(fp -> input_binary_stream_buffer + fp -> input_binary_stream_read_ptr - fp -> input_binary_stream_buffer_start_ptr + 18)) & 1);

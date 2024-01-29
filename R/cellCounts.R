@@ -682,7 +682,7 @@
 
 
 
-  if(any(is.na(spseqs)) && !is.na(dualseqs )){
+  if(any(is.na(spseqs)) && !any(is.na(dualseqs))){
     #for(i in 1:10)cat("WARNING: ONLY #1 and #3 index sequences were used!\n")
     #return(c(paste0(dualseqs[1], dualseqs[3])))
     return(list(A=paste0(dualseqs[1], dualseqs[2]), B=paste0(dualseqs[1], dualseqs[3])))
