@@ -1028,6 +1028,7 @@ HashTable * input_BLC_parse_SampleSheet(char * fname){
 ArrayList * input_BLC_parse_CellBarcodes(char * fname){
 	autozip_fp fp;
 	int resop = autozip_open(fname, &fp);
+	//SUBREADprintf("TRY open barcode fp: '%s'  having %p\n", fname, resop);
 	if(resop<0) return NULL;
 
 	ArrayList * ret = ArrayListCreate(10000000);
@@ -1037,9 +1038,10 @@ ArrayList * input_BLC_parse_CellBarcodes(char * fname){
 		char tmp_fl[MAX_BARCODE_LEN+1];
 		int skr = autozip_gets(&fp, tmp_fl, MAX_BARCODE_LEN);
 		if(skr<1) break;
-		//if(ret -> numOfElements <40) SUBREADprintf("LOAD_CELL_BAR : %s , %d\n", tmp_fl, skr);
 		int x1;
 		if(tmp_fl[skr-1]=='\n') tmp_fl[skr-1]=0;
+
+		//if(ret -> numOfElements <40) SUBREADprintf("LOAD_CELL_BAR : %s , %d\n", tmp_fl, skr);
 		for(x1=0; tmp_fl[x1]; x1++) if(!isalpha(tmp_fl[x1])){
 			tmp_fl[x1]=0;
 			break;
@@ -1759,7 +1761,7 @@ int input_mFQ_init_by_one_string(input_mFQ_t * fqs_input, char * three_paired_fq
 
 }
 
-int input_mFQ_init( input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files ){
+int input_mFQ_init(input_mFQ_t * fqs_input, char ** files1, char ** files2, char** files3, int total_files ){
 	int x1;
 	memset(fqs_input, 0, sizeof(input_mFQ_t));
 	fqs_input->files1 = malloc(sizeof(char*)*total_files);

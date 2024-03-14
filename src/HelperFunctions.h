@@ -275,4 +275,9 @@ void *windows_memmem(const void *haystack_start, size_t haystack_len, const void
 void sorting_LLU_array_exchange(void * arr, int i, int j);
 int sorting_LLU_array_compare(void * arr, int i, int j);
 
+
+void init_typical_dynamic_align(void *** buffers, int * penalties, int max_read_length);
+void destroy_typical_dynamic_align(void *** buffers,int max_read_length);
+char LRM_get_baseval_for_dp(unsigned int pos , void * vvcontext);
+
 #endif

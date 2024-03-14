@@ -1392,7 +1392,7 @@
 
 cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE){
   maxDiffToTopVotes=2
-  onlyDetectBarcode=FALSE
+  onlyDetectBarcode=F
   has.error <- FALSE
   maxMismatchBases <- maxMismatches
   minVotesPerRead <- minVotes

@@ -24,7 +24,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <zlib.h>
-#include <inttypes.h>
 
 #ifndef MAKE_STANDALONE
 #ifndef RUNNING_ENV
@@ -63,8 +62,6 @@
 #define RUN_ALIGN 		0
 #define RUN_FINAL 		1
 
-
-
 #define MAX_THREADS 40
 #define FC_MAX_THREADS 64
 #define MAX_EVENTS_IN_READ 8
@@ -83,7 +80,7 @@
 #define EXON_LONG_READ_LENGTH 160 
 #define EXON_MAX_CIGAR_LEN 256 
 #define FC_CIGAR_PARSER_ITEMS 11 
-#define FC_LONG_READ_RECORD_HARDLIMIT (8*1024*1024)
+#define FC_LONG_READ_RECORD_HARDLIMIT (64*1024-1)
 #define FC_UNSAFE_BLOCK_SIZE 15000
 
 #define MAX_INDEL_SECTIONS 7

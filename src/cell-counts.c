@@ -1,8 +1,10 @@
-#define MAKE_CELLCOUNTS
+//#define MAKE_CELLCOUNTS
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <dirent.h>
 #include <locale.h>
 #include <getopt.h>
 #include <math.h>
@@ -32,7 +34,6 @@
 // the configurations used in our cellCounts paper
 #define GENE_SCRNA_VOTE_SPACE 3
 #define GENE_SCRNA_VOTE_TABLE_SIZE 17 
-
 
 typedef struct{
 	gene_vote_number_t max_vote;
@@ -167,8 +168,8 @@ typedef struct{
 	int total_index_blocks;
 	int current_index_block_number;
 	gene_value_index_t * value_index;
-	gehash_t * current_index;
 	gene_input_t input_dataset;
+	gehash_t * current_index;
 	cellCounts_lock_t input_dataset_lock;
 
 	char cell_barcode_list_file[MAX_FILE_NAME_LENGTH];
@@ -785,7 +786,6 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 
 int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 	int rv = 0;
-
 	cct_context-> cell_barcodes_array = input_BLC_parse_CellBarcodes( cct_context-> cell_barcode_list_file );
 	if(NULL == cct_context-> cell_barcodes_array){
 		SUBREADprintf("ERROR: cannot find valid cell barcodes from the cell barcode list. Please check the content and the accessibility of the file.\n");
@@ -1685,7 +1685,7 @@ int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin
 		int umi_end_pos=0,nch;
 		for(umi_end_pos=0; 0!=(nch = (*UMI_seq) [umi_end_pos]); umi_end_pos++) if(!isalpha(nch))break;
 		if(umi_end_pos > MAX_UMI_LEN){
-			SUBREADprintf("ERROR: the UMI length is abnormaly long (%d bases). This can be caused by an incorrect cell barcode file.\n", umi_end_pos);
+			SUBREADprintf("ERROR: the UMI length is abnormally long (%d bases). This can be caused by an incorrect cell barcode file.\n", umi_end_pos);
 		  	umi_end_pos = MAX_UMI_LEN;
 			cct_context -> has_error = 1;
 		}
@@ -3051,6 +3051,7 @@ int cellCounts_build_simple_mode_subread_masks(cellcounts_global_t * cct_context
 int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) {
 	subread_read_number_t current_read_number=0;
 	char * read_text, * qual_text;
+
 	char read_name[MAX_READ_NAME_LEN+1];
 	char read_bin[REVERSED_READ_BIN_OFFSET * 2];
 	int read_len=0;

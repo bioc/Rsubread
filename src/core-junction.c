@@ -2225,7 +2225,6 @@ int process_voting_junction_PE_topK(global_context_t * global_context, thread_co
 		}
 
 
-
 		for (i=0; i<GENE_VOTE_TABLE_SIZE; i++)
 		{
 			for (j=0; j< current_vote->items[i]; j++){

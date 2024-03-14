@@ -5813,6 +5813,7 @@ int readSummary(int argc,char *argv[]){
 	if(long_read_minimum_length == 1) max_M = 65536; 
 
 	if(long_read_minimum_length < 2 && isPEassign[0]=='1'){
+		// this is because long read pairser cannot pair PE reads by names.
 		SUBREADputs("ERROR: long read assignment can only be done on single-end mode");
 		return -1;
 	}
