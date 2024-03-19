@@ -198,6 +198,7 @@ typedef struct{
 	int do_one_batch_runner_current;
 	int report_excluded_barcodes;
 	int has_error;
+	int need_check_strand;
 	
 	char features_annotation_file[MAX_FILE_NAME_LENGTH];
 	char features_annotation_alias_file[MAX_FILE_NAME_LENGTH];
@@ -529,6 +530,15 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> current_dataset_no = 1;
 	cct_context -> min_mapped_length_for_mapped_read = 40;
 	cct_context -> cmd_rebuilt = cmd_rebuilt;
+
+	if(0){
+		SUBREADprintf("===== Strand is reversely checked for spatial =====\n");
+		SUBREADprintf("===== Strand is reversely checked for spatial =====\n");
+		SUBREADprintf("===== Strand is reversely checked for spatial =====\n");
+		SUBREADprintf("===== Strand is reversely checked for spatial =====\n");
+		cct_context -> need_check_strand = -1;
+	}
+
 	strcpy(cct_context -> temp_file_dir, "./");
 
 	while (1){
@@ -942,11 +952,11 @@ int features_load_one_line(char * gene_name, char * transcript_name, char * chro
 		return -1;
 	}
 
+	//SUBREADprintf("LINE1ADD %s of %s:%d ~ %d\n", gene_name, chro_name, start, end );
 	for(exonpos_i = exonic_map_start; exonpos_i <= exonic_map_stop; exonpos_i++){
 		int exonic_map_byte = exonpos_i/ 8;
 		int exonic_map_bit = exonpos_i % 8;
 
-		//if(strcmp("IGKV3-31", gene_name)==0)SUBREADprintf("LINE1ADD %s of %d: %d > %d   (%s:%d ~ %d)\n", gene_name, exonpos_i, exonic_map_byte , exonic_map_bit, chro_name, start, end );
 		cct_context ->exonic_region_bitmap[exonic_map_byte] |= (1<<exonic_map_bit);
 	}
 
@@ -1595,7 +1605,7 @@ void cellCounts_find_hits_for_mapped_section(cellcounts_global_t * cct_context, 
 		}
 	}
 
-	//SUBREADprintf("CHROINF %s=%p ; PossibleLen = %d\n", chro_name, this_chro_info, this_chro_info?this_chro_info-> chro_possible_length:-1);
+//	if( strcmp("chrX",chro_name)==0 && section_begin_pos >= 95077507-60 && section_begin_pos < 95077507+10 )SUBREADprintf("CHROINF %s=%p ; PossibleLen = %d\n", chro_name, this_chro_info, this_chro_info?this_chro_info-> chro_possible_length:-1);
 	if(this_chro_info) {
 		unsigned int search_start, search_end, search_block_id;
 		assert(this_chro_info -> reverse_table_start_index);
@@ -1628,7 +1638,12 @@ void cellCounts_find_hits_for_mapped_section(cellcounts_global_t * cct_context, 
 					// there is an overlap >=1 between read and feature.
 					// the overlap length is min(end_r, end_F) - max(start_r, start_F) + 1
 					
-					int is_strand_ok = (is_fragment_negative_strand == cct_context -> features_sorted_strand[search_item_id]);
+					int is_strand_ok = 1;
+					if(cct_context -> need_check_strand){
+						is_strand_ok = (is_fragment_negative_strand == cct_context -> features_sorted_strand[search_item_id]);
+						if(cct_context -> need_check_strand==-1) is_strand_ok =!is_strand_ok;
+					}
+//					if( strcmp("chrX",chro_name)==0 && section_begin_pos >= 95077507-60 && section_begin_pos < 95077507+10 )SUBREADprintf("Geneno=%d, StrandOK=%d\n", search_item_id, is_strand_ok); 
 
 					if(is_strand_ok){
 						if((*nhits) >= thread_context -> hits_number_capacity - 1) {
@@ -1974,9 +1989,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 		int lineno = (sample_seq[6]-'0')*1000+(sample_seq[7]-'0')*100+(sample_seq[8]-'0')*10+(sample_seq[9]-'0') +1;
 		sample_no = HashTableGet(cct_context -> lineno1B_to_sampleno1B_tab, NULL+lineno)-NULL;
 	}else SUBREADprintf("Wrong read name: %s\n", read_name);
-	if(0 && FIXLENstrcmp("R00004925364",read_name)==0){
-		SUBREADprintf("WRITE-INTO %s:: %s : %d\n", read_name, chro_name, chro_pos) ;
-	}
+
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq);
 
 	if(nhits > 1 && !cct_context -> allow_multi_overlapping_reads) nhits = 0;
@@ -1993,6 +2006,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	if(sample_no>0){
 		cellCounts_lock_occupy(cct_context -> batch_file_locks + batch_no);
 		FILE * binfp = cct_context -> batch_files [ batch_no ];
+
 		cellCounts_write_one_read_bin(cct_context, thread_no, binfp, sample_no, cell_barcode_no, UMI_seq, readbin, nhits, batch_no == CELLBC_BATCH_NUMBER+1);
 		cellCounts_lock_release(cct_context -> batch_file_locks + batch_no);
 
@@ -2705,11 +2719,6 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 			if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
 				strcpy(read_qual+reverse_text_offset, read_qual);
 				reverse_quality(read_qual+reverse_text_offset, read_len);
-			}
-			if(0 && FIXLENstrcmp("R00000002478", read_name)==0){
-				char posstr[100];
-				cellCounts_absoffset_to_posstr(cct_context, thread_context -> reporting_positions[myno] +1, posstr);
-				SUBREADprintf("\nFINAL WRITTEN %s BY score=%lld\n====================\n\n",posstr,thread_context -> reporting_scores[ myno ]);
 			}
 			cellCounts_write_read_in_batch_bin(cct_context, thread_no, myno, read_name, read_text + reverse_text_offset, read_qual+reverse_text_offset, read_text , read_qual , read_len);
 		}
@@ -4561,7 +4570,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		pthread_join(threads[xk1], &pret);
 		removed_umis += (pret - NULL);
 	}
-	//SUBREADprintf("After processing batches, %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
+	//fprintf(stderr,"SPOTTC_HAS_FIN %lld UMIs were removed in step2 of UMI merging.\n", removed_umis);
 	print_in_box(80,0,0,"");
 	if(cct_context -> input_mode== GENE_INPUT_BCL){
 		srInt_64 all_extracted_reads = 0;
