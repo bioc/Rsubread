@@ -530,6 +530,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> current_dataset_no = 1;
 	cct_context -> min_mapped_length_for_mapped_read = 40;
 	cct_context -> cmd_rebuilt = cmd_rebuilt;
+	cct_context -> need_check_strand = 1;
 
 	if(0){
 		SUBREADprintf("===== Strand is reversely checked for spatial =====\n");
@@ -796,6 +797,7 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 
 int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 	int rv = 0;
+	//fprintf(stderr,"BBCCODE=%s\n", cct_context-> cell_barcode_list_file );
 	cct_context-> cell_barcodes_array = input_BLC_parse_CellBarcodes( cct_context-> cell_barcode_list_file );
 	if(NULL == cct_context-> cell_barcodes_array){
 		SUBREADprintf("ERROR: cannot find valid cell barcodes from the cell barcode list. Please check the content and the accessibility of the file.\n");
