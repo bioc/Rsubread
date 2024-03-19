@@ -9,7 +9,6 @@
 #include <getopt.h>
 #include <math.h>
 #include <pthread.h>
-#include <inttypes.h>
 #include <sys/stat.h>
 #include "subread.h"
 #include "gene-algorithms.h"

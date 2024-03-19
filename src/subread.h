@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <zlib.h>
+#include <inttypes.h>
 
 #ifndef MAKE_STANDALONE
 #ifndef RUNNING_ENV
