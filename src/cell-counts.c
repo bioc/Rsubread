@@ -2003,7 +2003,6 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	char readbin[READ_BIN_BUF_SIZE];
 	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist);
 
-	//if(batch_no < CELLBC_BATCH_NUMBER) SUBREADprintf("WRITE_FP_BTCH %d \n", batch_no);
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	if(sample_no>0){
 		cellCounts_lock_occupy(cct_context -> batch_file_locks + batch_no);
@@ -2080,8 +2079,14 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 	int chro_pos = 0;
 	if(reporting_index>=0){
 		locate_gene_position(thread_context -> reporting_positions[reporting_index]+1, &cct_context -> chromosome_table, &chro_name, &chro_pos );
-		if(!chro_name) reporting_index=-1;
+		if(!chro_name){
+			reporting_index=-1;
+			read_text = raw_text;
+			qual_text = raw_qual;
+		}
 	}
+
+
 	if(reporting_index>=0){
 		int is_negative = (thread_context -> reporting_flags[reporting_index] & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0;
 		chro_pos += get_soft_clipping_length(thread_context -> reporting_cigars[reporting_index]);
