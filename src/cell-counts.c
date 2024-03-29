@@ -112,8 +112,8 @@ typedef struct{
 
 	srInt_64 hiconf_map;
 	srInt_64 loconf_map;
-	int reporting_count;
-	int reporting_multi_alignment_no, reporting_this_alignment_no;
+	int populating_voteIJ_buf_index;
+	int total_voteIJs_to_write, writing_voteID_buf_index;
 	srInt_64 reporting_scores[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 	srInt_64 reporting_flags[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 	unsigned int reporting_positions[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
@@ -128,8 +128,7 @@ typedef struct{
 	cellcounts_align_thread_t * all_thread_contexts;
 	int reads_per_chunk;
 	int allow_multi_overlapping_reads;
-	int max_voting_simples;
-	int max_voting_locations;
+	int max_candidate_voteIJ_per_read;
 	int max_reported_alignments_per_read;
 	int max_indel_length;
 	int max_distinct_top_vote_numbers;
@@ -517,15 +516,16 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> features_annotation_file_type = FILE_TYPE_RSUBREAD;
 	cct_context -> reads_per_chunk = 30000000;
 	cct_context -> max_reported_alignments_per_read = 1;
-	cct_context -> max_voting_simples = 3;
-	cct_context -> max_mismatching_bases_in_reads = 3;
-	cct_context -> max_voting_locations = 3;
-	cct_context -> max_indel_length = 5;
-	cct_context -> max_distinct_top_vote_numbers = 3;
-	cct_context -> umi_cutoff = -1;
+	cct_context -> max_candidate_voteIJ_per_read = 3;
 	cct_context -> max_differential_from_top_vote_number = 2;
+
+
+	cct_context -> max_mismatching_bases_in_reads = 3;
+	cct_context -> max_indel_length = 5;
+	cct_context -> umi_cutoff = -1;
 	cct_context -> min_votes_per_mapped_read = 3;
 	cct_context -> total_subreads_per_read = 10;
+	cct_context -> max_distinct_top_vote_numbers = cct_context -> total_subreads_per_read;
 	cct_context -> is_BAM_and_FQ_out_generated = 1;
 	cct_context -> current_dataset_no = 1;
 	cct_context -> min_mapped_length_for_mapped_read = 40;
@@ -613,8 +613,16 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 	}
 
-	cct_context -> max_voting_simples = max(cct_context -> max_voting_simples, cct_context -> max_reported_alignments_per_read);
-	cct_context -> max_voting_locations = max(cct_context -> max_voting_locations, cct_context -> max_reported_alignments_per_read);
+
+	char * DBPZ_var_candidates = getenv("DBPZ_CCNT_CANDIDATES");
+	char * DBPZ_var_topdiff = getenv("DBPZ_CCNT_TOPDIFF");
+	if( DBPZ_var_candidates && DBPZ_var_topdiff ){
+		cct_context -> max_candidate_voteIJ_per_read = atoi(DBPZ_var_candidates);
+		cct_context -> max_differential_from_top_vote_number = atoi(DBPZ_var_topdiff);
+		SUBREADprintf("OverSET CAND and TOPDIFF %d and %d\n",  cct_context -> max_candidate_voteIJ_per_read,  cct_context -> max_differential_from_top_vote_number);
+	}
+	cct_context -> max_distinct_top_vote_numbers = min(cct_context -> max_distinct_top_vote_numbers, 1+cct_context -> max_differential_from_top_vote_number);
+	cct_context -> max_candidate_voteIJ_per_read = max(cct_context -> max_candidate_voteIJ_per_read, cct_context -> max_reported_alignments_per_read);
 
 	return 0;
 }
@@ -1463,15 +1471,13 @@ void cellCounts_clean_context_after_chunk(cellcounts_global_t * cct_context) {
 void cellCounts_init_topKbuff(cellcounts_global_t * cct_context, int thread_no){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	topK_buffer_t * topKbuff = &thread_context -> topKbuff;
-	topKbuff -> vote_simple_1_buffer = malloc(cct_context -> max_voting_simples * sizeof(simple_mapping_t));
-	topKbuff -> alignment_tmp_r1 = malloc(sizeof(voting_location_t) * cct_context -> max_voting_locations);
+	topKbuff -> vote_simple_1_buffer = malloc(cct_context -> max_candidate_voteIJ_per_read * sizeof(simple_mapping_t));
 }
 
 void cellCounts_free_topKbuff(cellcounts_global_t * cct_context, int thread_no){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	topK_buffer_t * topKbuff = &thread_context -> topKbuff;
 	free(topKbuff -> vote_simple_1_buffer);
-	free(topKbuff -> alignment_tmp_r1);
 }
 
 typedef struct{
@@ -1516,8 +1522,6 @@ typedef struct{
 	long long int *PE_distance;
 	char * out_cigar_buffer[CIGAR_PERFECT_SECTIONS];
 	cellCounts_output_tmp_t *r1;
-	cellCounts_output_tmp_t ** out_pairs;
-	voting_location_t ** out_raws;
 } cellCounts_output_context_t;
 
 void cellCounts_init_output_context(cellcounts_global_t * cct_context, cellCounts_output_context_t * out_context) {
@@ -1527,18 +1531,12 @@ void cellCounts_init_output_context(cellcounts_global_t * cct_context, cellCount
 	out_context -> r1 = malloc(sizeof(cellCounts_output_tmp_t));
 	for(xk1=0;xk1<CIGAR_PERFECT_SECTIONS;xk1++)
 		out_context -> out_cigar_buffer[xk1] = malloc(60);
-
-	out_context -> out_pairs = malloc(sizeof( cellCounts_output_context_t *) * cct_context -> max_voting_locations);
-	out_context -> out_raws = malloc(sizeof( voting_location_t **) * cct_context -> max_voting_locations);
 }
 
 void cellCounts_destroy_output_context(cellcounts_global_t * cct_context, cellCounts_output_context_t * out_context) {
 	int xk1;
 	for(xk1=0;xk1<CIGAR_PERFECT_SECTIONS;xk1++)
 		free(out_context -> out_cigar_buffer[xk1]);
-
-	free(out_context -> out_raws);
-	free(out_context -> out_pairs);
 	free(out_context -> r1 );
 }
 
@@ -2103,7 +2101,7 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 			}
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
-		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> reporting_multi_alignment_no, thread_context -> reporting_this_alignment_no +1, thread_context -> reporting_editing_distance[reporting_index]);
+		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index]);
 	}else //unmapped
 		cellCounts_vote_and_add_count(cct_context, thread_no, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1);
 }
@@ -2552,7 +2550,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 	abs_pos += read_pos_move;
 	signed int last_indel = indel_offsets[2], last_section_subread_no = indel_offsets[1]-1, head_soft_clipped = -1, last_mapped_base_in_read = 0;
 	if(0 && FIXLENstrcmp("R00000075029", read_name)==0)SUBREADprintf("\n%s\n%s\n000V THREE_TOLI %d %d %d  MAXN=%d\n", read_name, read_text, indel_offsets[0], indel_offsets[1], indel_offsets[2], tolimax);
-	thread_context -> reporting_cigars[thread_context -> reporting_count][0]=0;
+	thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index][0]=0;
 	for(toli = 3; toli < tolimax; toli+=3){
 		if(indel_offsets[toli]==0)break;
 		int hiconf_vote_first = indel_offsets[toli]-1;
@@ -2571,7 +2569,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 		if(head_soft_clipped <0){
 			int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1);
 			head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed, 0, abs_pos /* this can only happen if no indel is in read */, first_mapped_base_in_read , 0, first_mapped_base_in_read);
-			if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> reporting_count], 11,"%dS", head_soft_clipped );
+			if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], 11,"%dS", head_soft_clipped );
 			if(meet_start < head_soft_clipped + abs_pos ) meet_start= head_soft_clipped + abs_pos;
 			if(head_soft_clipped > last_correct_base) last_correct_base = head_soft_clipped;
 			in_cigar_readlen = head_soft_clipped;
@@ -2594,7 +2592,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 
 		SUBreadSprintf(newcigar, 45, "%dM%dM%d%c%dM", last_correct_base - in_cigar_readlen , indel_pos, abs(indel_diff), indel_diff>0?'D':'I', first_correct_base - last_correct_base - indel_pos + min(0, indel_diff) );
 		all_mapped_bases += first_correct_base - in_cigar_readlen + min(0, indel_diff);
-		strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
+		strcat(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], newcigar);
 		in_cigar_readlen = first_correct_base;
 		last_mapped_base_in_read = find_subread_end(read_len, all_subreads , hiconf_vote_last) - 16 + 9;;
 		last_indel = indel_offset;
@@ -2605,7 +2603,7 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 		int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1) - 8;
 		head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed,0, abs_pos /* this can only happen if no indel is in read */, first_mapped_base_in_read , 0, first_mapped_base_in_read);
 
-		if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> reporting_count], 11,"%dS", head_soft_clipped );
+		if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], 11,"%dS", head_soft_clipped );
 		in_cigar_readlen = head_soft_clipped;
 		last_mapped_base_in_read = find_subread_end(read_len, all_subreads, last_section_subread_no) - 16 + 8;
 	}
@@ -2617,33 +2615,33 @@ srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thre
 
 	SUBreadSprintf(newcigar, 11, "%dM", read_len - in_cigar_readlen - tail_soft_clipped);
 	all_mapped_bases += read_len - in_cigar_readlen - tail_soft_clipped;
-	strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
+	strcat(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], newcigar);
 	if(tail_soft_clipped){
 		SUBreadSprintf(newcigar, 11, "%dS", tail_soft_clipped);
-		strcat(thread_context -> reporting_cigars[thread_context -> reporting_count], newcigar);
+		strcat(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], newcigar);
 	}
 
 	char tmp_new_cigar[MAX_SCRNA_READ_LENGTH+20];
-	int rebuilt_rlen = cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar );
+	int rebuilt_rlen = cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], tmp_new_cigar );
 
-	strcpy(thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar);
+	strcpy(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], tmp_new_cigar);
 
 	srInt_64 weight = cellCounts_calculate_pos_weight(cct_context, abs_pos, tmp_new_cigar);
 	srInt_64 score = 0;
-	if(rebuilt_rlen==read_len && all_mapped_bases >= cct_context -> min_mapped_length_for_mapped_read )score=cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> reporting_count], head_soft_clipped, tail_soft_clipped, all_matched_bases, all_mismatched_bases)*weight;
+	if(rebuilt_rlen==read_len && all_mapped_bases >= cct_context -> min_mapped_length_for_mapped_read )score=cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], head_soft_clipped, tail_soft_clipped, all_matched_bases, all_mismatched_bases)*weight;
 
 	if(0 && (FIXLENstrcmp("R00000002478", read_name) == 0|| rebuilt_rlen!=read_len)){
 		char posstr[100], posstr2[100];
 		cellCounts_absoffset_to_posstr(cct_context, abs_pos , posstr);
 		cellCounts_absoffset_to_posstr(cct_context, abs_pos  + in_cigar_readlen + last_indel , posstr2);
-		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s [%s] %u; TESTINGPOS=%s ; CIGAR=%s -> %s / %d-bases\n MAPPED=%d ;  MATCH=%d ; MM=%d\nGOT Score=%lld ; at weight=%lld\n", read_name, read_text, posstr, rbin_offset_for_reversed ?"NEG":"POS", abs_pos , posstr2, thread_context -> reporting_cigars[thread_context -> reporting_count], tmp_new_cigar, rebuilt_rlen, all_mapped_bases, all_matched_bases, all_mismatched_bases , score , weight );
+		SUBREADprintf("\nREAD_EXP %s\n%s\nMAPPED=%s [%s] %u; TESTINGPOS=%s ; CIGAR=%s -> %s / %d-bases\n MAPPED=%d ;  MATCH=%d ; MM=%d\nGOT Score=%lld ; at weight=%lld\n", read_name, read_text, posstr, rbin_offset_for_reversed ?"NEG":"POS", abs_pos , posstr2, thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], tmp_new_cigar, rebuilt_rlen, all_mapped_bases, all_matched_bases, all_mismatched_bases , score , weight );
 	}
 
-	thread_context -> reporting_scores[thread_context -> reporting_count] = score;
-	thread_context -> reporting_positions[thread_context -> reporting_count] = abs_pos;
-	thread_context -> reporting_flags[thread_context -> reporting_count] = rbin_offset_for_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
-	thread_context -> reporting_mapq[thread_context -> reporting_count] = 40 - all_mismatched_bases;
-	thread_context -> reporting_editing_distance[thread_context -> reporting_count] = all_mismatched_bases + all_indel_length;
+	thread_context -> reporting_scores[thread_context -> populating_voteIJ_buf_index] = score;
+	thread_context -> reporting_positions[thread_context -> populating_voteIJ_buf_index] = abs_pos;
+	thread_context -> reporting_flags[thread_context -> populating_voteIJ_buf_index] = rbin_offset_for_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
+	thread_context -> reporting_mapq[thread_context -> populating_voteIJ_buf_index] = 40 - all_mismatched_bases;
+	thread_context -> reporting_editing_distance[thread_context -> populating_voteIJ_buf_index] = all_mismatched_bases + all_indel_length;
 	return score;
 }
 
@@ -2670,8 +2668,8 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	int i,j,reverse_text_offset, distinct_vote_number_i;
 
-	thread_context -> reporting_multi_alignment_no = 0;
-	thread_context -> reporting_count=0;
+	thread_context -> total_voteIJs_to_write = 0;
+	thread_context -> populating_voteIJ_buf_index=0;
 	if(votetab -> max_vote >= cct_context -> min_votes_per_mapped_read){
 		int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
 		memset(top_distinct_vote_numbers, 0 , cct_context -> max_distinct_top_vote_numbers * sizeof(int));
@@ -2684,44 +2682,44 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 		}
 
 		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < cct_context -> max_distinct_top_vote_numbers; distinct_vote_number_i ++){
-			if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+			if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 			int this_vote_N = top_distinct_vote_numbers[distinct_vote_number_i];
 			if(this_vote_N < 1 || (top_distinct_vote_numbers[0] - this_vote_N > cct_context -> max_differential_from_top_vote_number )) break;
 
 			for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
-				if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+				if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 				for (j=0; j< votetab->items[i]; j++){
-					if(thread_context -> reporting_count >= cct_context -> max_voting_simples)break;
+					if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 
 					int vv = votetab->votes[i][j];
 					if(vv == this_vote_N){
 						srInt_64 this_score = cellCounts_explain_one_read(cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j);
 //						SUBREADprintf("READQV %s : VOTE=%d  SCORE=%lld\n", read_name, vv, this_score);
-						thread_context -> reporting_count ++;
-						if(this_score >0)thread_context -> reporting_multi_alignment_no ++;
+						thread_context -> populating_voteIJ_buf_index ++;
+						if(this_score >0)thread_context -> total_voteIJs_to_write ++;
 					}
 				}
 			}
 		}
-		thread_context -> reporting_multi_alignment_no = min(thread_context -> reporting_multi_alignment_no, cct_context -> max_reported_alignments_per_read);
+		thread_context -> total_voteIJs_to_write = min(thread_context -> total_voteIJs_to_write, cct_context -> max_reported_alignments_per_read);
 	}
 
-//	SUBREADprintf("READQV %s : VOTE %d , ALN %d\n\n", read_name, votetab->max_vote, thread_context -> reporting_multi_alignment_no);
+//	SUBREADprintf("READQV %s : VOTE %d , ALN %d\n\n", read_name, votetab->max_vote, thread_context -> total_voteIJs_to_write);
 
 
-	if(thread_context -> reporting_multi_alignment_no) {
-		int sorting_index [thread_context -> reporting_count];
-		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> reporting_count; distinct_vote_number_i ++) sorting_index [distinct_vote_number_i ] = distinct_vote_number_i ;
+	if(thread_context -> total_voteIJs_to_write) {
+		int sorting_index [thread_context -> populating_voteIJ_buf_index];
+		for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> populating_voteIJ_buf_index; distinct_vote_number_i ++) sorting_index [distinct_vote_number_i ] = distinct_vote_number_i ;
 		void * sorting_ptr[2];
 		sorting_ptr[0] = thread_context;
 		sorting_ptr[1] = sorting_index;
 		//sort : large number first
-		quick_sort(sorting_ptr , thread_context -> reporting_count , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "reporting_multi_alignment_no" records ahead are worth writting (score > 0).
+		quick_sort(sorting_ptr , thread_context -> populating_voteIJ_buf_index , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "total_voteIJs_to_write" records ahead are worth writting (score > 0).
 
-		for(thread_context -> reporting_this_alignment_no = 0 ; thread_context -> reporting_this_alignment_no < thread_context -> reporting_multi_alignment_no; thread_context -> reporting_this_alignment_no ++){
-			int myno = sorting_index[thread_context -> reporting_this_alignment_no ];
+		for(thread_context -> writing_voteID_buf_index = 0 ; thread_context -> writing_voteID_buf_index < thread_context -> total_voteIJs_to_write; thread_context -> writing_voteID_buf_index ++){
+			int myno = sorting_index[thread_context -> writing_voteID_buf_index ];
 			if(thread_context -> reporting_scores[ myno ] < 1)continue;
-			if(thread_context -> reporting_this_alignment_no >= cct_context -> max_reported_alignments_per_read) break;
+			if(thread_context -> writing_voteID_buf_index >= cct_context -> max_reported_alignments_per_read) break;
 			reverse_text_offset = (thread_context -> reporting_flags[myno] & SAM_FLAG_REVERSE_STRAND_MATCHED)?MAX_SCRNA_READ_LENGTH+1:0;
 			if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
 				strcpy(read_qual+reverse_text_offset, read_qual);
@@ -2768,15 +2766,15 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 #define _index_vote_tol(key) (((unsigned int)(key)/INDEL_SEGMENT_SIZE)%GENE_SCRNA_VOTE_TABLE_SIZE)
 #define cellCounts_voting_update_topK(vt, vn, ij)  { \
 	int x3, x3done=0;\
-	for(x3= 0; x3 < cct_context -> max_voting_simples +1; x3++){\
+	for(x3= 0; x3 < cct_context -> max_candidate_voteIJ_per_read +1; x3++){\
 		if(ij == vt->topK_IJ[x3]){\
 			if(x3 > 0 && vn > vt->topK_votes[x3-1]){\
 				int x4;\
-				for(x4 = x3; x4< cct_context -> max_voting_simples; x4++){\
+				for(x4 = x3; x4< cct_context -> max_candidate_voteIJ_per_read; x4++){\
 					vt->topK_votes[x4] = vt->topK_votes[x4+1];\
 					vt->topK_IJ[x4] = vt->topK_IJ[x4+1];\
 				}\
-				vt->topK_votes[cct_context -> max_voting_simples]=0;\
+				vt->topK_votes[cct_context -> max_candidate_voteIJ_per_read]=0;\
 			}else{\
 				vt->topK_votes[x3] = vn;\
 				x3done=1;\
@@ -2784,10 +2782,10 @@ void cellCounts_process_copy_ptrs_to_votes_exchange(void * arrp, int i, int j){
 			break;\
 		}\
 	}\
-	if(!x3done)for(x3= 0; x3 < cct_context -> max_voting_simples +1; x3++){\
+	if(!x3done)for(x3= 0; x3 < cct_context -> max_candidate_voteIJ_per_read +1; x3++){\
 		if(vn > vt->topK_votes[x3]){\
 			int x4;\
-			if(vt->topK_votes[x3]>0)for(x4 = cct_context -> max_voting_simples ; x4 > x3; x4--){\
+			if(vt->topK_votes[x3]>0)for(x4 = cct_context -> max_candidate_voteIJ_per_read ; x4 > x3; x4--){\
 				vt->topK_votes[x4] = vt->topK_votes[x4-1];\
 				vt->topK_IJ[x4] = vt->topK_IJ[x4-1];\
 			}\
@@ -2915,7 +2913,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 
 	if(simple_mode){
 		init_gene_vote(vote);
-		for(x1=0;x1<cct_context -> max_voting_simples +1; x1++){
+		for(x1=0;x1<cct_context -> max_candidate_voteIJ_per_read +1; x1++){
 			vote -> topK_votes[x1]=0;
 			vote -> topK_IJ[x1]=0xffffffff;
 		}
@@ -2987,7 +2985,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 						test_max ++;
 						vote -> votes[offsetX][itemidx] = test_max;
 
-						if(simple_mode && test_max > vote->topK_votes[cct_context -> max_voting_simples]){
+						if(simple_mode && test_max > vote->topK_votes[cct_context -> max_candidate_voteIJ_per_read]){
 							int myIJ = (offsetX << 16) | itemidx;
 							cellCounts_voting_update_topK(vote, test_max , myIJ);
 						}
@@ -3021,7 +3019,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 
 				if(simple_mode){
 					int x3;
-					for(x3=0; x3< cct_context -> max_voting_simples+1;x3++) if(0==vote -> topK_votes[x3]){
+					for(x3=0; x3< cct_context -> max_candidate_voteIJ_per_read+1;x3++) if(0==vote -> topK_votes[x3]){
 						vote -> topK_votes[x3]=1;
 						vote -> topK_IJ[x3] = (offsetX2 << 16) | datalen2;
 					}
@@ -3032,7 +3030,7 @@ void simpleMode_cellCounts_process_copy_ptrs_to_votes(cellcounts_global_t * cct_
 }
 int cellCounts_simple_mode_highconf(cellcounts_global_t * cct_context, int thread_no, int applied_subreads, gene_sc_vote_t * vote, char * read_name){
 	int x1, vlast = vote -> max_vote;
-	for(x1 = 1; x1 < cct_context -> max_voting_simples +1; x1++){
+	for(x1 = 1; x1 < cct_context -> max_candidate_voteIJ_per_read +1; x1++){
 		int vdiff = vlast - vote->topK_votes[x1];
 		if(vdiff >= 3) return 1;
 
