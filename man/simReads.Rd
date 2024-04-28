@@ -72,6 +72,8 @@ scanFasta(
   Substitution sequencing errors can be simulated in the reads by emulating the sequencing quality of a real High-Throughput Sequencing sample. When \code{simulate.sequencing.error = TRUE} and a set of Phred+33 encoded quality strings are provided to \code{simReads}, a quality string is randomly chosen for each output read and read bases are substituted with random base values according to the probabilities described in the quality string. Inbuilt quality strings are provided for generating 100-bp and 75-bp long reads, hence the \code{quality.reference} can be optionally omitted when \code{read.length} is 100 or 75.
 
   The \code{scanFasta} function checks and processes the FASTA or gzipped-FASTA file. It scans through the file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths. It additionally checks the transcript sequences for uniqueness.
+  
+  Baldoni et al (2024) uses \code{simReads} to generate realistic RNA-seq data with specified levels of biological and technical variation.
 }
 \value{
   \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{paired.end}, containing the simulated reads.
@@ -93,10 +95,12 @@ scanFasta(
   }
   Note that selecting transcripts with \code{Duplicate == FALSE} will ensure unique sequences, i.e., any sequence that was observed multiple times in the FASTQ file will be only included only once in the selection.
 }
-%\references{
-%Yang Liao, Gordon K Smyth and Wei Shi. The Subread aligner: fast, accurate and scalable read mapping by seed-and-vote.
-%\emph{Nucleic Acids Research}, 41(10):e108, 2013.
-%}
+\references{
+Baldoni PL, Chen Y, Hediyeh-zadeh S, Liao Y, Dong X, Ritchie ME, Shi W, Smyth GK (2024).
+Dividing out quantification uncertainty allows efficient assessment of differential transcript expression with edgeR.
+\emph{Nucleic Acids Research} 52(3), e13.
+\doi{10.1093/nar/gkad1167}.
+}
 \author{Yang Liao, Gordon K Smyth and Wei Shi}
 \examples{
 \dontrun{
