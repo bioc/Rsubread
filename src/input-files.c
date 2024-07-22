@@ -2594,11 +2594,13 @@ int SAM_pairer_create(SAM_pairer_context_t * pairer, int all_threads, int bin_bu
 	subread_init_lock(&pairer -> SAM_BAM_table_lock);
 
 	pairer -> total_threads = all_threads;
+	srInt_64 input_buff_SBAM_size = 0;
 	if(pairer ->input_is_BAM){
-		pairer -> input_buff_SBAM_size = bin_buff_size_per_thread * 1024 * 1024;
+		input_buff_SBAM_size = bin_buff_size_per_thread * 1024 * 1024;
 	}else{
-		pairer -> input_buff_SBAM_size = max(bin_buff_size_per_thread * 1024 * 1024 + FC_LONG_READ_RECORD_HARDLIMIT ,  3*FC_LONG_READ_RECORD_HARDLIMIT/2);
+		input_buff_SBAM_size = max(bin_buff_size_per_thread * 1024 * 1024 + FC_LONG_READ_RECORD_HARDLIMIT ,  3*FC_LONG_READ_RECORD_HARDLIMIT/2);
 	}
+	pairer -> input_buff_SBAM_size = input_buff_SBAM_size;
 	
 	pairer -> input_buff_BIN_size = max(1024*1024, pairer -> input_buff_SBAM_size );
 

@@ -190,7 +190,7 @@ SamBam_FILE * SamBam_fopen(char * fname , int file_type)
 		}
 
 
-		int l_text = 0;
+		unsigned int l_text = 0;
 		memcpy(&l_text, SB_READ(ret), 4);
 		SB_RINC(ret, 4);
 

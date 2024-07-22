@@ -103,9 +103,9 @@ typedef struct {
 	unsigned int readno_in_chunk;
 
 	unsigned char * input_buff_BIN;
-	int input_buff_BIN_used;
-	int input_buff_BIN_ptr;
-	int input_buff_BIN_capacity;
+	unsigned int input_buff_BIN_used;
+	unsigned int input_buff_BIN_ptr;
+	unsigned int input_buff_BIN_capacity;
 	int orphant_block_no;
 	int need_find_start;
 	srInt_64 orphant_space;
@@ -147,8 +147,8 @@ typedef struct {
 
 	int total_threads;
 	int input_chunk_no;
-	int input_buff_SBAM_size;
-	int input_buff_BIN_size;
+	unsigned int input_buff_SBAM_size;
+	unsigned int input_buff_BIN_size;
 	char tmp_file_prefix[MAX_FILE_NAME_LENGTH+1];
 	char in_file_name[MAX_FILE_NAME_LENGTH+1];
 
