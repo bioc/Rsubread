@@ -2210,6 +2210,8 @@ void get_readname_from_bin(char * bin, char ** read_name){
 	(*read_name) = bin + 36;
 }
 
+#define INC_intervals_i_AND_CLEAN {(*intervals_i) ++;memset(intervals_buffer+ (*intervals_i), 0, sizeof(CIGAR_interval_t));}
+
 void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin2, char ** read_name, int * flag, char ** chro, srInt_64 * pos, int * mapq, char ** mate_chro, srInt_64 * mate_pos, srInt_64 * tlen, int * is_junction_read, int * cigar_sect, int * cigar_overflow, unsigned int * Starting_Chro_Points_1BASE, unsigned short * Starting_Read_Points, unsigned short * Section_Read_Lengths, char ** ChroNames, char * Event_After_Section, int * NH_value, int max_M, CIGAR_interval_t * intervals_buffer, int * intervals_i, int assign_reads_to_RG, char ** RG_ptr, int * ret_me_refID, int * ret_mate_refID){
 	int x1, len_of_S1 = 0;
 	*cigar_sect = 0;
@@ -2294,7 +2296,7 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 
 					if(intervals_buffer){
 						intervals_buffer[ *intervals_i ].chromosomal_length = chro_cursor - intervals_buffer[ *intervals_i ].start_pos;
-						(*intervals_i) ++;
+						INC_intervals_i_AND_CLEAN;
 					}
 				} else (*cigar_overflow)=1;
 
@@ -2329,7 +2331,8 @@ void parse_bin(SamBam_Reference_Info * sambam_chro_table, char * bin, char * bin
 			if( (*cigar_sect) < max_M){
 				if(intervals_buffer){
 					intervals_buffer[ *intervals_i ].chromosomal_length = chro_cursor - intervals_buffer[ *intervals_i ].start_pos + len_of_S1;
-					(*intervals_i)++;
+					INC_intervals_i_AND_CLEAN;
+					
 				}
 				Starting_Chro_Points_1BASE[*cigar_sect] = section_start_chro; 
 				Starting_Read_Points[*cigar_sect] = section_start_read;
@@ -2790,8 +2793,9 @@ void process_line_buffer(fc_thread_global_context_t * global_context, fc_thread_
 	}
 
 	if(global_context -> need_calculate_overlap_len ){
-		memset( CIGAR_intervals_R1, 0, sizeof(CIGAR_interval_t) *  global_context -> max_M  );
-		memset( CIGAR_intervals_R2, 0, sizeof(CIGAR_interval_t) *  global_context -> max_M  );
+		// we only need to clean the 1st item. The following items are cleaned in parse_bin.
+		memset( CIGAR_intervals_R1, 0, sizeof(CIGAR_interval_t));
+		memset( CIGAR_intervals_R2, 0, sizeof(CIGAR_interval_t));
 	}
 
 	thread_context->all_reads++;
