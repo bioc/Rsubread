@@ -2435,14 +2435,21 @@ void process_line_junctions(fc_thread_global_context_t * global_context, fc_thre
 	int alignment_masks, mapping_qual, NH_value;
 	char *RG_ptr=NULL;
 
+	unsigned int * Starting_Chro_Points_1BASE = malloc(sizeof(int)*global_context -> max_M);
+	unsigned short * Starting_Read_Points = malloc(sizeof(short)*global_context -> max_M);
+	unsigned short * Section_Read_Lengths = malloc(sizeof(short)*global_context -> max_M);
+	char ** ChroNames = malloc(sizeof(char*)*global_context -> max_M);
+ 	char * Event_After_Section = malloc(sizeof(char)*global_context -> max_M);
 	for(is_second_read = 0 ; is_second_read < 2; is_second_read++){
 		char * read_chr, *read_name, *mate_chr;
 		srInt_64 read_pos, fragment_length = 0, mate_pos;
+		/*
 		unsigned int Starting_Chro_Points_1BASE[global_context -> max_M];
 		unsigned short Starting_Read_Points[global_context -> max_M];
 		unsigned short Section_Read_Lengths[global_context -> max_M];
 		char * ChroNames[global_context -> max_M];
 		char Event_After_Section[global_context -> max_M];
+		*/
 		if(is_second_read && !global_context -> is_paired_end_mode_assign) break;
 		char * RG_ptr_one = NULL;
 		int me_refID, mate_refID;
@@ -2456,7 +2463,11 @@ void process_line_junctions(fc_thread_global_context_t * global_context, fc_thre
 	}
 	if(njunc1 >0 || njunc2>0)
 		add_fragment_supported_junction(global_context, thread_context, supported_junctions1, njunc1, supported_junctions2, njunc2, RG_ptr);
-
+	free(Starting_Chro_Points_1BASE);
+	free(Starting_Read_Points);
+	free(Section_Read_Lengths);
+	free(ChroNames);
+	free(Event_After_Section);
 }
 
 void ** get_RG_tables(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, char * rg_name){
