@@ -5178,7 +5178,7 @@ void * SAM_nosort_thread_run( void * params ){
 		subread_lock_release(&thread_context -> SBAM_lock);
 
 		if(has_found){
-			if(pairer -> is_internal_error)pairer -> output_function(pairer, thread_no, (char*) read_ptr_1,(char*) read_ptr_2);
+			if(!pairer -> is_internal_error)pairer -> output_function(pairer, thread_no, (char*) read_ptr_1,(char*) read_ptr_2);
 		}else{
 			if(to_quit) break;
 			usleep(nosort_tick_time);
