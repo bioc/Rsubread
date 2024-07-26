@@ -4497,7 +4497,7 @@ int SAM_pairer_find_start(SAM_pairer_context_t * pairer , SAM_pairer_thread_t * 
 			break;
 		}
 	}
-	if((input_fp_finished  && start_pos == search_end)|| save_start_pos >=0 ) {
+	if((input_fp_finished  && start_pos == search_end)|| save_start_pos > 0 ) {
 		if(save_start_pos<0) save_start_pos = search_end;
 		char * margin_key = malloc(22);
 		char * margin_data = malloc(save_start_pos+4);
