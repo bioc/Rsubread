@@ -1,3 +1,6 @@
+8 Oct 2024 - 2.19.2
+(1) Fixed a bug in featureCounts that caused slow speed when largestOverlap is turned on.
+
 22 Jul 2024 - 2.19.1
 (1) Fixed a bug in featureCounts that cannot process BAM files with header sizes close to 2GB.
 

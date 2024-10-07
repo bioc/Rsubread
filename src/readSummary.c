@@ -5177,11 +5177,6 @@ void print_usage()
 	SUBREADputs("                      removed). By default, intermediate files will be saved to");
 	SUBREADputs("                      the directory specified in '-o' argument.");
 	SUBREADputs("");
-	SUBREADputs("  --maxMOp <int>      Maximum number of 'M' operations allowed in a CIGAR");
-	SUBREADputs("                      string. 10 by default. Both 'X' and '=' are treated as 'M'");
-	SUBREADputs("                      and adjacent 'M' operations are merged in the CIGAR");
-	SUBREADputs("                      string.");
-	SUBREADputs("");
 	SUBREADputs("  --verbose           Output verbose information for debugging, such as un-");
 	SUBREADputs("                      matched chromosome/contig names.");
 	SUBREADputs("");
