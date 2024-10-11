@@ -2553,10 +2553,12 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 
 		sqr_read_number++;
 		fetch_next_read_pair(global_context, thread_context, ginp1, ginp2, &read_len_1, &read_len_2, read_name_1, read_name_2, read_text_1, read_text_2, qual_text_1, qual_text_2, 0, &current_read_number);
-		//if(current_read_number%500000==0)SUBREADprintf("THREAD_OPT2_fetch %s  %s ; RNO=%lld\n", read_name_1, read_text_1, current_read_number);
+
+		if((global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) ||  global_context -> input_reads.is_internal_error || (global_context -> output_sam_is_full))break;
+		if(current_read_number < 0) break;
+
 		strcpy(raw_read_text_1, read_text_1);
 		strcpy(raw_qual_text_1, qual_text_1);
-		//printf("OCT27-STEPB - %s\n", read_name_1);
 
 		if(global_context -> input_reads.is_paired_end_reads){
 			strcpy(raw_read_text_2, read_text_2);
@@ -2590,10 +2592,6 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 			if(global_context->input_reads.is_paired_end_reads)
 				fastq_64_to_33(raw_qual_text_2);
 		}
-
-		if((global_context -> config.is_BAM_output && global_context -> output_bam_writer -> is_internal_error) ||  global_context -> input_reads.is_internal_error || 
-		   (global_context -> output_sam_is_full))break;
-		if(current_read_number < 0) break;
 
 		// if no more reads
 		if( global_context -> input_reads.is_paired_end_reads)
@@ -2765,9 +2763,11 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 							if( scores_array[read_record_i] >= best_score_highest && (current_realignment_result -> realign_flags & CORE_TOO_MANY_MISMATCHES)==0
 							  && output_cursor < global_context -> config.reported_multi_best_reads){
 								strcpy(read_text_1, raw_read_text_1);
-								strcpy(read_text_2, raw_read_text_2);
 								strcpy(qual_text_1, raw_qual_text_1);
-								strcpy(qual_text_2, raw_qual_text_2);
+								if(global_context -> input_reads.is_paired_end_reads){
+									strcpy(read_text_2, raw_read_text_2);
+									strcpy(qual_text_2, raw_qual_text_2);
+								}
 
 								if(is_break_even) current_realignment_result -> realign_flags |= CORE_IS_BREAKEVEN; 
 								current_realignment_result -> MAPQ_adjustment = current_MISMATCH_buffer [read_record_i] + ( is_second_read?(r2_step2_locations): (r1_step2_locations));
@@ -2937,9 +2937,11 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 								realignment_result_t * r2_realign = final_realignments + final_realignment_index2[r2_best_id];
 
 								strcpy(read_text_1, raw_read_text_1);
-								strcpy(read_text_2, raw_read_text_2);
 								strcpy(qual_text_1, raw_qual_text_1);
-								strcpy(qual_text_2, raw_qual_text_2);
+								if(global_context -> input_reads.is_paired_end_reads){
+									strcpy(read_text_2, raw_read_text_2);
+									strcpy(qual_text_2, raw_qual_text_2);
+								}
 
 								if(is_break_even){
 									r1_realign -> realign_flags |= CORE_IS_BREAKEVEN;
@@ -2964,9 +2966,11 @@ int do_iteration_two(global_context_t * global_context, thread_context_t * threa
 		//printf("OCT27-WRITE-UNMAP?-%s-THRE %d\n", read_name_1, thread_context -> thread_id);
 		if(output_cursor<1) {
 			strcpy(read_text_1, raw_read_text_1);
-			strcpy(read_text_2, raw_read_text_2);
 			strcpy(qual_text_1, raw_qual_text_1);
-			strcpy(qual_text_2, raw_qual_text_2);
+			if(global_context -> input_reads.is_paired_end_reads){
+				strcpy(read_text_2, raw_read_text_2);
+				strcpy(qual_text_2, raw_qual_text_2);
+			}
 //		SUBREADprintf("THREAD_OPT3_write %s\n", read_name_1);
 			write_realignments_for_fragment(global_context, thread_context, &out_context, current_read_number, NULL, NULL, read_name_1, read_name_2, read_text_1, read_text_2, raw_qual_text_1, raw_qual_text_2, read_len_1, read_len_2, 0, 0, non_informative_subreads_r1, non_informative_subreads_r2);
 		}

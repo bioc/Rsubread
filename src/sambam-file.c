@@ -376,8 +376,8 @@ char * SamBam_fgets(SamBam_FILE * fp, char * buff , int buff_len, int seq_needed
 		{
 			SamBam_Alignment *aln = &fp->aln_buff;
 			int chunk_ptr = 0;
-			SB_FETCH_ONEREAD(fp);
 			if(SB_EOF(fp)) return NULL;
+			SB_FETCH_ONEREAD(fp);
 
 			fp -> is_paired_end = 10 + ((*(fp -> input_binary_stream_buffer + fp -> input_binary_stream_read_ptr - fp -> input_binary_stream_buffer_start_ptr + 18)) & 1);
 			//SUBREADprintf("FLAG=%d\n",  *(fp -> input_binary_stream_buffer + fp -> input_binary_stream_read_ptr - fp -> input_binary_stream_buffer_start_ptr + 18) );
