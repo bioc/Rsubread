@@ -69,7 +69,15 @@ typedef struct
 
 
 #define SB_FETCH(a)  if((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < 3000){int test_rlen_2 = SamBam_fetch_next_chunk(a); if(test_rlen_2 == -2){(a)->is_bam_broken = 1;}}
-#define SB_FETCH_ONEREAD(a)   { int record_len=0;memcpy(&record_len,(a) -> input_binary_stream_buffer + (a) -> input_binary_stream_read_ptr - (a) -> input_binary_stream_buffer_start_ptr,4); while((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < record_len +4){int test_rlen_2 = SamBam_fetch_next_chunk(a); if(test_rlen_2 <1){(a)->is_bam_broken = 1;break;}} }
+
+#define SB_FETCH_ONEREAD(a)   {if((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr <4){\
+    if((a)-> is_eof ) (a)->is_bam_broken = 1;else{ int test_rlen_2 = SamBam_fetch_next_chunk(a); if(test_rlen_2 <1){(a)->is_bam_broken = 1;}}}\
+    if(!(a)->is_bam_broken){ \
+    int record_len=0;memcpy(&record_len,(a) -> input_binary_stream_buffer + (a) -> input_binary_stream_read_ptr - (a) -> input_binary_stream_buffer_start_ptr,4); \
+     while((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < record_len +4){int test_rlen_2 = SamBam_fetch_next_chunk(a); if(test_rlen_2 <1){(a)->is_bam_broken = 1;break;}}}}
+
+
+//#define SB_FETCH_ONEREAD(a)   { int record_len=0;memcpy(&record_len,(a) -> input_binary_stream_buffer + (a) -> input_binary_stream_read_ptr - (a) -> input_binary_stream_buffer_start_ptr,4); while((a) -> input_binary_stream_write_ptr - (a) -> input_binary_stream_read_ptr < record_len +4){int test_rlen_2 = SamBam_fetch_next_chunk(a); if(test_rlen_2 <1){(a)->is_bam_broken = 1;break;}} }
 #define SB_EOF(a)  ((a)-> is_eof && (  (a) -> input_binary_stream_write_ptr <= (a) -> input_binary_stream_read_ptr ))
 #define SB_READ(a)  ((a) -> input_binary_stream_buffer + (a) -> input_binary_stream_read_ptr - (a) -> input_binary_stream_buffer_start_ptr)
 #define SB_RINC(a, len)   ((a) -> input_binary_stream_read_ptr) += len
