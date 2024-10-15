@@ -723,7 +723,7 @@ void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simp
 
 	outsize += SUBreadSprintf(outbuff, outcapa, "@HD\tVN:1.0\tSO:%s\n", "coordinate");
 	for(x1=0;x1<cct_context->chromosome_table.total_offsets; x1++){
-		if(outsize + rebuilt_len >= outcapa -MAX_CHROMOSOME_NAME_LEN -40){
+		if(outsize + rebuilt_len + 200 + MAX_CHROMOSOME_NAME_LEN + 40 >= outcapa){
 			outcapa *=2;
 			outbuff = realloc(outbuff, outcapa);
 		}
@@ -733,8 +733,9 @@ void cellCounts_add_simple_writer_header(cellcounts_global_t * cct_context, simp
 		last_end = this_end;
 		outsize += SUBreadSprintf(outbuff+outsize, outcapa-outsize,"@SQ\tSN:%s\tLN:%d\n",chro_name,this_size);
 	}
+
 	// if the command line is longer than 16K the remaining part is omitted.
-	outsize += snprintf(outbuff+outsize,1024*32, "@PG\tID:cellCounts\tPN:cellCounts\tVN:%s\tCL:%s", SUBREAD_VERSION, cct_context->cmd_rebuilt);
+	outsize += snprintf(outbuff + outsize, outcapa - outsize , "@PG\tID:cellCounts\tPN:cellCounts\tVN:%s\tCL:%s", SUBREAD_VERSION, cct_context->cmd_rebuilt);
 	outbuff[outsize++]='\n';
 	outbuff[outsize++]='\0';
 	simple_bam_write(&outsize,4,wtr,0);

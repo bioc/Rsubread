@@ -150,7 +150,7 @@ The \R{cellCounts} function can be used to quantify the scRNA-seq data generated
 
 \begin{scriptsize}
 <<>>=
-if(FALSE && grepl("linux", R.version$os) && grepl("x86_64", R.version$arch)) {
+if(grepl("linux", R.version$os) && grepl("x86_64", R.version$arch)) {
   md5.zip <- "ffd5036b36e25e9b61efc412e71820dd"
   URL <- "https://shilab-bioinformatics.github.io/cellCounts-Example/cellCounts-Example.zip"
   temp.file <- tempfile()
@@ -209,10 +209,8 @@ The \R{qualityScores} function can be used to quickly retrieve and display the q
 
 \begin{scriptsize}
 <<>>=
-if(FALSE){
   x <- qualityScores(filename=reads,offset=64,nreads=1000)
   x[1:10,1:10]
-}
 @
 \end{scriptsize}
 
@@ -238,7 +236,7 @@ For paired end reads, it can return the proportion of mapped fragments (ie. read
 
 \begin{scriptsize}
 <<>>=
-if(FALSE)propmapped("alignResults.BAM")
+propmapped("alignResults.BAM")
 @
 \end{scriptsize}
 

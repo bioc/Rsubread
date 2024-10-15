@@ -384,7 +384,172 @@ void LRMtest_move_buff( LRMcontext_t* context, LRMthread_context_t* thread_conte
 }
 
 int my_debug = 0;
+
+
+//int oldLRMdynamic_in_middle(LRMcontext_t* context, LRMthread_context_t* thread_context, LRMread_iteration_context_t * iteration_context, int last_correct_base, int first_correct_base ,  unsigned int last_correct_base_on_chro, int expected_indels){
 int LRMdynamic_in_middle(LRMcontext_t* context, LRMthread_context_t* thread_context, LRMread_iteration_context_t * iteration_context, int last_correct_base, int first_correct_base ,  unsigned int last_correct_base_on_chro, int expected_indels){
+	int moves, xx1;
+
+	if((expected_indels > 0 && expected_indels >= first_correct_base - last_correct_base)||
+		abs( first_correct_base - last_correct_base ) + LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE <  abs(expected_indels) ||
+		abs(expected_indels) >=LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE ){
+		int mlen = first_correct_base - last_correct_base - ( expected_indels > 0? expected_indels:0 );
+		int moves = sprintf(thread_context -> dynamic_programming_indel_movement_buf + thread_context -> dynamic_programming_indel_movement_start, "%dM%d%c%dM", mlen/2, abs(expected_indels), expected_indels>0?'I':'D' , mlen-mlen/2);
+		thread_context -> dynamic_programming_indel_movement_start += moves;
+		return moves;
+	}
+
+
+	char * corrected_read = iteration_context -> read_text;//+ last_correct_base;
+	int high_penalty_create_gap = 0;
+
+	if(0) {
+		char postxt[100];
+		LRMpos2txt(context, last_correct_base_on_chro, postxt);
+		LRMprintf("Dynamic: at %s : %d - %d ; expected = %d\n", postxt, last_correct_base, first_correct_base, expected_indels);
+		for(xx1 = 0 ; xx1 < first_correct_base -  last_correct_base ; xx1++ ){
+			LRMprintf("%c", corrected_read[ xx1 + last_correct_base ]);
+		}
+		LRMprintf("\n");
+		for(xx1 = 0 ; xx1 < first_correct_base -  last_correct_base - expected_indels; xx1++){
+			LRMprintf("%c", LRMgvindex_get(& context -> current_base_index,  last_correct_base_on_chro + xx1));
+		}
+		LRMprintf("\n");
+	}
+
+	int dynamic_rows = first_correct_base - last_correct_base;
+	int trying_indel_length = abs(expected_indels);
+	trying_indel_length = max(trying_indel_length, 4);
+	trying_indel_length = min(trying_indel_length, LRMINDEL_DYNAMIC_CHANNEL_TOLERANCE);
+	
+	int best_offset_history [dynamic_rows];
+	int score_match = context -> dynamic_programming_score_match;
+	int score_mismatch = context -> dynamic_programming_score_mismatch;
+	int score_create_gap = context -> dynamic_programming_score_create_gap * (1+high_penalty_create_gap);
+	int score_extend_gap = context -> dynamic_programming_score_extend_gap;
+	int dynamic_row_width = 2* trying_indel_length + 1;
+
+	
+	char postxt[100];
+	LRMpos2txt(context, last_correct_base_on_chro, postxt);
+	//LRMprintf("DDDDD1  SIZE=%d ; last_correct = %d; first_correct = %d ; delta=%d ; pos=%u (%s)\n", dynamic_row_width * dynamic_rows, last_correct_base, first_correct_base, expected_indels, last_correct_base_on_chro, postxt);
+	int * dynamic_score_buffer = (int *)thread_context -> dynamic_programming_score_buffer;
+	char * dynamic_movement_BEFORE_buffer = thread_context -> dynamic_programming_movement_buffer;
+	memset(dynamic_score_buffer, 0, sizeof(int) * dynamic_row_width * dynamic_rows);
+	memset(dynamic_movement_BEFORE_buffer, 0, sizeof(char) * dynamic_row_width * dynamic_rows);
+	char * indel_movement_buff = (char *) thread_context -> dynamic_programming_indel_movement_buf;
+	int this_movement_start = thread_context -> dynamic_programming_indel_movement_start;
+	
+	LRMDP_score(0,  trying_indel_length  )=0;
+	int read_cursor = last_correct_base, row_i, indel_i;
+	unsigned int chro_cursor = last_correct_base_on_chro;
+
+	int last_slope_offset = 0;
+	float slope = expected_indels *1. / dynamic_rows;
+	for(xx1 = 0; xx1 < dynamic_rows; xx1++)
+		best_offset_history[xx1] = 1* (int)(xx1 * slope);
+
+	for(; read_cursor < first_correct_base; read_cursor++){
+		row_i = read_cursor - last_correct_base;
+		int slope_offset = row_i>0?best_offset_history[row_i-1]:0;
+		int last_slope_delta = slope_offset - last_slope_offset;
+
+		for(indel_i = dynamic_row_width-1 ; indel_i >=0; indel_i --){ // negative: deletion; positive: insertion
+			int testing_indel = indel_i - trying_indel_length;
+			int net_tst_indels = testing_indel + slope_offset;
+			if(1){
+				int score_from_del = -0x7fffffff, score_from_ins = -0x7fffffff, score_from_match = -0x7fffffff;
+				int is_matched_base = toupper(corrected_read[read_cursor]) == toupper(LRMgvindex_get(& context -> current_base_index, chro_cursor - net_tst_indels));
+				//if(testing_indel+slope_offset==0)LRMprintf("GETC %c\n", LRMgvindex_get(& context -> current_base_index, chro_cursor - slope_offset - testing_indel));
+
+				if(row_i>0 && (indel_i-1+ last_slope_delta)>=0 && (indel_i-1+ last_slope_delta)< dynamic_row_width && LRMDP_score(row_i-1, indel_i-1 + last_slope_delta) > -0x7ffffff0)
+					score_from_ins = LRMDP_score(row_i-1, indel_i-1 + last_slope_delta) + ( (LRMDP_move(row_i-1, indel_i-1+ last_slope_delta) == 'M' || LRMDP_move(row_i-1, indel_i-1 +last_slope_delta) == 'X')?score_create_gap:score_extend_gap);
+
+				if(net_tst_indels < row_i)if(indel_i < dynamic_row_width-1 && LRMDP_score(row_i, indel_i+1) > -0x7ffffff0)
+					score_from_del = LRMDP_score(row_i, indel_i+1) + ((LRMDP_move(row_i, indel_i+1) == 'M' || LRMDP_move(row_i, indel_i+1) == 'X')?score_create_gap:score_extend_gap);
+
+				if((indel_i+ last_slope_delta)>=0 && (indel_i+ last_slope_delta)< dynamic_row_width && (row_i ==0 || LRMDP_score(row_i-1, indel_i + last_slope_delta) > -0x7ffffff0)){
+					if(row_i >0 || testing_indel<=0){
+						score_from_match =(row_i > 0 ?LRMDP_score(row_i-1, indel_i + last_slope_delta): 0)+ (is_matched_base?score_match:score_mismatch);
+						if(row_i == 0 && testing_indel < 0) score_from_match += score_create_gap + (abs(testing_indel)-1) * score_extend_gap;
+					}
+					//if(row_i == 0 && testing_indel > 0) score_from_match += score_create_gap + (testing_indel-1) * score_extend_gap;
+				}
+				
+				int final_score = max(score_from_del, max(score_from_ins, score_from_match));
+				if(net_tst_indels > 0 && row_i < net_tst_indels){
+					LRMDP_score(row_i, indel_i) = score_create_gap + (score_extend_gap-1)  * net_tst_indels;
+					LRMDP_move(row_i, indel_i) =  'I'; 
+				}else{
+					LRMDP_score(row_i, indel_i) = final_score;
+					if(final_score < -0x7ffffff0) LRMDP_move(row_i, indel_i) = '?';
+					else LRMDP_move(row_i, indel_i) = score_from_del == final_score?'D':((score_from_ins == final_score)?'I': ( is_matched_base ?'M':'X'));
+				}
+			}
+		}
+		last_slope_offset = slope_offset;
+		chro_cursor ++;
+	}
+
+
+	row_i = first_correct_base - last_correct_base - 1;
+	indel_i = trying_indel_length + expected_indels -(row_i >0?best_offset_history[row_i - 1]:0);
+
+	moves = 0;
+	while(row_i>=0 && indel_i >=0 && indel_i < dynamic_row_width){
+		int slope_offset = 0;
+		if(row_i >0) slope_offset = best_offset_history[row_i-1];
+		int next_slope_offset = row_i > 1?best_offset_history[row_i-2]:0;
+		int last_slope_delta = slope_offset - next_slope_offset;
+		//#warning "========= DO NOT ASSERT ============="
+		indel_movement_buff[ this_movement_start + moves] = LRMDP_move(row_i, indel_i);
+		if(indel_movement_buff[ this_movement_start + moves]=='?')LRMprintf("Assertion_Error:%s\n", iteration_context -> read_name);
+		assert(indel_movement_buff[ this_movement_start +  moves]!='?');
+
+		if(indel_movement_buff[ this_movement_start +  moves] == 'M' || indel_movement_buff[ this_movement_start +  moves] == 'X'){
+			row_i--;
+			if(row_i>=0)indel_i += last_slope_delta;
+		} else if(indel_movement_buff[ this_movement_start +  moves] == 'D')indel_i++;
+		  else {
+			indel_i --;
+			row_i--;
+			if(row_i>=0)indel_i += last_slope_delta;
+		}
+		moves ++;
+
+		if(row_i < 0 && indel_i < trying_indel_length){
+//			fprintf(stderr,"FLY_BACK %d : %d\n", row_i , trying_indel_length - indel_i);
+			for(; indel_i < trying_indel_length; indel_i++) indel_movement_buff[ this_movement_start + ( moves++ ) ] ='D';
+		}
+
+		if(moves > max( LRMDYNAMIC_MAXIMUM_GAP_LENGTH * 15, 300 ) +  context -> max_dynamic_indel_length ){
+			LRMprintf("ERROR: Dynamic programming moves more than %d\n",  max( (int)(LRMDYNAMIC_MAXIMUM_GAP_LENGTH * 15), 300 ) +  context -> max_dynamic_indel_length);
+			return -1;
+		}
+		if(0)if(!(row_i>=0 && indel_i >=0 && indel_i < dynamic_row_width))
+			fprintf(stderr,"LAST_BREAK %d %d %d    W %d\n", row_i, indel_i, trying_indel_length, dynamic_row_width);
+	}
+
+	
+	indel_movement_buff[ this_movement_start +  moves]=0;
+	for(row_i = 0; row_i < moves/2; row_i++){
+		char tmp = indel_movement_buff[ this_movement_start +  row_i];
+		indel_movement_buff[ this_movement_start +  row_i] = indel_movement_buff[ this_movement_start +  moves - row_i - 1];
+		indel_movement_buff[ this_movement_start +  moves - row_i - 1] = tmp;
+	}
+
+	indel_movement_buff[ this_movement_start + (moves++)]='/';
+	indel_movement_buff[ this_movement_start + moves] = 0;
+
+	LRMtest_move_buff( context,  thread_context, iteration_context , indel_movement_buff + this_movement_start, moves , dynamic_rows);
+	if(0)LRMprintf("MOVES = %s\n", indel_movement_buff + this_movement_start);
+
+	thread_context -> dynamic_programming_indel_movement_start += moves;
+	return moves;
+}
+
+
+int oldLRMdynamic_in_middle(LRMcontext_t* context, LRMthread_context_t* thread_context, LRMread_iteration_context_t * iteration_context, int last_correct_base, int first_correct_base ,  unsigned int last_correct_base_on_chro, int expected_indels){
 	int moves, xx1;
 
 	char * corrected_read = iteration_context -> read_text;//+ last_correct_base;
@@ -479,8 +644,6 @@ int LRMdynamic_in_middle(LRMcontext_t* context, LRMthread_context_t* thread_cont
 		last_slope_offset = slope_offset;
 		chro_cursor ++;
 	}
-
-	if(0) LRMindel_dynamic_search_debug(context, dynamic_score_buffer, dynamic_movement_BEFORE_buffer, dynamic_row_width, dynamic_rows, best_offset_history);
 
 	row_i = first_correct_base - last_correct_base - 1;
 	indel_i = trying_indel_length + expected_indels -(row_i >0?best_offset_history[row_i - 1]:0);
