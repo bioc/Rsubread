@@ -1,3 +1,6 @@
+17 Oct 2024 - 2.19.6
+(1) Updated users manual.
+
 16 Oct 2024 - 2.19.5
 (1) Fixed another bug that potentially leads to buffer overflow errors.
 
