@@ -199,7 +199,7 @@ typedef struct {
 
 	unsigned short chro_reverse_table_current_size;
 	unsigned int * reverse_table_start_index;
-	int reverse_table_start_index_size;
+	unsigned int reverse_table_start_index_size;
 	//unsigned int * reverse_table_end_index;
 } fc_chromosome_index_info;
 
@@ -1133,9 +1133,9 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			chro_stab -> chro_features ++;
 
 			if( chro_stab -> chro_possible_length >= chro_stab -> reverse_table_start_index_size ) {
-				int old_end = sizeof(int) *( chro_stab -> reverse_table_start_index_size  / REVERSE_TABLE_BUCKET_LENGTH +2);
+				unsigned int old_end = sizeof(int) *( chro_stab -> reverse_table_start_index_size  / REVERSE_TABLE_BUCKET_LENGTH +2);
 				chro_stab -> reverse_table_start_index_size = max(chro_stab -> reverse_table_start_index_size * 2, (int)(chro_stab -> chro_possible_length * 1.3));
-				int new_size = sizeof(int) *( chro_stab -> reverse_table_start_index_size  / REVERSE_TABLE_BUCKET_LENGTH +2);
+				unsigned int new_size = sizeof(int) *( chro_stab -> reverse_table_start_index_size  / REVERSE_TABLE_BUCKET_LENGTH +2);
 				chro_stab -> reverse_table_start_index = realloc( chro_stab -> reverse_table_start_index , new_size);
 				memset(chro_stab -> reverse_table_start_index + old_end / sizeof(int), 0, new_size - old_end);
 			}
