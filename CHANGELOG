@@ -1,3 +1,6 @@
+1 Nov 2024 - 2.21.1
+(1) Fixed a bug in featureCounts that cannot run when chromosome length ~ 2G.
+
 17 Oct 2024 - 2.19.6
 (1) Updated users manual.
 
