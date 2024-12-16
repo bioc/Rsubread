@@ -283,6 +283,7 @@ typedef struct {
 	int known_cell_barcode_length;
 	HashTable * junction_features_table;
 	HashTable * junction_bucket_table;
+	HashTable * junction_IVTree_table;
 	fasta_contigs_t * fasta_contigs;
 
 	HashTable * gene_name_table;	// gene_name -> gene_number
@@ -952,8 +953,12 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 		HashTableSetDeallocationFunctions(global_context -> junction_features_table, free, (void (*)(void *))HashTableDestroy);
 		HashTableSetKeyComparisonFunction(global_context -> junction_features_table, fc_strcmp);
 		HashTableSetHashFunction(global_context -> junction_features_table, fc_chro_hash);
-	}
 
+		global_context -> junction_IVTree_table = HashTableCreate(1603);
+		HashTableSetDeallocationFunctions(global_context -> junction_IVTree_table, free, (void (*)(void *))IVT_freeTree);
+		HashTableSetKeyComparisonFunction(global_context -> junction_IVTree_table, fc_strcmp);
+		HashTableSetHashFunction(global_context -> junction_IVTree_table, fc_chro_hash);
+	}
 
 	// first scan: get the chromosome size (that have exons), total number of features
 	// also create chro_name_table : chro_name => fc_chromosome_index_info 
@@ -6215,6 +6220,7 @@ int readSummary(int argc,char *argv[]){
 	if(global_context.do_junction_counting){
 		HashTableDestroy(global_context.junction_bucket_table);
 		HashTableDestroy(global_context.junction_features_table);
+		HashTableDestroy(global_context.junction_IVTree_table);
 	}
 
 

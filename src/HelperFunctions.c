@@ -3053,3 +3053,190 @@ int general_dynamic_align(char * read, int read_len, unsigned int begin_position
 }
 
 
+
+// Get the height of the tree
+int IVT_height(IVT_IntervalTreeNode *node) {
+    return node ? node->height : 0;
+}
+
+// Calculate the balance factor of a node
+int IVT_getBalance(IVT_IntervalTreeNode *node) {
+    return node ? IVT_height(node->left) - IVT_height(node->right) : 0;
+}
+
+// Update the height of a node
+void IVT_updateHeight(IVT_IntervalTreeNode *node) {
+    if (node) {
+        node->height = 1 + (IVT_height(node->left) > IVT_height(node->right) ? IVT_height(node->left) : IVT_height(node->right));
+    }
+}
+
+// Update the max value of a node
+void IVT_updateMax(IVT_IntervalTreeNode *node) {
+    if (node) {
+        node->posmax = node->interval.end;
+        if (node->left && node->left->posmax > node->posmax) {
+            node->posmax = node->left->posmax;
+        }
+        if (node->right && node->right->posmax > node->posmax) {
+            node->posmax = node->right->posmax;
+        }
+    }
+}
+
+// Right rotate the subtree rooted with y
+IVT_IntervalTreeNode* IVT_rightRotate(IVT_IntervalTreeNode *y) {
+    IVT_IntervalTreeNode *x = y->left;
+    IVT_IntervalTreeNode *T2 = x->right;
+
+    x->right = y;
+    y->left = T2;
+
+    IVT_updateHeight(y);
+    IVT_updateMax(y);
+    IVT_updateHeight(x);
+    IVT_updateMax(x);
+
+    return x;
+}
+
+// Left rotate the subtree rooted with x
+IVT_IntervalTreeNode* IVT_leftRotate(IVT_IntervalTreeNode *x) {
+    IVT_IntervalTreeNode *y = x->right;
+    IVT_IntervalTreeNode *T2 = y->left;
+
+    y->left = x;
+    x->right = T2;
+
+    IVT_updateHeight(x);
+    IVT_updateMax(x);
+    IVT_updateHeight(y);
+    IVT_updateMax(y);
+
+    return y;
+}
+
+// Create a new interval tree node
+IVT_IntervalTreeNode* IVT_createNode(int start, int end, void * attr) {
+    IVT_IntervalTreeNode* node = (IVT_IntervalTreeNode*)malloc(sizeof(IVT_IntervalTreeNode));
+    node->interval.start = start;
+    node->interval.end = end;
+    node->interval.attr = attr;
+    node->posmax = end;
+    node->height = 1;
+    node->left = node->right = NULL;
+    return node;
+}
+
+// Insert a new interval into the interval tree
+IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, int start, int end, void * attr) {
+    if (!node) {
+        return IVT_createNode(start, end, attr);
+    }
+
+    if (start < node->interval.start) {
+        node->left = IVT_insert(node->left, start, end, attr);
+    } else {
+        node->right = IVT_insert(node->right, start, end, attr);
+    }
+
+    IVT_updateHeight(node);
+    IVT_updateMax(node);
+
+    int balance = IVT_getBalance(node);
+
+    // Left Left Case
+    if (balance > 1 && start < node->left->interval.start) {
+        return IVT_rightRotate(node);
+    }
+
+    // Right Right Case
+    if (balance < -1 && start > node->right->interval.start) {
+        return IVT_leftRotate(node);
+    }
+
+    // Left Right Case
+    if (balance > 1 && start > node->left->interval.start) {
+        node->left = IVT_leftRotate(node->left);
+        return IVT_rightRotate(node);
+    }
+
+    // Right Left Case
+    if (balance < -1 && start < node->right->interval.start) {
+        node->right = IVT_rightRotate(node->right);
+        return IVT_leftRotate(node);
+    }
+
+    return node;
+}
+
+void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int outbuf_capa, int * items, int to_left) {
+    if(!root)return;
+    int current_edge = -1;
+
+    if(*items>0){
+      if(to_left) current_edge = outbuf[0]->end;
+      else current_edge = outbuf[0]->start;
+    }
+
+    int testing_edge;
+    if(to_left) testing_edge = root->interval.end;
+    else testing_edge = root->interval.start;
+
+    if( current_edge <0 || abs(current_edge - point) > abs(testing_edge - point)){
+      if(outbuf_capa>0){
+        outbuf[0] =&root -> interval;
+        *items =1;
+      }
+    } else if(abs(current_edge - point) == abs(testing_edge - point)) {
+      if(outbuf_capa>*items) outbuf[(*items)++] =&root -> interval;
+    }
+
+    int do_left_search = 1;
+    if( to_left    && root -> interval.start < point) do_left_search = 0;
+    IVT_query_lr_int(root -> left, point, outbuf, outbuf_capa, items, to_left);
+
+    int do_right_search = 1;
+    if( 0==to_left && root -> posmax         < point) do_right_search = 0;
+    if( do_right_search )IVT_query_lr_int(root -> right, point, outbuf, outbuf_capa, items, to_left);
+}
+
+void IVT_query_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int * outptr, int capa) {
+    if (!root) return;
+
+    if (root->interval.start <= point && point <= root->interval.end)
+        if( *outptr < capa ) outbuf[(*outptr)++]=&root->interval;
+
+    if (root->left && root->left->posmax >= point) IVT_query_int(root->left, point, outbuf, outptr, capa);
+
+    IVT_query_int(root->right, point, outbuf, outptr, capa);
+}
+
+// Query the interval tree to find all intervals containing a given point
+// If no overlapping interval is found then find the left or right nearest intervals.
+int IVT_query_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa, int * is_overlapping_match, int to_left) {
+  int items= 0;
+
+  *is_overlapping_match = 1;
+  IVT_query_int(root, point, outbuf, &items, outbuf_capa);
+  if(items>0)return items;
+
+  *is_overlapping_match = 0;
+  IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
+  return items;
+}
+
+// Query the interval tree to find all intervals containing a given point
+int IVT_query(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa) {
+    int outptr=0;
+    IVT_query_int(root, point, outbuf, &outptr, outbuf_capa);
+    return outptr;
+}
+
+// Free the interval tree
+void IVT_freeTree(IVT_IntervalTreeNode* root) {
+    if (!root) return;
+    IVT_freeTree(root->left);
+    IVT_freeTree(root->right);
+    free(root);
+}

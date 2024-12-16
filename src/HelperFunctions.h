@@ -280,4 +280,31 @@ void init_typical_dynamic_align(void *** buffers, int * penalties, int max_read_
 void destroy_typical_dynamic_align(void *** buffers,int max_read_length);
 char LRM_get_baseval_for_dp(unsigned int pos , void * vvcontext);
 
+
+// the interal tree structure funcs
+// Define a structure for an interval
+typedef struct {
+    int start;
+    int end;
+    void * attr;
+} IVT_Interval;
+
+// Define a structure for a node in the interval tree
+typedef struct IVT_IntervalTreeNode {
+    IVT_Interval interval;
+    int posmax;
+    int height;
+    struct IVT_IntervalTreeNode *left;
+    struct IVT_IntervalTreeNode *right;
+} IVT_IntervalTreeNode;
+IVT_IntervalTreeNode* IVT_createNode(int start, int end, void * attr);
+IVT_IntervalTreeNode* IVT_leftRotate(IVT_IntervalTreeNode *x);
+IVT_IntervalTreeNode* IVT_rightRotate(IVT_IntervalTreeNode *y);
+void IVT_updateMax(IVT_IntervalTreeNode *node);
+void IVT_updateHeight(IVT_IntervalTreeNode *node);
+int IVT_getBalance(IVT_IntervalTreeNode *node);
+int IVT_height(IVT_IntervalTreeNode *node);
+IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, int start, int end, void * attr);
+int IVT_query(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int outbuf_capa);
+void IVT_freeTree(IVT_IntervalTreeNode* root);
 #endif
