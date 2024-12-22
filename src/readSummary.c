@@ -1149,7 +1149,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 			assert(feature_name);
 			if(global_context -> do_junction_counting)
-				register_junc_feature(global_context , feature_name, seq_name, ret_features[xk1].start, ret_features[xk1].end);
+				register_junc_feature(global_context , feature_name, transcript_id, seq_name, ret_features[xk1].start, ret_features[xk1].end);
 
 			xk1++;
 		} else if(file_type == FILE_TYPE_GTF) {
@@ -1294,7 +1294,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				chro_stab -> reverse_table_start_index[bin_location]++;
 
 				if(global_context -> do_junction_counting)
-					register_junc_feature(global_context , feature_name_tmp, seq_name, ret_features[xk1].start, ret_features[xk1].end);
+					register_junc_feature(global_context , feature_name_tmp, transcript_id_tmp, seq_name, ret_features[xk1].start, ret_features[xk1].end);
 
 				xk1++;
 			}

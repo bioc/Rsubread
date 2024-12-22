@@ -3075,12 +3075,21 @@ void IVT_updateHeight(IVT_IntervalTreeNode *node) {
 void IVT_updateMax(IVT_IntervalTreeNode *node) {
     if (node) {
         node->posmax = node->interval.end;
+        node->posmin = node->interval.start;
+
         if (node->left && node->left->posmax > node->posmax) {
             node->posmax = node->left->posmax;
         }
         if (node->right && node->right->posmax > node->posmax) {
             node->posmax = node->right->posmax;
         }
+        if (node->left && node->left->posmin < node->posmin) {
+            node->posmin = node->left->posmin;
+        }
+        if (node->right && node->right->posmin < node->posmin) {
+            node->posmin = node->right->posmin;
+        }
+
     }
 }
 
@@ -3123,6 +3132,7 @@ IVT_IntervalTreeNode* IVT_createNode(int start, int end, void * attr) {
     node->interval.end = end;
     node->interval.attr = attr;
     node->posmax = end;
+    node->posmin = start;
     node->height = 1;
     node->left = node->right = NULL;
     return node;
@@ -3178,27 +3188,32 @@ void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outb
       if(to_left) current_edge = outbuf[0]->end;
       else current_edge = outbuf[0]->start;
     }
-
-    int testing_edge;
-    if(to_left) testing_edge = root->interval.end;
-    else testing_edge = root->interval.start;
-
-    if( current_edge <0 || abs(current_edge - point) > abs(testing_edge - point)){
-      if(outbuf_capa>0){
-        outbuf[0] =&root -> interval;
-        *items =1;
+    int do_search = 1;
+    if( current_edge >=0 &&    to_left && root -> posmax < current_edge) do_search = 0;
+    if( to_left && root -> posmin > point) do_search = 0;
+    if( current_edge >=0 && 0==to_left && root -> posmin > current_edge) do_search = 0;
+    if( to_left==0 && root -> posmax < point) do_search = 0;
+ 
+   //fprintf(stderr,"DO_SEARCH  LEFT=%d  AT %d => [%d %d]  RANGE [%d %d]  CUR_EDGE %d  DO=%d\n", to_left, point, root->interval.start, root->interval.end, root->posmin, root->posmax, current_edge, do_search);
+   if( do_search ){
+      int testing_edge;
+      if(to_left) testing_edge = root->interval.end;
+      else testing_edge = root->interval.start;
+  
+      if((to_left == 0) == (point < testing_edge)){
+        if((current_edge <0 || abs(current_edge - point) > abs(testing_edge - point))){
+          if(outbuf_capa>0){
+            outbuf[0] =&root -> interval;
+            *items =1;
+          }
+        } else if(abs(current_edge - point) == abs(testing_edge - point)) {
+          if(outbuf_capa>*items) outbuf[(*items)++] =&root -> interval;
+        }
       }
-    } else if(abs(current_edge - point) == abs(testing_edge - point)) {
-      if(outbuf_capa>*items) outbuf[(*items)++] =&root -> interval;
-    }
 
-    int do_left_search = 1;
-    if( to_left    && root -> interval.start < point) do_left_search = 0;
-    IVT_query_lr_int(root -> left, point, outbuf, outbuf_capa, items, to_left);
-
-    int do_right_search = 1;
-    if( 0==to_left && root -> posmax         < point) do_right_search = 0;
-    if( do_right_search )IVT_query_lr_int(root -> right, point, outbuf, outbuf_capa, items, to_left);
+      IVT_query_lr_int(root -> left,  point, outbuf, outbuf_capa, items, to_left);
+      IVT_query_lr_int(root -> right, point, outbuf, outbuf_capa, items, to_left);
+   }
 }
 
 void IVT_query_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int * outptr, int capa) {
@@ -3208,8 +3223,7 @@ void IVT_query_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf,
         if( *outptr < capa ) outbuf[(*outptr)++]=&root->interval;
 
     if (root->left && root->left->posmax >= point) IVT_query_int(root->left, point, outbuf, outptr, capa);
-
-    IVT_query_int(root->right, point, outbuf, outptr, capa);
+    if (root->right && root->right->posmin <= point)IVT_query_int(root->right, point, outbuf, outptr, capa);
 }
 
 // Query the interval tree to find all intervals containing a given point

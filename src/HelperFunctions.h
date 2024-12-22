@@ -293,6 +293,7 @@ typedef struct {
 typedef struct IVT_IntervalTreeNode {
     IVT_Interval interval;
     int posmax;
+    int posmin;
     int height;
     struct IVT_IntervalTreeNode *left;
     struct IVT_IntervalTreeNode *right;
