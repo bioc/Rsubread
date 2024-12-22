@@ -307,5 +307,7 @@ int IVT_getBalance(IVT_IntervalTreeNode *node);
 int IVT_height(IVT_IntervalTreeNode *node);
 IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, int start, int end, void * attr);
 int IVT_query(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int outbuf_capa);
+int IVT_edges_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa, int to_left);
+int IVT_query_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa, int * is_overlapping_match, int to_left);
 void IVT_freeTree(IVT_IntervalTreeNode* root);
 #endif

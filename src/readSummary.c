@@ -833,7 +833,7 @@ void junc_gene_free(void *vv){
 	free(v);
 }
 
-void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * chro, unsigned int start, unsigned int stop){
+void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * transcript_id, char * chro, unsigned int start, unsigned int stop){
 	HashTable * gene_table = HashTableGet(global_context -> junction_features_table, chro);
 	//SUBREADprintf("REG %s : %p\n", chro, gene_table);
 	if(NULL == gene_table){

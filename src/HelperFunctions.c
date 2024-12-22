@@ -3190,9 +3190,9 @@ void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outb
     }
     int do_search = 1;
     if( current_edge >=0 &&    to_left && root -> posmax < current_edge) do_search = 0;
-    if( to_left && root -> posmin > point) do_search = 0;
+    if( to_left && root -> posmin >= point) do_search = 0;
     if( current_edge >=0 && 0==to_left && root -> posmin > current_edge) do_search = 0;
-    if( to_left==0 && root -> posmax < point) do_search = 0;
+    if( to_left==0 && root -> posmax <= point) do_search = 0;
  
    //fprintf(stderr,"DO_SEARCH  LEFT=%d  AT %d => [%d %d]  RANGE [%d %d]  CUR_EDGE %d  DO=%d\n", to_left, point, root->interval.start, root->interval.end, root->posmin, root->posmax, current_edge, do_search);
    if( do_search ){
@@ -3200,7 +3200,7 @@ void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outb
       if(to_left) testing_edge = root->interval.end;
       else testing_edge = root->interval.start;
   
-      if((to_left == 0) == (point < testing_edge)){
+      if((to_left == 0) == (point < testing_edge) && point != testing_edge){
         if((current_edge <0 || abs(current_edge - point) > abs(testing_edge - point))){
           if(outbuf_capa>0){
             outbuf[0] =&root -> interval;
@@ -3239,6 +3239,14 @@ int IVT_query_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, i
   IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
   return items;
 }
+
+// Only query edges: to_left == 1 then find "end" edges; to_left == 0 then find "start" edges".
+int IVT_edges_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa, int to_left) {
+  int items= 0;
+  IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
+  return items;
+}
+
 
 // Query the interval tree to find all intervals containing a given point
 int IVT_query(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa) {
