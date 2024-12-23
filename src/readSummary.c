@@ -63,11 +63,16 @@
 #define FC_FLIST_SPLITOR "\026"
 
 typedef struct{
+	int is_negative_strand;
+	ArrayList * exons_in_transcript; // the items in IVT tree obj is deallocated when this ArrayList is destroyed. 
 	char * gene_name;
-	unsigned int pos_first_base;
-	unsigned int pos_last_base;
-} fc_junction_gene_t;
+} fc_junction_transcript_t;
 
+typedef struct{
+	char * transcript_id; // This should be the memory address in the fc_junction_transcript_t table. Not a dedicated memory space for exons.
+	int chro_start;
+	int chro_end;
+} fc_junction_exon_in_transcript_t;
 
 #define MAXIMUM_INSERTION_IN_SECTION 8
 
@@ -80,13 +85,6 @@ typedef struct {
 	unsigned short insertion_lengths[ MAXIMUM_INSERTION_IN_SECTION ];
 } CIGAR_interval_t;
 
-
-
-typedef struct {
-	int space;
-	int used;
-	fc_junction_gene_t ** genes;
-} gene_info_list_t;
 
 typedef struct {
 	char chromosome_name_left[CHROMOSOME_NAME_LENGTH + 1];
@@ -281,8 +279,9 @@ typedef struct {
 	srInt_64 unistr_buffer_used;
 	HashTable * lineno_2_sortedno_tab;
 	int known_cell_barcode_length;
-	HashTable * junction_features_table;
-	HashTable * junction_bucket_table;
+//	HashTable * junction_features_table;
+//	HashTable * junction_bucket_table;
+	HashTable * junction_transcript_table;
 	HashTable * junction_IVTree_table;
 	fasta_contigs_t * fasta_contigs;
 
@@ -317,6 +316,7 @@ typedef struct {
 	srInt_64 * exontable_stop;
 	char feature_name_column[2000];
 	char gene_id_column[100];
+	char transcript_id_column[100];
 
 	srInt_64 * exontable_block_end_index;
 	srInt_64 * exontable_block_max_end;
@@ -827,43 +827,38 @@ int fc_strcmp(const void * s1, const void * s2)
 	return strcmp((char*)s1, (char*)s2);
 }
 
-void junc_gene_free(void *vv){
-	fc_junction_gene_t *v = vv;
-	free(v -> gene_name);
-	free(v);
+void junc_transcript_free(fc_junction_transcript_t * txp){
+	free(txp -> gene_name);
+	ArrayListDestroy(txp -> exons_in_transcript);
+	free(txp);
 }
 
 void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * transcript_id, char * chro, unsigned int start, unsigned int stop){
-	HashTable * gene_table = HashTableGet(global_context -> junction_features_table, chro);
-	//SUBREADprintf("REG %s : %p\n", chro, gene_table);
-	if(NULL == gene_table){
-		gene_table = HashTableCreate(48367);
-		HashTableSetDeallocationFunctions(gene_table, NULL, junc_gene_free);
-		HashTableSetKeyComparisonFunction(gene_table, fc_strcmp);
-		HashTableSetHashFunction(gene_table, fc_chro_hash);
-
-		char * new_name = malloc(strlen(chro)+1);
-		strcpy(new_name, chro);
-		HashTablePut(global_context -> junction_features_table, new_name, gene_table);
-	}
-	fc_junction_gene_t * gene_info = HashTableGet(gene_table, feature_name);
-	if(NULL == gene_info){
-		gene_info = malloc(sizeof(fc_junction_gene_t));
-		gene_info -> gene_name = strdup(feature_name);
-		gene_info -> pos_first_base = start;
-		gene_info -> pos_last_base = stop;
-
-		HashTablePut(gene_table, gene_info -> gene_name, gene_info);
+	if(transcript_id==NULL)return;	// SAF format: don't do anything about junction assignment to genes.
+	fc_junction_exon_in_transcript_t * new_item = calloc(sizeof(sizeof(fc_junction_exon_in_transcript_t)),1);
+	new_item -> transcript_id = HashTableGetKey(global_context -> junction_transcript_table, transcript_id); 
+	if(NULL == new_item -> transcript_id){
+		new_item -> transcript_id = strdup(transcript_id);
+		fc_junction_transcript_t * new_txp = calloc(sizeof(fc_junction_transcript_t),1);
+		new_txp -> exons_in_transcript = ArrayListCreate(10); 
+		ArrayListSetDeallocationFunction(new_txp -> exons_in_transcript, free);
+		ArrayListPush(new_txp -> exons_in_transcript, new_item);
+		new_txp -> gene_name = strdup(feature_name);
+		HashTablePut(global_context -> junction_transcript_table, new_item->transcript_id, new_txp);
 	}else{
-		gene_info -> pos_first_base = min(start, gene_info -> pos_first_base);
-		gene_info -> pos_last_base = max(stop, gene_info -> pos_last_base);
-	}
-}
+		fc_junction_transcript_t * has_txp = HashTableGet(global_context -> junction_transcript_table, transcript_id);
+		ArrayListPush(has_txp -> exons_in_transcript, new_item);
+	} 
 
-void free_bucket_table_list(void * pv){
-	gene_info_list_t * list = (gene_info_list_t*) pv;
-	free(list -> genes);
-	free(list);
+	IVT_IntervalTreeNode * IVT_rootnode = HashTableGet(global_context -> junction_IVTree_table, chro);
+	if(NULL == IVT_rootnode){
+		IVT_rootnode = IVT_insert(IVT_rootnode, start, stop, new_item);
+		char * new_name = strdup(chro);
+		HashTablePut(global_context -> junction_IVTree_table, new_name, IVT_rootnode);
+	}else{
+		IVT_rootnode = IVT_insert(IVT_rootnode, start, stop, new_item);
+		HashTablePutReplaceEx(global_context -> junction_IVTree_table, chro, IVT_rootnode,0,0,0); // use old key ptr in table; don't free key and value.
+	}
 }
 
 int match_feature_name_column(char * infile, char * needed){
@@ -876,51 +871,6 @@ int match_feature_name_column(char * infile, char * needed){
 		t1 = strtok_r(NULL,",", &ptt);
 	}
 	return 0;
-}
-
-#define JUNCTION_BUCKET_STEP (128*1024)
-
-int locate_junc_features(fc_thread_global_context_t *global_context, char * chro, unsigned int pos, fc_junction_gene_t ** ret_info, int max_ret_info_size){
-	gene_info_list_t * list = NULL;
-	char bucket_key[CHROMOSOME_NAME_LENGTH + 20];
-
-	if(global_context -> BAM_chros_to_anno_table) {
-		char * anno_chro_name = HashTableGet( global_context -> BAM_chros_to_anno_table , chro);
-		if(anno_chro_name){
-			SUBreadSprintf(bucket_key, CHROMOSOME_NAME_LENGTH +20, "%s:%u", anno_chro_name, pos - pos % JUNCTION_BUCKET_STEP);
-			list = HashTableGet(global_context -> junction_bucket_table, bucket_key);
-		}
-	}
-
-	if(list == NULL){
-		SUBreadSprintf(bucket_key,  CHROMOSOME_NAME_LENGTH +20, "%s:%u", chro, pos - pos % JUNCTION_BUCKET_STEP);
-		list = HashTableGet(global_context -> junction_bucket_table, bucket_key);
-	}
-
-	if(list == NULL && strlen(chro)>3 && memcmp(chro, "chr", 3)==0){
-		SUBreadSprintf(bucket_key,  CHROMOSOME_NAME_LENGTH +20, "%s:%u", chro+3, pos - pos % JUNCTION_BUCKET_STEP);
-		list = HashTableGet(global_context -> junction_bucket_table, bucket_key);
-	}
-
-	if(list == NULL){
-		SUBreadSprintf(bucket_key,  CHROMOSOME_NAME_LENGTH +20, "chr%s:%u", chro, pos - pos % JUNCTION_BUCKET_STEP);
-		list = HashTableGet(global_context -> junction_bucket_table, bucket_key);
-	}
-
-	int ret = 0;
-
-	if(list){
-		int x1; 
-		for(x1 = 0; x1 < list -> used; x1++){
-			fc_junction_gene_t * gene_info = list -> genes[x1];
-			if(gene_info -> pos_first_base <= pos && gene_info -> pos_last_base >= pos){
-				if(ret < max_ret_info_size)
-					ret_info [ret ++] = gene_info;
-			}
-		}
-	}
-	
-	return ret;
 }
 
 // This function loads annotations from the file.
@@ -944,15 +894,10 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	global_context -> longest_chro_name = 0;
 
 	if(global_context -> do_junction_counting){
-		global_context -> junction_bucket_table = HashTableCreate(76037);
-		HashTableSetDeallocationFunctions(global_context -> junction_bucket_table, free, free_bucket_table_list);
-		HashTableSetKeyComparisonFunction(global_context -> junction_bucket_table, fc_strcmp);
-		HashTableSetHashFunction(global_context -> junction_bucket_table, fc_chro_hash);
-
-		global_context -> junction_features_table = HashTableCreate(1603);
-		HashTableSetDeallocationFunctions(global_context -> junction_features_table, free, (void (*)(void *))HashTableDestroy);
-		HashTableSetKeyComparisonFunction(global_context -> junction_features_table, fc_strcmp);
-		HashTableSetHashFunction(global_context -> junction_features_table, fc_chro_hash);
+		global_context -> junction_transcript_table = HashTableCreate(1603);
+		HashTableSetDeallocationFunctions(global_context -> junction_transcript_table, free, (void (*)(void *))junc_transcript_free); 
+		HashTableSetKeyComparisonFunction(global_context -> junction_transcript_table, fc_strcmp);
+		HashTableSetHashFunction(global_context -> junction_transcript_table, fc_chro_hash);
 
 		global_context -> junction_IVTree_table = HashTableCreate(1603);
 		HashTableSetDeallocationFunctions(global_context -> junction_IVTree_table, free, (void (*)(void *))IVT_freeTree);
@@ -1029,7 +974,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	lineno = 0;
 	while(1)
 	{
-		int is_gene_id_found = 0;
+		int is_gene_id_found = 0, is_txn_id_found = 0;
 		int rchars = autozip_gets(&anno_fp, file_line, MAX_ANNOT_LINE_LENGTH);
 		if(rchars < 1) break;
 		if(rchars >= MAX_ANNOT_LINE_LENGTH - 1){
@@ -1148,18 +1093,20 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			is_gene_id_found = 1;
 
 			assert(feature_name);
-			if(global_context -> do_junction_counting)
-				register_junc_feature(global_context , feature_name, transcript_id, seq_name, ret_features[xk1].start, ret_features[xk1].end);
+			if(global_context -> do_junction_counting){
+				register_junc_feature(global_context , feature_name, NULL, seq_name, ret_features[xk1].start, ret_features[xk1].end);
+			}
 
 			xk1++;
 		} else if(file_type == FILE_TYPE_GTF) {
 			char feature_name_tmp[FEATURE_NAME_LENGTH];
+			char transcript_id_tmp[FEATURE_NAME_LENGTH];
 			SUBreadSprintf(feature_name_tmp, FEATURE_NAME_LENGTH, "LINE_%07u", xk1 + 1);
+			transcript_id_tmp[0]=0;
 			char * seq_name = strtok_r(file_line,"\t",&token_temp);
 			strtok_r(NULL,"\t", &token_temp);// source
 			char * feature_type = strtok_r(NULL,"\t", &token_temp);// feature_type
 			if(match_feature_name_column(feature_type, global_context -> feature_name_column)) {
-
 				if(xk1 >= ret_features_size) {
 					ret_features_size *=2;
 					ret_features = realloc(ret_features, sizeof(fc_feature_info_t) * ret_features_size);
@@ -1202,7 +1149,9 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				if(extra_attrs && (strlen(extra_attrs)>2))
 				{
 					int attr_val_len = GTF_extra_column_value(extra_attrs , global_context -> gene_id_column , feature_name_tmp, FEATURE_NAME_LENGTH);
+					int txpid_val_len = GTF_extra_column_value(extra_attrs , global_context -> transcript_id_column , transcript_id_tmp, FEATURE_NAME_LENGTH);
 					if(attr_val_len>0) is_gene_id_found=1;
+					if(txpid_val_len>0) is_txn_id_found=1;
 			//		printf("V=%s\tR=%d\n", extra_attrs , attr_val_len);
 
 					if(global_context -> reported_extra_columns){
@@ -1244,8 +1193,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 				}
 
 				if(!is_gene_id_found) {
-					if(!is_GFF_warned)
-					{
+					if(!is_GFF_warned) {
 						int ext_att_len = strlen(extra_attrs);
 						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
 						SUBREADprintf("\nERROR: failed to find the gene identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nAn example of attributes included in your GTF annotation is '%s'.\n\n",  global_context -> gene_id_column, extra_attrs);
@@ -1293,8 +1241,14 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 	
 				chro_stab -> reverse_table_start_index[bin_location]++;
 
-				if(global_context -> do_junction_counting)
+				if(global_context -> do_junction_counting){
+					if(!is_txn_id_found){
+						int ext_att_len = strlen(extra_attrs);
+						if(extra_attrs[ext_att_len-1] == '\n') extra_attrs[ext_att_len-1] =0;
+						SUBREADprintf("\nERROR: failed to find the transcript identifier attribute in the 9th column of the provided GTF file.\nThe specified gene identifier attribute is '%s' \nAn example of attributes included in your GTF annotation is '%s'.\n\n",  global_context -> transcript_id_column, extra_attrs);
+					}
 					register_junc_feature(global_context , feature_name_tmp, transcript_id_tmp, seq_name, ret_features[xk1].start, ret_features[xk1].end);
+				}
 
 				xk1++;
 			}
@@ -2535,7 +2489,6 @@ int process_pairer_output(void * pairer_vp, int thread_no, char * bin1, char * b
 	return 0;
 }
 
-void sort_bucket_table(fc_thread_global_context_t * global_context);
 void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context,
 			srInt_64 * hits_indices1, int nhits1, srInt_64 * hits_indices2, int nhits2, unsigned int total_frag_len,
 			char ** hits_chro1, char ** hits_chro2, unsigned int * hits_start_pos1, unsigned int * hits_start_pos2, unsigned short * hits_length1, unsigned short * hits_length2, int fixed_fractional_count, char * read_name, char * RG_name, char * bin1, char * bin2);
@@ -4159,7 +4112,7 @@ void fc_NCfree(void * vv){
 }
 
 
-void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, int is_dual_index ) {
+void fc_thread_init_global_context(fc_thread_global_context_t * global_context, unsigned int buffer_size, unsigned short threads, int line_length, int min_pe_dist, int max_pe_dist, int is_gene_level, int is_overlap_allowed, char * strand_check_mode, char * output_fname, int is_sam_out, int is_both_end_required, int is_chimertc_disallowed, int is_PE_distance_checked, char *feature_name_column, char * gene_id_column, char * transcript_id_column, int min_map_qual_score, int is_multi_mapping_allowed, int is_SAM, char * alias_file_name, char * cmd_rebuilt, int is_input_file_resort_needed, int feature_block_size, int isCVersion, int fiveEndExtension,  int threeEndExtension, int minFragmentOverlap, int is_split_or_exonic_only, int reduce_5_3_ends_to_one, char * debug_command, int is_duplicate_ignored, int is_not_sort, int use_fraction_multimapping, int useOverlappingBreakTie, char * pair_orientations, int do_junction_cnt, int max_M, int isRestrictlyNoOvelrapping, float fracOverlap, char * temp_dir, int use_stdin_file, int assign_reads_to_RG, int long_read_minimum_length, int is_verbose, float frac_feature_overlap, int do_detection_call, int max_missing_bases_in_read, int max_missing_bases_in_feature, int is_primary_alignment_only, char * Rpath, char * extra_column_names , char * annotation_file_screen_output, int read_shift_type, int read_shift_size, int is_dual_index ) {
 	int x1;
 	myrand_srand(time(NULL));
 
@@ -4256,6 +4209,7 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 
 	strcpy(global_context -> feature_name_column,feature_name_column);
 	strcpy(global_context -> gene_id_column,gene_id_column);
+	strcpy(global_context -> transcript_id_column,transcript_id_column);
 	strcpy(global_context -> output_file_name, output_fname);
 	global_context -> output_file_path[0]=0;
 	for( x1 = strlen(output_fname)-1; x1 >= 0; x1 --){
@@ -5284,12 +5238,8 @@ void junckey_sort_merge(void * inptr, int start, int items1, int items2){
 	free(tmpp);
 }
 
-int junccmp(fc_junction_gene_t * j1, fc_junction_gene_t * j2){
-	if(strcmp( j1 -> gene_name, j2 -> gene_name ) == 0)
-		return 0;
-	return 1;
-}
 
+#define MAX_OVERLAP_EDGE_NUMBER 1000
 
 void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char * output_file_name, ArrayList * column_names, ArrayList * junction_global_table_list, ArrayList * splicing_global_table_list){
 	int infile_i, disk_is_full = 0;
@@ -5365,11 +5315,6 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	int max_junction_genes = 3000;
 	char * gene_names = malloc(max_junction_genes * FEATURE_NAME_LENGTH), * gene_name_tail;
-	fc_junction_gene_t ** ret_juncs_small = malloc(sizeof(fc_junction_gene_t *) * max_junction_genes);
-	fc_junction_gene_t ** ret_juncs_large = malloc(sizeof(fc_junction_gene_t *) * max_junction_genes);
-	fc_junction_gene_t ** junction_key_list = malloc(sizeof(fc_junction_gene_t *)* max_junction_genes * 2);
-	unsigned int * junction_support_list = malloc(sizeof(int)* max_junction_genes * 2);
-	unsigned char * junction_source_list = malloc(sizeof(char)* max_junction_genes * 2 );
 
 	int ky_i1, ky_i2;
 	FILE * ofp = fopen(outfname, "w");
@@ -5384,10 +5329,11 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	}
 	fprintf(ofp, "\n");
 
+	IVT_Interval ** junc_exons_olayleft = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_exons_olayright = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_exons_left = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_exons_right = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
 	for(ky_i = 0; ky_i < merged_junction_table -> numOfElements ; ky_i ++){
-
-		//SUBREADprintf("KY=%s\n", key_list[ky_i]);
-
 		int unique_junctions = 0;
 		char * chro_small = strtok_r( key_list[ky_i] , "\t", &tmpp);
 		char * pos_small_str = strtok_r( NULL, "\t", &tmpp);
@@ -5396,9 +5342,6 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 		unsigned int pos_small = atoi(pos_small_str);
 		unsigned int pos_large = atoi(pos_large_str);
-
-		int found_features_small = locate_junc_features(global_context, chro_small, pos_small, ret_juncs_small , max_junction_genes); 
-		int found_features_large = locate_junc_features(global_context, chro_large, pos_large, ret_juncs_large , max_junction_genes);
 
 		char * strand = "NA";
 		if(global_context -> fasta_contigs){
@@ -5417,90 +5360,18 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 			}
 		}
-
-		//SUBREADprintf("FOUND=%d, %d\n", found_features_small, found_features_large);
-
-		gene_name_tail = gene_names;
-		gene_names[0]=0;
-
-		// rules to choose the primary gene:
-		// (1) if some genes have one support but the other have multiple supporting reads: remove the lowly supported genes
-		// (2) if all genes have only one support but from different ends of the fragment, then remove the genes that are assigned to the end having lower supporting fragments
-		// (3) choose the gene that have the smallest coordinate.
-
-		int max_supp = 0;
-		for(ky_i1 = 0; ky_i1 < found_features_small + found_features_large; ky_i1++){
-			int is_duplicate = 0;
-			fc_junction_gene_t * tested_key = (ky_i1 < found_features_small)?ret_juncs_small[ky_i1] :ret_juncs_large[ky_i1 - found_features_small];
-			for(ky_i2 = 0; ky_i2 < unique_junctions; ky_i2 ++){
-				if(junccmp( tested_key, junction_key_list[ky_i2]  )==0){
-					junction_support_list[ ky_i2 ] ++;
-					junction_source_list[ky_i2] |= ( (ky_i1 < found_features_small)? 1 : 2 );
-					is_duplicate = 1;
-
-					max_supp = max(junction_support_list[ky_i2], max_supp);
-					break;
-				}
-			}
-
-			if(!is_duplicate){
-				junction_key_list[unique_junctions] = tested_key;
-				junction_support_list[unique_junctions] = 1;
-				junction_source_list[unique_junctions] = ( (ky_i1 < found_features_small)? 1 : 2 );
-				max_supp = max(junction_support_list[unique_junctions], max_supp);
-				unique_junctions++;
+		assert(0==strcmp(chro_small, chro_large));
+		IVT_IntervalTreeNode * IVT_exon_root = HashTableGet(global_context -> junction_IVTree_table, chro_small);
+		if(IVT_exon_root){
+			int junc_exon_olay_left_result_no, junc_exon_olay_right_result_no, junc_exon_left_result_no, junc_exon_right_result_no;
+			junc_exon_olay_left_result_no = IVT_query(IVT_exon_root, pos_small, junc_exons_olayleft, MAX_OVERLAP_EDGE_NUMBER);
+			junc_exon_olay_right_result_no = IVT_query(IVT_exon_root, pos_small, junc_exons_olayright, MAX_OVERLAP_EDGE_NUMBER);
+			junc_exon_left_result_no = IVT_edges_lr(IVT_exon_root, pos_small, junc_exons_left, MAX_OVERLAP_EDGE_NUMBER, 1);
+			junc_exon_right_result_no = IVT_edges_lr(IVT_exon_root, pos_large, junc_exons_right, MAX_OVERLAP_EDGE_NUMBER, 0);
+			if(junc_exon_olay_left_result_no == MAX_OVERLAP_EDGE_NUMBER|| junc_exon_olay_right_result_no==MAX_OVERLAP_EDGE_NUMBER || junc_exon_left_result_no==MAX_OVERLAP_EDGE_NUMBER || junc_exon_right_result_no==MAX_OVERLAP_EDGE_NUMBER){
+				SUBREADprintf("WARNING: Your annotation file contains very many exons that start/end at the same location. Consider to increase MAX_OVERLAP_EDGE_NUMBER in readSummary.c to accomodate these exons for junction counting.\n");
 			}
 		}
-
-		if(1 == max_supp){
-			if(found_features_small > 0 && found_features_large > 0){
-				char junc_key [FEATURE_NAME_LENGTH + 15]; 
-				SUBreadSprintf(junc_key, FEATURE_NAME_LENGTH+15, "%s\t%u", chro_small, pos_small);
-				unsigned int supp_small = HashTableGet(merged_splicing_table, junc_key) - NULL;
-				SUBreadSprintf(junc_key, FEATURE_NAME_LENGTH+15, "%s\t%u", chro_large, pos_large);
-				unsigned int supp_large = HashTableGet(merged_splicing_table, junc_key) - NULL;
-
-				if(supp_small !=supp_large){
-					for(ky_i2 = 0; ky_i2 < unique_junctions; ky_i2 ++){
-						if(supp_small > supp_large && junction_source_list[ky_i2] == 1) junction_key_list[ky_i2] = NULL;
-						else if(supp_small < supp_large && junction_source_list[ky_i2] == 2) junction_key_list[ky_i2] = NULL;
-					}
-				} 
-			}
-		}
-
-		int smallest_coordinate_gene = 0x7fffffff;
-		fc_junction_gene_t * primary_gene = NULL;
-		
-		for(ky_i2 = 0; ky_i2 < unique_junctions; ky_i2 ++){
-			fc_junction_gene_t * tested_key = junction_key_list[ky_i2];
-			if(tested_key != NULL && junction_support_list[ky_i2] == max_supp && tested_key -> pos_first_base < smallest_coordinate_gene){
-				primary_gene = tested_key;
-				smallest_coordinate_gene = tested_key -> pos_first_base;
-			}
-		}
-
-		if(primary_gene == NULL){
-			strcpy(gene_names, "NA");
-		}else{
-			strcpy(gene_names, primary_gene -> gene_name);
-		}
-
-		*(pos_small_str-1)='\t';
-		*(pos_large_str-1)='\t';
-
-		fprintf(ofp, "%s", gene_names);
-	
-		gene_name_tail = gene_names;
-		gene_names[0]=0;
-		for(ky_i2 = 0; ky_i2 < unique_junctions; ky_i2 ++){
-			fc_junction_gene_t * tested_key = junction_key_list[ky_i2];
-			if(tested_key && tested_key != primary_gene)
-				gene_name_tail += SUBreadSprintf(gene_name_tail, max_junction_genes * FEATURE_NAME_LENGTH , "%s,", tested_key -> gene_name);
-		}
-		if( gene_names[0] ) gene_name_tail[-1]=0;
-		else strcpy(gene_names, "NA");
-		fprintf(ofp, "\t%s", gene_names);
 
 		fprintf(ofp, "\t%s\t%s\t%s\t%s", chro_small, strand, chro_large, strand);
 
@@ -5519,13 +5390,8 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		if(wlen < 1) disk_is_full = 1;
 	}
 	fclose(ofp);
-	free(junction_key_list);
 	free(gene_names);
-	free(ret_juncs_small);
-	free(ret_juncs_large);
-	free(junction_support_list);
 	free(key_list);
-	free(junction_source_list);
 
 	//print_in_box(80,0,PRINT_BOX_CENTER,"Found %llu junctions in all the input files.", merged_junction_table -> numOfElements);
 	//print_in_box(80,0,0,"");
@@ -5635,7 +5501,7 @@ int readSummary(int argc,char *argv[]){
 	srInt_64 *start, *stop;
 	int *geneid;
 
-	char *nameFeatureTypeColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr =NULL, *strand_check_mode = NULL, *extra_column_names = NULL;
+	char *nameFeatureTypeColumn, *nameTranscriptIDColumn, *nameGeneIDColumn,*debug_command, *pair_orientations="fr", *temp_dir, *file_name_ptr =NULL, *strand_check_mode = NULL, *extra_column_names = NULL;
 	srInt_64 nexons;
 
 
@@ -5885,6 +5751,10 @@ int readSummary(int argc,char *argv[]){
 	if(argc>64) scrna_total_BAM_no = atoi(argv[64]);
 	else scrna_total_BAM_no =0; 
 
+	if(argc > 65)
+		nameTranscriptIDColumn = argv[65];
+	else	nameTranscriptIDColumn = "transcript_id";
+
 	if(read_shift_size<0){
 		SUBREADprintf("ERROR: why the value for read_shift_size is negative?\n");
 		return -1;
@@ -5916,7 +5786,7 @@ int readSummary(int argc,char *argv[]){
 
 	fc_thread_global_context_t global_context;
 
-	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, is_dual_index );
+	fc_thread_init_global_context(& global_context, FEATURECOUNTS_BUFFER_SIZE, thread_number, MAX_LINE_LENGTH, minPEDistance, maxPEDistance,isGeneLevel, isMultiOverlapAllowed, strand_check_mode, (char *)argv[3] , isReadSummaryReport, isBothEndRequired, isChimericDisallowed, isPEDistChecked, nameFeatureTypeColumn, nameGeneIDColumn, nameTranscriptIDColumn, minMappingQualityScore,isMultiMappingAllowed, 0, alias_file_name, cmd_rebuilt, isInputFileResortNeeded, feature_block_size, isCVersion, fiveEndExtension, threeEndExtension , minFragmentOverlap, isSplitOrExonicOnly, reduce_5_3_ends_to_one, debug_command, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, pair_orientations, doJuncCounting, max_M, isRestrictlyNoOvelrapping, fracOverlap, temp_dir, useStdinFile, assignReadsToRG, long_read_minimum_length, is_verbose, fracOverlapFeature, do_detectionCall, max_missing_bases_in_read, max_missing_bases_in_feature, is_Primary_Alignment_only, Rpath, extra_column_names, annotation_file_screen_output, read_shift_type, read_shift_size, is_dual_index );
 
 	fc_thread_init_input_files( & global_context, argv[2], &file_name_ptr );
 
@@ -5934,9 +5804,7 @@ int readSummary(int argc,char *argv[]){
 
 	sort_feature_info(&global_context, nexons, loaded_features, &chr, &geneid, &start, &stop, &sorted_strand, &anno_chr_2ch, &anno_chrs, &anno_chr_head, & block_end_index, & block_min_start, & block_max_end);
 	global_context.lineno_2_sortedno_tab = NULL;
-	if(global_context.do_junction_counting){
-		sort_bucket_table(&global_context);
-	}
+
 	print_in_box(80,0,0,"   Meta-features : %d", global_context . gene_name_table -> numOfElements);
 	print_in_box(80,0,0,"   Chromosomes/contigs : %d", global_context . exontable_nchrs);
 
@@ -6218,8 +6086,7 @@ int readSummary(int argc,char *argv[]){
 	if(global_context.BAM_chros_to_anno_table)
 		HashTableDestroy(global_context.BAM_chros_to_anno_table);
 	if(global_context.do_junction_counting){
-		HashTableDestroy(global_context.junction_bucket_table);
-		HashTableDestroy(global_context.junction_features_table);
+		HashTableDestroy(global_context.junction_transcript_table);
 		HashTableDestroy(global_context.junction_IVTree_table);
 	}
 
@@ -6248,57 +6115,6 @@ int readSummary(int argc,char *argv[]){
 
 	return total_written_coulmns?0:-1;
 }
-
-void register_buckets(fc_thread_global_context_t * global_context , HashTable * gene_feature_table, char * chro_name){
-	KeyValuePair * cursor;
-	int bucket;
-	for(bucket=0; bucket < gene_feature_table -> numOfBuckets; bucket++){
-		cursor = gene_feature_table -> bucketArray[bucket];
-		while(1){
-			if (!cursor) break;
-			fc_junction_gene_t * gene = (fc_junction_gene_t *) cursor -> value;
-			unsigned int x1;
-			
-			for(x1 = gene -> pos_first_base - gene -> pos_first_base % JUNCTION_BUCKET_STEP; x1 <= gene -> pos_last_base ; x1 += JUNCTION_BUCKET_STEP){
-				char bucket_key[CHROMOSOME_NAME_LENGTH + 20];
-				SUBreadSprintf(bucket_key, CHROMOSOME_NAME_LENGTH + 20, "%s:%u", chro_name, x1);
-				gene_info_list_t * list = HashTableGet(global_context -> junction_bucket_table, bucket_key);
-				if(list == NULL){
-					list = malloc(sizeof(gene_info_list_t));
-					list -> space = 3;
-					list -> used = 0;
-					list -> genes = malloc(sizeof(void *) * list -> space);
-					char * mem_bucket_key = malloc(strlen(bucket_key) + 1);
-					strcpy(mem_bucket_key , bucket_key);
-					HashTablePut(global_context -> junction_bucket_table, mem_bucket_key , list);
-				}
-
-				if(list -> used  ==  list -> space){
-					list -> space = max(list -> space + 3, list -> space * 1.3);
-					list -> genes = realloc(list -> genes , list -> space * sizeof(void *));
-				}
-				list -> genes[list -> used++] = gene;
-			}
-			cursor = cursor -> next;
-		}
-	}
-}
-
-void sort_bucket_table(fc_thread_global_context_t * global_context){
-	KeyValuePair * cursor;
-	int bucket;
-	for(bucket=0; bucket < global_context -> junction_features_table -> numOfBuckets; bucket++){
-		cursor = global_context -> junction_features_table -> bucketArray[bucket];
-		while(1){
-			if (!cursor) break;
-			HashTable * gene_feature_table = cursor -> value;
-			char * chro_name = (char *)cursor -> key;
-			register_buckets(global_context , gene_feature_table, chro_name);
-			cursor = cursor -> next;
-		}
-	}
-}
-
 
 int readSummary_single_file(fc_thread_global_context_t * global_context, read_count_type_t * column_numbers, srInt_64 nexons,  int * geneid, char ** chr, srInt_64 * start, srInt_64 * stop, unsigned char * sorted_strand, char * anno_chr_2ch, char ** anno_chrs, srInt_64 * anno_chr_head, srInt_64 * block_end_index, srInt_64 * block_min_start , srInt_64 * block_max_end, fc_read_counters * my_read_counter, HashTable * junction_global_table, HashTable * splicing_global_table, HashTable * merged_RG_table, fc_feature_info_t * loaded_features)
 {
@@ -6373,6 +6189,7 @@ int feature_count_main(int argc, char ** argv)
 	char max_M_str[8];
 	char nameFeatureTypeColumn[2000];
 	char nameGeneIDColumn[66];
+	char nameTranscriptIDColumn[66];
 	int min_qual_score = 0;
 	int min_dist = 50;
 	int max_dist = 600;
@@ -6439,6 +6256,7 @@ int feature_count_main(int argc, char ** argv)
 	strcpy(read_shift_type,"upstream");
 	strcpy(nameFeatureTypeColumn,"exon");
 	strcpy(nameGeneIDColumn,"gene_id");
+	strcpy(nameTranscriptIDColumn,"transcript_id");
 	strcpy(temp_dir, "<use output directory>");
 	annot_name[0]=0;out_name[0]=0;Rpath[0]=0;
 	
@@ -6858,6 +6676,7 @@ int feature_count_main(int argc, char ** argv)
 	Rargv[61] = "0";
 	Rargv[62] = "-1";
 	Rargv[63] = "Single-Index";
+	Rargv[64] = nameTranscriptIDColumn;
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
