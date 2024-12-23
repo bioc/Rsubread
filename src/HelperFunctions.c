@@ -3156,23 +3156,23 @@ IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, int start, int end,
     int balance = IVT_getBalance(node);
 
     // Left Left Case
-    if (balance > 1 && start < node->left->interval.start) {
+    if (balance > 1 && start < node->left->interval.start && node-> left) {
         return IVT_rightRotate(node);
     }
 
     // Right Right Case
-    if (balance < -1 && start > node->right->interval.start) {
+    if (balance < -1 && start > node->right->interval.start && node->right) {
         return IVT_leftRotate(node);
     }
 
     // Left Right Case
-    if (balance > 1 && start > node->left->interval.start) {
+    if (balance > 1 && start > node->left->interval.start&& node-> left&&node->right && node->left->right) {
         node->left = IVT_leftRotate(node->left);
         return IVT_rightRotate(node);
     }
 
     // Right Left Case
-    if (balance < -1 && start < node->right->interval.start) {
+    if (balance < -1 && start < node->right->interval.start && node->left&& node->right && node->right->left) {
         node->right = IVT_rightRotate(node->right);
         return IVT_leftRotate(node);
     }

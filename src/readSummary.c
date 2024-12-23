@@ -852,7 +852,7 @@ void register_junc_feature(fc_thread_global_context_t *global_context, char * fe
 
 	IVT_IntervalTreeNode * IVT_rootnode = HashTableGet(global_context -> junction_IVTree_table, chro);
 	if(NULL == IVT_rootnode){
-		IVT_rootnode = IVT_insert(IVT_rootnode, start, stop, new_item);
+		IVT_rootnode = IVT_insert(NULL, start, stop, new_item);
 		char * new_name = strdup(chro);
 		HashTablePut(global_context -> junction_IVTree_table, new_name, IVT_rootnode);
 	}else{
@@ -6176,7 +6176,7 @@ int main(int argc, char ** argv)
 int feature_count_main(int argc, char ** argv)
 #endif
 {
-	char * Rargv[64];
+	char * Rargv[65];
 	char annot_name[MAX_FILE_NAME_LENGTH];
 	char temp_dir[MAX_FILE_NAME_LENGTH];
 	char * out_name = malloc(MAX_FILE_NAME_LENGTH);
@@ -6680,7 +6680,7 @@ int feature_count_main(int argc, char ** argv)
 
 	int retvalue = -1;
 	if(is_ReadSummary_Report && (std_input_output_mode & 1)==1) SUBREADprintf("ERROR: no detailed assignment results can be written when the input is from STDIN. Please remove the '-R' option.\n");
-	else retvalue = readSummary(64, Rargv);
+	else retvalue = readSummary(65, Rargv);
 
 	free(very_long_file_names);
 	free(out_name);
