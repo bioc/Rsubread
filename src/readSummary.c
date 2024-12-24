@@ -5365,9 +5365,13 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		if(IVT_exon_root){
 			int junc_exon_olay_left_result_no, junc_exon_olay_right_result_no, junc_exon_left_result_no, junc_exon_right_result_no;
 			junc_exon_olay_left_result_no = IVT_query(IVT_exon_root, pos_small, junc_exons_olayleft, MAX_OVERLAP_EDGE_NUMBER);
-			junc_exon_olay_right_result_no = IVT_query(IVT_exon_root, pos_small, junc_exons_olayright, MAX_OVERLAP_EDGE_NUMBER);
+			junc_exon_olay_right_result_no = IVT_query(IVT_exon_root, pos_large, junc_exons_olayright, MAX_OVERLAP_EDGE_NUMBER);
 			junc_exon_left_result_no = IVT_edges_lr(IVT_exon_root, pos_small, junc_exons_left, MAX_OVERLAP_EDGE_NUMBER, 1);
 			junc_exon_right_result_no = IVT_edges_lr(IVT_exon_root, pos_large, junc_exons_right, MAX_OVERLAP_EDGE_NUMBER, 0);
+char * transL = NULL, * transR = NULL;
+if(junc_exon_olay_left_result_no>0) transL = ((fc_junction_exon_in_transcript_t *)junc_exons_olayleft[0]->attr)-> transcript_id;
+if(junc_exon_olay_right_result_no>0) transR = ((fc_junction_exon_in_transcript_t *)junc_exons_olayright[0]->attr)-> transcript_id;
+SUBREADprintf("Found qpos %d %d OLAY %d (%s)   %d (%s) EGDE %d %d\n", pos_small, pos_large, junc_exon_olay_left_result_no, transL, junc_exon_olay_right_result_no, transR, junc_exon_left_result_no, junc_exon_right_result_no);
 			if(junc_exon_olay_left_result_no == MAX_OVERLAP_EDGE_NUMBER|| junc_exon_olay_right_result_no==MAX_OVERLAP_EDGE_NUMBER || junc_exon_left_result_no==MAX_OVERLAP_EDGE_NUMBER || junc_exon_right_result_no==MAX_OVERLAP_EDGE_NUMBER){
 				SUBREADprintf("WARNING: Your annotation file contains very many exons that start/end at the same location. Consider to increase MAX_OVERLAP_EDGE_NUMBER in readSummary.c to accomodate these exons for junction counting.\n");
 			}
@@ -5392,6 +5396,10 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	fclose(ofp);
 	free(gene_names);
 	free(key_list);
+	free(junc_exons_olayleft);
+	free(junc_exons_olayright);
+	free(junc_exons_left);
+	free(junc_exons_right);
 
 	//print_in_box(80,0,PRINT_BOX_CENTER,"Found %llu junctions in all the input files.", merged_junction_table -> numOfElements);
 	//print_in_box(80,0,0,"");
