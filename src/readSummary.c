@@ -852,11 +852,11 @@ void register_junc_feature(fc_thread_global_context_t *global_context, char * fe
 
 	IVT_IntervalTreeNode * IVT_rootnode = HashTableGet(global_context -> junction_IVTree_table, chro);
 	if(NULL == IVT_rootnode){
-		IVT_rootnode = IVT_insert(NULL, start, stop, new_item);
+		IVT_rootnode = IVT_insert(NULL, start, stop, new_item); // JCount module uses 1-based coordinates.
 		char * new_name = strdup(chro);
 		HashTablePut(global_context -> junction_IVTree_table, new_name, IVT_rootnode);
 	}else{
-		IVT_rootnode = IVT_insert(IVT_rootnode, start, stop, new_item);
+		IVT_rootnode = IVT_insert(IVT_rootnode, start, stop, new_item); // JCount module uses 1-based coordinates.
 		HashTablePutReplaceEx(global_context -> junction_IVTree_table, chro, IVT_rootnode,0,0,0); // use old key ptr in table; don't free key and value.
 	}
 }
@@ -2493,9 +2493,42 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			srInt_64 * hits_indices1, int nhits1, srInt_64 * hits_indices2, int nhits2, unsigned int total_frag_len,
 			char ** hits_chro1, char ** hits_chro2, unsigned int * hits_start_pos1, unsigned int * hits_start_pos2, unsigned short * hits_length1, unsigned short * hits_length2, int fixed_fractional_count, char * read_name, char * RG_name, char * bin1, char * bin2);
 
+
+void add_bin_new_tags_reduce_longtag(char * bin2){
+	int block2_len = 0;
+	memcpy(&block2_len, bin2, 4);
+	block2_len +=4;
+
+	int name_len = 0, cigar_len = 0, seq_len = 0;
+	memcpy(&name_len, bin2+12, 1);
+	name_len = name_len & 0xff;
+	memcpy(&cigar_len, bin2+16, 2);
+	cigar_len = cigar_len & 0xffff;
+	memcpy(&seq_len, bin2+20, 4);
+
+	int bin2_ptr = 36 + name_len + 4 * cigar_len + seq_len + (seq_len+1)/2;
+	int out_ptr = bin2_ptr;
+	while(bin2_ptr<block2_len){
+		int tag_len = SAP_pairer_skip_tag_body_len(bin2);
+		if(tag_len < 100){
+			if(out_ptr < bin2_ptr) {
+				int tagpos;
+				for(tagpos = 0; tagpos <tag_len; tagpos++) bin2[out_ptr + tagpos] = bin2[bin2_ptr + tagpos];
+			}
+			out_ptr += tag_len;
+		}
+		bin2_ptr += tag_len;
+	}
+	if(out_ptr < block2_len)
+		memcpy(bin2, &out_ptr, 4);
+}
+
 void add_bin_new_tags(char * oldbin, char **newbin, char ** tags, char * types, void ** vals){
 	int new_tags_length = 0;
 	int tagi;
+
+	add_bin_new_tags_reduce_longtag(oldbin);
+
 	for(tagi = 0; tags[tagi]; tagi++){
 		char type = types[tagi];
 		if(type == 'i') new_tags_length += 7;
@@ -2527,7 +2560,6 @@ void add_bin_new_tags(char * oldbin, char **newbin, char ** tags, char * types, 
 		}
 	}
 }
-
 
 
 int compress_read_detail_BAM(fc_thread_global_context_t * global_context, fc_thread_thread_context_t * thread_context, int write_start, int write_end, char * bam_buf){
@@ -5239,7 +5271,61 @@ void junckey_sort_merge(void * inptr, int start, int items1, int items2){
 }
 
 
+#define JC_STATUS_KNOWN 1
+#define JC_STATUS_NOVEL 2
+#define JC_STATUS_NOVEL_FUSION 3
 #define MAX_OVERLAP_EDGE_NUMBER 1000
+#define JC_OUT_GENE_COLUMNS_LENGTH (MAX_OVERLAP_EDGE_NUMBER * (4+CHROMOSOME_NAME_LENGTH)) 
+int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_context, int side_small, int side_large, int junc_exon_olay_left_result_no,int junc_exon_olay_right_result_no,int junc_exon_left_result_no,int junc_exon_right_result_no, IVT_Interval ** junc_exons_olayleft, IVT_Interval ** junc_exons_olayright, IVT_Interval ** junc_exons_left, IVT_Interval ** junc_exons_right, char * gene_ids_str, char * transcript_ids_str, int * num_exons, char * dist_to_nearest_splice_side_str){
+	// test "exact hit edges" situation
+	int xk1;
+	HashTable * match_txn_table = StringTableCreate(100);
+	for(xk1=0; xk1<junc_exon_olay_left_result_no; xk1++){
+		fc_junction_exon_in_transcript_t * txn_for_jc_ptr = junc_exons_olayleft[xk1]->attr;
+		char * txn_id = txn_for_jc_ptr -> transcript_id;
+		int known_exon_large_edge = junc_exons_olayleft[xk1] -> end;
+		if(known_exon_large_edge == side_small)HashTablePut(match_txn_table, txn_id, NULL+1);
+	}
+	
+	ArrayList * two_matched_txn_ids_list = ArrayListCreate(10);
+	for(xk1=0; xk1<junc_exon_olay_right_result_no; xk1++){
+		fc_junction_exon_in_transcript_t * txn_for_jc_ptr = junc_exons_olayright[xk1]->attr;
+		char * txn_id = txn_for_jc_ptr -> transcript_id;
+		int known_exon_small_edge = junc_exons_olayright[xk1] -> start;
+	//	fprintf(stderr,"  ABSDIFF  %d\n", known_exon_small_edge - side_large);
+		if(known_exon_small_edge == side_large && HashTableGet(match_txn_table, txn_id)) ArrayListPush(two_matched_txn_ids_list, txn_id);
+	}
+	fprintf(stderr,"COMM1  %lld  HASHS %lld  HITS %d %d\n", two_matched_txn_ids_list -> numOfElements , match_txn_table -> numOfElements, junc_exon_olay_left_result_no, junc_exon_olay_right_result_no);
+	HashTableDestroy(match_txn_table);
+
+	// mode 1 : the two sides of the junction matches exactly two exons in the same transcript.
+	if(two_matched_txn_ids_list -> numOfElements >0){
+		HashTable * gene_tab = StringTableCreate(100);
+		ArrayList * txn_id_list = ArrayListCreate(10);
+		for(xk1=0; xk1< two_matched_txn_ids_list -> numOfElements; xk1++){
+			char * txn_id = ArrayListGet(two_matched_txn_ids_list, xk1);
+			fc_junction_transcript_t * txn_1 = HashTableGet(global_context -> junction_transcript_table, txn_id); 
+			HashTablePut(gene_tab, txn_1 -> gene_name, NULL+1);
+			ArrayListPush(txn_id_list, txn_id);
+		}
+		ArrayListSort(txn_id_list, ArrayListStringComparison);
+		ArrayList * gene_name_list = HashTableKeys(gene_tab);
+		ArrayListSort(gene_name_list, ArrayListStringComparison);
+
+		ArrayListStringJoin(gene_name_list, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH);
+		ArrayListStringJoin(txn_id_list,transcript_ids_str, JC_OUT_GENE_COLUMNS_LENGTH);
+		
+
+		fprintf(stderr,"%s\t\t%s\n", gene_ids_str, transcript_ids_str);
+		strcpy(dist_to_nearest_splice_side_str,"0/0");
+		
+		return JC_STATUS_KNOWN;
+	}
+
+	// mode 2 : both sides match exactly two exons, within the same gene, but not in the same transcript. 
+	// mode 3 : one of the sides exactly matches the edge of an exon. The other side matches no exons exactly. 
+	ArrayListDestroy(two_matched_txn_ids_list);
+}
 
 void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char * output_file_name, ArrayList * column_names, ArrayList * junction_global_table_list, ArrayList * splicing_global_table_list){
 	int infile_i, disk_is_full = 0;
@@ -5362,19 +5448,24 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		}
 		assert(0==strcmp(chro_small, chro_large));
 		IVT_IntervalTreeNode * IVT_exon_root = HashTableGet(global_context -> junction_IVTree_table, chro_small);
+		char gene_ids_str[JC_OUT_GENE_COLUMNS_LENGTH], transcript_ids_str[JC_OUT_GENE_COLUMNS_LENGTH], dist_to_nearest_splice_side_str[JC_OUT_GENE_COLUMNS_LENGTH];
+		gene_ids_str[0]=0;
+		transcript_ids_str[0]=0;
+		dist_to_nearest_splice_side_str[0]=0;
+		int num_exons=0;
+		
 		if(IVT_exon_root){
 			int junc_exon_olay_left_result_no, junc_exon_olay_right_result_no, junc_exon_left_result_no, junc_exon_right_result_no;
 			junc_exon_olay_left_result_no = IVT_query(IVT_exon_root, pos_small, junc_exons_olayleft, MAX_OVERLAP_EDGE_NUMBER);
 			junc_exon_olay_right_result_no = IVT_query(IVT_exon_root, pos_large, junc_exons_olayright, MAX_OVERLAP_EDGE_NUMBER);
 			junc_exon_left_result_no = IVT_edges_lr(IVT_exon_root, pos_small, junc_exons_left, MAX_OVERLAP_EDGE_NUMBER, 1);
 			junc_exon_right_result_no = IVT_edges_lr(IVT_exon_root, pos_large, junc_exons_right, MAX_OVERLAP_EDGE_NUMBER, 0);
-char * transL = NULL, * transR = NULL;
-if(junc_exon_olay_left_result_no>0) transL = ((fc_junction_exon_in_transcript_t *)junc_exons_olayleft[0]->attr)-> transcript_id;
-if(junc_exon_olay_right_result_no>0) transR = ((fc_junction_exon_in_transcript_t *)junc_exons_olayright[0]->attr)-> transcript_id;
-SUBREADprintf("Found qpos %d %d OLAY %d (%s)   %d (%s) EGDE %d %d\n", pos_small, pos_large, junc_exon_olay_left_result_no, transL, junc_exon_olay_right_result_no, transR, junc_exon_left_result_no, junc_exon_right_result_no);
+
 			if(junc_exon_olay_left_result_no == MAX_OVERLAP_EDGE_NUMBER|| junc_exon_olay_right_result_no==MAX_OVERLAP_EDGE_NUMBER || junc_exon_left_result_no==MAX_OVERLAP_EDGE_NUMBER || junc_exon_right_result_no==MAX_OVERLAP_EDGE_NUMBER){
 				SUBREADprintf("WARNING: Your annotation file contains very many exons that start/end at the same location. Consider to increase MAX_OVERLAP_EDGE_NUMBER in readSummary.c to accomodate these exons for junction counting.\n");
 			}
+
+			int jc_gene_status = determine_jcount_gene_transcript_report(global_context , pos_small, pos_large, junc_exon_olay_left_result_no, junc_exon_olay_right_result_no, junc_exon_left_result_no, junc_exon_right_result_no, junc_exons_olayleft, junc_exons_olayright, junc_exons_left, junc_exons_right, gene_ids_str, transcript_ids_str, &num_exons, dist_to_nearest_splice_side_str);
 		}
 
 		fprintf(ofp, "\t%s\t%s\t%s\t%s", chro_small, strand, chro_large, strand);
