@@ -2519,8 +2519,10 @@ void add_bin_new_tags_reduce_longtag(char * bin2){
 		}
 		bin2_ptr += tag_len;
 	}
-	if(out_ptr < block2_len)
+	if(out_ptr < block2_len){
+		out_ptr -=4;
 		memcpy(bin2, &out_ptr, 4);
+	}
 }
 
 void add_bin_new_tags(char * oldbin, char **newbin, char ** tags, char * types, void ** vals){
