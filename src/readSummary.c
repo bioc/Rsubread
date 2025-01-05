@@ -2509,7 +2509,7 @@ void add_bin_new_tags_reduce_longtag(char * bin2){
 	int bin2_ptr = 36 + name_len + 4 * cigar_len + seq_len + (seq_len+1)/2;
 	int out_ptr = bin2_ptr;
 	while(bin2_ptr<block2_len){
-		int tag_len = SAP_pairer_skip_tag_body_len(bin2);
+		int tag_len = SAP_pairer_skip_tag_body_len(bin2 + bin2_ptr);
 		if(tag_len < 100){
 			if(out_ptr < bin2_ptr) {
 				int tagpos;
