@@ -344,4 +344,5 @@ int geinput_open_scRNA_fqs(char * fnames,  gene_input_t * input, int reads_per_c
 int geinput_open_scRNA_BAM(char * fnames,  gene_input_t * input, int reads_per_chunk, int threads);
 int geinput_open_bcl( const char * dir_name,  gene_input_t * input, int reads_in_chunk, int threads);
 char *strtokmm(char *str, const char *delim, char ** next);
+void add_bin_new_tags_reduce_longtag(char *bin);
 #endif

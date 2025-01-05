@@ -3045,7 +3045,7 @@ int SAM_pairer_get_next_read_BIN( SAM_pairer_context_t * pairer , SAM_pairer_thr
 				memcpy(&seq_len, thread_context -> input_buff_BIN + thread_context -> input_buff_BIN_ptr + 16, 4);
 				
 				if(record_len < 32 || record_len + 4 >= FC_UNSAFE_BLOCK_SIZE){
-					pairer -> tiny_mode  = 1;
+					//pairer -> tiny_mode  = 1;
 					pairer -> format_need_fixing = 1;
 					return 0;
 				}
@@ -4828,6 +4828,35 @@ int  fix_write_block(FILE * out, char * bin, int binlen, z_stream * strm){
 #define FIX_APPEND_OUT(p, c) { if(out_bin_ptr > 60002){FIX_FLASH_OUT} ;  memcpy(out_bin + out_bin_ptr, p, c); out_bin_ptr +=c ; }
 #define FIX_APPEND_READ(p, c){ memcpy(out_bin + out_bin_ptr, p, c); out_bin_ptr +=c ;  }
 
+void add_bin_new_tags_reduce_longtag(char * bin2){
+	int block2_len = 0;
+	memcpy(&block2_len, bin2, 4);
+	block2_len +=4;
+
+	int name_len = 0, cigar_len = 0, seq_len = 0;
+	memcpy(&name_len, bin2+12, 1);
+	memcpy(&cigar_len, bin2+16, 2);
+	memcpy(&seq_len, bin2+20, 4);
+
+	int bin2_ptr = 36 + name_len + 4 * cigar_len + seq_len + (seq_len+1)/2;
+	int out_ptr = bin2_ptr;
+	while(bin2_ptr<block2_len){
+		int tag_len = SAP_pairer_skip_tag_body_len(bin2 + bin2_ptr);
+		if(tag_len < 100){
+			if(out_ptr < bin2_ptr) {
+				int tagpos;
+				for(tagpos = 0; tagpos <tag_len; tagpos++) bin2[out_ptr + tagpos] = bin2[bin2_ptr + tagpos];
+			}
+			out_ptr += tag_len;
+		}
+		bin2_ptr += tag_len;
+	}
+	if(out_ptr < block2_len){
+		out_ptr -=4;
+		memcpy(bin2, &out_ptr, 4);
+	}
+}
+
 int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	FILE * old_fp = pairer -> input_fp;
 	fseeko(old_fp, 0, SEEK_SET);
@@ -4941,9 +4970,8 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 			block_size += (nch << (8 * x1));
 		}
 
-		FIX_APPEND_READ(&block_size, 4);
-
 		if(pairer -> tiny_mode){
+			FIX_APPEND_READ(&block_size, 4);
 			// block_remainder
 			int extag_new_len = 0;
 //			if(block_no>280000)SUBREADprintf("DOING BLOCK %d\n", block_no);
@@ -5065,29 +5093,22 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 				memcpy(block_size_ptr, &new_block_size, 4);
 			}
 		}else{
+			char * bin2 = malloc(4+block_size);
+			memcpy(bin2, &block_size, 4);
 			for(x1 = 0; x1 < block_size; x1++){
 				FIX_GET_NEXT_NCH;
-				if(nch < 0) return -1;
-
-				if(x1 == 8) name_len = nch;
-				else if(x1 >= 16 && x1 < 20){
-					seq_len += ( nch << (8 * (x1 - 16)));
-					if(x1 == 16)  sqlen_ptr = out_bin + out_bin_ptr;
-				}else if(x1 == 12 || x1 == 13){
-					cigar_opts += ( nch << (8 * (x1 - 12))); 
-				}
-
-				if(x1 == 32 && block_size > FC_UNSAFE_BLOCK_SIZE){
-					long_read_not_fixable = 1;
-					int x2;
-					for(x2 = 0; x2 < name_len; x2++){
-						FIX_GET_NEXT_NCH;
-						readname[x2] = nch;
-					}
-					break;
-				}
-
-				FIX_APPEND_READ(&nch, 1);
+				bin2[x1+4]=nch;
+			}
+			add_bin_new_tags_reduce_longtag(bin2);
+			memcpy(&block_size, bin2, 4);
+			block_size +=4;
+			for(x1 = 0; x1 < 4+block_size; x1++){
+				FIX_APPEND_READ(bin2+x1, 1);
+			}
+			free(bin2);
+			if(block_size > FC_UNSAFE_BLOCK_SIZE){
+				long_read_not_fixable = 1;
+				break;
 			}
 		}
 
@@ -5108,7 +5129,11 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 	if(long_read_not_fixable){
 		unlink(tmpfname);
 		pairer -> using_long_read_parser = 1;
-		pairer -> tiny_mode = 1;
+		if(!pairer -> tiny_mode){
+			SUBREADprintf("ERROR: unable to fix the BAM file when SAM or BAM alignment output is needed.\n"); 
+			pairer -> is_internal_error = 1;
+			return 1;
+		}
 		if(!pairer -> is_single_end_mode){
 			// long read parser cannot pair long reads by names.
 			SUBREADprintf("ERROR: featureCounts does not support counting long paired-end reads.\n");

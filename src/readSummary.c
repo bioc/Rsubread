@@ -1699,6 +1699,7 @@ void disallocate_RG_tables(void * pt){
 	free(pt);
 }
 
+void fc_thread_start_open_report_fp(fc_thread_global_context_t * global_context);
 
 void process_pairer_reset(void * pairer_vp){
 //	SUBREADprintf("RESET COUNTERS\n");
@@ -1764,11 +1765,7 @@ void process_pairer_reset(void * pairer_vp){
 
 	}
 
-	if(global_context -> read_details_out_FP){
-		int tranc_ret = ftruncate(fileno(global_context -> read_details_out_FP), 0);
-		if(0 != tranc_ret) SUBREADprintf("ERROR: Unable to truncate assignment detail file\n");
-		fseek(global_context -> read_details_out_FP, 0 , SEEK_SET);
-	}
+	if(global_context -> read_details_out_FP) fc_thread_start_open_report_fp(global_context);
 }
 
 int is_value_contig_name(char * n, int l){
@@ -2493,38 +2490,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 			srInt_64 * hits_indices1, int nhits1, srInt_64 * hits_indices2, int nhits2, unsigned int total_frag_len,
 			char ** hits_chro1, char ** hits_chro2, unsigned int * hits_start_pos1, unsigned int * hits_start_pos2, unsigned short * hits_length1, unsigned short * hits_length2, int fixed_fractional_count, char * read_name, char * RG_name, char * bin1, char * bin2);
 
-
-void add_bin_new_tags_reduce_longtag(char * bin2){
-	int block2_len = 0;
-	memcpy(&block2_len, bin2, 4);
-	block2_len +=4;
-
-	int name_len = 0, cigar_len = 0, seq_len = 0;
-	memcpy(&name_len, bin2+12, 1);
-	name_len = name_len & 0xff;
-	memcpy(&cigar_len, bin2+16, 2);
-	cigar_len = cigar_len & 0xffff;
-	memcpy(&seq_len, bin2+20, 4);
-
-	int bin2_ptr = 36 + name_len + 4 * cigar_len + seq_len + (seq_len+1)/2;
-	int out_ptr = bin2_ptr;
-	while(bin2_ptr<block2_len){
-		int tag_len = SAP_pairer_skip_tag_body_len(bin2 + bin2_ptr);
-		if(tag_len < 100){
-			if(out_ptr < bin2_ptr) {
-				int tagpos;
-				for(tagpos = 0; tagpos <tag_len; tagpos++) bin2[out_ptr + tagpos] = bin2[bin2_ptr + tagpos];
-			}
-			out_ptr += tag_len;
-		}
-		bin2_ptr += tag_len;
-	}
-	if(out_ptr < block2_len){
-		out_ptr -=4;
-		memcpy(bin2, &out_ptr, 4);
-	}
-}
-
 void add_bin_new_tags(char * oldbin, char **newbin, char ** tags, char * types, void ** vals){
 	int new_tags_length = 0;
 	int tagi;
@@ -2546,7 +2511,6 @@ void add_bin_new_tags(char * oldbin, char **newbin, char ** tags, char * types, 
 	memcpy(*newbin, oldbin, oldbin_len);
 	newbin_len -= 4;
 	memcpy(*newbin, &newbin_len, 4);
-	newbin_len += 4;
 	
 	for(tagi = 0; tags[tagi]; tagi++){
 		memcpy( (*newbin) + oldbin_len, tags[tagi] ,2);
@@ -4268,18 +4232,9 @@ void fc_thread_init_global_context(fc_thread_global_context_t * global_context, 
 }
 
 
-
-int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, srInt_64 * et_start, srInt_64 * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, srInt_64 * et_anno_chr_heads, srInt_64 * et_bk_end_index, srInt_64 * et_bk_min_start, srInt_64 * et_bk_max_end, int read_length)
-{
-	int xk1;
-
-	global_context -> read_length = read_length;
-	global_context -> is_unpaired_warning_shown = 0;
-	global_context -> is_stake_warning_shown = 0;
-	global_context -> is_read_too_long_to_SAM_BAM_shown = 0;
-
-	if(global_context -> is_read_details_out)
-	{
+void fc_thread_start_open_report_fp(fc_thread_global_context_t * global_context){
+	if(global_context -> read_details_out_FP) fclose( global_context -> read_details_out_FP );
+	if(global_context -> is_read_details_out){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+20], *modified_fname;
 		int i=0;
 		char * applied_detail_path = global_context -> output_file_path;
@@ -4309,9 +4264,19 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 		}else{
 			SUBREADprintf("Unable to create file '%s'; the read assignment details are not written.\n", tmp_fname);
 		}
-	}
-	else
-		global_context -> read_details_out_FP = NULL;
+	}else global_context -> read_details_out_FP = NULL;
+}
+
+int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_exons, int * et_geneid, char ** et_chr, srInt_64 * et_start, srInt_64 * et_stop, unsigned char * et_strand, char * et_anno_chr_2ch, char ** et_anno_chrs, srInt_64 * et_anno_chr_heads, srInt_64 * et_bk_end_index, srInt_64 * et_bk_min_start, srInt_64 * et_bk_max_end, int read_length)
+{
+	int xk1;
+
+	global_context -> read_length = read_length;
+	global_context -> is_unpaired_warning_shown = 0;
+	global_context -> is_stake_warning_shown = 0;
+	global_context -> is_read_too_long_to_SAM_BAM_shown = 0;
+
+	fc_thread_start_open_report_fp(global_context);
 
 	global_context -> redo = 0;
 	global_context -> exontable_geneid = et_geneid;
@@ -4327,6 +4292,7 @@ int fc_thread_start_threads(fc_thread_global_context_t * global_context, int et_
 	global_context -> exontable_block_min_start = et_bk_min_start;
 	global_context -> sambam_chro_table_items = 0;
 	global_context -> sambam_chro_table = NULL;
+
 
 	global_context -> thread_contexts = malloc(sizeof(fc_thread_thread_context_t) * global_context -> thread_number);
 	for(xk1=0; xk1<global_context -> thread_number; xk1++)
