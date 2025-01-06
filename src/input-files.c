@@ -5101,11 +5101,11 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 			}
 			add_bin_new_tags_reduce_longtag(bin2);
 			memcpy(&block_size, bin2, 4);
-			block_size +=4;
 			for(x1 = 0; x1 < 4+block_size; x1++){
 				FIX_APPEND_READ(bin2+x1, 1);
 			}
 			free(bin2);
+			block_size +=4;
 			if(block_size > FC_UNSAFE_BLOCK_SIZE){
 				long_read_not_fixable = 1;
 				break;
