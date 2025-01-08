@@ -5328,8 +5328,8 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			if(side_small == exon_end_known) HashTablePut(match1_txn_table, jte_ptr -> transcript_id, NULL+1);
 			else if( HashTableGet(match1_txn_table, jte_ptr -> transcript_id)!= NULL+1 ) HashTablePut(match1_txn_table, jte_ptr -> transcript_id, NULL+2);
 			if(side_small - exon_end_known < edge1_dist && side_small >= exon_end_known) edge1_dist = side_small - exon_end_known;
-			HashTablePut(edge1P1_table, jg_ptr -> gene_name, NULL+1+edge1_dist);
 		}
+		HashTablePut(edge1P1_table, jg_ptr -> gene_name, NULL+1+edge1_dist);
 	}
 	
 	srInt_64 edge2_dist = 0xffffffffu;
@@ -5344,9 +5344,9 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			int exon_start_known = jte_ptr -> chro_start; 
 			if(exon_start_known == side_large && NULL+1==HashTableGet(match1_txn_table, txn_id)) HashTablePut(two_matched_txn_ids_tab, txn_id, NULL+1);
 			if(exon_start_known - side_large < edge2_dist && side_large <= exon_start_known) edge2_dist = exon_start_known - side_large;
-			HashTablePut(edge2P1_table, jg_ptr -> gene_name, NULL+1+edge2_dist);
 			HashTablePut(missed2_gene_table, jg_ptr -> gene_name, NULL+2);
 		}
+		HashTablePut(edge2P1_table, jg_ptr -> gene_name, NULL+1+edge2_dist);
 	}
 //	fprintf(stderr,"COMM1  %lld  HASHS %lld  HITS %d %d\n", two_matched_txn_ids_tab -> numOfElements , match1_txn_table -> numOfElements, junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no);
 	ArrayList * two_matched_txn_ids_list = HashTableKeys(two_matched_txn_ids_tab); 
