@@ -5334,7 +5334,6 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 	
 	srInt_64 edge2_dist = 0xffffffffu;
 	HashTable * two_matched_txn_ids_tab = StringTableCreate(10);
-	HashTable * missed2_gene_table = StringTableCreate(100);
 	for(xk1=0; xk1<junc_olay_genebody_right_result_no; xk1++){
 		fc_junction_genebody_t * jg_ptr = junc_genebody_olayright[xk1]->attr;
 		ArrayList * exon_list = jg_ptr -> exon_list;
@@ -5344,7 +5343,6 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			int exon_start_known = jte_ptr -> chro_start; 
 			if(exon_start_known == side_large && NULL+1==HashTableGet(match1_txn_table, txn_id)) HashTablePut(two_matched_txn_ids_tab, txn_id, NULL+1);
 			if(exon_start_known - side_large < edge2_dist && side_large <= exon_start_known) edge2_dist = exon_start_known - side_large;
-			HashTablePut(missed2_gene_table, jg_ptr -> gene_name, NULL+2);
 		}
 		HashTablePut(edge2P1_table, jg_ptr -> gene_name, NULL+1+edge2_dist);
 	}
@@ -5382,59 +5380,110 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 		// mode 2: two sides matched the same gene body.
 		HashTable * two_mismatched_gene_tab = StringTableCreate(10);
 		HashTable * two_fusion_gene_tab = StringTableCreate(10);
-		ArrayList * mis2_genes = HashTableKeys(missed2_gene_table);
-		ArrayList * mis1_txns = HashTableKeys(match1_txn_table);
-		for(xk1 = 0; xk1< mis1_txns -> numOfElements; xk1++){
-			char * mis1_txn_name = ArrayListGet(mis1_txns,xk1);
-			fc_junction_transcript_t * txn_1 = HashTableGet(global_context -> junction_transcript_table, mis1_txn_name);
-			char * mis1_gene_name = txn_1 -> gene_name; 
-			if(HashTableGet(missed2_gene_table, mis1_gene_name)){
+		ArrayList * mis2_genes = HashTableKeys(edge2P1_table);
+		ArrayList * mis1_genes = HashTableKeys(edge1P1_table);
+		for(xk1 = 0; xk1< mis1_genes -> numOfElements; xk1++){
+			char * mis1_gene_name = ArrayListGet(mis1_genes,xk1); 
+			if(HashTableGet(edge2P1_table, mis1_gene_name))
 				HashTablePut(two_mismatched_gene_tab, mis1_gene_name, NULL+1);
-			}
 		}
 
 		if(two_mismatched_gene_tab -> numOfElements>0){
-			ArrayList * gene_name_list = HashTableKeys(two_mismatched_gene_tab);
+			ArrayList * gene_name_list = HashTableKeys(two_mismatched_gene_tab),
+				* gene_name_list_best = ArrayListCreate(10),
+				* gene_dist_best = ArrayListCreate(10);
 			ArrayListSort(gene_name_list, ArrayListStringComparison);
-			ArrayListStringJoin(gene_name_list, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH);
+			ArrayListSetDeallocationFunction(gene_dist_best,free);
 			transcript_ids_str[0]=0;
+			int best_nexons = 0;
+			for(xk1 = 0; xk1 < gene_name_list-> numOfElements; xk1++){
+				char * gene_name = ArrayListGet(gene_name_list,xk1);
+				srInt_64 dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
+				srInt_64 dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
+				int this_exons=0;
+				if(dist1 == 0 && dist2 == 0) this_exons=2;
+				else if(dist1 == 0 || dist2 == 0) this_exons=1;
+				best_nexons = max(best_nexons, this_exons);
+			}
 
+			for(xk1 = 0; xk1 < gene_name_list-> numOfElements; xk1++){
+				char * gene_name = ArrayListGet(gene_name_list,xk1);
+				int dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
+				int dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
+				int this_exons=0;
+				if(dist1 == 0 && dist2 == 0) this_exons=2;
+				else if(dist1 == 0 || dist2 == 0) this_exons=1;
+				if(this_exons==best_nexons){
+					char* gene_dist_str = malloc(30);
+					if(dist1<0 && dist2>=0) sprintf(gene_dist_str,"NA/%d", dist2);
+					else if(dist1>=0 && dist2<0) sprintf(gene_dist_str,"%d/NA", dist1);
+					else if(dist1<0 && dist2<0) strcpy(gene_dist_str,"NA/NA");
+					else sprintf(gene_dist_str,"%d/%d", dist1,dist2);
+					ArrayListPush(gene_name_list_best, gene_name);
+					ArrayListPush(gene_dist_best, gene_dist_str);
+				}
+			}
+	
+			ArrayListStringJoin(gene_name_list_best, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH);
+			ArrayListStringJoin(gene_dist_best, dist_to_nearest_splice_side_str, JC_OUT_GENE_COLUMNS_LENGTH);
+			ArrayListDestroy(gene_name_list_best);
+			ArrayListDestroy(gene_dist_best);
 			ArrayListDestroy(gene_name_list);
 			retv = JC_STATUS_NOVEL;
 		}
 		HashTableDestroy(two_mismatched_gene_tab);
 
-		ArrayListDestroy(mis1_txns);
+		ArrayListDestroy(mis1_genes);
 		ArrayListDestroy(mis2_genes);
-//fprintf(stderr,"G_ONLY_LISTS\t%d  %d\t%s\t\t%s\n", side_small,side_large , gene_ids_str, transcript_ids_str);
 //
 		HashTableDestroy(two_fusion_gene_tab);
 	}
-	if(!retv){
-		ArrayList * edge1_gene_list = HashTableKeys(edge1P1_table);
-		ArrayList * edge12_gene_list = ArrayListCreate(10);
-		for(xk1 = 0; xk1< edge1_gene_list -> numOfElements; xk1++){
-			char * e1gene = ArrayListGet(edge1_gene_list,xk1);
+	if( edge1P1_table->numOfElements && edge2P1_table -> numOfElements && !retv){
+		// mode 3: two sides matched different gene bodies.
+		ArrayList * gene_name_list = HashTableKeys(edge1P1_table),
+				* edge2_gene_list = HashTableKeys(edge2P1_table),
+				* gene_name_list_best = ArrayListCreate(10),
+				* gene_dist_best = ArrayListCreate(10);
+		ArrayListExtend(gene_name_list,edge2_gene_list);
 
-			// NULL+1 : exactly match the edge.
-			if(HashTableGet(edge1P1_table, e1gene)!=NULL+1) continue;
-			if(HashTableGet(edge2P1_table, e1gene)==NULL+1) ArrayListPush(edge12_gene_list, e1gene);
+		int best_nexons1 = 0, best_nexons2 = 0;
+		for(xk1 = 0; xk1 < gene_name_list-> numOfElements; xk1++){
+			char * gene_name = ArrayListGet(gene_name_list,xk1);
+			srInt_64 dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
+			srInt_64 dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
+			int this_exons=0;
+			if(dist1 == 0 && best_nexons1 ==0) best_nexons1=1;
+			if(dist2 == 0 && best_nexons2 ==0) best_nexons2=1;
 		}
-		ArrayListDestroy(edge1_gene_list);
-		if(edge12_gene_list -> numOfElements>0){
-			ArrayListSort(edge12_gene_list, ArrayListStringComparison);
-			ArrayListStringJoin(edge12_gene_list, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH);
-			transcript_ids_str[0]=0;
-//fprintf(stderr,"G_FUSION_2\t%d  %d\t%s\t\t%s\n", side_small,side_large , gene_ids_str, transcript_ids_str);
-			retv = JC_STATUS_NOVEL_FUSION;
+
+		for(xk1 = 0; xk1 < gene_name_list-> numOfElements; xk1++){
+			char * gene_name = ArrayListGet(gene_name_list,xk1);
+			int dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
+			int dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
+			int this_exons=0;
+			if((best_nexons1 == 0 || dist1 == 0) || (best_nexons2 == 0 || dist2 == 0)){
+				char * gene_dist_str = malloc(30);
+				if(dist1<0 && dist2>=0) sprintf(gene_dist_str,"NA/%d", dist2);
+				else if(dist1>=0 && dist2<0) sprintf(gene_dist_str,"%d/NA", dist1);
+				else if(dist1<0 && dist2<0) strcpy(gene_dist_str,"NA/NA");
+				else sprintf(gene_dist_str,"%d/%d", dist1,dist2);
+				ArrayListPush(gene_name_list_best, gene_name);
+				ArrayListPush(gene_dist_best, gene_dist_str);
+			}
 		}
-		ArrayListDestroy(edge12_gene_list);
+		ArrayListStringJoin(gene_name_list_best, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH);
+		ArrayListStringJoin(gene_dist_best, dist_to_nearest_splice_side_str, JC_OUT_GENE_COLUMNS_LENGTH);
+	
+fprintf(stderr,"G_FUSE_LISTS\t%d  %d\t%s\t%s\t%s\n", side_small,side_large , gene_ids_str, dist_to_nearest_splice_side_str, transcript_ids_str);
+		ArrayListDestroy(gene_dist_best);
+		ArrayListDestroy(gene_name_list_best);
+		ArrayListDestroy(gene_name_list);
+		ArrayListDestroy(edge2_gene_list);
 	}
 
 	HashTableDestroy(match1_txn_table);
 	HashTableDestroy(edge1P1_table);
 	HashTableDestroy(edge2P1_table);
-	HashTableDestroy(missed2_gene_table);
 
 	if(!retv){
 	}

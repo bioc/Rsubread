@@ -54,6 +54,12 @@ int ArrayListStringJoin(ArrayList * list, char *outbuf, int out_max_len){
 	return outpt;
 }
 
+void ArrayListExtend(ArrayList * list, ArrayList * additional){
+	srInt_64 x1;
+	for(x1 = 0; x1 < additional->numOfElements; x1++)
+		ArrayListPush(list, ArrayListGet(additional, x1));
+}
+
 int ArrayListContainsPtr(ArrayList * list, void * who){
 	srInt_64 x1;
 	for(x1 = 0; x1 < list->numOfElements; x1++) if(list->elementList [ x1 ]==who) return 1;

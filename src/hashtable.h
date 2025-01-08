@@ -64,6 +64,7 @@ void * ArrayListRandom(ArrayList * list);
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListStringJoin(ArrayList * list, char *outbuf, int out_max_len);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
+void ArrayListExtend(ArrayList * list, ArrayList * additional);
 // Shift is the other direction of Pop:
 // Say, a list has elements 0,1,2,3,4
 // Pop removes 4 from the list and returns it.
