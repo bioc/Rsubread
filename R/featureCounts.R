@@ -276,7 +276,7 @@ featureCounts <- function(files,annot.inbuilt="mm39",annot.ext=NULL,isGTFAnnotat
 
         if(juncCounts){
             x_jcounts <- read.delim(paste(fout,".jcounts",sep=""), stringsAsFactors=FALSE, sep="\t")
-            colnames(x_jcounts)[-(1:8)]  <- out.col.names
+            colnames(x_jcounts)[-(1:11)]  <- out.col.names
         }
 
         file.remove(fout)
