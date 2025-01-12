@@ -867,7 +867,7 @@ void sort_junc_feature_make_gaps(void *k, void *v, HashTable * tab){
 void sort_junc_feature(fc_thread_global_context_t *global_context){
 	global_context -> junction_genebody_table -> appendix1 = global_context;
 	HashTableIteration(global_context -> junction_genebody_table, sort_junc_feature_make_gaps);
-	fprintf(stderr,"MERGED GeneBodyTree = %ld\n", global_context -> junction_GenebodyTree_table -> numOfElements);
+//	fprintf(stderr,"MERGED GeneBodyTree = %ld\n", global_context -> junction_GenebodyTree_table -> numOfElements);
 }
 
 void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * transcript_id, char * chro, unsigned int start, unsigned int stop){
@@ -5329,15 +5329,14 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			else if( HashTableGet(match1_txn_table, jte_ptr -> transcript_id)!= NULL+1 ) HashTablePut(match1_txn_table, jte_ptr -> transcript_id, NULL+2);
 			if(side_small - exon_end_known < edge1_dist && side_small >= exon_end_known){
 				edge1_dist = side_small - exon_end_known;
-//if(side_small==6013 && side_large==7506) fprintf(stderr,"TEST_ONEDEGE_QQ0 %d = %d - %d of TXN %s\n", edge1_dist, side_small, exon_end_known, jte_ptr -> transcript_id);
 			}
 		}
 		HashTablePut(edge1P1_table, jg_ptr -> gene_name, NULL+1+edge1_dist);
 	}
 	
-	srInt_64 edge2_dist = 0xffffffffu;
 	HashTable * two_matched_txn_ids_tab = StringTableCreate(10);
 	for(xk1=0; xk1<junc_olay_genebody_right_result_no; xk1++){
+		srInt_64 edge2_dist = 0xffffffffu;
 		fc_junction_genebody_t * jg_ptr = junc_genebody_olayright[xk1]->attr;
 		ArrayList * exon_list = jg_ptr -> exon_list;
 		for(xk2=0; xk2< exon_list->numOfElements; xk2++){
@@ -5345,7 +5344,9 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			char * txn_id = jte_ptr -> transcript_id;
 			int exon_start_known = jte_ptr -> chro_start; 
 			if(exon_start_known == side_large && NULL+1==HashTableGet(match1_txn_table, txn_id)) HashTablePut(two_matched_txn_ids_tab, txn_id, NULL+1);
-			if(exon_start_known - side_large < edge2_dist && side_large <= exon_start_known) edge2_dist = exon_start_known - side_large;
+			if(exon_start_known - side_large < edge2_dist && side_large <= exon_start_known){
+				edge2_dist = exon_start_known - side_large;
+			}
 		}
 		HashTablePut(edge2P1_table, jg_ptr -> gene_name, NULL+1+edge2_dist);
 	}
@@ -5414,7 +5415,7 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 				char * gene_name = ArrayListGet(gene_name_list,xk1);
 				int dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
 				int dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
-if(side_small==6013 && side_large==7506&&strcmp("LOC124902912_1",gene_name)) fprintf(stderr,"TEST_ONEDEGE %d %d\n", dist1, dist2);
+//if(side_small==539704 && side_large==546211) fprintf(stderr,"TEST_ONEDEGE %d %d\n", dist1, dist2);
 				int this_exons=0;
 				if(dist1 == 0 && dist2 == 0) this_exons=2;
 				else if(dist1 == 0 || dist2 == 0) this_exons=1;
@@ -5457,17 +5458,18 @@ if(side_small==6013 && side_large==7506&&strcmp("LOC124902912_1",gene_name)) fpr
 			char * gene_name = ArrayListGet(gene_name_list,xk1);
 			srInt_64 dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
 			srInt_64 dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
-			int this_exons=0;
 			if(dist1 == 0 && best_nexons1 ==0) best_nexons1=1;
 			if(dist2 == 0 && best_nexons2 ==0) best_nexons2=1;
 		}
 
+		ArrayListSort(gene_name_list, ArrayListStringComparison);
 		for(xk1 = 0; xk1 < gene_name_list-> numOfElements; xk1++){
 			char * gene_name = ArrayListGet(gene_name_list,xk1);
-			int dist1 = HashTableGet(edge1P1_table, gene_name) - NULL - 1 ;
-			int dist2 = HashTableGet(edge2P1_table, gene_name) - NULL - 1 ;
-			int this_exons=0;
-			if((best_nexons1 == 0 || dist1 == 0) || (best_nexons2 == 0 || dist2 == 0)){
+			void * dist1ptr = HashTableGet(edge1P1_table, gene_name) ;
+			void * dist2ptr = HashTableGet(edge2P1_table, gene_name) ;
+			int dist1 = dist1ptr - NULL - 1 ;
+			int dist2 = dist2ptr - NULL - 1 ;
+			if(((best_nexons1 == 0 || dist1 == 0) && dist1ptr) || ((best_nexons2 == 0 || dist2 == 0)&& dist2ptr)){
 				char * gene_dist_str = malloc(30);
 				if(dist1<0 && dist2>=0) sprintf(gene_dist_str,"NA/%d", dist2);
 				else if(dist1>=0 && dist2<0) sprintf(gene_dist_str,"%d/NA", dist1);
