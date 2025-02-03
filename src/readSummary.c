@@ -854,8 +854,8 @@ void sort_junc_feature_make_gaps(void *k, void *v, HashTable * tab){
 		min_start = min(min_start, one_ex->chro_start);
 		max_stop = max(max_stop, one_ex->chro_stop);
 	}
-	if(strcmp(k,"768215\tchrX")==0){
-		fprintf(stderr,"POS %d %d of %s\n", min_start,max_stop,k);
+	if(0)if(strcmp(k,"768215\tchrX")==0){
+		fprintf(stderr,"POS %u %u of %s\n", min_start,max_stop,k);
 	}
 	fc_thread_global_context_t *global_context = tab -> appendix1;
 	IVT_IntervalTreeNode * IVT_rootnode = HashTableGet(global_context -> junction_GenebodyTree_table, jg -> chromosome_name);

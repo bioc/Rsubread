@@ -48,7 +48,7 @@ int ArrayListStringJoin(ArrayList * list, char *outbuf, int out_max_len){
 	int outpt=0;
 	srInt_64 x1;
 	for(x1 = 0; x1 < list->numOfElements; x1++){
-		outpt += snprintf(outbuf + outpt, out_max_len - outpt -1,"%s%s", list->elementList [ x1 ], x1<list->numOfElements-1?",":"");
+		outpt += snprintf(outbuf + outpt, out_max_len - outpt -1,"%s%s", (char*)list->elementList [ x1 ], x1<list->numOfElements-1?",":"");
 	}
 	outbuf[out_max_len-1] = 0;
 	return outpt;
