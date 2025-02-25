@@ -55,12 +55,14 @@ typedef struct {
 } ArrayList;
 
 int ArrayListContainsPtr(ArrayList * list, void * who);
+int ArrayListContainsString(ArrayList * list, char * who);
 ArrayList * ArrayListCreate(int init_capacity);
 ArrayList * ArrayListDuplicate(ArrayList * ori);
 void ArrayListDestroy(ArrayList * list);
 void * ArrayListGet(ArrayList * list, srInt_64 n);
 void * ArrayListSet(ArrayList * list, srInt_64 n, void * new_elem);
 void * ArrayListRandom(ArrayList * list);
+void ArrayListUnique(ArrayList * list, int same_item(void * L_elem, void * R_elem, ArrayList * me));
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListStringJoin(ArrayList * list, char *outbuf, int out_max_len);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);

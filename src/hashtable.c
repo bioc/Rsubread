@@ -60,6 +60,11 @@ void ArrayListExtend(ArrayList * list, ArrayList * additional){
 		ArrayListPush(list, ArrayListGet(additional, x1));
 }
 
+int ArrayListContainsString(ArrayList * list, char * who){
+	srInt_64 x1;
+	for(x1 = 0; x1 < list->numOfElements; x1++) if(strcmp(list->elementList [ x1 ],who)==0) return 1;
+	return 0;
+}
 int ArrayListContainsPtr(ArrayList * list, void * who){
 	srInt_64 x1;
 	for(x1 = 0; x1 < list->numOfElements; x1++) if(list->elementList [ x1 ]==who) return 1;
@@ -1084,4 +1089,27 @@ ArrayList * HashTableSortedIndexes(HashTable * k2int_tab, int larger_value_first
 	appx[1]=NULL+larger_value_first;
 	ArrayListSort(ret, HashTableSortedIndexes_cmp_idx);
 	return ret;
+}
+
+void ArrayListUnique(ArrayList * list, int same_item(void * L_elem, void * R_elem, ArrayList * me)){
+	long xk1, xk2;
+	char * remove_list = malloc(list -> numOfElements);
+	memset(remove_list, 0, list -> numOfElements);
+	for(xk1=0; xk1< list -> numOfElements; xk1++){
+		if(remove_list[xk1])continue;
+		for(xk2=xk1+1; xk2 < list -> numOfElements; xk2++){
+			if( same_item( list -> elementList[xk1], list -> elementList[xk2], list ) ){
+				remove_list[xk2]=1;
+			}
+		}
+	}
+	xk2=0;
+	for(xk1=0; xk1< list -> numOfElements; xk1++){
+		if(!remove_list[xk1]){
+			if(xk1!=xk2) list -> elementList[xk2] = list -> elementList[xk1];
+			xk2++;
+		}
+	}
+	list -> numOfElements = xk2;
+	free(remove_list);
 }
