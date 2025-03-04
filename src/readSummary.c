@@ -294,6 +294,7 @@ typedef struct {
 	HashTable * junction_genebody_table;
 	HashTable * junction_GenebodyTree_table;
 	HashTable * junction_ExonTree_table;
+	HashTable * junction_ExonEdgeTree_table[3];
 	fasta_contigs_t * fasta_contigs;
 
 	HashTable * gene_name_table;	// gene_name -> gene_number
@@ -878,10 +879,11 @@ void sort_junc_feature(fc_thread_global_context_t *global_context){
 }
 
 void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * transcript_id, char * chro, unsigned int start, unsigned int stop, int is_negative){
-	int xk1;
+	int xk1, edge_tab_i;
 	if(transcript_id==NULL)return;	// SAF format: don't do anything about junction assignment to genes.
 	fc_junction_exon_in_transcript_t * new_item = calloc(sizeof(fc_junction_exon_in_transcript_t),1);
 	new_item -> transcript_id = HashTableGetKey(global_context -> junction_transcript_table, transcript_id); 
+	char * edgetab_used_gene_name=NULL;
 	if(NULL == new_item -> transcript_id){
 		fc_junction_transcript_t * new_txp = calloc(sizeof(fc_junction_transcript_t),1);
 		new_txp -> exons_in_transcript = ArrayListCreate(10); 
@@ -891,9 +893,11 @@ void register_junc_feature(fc_thread_global_context_t *global_context, char * fe
 		new_txp -> transcript_id = strdup(transcript_id);
 		new_item -> transcript_id = new_txp -> transcript_id; 
 		HashTablePut(global_context -> junction_transcript_table, new_item->transcript_id, new_txp);
+		edgetab_used_gene_name=new_txp -> gene_name;
 	}else{
 		fc_junction_transcript_t * has_txp = HashTableGet(global_context -> junction_transcript_table, transcript_id);
 		ArrayListPush(has_txp -> exons_in_transcript, new_item);
+		edgetab_used_gene_name=has_txp -> gene_name;
 	}
 
 	new_item -> chro_start = start;
@@ -908,6 +912,19 @@ void register_junc_feature(fc_thread_global_context_t *global_context, char * fe
 	}else{
 		IVT_rootnode = IVT_insert(IVT_rootnode, start, stop, new_item); // JCount module uses 1-based coordinates.
 		HashTablePutReplaceEx(global_context -> junction_ExonTree_table, chro, IVT_rootnode,0,0,0); // use old key ptr in table; don't free key and value.
+	}
+
+	IVT_IntervalTreeNode * IVT_edgenode = HashTableGet(global_context -> junction_ExonEdgeTree_table[0], chro);
+	IVT_edgenode = IVT_insert(IVT_edgenode, start, start, edgetab_used_gene_name); 
+	IVT_edgenode = IVT_insert(IVT_edgenode, stop, stop, edgetab_used_gene_name); 
+	HashTablePutReplaceEx(global_context -> junction_ExonEdgeTree_table[0], strdup(chro), IVT_edgenode,1,1,0); // use old key ptr in table; don't free key and value.
+
+	for(edge_tab_i=1; edge_tab_i<=2; edge_tab_i++){
+		if(is_negative != ( edge_tab_i==2 )) continue;
+		IVT_edgenode = HashTableGet(global_context -> junction_ExonEdgeTree_table[edge_tab_i], chro);
+		IVT_edgenode = IVT_insert(IVT_edgenode, start, start, edgetab_used_gene_name);
+		IVT_edgenode = IVT_insert(IVT_edgenode, stop, stop, edgetab_used_gene_name);
+		HashTablePutReplaceEx(global_context -> junction_ExonEdgeTree_table[edge_tab_i], strdup(chro), IVT_edgenode,1,1,0);
 	}
 
 	char gene_body_key[FEATURE_NAME_LENGTH + CHROMOSOME_NAME_LENGTH+10];
@@ -978,6 +995,15 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 
 		global_context -> junction_ExonTree_table = StringTableCreate(1603);
 		HashTableSetDeallocationFunctions(global_context -> junction_ExonTree_table, free, (void (*)(void *))IVT_freeTree);
+
+		global_context -> junction_ExonEdgeTree_table[0] = StringTableCreate(1603);
+		HashTableSetDeallocationFunctions(global_context -> junction_ExonEdgeTree_table[0], free, (void (*)(void *))IVT_freeTree);
+
+		global_context -> junction_ExonEdgeTree_table[1] = StringTableCreate(1603);
+		HashTableSetDeallocationFunctions(global_context -> junction_ExonEdgeTree_table[1], free, (void (*)(void *))IVT_freeTree);
+
+		global_context -> junction_ExonEdgeTree_table[2] = StringTableCreate(1603);
+		HashTableSetDeallocationFunctions(global_context -> junction_ExonEdgeTree_table[2], free, (void (*)(void *))IVT_freeTree);
 
 		global_context -> junction_GenebodyTree_table = StringTableCreate(1603);
 		HashTableSetDeallocationFunctions(global_context -> junction_GenebodyTree_table, NULL, (void (*)(void *))IVT_freeTree);
@@ -5324,16 +5350,31 @@ void junckey_sort_merge(void * inptr, int start, int items1, int items2){
 #define JC_STATUS_NOVEL_FUSION 3
 #define MAX_OVERLAP_EDGE_NUMBER 1000
 #define JC_OUT_GENE_COLUMNS_LENGTH (MAX_OVERLAP_EDGE_NUMBER * (4+CHROMOSOME_NAME_LENGTH)) 
-int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_context, int side_small, int side_large, int junc_olay_genebody_left_result_no,int junc_olay_genebody_right_result_no, IVT_Interval ** junc_genebody_olayleft, IVT_Interval ** junc_genebody_olayright, char * gene_ids_str, char * transcript_ids_str, int * num_exons, char * dist_to_nearest_splice_side_str, int strand_learnt_from_FASTA){
+
+
+void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int side_small, int side_large, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2,
+				int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no,
+				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges);
+
+int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_context, int side_small, int side_large, int junc_olay_genebody_left_result_no,int junc_olay_genebody_right_result_no, IVT_Interval ** junc_genebody_olayleft, IVT_Interval ** junc_genebody_olayright, char * gene_ids_str_SP1, char * gene_ids_str_SP2, char * transcript_ids_str_SP1, char * transcript_ids_str_SP2, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2, int strand_learnt_from_FASTA, int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no, IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges){
 	// test "exact hit edges" situation
-	int xk1,xk2, txp_id;
-	gene_ids_str[0] = transcript_ids_str[0] = dist_to_nearest_splice_side_str[0] = 0;
+	int xk1,xk2, txp_id, retv=0;
+if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1){
+fprintf(stderr,"HAS_NBNB %d %d %d %d;  Strand-is-NEG=%d\n", junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no, strand_learnt_from_FASTA);
+for(xk1=0; xk1<junc_near_LLedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:LL %d  %d\n" , junc_nearest_LLedges[xk1]->start, junc_nearest_LLedges[xk1]->start - side_small);
+for(xk1=0; xk1<junc_near_LRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:LR %d  %d\n" , junc_nearest_LRedges[xk1]->start, junc_nearest_LRedges[xk1]->start - side_small );
+for(xk1=0; xk1<junc_near_RLedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RL %d  %d\n" , junc_nearest_RLedges[xk1]->start, junc_nearest_RLedges[xk1]->start - side_large );
+for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n" , junc_nearest_RRedges[xk1]->start, junc_nearest_RRedges[xk1]->start - side_large);
+
+}
+	gene_ids_str_SP1[0] = transcript_ids_str_SP1[0] = dist_to_nearest_splice_side_str_SP1[0] = 0;
+	gene_ids_str_SP2[0] = transcript_ids_str_SP2[0] = dist_to_nearest_splice_side_str_SP2[0] = 0;
 	HashTable * match1_txn_table = StringTableCreate(100);
 	HashTable * edge1P1_table = StringTableCreate(100);
 	HashTable * edge2P1_table = StringTableCreate(100);
+	ArrayList * common_txn_list = ArrayListCreate(10);
 	int small_site_exactly = 0;
 	int large_site_exactly = 0;
-	*num_exons=-1;
 	for(xk1=0; xk1<junc_olay_genebody_left_result_no; xk1++){
 		fc_junction_genebody_t * jg_ptr = junc_genebody_olayleft[xk1]->attr;
 		for(txp_id = 0; txp_id < jg_ptr -> transcript_list -> numOfElements; txp_id ++){
@@ -5343,13 +5384,13 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			for(xk2=0; xk2< exon_list->numOfElements; xk2++){
 				fc_junction_exon_in_transcript_t * jte_ptr = ArrayListGet(exon_list,xk2);
 				if(strand_learnt_from_FASTA >=0 && strand_learnt_from_FASTA !=  jte_ptr -> is_negative) continue;
+//if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1) fprintf(stderr,"TESTJTE %s : %d vs %d\n",  txp_ptr -> transcript_id,  jte_ptr -> is_negative, strand_learnt_from_FASTA);
 				int exon_start_known = jte_ptr -> chro_start;
 				int exon_end_known = jte_ptr -> chro_stop;
 				int dist_to_any_side = min(abs(side_small - exon_end_known),abs(side_small - exon_start_known));
 				if(dist_to_any_side < edge1_dist) edge1_dist = dist_to_any_side;
 			}
-//if(abs(side_large - 784898)<=1)fprintf(stderr,"HAS_TXN_P1 JPos [%d %d] : %s (%s) [TXN_NO=%d:%d] dist=%d\n", side_small, side_large, txp_ptr -> transcript_id, txp_ptr -> gene_name, xk1, txp_id, edge1_dist);
-			HashTablePut(edge1P1_table, txp_ptr -> transcript_id, NULL+1+edge1_dist);
+			if(edge1_dist!=0xffffffffu)HashTablePut(edge1P1_table, txp_ptr -> transcript_id, NULL+1+edge1_dist);
 			if(0==edge1_dist)small_site_exactly++;
 		}
 	}
@@ -5363,241 +5404,164 @@ int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_
 			for(xk2=0; xk2< exon_list->numOfElements; xk2++){
 				fc_junction_exon_in_transcript_t * jte_ptr = ArrayListGet(exon_list,xk2);
 				if(strand_learnt_from_FASTA >=0 && strand_learnt_from_FASTA !=  jte_ptr -> is_negative) continue;
+//if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1) fprintf(stderr,"TESTJTX %s : %d vs %d\n",  txp_ptr -> transcript_id,  jte_ptr -> is_negative, strand_learnt_from_FASTA);
 				int exon_end_known = jte_ptr -> chro_stop; 
 				int exon_start_known = jte_ptr -> chro_start; 
 				int dist_to_any_side = min(abs(side_large - exon_end_known),abs(side_large - exon_start_known));
 				if(dist_to_any_side < edge2_dist) edge2_dist = dist_to_any_side;
 			}
-//if(abs(side_large - 784898)<=1)fprintf(stderr,"HAS_TXN_P2 JPos [%d %d] : %s (%s) [TXN_NO=%d:%d] dist=%d\n", side_small, side_large, txp_ptr -> transcript_id, txp_ptr -> gene_name, xk1, txp_id, edge2_dist);
-			HashTablePut(edge2P1_table, txp_ptr -> transcript_id, NULL+1+edge2_dist);
+			if(edge2_dist!=0xffffffffu)HashTablePut(edge2P1_table, txp_ptr -> transcript_id, NULL+1+edge2_dist);
 			if(0==edge2_dist)large_site_exactly++;
 		}
 	}
 
-//if(abs(side_large - 784898)<=1)fprintf(stderr,"EXACT_HIT SMALL %d   LARGE %d\n", small_site_exactly, large_site_exactly); 
-	int retv = 0;
-	if(large_site_exactly&&small_site_exactly){
-		*num_exons = 2;
-		// highest priority; then check known? novel? novel-fusion?
-		ArrayList * common_transcript_ids = ArrayListCreate(10);
-		HashTable * common_gene_namestab = StringTableCreate(10);
-		ArrayList * ids_edge1 = HashTableKeys(edge1P1_table); 
-		for(xk1=0; xk1<ids_edge1 -> numOfElements; xk1++){
-			char * id_edge1 = ArrayListGet(ids_edge1, xk1);
-			fc_junction_transcript_t * txp_ptr1= HashTableGet(global_context->junction_transcript_table, id_edge1);
-			srInt_64 has_edge1 = HashTableGet(edge1P1_table, id_edge1) - NULL;
-			if(has_edge1 == 1){ // void *0
-				char * gene_edge1 = txp_ptr1 -> gene_name;
-				srInt_64 has_edge2 = HashTableGet(edge2P1_table, id_edge1) - NULL;
-				if(has_edge2 == 1){// void * 0
-					ArrayListPush(common_transcript_ids, id_edge1);
-					HashTablePut(common_gene_namestab, gene_edge1, NULL+3);
-				}
-				HashTablePut(common_gene_namestab, gene_edge1, NULL+((HashTableGet(common_gene_namestab, gene_edge1)-NULL)|1));
+	if(small_site_exactly >0 && large_site_exactly >0){
+		ArrayList * edge1_txnids = HashTableKeys(edge1P1_table);
+		for(xk1=0; xk1<edge1_txnids->numOfElements; xk1++){
+			char * edge1_txnid = ArrayListGet(edge1_txnids, xk1);
+			int edge1_ptr = HashTableGet(edge1P1_table, edge1_txnid)-NULL;
+			if(edge1_ptr!=1)continue;
+			int edge2_ptr = HashTableGet(edge2P1_table, edge1_txnid)-NULL;
+			if(edge2_ptr==1){
+				ArrayListPush(common_txn_list , edge1_txnid);
 			}
 		}
-
-		if(!common_transcript_ids -> numOfElements){
-			ArrayList * ids_edge2 = HashTableKeys(edge2P1_table); 
-			for(xk1=0; xk1<ids_edge2 -> numOfElements; xk1++){
-				char * id_edge2 = ArrayListGet(ids_edge2, xk1);
-				fc_junction_transcript_t * txp_ptr2= HashTableGet(global_context->junction_transcript_table, id_edge2);
-				char * gene_edge2 = txp_ptr2 -> gene_name;
-				srInt_64 has_edge2 = HashTableGet(edge2P1_table, id_edge2) - NULL;
-				if(has_edge2 == 1)
-					HashTablePut(common_gene_namestab, gene_edge2, NULL+((HashTableGet(common_gene_namestab, gene_edge2)-NULL) | 2));//OR 2 to genes called in #1
-				// hence genes with both large and small sites matched have value 3 in common_gene_namestab
-			}
-			ArrayListDestroy(ids_edge2);
-		}
-
-		ArrayList * common_gene_names = ArrayListCreate(10);
-		ArrayList * common_gene_namestab_keys = HashTableKeys(common_gene_namestab);
-		for(xk1 = 0; xk1 < common_gene_namestab_keys -> numOfElements; xk1++){
-			char * gname = ArrayListGet(common_gene_namestab_keys,xk1);
-			int matchv = HashTableGet(common_gene_namestab, gname)-NULL;
-			if(3==matchv)ArrayListPush(common_gene_names, gname);
-//if(abs(side_large - 784898)<=1 && abs(side_small - 555305) <=1)fprintf(stderr,"Q2EXON_NOVEL  comm_name=%s  3match=%d\n", gname, matchv ); 
-		}
-
-		int dist_ptr = 0;
-		int total_reported_dists;
-		if(common_transcript_ids -> numOfElements) total_reported_dists = common_transcript_ids -> numOfElements;
-		else if(common_gene_names -> numOfElements) total_reported_dists = common_gene_names -> numOfElements;
-		else total_reported_dists = small_site_exactly + large_site_exactly; 
-		for(xk1 = 0; xk1 < total_reported_dists; xk1++){
-			if(dist_ptr >= JC_OUT_GENE_COLUMNS_LENGTH-5)break;
-			dist_ptr += sprintf(dist_to_nearest_splice_side_str+dist_ptr, "0/0,");
-		}
-		dist_to_nearest_splice_side_str[dist_ptr-1]=0;
-
-		// there are common transcripts.
-		if(common_transcript_ids -> numOfElements){
-			ArrayListStringJoin(common_transcript_ids, transcript_ids_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			ArrayListStringJoin(common_gene_names, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			retv = JC_STATUS_KNOWN; 
-		}
-
-		// there are no common transcrtipts.
-		// could be: common genes, or different genes.
-		if(common_gene_names -> numOfElements && !retv){
-			retv = JC_STATUS_NOVEL; 
-			strcpy(transcript_ids_str, "NA");
-			ArrayListStringJoin(common_gene_names, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-		}
-
-		if(!retv){
-			retv = JC_STATUS_NOVEL_FUSION; 
-			// every single gene at either large or small sides. 
-			// dist order = gene order
-			// dist = NA/0 for large-only genes; 0/NA for small-only genes.
-			strcpy(transcript_ids_str, "NA");
-			ArrayList * dist_list =  ArrayListCreate(10);
-			ArrayList * ids_edge2 = HashTableKeys(edge2P1_table); 
-			HashTable * had_genes = StringTableCreate(10);
-
-			for(xk1 = 0; xk1 < ids_edge1 -> numOfElements ; xk1++){
-				char * id_edge1 = ArrayListGet(ids_edge1, xk1);
-				fc_junction_transcript_t * txp_ptr1= HashTableGet(global_context->junction_transcript_table, id_edge1);
-				srInt_64 has_edge1 = HashTableGet(edge1P1_table, id_edge1) - NULL;
-				if(has_edge1==1 && !HashTableGet(had_genes, txp_ptr1 -> gene_name)){
-					ArrayListPush(common_gene_names, txp_ptr1 -> gene_name); 
-					ArrayListPush(dist_list, "0/NA");
-					HashTablePut(had_genes, txp_ptr1 -> gene_name, NULL+1);
-				}
-			}
-			for(xk1 = 0; xk1 < ids_edge2 -> numOfElements ; xk1++){
-				char * id_edge2 = ArrayListGet(ids_edge2, xk1);
-				fc_junction_transcript_t * txp_ptr2= HashTableGet(global_context->junction_transcript_table, id_edge2);
-				srInt_64 has_edge2 = HashTableGet(edge2P1_table, id_edge2) - NULL;
-				if(has_edge2==1 && !HashTableGet(had_genes, txp_ptr2 -> gene_name)){
-					ArrayListPush(common_gene_names, txp_ptr2 -> gene_name); 
-					ArrayListPush(dist_list, "NA/0");
-					HashTablePut(had_genes, txp_ptr2 -> gene_name, NULL+1);
-				}
-			}
-
-			HashTableDestroy(had_genes);
-			ArrayListStringJoin(common_gene_names, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			ArrayListStringJoin(dist_list, dist_to_nearest_splice_side_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			ArrayListDestroy(ids_edge2);
-			ArrayListDestroy(dist_list);
-		}
-		ArrayListDestroy(ids_edge1);
-		ArrayListDestroy(common_transcript_ids);
-		ArrayListDestroy(common_gene_names);
-		ArrayListDestroy(common_gene_namestab_keys);
-		HashTableDestroy(common_gene_namestab);
-	}else{
-		// nExons == 1 or == 0
-		*num_exons = (large_site_exactly>0) + (small_site_exactly>0);
-		strcpy(transcript_ids_str, "NA");
-		// need to convert transcript-dist to gene-dist (min among all transcripts)
-		HashTable * gene_edge1P1_table = StringTableCreate(10);
-		HashTable * gene_edge2P1_table = StringTableCreate(10);
-
-		for(xk2 =0; xk2<2; xk2++){
-			HashTable * gene_edgeP1_table = xk2?gene_edge2P1_table:gene_edge1P1_table;
-			HashTable * edgeP1_table = xk2?edge2P1_table:edge1P1_table;
-			ArrayList * txpids_edge = HashTableKeys(edgeP1_table); 
-			for(xk1 = 0; xk1 < txpids_edge ->numOfElements; xk1++){
-				char * id_edge = ArrayListGet(txpids_edge, xk1); 
-				fc_junction_transcript_t * txp_ptr= HashTableGet(global_context->junction_transcript_table, id_edge);
-				char * gene_name = txp_ptr -> gene_name;
-				void * had_dist_ptr = HashTableGet(gene_edgeP1_table, gene_name);
-//if(abs(side_large -39874)<=1) fprintf(stderr,"OLD_GENE_PTR %s = GD %d  TD %d\n", gene_name , had_dist_ptr - NULL, HashTableGet(edgeP1_table, id_edge)-NULL);
-				if(had_dist_ptr) HashTablePut(gene_edgeP1_table, gene_name, min(HashTableGet(edgeP1_table, id_edge), had_dist_ptr));
-				else HashTablePut(gene_edgeP1_table, gene_name, HashTableGet(edgeP1_table, id_edge));
-			}
-			ArrayListDestroy(txpids_edge);
-		}
-
-		HashTable * common_gene_namestab = StringTableCreate(10);
-
-		// build common gene 1|2 table.
-		ArrayList * dist_list = ArrayListCreate(10);
-		ArrayListSetDeallocationFunction(dist_list, free);
-		for(xk2 =0; xk2<2; xk2++){
-			HashTable * edgeP1_table = xk2?edge2P1_table:edge1P1_table;
-			ArrayList * ids_edge = HashTableKeys(edgeP1_table); 
-			int me_site_exactly = xk2?large_site_exactly:small_site_exactly;
-			for(xk1=0; xk1<ids_edge -> numOfElements; xk1++){
-				char * txp_id_edge = ArrayListGet(ids_edge, xk1);
-				fc_junction_transcript_t * txp_ptr= HashTableGet(global_context->junction_transcript_table, txp_id_edge);
-
-				char * gene_edge = txp_ptr -> gene_name;
-				srInt_64 has_edge = HashTableGet(edgeP1_table, txp_id_edge) - NULL - 1;
-
-				if(has_edge == 0 || me_site_exactly==0){ 
-					HashTablePut(common_gene_namestab, gene_edge,NULL+((HashTableGet(common_gene_namestab, gene_edge) - NULL)| (xk2?2:1)));
-				}
-			}
-		}
-
-		// go through the common gene 1|2 table; get all 1+2 genes and their distances.
-		ArrayList * common_gene_names = ArrayListCreate(10);
-		ArrayList * common_gene_namestab_keys = HashTableKeys(common_gene_namestab);
-		for(xk1 = 0; xk1 < common_gene_namestab_keys->numOfElements; xk1++){
-			char * commgenename = ArrayListGet(common_gene_namestab_keys, xk1);
-			if(3==(HashTableGet(common_gene_namestab, commgenename)-NULL)){
-				ArrayListPush(common_gene_names, commgenename);
-				int small_dist = HashTableGet(gene_edge1P1_table , commgenename)-NULL-1; 
-				int large_dist = HashTableGet(gene_edge2P1_table , commgenename)-NULL-1; 
-				char * dist_str = malloc(30);
-				sprintf(dist_str,"%d/%d", small_dist, large_dist);
-				ArrayListPush(dist_list, dist_str);
-			}
-		}
-		HashTableDestroy(common_gene_namestab);
-		ArrayListDestroy(common_gene_namestab_keys);
-
-		if(common_gene_names -> numOfElements){
-			retv = JC_STATUS_NOVEL; 
-			ArrayListStringJoin(common_gene_names, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			ArrayListStringJoin(dist_list, dist_to_nearest_splice_side_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-		}else{
-			retv = JC_STATUS_NOVEL_FUSION; 
-			ArrayList * all_gene_names = ArrayListCreate(10);
-			for(xk2 =0; xk2<2; xk2++){
-				HashTable * gene_edgeP1_table = xk2?gene_edge2P1_table:gene_edge1P1_table;
-				ArrayList * gene_names_edge = HashTableKeys(gene_edgeP1_table); 
-				int me_site_exactly = xk2?large_site_exactly:small_site_exactly;
-				for(xk1=0; xk1<gene_names_edge -> numOfElements; xk1++){
-					char * gene_name_edge = ArrayListGet(gene_names_edge, xk1);
-					srInt_64 has_edge = HashTableGet(gene_edgeP1_table, gene_name_edge) - NULL - 1;
-					if(has_edge == 0 || me_site_exactly==0){ 
-						if(!ArrayListContainsString(all_gene_names, gene_name_edge)){
-							char * dist_str = malloc(30);
-							if(xk2) sprintf(dist_str,"NA/%d",has_edge);
-							else sprintf(dist_str,"%d/NA",has_edge);
-							ArrayListPush(dist_list, dist_str);
-
-							ArrayListPush(all_gene_names, gene_name_edge);
-						}
-					}
-				}
-				ArrayListDestroy(gene_names_edge);
-			}
-			// a novel_fusion junction can be between one gene and one intergenetic region. Or between two intergenetic regions.
-			ArrayListStringJoin(all_gene_names, gene_ids_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			if(!gene_ids_str[0])strcpy(gene_ids_str,"NA");
-			ArrayListStringJoin(dist_list, dist_to_nearest_splice_side_str, JC_OUT_GENE_COLUMNS_LENGTH-1);
-			if(!dist_to_nearest_splice_side_str[0])strcpy(dist_to_nearest_splice_side_str,"NA");
-			ArrayListDestroy(all_gene_names);
-		}
-
-		HashTableDestroy(gene_edge1P1_table);
-		HashTableDestroy(gene_edge2P1_table);
-		ArrayListDestroy(dist_list);
-		ArrayListDestroy(common_gene_names);
 	}
-	// mode 1 : the two sides of the junction matches exactly two exons in the same transcript.
+	if(common_txn_list -> numOfElements > 0){
+		HashTable * out_gene_tab = StringTableCreate(10);
+		HashTable * out_txn_tab = StringTableCreate(10);
+		for(xk1=0; xk1<common_txn_list->numOfElements; xk1++){
+			char *common_txn_id = ArrayListGet(common_txn_list,xk1);
+			fc_junction_transcript_t *txnptr = HashTableGet(global_context ->junction_transcript_table, common_txn_id);
+			HashTablePut(out_gene_tab, txnptr -> gene_name, NULL+1);
+			HashTablePut(out_txn_tab, txnptr -> transcript_id, NULL+1);
+		}
+		ArrayList * out_gene_list = HashTableKeys(out_gene_tab);
+		ArrayList * out_txn_list = HashTableKeys(out_txn_tab);
 
+		ArrayListSort(out_gene_list, ArrayListStringComparison);
+		ArrayListSort(out_txn_list, ArrayListStringComparison);
+
+		ArrayListStringJoin(out_gene_list, gene_ids_str_SP1,JC_OUT_GENE_COLUMNS_LENGTH);
+		ArrayListStringJoin(out_txn_list, transcript_ids_str_SP1,JC_OUT_GENE_COLUMNS_LENGTH);
+
+		// when they share the same genes and txns, the lists must be identical for two sides. 
+		ArrayListStringJoin(out_gene_list, gene_ids_str_SP2,JC_OUT_GENE_COLUMNS_LENGTH);
+		ArrayListStringJoin(out_txn_list, transcript_ids_str_SP2,JC_OUT_GENE_COLUMNS_LENGTH);
+
+		ArrayListDestroy(out_gene_list);
+		ArrayListDestroy(out_txn_list);
+		HashTableDestroy(out_txn_tab);
+		HashTableDestroy(out_gene_tab);
+		retv = JC_STATUS_KNOWN; 
+	}
+	if(retv==0){
+		int side_i;
+		for(side_i=0; side_i<2; side_i++){
+			HashTable * this_side_reported_genes = StringTableCreate(10);
+			int this_side_has_exactly = side_i?large_site_exactly:small_site_exactly;
+			HashTable * this_side_olay_tab = side_i?edge2P1_table:edge1P1_table;
+			ArrayList * edge_txnids = HashTableKeys(this_side_olay_tab);
+
+			for(xk1 = 0; xk1 < edge_txnids -> numOfElements; xk1++){
+				char * this_side_txn_id = ArrayListGet(edge_txnids,xk1);
+				srInt_64 edge_dist = HashTableGet(this_side_olay_tab, this_side_txn_id)-NULL;
+				if( this_side_has_exactly==0 || edge_dist == 1 ){
+					fc_junction_transcript_t * txn_ptr = HashTableGet(global_context -> junction_transcript_table,  this_side_txn_id);
+					HashTablePut(this_side_reported_genes, txn_ptr -> gene_name, NULL+1);
+				}
+			}
+
+			ArrayList * this_side_reported_list = HashTableKeys(this_side_reported_genes);
+			ArrayListSort(this_side_reported_list, ArrayListStringComparison);
+			ArrayListStringJoin(this_side_reported_list, side_i?gene_ids_str_SP2:gene_ids_str_SP1,JC_OUT_GENE_COLUMNS_LENGTH);
+			ArrayListDestroy(this_side_reported_list);
+			HashTableDestroy(this_side_reported_genes);
+		}
+
+		retv = JC_STATUS_NOVEL;
+	}
+
+	ArrayListDestroy(common_txn_list);
 	HashTableDestroy(match1_txn_table);
 	HashTableDestroy(edge1P1_table);
 	HashTableDestroy(edge2P1_table);
 
+	find_nearest_gene_dist(global_context, side_small, side_large,
+				dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2,
+				junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no,
+				junc_nearest_LLedges,  junc_nearest_LRedges,  junc_nearest_RLedges,  junc_nearest_RRedges) ;
+	
 	return retv;
+}
+
+void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int side_small, int side_large, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2,
+				int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no,
+				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges){
+	int side_i, xk1;
+	for(side_i=0; side_i<2; side_i++){
+		int Lscan_edge_no = side_i?junc_near_RLedge_no:junc_near_LLedge_no;
+		int Rscan_edge_no = side_i?junc_near_RRedge_no:junc_near_LRedge_no;
+		srInt_64 this_side = side_i?side_large:side_small;
+		int L_scan_dist = -1;
+		int R_scan_dist = -1;
+		IVT_Interval ** L_scan_res = side_i?junc_nearest_RLedges:junc_nearest_LLedges;
+		IVT_Interval ** R_scan_res = side_i?junc_nearest_RRedges:junc_nearest_LRedges;
+		int show_genes_L = 0;
+		int show_genes_R = 0;
+		if(Lscan_edge_no >0) L_scan_dist = abs( this_side - L_scan_res[0]->start );
+		if(Rscan_edge_no >0) R_scan_dist = abs( this_side - R_scan_res[0]->start );
+
+		int final_dist = -1;
+		if(Lscan_edge_no >0 && Rscan_edge_no<1){
+			show_genes_L = 1;
+			final_dist = L_scan_dist;
+		}else if(Lscan_edge_no <1 && Rscan_edge_no>0){
+			show_genes_R = 1;
+			final_dist = R_scan_dist;
+		}else if(Lscan_edge_no >0 && Rscan_edge_no>0){
+			if(L_scan_dist < R_scan_dist) show_genes_L = 1;
+			else if(L_scan_dist > R_scan_dist) show_genes_R = 1;
+			else{
+				show_genes_L = 1;
+				show_genes_R = 1;
+			}
+			final_dist = min(R_scan_dist, L_scan_dist);
+		}
+		if(show_genes_L || show_genes_R){
+			char * outchrs = side_i?dist_to_nearest_splice_side_str_SP2:dist_to_nearest_splice_side_str_SP1;
+			int lri, outchrs_ptr=0;
+			HashTable * gene_name_tab = StringTableCreate(10);
+			for(lri=0; lri<2; lri++){
+				if(lri==0 && !show_genes_L) continue;
+				if(lri==1 && !show_genes_R) continue;
+				int this_scan_dir_items;
+				IVT_Interval ** this_scan_dir_item_ptr;
+				if(side_i){
+					this_scan_dir_items = lri?junc_near_RRedge_no:junc_near_RLedge_no;
+					this_scan_dir_item_ptr = lri?junc_nearest_RRedges:junc_nearest_RLedges;
+				}else{
+					this_scan_dir_items = lri?junc_near_LRedge_no:junc_near_LLedge_no;
+					this_scan_dir_item_ptr = lri?junc_nearest_LRedges:junc_nearest_LLedges;
+				}
+				for(xk1 = 0; xk1 < this_scan_dir_items ; xk1++){
+					char * gene_name = this_scan_dir_item_ptr[xk1] -> attr;
+					HashTablePut(gene_name_tab, gene_name, NULL+1);
+				}
+			}
+			ArrayList * gene_name_list = HashTableKeys(gene_name_tab);
+			ArrayListSort(gene_name_list, ArrayListStringComparison);
+			if(outchrs_ptr>0) outchrs[outchrs_ptr ++]=',';
+//if(gene_name_list->numOfElements<1)fprintf(stderr,"HOW??HOW??\nHOW???\n");
+			ArrayListStringJoin(gene_name_list, outchrs+outchrs_ptr, JC_OUT_GENE_COLUMNS_LENGTH - outchrs_ptr-12);
+			outchrs_ptr+=strlen(outchrs+outchrs_ptr);
+
+			sprintf(outchrs+outchrs_ptr,":%d", final_dist);
+			ArrayListDestroy(gene_name_list);
+			HashTableDestroy(gene_name_tab);
+
+		}
+	}
 }
 
 void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char * output_file_name, ArrayList * column_names, ArrayList * junction_global_table_list, ArrayList * splicing_global_table_list){
@@ -5679,7 +5643,9 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	FILE * ofp = fopen(outfname, "w");
 	char * tmpp = NULL;
 
-	fprintf(ofp, "GeneName\tTranscriptID\tStatus\tnExons\tDist.to.nearest.splicing.site\tSite1_chr\tSite1_location\tSite1_strand\tSite2_chr\tSite2_location\tSite2_strand");
+	fprintf(ofp, "GeneName_SP1\tGeneName_SP2\tTranscriptID_SP1\tTranscriptID_SP2\t"
+            "Status\tDonorSide\tAcceptorSide\t"
+            "DistToNearestSplicingSite_SP1\tDistToNearestSplicingSite_SP2\tSite1_chr\tSite1_location\tSite1_strand\tSite2_chr\tSite2_location\tSite2_strand");
 
 	for(infile_i=0; infile_i < column_names -> numOfElements; infile_i++)
 	{
@@ -5690,6 +5656,10 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	IVT_Interval ** junc_genebody_olayleft = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
 	IVT_Interval ** junc_genebody_olayright = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_nearest_LLedges = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_nearest_RLedges = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_nearest_LRedges = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
+	IVT_Interval ** junc_nearest_RRedges = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
 	for(ky_i = 0; ky_i < merged_junction_table -> numOfElements ; ky_i ++){
 		int unique_junctions = 0;
 		char * chro_small = strtok_r( key_list[ky_i] , "\t", &tmpp);
@@ -5719,34 +5689,76 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		}
 		assert(0==strcmp(chro_small, chro_large));
 		IVT_IntervalTreeNode * IVT_gbody_root = HashTableGet(global_context -> junction_GenebodyTree_table, chro_small);
-		char gene_ids_str[JC_OUT_GENE_COLUMNS_LENGTH], transcript_ids_str[JC_OUT_GENE_COLUMNS_LENGTH], dist_to_nearest_splice_side_str[JC_OUT_GENE_COLUMNS_LENGTH];
-		strcpy(gene_ids_str,"NA");
-		strcpy(transcript_ids_str,"NA");
-		strcpy(dist_to_nearest_splice_side_str,"NA");
-		int num_exons=0;
+
+		int this_edge_tab_i = 0; // no strand info
+		if(strand[0]=='+') this_edge_tab_i = 1;
+		if(strand[0]=='-') this_edge_tab_i = 2;
+		HashTable * this_edge_tab = global_context -> junction_ExonEdgeTree_table[this_edge_tab_i];
+		IVT_IntervalTreeNode * IVT_edge_root = HashTableGet(this_edge_tab, chro_small);
+
+		char gene_ids_str_SP1[JC_OUT_GENE_COLUMNS_LENGTH], gene_ids_str_SP2[JC_OUT_GENE_COLUMNS_LENGTH],
+		     transcript_ids_str_SP1[JC_OUT_GENE_COLUMNS_LENGTH], transcript_ids_str_SP2[JC_OUT_GENE_COLUMNS_LENGTH],
+		     dist_to_nearest_splice_side_str_SP1[JC_OUT_GENE_COLUMNS_LENGTH], dist_to_nearest_splice_side_str_SP2[JC_OUT_GENE_COLUMNS_LENGTH];
+		strcpy(gene_ids_str_SP1,"NA");
+		strcpy(gene_ids_str_SP2,"NA");
+		strcpy(transcript_ids_str_SP1,"NA");
+		strcpy(transcript_ids_str_SP2,"NA");
+		strcpy(dist_to_nearest_splice_side_str_SP1,"NA");
+		strcpy(dist_to_nearest_splice_side_str_SP2,"NA");
 
 //fprintf(stderr,"IVT_PTR %p  %s\n", IVT_gbody_root, chro_small);
 		char * jc_retv_str = "NA";
 		int jc_gene_status = -1;
+
+		int strand_learned_from_FASTA = -1;
+		if(strand[0]=='+') strand_learned_from_FASTA =0;
+		if(strand[0]=='-') strand_learned_from_FASTA =1;
 		if(IVT_gbody_root){
-			int junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no;
+			int junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no, junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no;
 			junc_olay_genebody_left_result_no = IVT_query(IVT_gbody_root, pos_small, junc_genebody_olayleft, MAX_OVERLAP_EDGE_NUMBER);
 			junc_olay_genebody_right_result_no = IVT_query(IVT_gbody_root, pos_large, junc_genebody_olayright, MAX_OVERLAP_EDGE_NUMBER);
 
-			if(junc_olay_genebody_left_result_no == MAX_OVERLAP_EDGE_NUMBER|| junc_olay_genebody_right_result_no==MAX_OVERLAP_EDGE_NUMBER){
+			junc_near_LLedge_no = IVT_edges_lr(IVT_edge_root,pos_small,junc_nearest_LLedges,MAX_OVERLAP_EDGE_NUMBER,1);
+			junc_near_LRedge_no = IVT_edges_lr(IVT_edge_root,pos_small,junc_nearest_LRedges,MAX_OVERLAP_EDGE_NUMBER,0);
+
+			junc_near_RLedge_no = IVT_edges_lr(IVT_edge_root,pos_large,junc_nearest_RLedges,MAX_OVERLAP_EDGE_NUMBER,1);
+			junc_near_RRedge_no = IVT_edges_lr(IVT_edge_root,pos_large,junc_nearest_RRedges,MAX_OVERLAP_EDGE_NUMBER,0);
+
+
+
+//if(abs(pos_small - 2168686)<=1 && abs(pos_large - 2169791)<=1) fprintf(stderr,"STRAND_I %d  LRquery NOs %d %d  %s %s\n", this_edge_tab_i, junc_near_LLedge_no, junc_near_RRedge_no , junc_near_LLedge_no<1?NULL:(junc_nearest_LLedges[0]->attr), junc_near_RRedge_no<1?NULL:(junc_nearest_RRedges[0]->attr) );
+
+			if(junc_olay_genebody_left_result_no == MAX_OVERLAP_EDGE_NUMBER|| junc_olay_genebody_right_result_no==MAX_OVERLAP_EDGE_NUMBER ||
+                             junc_near_LLedge_no == MAX_OVERLAP_EDGE_NUMBER || junc_near_RLedge_no == MAX_OVERLAP_EDGE_NUMBER||
+                             junc_near_LRedge_no == MAX_OVERLAP_EDGE_NUMBER || junc_near_RRedge_no == MAX_OVERLAP_EDGE_NUMBER
+                           ){
 				SUBREADprintf("WARNING: Your annotation file contains very many exons that start/end at the same location. Consider to increase MAX_OVERLAP_EDGE_NUMBER in readSummary.c to accomodate these exons for junction counting.\n");
 			}
 
-			int strand_learned_from_FASTA = -1;
-			if(strand[0]=='+') strand_learned_from_FASTA =0;
-			if(strand[0]=='-') strand_learned_from_FASTA = 1;
-			jc_gene_status = determine_jcount_gene_transcript_report(global_context , pos_small, pos_large, junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no, junc_genebody_olayleft, junc_genebody_olayright, gene_ids_str, transcript_ids_str, &num_exons, dist_to_nearest_splice_side_str, strand_learned_from_FASTA);
+			jc_gene_status = determine_jcount_gene_transcript_report(global_context , pos_small, pos_large, junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no, junc_genebody_olayleft, junc_genebody_olayright, gene_ids_str_SP1,gene_ids_str_SP2, transcript_ids_str_SP1, transcript_ids_str_SP2, dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2, strand_learned_from_FASTA, junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no, junc_nearest_LLedges,junc_nearest_LRedges,junc_nearest_RLedges,junc_nearest_RRedges);
 		}
 		if(jc_gene_status == JC_STATUS_KNOWN) jc_retv_str = "KNOWN";
 		if(jc_gene_status == JC_STATUS_NOVEL) jc_retv_str = "NOVEL";
-		if(jc_gene_status == JC_STATUS_NOVEL_FUSION) jc_retv_str = "NOVEL_FUSION";
+		char donorside[20], acceptorside[20];
+		if( strand_learned_from_FASTA == -1){
+			strcpy(donorside,"NA");
+			strcpy(acceptorside,"NA");
+		}else if(strand_learned_from_FASTA == 0 ){
+			strcpy(donorside,"SP1");
+			strcpy(acceptorside,"SP2");
+		}else{
+			strcpy(donorside,"SP2");
+			strcpy(acceptorside,"SP1");
+		}
 
-		fprintf(ofp, "%s\t%s\t%s\t%d\t%s\t%s\t%d\t%s\t%s\t%d\t%s", gene_ids_str, transcript_ids_str, jc_retv_str, num_exons, dist_to_nearest_splice_side_str, chro_small, pos_small, strand, chro_large,pos_large, strand);
+		fprintf(ofp, "%s\t%s\t%s\t%s\t"
+				"%s\t%s\t%s\t"
+                                "%s\t%s\t%s\t"
+ 				"%d\t%s\t%s\t%d\t%s",
+				gene_ids_str_SP1, gene_ids_str_SP2, transcript_ids_str_SP1, transcript_ids_str_SP2,
+				jc_retv_str, donorside, acceptorside, 
+                                dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2, chro_small,
+				pos_small,  strand,  chro_large,  pos_large,  strand);
 
 		*(pos_small_str-1)='\t';
 		*(pos_large_str-1)='\t';
@@ -5769,6 +5781,10 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	free(key_list);
 	free(junc_genebody_olayleft);
 	free(junc_genebody_olayright);
+	free(junc_nearest_LLedges);
+	free(junc_nearest_RLedges);
+	free(junc_nearest_LRedges);
+	free(junc_nearest_RRedges);
 
 	//print_in_box(80,0,PRINT_BOX_CENTER,"Found %llu junctions in all the input files.", merged_junction_table -> numOfElements);
 	//print_in_box(80,0,0,"");
@@ -6466,6 +6482,9 @@ int readSummary(int argc,char *argv[]){
 		HashTableDestroy(global_context.junction_genebody_table);
 		HashTableDestroy(global_context.junction_transcript_table);
 		HashTableDestroy(global_context.junction_GenebodyTree_table);
+		HashTableDestroy(global_context.junction_ExonEdgeTree_table[0]);
+		HashTableDestroy(global_context.junction_ExonEdgeTree_table[1]);
+		HashTableDestroy(global_context.junction_ExonEdgeTree_table[2]);
 		HashTableDestroy(global_context.junction_ExonTree_table);
 	}
 
