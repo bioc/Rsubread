@@ -5367,8 +5367,15 @@ for(xk1=0; xk1<junc_near_RLedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RL %d  %d\n"
 for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n" , junc_nearest_RRedges[xk1]->start, junc_nearest_RRedges[xk1]->start - side_large);
 
 }
-	gene_ids_str_SP1[0] = transcript_ids_str_SP1[0] = dist_to_nearest_splice_side_str_SP1[0] = 0;
-	gene_ids_str_SP2[0] = transcript_ids_str_SP2[0] = dist_to_nearest_splice_side_str_SP2[0] = 0;
+	gene_ids_str_SP1[0] = transcript_ids_str_SP1[0] = dist_to_nearest_splice_side_str_SP1[0] =
+	gene_ids_str_SP2[0] = transcript_ids_str_SP2[0] = dist_to_nearest_splice_side_str_SP2[0] = 'N';
+
+	gene_ids_str_SP1[1] = transcript_ids_str_SP1[1] = dist_to_nearest_splice_side_str_SP1[1] =
+	gene_ids_str_SP2[1] = transcript_ids_str_SP2[1] = dist_to_nearest_splice_side_str_SP2[1] = 'A';
+
+	gene_ids_str_SP1[2] = transcript_ids_str_SP1[2] = dist_to_nearest_splice_side_str_SP1[2] =
+	gene_ids_str_SP2[2] = transcript_ids_str_SP2[2] = dist_to_nearest_splice_side_str_SP2[2] = '\0';
+
 	HashTable * match1_txn_table = StringTableCreate(100);
 	HashTable * edge1P1_table = StringTableCreate(100);
 	HashTable * edge2P1_table = StringTableCreate(100);
