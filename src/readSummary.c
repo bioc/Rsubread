@@ -5354,12 +5354,13 @@ void junckey_sort_merge(void * inptr, int start, int items1, int items2){
 
 void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int side_small, int side_large, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2,
 				int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no,
-				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges);
+				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges, char * my_chro);
 
-int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_context, int side_small, int side_large, int junc_olay_genebody_left_result_no,int junc_olay_genebody_right_result_no, IVT_Interval ** junc_genebody_olayleft, IVT_Interval ** junc_genebody_olayright, char * gene_ids_str_SP1, char * gene_ids_str_SP2, char * transcript_ids_str_SP1, char * transcript_ids_str_SP2, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2, int strand_learnt_from_FASTA, int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no, IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges){
+int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_context, int side_small, int side_large, int junc_olay_genebody_left_result_no,int junc_olay_genebody_right_result_no, IVT_Interval ** junc_genebody_olayleft, IVT_Interval ** junc_genebody_olayright, char * gene_ids_str_SP1, char * gene_ids_str_SP2, char * transcript_ids_str_SP1, char * transcript_ids_str_SP2, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2, int strand_learnt_from_FASTA, int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no, IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges, char * my_chro){
 	// test "exact hit edges" situation
 	int xk1,xk2, txp_id, retv=0;
-if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1){
+
+if(0)if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1){
 fprintf(stderr,"HAS_NBNB %d %d %d %d;  Strand-is-NEG=%d\n", junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no, strand_learnt_from_FASTA);
 for(xk1=0; xk1<junc_near_LLedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:LL %d  %d\n" , junc_nearest_LLedges[xk1]->start, junc_nearest_LLedges[xk1]->start - side_small);
 for(xk1=0; xk1<junc_near_LRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:LR %d  %d\n" , junc_nearest_LRedges[xk1]->start, junc_nearest_LRedges[xk1]->start - side_small );
@@ -5497,27 +5498,33 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 	find_nearest_gene_dist(global_context, side_small, side_large,
 				dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2,
 				junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no,
-				junc_nearest_LLedges,  junc_nearest_LRedges,  junc_nearest_RLedges,  junc_nearest_RRedges) ;
+				junc_nearest_LLedges,  junc_nearest_LRedges,  junc_nearest_RLedges,  junc_nearest_RRedges, my_chro);
 	
 	return retv;
 }
 
 void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int side_small, int side_large, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2,
 				int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no,
-				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges){
+				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges, char * exon_SE_chro){
 	int side_i, xk1;
 	for(side_i=0; side_i<2; side_i++){
 		int Lscan_edge_no = side_i?junc_near_RLedge_no:junc_near_LLedge_no;
 		int Rscan_edge_no = side_i?junc_near_RRedge_no:junc_near_LRedge_no;
 		srInt_64 this_side = side_i?side_large:side_small;
-		int L_scan_dist = -1;
-		int R_scan_dist = -1;
+		int L_scan_dist = -1, L_exon_SE_coord = -1;
+		int R_scan_dist = -1, R_exon_SE_coord = -1;
 		IVT_Interval ** L_scan_res = side_i?junc_nearest_RLedges:junc_nearest_LLedges;
 		IVT_Interval ** R_scan_res = side_i?junc_nearest_RRedges:junc_nearest_LRedges;
 		int show_genes_L = 0;
 		int show_genes_R = 0;
-		if(Lscan_edge_no >0) L_scan_dist = abs( this_side - L_scan_res[0]->start );
-		if(Rscan_edge_no >0) R_scan_dist = abs( this_side - R_scan_res[0]->start );
+		if(Lscan_edge_no >0){
+			L_scan_dist = abs( this_side - L_scan_res[0]->start );
+			L_exon_SE_coord = L_scan_res[0]->start;
+		}
+		if(Rscan_edge_no >0){
+			R_scan_dist = abs( this_side - R_scan_res[0]->start );
+			R_exon_SE_coord = R_scan_res[0]->start;
+		}
 
 		int final_dist = -1;
 		if(Lscan_edge_no >0 && Rscan_edge_no<1){
@@ -5535,11 +5542,12 @@ void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int sid
 			}
 			final_dist = min(R_scan_dist, L_scan_dist);
 		}
+		if(final_dist<1) show_genes_R = 0; //L and R search had the same results.
 		if(show_genes_L || show_genes_R){
 			char * outchrs = side_i?dist_to_nearest_splice_side_str_SP2:dist_to_nearest_splice_side_str_SP1;
 			int lri, outchrs_ptr=0;
-			HashTable * gene_name_tab = StringTableCreate(10);
 			for(lri=0; lri<2; lri++){
+				HashTable * gene_name_tab = StringTableCreate(10);
 				if(lri==0 && !show_genes_L) continue;
 				if(lri==1 && !show_genes_R) continue;
 				int this_scan_dir_items;
@@ -5555,18 +5563,22 @@ void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int sid
 					char * gene_name = this_scan_dir_item_ptr[xk1] -> attr;
 					HashTablePut(gene_name_tab, gene_name, NULL+1);
 				}
+
+				ArrayList * gene_name_list = HashTableKeys(gene_name_tab);
+				ArrayListSort(gene_name_list, ArrayListStringComparison);
+				int me_exon_SE_coord = lri?R_exon_SE_coord:L_exon_SE_coord;
+				outchrs_ptr += sprintf(outchrs+outchrs_ptr,"%s:%d,", exon_SE_chro, me_exon_SE_coord);
+				outchrs_ptr += ArrayListStringJoin(gene_name_list, outchrs+outchrs_ptr, JC_OUT_GENE_COLUMNS_LENGTH - outchrs_ptr-12);
+				ArrayListDestroy(gene_name_list);
+				HashTableDestroy(gene_name_tab);
+
+				char * lrstr = lri?",right":",left";
+				if (final_dist < 1) lrstr = "";
+				outchrs_ptr += sprintf(outchrs+outchrs_ptr,",%d%s", final_dist, lrstr);
+				if(outchrs_ptr)outchrs[outchrs_ptr ++]=';';
 			}
-			ArrayList * gene_name_list = HashTableKeys(gene_name_tab);
-			ArrayListSort(gene_name_list, ArrayListStringComparison);
-			if(outchrs_ptr>0) outchrs[outchrs_ptr ++]=',';
-//if(gene_name_list->numOfElements<1)fprintf(stderr,"HOW??HOW??\nHOW???\n");
-			ArrayListStringJoin(gene_name_list, outchrs+outchrs_ptr, JC_OUT_GENE_COLUMNS_LENGTH - outchrs_ptr-12);
-			outchrs_ptr+=strlen(outchrs+outchrs_ptr);
-
-			sprintf(outchrs+outchrs_ptr,":%d", final_dist);
-			ArrayListDestroy(gene_name_list);
-			HashTableDestroy(gene_name_tab);
-
+			if(outchrs[outchrs_ptr-1]==';') outchrs_ptr--;
+			outchrs[outchrs_ptr] = 0;
 		}
 	}
 }
@@ -5650,9 +5662,9 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	FILE * ofp = fopen(outfname, "w");
 	char * tmpp = NULL;
 
-	fprintf(ofp, "GeneName_SP1\tGeneName_SP2\tTranscriptID_SP1\tTranscriptID_SP2\t"
-            "Status\tDonorSide\tAcceptorSide\t"
-            "DistToNearestSplicingSite_SP1\tDistToNearestSplicingSite_SP2\tSite1_chr\tSite1_location\tSite1_strand\tSite2_chr\tSite2_location\tSite2_strand");
+	fprintf(ofp, "Gene_SP1\tGene_SP2\tTranscript\t"
+            "Status\tDonor\tAcceptor\t"
+            "NearestSplicingSite_SP1\tNearestSplicingSite_SP2\tSite1_chr\tSite1_location\tSite1_strand\tSite2_chr\tSite2_location\tSite2_strand");
 
 	for(infile_i=0; infile_i < column_names -> numOfElements; infile_i++)
 	{
@@ -5742,7 +5754,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 				SUBREADprintf("WARNING: Your annotation file contains very many exons that start/end at the same location. Consider to increase MAX_OVERLAP_EDGE_NUMBER in readSummary.c to accomodate these exons for junction counting.\n");
 			}
 
-			jc_gene_status = determine_jcount_gene_transcript_report(global_context , pos_small, pos_large, junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no, junc_genebody_olayleft, junc_genebody_olayright, gene_ids_str_SP1,gene_ids_str_SP2, transcript_ids_str_SP1, transcript_ids_str_SP2, dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2, strand_learned_from_FASTA, junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no, junc_nearest_LLedges,junc_nearest_LRedges,junc_nearest_RLedges,junc_nearest_RRedges);
+			jc_gene_status = determine_jcount_gene_transcript_report(global_context , pos_small, pos_large, junc_olay_genebody_left_result_no, junc_olay_genebody_right_result_no, junc_genebody_olayleft, junc_genebody_olayright, gene_ids_str_SP1,gene_ids_str_SP2, transcript_ids_str_SP1, transcript_ids_str_SP2, dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2, strand_learned_from_FASTA, junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no, junc_nearest_LLedges,junc_nearest_LRedges,junc_nearest_RLedges,junc_nearest_RRedges, chro_small);
 		}
 		if(jc_gene_status == JC_STATUS_KNOWN) jc_retv_str = "KNOWN";
 		if(jc_gene_status == JC_STATUS_NOVEL) jc_retv_str = "NOVEL";
@@ -5758,11 +5770,11 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			strcpy(acceptorside,"SP1");
 		}
 
-		fprintf(ofp, "%s\t%s\t%s\t%s\t"
+		fprintf(ofp, "%s\t%s\t%s\t"
 				"%s\t%s\t%s\t"
                                 "%s\t%s\t%s\t"
  				"%d\t%s\t%s\t%d\t%s",
-				gene_ids_str_SP1, gene_ids_str_SP2, transcript_ids_str_SP1, transcript_ids_str_SP2,
+				gene_ids_str_SP1, gene_ids_str_SP2, transcript_ids_str_SP1, /*transcript_ids_str_SP2, which is identical to SP1*/
 				jc_retv_str, donorside, acceptorside, 
                                 dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2, chro_small,
 				pos_small,  strand,  chro_large,  pos_large,  strand);
