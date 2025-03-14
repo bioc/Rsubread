@@ -3,7 +3,7 @@ Version: 2.21.1
 Date: 2024-11-01
 Title: Mapping, quantification and variant analysis of sequencing data 
 Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
-Maintainer: Wei Shi <wei.shi@onjcri.org.au>, Yang Liao <yang.liao@onjcri.org.au> and Gordon K Smyth <smyth@wehi.edu.au>
+Maintainer: Wei Shi <wei.shi2@monash.edu>, Yang Liao <yang.liao@monash.edu> and Gordon K Smyth <smyth@wehi.edu.au>
 Description: Alignment, quantification and analysis of
         RNA sequencing data (including both bulk RNA-seq and scRNA-seq) and
         DNA sequenicng data (including ATAC-seq, ChIP-seq, WGS, WES etc). 
