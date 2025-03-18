@@ -871,10 +871,21 @@ void sort_junc_feature_make_gaps(void *k, void *v, HashTable * tab){
 	}
 }
 
+int sort_junc_feature_sort_exons_cmp(void * L_elem, void * R_elem, ArrayList * me){
+	fc_junction_exon_in_transcript_t *l = L_elem, *r = R_elem;
+	return l->chro_start - r->chro_start;
+}
+
+void sort_junc_feature_sort_exons(void *k, void *v, HashTable * tab){
+	fc_junction_transcript_t * txnobj = v;
+	ArrayListSort(txnobj -> exons_in_transcript, sort_junc_feature_sort_exons_cmp);
+}
+
 // this is called after all the features are loaded.
 void sort_junc_feature(fc_thread_global_context_t *global_context){
 	global_context -> junction_genebody_table -> appendix1 = global_context;
 	HashTableIteration(global_context -> junction_genebody_table, sort_junc_feature_make_gaps);
+	HashTableIteration(global_context -> junction_transcript_table, sort_junc_feature_sort_exons);
 //	fprintf(stderr,"MERGED GeneBodyTree = %ld\n", global_context -> junction_GenebodyTree_table -> numOfElements);
 }
 
@@ -5380,6 +5391,10 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 	HashTable * match1_txn_table = StringTableCreate(100);
 	HashTable * edge1P1_table = StringTableCreate(100);
 	HashTable * edge2P1_table = StringTableCreate(100);
+
+	HashTable * edge1exonNo_table = StringTableCreate(100);
+	HashTable * edge2exonNo_table = StringTableCreate(100);
+
 	ArrayList * common_txn_list = ArrayListCreate(10);
 	int small_site_exactly = 0;
 	int large_site_exactly = 0;
@@ -5389,17 +5404,25 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 			srInt_64 edge1_dist = 0xffffffffu;
 			fc_junction_transcript_t * txp_ptr = ArrayListGet(jg_ptr -> transcript_list, txp_id);
 			ArrayList * exon_list = txp_ptr -> exons_in_transcript;
+			int exactly_matched_exon_no = -1;
 			for(xk2=0; xk2< exon_list->numOfElements; xk2++){
 				fc_junction_exon_in_transcript_t * jte_ptr = ArrayListGet(exon_list,xk2);
 				if(strand_learnt_from_FASTA >=0 && strand_learnt_from_FASTA !=  jte_ptr -> is_negative) continue;
-//if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1) fprintf(stderr,"TESTJTE %s : %d vs %d\n",  txp_ptr -> transcript_id,  jte_ptr -> is_negative, strand_learnt_from_FASTA);
 				int exon_start_known = jte_ptr -> chro_start;
 				int exon_end_known = jte_ptr -> chro_stop;
 				int dist_to_any_side = min(abs(side_small - exon_end_known),abs(side_small - exon_start_known));
-				if(dist_to_any_side < edge1_dist) edge1_dist = dist_to_any_side;
+				if(dist_to_any_side < edge1_dist){
+					edge1_dist = dist_to_any_side;
+					if(0==edge1_dist) exactly_matched_exon_no = xk2;
+				}
 			}
-			if(edge1_dist!=0xffffffffu)HashTablePut(edge1P1_table, txp_ptr -> transcript_id, NULL+1+edge1_dist);
-			if(0==edge1_dist)small_site_exactly++;
+			if(edge1_dist!=0xffffffffu){
+				HashTablePut(edge1P1_table, txp_ptr -> transcript_id, NULL+1+edge1_dist);
+				if(0==edge1_dist){
+					small_site_exactly++;
+					HashTablePut(edge1exonNo_table, txp_ptr -> transcript_id, NULL+1+exactly_matched_exon_no);
+				}
+			}
 		}
 	}
 	
@@ -5409,17 +5432,25 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 			srInt_64 edge2_dist = 0xffffffffu;
 			fc_junction_transcript_t * txp_ptr = ArrayListGet(jg_ptr -> transcript_list, txp_id);
 			ArrayList * exon_list = txp_ptr -> exons_in_transcript;
+			int exactly_matched_exon_no = -1;
 			for(xk2=0; xk2< exon_list->numOfElements; xk2++){
 				fc_junction_exon_in_transcript_t * jte_ptr = ArrayListGet(exon_list,xk2);
 				if(strand_learnt_from_FASTA >=0 && strand_learnt_from_FASTA !=  jte_ptr -> is_negative) continue;
-//if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1) fprintf(stderr,"TESTJTX %s : %d vs %d\n",  txp_ptr -> transcript_id,  jte_ptr -> is_negative, strand_learnt_from_FASTA);
 				int exon_end_known = jte_ptr -> chro_stop; 
 				int exon_start_known = jte_ptr -> chro_start; 
 				int dist_to_any_side = min(abs(side_large - exon_end_known),abs(side_large - exon_start_known));
-				if(dist_to_any_side < edge2_dist) edge2_dist = dist_to_any_side;
+				if(dist_to_any_side < edge2_dist){
+					edge2_dist = dist_to_any_side;
+					if(0==edge2_dist) exactly_matched_exon_no = xk2;
+				}
 			}
-			if(edge2_dist!=0xffffffffu)HashTablePut(edge2P1_table, txp_ptr -> transcript_id, NULL+1+edge2_dist);
-			if(0==edge2_dist)large_site_exactly++;
+			if(edge2_dist!=0xffffffffu){
+				HashTablePut(edge2P1_table, txp_ptr -> transcript_id, NULL+1+edge2_dist);
+				if(0==edge2_dist){
+					large_site_exactly++;
+					HashTablePut(edge2exonNo_table, txp_ptr -> transcript_id, NULL+1+exactly_matched_exon_no);
+				}
+			}
 		}
 	}
 
@@ -5431,10 +5462,13 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 			if(edge1_ptr!=1)continue;
 			int edge2_ptr = HashTableGet(edge2P1_table, edge1_txnid)-NULL;
 			if(edge2_ptr==1){
-				ArrayListPush(common_txn_list , edge1_txnid);
+				int exonno_1 = HashTableGet(edge1exonNo_table, edge1_txnid)-NULL-1;
+				int exonno_2 = HashTableGet(edge2exonNo_table, edge1_txnid)-NULL-1;
+				if(abs(exonno_1 - exonno_2)==1)ArrayListPush(common_txn_list , edge1_txnid);
 			}
 		}
 	}
+
 	if(common_txn_list -> numOfElements > 0){
 		HashTable * out_gene_tab = StringTableCreate(10);
 		HashTable * out_txn_tab = StringTableCreate(10);
@@ -5494,6 +5528,8 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 	HashTableDestroy(match1_txn_table);
 	HashTableDestroy(edge1P1_table);
 	HashTableDestroy(edge2P1_table);
+	HashTableDestroy(edge1exonNo_table);
+	HashTableDestroy(edge2exonNo_table);
 
 	find_nearest_gene_dist(global_context, side_small, side_large,
 				dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2,
