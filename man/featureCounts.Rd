@@ -227,7 +227,7 @@ A list with the following components:
 
 \item Acceptor: See description for \code{Donor}. 
 
-\item NearestExonBoundary_SP1: Providing information about the nearest exon boundary (either the start or end base of an exon) relative to the splicing point, including chromosomal coordinate, gene name, distance, and direction (left or right of the splicing point). If the splicing point coincides with an exon boundary (as expected in most cases), the distance will be 0, and direction information will be omitted. Example formats: \code{chr1:1000,genename,0}, \code{chr2:2000,genename,100,left}.
+\item NearestExonBoundary_SP1: Providing information about the nearest exon boundary (either the start or end base of an exon) relative to the splicing point, including chromosomal coordinate, gene name, distance, and direction (left or right of the splicing point). If the splicing point coincides with an exon boundary (as expected in most cases), the distance will be 0, and direction information will be omitted. Example formats: \code{chr1:1000,genename,0}, or \code{chr2:2000,genename,100,left}.
 
 \item NearestExonBoundary_SP2: See description for \code{NearestExonBoundary_SP1}.
 
