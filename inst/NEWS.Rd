@@ -1,6 +1,12 @@
 \name{Rsubreadnews}
 \title{Rsubread News}
 \encoding{UTF-8}
+
+\section{Version 2.22.0}{\itemize{
+
+\item Improved identification and reporting of junction counting functionality in featureCounts.
+}}
+
 \section{Version 2.18.0}{\itemize{
 
 \item Removed the 'maxMOp' parameter from featureCounts. 

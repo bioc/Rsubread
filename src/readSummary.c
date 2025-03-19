@@ -5700,7 +5700,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	fprintf(ofp, "Gene_SP1\tGene_SP2\tTranscript\t"
             "Status\tDonor\tAcceptor\t"
-            "NearestSplicingSite_SP1\tNearestSplicingSite_SP2\tSite1_chr\tSite1_location\tSite1_strand\tSite2_chr\tSite2_location\tSite2_strand");
+            "NearestExonBoundary_SP1\tNearestExonBoundary_SP2\tChr_SP1\tLocation_SP1\tStrand_SP1\tChr_SP2\tLocation_SP2\tStrand_SP2");
 
 	for(infile_i=0; infile_i < column_names -> numOfElements; infile_i++)
 	{

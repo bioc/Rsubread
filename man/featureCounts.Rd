@@ -212,7 +212,39 @@ When \code{isPairedEnd} is \code{TRUE}, fragments (pairs of reads) instead of re
 \value{ 
 A list with the following components:
 \item{counts}{ a data matrix containing read counts for each feature or meta-feature for each library.}
-\item{counts_junction (optional)}{ a data frame including primary and secondary genes overlapping an exon junction, position information for the left splice site (`Site1') and the right splice site (`Site2') of a junction (including chromosome name, coordinate and strand) and number of supporting reads for each junction in each library. Both primary and secondary genes overlap at least one of the two splice sites of a junction. Secondary genes do not overlap more splice sites than the primary gene. When the primary and secondary genes overlap same number of splice sites, the gene with the smallest leftmost base position is selected as the primary gene. For each junction, no more than one primary gene is reported but there might be more than one secondary genes reported. If a junction does not overlap any genes, it has a missing value in the fields of primary gene and secondary gene. Note that this data frame is only generated when \code{juncCounts} is \code{TRUE}.}
+
+\item{counts_junction (optional)}{ A data frame generated when \code{juncCounts=TRUE}, containing information on detected exon-exon junctions and their associated splicing points. A splicing point refers to the chromosomal base immediately before the donor site or after the acceptor site. The data frame includes the following columns:
+\itemize{
+\item Gene_SP1: Gene(s) annotated for a splicing point. This represents one of the two splicing points associated with an exon-exon junction. The annotation provided to featureCounts is used to label junctions and their corresponding splicing points. Gene(s) associated with a splicing point are determined based on the following priority order: (1) genes containing a transcript that supports the existence of this junction; (2) genes containing an exon whose start or end base coincides with this splicing point; (3) genes within whose span this splicing point is located. If no such genes are found, the value will be \code{NA}.
+
+\item Gene_SP2: See description for {Gene_SP1}.
+
+\item Transcript: Transcript(s) that support this junction. If none are found, the value is \code{NA}.
+
+\item Status: If at least one transcript in the provided annotation supports the junction, the value is \code{KNOWN}; otherwise, it is \code{NOVEL}.
+
+\item Donor: If the junction's donor and acceptor sites can be identified based on the canonical donor/acceptor sequences (GT/AG), the value will be \code{SP1} or \code{SP2}. Otherwise, it will be \code{NA}.
+
+\item Acceptor: See description for {Donor}. 
+
+\item NearestExonBoundary_SP1: Providing information about the nearest exon boundary (either the start or end base of an exon) relative to the splicing point, including chromosomal coordinate, gene name, distance, and direction (left or right of the splicing point). If the splicing point coincides with an exon boundary (as expected in most cases), the distance will be 0, and direction information will be omitted. Example formats: \code{chr1:1000,genename,0}, \code{chr2:2000,genename,100,left}.
+
+\item NearestExonBoundary_SP2: See description for {NearestExonBoundary_SP1}.
+
+\item Chr_SP1: Name of chromosome where splicing point 1 is located. 
+
+\item Location_SP1: Chromosomal coordinate of splicing point 1.
+
+\item Strand_SP1: Strand of splicing point 1, which can be \code{+}, \code{-}, or \code{NA} if unknown.
+
+\item Chr_SP2: see description for \code{Chr_SP1}.
+
+\item Location_SP2: see description for \code{Location_SP1}.
+
+\item Strand_SP2 : see description for \code{Strand_SP1}.
+
+\item Columns for junction counts: Columns containing read counts supporting each junction for each sample.
+}}
 \item{annotation}{ a data frame with six columns including \code{GeneID}, \code{Chr}, \code{Start}, \code{End} and \code{Length}. When read summarization was performed at feature level, each row in the data frame is a feature and columns in the data frame give the annotation information for the features. When read summarization was performed at meta-feature level, each row in the data frame is a meta-feature and columns in the data frame give the annotation information for the features included in each meta feature except the \code{Length} column. For each meta-feature, the \code{Length} column gives the total length of genomic regions covered by features included in that meta-feature.   Note that this length will be less than the sum of lengths of features included in the meta-feature when there are features overlapping with each other. Also note the \code{GeneID} column gives Entrez gene identifiers when the inbuilt annotations are used.}
 \item{targets}{ a character vector giving sample information.}
 \item{stat}{ a data frame giving number of successfully assigned reads in each library and also number of unassigned reads falling in each filtering category (unmapped, read type, singleton, mapping quality, chimera, fragment length, duplicate, multi-mapping, secondary alignment, split alignment, no features, overlapping length and assignment ambiguity). See Users Guide for more details.}
