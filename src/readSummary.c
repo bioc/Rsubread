@@ -939,7 +939,7 @@ void register_junc_feature(fc_thread_global_context_t *global_context, char * fe
 	}
 
 	char gene_body_key[FEATURE_NAME_LENGTH + CHROMOSOME_NAME_LENGTH+10];
-	sprintf(gene_body_key,"%s\t%s%s", feature_name, chro, is_negative?"NEG":"POS");
+	SUBreadSprintf(gene_body_key, FEATURE_NAME_LENGTH + CHROMOSOME_NAME_LENGTH+10 ,"%s\t%s%s", feature_name, chro, is_negative?"NEG":"POS");
 	fc_junction_genebody_t * jgbody = HashTableGet(global_context -> junction_genebody_table, gene_body_key);
 	if(!jgbody){
 		jgbody = malloc(sizeof(fc_junction_genebody_t));
@@ -5603,14 +5603,14 @@ void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int sid
 				ArrayList * gene_name_list = HashTableKeys(gene_name_tab);
 				ArrayListSort(gene_name_list, ArrayListStringComparison);
 				int me_exon_SE_coord = lri?R_exon_SE_coord:L_exon_SE_coord;
-				outchrs_ptr += sprintf(outchrs+outchrs_ptr,"%s:%d,", exon_SE_chro, me_exon_SE_coord);
+				outchrs_ptr += SUBreadSprintf(outchrs+outchrs_ptr, JC_OUT_GENE_COLUMNS_LENGTH - outchrs_ptr,"%s:%d,", exon_SE_chro, me_exon_SE_coord);
 				outchrs_ptr += ArrayListStringJoin(gene_name_list, outchrs+outchrs_ptr, JC_OUT_GENE_COLUMNS_LENGTH - outchrs_ptr-12);
 				ArrayListDestroy(gene_name_list);
 				HashTableDestroy(gene_name_tab);
 
 				char * lrstr = lri?",right":",left";
 				if (final_dist < 1) lrstr = "";
-				outchrs_ptr += sprintf(outchrs+outchrs_ptr,",%d%s", final_dist, lrstr);
+				outchrs_ptr += SUBreadSprintf(outchrs+outchrs_ptr, JC_OUT_GENE_COLUMNS_LENGTH - outchrs_ptr,",%d%s", final_dist, lrstr);
 				if(outchrs_ptr)outchrs[outchrs_ptr ++]=';';
 			}
 			if(outchrs[outchrs_ptr-1]==';') outchrs_ptr--;
