@@ -61,6 +61,7 @@
 #define MAX_HIT_NUMBER (1000*1000*1000)
 #define MAX_EXTRA_COLS 15
 #define FC_FLIST_SPLITOR "\026"
+#define NIL_TXN_PLACEHOLDER "__DBPZ_com_nil_TXN" // SAF format: using placeholder for transcripts. DBPZ_com is my namespace.
 
 typedef struct{
 	ArrayList * exons_in_transcript; // the items in IVT tree obj is deallocated when this ArrayList is destroyed. 
@@ -288,6 +289,7 @@ typedef struct {
 	srInt_64 unistr_buffer_used;
 	HashTable * lineno_2_sortedno_tab;
 	int known_cell_barcode_length;
+	int ignore_transcript_junction_assignment;
 //	HashTable * junction_features_table;
 //	HashTable * junction_bucket_table;
 	HashTable * junction_transcript_table;
@@ -891,7 +893,12 @@ void sort_junc_feature(fc_thread_global_context_t *global_context){
 
 void register_junc_feature(fc_thread_global_context_t *global_context, char * feature_name, char * transcript_id, char * chro, unsigned int start, unsigned int stop, int is_negative){
 	int xk1, edge_tab_i;
-	if(transcript_id==NULL)return;	// SAF format: don't do anything about junction assignment to genes.
+	char transcript_id_place[FEATURE_NAME_LENGTH+30];
+	if(transcript_id==NULL){
+		SUBreadSprintf(transcript_id_place, FEATURE_NAME_LENGTH+30,"%s%s", feature_name, NIL_TXN_PLACEHOLDER);
+		transcript_id=transcript_id_place;
+	}
+
 	fc_junction_exon_in_transcript_t * new_item = calloc(sizeof(fc_junction_exon_in_transcript_t),1);
 	new_item -> transcript_id = HashTableGetKey(global_context -> junction_transcript_table, transcript_id); 
 	char * edgetab_used_gene_name=NULL;
@@ -1210,6 +1217,7 @@ int load_feature_info(fc_thread_global_context_t *global_context, const char * a
 			assert(feature_name);
 			if(global_context -> do_junction_counting){
 				register_junc_feature(global_context , feature_name, NULL, seq_name, ret_features[xk1].start, ret_features[xk1].end, ret_features[xk1].is_negative_strand);
+				global_context -> ignore_transcript_junction_assignment = 1;
 			}
 
 			xk1++;
@@ -5356,6 +5364,7 @@ void junckey_sort_merge(void * inptr, int start, int items1, int items2){
 }
 
 
+#define JC_STATUS_NA 0
 #define JC_STATUS_KNOWN 1
 #define JC_STATUS_NOVEL 2
 #define JC_STATUS_NOVEL_FUSION 3
@@ -5368,17 +5377,8 @@ void find_nearest_gene_dist(fc_thread_global_context_t * global_context, int sid
 				IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges, char * my_chro);
 
 int determine_jcount_gene_transcript_report(fc_thread_global_context_t * global_context, int side_small, int side_large, int junc_olay_genebody_left_result_no,int junc_olay_genebody_right_result_no, IVT_Interval ** junc_genebody_olayleft, IVT_Interval ** junc_genebody_olayright, char * gene_ids_str_SP1, char * gene_ids_str_SP2, char * transcript_ids_str_SP1, char * transcript_ids_str_SP2, char * dist_to_nearest_splice_side_str_SP1,  char * dist_to_nearest_splice_side_str_SP2, int strand_learnt_from_FASTA, int junc_near_LLedge_no, int junc_near_LRedge_no, int junc_near_RLedge_no, int junc_near_RRedge_no, IVT_Interval ** junc_nearest_LLedges, IVT_Interval ** junc_nearest_LRedges, IVT_Interval ** junc_nearest_RLedges, IVT_Interval ** junc_nearest_RRedges, char * my_chro){
-	// test "exact hit edges" situation
 	int xk1,xk2, txp_id, retv=0;
 
-if(0)if(abs(side_small - 7467901)<=1 && abs(side_large - 7640400)<=1){
-fprintf(stderr,"HAS_NBNB %d %d %d %d;  Strand-is-NEG=%d\n", junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no, strand_learnt_from_FASTA);
-for(xk1=0; xk1<junc_near_LLedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:LL %d  %d\n" , junc_nearest_LLedges[xk1]->start, junc_nearest_LLedges[xk1]->start - side_small);
-for(xk1=0; xk1<junc_near_LRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:LR %d  %d\n" , junc_nearest_LRedges[xk1]->start, junc_nearest_LRedges[xk1]->start - side_small );
-for(xk1=0; xk1<junc_near_RLedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RL %d  %d\n" , junc_nearest_RLedges[xk1]->start, junc_nearest_RLedges[xk1]->start - side_large );
-for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n" , junc_nearest_RRedges[xk1]->start, junc_nearest_RRedges[xk1]->start - side_large);
-
-}
 	gene_ids_str_SP1[0] = transcript_ids_str_SP1[0] = dist_to_nearest_splice_side_str_SP1[0] =
 	gene_ids_str_SP2[0] = transcript_ids_str_SP2[0] = dist_to_nearest_splice_side_str_SP2[0] = 'N';
 
@@ -5464,7 +5464,7 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 			if(edge2_ptr==1){
 				int exonno_1 = HashTableGet(edge1exonNo_table, edge1_txnid)-NULL-1;
 				int exonno_2 = HashTableGet(edge2exonNo_table, edge1_txnid)-NULL-1;
-				if(abs(exonno_1 - exonno_2)==1)ArrayListPush(common_txn_list , edge1_txnid);
+				if(abs(exonno_1 - exonno_2)==1 || strstr(edge1_txnid, NIL_TXN_PLACEHOLDER))ArrayListPush(common_txn_list , edge1_txnid);
 			}
 		}
 	}
@@ -5489,7 +5489,7 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 
 		// when they share the same genes and txns, the lists must be identical for two sides. 
 		ArrayListStringJoin(out_gene_list, gene_ids_str_SP2,JC_OUT_GENE_COLUMNS_LENGTH);
-		ArrayListStringJoin(out_txn_list, transcript_ids_str_SP2,JC_OUT_GENE_COLUMNS_LENGTH);
+		//ArrayListStringJoin(out_txn_list, transcript_ids_str_SP2,JC_OUT_GENE_COLUMNS_LENGTH);
 
 		ArrayListDestroy(out_gene_list);
 		ArrayListDestroy(out_txn_list);
@@ -5535,6 +5535,9 @@ for(xk1=0; xk1<junc_near_RRedge_no; xk1++)fprintf(stderr,"HAS_NBNB_:RR %d  %d\n"
 				dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2,
 				junc_near_LLedge_no, junc_near_LRedge_no, junc_near_RLedge_no, junc_near_RRedge_no,
 				junc_nearest_LLedges,  junc_nearest_LRedges,  junc_nearest_RLedges,  junc_nearest_RRedges, my_chro);
+
+	if(strstr(transcript_ids_str_SP1,NIL_TXN_PLACEHOLDER)) strcpy(transcript_ids_str_SP1,"NA");
+	if(global_context -> ignore_transcript_junction_assignment) retv = JC_STATUS_NA;
 	
 	return retv;
 }
@@ -5700,7 +5703,9 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 	fprintf(ofp, "Gene_SP1\tGene_SP2\tTranscript\t"
             "Status\tDonor\tAcceptor\t"
-            "NearestExonBoundary_SP1\tNearestExonBoundary_SP2\tChr_SP1\tLocation_SP1\tStrand_SP1\tChr_SP2\tLocation_SP2\tStrand_SP2");
+            "Chr_SP1\tLocation_SP1\tStrand_SP1\tChr_SP2\tLocation_SP2\tStrand_SP2\t"
+            "NearestExonBoundary_SP1\tNearestExonBoundary_SP2" 
+        );
 
 	for(infile_i=0; infile_i < column_names -> numOfElements; infile_i++)
 	{
@@ -5794,6 +5799,7 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		}
 		if(jc_gene_status == JC_STATUS_KNOWN) jc_retv_str = "KNOWN";
 		if(jc_gene_status == JC_STATUS_NOVEL) jc_retv_str = "NOVEL";
+		if(jc_gene_status == JC_STATUS_NA) jc_retv_str = "NA";
 		char donorside[20], acceptorside[20];
 		if( strand_learned_from_FASTA == -1){
 			strcpy(donorside,"NA");
@@ -5808,12 +5814,13 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 
 		fprintf(ofp, "%s\t%s\t%s\t"
 				"%s\t%s\t%s\t"
-                                "%s\t%s\t%s\t"
- 				"%d\t%s\t%s\t%d\t%s",
-				gene_ids_str_SP1, gene_ids_str_SP2, transcript_ids_str_SP1, /*transcript_ids_str_SP2, which is identical to SP1*/
-				jc_retv_str, donorside, acceptorside, 
-                                dist_to_nearest_splice_side_str_SP1, dist_to_nearest_splice_side_str_SP2, chro_small,
-				pos_small,  strand,  chro_large,  pos_large,  strand);
+				"%s\t%d\t%s\t%s\t%d\t%s\t"
+				"%s\t%s",
+				gene_ids_str_SP1,gene_ids_str_SP2,transcript_ids_str_SP1,
+				jc_retv_str,donorside,acceptorside,
+				chro_small,pos_small,strand,  chro_large,pos_large,strand,
+				dist_to_nearest_splice_side_str_SP1,  dist_to_nearest_splice_side_str_SP2
+		);
 
 		*(pos_small_str-1)='\t';
 		*(pos_large_str-1)='\t';
