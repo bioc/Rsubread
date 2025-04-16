@@ -1,5 +1,5 @@
 16 Apr 2025 - 2.23.1
-(1) 
+(1) Support junction reporting in featureCounts when the annotation format is SAF.
 
 20 Mar 2025 - 2.21.2
 (1) Improved identification and reporting of junctions in featureCounts.
