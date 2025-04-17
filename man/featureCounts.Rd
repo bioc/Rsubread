@@ -215,33 +215,33 @@ A list with the following components:
 
 \item{counts_junction (optional)}{ A data frame generated when \code{juncCounts=TRUE}, containing information on detected exon-exon junctions and their associated splicing points. A splicing point refers to the chromosomal base immediately before the donor site or after the acceptor site. The data frame includes the following columns:
 \itemize{
-\item Gene_SP1: Gene(s) annotated for a splicing point. This represents one of the two splicing points associated with an exon-exon junction. The annotation provided to featureCounts is used to label junctions and their corresponding splicing points. Gene(s) associated with a splicing point are determined based on the following priority order: (1) genes containing a transcript that supports the existence of this junction; (2) genes containing an exon whose start or end base coincides with this splicing point; (3) genes within whose span this splicing point is located. If no such genes are found, the value will be \code{NA}.
+\item Gene_SP1: Gene(s) annotated for a splicing point. This represents one of the two splicing points associated with an exon-exon junction. A splicing point refers to the chromosomal base immediately before the donor site or after the acceptor site. The annotation provided to featureCounts is used to label junctions and their corresponding splicing points. Gene(s) associated with a splicing point are determined based on the following priority order: (1) genes containing a transcript that supports the existence of this junction; (2) genes containing an exon whose start or end base coincides with this splicing point; (3) genes within whose span this splicing point is located. If no such genes are found, the value will be \code{NA}. If an \code{SAF} format annotation is provided, the first priority will be ignored as the \code{SAF} annotation does not contain transcript information.
 
 \item Gene_SP2: See description for \code{Gene_SP1}.
 
 \item Transcript: Transcript(s) that support this junction. If none are found, the value is \code{NA}.
 
-\item Status: If at least one transcript in the provided annotation supports the junction, the value is \code{KNOWN}; otherwise, it is \code{NOVEL}.
+\item Status: If at least one transcript in the provided annotation supports the junction, the value is \code{KNOWN}; otherwise, it is \code{NOVEL}. \code{NA} if an \code{SAF} annotation is provided.
 
 \item Donor: If the junction's donor and acceptor sites can be identified based on the canonical donor/acceptor sequences (GT/AG), the value will be \code{SP1} or \code{SP2}. Otherwise, it will be \code{NA}.
 
 \item Acceptor: See description for \code{Donor}. 
 
-\item NearestExonBoundary_SP1: Providing information about the nearest exon boundary (either the start or end base of an exon) relative to the splicing point, including chromosomal coordinate, gene name, distance, and direction (left or right of the splicing point). If the splicing point coincides with an exon boundary (as expected in most cases), the distance will be 0, and direction information will be omitted. Example formats: \code{chr1:1000,genename,0}, or \code{chr2:2000,genename,100,left}.
-
-\item NearestExonBoundary_SP2: See description for \code{NearestExonBoundary_SP1}.
-
 \item Chr_SP1: Name of chromosome where splicing point 1 is located. 
 
 \item Location_SP1: Chromosomal coordinate of splicing point 1.
 
-\item Strand_SP1: Strand of splicing point 1, which can be \code{+}, \code{-}, or \code{NA} if unknown.
+\item Strand_SP1: Strand of splicing point 1, which can be \code{+}, \code{-}, or \code{NA} if unknown. Strandness is determined based on the donor/acceptor sequences (GT/AG). 
 
 \item Chr_SP2: See description for \code{Chr_SP1}.
 
 \item Location_SP2: See description for \code{Location_SP1}.
 
 \item Strand_SP2 : See description for \code{Strand_SP1}.
+
+\item NearestExonBoundary_SP1: Providing information about the nearest exon boundary (either the start or end base of an exon) relative to the splicing point, including chromosomal coordinate, gene name, distance, and direction (left or right of the splicing point). If the splicing point coincides with an exon boundary (as expected in most cases), the distance will be 0, and direction information will be omitted. Example formats: \code{chr1:1000,genename,0}, or \code{chr2:2000,genename,100,left}.
+
+\item NearestExonBoundary_SP2: See description for \code{NearestExonBoundary_SP1}.
 
 \item Columns for junction counts: Columns containing read counts supporting each junction for each sample.
 }}
