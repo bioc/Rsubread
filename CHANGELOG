@@ -1,3 +1,6 @@
+11 Jun 2025 - 2.23.2
+(1) Added read assignment output in cellCounts.
+
 16 Apr 2025 - 2.23.1
 (1) Support junction reporting in featureCounts when the annotation format is SAF.
 

@@ -161,6 +161,7 @@ typedef struct{
 	char index_prefix[MAX_FILE_NAME_LENGTH];
 	char output_prefix[MAX_FILE_NAME_LENGTH];
 	char temp_file_dir[MAX_FILE_NAME_LENGTH];
+        char read_assignment_detail_file[MAX_FILE_NAME_LENGTH];
 	char input_dataset_name[MAX_FILE_NAME_LENGTH * MAX_SCRNA_FASTQ_FILES * 3];
 	int input_mode;
 
@@ -188,6 +189,8 @@ typedef struct{
 	parallel_gzip_writer_t fastq_unassigned_writer[4];
 	cellCounts_lock_t fastq_unassigned_lock;
 	pthread_t thread_delete_files;
+	cellCounts_lock_t read_assignment_detail_lock;
+	FILE * read_assignment_detail_fp;
 
 	int UMI_length;
 	int barcode_batched_max_genes;
@@ -410,6 +413,7 @@ static struct option cellCounts_long_options[]={
 	{"annotationChroAlias", required_argument ,0,0},
 	{"reportExcludedBarcodes", required_argument ,0,0},
 
+	{"readAssignmentFile",required_argument, 0,0},
 	{"cellBarcodeFile",required_argument, 0,0},
 	{"sampleSheetFile",required_argument, 0,0},
 	{"reportMultiMappingReads", no_argument ,0,0},
@@ -600,6 +604,9 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		}
 		if(strcmp("isGTFannotation", cellCounts_long_options[option_index].name)==0){
 			cct_context -> features_annotation_file_type = FILE_TYPE_GTF;
+		}
+		if(strcmp("readAssignmentFile", cellCounts_long_options[option_index].name)==0){
+			strncpy(cct_context -> read_assignment_detail_file, optarg, MAX_FILE_NAME_LENGTH -1);
 		}
 		if(strcmp("cellBarcodeFile", cellCounts_long_options[option_index].name)==0){
 			strncpy(cct_context -> cell_barcode_list_file, optarg, MAX_FILE_NAME_LENGTH -1);
@@ -1385,6 +1392,10 @@ int cellCounts_lock_release(cellCounts_lock_t * lock){
 int cellCounts_load_context(cellcounts_global_t * cct_context){
 	int rv = 0;
 	cellCounts_init_lock(&cct_context -> input_dataset_lock, 1 || (cct_context -> input_mode == GENE_INPUT_BCL));
+	if(cct_context -> read_assignment_detail_file[0]) {
+		cellCounts_init_lock(&cct_context -> read_assignment_detail_lock,0);
+		cct_context -> read_assignment_detail_fp = fopen(cct_context -> read_assignment_detail_file,"w");
+	}
 
 	if(cct_context -> input_mode == GENE_INPUT_BCL){
 		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
@@ -1451,6 +1462,7 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	free(cct_context -> block_max_end);
 	free(cct_context -> gene_name_array);
 	free(cct_context -> unistr_buffer_space);
+	if(cct_context -> read_assignment_detail_file[0])fclose(cct_context -> read_assignment_detail_fp);
 
 	print_in_box(80,0,0,"");
 	print_in_box(80,2,0,"");
@@ -1873,6 +1885,22 @@ void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread
 	memcpy(&x1, readbin, 4);
 	x1+=4;
 	fwrite(readbin, x1, 1, binfp);
+
+	if(cct_context -> read_assignment_detail_fp && nhits>0 && 0==notmapped){
+		char * cellbc = NULL;
+		if(cellbarcode_no>=0)cellbc = ArrayListGet(cct_context -> cell_barcodes_array, cellbarcode_no);
+		if(cellbc){
+			cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);
+			char * rname = readbin + 36;
+			fprintf(cct_context -> read_assignment_detail_fp,"READ_TO_GENE\t%s\t%s\t%s", rname, cellbc, umi_barcode);
+			for(x1=0; x1<nhits;x1++){
+				srInt_64 entrez_no = thread_context -> hits_indices[x1];
+				fprintf(cct_context -> read_assignment_detail_fp,"\t%d", cct_context ->gene_name_array[entrez_no]);
+			}
+			fprintf(cct_context -> read_assignment_detail_fp,"\n");
+			cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);
+		}
+	}
 }
 
 int cellCounts_get_sample_id(cellcounts_global_t * cct_context, char * sbc, int read_laneno){
@@ -3533,7 +3561,11 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 	return ret;
 }
 
-#define ADD_count_hash(bc,gn,no)   HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) )
+#define ADD_count_hash(bc,gn,no)  { HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
+    if( cct_context -> read_assignment_detail_fp ){\
+        fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\t%s\t%s\t%s\n", ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
+       }\
+    }
 void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, int sec_end, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count){
 	int x1;
 	void ** app1 = structs -> appendix1;
@@ -3683,9 +3715,9 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 		}
 
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
-			struct cell_gene_umi_supp * str0 = ArrayListGet(structs, sec_start);
-			if(x1 - sec_start>1 && str0->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count);
-			else if(is_UMI_step2 && str0->cellbc>=0) ADD_count_hash(str0->cellbc,str0->gene_no,1);
+			struct cell_gene_umi_supp * str1 = ArrayListGet(structs, sec_start);
+			if(x1 - sec_start>1 && str1->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count);
+			else if(is_UMI_step2 && str1->cellbc>=0) ADD_count_hash(str1->cellbc,str1->gene_no,1);
 
 			sec_start = x1;
 		}

@@ -1419,7 +1419,8 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   ann <- annlist$ann
   annot.screen.output <- annlist$screen
   delete.annot.file <- annlist$delete
-
+  readAssignmentFile <- NULL
+ 
   if(input.mode=="FASTQ" || input.mode == "FASTQ-dir"){
     if(input.mode == "FASTQ-dir") sample.info.idx <- .scan.fastq.dir(sample)
     #print(sample.info.idx)
@@ -1450,6 +1451,9 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
+    env.readAssignmentFile <- Sys.getenv("CELLCOUNTS_DETAIL_OUT_FILENAME")
+    if(!identical(env.readAssignmentFile, "")) opt <- c(opt, "--readAssignmentFile", env.readAssignmentFile)
+ 
 
     cmd <- paste(opt,collapse=.R_param_splitor)
     n <- length(unlist(strsplit(cmd,.R_param_splitor)))
