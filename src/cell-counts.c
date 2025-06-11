@@ -1892,12 +1892,16 @@ void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread
 		if(cellbc){
 			cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);
 			char * rname = readbin + 36;
+			rname[12]=0;
+			umi_barcode[cct_context->UMI_length] = 0;
 			fprintf(cct_context -> read_assignment_detail_fp,"READ_TO_GENE\t%s\t%s\t%s", rname, cellbc, umi_barcode);
 			for(x1=0; x1<nhits;x1++){
 				srInt_64 entrez_no = thread_context -> hits_indices[x1];
-				fprintf(cct_context -> read_assignment_detail_fp,"\t%d", cct_context ->gene_name_array[entrez_no]);
+				fprintf(cct_context -> read_assignment_detail_fp,"\t%s", cct_context ->gene_name_array[entrez_no]);
 			}
 			fprintf(cct_context -> read_assignment_detail_fp,"\n");
+			rname[12]='|';
+			umi_barcode[cct_context->UMI_length] = '|';
 			cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);
 		}
 	}
