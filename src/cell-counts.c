@@ -1894,7 +1894,7 @@ void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread
 			char * rname = readbin + 36;
 			rname[12]=0;
 			umi_barcode[cct_context->UMI_length] = 0;
-			fprintf(cct_context -> read_assignment_detail_fp,"READ_TO_GENE\t%s\t%s\t%s", rname, cellbc, umi_barcode);
+			fprintf(cct_context -> read_assignment_detail_fp,"READ_TO_GENE\tSAMPLE%03d\t%s\t%s\t%s", sample_no, rname, cellbc, umi_barcode);
 			for(x1=0; x1<nhits;x1++){
 				srInt_64 entrez_no = thread_context -> hits_indices[x1];
 				fprintf(cct_context -> read_assignment_detail_fp,"\t%s", cct_context ->gene_name_array[entrez_no]);
@@ -3568,11 +3568,11 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 #define ADD_count_hash(bc,gn,no)  { HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
     if( cct_context -> read_assignment_detail_fp ){\
         cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);\
-        fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\t%s\t%s\t%s\n", ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
+        fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\tSAMPLE%03d\t%s\t%s\t%s\n",sample_no, ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
         cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);\
        }\
     }
-void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, int sec_end, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count){
+void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, int sec_end, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count, int sample_no){
 	int x1;
 	void ** app1 = structs -> appendix1;
 	cellcounts_global_t * cct_context = app1[0];
@@ -3695,7 +3695,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 	}
 }
 
-void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count){
+void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count, int sample_no){
 	void ** app1 = structs -> appendix1;
 	cellcounts_global_t * cct_context = app1[0];
 	HashTable * cellBCp0_genep0_P1_to_UMIs = app1[2];
@@ -3722,7 +3722,7 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str1 = ArrayListGet(structs, sec_start);
-			if(x1 - sec_start>1 && str1->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count);
+			if(x1 - sec_start>1 && str1->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count, sample_no);
 			else if(is_UMI_step2 && str1->cellbc>=0) ADD_count_hash(str1->cellbc,str1->gene_no,1);
 
 			sec_start = x1;
@@ -4109,13 +4109,13 @@ void * cellCounts_do_one_batch(void * paramsp1){
 						// 0 : sorted by cell_bc, then UMIstr, then supported_reads, then gene (this is for step2 UMI merging)
 						// supported_reads : large -> small; the other: small -> large
 			ArrayListSort(cell_gene_umi_list[x1],  cellCounts_do_one_batch_tab_to_struct_list_compare);
-			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 0, filtered_SCGU_table, NULL);
+			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 0, filtered_SCGU_table, NULL, x1);
 
 			app1[1] = NULL+0;
 			app1[2] = cellbcP0_to_geneno0B_P1_to_UMIs;
 			ArrayListSort(cell_gene_umi_list[x1], cellCounts_do_one_batch_tab_to_struct_list_compare);
 
-			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table, &removed_UMIs);
+			cellCounts_do_one_batch_UMI_merge_one_step(cell_gene_umi_list[x1], 1, filtered_SCGU_table, &removed_UMIs, x1);
 
 			cellbcP0_to_geneno0B_P1_to_UMIs -> appendix1 = fp;
 
