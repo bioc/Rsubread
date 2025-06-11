@@ -3567,7 +3567,9 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 
 #define ADD_count_hash(bc,gn,no)  { HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
     if( cct_context -> read_assignment_detail_fp ){\
+        cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);\
         fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\t%s\t%s\t%s\n", ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
+        cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);\
        }\
     }
 void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_start, int sec_end, int is_UMI_step2, HashTable * filtered_CGU_table, srInt_64 * remove_count){
