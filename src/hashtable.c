@@ -1113,3 +1113,14 @@ void ArrayListUnique(ArrayList * list, int same_item(void * L_elem, void * R_ele
 	list -> numOfElements = xk2;
 	free(remove_list);
 }
+
+int ArrayListFilter(ArrayList * list, int (*keep_me)(void *elem, ArrayList * me)){
+	srInt_64 x1, deleted=0;
+	for(x1 = 0; x1 < list->numOfElements; x1++){
+		if(keep_me( list->elementList[x1], list )){
+			if(deleted) list->elementList[x1-deleted] = list->elementList[x1];
+		} else deleted++;
+	}
+	list -> numOfElements -= deleted;
+	return deleted;
+}

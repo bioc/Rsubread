@@ -2916,6 +2916,26 @@ void destroy_typical_dynamic_align(void *** buffers,int max_read_length){
 	free(buffers[1]);
 }
 
+
+int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, char * cigar){
+	int tmpi = 0;
+	int last_op = -1;
+	int x1, ret=0;
+	for(x1=0; x1<=nmoves; x1++){
+		int nmove =-1;
+		if(x1 < nmoves) nmove = movement_buffer[x1];
+		if(nmove==3)nmove=0; // Misma => Match
+		if(x1 == nmoves || last_op != nmove){
+			if(tmpi>0){
+				ret += sprintf( cigar+ret , "%d%c", tmpi, last_op?(last_op==1?'D':'I'):'M');
+				tmpi = 1;
+			}
+			last_op = nmove;
+		}else tmpi++;
+	}
+}
+
+
 // buffers : shrot ** then char ** for scores then masks.
 // tables: malloc(MAX_READ_LENGTH * void*) then malloc(short or char * MAX_READ_LENGTH) for each row
 
@@ -3126,7 +3146,7 @@ IVT_IntervalTreeNode* IVT_leftRotate(IVT_IntervalTreeNode *x) {
 }
 
 // Create a new interval tree node
-IVT_IntervalTreeNode* IVT_createNode(int start, int end, void * attr) {
+IVT_IntervalTreeNode* IVT_createNode(srInt_64 start, srInt_64 end, void * attr) {
     IVT_IntervalTreeNode* node = (IVT_IntervalTreeNode*)malloc(sizeof(IVT_IntervalTreeNode));
     node->interval.start = start;
     node->interval.end = end;
@@ -3139,7 +3159,7 @@ IVT_IntervalTreeNode* IVT_createNode(int start, int end, void * attr) {
 }
 
 // Insert a new interval into the interval tree
-IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, int start, int end, void * attr) {
+IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, srInt_64 start, srInt_64 end, void * attr) {
     if (!node) {
         return IVT_createNode(start, end, attr);
     }
@@ -3180,9 +3200,9 @@ IVT_IntervalTreeNode* IVT_insert(IVT_IntervalTreeNode* node, int start, int end,
     return node;
 }
 
-void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int outbuf_capa, int * items, int to_left) {
+void IVT_query_lr_int(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval **outbuf, int outbuf_capa, int * items, int to_left) {
     if(!root)return;
-    int current_edge = -1;
+    srInt_64 current_edge = -1;
 
     if(*items>0){
       if(to_left) current_edge = outbuf[0]->end;
@@ -3196,7 +3216,7 @@ void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outb
  
    //fprintf(stderr,"DO_SEARCH  LEFT=%d  AT %d => [%d %d]  RANGE [%d %d]  CUR_EDGE %d  DO=%d\n", to_left, point, root->interval.start, root->interval.end, root->posmin, root->posmax, current_edge, do_search);
    if( do_search ){
-      int testing_edge;
+      srInt_64 testing_edge;
       if(to_left) testing_edge = root->interval.end;
       else testing_edge = root->interval.start;
   
@@ -3216,7 +3236,7 @@ void IVT_query_lr_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outb
    }
 }
 
-void IVT_query_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf, int * outptr, int capa) {
+void IVT_query_int(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval **outbuf, int * outptr, int capa) {
     if (!root) return;
 
     if (root->interval.start <= point && point <= root->interval.end)
@@ -3228,28 +3248,28 @@ void IVT_query_int(IVT_IntervalTreeNode* root, int point, IVT_Interval **outbuf,
 
 // Query the interval tree to find all intervals containing a given point
 // If no overlapping interval is found then find the left or right nearest intervals.
-int DONT_USE_IVT_query_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa, int * is_overlapping_match, int to_left) {
-  int items= 0;
-
-  *is_overlapping_match = 1;
-  IVT_query_int(root, point, outbuf, &items, outbuf_capa);
-  if(items>0)return items;
-
-  *is_overlapping_match = 0;
-  IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
-  return items;
+int DONT_USE_IVT_query_lr(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval** outbuf, int outbuf_capa, int * is_overlapping_match, int to_left) {
+    int items= 0;
+  
+    *is_overlapping_match = 1;
+    IVT_query_int(root, point, outbuf, &items, outbuf_capa);
+    if(items>0)return items;
+  
+    *is_overlapping_match = 0;
+    IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
+    return items;
 }
 
-// Only query edges: to_left == 1 then find "end" edges; to_left == 0 then find "start" edges".
-int IVT_edges_lr(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa, int to_left) {
-  int items= 0;
-  IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
-  return items;
+// Only query edges: to_left == 1 then find "end" edges; to_left == 0 then find "start" edges.
+int IVT_edges_lr(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval** outbuf, int outbuf_capa, int to_left) {
+    int items= 0;
+    IVT_query_lr_int( root, point, outbuf, outbuf_capa, &items, to_left);
+    return items;
 }
 
 
 // Query the interval tree to find all intervals containing a given point
-int IVT_query(IVT_IntervalTreeNode* root, int point, IVT_Interval** outbuf, int outbuf_capa) {
+int IVT_query(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval** outbuf, int outbuf_capa) {
     int outptr=0;
     IVT_query_int(root, point, outbuf, &outptr, outbuf_capa);
     return outptr;
@@ -3261,4 +3281,39 @@ void IVT_freeTree(IVT_IntervalTreeNode* root) {
     IVT_freeTree(root->left);
     IVT_freeTree(root->right);
     free(root);
+}
+
+void IVT_query_range(IVT_IntervalTreeNode* root, srInt_64 edge_L_inced, srInt_64 edge_R_inced, IVT_Interval **outbuf, int outbuf_capa, int * items){
+    if((* items ) == outbuf_capa)return;
+    if(!root)return;
+
+    //printf("THIS_RANGE %lld ~ %lld   COV %lld ~ %lld for Q %lld ~ %lld\n", root->interval.start, root->interval.end, root -> posmin, root-> posmax, edge_L_inced, edge_R_inced);
+    if(root -> posmin > edge_R_inced || root -> posmax < edge_L_inced) return;
+    if((root -> interval.start <= edge_L_inced && root -> interval.end >= edge_L_inced)||
+       (root -> interval.start >= edge_L_inced && root -> interval.start <= edge_R_inced))
+        if((*items) < outbuf_capa ) outbuf[ (* items ) ++ ] =&root -> interval;
+
+    IVT_query_range(root -> left,  edge_L_inced, edge_R_inced, outbuf, outbuf_capa, items);
+    IVT_query_range(root -> right, edge_L_inced, edge_R_inced, outbuf, outbuf_capa, items);
+}
+
+const int integer_log2_looktab[64] = {
+    63,  0, 58,  1, 59, 47, 53,  2,
+    60, 39, 48, 27, 54, 33, 42,  3,
+    61, 51, 37, 40, 49, 18, 28, 20,
+    55, 30, 34, 11, 43, 14, 22,  4,
+    62, 57, 46, 52, 38, 26, 32, 41,
+    50, 36, 17, 19, 29, 10, 13, 21,
+    56, 45, 25, 31, 35, 16,  9, 12,
+    44, 24, 15,  8, 23,  7,  6,  5};
+
+int integer_log2_64 (srInt_64 value)
+{
+    value |= value >> 1;
+    value |= value >> 2;
+    value |= value >> 4;
+    value |= value >> 8;
+    value |= value >> 16;
+    value |= value >> 32;
+    return integer_log2_looktab[((uint64_t)((value - (value >> 1))*0x07EDD5E59A4E28C2)) >> 58];
 }

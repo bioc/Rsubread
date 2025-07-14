@@ -66,6 +66,7 @@ void ArrayListUnique(ArrayList * list, int same_item(void * L_elem, void * R_ele
 int ArrayListPush(ArrayList * list, void * new_elem);
 int ArrayListStringJoin(ArrayList * list, char *outbuf, int out_max_len);
 int ArrayListPush_NoRepeatedPtr(ArrayList * list, void * new_elem);
+int ArrayListFilter(ArrayList * list, int (*keep_me)(void *elem, ArrayList * me));
 void ArrayListExtend(ArrayList * list, ArrayList * additional);
 // Shift is the other direction of Pop:
 // Say, a list has elements 0,1,2,3,4

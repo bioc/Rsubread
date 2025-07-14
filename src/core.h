@@ -599,6 +599,7 @@ typedef struct{
 #define MODULE_INDEL_ID 0
 #define MODULE_JUNCTION_ID 1
 
+#define STEP_JUNC_TABLE 5
 #define STEP_VOTING 10
 #define STEP_ITERATION_ONE 20
 #define STEP_ITERATION_TWO 30
