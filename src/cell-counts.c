@@ -991,6 +991,7 @@ int cellCounts_add_or_update_chroEvent_in_table(cellcounts_global_t* cct_context
 		LR_roots[1]=IVT_insert(LR_roots[1], r, r, NULL+l);
 		if(is_new_key) HashTablePut(cct_context -> chroEvent_entry_table, strdup( chro_strn_ky ), LR_roots);
 	}
+fprintf(stderr,"ADD_EVENT (%s) %s : %d - %d type %d\n", known?"KNOWN":"NEW" ,chro,l,r,env_type);
 
 	if(0==known || (chroEvent_t_TYPE_INDEL == env_type && inslen_negative<0)){
 		unsigned int linear_loc = linear_gene_position(&cct_context->chromosome_table , chro, l);
@@ -2787,13 +2788,21 @@ void cellCounts_init_build_junctionread_context(cellcounts_global_t * cct_contex
 }
 
 void cellCounts_build_junction_read_one_end( cellcounts_global_t * cct_context, int thread_no, char * chro,  int this_end_last_correct_maiping_chro, int this_end_last_correct_mapping_read, char * read_text, int read_len, int to3end ){
-	int read_testing_cursor = this_end_last_correct_mapping_read;
-	int posdelta = to3end*2-1;
-	while(1){
-		read_testing_cursor += posdelta;
-		if(read_testing_cursor <0 || read_testing_cursor == read_len) break;
-	}
-	fprintf(stderr,"ONE_END_GOGO %d : from %s:%d and %d\n", to3end , chro, this_end_last_correct_maiping_chro , this_end_last_correct_mapping_read);
+	char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
+	char negchar = '*';
+	snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", chro, negchar);
+	IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky); // LR_roots [0] : left-edge ; LR_roots [1] : right-edge
+	IVT_IntervalTreeNode * myroot = LR_roots[!to3end];
+
+	int founditems = 0;
+	int gap_start = to3end?this_end_last_correct_maiping_chro:(this_end_last_correct_maiping_chro - this_end_last_correct_mapping_read); 
+	int gap_end = to3end?(this_end_last_correct_maiping_chro + read_len - this_end_last_correct_mapping_read):this_end_last_correct_maiping_chro;
+	int eventbufsize = 100;
+	IVT_Interval * eventbuf[eventbufsize];
+	IVT_query_range(myroot , gap_start, gap_end, eventbuf, eventbufsize, &founditems);
+	if(founditems >= eventbufsize - 1)SUBREADprintf("Warning: there are %d chromosomal events found in a read region. This is abnormally too many.\n", founditems);
+	
+	fprintf(stderr,"ONE_END_GOGO %d : within %s %d ~ %d ; had %d events\n", to3end , chro, gap_start, gap_end, founditems);
 }
 	
 srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_cov_readstart, int noindel_cov_readend, unsigned int linear_mapped_pos){
@@ -3066,7 +3075,7 @@ void cellCounts_add_covered_indels_in_table(cellcounts_global_t * cct_context, i
 			tmpi=0;
 		}
 	}
-	fprintf(stderr,"DP_INDEL = %s having %d    in %d ~ %d\n", result_cigar, retlen, cov_start, cov_end);
+if(0)fprintf(stderr,"DP_INDEL = %s having %d    in %d ~ %d\n", result_cigar, retlen, cov_start, cov_end);
 }
 
 #define JUNCTION_MAX_CHRO_DISTANCE 500000
@@ -3224,7 +3233,7 @@ if(0){
 				locate_gene_position(junction_right_first_exon_base, & cct_context -> chromosome_table, & machro, & tstpos);
 				int is_update = cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_JUNCTION, machro, mapos, tstpos, 0);//mapos and tstpos are just borrowed variables. 
 
-				if(1){
+				if(0){
 					char left_pos[100], right_pos[100];
 					cellCounts_absoffset_to_posstr(cct_context, junction_left_last_exon_base+1, left_pos);
 					cellCounts_absoffset_to_posstr(cct_context, junction_right_first_exon_base+1, right_pos);
