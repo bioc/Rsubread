@@ -26,13 +26,20 @@
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
 #define CIGAR_PERFECT_SECTIONS 12 
-#define JUNCTION_MAX_COLOCATION 10000
 #define MAX_UMI_LEN 14
 #define MAX_SCRNA_SAMPLE_NUMBER 40 
 #define MAX_SUBREADS_PER_READ 32
 #define SCRNA_SUBREADS_HARD_LIMIT 20 
 #define REVERSED_READ_BIN_OFFSET ( MAX_SCRNA_READ_LENGTH /4+1 )
 
+
+#define JUNCTION_REALIGNMENT_MAX_DEPTH 5
+#define JUNCTION_MAX_COLOCATION 10000
+#define JUNCTION_MAX_MISMATCHING_BASES_IN_REALIGNMENT 1
+#define JUNCTION_MAX_CHRO_DISTANCE 500000
+#define JUNCTION_WIDDEN_GAP_LEN 4
+#define JUNCTION_MAX_MISMA_MEET max(1,(gaplen * .1) )
+#define JUNCTION_MINIMUM_MAIN_HALF ( (int)(all_subreads / 6.0 - 0.0001) )
 
 // the configurations used in our cellCounts paper
 #define GENE_SCRNA_VOTE_SPACE 3
@@ -91,6 +98,13 @@ typedef struct {
 	unsigned int * start_location_in_index [MAX_SUBREADS_PER_READ *2]; // * 2 because positive and negative strand votes are evaluated together.
 } temp_votes_per_read_t;
 
+typedef struct {
+	unsigned int linear_l, linear_r;
+	short insertion_idx;
+	short matching_bases_in_alignment, mismatching_bases_in_alignment;
+	short read_covered_first_base, read_covered_last_base;
+} realignment_event_stack_item_t;
+
 typedef struct{
 	int thread_no;
 	pthread_t thread;
@@ -130,6 +144,14 @@ typedef struct{
 
 	char ** dynamic_align_buffers[2];
 	int dynamic_align_penalties[4];
+
+	int realignment_event_stack_current_depth;
+	int realignment_event_stack_current_score;
+	realignment_event_stack_item_t realignment_event_current_stack[JUNCTION_REALIGNMENT_MAX_DEPTH];
+
+	int realignment_event_stack_best_depth;
+	int realignment_event_stack_best_score;
+	realignment_event_stack_item_t realignment_event_best_stack[JUNCTION_REALIGNMENT_MAX_DEPTH];
 } cellcounts_align_thread_t;
 
 typedef struct{
@@ -944,8 +966,8 @@ srInt_64 cellCounts_unistr_cpy(cellcounts_global_t * cct_context, char * str, in
 }
 
 // "tlen" is the number before "N" in cigar.
-void cellCounts_set_chroEvent_details(cellcounts_global_t* cct_context, int event_type, unsigned int linear_loc, int tlen){
-	srUInt_64 envkey = (linear_loc*1LLU<<32)|(linear_loc+tlen+1);
+void cellCounts_set_chroEvent_details(cellcounts_global_t* cct_context, int event_type, unsigned int linear_loc, unsigned int linear_loc2, int tlen){
+	srUInt_64 envkey = (linear_loc*1LLU<<32)|(linear_loc2);
 
 	chroEvent_t * new_event = HashTableGet( cct_context -> chroEvent_detail_table, envkey);
 	if(new_event){
@@ -970,6 +992,7 @@ void cellCounts_set_chroEvent_details(cellcounts_global_t* cct_context, int even
 		new_event -> length = (void*)NULL+(tlen); // "tlen" is the number before "N" in cigar.
 		if(event_type == chroEvent_t_TYPE_INDEL && tlen <0) new_event -> inserted_bases = calloc(1,1);
 
+fprintf(stderr,"HARD_INSTERT %p\n", NULL+envkey);
 		HashTablePut(cct_context -> chroEvent_detail_table, NULL+envkey, new_event);
 	}
 }
@@ -995,9 +1018,10 @@ if(1)fprintf(stderr,"ADD_EVENT (%s) %s : %d - %d type %d\n", known?"KNOWN":"NEW"
 
 	if(0==known || (chroEvent_t_TYPE_INDEL == env_type && inslen_negative<0)){
 		unsigned int linear_loc = linear_gene_position(&cct_context->chromosome_table , chro, l);
+		unsigned int linear_loc2 = linear_loc - l + r;
 		int tlen = r-l-1;
 		if( chroEvent_t_TYPE_INDEL == env_type && inslen_negative<0 ) tlen = - inslen_negative;
-		cellCounts_set_chroEvent_details(cct_context, env_type, linear_loc, tlen);
+		cellCounts_set_chroEvent_details(cct_context, env_type, linear_loc, linear_loc2, tlen);
 	}
 
 	cellCounts_lock_release(&cct_context -> chroEvent_entry_table_lock);
@@ -2787,7 +2811,16 @@ void cellCounts_init_build_junctionread_context(cellcounts_global_t * cct_contex
 	for(x1=0;x1<2;x1++) cellCounts_init_build_junctionread_reset_best_oneend(cct_context, thread_no, x1, -1); // Reset left and right alignments. Left and right alignments are independent.
 }
 
+void cellCounts_build_junction_read_set_current_stack(cellcounts_global_t * cct_context, int thread_no,
+	unsigned int linear_env_L, unsigned int linear_env_R, short total_match, short total_mismatch,
+	short covered_first_base_in_read, short covered_last_base_in_read){  
+}
+
 void cellCounts_build_junction_read_one_end( cellcounts_global_t * cct_context, int thread_no, char * chro,  int this_end_last_correct_maiping_chro, int this_end_last_correct_mapping_read, char * read_name, char * read_text, int read_len, int to3end ){
+	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+	thread_context -> realignment_event_stack_current_depth ++;
+	gene_value_index_t * current_value_index = cct_context->value_index;
+
 	char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
 	char negchar = '*';
 	snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", chro, negchar);
@@ -2799,12 +2832,18 @@ void cellCounts_build_junction_read_one_end( cellcounts_global_t * cct_context, 
 
 	int remaining_bases_to_scan = to3end?(read_len - 1 - this_end_last_correct_mapping_read):this_end_last_correct_mapping_read;
 	int edge_region_end = edge_region_start + remaining_bases_to_scan; // inclusive, as defined by the IVT_query_range function.
-	int eventbufsize = 100;
+	int eventbufsize = JUNCTION_MAX_COLOCATION;
 	IVT_Interval * eventbuf[eventbufsize];
-	IVT_query_range(myroot , edge_region_start, edge_region_end, eventbuf, eventbufsize, &founditems);
+
+	if(thread_context -> realignment_event_stack_current_depth < JUNCTION_REALIGNMENT_MAX_DEPTH) IVT_query_range(myroot , edge_region_start, edge_region_end, eventbuf, eventbufsize, &founditems);
 
 	if(founditems){
 		int fairest_evn_edge = to3end?-1:0x7fffffff;
+		int my_env_total_mismatch[founditems], my_env_total_match[founditems];
+
+		memset(my_env_total_mismatch, 0, sizeof(int)*founditems);
+		memset(my_env_total_mismatch, 0, sizeof(int)*founditems);
+
 		for(x1=0;x1<founditems; x1++){
 			IVT_Interval * evb = eventbuf[x1];
 			int ebedge = evb -> start; // evb start == end for events (one edge)
@@ -2814,44 +2853,114 @@ fprintf(stderr,"Event # %d Dist: %d    locs %d ~ %d  gaplen %d\n",x1, abs(evb ->
 		if(founditems >= eventbufsize - 1)SUBREADprintf("Warning: there are %d chromosomal events found in a read region. This is abnormally too many.\n", founditems);
 		
 
-		gene_value_index_t * current_value_index = cct_context->value_index;
 		int read_for_testing_len = edge_region_end - edge_region_start +1;
-		char base_mapped_in_local[ read_len ]; 
 		int x1delta = to3end?1:-1;
-		unsigned int chro_linear_pos = linear_gene_position(&cct_context->chromosome_table, chro , this_end_last_correct_maiping_chro + x1delta);
-		int read_pos = this_end_last_correct_mapping_read + x1delta;
+		int chro_this_pos = this_end_last_correct_maiping_chro + x1delta;
+		unsigned int chro_linear_pos = linear_gene_position(&cct_context->chromosome_table, chro , chro_this_pos);
+		int read_pos = this_end_last_correct_mapping_read + x1delta, read_pos0 = read_pos;
+		
 		int dist_from_last_base_Minus1 = 0;
 		int total_matching = 0;
-		unsigned int fairest_evn_linear = chro_linear_pos -(this_end_last_correct_maiping_chro + x1delta) + fairest_evn_edge;
+		unsigned int fairest_evn_linear = chro_linear_pos -(chro_this_pos) + fairest_evn_edge;
 		while(1){
 			char chr_base = gvindex_get(current_value_index, chro_linear_pos);
 			char read_base = read_text[read_pos];
-			base_mapped_in_local[dist_from_last_base_Minus1++] = read_base==chr_base;
+			int this_base_misma = read_base!=chr_base;
+			for(x1=0; x1<founditems; x1++){
+				IVT_Interval * evb = eventbuf[x1];
+				if((to3end && evb -> start <= chro_this_pos )|| (to3end==0 && evb -> start >= chro_this_pos )){
+					if(this_base_misma) my_env_total_mismatch[x1]++; else my_env_total_match[x1]++;
+				}
+			}
 			total_matching += read_base==chr_base;
-if(1){
+if(0){
 char ttpos[100];
 cellCounts_absoffset_to_posstr(cct_context, chro_linear_pos+1, ttpos);
 fprintf(stderr,"ONE_END_MA %c %c  at %s\n", chr_base, read_base, ttpos);
 }
 			if(chro_linear_pos == fairest_evn_linear) break ;
 			chro_linear_pos += x1delta;
+			chro_this_pos += x1delta;
 			read_pos += x1delta;
-
 		}
+		dist_from_last_base_Minus1 = 1+abs(read_pos - read_pos0); // 1+ is because only 1 read base has 0 adding x1delta.
+		// for each event that don't have too many mismatching bases locally, go deeper. 
+		for(x1=0; x1<founditems; x1++){
+			if(my_env_total_mismatch[x1]< JUNCTION_MAX_MISMATCHING_BASES_IN_REALIGNMENT){
+				IVT_Interval * evb = eventbuf[x1];
+				int evbposleft = evb -> start;
+				int evbposright = evb -> attr - NULL;
+				unsigned int linear_env_1 = linear_gene_position(&cct_context->chromosome_table, chro , evbposleft);
+				unsigned int linear_env_2 = linear_gene_position(&cct_context->chromosome_table, chro , evbposright);
+				unsigned int linear_env_L = min(linear_env_1, linear_env_2);
+				unsigned int linear_env_R = max(linear_env_1, linear_env_2);
+				srUInt_64 envkey = (linear_env_L*1LLU<<32)| linear_env_R;
+if(1)fprintf(stderr,"GET_X2_ENV %s:%d~%d  PTR %p\n", chro, evbposleft+1, evbposright+1, NULL+envkey);
+				chroEvent_t * envdtl = HashTableGet( cct_context -> chroEvent_detail_table, NULL+ envkey);
+	
+				int remote_first_matching_base_chro = evb -> attr - NULL, x2;
+				for(x2=0; x2< envdtl -> n_events; x2++){
+					int inslen = 0;
+					if(envdtl -> event_type == chroEvent_t_TYPE_INDEL){
+						if( envdtl -> n_events >1 )
+							inslen = envdtl -> length[x2];
+						else inslen = NULL - (void*)envdtl -> length;
+						if(inslen>0)inslen=0; else inslen = -inslen;
+					}
+					int remote_first_matching_base_read = inslen * x1delta; 
+					int evb_pos_in_read_after_last_correct_base = evb -> start - this_end_last_correct_maiping_chro; // can be negative if search is to 5'.
+					remote_first_matching_base_read += x1delta + evb_pos_in_read_after_last_correct_base + this_end_last_correct_mapping_read; 
 
-fprintf(stderr,"ONE_END_GOGO of %s  %d : within %s %d ~ %d ; had %d events; edge_region matching %d in %d\n", read_name, to3end , chro, edge_region_start, edge_region_end, founditems, total_matching, dist_from_last_base_Minus1);
+					int cov_base0 =   to3end ?this_end_last_correct_mapping_read:(evb_pos_in_read_after_last_correct_base + this_end_last_correct_mapping_read);
+					int cov_base1 = (!to3end)?this_end_last_correct_mapping_read:(evb_pos_in_read_after_last_correct_base + this_end_last_correct_mapping_read);
+					cellCounts_build_junction_read_set_current_stack( cct_context, thread_no, linear_env_L, linear_env_R,
+						my_env_total_match[x1], my_env_total_mismatch[x1], cov_base0 , cov_base1);
+					cellCounts_build_junction_read_one_end( cct_context, thread_no, chro, remote_first_matching_base_chro, remote_first_matching_base_read, read_name, read_text, read_len, to3end );
+				}
+			}
+		}
+fprintf(stderr,"ONE_END_GOGO of %s to_3 %d  : within %s %d ~ %d ; had %d events; edge_region matching %d in %d\n", read_name, to3end , chro, edge_region_start, edge_region_end, founditems, total_matching, dist_from_last_base_Minus1);
+	}else{
+
+		unsigned int linear_x1 = linear_gene_position(&cct_context->chromosome_table , chro, edge_region_start); // when search to 5'end, edge_region_start is the mapping location of the first base in read.
+		int read_x1 = to3end?this_end_last_correct_mapping_read:0; 
+		int total_mismatching = 0, total_matching = 0;
+		for(x1 = edge_region_start; x1 <=edge_region_end; x1++){
+			char chr_base = gvindex_get(current_value_index, linear_x1);
+			char read_base = read_text[read_x1];
+			if(chr_base==read_base)total_matching++;else total_mismatching++;
+			linear_x1++;
+			read_x1++;
+		}
+fprintf(stderr,"ONE_END_NOGO_AND_TEST_BEST_SCORE_IN_STACK %s  MATCHING=%d   MISMATCHING=%d\n", read_name, total_matching, total_mismatching);
+		thread_context -> realignment_event_stack_current_depth --;
 	}
 }
-	
+
+
+
+void cellCounts_end_junctionread_one_end(cellcounts_global_t * cct_context, int thread_no){
+}
+
+void cellCounts_init_junctionread_one_end(cellcounts_global_t * cct_context, int thread_no){
+	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+	thread_context -> realignment_event_stack_current_depth = 0;
+	thread_context -> realignment_event_stack_best_score = -1;
+}
+
 srInt_64 cellCounts_explain_one_read(cellcounts_global_t * cct_context, int thread_no, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_cov_readstart, int noindel_cov_readend, unsigned int linear_mapped_pos){
 	cellCounts_init_build_junctionread_context(cct_context, thread_no);
 	int to3end;
 	for(to3end=0; to3end<2; to3end++){
+		cellCounts_init_junctionread_one_end(cct_context, thread_no);
+
 		unsigned int this_end_last_correct_mapping_chro = to3end?(linear_mapped_pos + noindel_cov_readend ): (linear_mapped_pos + noindel_cov_readstart) ;
 		char * chro_name = NULL;
 		int this_end_last_correct_mapping_read = to3end?noindel_cov_readend:noindel_cov_readstart, chro_pos = 0;
 		locate_gene_position(this_end_last_correct_mapping_chro, &cct_context -> chromosome_table, &chro_name, &chro_pos);
 		cellCounts_build_junction_read_one_end( cct_context, thread_no, chro_name, chro_pos, this_end_last_correct_mapping_read, read_name, read_text, read_len, to3end );
+
+		cellCounts_end_junctionread_one_end(cct_context, thread_no);
 	}
 	cellCounts_end_build_junctionread_context(cct_context, thread_no);
 }
@@ -3113,7 +3222,7 @@ void cellCounts_add_covered_indels_in_table(cellcounts_global_t * cct_context, i
 			tmpi=0;
 		}
 	}
-if(1){
+if(0){
 char lpos[100];
 cellCounts_absoffset_to_posstr(cct_context, chro_loc + cov_start+1 , lpos);
 fprintf(stderr,"DP_INDEL = %s  starting at %s having %d    in %d ~ %d\n", result_cigar, lpos, retlen, cov_start, cov_end);
@@ -3121,10 +3230,6 @@ fprintf(stderr,"DP_INDEL = %s  starting at %s having %d    in %d ~ %d\n", result
 
 }
 
-#define JUNCTION_MAX_CHRO_DISTANCE 500000
-#define JUNCTION_WIDDEN_GAP_LEN 4
-#define JUNCTION_MAX_MISMA_MEET max(1,(gaplen * .1) )
-#define JUNCTION_MINIMUM_MAIN_HALF ( (int)(all_subreads / 6.0 - 0.0001) )
 int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thread_no, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	int i,j,reverse_text_offset, distinct_vote_number_i;
@@ -3276,12 +3381,12 @@ if(0){
 				locate_gene_position(junction_right_first_exon_base, & cct_context -> chromosome_table, & machro, & tstpos);
 				int is_update = cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_JUNCTION, machro, mapos, tstpos, 0);//mapos and tstpos are just borrowed variables. 
 
-				if(0){
-					char left_pos[100], right_pos[100];
-					cellCounts_absoffset_to_posstr(cct_context, junction_left_last_exon_base+1, left_pos);
-					cellCounts_absoffset_to_posstr(cct_context, junction_right_first_exon_base+1, right_pos);
-					fprintf(stderr,"POPU_JTAB %s %s -- %s SPLIT AT %d, within %d gap, having MisMa=%d. Read=%s\n", is_update?"UPDATE":"NEW", left_pos,  right_pos, best_s1_aft_split, rgap, best_misma_no, read_name);
-				}
+if(0){
+char left_pos[100], right_pos[100];
+cellCounts_absoffset_to_posstr(cct_context, junction_left_last_exon_base+1, left_pos);
+cellCounts_absoffset_to_posstr(cct_context, junction_right_first_exon_base+1, right_pos);
+fprintf(stderr,"POPU_JTAB %s %s -- %s SPLIT AT %d, within %d gap, having MisMa=%d. Read=%s\n", is_update?"UPDATE":"NEW", left_pos,  right_pos, best_s1_aft_split, rgap, best_misma_no, read_name);
+}
 
 				if(NULL==HashTableGet(indel_dp_exed, NULL+1+(tstiijj & 0xffffffffffffllu))){
 					HashTablePut(indel_dp_exed, NULL+1+(tstiijj & 0xffffffffffffllu), NULL+1);
@@ -3332,15 +3437,15 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 						int subread_step =  CR15GLS /(cct_context -> total_subreads_per_read -1);
 						if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
 
-						int perfect_align_srno = votetab->indel_recorder[i][j][0];
+						int perfect_align_srno = votetab->indel_recorder[i][j][0]-1; // indel_recorder is subread_no + 1
 						int perfect_start_offset = ((subread_step * perfect_align_srno) >> 16);
-						perfect_align_srno = votetab->indel_recorder[i][j][1];
+						perfect_align_srno = votetab->indel_recorder[i][j][1]-1;
 						int perfect_end_offset = ((subread_step * perfect_align_srno) >> 16) +15;
 
 						int is_negative = votetab->masks[i][j];
 						int reverse_text_offset = is_negative?MAX_SCRNA_READ_LENGTH+1:0;
+fprintf(stderr,"EXPMAIN_ME_2ENDS %s  cov %d (srno %d) ~ %d (srno %d)  INIT INDEL %d\n", read_name, perfect_start_offset,  votetab->indel_recorder[i][j][0] , perfect_end_offset, votetab->indel_recorder[i][j][1],  votetab->indel_recorder[i][j][2]);
 						srInt_64 this_score = cellCounts_explain_one_read(cct_context, thread_no, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_start_offset, perfect_end_offset, votetab->pos[i][j]);
-//						SUBREADprintf("READQV %s : VOTE=%d  SCORE=%lld\n", read_name, vv, this_score);
 						thread_context -> populating_voteIJ_buf_index ++;
 						if(this_score >0)thread_context -> total_voteIJs_to_write ++;
 					}
