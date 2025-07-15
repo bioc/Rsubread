@@ -2926,13 +2926,12 @@ int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, cha
 		if(x1 < nmoves) nmove = movement_buffer[x1];
 		if(nmove==3)nmove=0; // Misma => Match
 		if(x1 == nmoves || last_op != nmove){
-			if(tmpi>0){
-				ret += sprintf( cigar+ret , "%d%c", tmpi, last_op?(last_op==1?'D':'I'):'M');
-				tmpi = 1;
-			}
+			if(tmpi>0) ret += sprintf( cigar+ret , "%d%c", tmpi, last_op?(last_op==1?'D':'I'):'M');
+			tmpi = 1;
 			last_op = nmove;
 		}else tmpi++;
 	}
+	return ret;
 }
 
 
@@ -3036,6 +3035,9 @@ int general_dynamic_align(char * read, int read_len, unsigned int begin_position
 	int out_pos = 0, delta=0;
 	j = read_len - 1;
 
+int debugout1 = 0;
+if(0) debugout1 =1;
+if(debugout1)fprintf(stderr,"\n");
 	while(1)
 	{
 		if(table_mask[path_i][j] == INDEL_MASK_BY_INSERTION)
@@ -3043,23 +3045,27 @@ int general_dynamic_align(char * read, int read_len, unsigned int begin_position
 			j--;
 			delta --;
 			movement_buffer[out_pos++] = 2;
+if(debugout1)fprintf(stderr,"I");
 		}
 		else if(table_mask[path_i][j] == INDEL_MASK_BY_DELETION)
 		{
 			path_i--;
 			delta ++;
 			movement_buffer[out_pos++] = 1;
+if(debugout1)fprintf(stderr,"D");
 		}
 		else if(table_mask[path_i][j] == INDEL_MASK_BY_MATCH || table_mask[path_i][j] == INDEL_MASK_BY_MISMATCH)
 		{
 			movement_buffer[out_pos++] = table_mask[path_i][j] == INDEL_MASK_BY_MATCH?0:3;
 			path_i--;
 			j--;
+if(debugout1)fprintf(stderr,"M");
 		}
 
 		if(path_i == -1 && j == -1) break;
 		if(j<0 || path_i<0) return 0;
 	}
+if(debugout1)fprintf(stderr,"\n");
 
 	if(expected_offset!=delta)return 0;
 	for(i=0; i<out_pos/2; i++)
