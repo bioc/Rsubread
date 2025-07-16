@@ -3323,3 +3323,31 @@ int integer_log2_64 (srInt_64 value)
     value |= value >> 32;
     return integer_log2_looktab[((uint64_t)((value - (value >> 1))*0x07EDD5E59A4E28C2)) >> 58];
 }
+
+int reduce_repeating_cigar(char * src, char * dst){
+	int tmpi = -1;
+	int ci, nch, repeat_i = 0, old_opt = 0, wcur=0;
+ 	for(ci = 0; ; ci++){
+		nch = src[ci];
+		if(!nch) break;
+		if(nch == '/') continue;
+		if(nch == '.') continue;
+		if(nch == 'X') nch='M';
+
+		if(isdigit(nch)){
+			if(tmpi<0) tmpi = 0;
+			tmpi = tmpi*10 + (nch-'0');
+		}else{
+			if(tmpi<0) tmpi = 1;
+			if(old_opt != nch && repeat_i>0){
+				wcur += SUBreadSprintf( dst + wcur, 11, "%d%c", repeat_i, old_opt );
+				repeat_i = 0;
+			}
+			repeat_i += tmpi; 
+			tmpi = -1;
+			old_opt = nch;
+		}
+	}
+	if(repeat_i>0) wcur += SUBreadSprintf( dst + wcur, 11, "%d%c", repeat_i, old_opt );
+	return wcur;
+}

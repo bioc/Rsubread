@@ -2772,16 +2772,24 @@ srInt_64 cellCounts_test_score(cellcounts_global_t * cct_context, int thread_no,
 unsigned int cellCounts_convert_stack_to_cigar(cellcounts_global_t * cct_context, int thread_no, realignment_event_stack_item_t * stack, char * cigar, int to3end){
 	int stack_depth = 0,x1, cigar_ptr=0;
 
+	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	while(stack_depth<JUNCTION_REALIGNMENT_MAX_DEPTH){
 		if(stack[stack_depth].event_details == NULL+IMPOSSIBLE_MEMORY_SPACE)break;
 		stack_depth++;
 	}
+if(0)fprintf(stderr,"STACK_TO_CIGAR CAPA=%d   3END=%d   %s\n", stack_depth, to3end, thread_context -> realignment_event_read_name);
 	unsigned int read_base1_linear = 0;
 	for(x1=0; x1<stack_depth;x1++){
 		int stidx = to3end?x1:( stack_depth-1-x1 );
 		realignment_event_stack_item_t * oneitem = stack + stidx;
 		if(x1==0 && !to3end) read_base1_linear = oneitem -> linear_l - oneitem -> read_covered_last_base; 
-		if(x1>0){
+
+		if(!to3end)cigar_ptr += sprintf( cigar+cigar_ptr, "%dM", oneitem -> read_covered_last_base - oneitem -> read_covered_first_base +1);
+
+		chroEvent_t * event_details = NULL;
+		if(stidx>0) event_details = oneitem -> event_details;
+
+		if( event_details ){
 			chroEvent_t * event_details;
 			if(to3end) event_details = oneitem -> event_details;
 			else event_details = oneitem -> event_details;
@@ -2794,9 +2802,9 @@ unsigned int cellCounts_convert_stack_to_cigar(cellcounts_global_t * cct_context
 			if(event_details -> event_type == chroEvent_t_TYPE_JUNCTION) Nmode = 'N';
 			else if( Nlen > 0 ) Nmode = 'D';
 			else Nmode = 'I';
-			cigar_ptr += sprintf( cigar, "%d%c", abs(Nlen), Nmode); 
+			cigar_ptr += sprintf( cigar+cigar_ptr, "%d%c", abs(Nlen), Nmode); 
 		}
-		cigar_ptr += sprintf( cigar, "%dM", oneitem -> read_covered_last_base - oneitem -> read_covered_first_base +1);
+		if(to3end)cigar_ptr += sprintf( cigar+cigar_ptr, "%dM", oneitem -> read_covered_last_base - oneitem -> read_covered_first_base +1);
 	}
 
 	return read_base1_linear; // if to 3 end: ignore the retured value.
@@ -2805,6 +2813,7 @@ unsigned int cellCounts_convert_stack_to_cigar(cellcounts_global_t * cct_context
 void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 
+	char final_cigar[11*(1+2*JUNCTION_REALIGNMENT_MAX_DEPTH)];
 	int x_3end, x_5end, x_candidate;
 	for(x_5end = 0; x_5end < thread_context -> best_5end_stack_list -> numOfElements; x_5end++){
 		realignment_event_stack_item_t * stack_end5 = ArrayListGet(thread_context -> best_5end_stack_list , x_5end);
@@ -2815,7 +2824,8 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 		for(x_3end = 0; x_3end < thread_context -> best_3end_stack_list -> numOfElements; x_3end++){
 			realignment_event_stack_item_t * stack_end3 = ArrayListGet(thread_context -> best_3end_stack_list , x_3end);
 			cellCounts_convert_stack_to_cigar(cct_context, thread_no, stack_end3, cigar_end5+ cigar_ptr, 1);
-fprintf(stderr,"CIGAR_FROM_2ENDS  %s   %s\n", cigar_end5, thread_context -> realignment_event_read_name);
+			reduce_repeating_cigar(cigar_end5, final_cigar);
+fprintf(stderr,"CIGAR_FROM_2ENDS  %s   %s\n", final_cigar, thread_context -> realignment_event_read_name);
 		}
 	}
 
@@ -2889,14 +2899,14 @@ if(0)fprintf(stderr," #AllMatch=%d  #AllMisma=%d   ::%s\n", all_match_in_stack, 
 	if(my_score > thread_context -> realignment_event_stack_best_score){
 		thread_context -> realignment_event_stack_best_score = my_score;
 		cellCounts_reset_3end_5end_best_stacks(cct_context, thread_no, to3end);
-if(0)fprintf(stderr,"REPLACE BEST %d -> %d    %s\n",  thread_context -> realignment_event_stack_best_score, my_score , thread_context -> realignment_event_read_name);
+if(0)fprintf(stderr,"REPLACE BEST %d -> %d  DEPTH %d %s\n",  thread_context -> realignment_event_stack_best_score, my_score , thread_context -> realignment_event_stack_current_depth , thread_context -> realignment_event_read_name);
 	}
 	if(my_score == thread_context -> realignment_event_stack_best_score){
 		realignment_event_stack_item_t* stack_copy_ptr = malloc(sizeof(realignment_event_stack_item_t) * JUNCTION_REALIGNMENT_MAX_DEPTH);
 		memcpy( stack_copy_ptr , thread_context -> realignment_event_current_stack , sizeof(realignment_event_stack_item_t) *  thread_context -> realignment_event_stack_current_depth  );
-		if( thread_context -> realignment_event_stack_current_depth < JUNCTION_REALIGNMENT_MAX_DEPTH-1 ) stack_copy_ptr[thread_context -> realignment_event_stack_current_depth+1].event_details = NULL+IMPOSSIBLE_MEMORY_SPACE;
+		if( thread_context -> realignment_event_stack_current_depth < JUNCTION_REALIGNMENT_MAX_DEPTH-1 ) stack_copy_ptr[thread_context -> realignment_event_stack_current_depth].event_details = NULL+IMPOSSIBLE_MEMORY_SPACE;
 		ArrayListPush( to3end? thread_context -> best_3end_stack_list : thread_context -> best_5end_stack_list , stack_copy_ptr);
-if(0)fprintf(stderr,"APPENDING BEST %d    %s\n",  thread_context -> realignment_event_stack_best_score , thread_context -> realignment_event_read_name);
+if(0)fprintf(stderr,"APPENDING BEST %d depth %d   %s\n",  thread_context -> realignment_event_stack_best_score, thread_context -> realignment_event_stack_current_depth , thread_context -> realignment_event_read_name);
 	}
 }
 

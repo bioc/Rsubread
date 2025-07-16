@@ -316,4 +316,5 @@ int IVT_edges_lr(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval** outb
 // srInt_64 IVT_query_lr(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval** outbuf, srInt_64 outbuf_capa, srInt_64 * is_overlapping_match, srInt_64 to_left);
 void IVT_freeTree(IVT_IntervalTreeNode* root);
 int integer_log2_64 (srInt_64 value);
+int reduce_repeating_cigar(char * src, char * dst);
 #endif
