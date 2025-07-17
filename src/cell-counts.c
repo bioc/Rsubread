@@ -993,7 +993,7 @@ void cellCounts_write_one_chroEvent(void *k, void *v, HashTable * tab){
 	} 
 }
 
-void cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
+int cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 	void * params [5];
 	FILE* wfp = fopen("del4-juncs.tab","w");
 	params[0] = wfp;
@@ -1001,6 +1001,7 @@ void cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 	cct_context -> chroEvent_detail_table -> appendix1 = params;
 	HashTableIteration(cct_context -> chroEvent_detail_table, cellCounts_write_one_chroEvent);
 	fclose(wfp);
+	return 0;
 }
 
 // "tlen" is the number before "N" in cigar.
@@ -1108,12 +1109,15 @@ void cellCounts_copy_txn_to_juncs(void * ky, void * va, HashTable * me){
 	ArrayListSort(my_exons, ArrayListLLUComparison);
 	int last_end = -1;
 	char * chname_strand = strstr(txn_chr_neg,"\t")+1;
+//#warning "====== Not using input GTF for initing the event table ====="
+int ignore_GTF = 0;
 
+if(ignore_GTF){
 SUBREADprintf("warning : Not using input GTF for initing the event table\n");
 SUBREADprintf("warning : Not using input GTF for initing the event table\n");
 SUBREADprintf("warning : Not using input GTF for initing the event table\n");
 SUBREADprintf("warning : Not using input GTF for initing the event table\n");
-
+}
 
 	for(x1=0; x1 < my_exons->numOfElements; x1++){
 		srInt_64 ve = ArrayListGet(my_exons, x1)-NULL;
@@ -1129,8 +1133,7 @@ SUBREADprintf("warning : Not using input GTF for initing the event table\n");
 			//if(*(chro_end+1)=='-') is_negative = 1;
 			//if(*(chro_end+1)=='+') is_negative = 0;
 			*chro_end=0;
-#warning "====== Not using input GTF for initing the event table ====="
-if(0)			cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_JUNCTION, chname_strand , last_end, start, 0, 1);
+if(!ignore_GTF)		cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_JUNCTION, chname_strand , last_end, start, 0, 1);
 			*chro_end='\t';
 		}
 		last_end = end;
@@ -2041,9 +2044,9 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 		if(this_multi_mapping_i>1) flags += 256;
 	}
 
-	int cigar_opts[1+JUNCTION_REALIGNMENT_MAX_DEPTH *2], xk1, cover_length = 0;
+	int cigar_opts[1+2*JUNCTION_REALIGNMENT_MAX_DEPTH *2], xk1, cover_length = 0;
 	int cigar_opt_len = 0;
-	if(cigar) cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, 1+JUNCTION_REALIGNMENT_MAX_DEPTH *2);
+	if(cigar) cigar_opt_len = SamBam_compress_cigar(cigar, cigar_opts, & cover_length, 1+2*JUNCTION_REALIGNMENT_MAX_DEPTH *2);
 
 	int record_length = 4 + 4 + 4 + 4 + 4 +  /* l_seq: */ 4 + 4 + 4 + 4 + /* read_name:*/ read_name_len + cigar_opt_len * 4 + (read_len + 1) /2 + read_len;
 
@@ -2874,7 +2877,7 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 	for(x_5end = 0; x_5end < thread_context -> best_5end_stack_list -> numOfElements; x_5end++){
 		if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 		realignment_event_stack_item_t * stack_end5 = ArrayListGet(thread_context -> best_5end_stack_list , x_5end);
-		char cigar_end5[11*(1+2*JUNCTION_REALIGNMENT_MAX_DEPTH)];
+		char cigar_end5[11*(1+4*JUNCTION_REALIGNMENT_MAX_DEPTH)];
 		unsigned int mapped_loc = cellCounts_convert_stack_to_cigar_count_supp(cct_context, thread_no, stack_end5, cigar_end5, 0);
 		int cigar_ptr = strlen(cigar_end5);
 		cigar_ptr += sprintf( cigar_end5 + cigar_ptr , "%dM", noindel_coved_lastbase - noindel_coved_firstbase  - 1); // the first and last covered base in the non-event region are also included in the first item in the stack.
@@ -5856,6 +5859,7 @@ int cellCounts_run_counting(cellcounts_global_t * cct_context){
 	int ret= 0;
 	ret = ret || cellCounts_do_cellbc_batches(cct_context);
 	ret = ret || cellCounts_write_gene_list(cct_context);
+	ret = ret || cellCounts_write_junction_sumtable(cct_context);
 	return ret;
 }
 
