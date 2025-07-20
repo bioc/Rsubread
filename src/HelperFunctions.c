@@ -3154,6 +3154,7 @@ IVT_IntervalTreeNode* IVT_leftRotate(IVT_IntervalTreeNode *x) {
 // Create a new interval tree node
 IVT_IntervalTreeNode* IVT_createNode(srInt_64 start, srInt_64 end, void * attr) {
     IVT_IntervalTreeNode* node = (IVT_IntervalTreeNode*)malloc(sizeof(IVT_IntervalTreeNode));
+if(0)    fprintf(stderr,"MEMTEST %p ALLOC\n", node);
     node->interval.start = start;
     node->interval.end = end;
     node->interval.attr = attr;
@@ -3286,6 +3287,8 @@ void IVT_freeTree(IVT_IntervalTreeNode* root) {
     if (!root) return;
     IVT_freeTree(root->left);
     IVT_freeTree(root->right);
+
+if(0)    fprintf(stderr,"MEMTEST %p FREE\n", root);
     free(root);
 }
 
