@@ -1,6 +1,6 @@
 //#define MAKE_CELLCOUNTS
 #include <stdio.h>
-#include <stdlib.h>
+
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -35,7 +35,8 @@
 #define REVERSED_READ_BIN_OFFSET ( MAX_SCRNA_READ_LENGTH /4+1 )
 
 
-#define JUNCTION_REALIGNMENT_MAX_DEPTH 6
+#define JUNCTION_REALIGNMENT_MAX_TRIES 10000
+#define JUNCTION_REALIGNMENT_MAX_DEPTH 5
 #define JUNCTION_MAX_COLOCATION 10000
 #define JUNCTION_MAX_MISMATCHING_BASES_IN_REALIGNMENT 1
 #define JUNCTION_MAX_CHRO_DISTANCE 500000
@@ -3326,6 +3327,7 @@ if(0)fprintf(stderr,"APPENDING BEST %d depth %d   %s\n",  thread_context -> real
 
 void cellCounts_build_junction_read_one_end( cellcounts_global_t * cct_context, int thread_no, char * chro,  int this_end_last_correct_maiping_chro, int this_end_last_correct_mapping_read, char * read_name, char * read_text, int read_len, int to3end ){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+	if( thread_context -> realignment_event_stack_runcount > JUNCTION_REALIGNMENT_MAX_TRIES)return;
 	thread_context -> realignment_event_stack_current_depth ++;
 	if(thread_context -> realignment_event_stack_current_depth > JUNCTION_REALIGNMENT_MAX_DEPTH){
 		fprintf(stderr,"SHOULND'T REACH HERE: %d > %d\n", thread_context -> realignment_event_stack_current_depth,  JUNCTION_REALIGNMENT_MAX_DEPTH);
