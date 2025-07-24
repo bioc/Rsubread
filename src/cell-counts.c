@@ -55,6 +55,8 @@
 
 #define chroEvent_t_TYPE_INDEL 1
 #define chroEvent_t_TYPE_JUNCTION 2
+#define chroEvent_t_TYPE_EXON 3
+#define chroEvent_t_TYPE_INTRON_RETENTION 4
 typedef struct{
 	int event_type;	// 1==indel; 2==junction
 	unsigned int left_edge;	// linear chromosome location for the left edge (included in the read).
@@ -66,7 +68,7 @@ typedef struct{
 	char * inserted_bases;
 	int step1_supported_reads;
 	int * step2_supported_reads;
-	int * step2_all_spanning_reads;
+	int * step2_non_supported_reads;
 	int from_truth;
 } chroEvent_t;
 
@@ -610,6 +612,7 @@ static struct option cellCounts_long_options[]={
 	{"cellBarcodeFile",required_argument, 0,0},
 	{"sampleSheetFile",required_argument, 0,0},
 	{"reportMultiMappingReads", no_argument ,0,0},
+	{"junctionDetection", no_argument ,0,0},
 
 	{"maxDiffToTopVotes", required_argument ,0,0},
 	{"maxMismatch", required_argument ,0,0},
@@ -1128,7 +1131,7 @@ void cellCounts_write_one_chroEvent(void *k, void *v, HashTable * tab){
 }
 
 void cellCounts_write_final_junctions(cellcounts_global_t * cct_context,  char * output_file_name);
-void cellCounts_write_final_indels(cellcounts_global_t * cct_context,  char * output_file_name);
+void cellCounts_write_final_other_events(cellcounts_global_t * cct_context,  char * output_file_name, int type_to_write);
 int cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 	void * params [5];
 	FILE* wfp = fopen("del4-juncs.tab","w");
@@ -1138,11 +1141,11 @@ int cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 	HashTableIteration(cct_context -> chroEvent_detail_table, cellCounts_write_one_chroEvent);
 	fclose(wfp);
 	cellCounts_write_final_junctions(cct_context, "del4-juncs2.tab");
-	cellCounts_write_final_indels(cct_context, "del4-indels.tab");
+	cellCounts_write_final_other_events(cct_context, "del4-indels.tab", chroEvent_t_TYPE_INDEL);
+	cellCounts_write_final_other_events(cct_context, "del4-exons.tab", chroEvent_t_TYPE_EXON);
+	cellCounts_write_final_other_events(cct_context, "del4-insertions.tab", chroEvent_t_TYPE_INTRON_RETENTION);
 	return 0;
 }
-
-long long IVTcount = 0;
 
 // "tlen" is the number before "N" in cigar.
 chroEvent_t * cellCounts_set_chroEvent_details(cellcounts_global_t* cct_context, int event_type, unsigned int linear_loc, unsigned int linear_loc2, int tlen, int from_truth){
@@ -1169,15 +1172,15 @@ chroEvent_t * cellCounts_set_chroEvent_details(cellcounts_global_t* cct_context,
 					newlen[1]=tlen;
 					old_or_new_env -> length = newlen;
 					old_or_new_env -> step2_supported_reads = calloc(sizeof(int),2);
-					old_or_new_env -> step2_all_spanning_reads = calloc(sizeof(int),2);
+					old_or_new_env -> step2_non_supported_reads = calloc(sizeof(int),2);
 
 					old_or_new_env -> n_events =2;
 				}else{
 					old_or_new_env -> length = realloc(old_or_new_env -> length, sizeof(int)*(1+old_or_new_env -> n_events));
 					old_or_new_env -> step2_supported_reads = realloc(old_or_new_env -> step2_supported_reads, sizeof(int)*(1+old_or_new_env -> n_events));
-					old_or_new_env -> step2_all_spanning_reads = realloc(old_or_new_env -> step2_all_spanning_reads, sizeof(int)*(1+old_or_new_env -> n_events));
+					old_or_new_env -> step2_non_supported_reads = realloc(old_or_new_env -> step2_non_supported_reads, sizeof(int)*(1+old_or_new_env -> n_events));
 
-					old_or_new_env -> step2_supported_reads [ old_or_new_env -> n_events ] = old_or_new_env -> step2_all_spanning_reads [ old_or_new_env -> n_events ] = 0;
+					old_or_new_env -> step2_supported_reads [ old_or_new_env -> n_events ] = old_or_new_env -> step2_non_supported_reads [ old_or_new_env -> n_events ] = 0;
 					old_or_new_env -> length[old_or_new_env -> n_events++] = tlen;
 				}
 			}
@@ -1193,7 +1196,6 @@ if(0)if(cct_context -> chroEvent_detail_table -> numOfElements % 10000LLU==0) fp
 		if(event_type == chroEvent_t_TYPE_INDEL && tlen <0) old_or_new_env -> inserted_bases = calloc(1,1);
 
 		HashTablePut(cct_context -> chroEvent_detail_table, NULL+envkey, old_or_new_env);
-if(0)if(cct_context -> chroEvent_detail_table -> numOfElements % 100000LLU==0) fprintf(stderr,"HARD_INSTERT %p  ITEMS %lld  IVT insertion %lld\n", NULL+envkey, cct_context -> chroEvent_detail_table -> numOfElements, IVTcount);
 	}
 	return old_or_new_env;
 }
@@ -1204,19 +1206,18 @@ int cellCounts_add_or_update_chroEvent_in_table(cellcounts_global_t* cct_context
 	cellCounts_lock_occupy(&cct_context -> chroEvent_entry_table_lock);
 	int known = cellCounts_junction_in_table(cct_context, chro, l, r), retv=0;
 
+	char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
+	char negchar = '*';
+	snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", chro, negchar);
+
+	IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky);
+	int is_new_key= !LR_roots;
+	if(is_new_key) LR_roots = calloc(sizeof(void*),3);
+
 	if(known) retv=1; else{
-		char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
-		char negchar = '*';
-		snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", chro, negchar);
-
-		IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky);
-		int is_new_key= !LR_roots;
-		if(is_new_key) LR_roots = calloc(sizeof(void*),2);
-
-		IVTcount +=2;
-
 		LR_roots[0]=IVT_insert(LR_roots[0], l, l, NULL+r);
 		LR_roots[1]=IVT_insert(LR_roots[1], r, r, NULL+l);
+		if( env_type == chroEvent_t_TYPE_EXON )  LR_roots[2]=IVT_insert(LR_roots[2], l, r, NULL);
 		if(is_new_key) HashTablePut(cct_context -> chroEvent_entry_table, strdup( chro_strn_ky ), LR_roots);
 	}
 
@@ -1259,7 +1260,7 @@ void cellCounts_copy_txn_to_juncs(void * ky, void * va, HashTable * me){
 	cellcounts_global_t* cct_context = me->appendix1;
 	ArrayList * my_exons = va;
 	ArrayListSort(my_exons, ArrayListLLUComparison);
-	int last_end = -1;
+	int last_end = -1, last_start = -1;
 	char * chname_strand = strstr(txn_chr_neg,"\t")+1;
 	char * chro_end = strstr(chname_strand,"\t");
 	int is_negative = -1;
@@ -1278,12 +1279,17 @@ int ignore_GTF = 0;
 		srInt_64 ve = ArrayListGet(my_exons, x1)-NULL;
 		int start = ve >> 32;
 		int end = ve & 0x7fffffff; 
+
+if(!ignore_GTF)	cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_EXON, chname_strand , start, end, 0, 1);
+
 		if(last_end>0){
+//if(!ignore_GTF)		cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_INTRON_RETENTION, chname_strand , last_start, end, 0, 1);
 			if(start < last_end)SUBREADprintf("WARNING: Transcript '%s' contains overlapping exons (%d > %d). The junction between the overlapping exons is ignored.\n", ky, last_end, start);
 
 if(!ignore_GTF)		cellCounts_add_or_update_chroEvent_in_table(cct_context, chroEvent_t_TYPE_JUNCTION, chname_strand , last_end, start, 0, 1);
 		}
 		last_end = end;
+		last_start = start;
 
 if(!ignore_GTF) for(x2 = 0; x2 < 2;x2++){
 			HashTable * mystrand_tab;
@@ -1950,6 +1956,7 @@ void cellCounts_2IVT_freeTree(void * c2){
 	void ** cc2 = c2;
 	IVT_freeTree(cc2[0]);
 	IVT_freeTree(cc2[1]);
+	IVT_freeTree(cc2[2]);
 }
 
 void cellCounts_chroEvent_freebuff(void *c2){
@@ -2077,7 +2084,7 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	free(cct_context -> block_min_start);
 	free(cct_context -> block_max_end);
 	free(cct_context -> gene_name_array);
-	free( cct_context -> read_assignment_counter_locks);
+	free(cct_context -> read_assignment_counter_locks);
 	free(cct_context -> unistr_buffer_space);
 	if(cct_context -> read_assignment_detail_file[0])fclose(cct_context -> read_assignment_detail_fp);
 
@@ -3225,6 +3232,7 @@ if(0)fprintf(stderr,"CIGAR_FROM_2ENDS  %s => %s   %s\n", cigar_end5, final_cigar
 			thread_context -> reporting_editing_distance[thread_context -> populating_voteIJ_buf_index] = 0;// all_mismatched_bases + all_indel_length;
 
 			thread_context -> populating_voteIJ_buf_index ++;
+			thread_context -> total_voteIJs_to_write ++;
 		}
 	}
 
@@ -3363,7 +3371,7 @@ void cellCounts_build_junction_read_one_end( cellcounts_global_t * cct_context, 
 	char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
 	char negchar = '*';
 	snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", chro, negchar);
-	IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky); // LR_roots [0] : left-edge ; LR_roots [1] : right-edge
+	IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky); // LR_roots [0] : left-edge ; LR_roots [1] : right-edge ; LR_roots [2] : covered-range
 	if(margin_for_misma >0 && LR_roots && thread_context -> realignment_event_stack_current_depth < JUNCTION_REALIGNMENT_MAX_DEPTH){
 		IVT_IntervalTreeNode * myroot = NULL;
 		myroot=LR_roots[!to3end];
@@ -3928,12 +3936,23 @@ fprintf(stderr,"POPU_JTAB %s %s -- %s SPLIT AT %d, within %d gap, having MisMa=%
 void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t * cct_context, int thread_no ){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	char * cigar = thread_context -> reporting_cigars[thread_context -> writing_voteID_buf_index];
+	chroEvent_t * added_event_array[ JUNCTION_REALIGNMENT_MAX_DEPTH * 2 +1 ];
+	int added_event_insertion_index[ JUNCTION_REALIGNMENT_MAX_DEPTH * 2 +1 ];
+	int added_event_array_no = 0;
+
 	unsigned int linear_cur = thread_context -> reporting_positions[thread_context -> writing_voteID_buf_index], linear0 = linear_cur;
 	//int read_cur = 0;
-	int nch, tmpi=0, x1=0, b1off=0;
+	int nch, tmpi=0, x1=0, b1off=0, x3;
 	char *ch = NULL;
 	locate_gene_position(linear_cur, &cct_context -> chromosome_table, &  ch, &b1off);
-	
+	char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
+	char negchar = '*', LRi;
+	snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", ch, negchar);
+	IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky); // LR_roots [0] : left-edge ; LR_roots [1] : right-edge ; LR_roots [2] : covered_regions
+
+	int eventbufsize = JUNCTION_MAX_COLOCATION, founditems = 0;
+	IVT_Interval * eventbuf[eventbufsize];
+
 	while(nch = cigar[x1++]){
 		if(isdigit(nch)){
 			tmpi = 10*tmpi+nch-'0';
@@ -3941,38 +3960,83 @@ void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t 
 			unsigned int p2 = 0;
 			chroEvent_t * oneitem = NULL;
 
+			// add supp reads to events that EXACTLY match the two edge locations.
 			if(nch == 'N' || nch == 'D') p2 = linear_cur + tmpi;
 			else if(nch=='I') p2 = linear_cur;
 			if(p2){
+				int last_added_insertion_index = -1;
 				srUInt_64 envkey = ((linear_cur-1) *1LLU<<32) | p2;
 				oneitem = HashTableGet( cct_context -> chroEvent_detail_table, NULL+ envkey);
 				cellCounts_chroEvent_locks_opt(cct_context, thread_no, oneitem, 1);
 				if(oneitem -> n_events > 1){
 					int x2;
 					assert(nch=='I');
-					for(x2=0; x2< oneitem -> n_events;x2++)if( oneitem -> length[x2] == -tmpi ) oneitem -> step2_supported_reads[ x2 ]++;
+					for(x2=0; x2< oneitem -> n_events;x2++)if( oneitem -> length[x2] == -tmpi ){
+						last_added_insertion_index = x2;
+						oneitem -> step2_supported_reads[ x2 ]++;
+						break;
+					}
 				}else oneitem -> step2_supported_reads = (void*) oneitem -> step2_supported_reads+1;
 				cellCounts_chroEvent_locks_opt(cct_context, thread_no, oneitem, 0);
+
+				int on_chro_len = tmpi +1;
+				if(nch=='I') on_chro_len = 1;
+if(0)fprintf(stderr,"SUPP_ADDED env-cov %d ~ %d \n", oneitem -> left_edge - linear0 + b1off, oneitem -> left_edge - linear0 + b1off+ on_chro_len);
+				added_event_array[added_event_array_no] = oneitem;
+				if(oneitem -> n_events >1)added_event_insertion_index[added_event_array_no] = last_added_insertion_index;
+				added_event_array_no ++;
 			}
 
-			if(nch == 'M'){
+			if(nch=='M'){
+				if(LR_roots){
+					int Mstart_base = linear_cur - linear0 + b1off, x2;
+					int Mlast_base = Mstart_base + tmpi - 1;
+					founditems=0;
+
+					IVT_IntervalTreeNode * cover_root = LR_roots[2];
+					IVT_query_range(cover_root , Mstart_base, Mlast_base, eventbuf, eventbufsize, &founditems);
+
+					for(x2=0; x2 < founditems; x2++){
+						IVT_Interval * evb = eventbuf [x2];
+						int evbposleft = evb -> start;
+						int evbposright = evb -> end;
+						unsigned int linear_env_1 = linear_gene_position(&cct_context->chromosome_table, ch , evbposleft);
+						unsigned int linear_env_2 = linear_gene_position(&cct_context->chromosome_table, ch , evbposright);
+						unsigned int linear_env_L = min(linear_env_1, linear_env_2);
+						unsigned int linear_env_R = max(linear_env_1, linear_env_2);
+
+						srUInt_64 envkey = (linear_env_L*1LLU<<32)| linear_env_R;
+						chroEvent_t * exed = HashTableGet(cct_context -> chroEvent_detail_table , NULL+envkey);
+						if(!exed) continue; // if it isn't an Exon event, it can be NULL. We only need EXONs.
+						if(exed -> event_type != chroEvent_t_TYPE_EXON) continue;
+						exed -> step2_supported_reads = (void*) exed -> step2_supported_reads+1;
+					}
+				}
+			}
+
+			if(nch == 'D' || nch == 'M' || nch== 'N') linear_cur += tmpi; 
+			tmpi = 0;
+		}
+	}
+	x1=0;
+	tmpi=0;
+	linear_cur = linear0;
+	while(nch = cigar[x1++]){
+		if(isdigit(nch)){
+			tmpi = 10*tmpi+nch-'0';
+		}else{
+			if(nch == 'M' || nch == 'N'){
 				// Find all events in this region -- they aren't supported.
 				// The events can be starting and/or ending in this region.
 				// This includes the events at two edges. 
-				char chro_strn_ky[MAX_CHROMOSOME_NAME_LEN+10];
-				char negchar = '*', LRi;
-				snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", ch, negchar);
-				IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky); // LR_roots [0] : left-edge ; LR_roots [1] : right-edge
 				if(LR_roots) for(LRi=0; LRi<2; LRi++){
 					IVT_IntervalTreeNode * myroot = LR_roots[LRi];
 					int Mstart_base = linear_cur - linear0 + b1off;
 					int Mlast_base = Mstart_base + tmpi - 1;
-					int eventbufsize = JUNCTION_MAX_COLOCATION, founditems = 0;
-					IVT_Interval * eventbuf[eventbufsize];
-
 					IVT_query_range(myroot , Mstart_base, Mlast_base, eventbuf, eventbufsize, &founditems);
 					int evbi;
 					for(evbi=0; evbi<founditems; evbi++){
+						int last_added_insertion_index = -1;
 						IVT_Interval * evb = eventbuf [evbi];
 						int evbposleft = evb -> start;
 						int evbposright = evb -> attr - NULL;
@@ -3981,14 +4045,36 @@ void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t 
 						unsigned int linear_env_L = min(linear_env_1, linear_env_2);
 						unsigned int linear_env_R = max(linear_env_1, linear_env_2);
 
-
 						srUInt_64 envkey = (linear_env_L*1LLU<<32)| linear_env_R;
 						chroEvent_t * uned = HashTableGet(cct_context -> chroEvent_detail_table , NULL+envkey);
+if(!uned) fprintf(stderr,"SUPP_ZERO %s:%d ~ %s:%d\n", ch, evbposleft, evbposright);
+//						if(!uned) continue;	// Although we only queried LR_root [0] and [1], but the EXON type events are also registered in these two roots.
+//									// EXON type events are not saved in the detail table in this way.
+
+						if(nch == 'N' && uned -> event_type != chroEvent_t_TYPE_EXON)continue; // "N" can only give non-supporting to the fly-over exons.
+						if(nch == 'N' && !(uned -> left_edge >= linear_cur && uned -> left_edge + ((void*) uned -> length-NULL) <= linear_env_R )) continue; // fly-over exons must be entirely in the "N" part.
+						int is_the_last = 0;
 						cellCounts_chroEvent_locks_opt(cct_context, thread_no, uned, 1);
-						if(uned -> n_events == 1) uned -> step2_all_spanning_reads = (void *) uned -> step2_all_spanning_reads +1 ;
-						else{
+						chroEvent_t * last_added_env = NULL;
+
+						for(x3=0; x3<added_event_array_no; x3++){
+							chroEvent_t * added_env = added_event_array[x3];
+							if(uned == added_env){
+								is_the_last = 1;
+								if( added_env -> n_events>1 ) last_added_insertion_index = added_event_insertion_index[x3];
+							}
+						}
+
+						if(uned -> n_events == 1){
+							if(!is_the_last) uned -> step2_non_supported_reads = (void *) uned -> step2_non_supported_reads +1 ;
+if(0)fprintf(stderr,"SUPP_NON   query-cov %d ~ %d   non-env-cov %d ~ %d   %s\n", Mstart_base, Mlast_base, evb -> start, evb -> attr -NULL , is_the_last?"SKIPPED":"ADDED");
+						}else{
 							int x2;
-							for(x2=0; x2<uned -> n_events; x2++) uned -> step2_all_spanning_reads[x2]++;
+							for(x2=0; x2<uned -> n_events; x2++){
+								if(!(is_the_last && x2==last_added_insertion_index))
+									uned -> step2_non_supported_reads[x2]++;
+if(0)fprintf(stderr,"SUPP_X2TEST   query-cov %d ~ %d   non-env-cov %d ~ %d  X2 %d %s\n", Mstart_base, Mlast_base, evb -> start, evb -> attr -NULL , x2, (is_the_last && x2==last_added_insertion_index)?"SKIPPED":"ADDED");
+							}
 						}
 						cellCounts_chroEvent_locks_opt(cct_context, thread_no, uned, 0);
 					}
@@ -6294,7 +6380,7 @@ int cellCounts_run_counting(cellcounts_global_t * cct_context){
 	int ret= 0;
 	ret = ret || cellCounts_do_cellbc_batches(cct_context);
 	ret = ret || cellCounts_write_gene_list(cct_context);
-	ret = ret || cellCounts_write_junction_sumtable(cct_context);
+	if( cct_context -> do_junction_table_populating ) ret = ret || cellCounts_write_junction_sumtable(cct_context);
 	return ret;
 }
 
@@ -6649,18 +6735,18 @@ void cellCounts_copy_junc_table_to_output_table(void * k, void * v, HashTable * 
 	// format: chro-small<TAB>pos-small<TAB>chro-large<TAB>pos-large
 	sprintf(junckey, "%s\t%d\t%s\t%d", chro, pos_small+1, chro, pos_large+1);
 	srInt_64 cck = (void*)ed -> step2_supported_reads - NULL;
-	cck = cck << 32 |((void*)ed -> step2_all_spanning_reads - NULL);
+	cck = cck << 32 |((void*)ed -> step2_non_supported_reads - NULL);
 	HashTablePut( newtab, strdup(junckey), NULL+ cck);
 }
 
-void cellCounts_write_final_indels(cellcounts_global_t * cct_context,  char * output_file_name){
+void cellCounts_write_final_other_events(cellcounts_global_t * cct_context,  char * output_file_name, int type_mode){
 	ArrayList * small_large_keys = HashTableKeys(cct_context -> chroEvent_detail_table);
 	ArrayListSort(small_large_keys, ArrayListLLUComparison);
 	FILE * ofp = fopen(output_file_name,"w");
 	int x1;
 	for(x1=0; x1< small_large_keys-> numOfElements; x1++){
 		chroEvent_t * ed = HashTableGet(cct_context -> chroEvent_detail_table , ArrayListGet(small_large_keys,x1));
-		if(ed -> event_type != chroEvent_t_TYPE_INDEL) continue;
+		if(ed -> event_type != type_mode) continue;
 
 		char * chro = NULL;
 		int poss = 0;
@@ -6668,16 +6754,18 @@ void cellCounts_write_final_indels(cellcounts_global_t * cct_context,  char * ou
 		locate_gene_position(ed -> left_edge +1, &cct_context -> chromosome_table, &chro, &poss);
 		int x2;
 		for(x2=0; x2 < ed -> n_events; x2++){
-			int envlen, nsupp;
+			int envlen, nsupp, nonsupp;
 			if(ed -> n_events >1) {
 				envlen = ed -> length[x2];
 				nsupp = ed -> step2_supported_reads[x2];
+				nonsupp = ed -> step2_non_supported_reads[x2];
 			}else{
 				envlen = (void*)ed -> length - NULL;
 				nsupp = (void*)ed -> step2_supported_reads - NULL;
+				nonsupp = (void*)ed -> step2_non_supported_reads - NULL;
 			}
 			
-			if(nsupp)fprintf(ofp,"%s\t%d\t%d%c\t%d\n", chro, poss, abs(envlen), envlen>0?'D':'I', nsupp);
+			if(nsupp)fprintf(ofp,"%s\t%d\t%d%c\t%d\t%d\n", chro, poss, abs(envlen), envlen>0?'D':'I', nsupp, nonsupp);
 		}
 	}
 	ArrayListDestroy(small_large_keys);
