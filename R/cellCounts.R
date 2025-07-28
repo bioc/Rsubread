@@ -1395,7 +1395,12 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
   }
-  maxDiffToTopVotes=2
+  cat("=========== WARNING : REMOVE '+4' BELOW  ========\n")
+  cat("=========== WARNING : REMOVE '+4' BELOW  ========\n")
+  cat("=========== WARNING : REMOVE '+4' BELOW  ========\n")
+  cat("=========== WARNING : REMOVE '+4' BELOW  ========\n")
+  cat("=========== WARNING : REMOVE '+4' BELOW  ========\n")
+  maxDiffToTopVotes=2+4
   onlyDetectBarcode=F
   has.error <- FALSE
   maxMismatchBases <- maxMismatches

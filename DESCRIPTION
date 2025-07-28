@@ -1,6 +1,6 @@
 Package: Rsubread
-Version: 2.23.2
-Date: 2025-06-11
+Version: 2.23.3
+Date: 2025-07-29
 Title: Mapping, quantification and variant analysis of sequencing data 
 Author: Wei Shi, Yang Liao and Gordon K Smyth with contributions from Jenny Dai
 Maintainer: Wei Shi <wei.shi2@monash.edu>, Yang Liao <yang.liao@monash.edu> and Gordon K Smyth <smyth@wehi.edu.au>
