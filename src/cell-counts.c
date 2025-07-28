@@ -1447,6 +1447,7 @@ int features_load_one_line(char * gene_name, char * transcript_name, char * chro
 	unsigned int exonic_map_start = linear_gene_position(&cct_context->chromosome_table , chro_name, start);
 	unsigned int exonic_map_stop = linear_gene_position(&cct_context->chromosome_table , chro_name, end), exonpos_i;
 	if(exonic_map_start > 0xffffff00 || exonic_map_stop > 0xffffff00){
+		if(txn_to_free) free(transcript_name);
 		return -1;
 	}
 
@@ -1469,6 +1470,7 @@ int features_load_one_line(char * gene_name, char * transcript_name, char * chro
 
 	cellCounts_register_junc_feature(cct_context, gene_name, transcript_name,chro_name, start, end, is_negative_strand); // The cellCounts part uses 0-based coordinates. The featureCOunts part uses 1-based coordinates.
 	if(txn_to_free) free(transcript_name);
+	return 0;
 }
 
 void cellCounts_register_junc_feature(cellcounts_global_t * cct_context, char * feature_name, char * transcript_id, char * chro, unsigned int start, unsigned int stop, int is_negative){
