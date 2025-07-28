@@ -1155,7 +1155,7 @@ int cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 chroEvent_t * cellCounts_set_chroEvent_details(cellcounts_global_t* cct_context, int event_type, unsigned int linear_loc, unsigned int linear_loc2, int tlen, int from_truth){
 	srUInt_64 envkey = (linear_loc*1LLU<<32)|(linear_loc2);
 
-	chroEvent_t * old_or_new_env = HashTableGet( cct_context -> chroEvent_detail_table, envkey);
+	chroEvent_t * old_or_new_env = HashTableGet( cct_context -> chroEvent_detail_table, NULL+envkey);
 	if(old_or_new_env){
 		if(event_type == chroEvent_t_TYPE_INDEL && tlen <0){
 			int known =0, x1;
@@ -1248,12 +1248,12 @@ int cellCounts_junction_in_table(cellcounts_global_t* cct_context, char * chro, 
 	snprintf(chro_strn_ky, MAX_CHROMOSOME_NAME_LEN+10, "%s\t%c", chro, negchar);
 	IVT_IntervalTreeNode **LR_roots = HashTableGet(cct_context -> chroEvent_entry_table, chro_strn_ky);
 	if(!LR_roots)return 0;
-	IVT_IntervalTreeNode * search_out [JUNCTION_MAX_COLOCATION];
-	IVT_query_range( LR_roots[0], l,l, (IVT_IntervalTreeNode**)search_out, JUNCTION_MAX_COLOCATION, &coloc_num );
+	IVT_Interval* search_out [JUNCTION_MAX_COLOCATION];
+	IVT_query_range( LR_roots[0], l,l, (IVT_Interval**)search_out, JUNCTION_MAX_COLOCATION, &coloc_num );
 
 	if(coloc_num>=JUNCTION_MAX_COLOCATION-1)SUBREADprintf("WARNING: your annotation input contains very many exons ending at the same location. We only use %d of them.\n", JUNCTION_MAX_COLOCATION);
 	int known = 0, x2;
-	for(x2=0; x2<coloc_num; x2++) if( search_out[x2]->interval.attr == NULL+r ){known=1;break; }
+	for(x2=0; x2<coloc_num; x2++) if( search_out[x2]->attr == NULL+r ){known=1;break; }
 	return known;
 }
 
@@ -1378,7 +1378,7 @@ int features_load_one_line(char * gene_name, char * transcript_name, char * chro
 
 	if(!cct_context -> transcript_exon_table){
 		cct_context ->transcript_exon_table = StringTableCreate(100000);
-		HashTableSetDeallocationFunctions(cct_context -> transcript_exon_table, free, ArrayListDestroy);
+		HashTableSetDeallocationFunctions(cct_context -> transcript_exon_table, free, (void (*)(void *))ArrayListDestroy);
 
 		cct_context -> transcript_to_gene_name_table = StringTableCreate(100000);
 		HashTableSetDeallocationFunctions(cct_context -> transcript_to_gene_name_table, free, free);
@@ -1552,8 +1552,6 @@ if(0){
 		if(strcmp(transcript_id, had_txp -> transcript_id)==0) transcript_had_in_gene = 1;
 	}
 	if(!transcript_had_in_gene) ArrayListPush(jgbody -> transcript_list, HashTableGet(cct_context -> junction_transcript_table, transcript_id));
-
-	return 0;
 }
 
 int cellCounts_find_or_insert_gene_name(cellcounts_global_t * cct_context, unsigned char * feature_name) {
@@ -2761,11 +2759,11 @@ void * cellCounts_run_in_thread(void * params){
 
 int cellCounts_release_context_from_align(cellcounts_global_t * cct_context, int thread_no, int task) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	destroy_typical_dynamic_align(thread_context -> dynamic_align_buffers, MAX_SCRNA_READ_LENGTH);
+	destroy_typical_dynamic_align((void***)thread_context -> dynamic_align_buffers, MAX_SCRNA_READ_LENGTH);
 }
 int cellCounts_prepare_context_for_align(cellcounts_global_t * cct_context, int thread_no, int task) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	init_typical_dynamic_align(thread_context -> dynamic_align_buffers, thread_context -> dynamic_align_penalties, MAX_SCRNA_READ_LENGTH);
+	init_typical_dynamic_align((void***)thread_context -> dynamic_align_buffers, thread_context -> dynamic_align_penalties, MAX_SCRNA_READ_LENGTH);
 	return 0;
 }
 
@@ -3776,7 +3774,7 @@ void cellCounts_add_covered_indels_in_table(cellcounts_global_t * cct_context, i
 	char result_buffer[3*MAX_SCRNA_READ_LENGTH+1];
 	char result_cigar[3*MAX_SCRNA_READ_LENGTH+1];
 	int moved_len = general_dynamic_align(read + cov_start, cov_end - cov_start, chro_loc + cov_start, result_buffer, expected_indel, cct_context ->max_indel_length,
-		dpbuf, dpplt, cellCounts_add_covered_indels_in_table_getval, cct_context);
+		(void***)dpbuf, dpplt, cellCounts_add_covered_indels_in_table_getval, cct_context);
 	int retlen = general_dynamic_align_moves_to_cigar(result_buffer, moved_len, result_cigar);
 
 	int nch, tmpi=0,x1;
