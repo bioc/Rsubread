@@ -1420,7 +1420,13 @@ int features_load_one_line(char * gene_name, char * transcript_name, char * chro
 
 	fc_chromosome_index_info * chro_stub = HashTableGet(cct_context -> chromosome_exons_table, chro_name);
 	if(chro_stub){
-		if(chro_stub -> chro_possible_length < end+1) chro_stub -> chro_possible_length = end+1;
+		if(chro_stub -> chro_possible_length < end+1){
+			if(chro_stub -> reverse_table_start_index){
+				SUBREADprintf("ERROR: chromosome '%s' in the index is shorter than the same chromosome in the annotations: %d > %d.\n", chro_name, end, chro_stub -> chro_possible_length);
+				return -1;
+			}
+			else chro_stub -> chro_possible_length = end+1;
+		}
 	}else{
 		chro_stub = calloc(sizeof(fc_chromosome_index_info),1);
 		char * tmp_chro_name = malloc(CHROMOSOME_NAME_LENGTH);
