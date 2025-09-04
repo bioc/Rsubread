@@ -4007,7 +4007,7 @@ void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t 
 
 	int eventbufsize = JUNCTION_MAX_COLOCATION, founditems = 0;
 	IVT_Interval * eventbuf[eventbufsize];
-if(1)if( strstr(thread_context -> realignment_event_read_name ,"R00000985779") )fprintf(stderr,"SUPP_TRYING  %s   %s\n", cigar, thread_context -> realignment_event_read_name);
+if(0)if( strstr(thread_context -> realignment_event_read_name ,"R00000985779") )fprintf(stderr,"SUPP_TRYING  %s   %s\n", cigar, thread_context -> realignment_event_read_name);
 
 	while(nch = cigar[x1++]){
 		if(isdigit(nch)){
@@ -4042,7 +4042,7 @@ if(1)if( strstr(thread_context -> realignment_event_read_name ,"R00000985779") )
 
 				int on_chro_len = tmpi +1;
 				if(nch=='I') on_chro_len = 1;
-if(1)if( strstr(thread_context -> realignment_event_read_name ,"R00000985779") )fprintf(stderr,"SUPP_ADDED env-cov %d ~ %d R=%s\n", oneitem -> left_edge - linear0 + b1off, oneitem -> left_edge - linear0 + b1off+ on_chro_len, thread_context -> realignment_event_read_name);
+if(0)if( strstr(thread_context -> realignment_event_read_name ,"R00000985779") )fprintf(stderr,"SUPP_ADDED env-cov %d ~ %d R=%s\n", oneitem -> left_edge - linear0 + b1off, oneitem -> left_edge - linear0 + b1off+ on_chro_len, thread_context -> realignment_event_read_name);
 				ADD_USED_EVENT_DETAILS_PTR(oneitem, last_added_insertion_index);
 			}
 
@@ -6938,7 +6938,9 @@ void cellCounts_write_final_junctions(cellcounts_global_t * cct_context,  char *
             "NearestExonBoundary_SP1\tNearestExonBoundary_SP2" 
         );
 
-	fprintf(ofp, "\tSupporting_Reads\nUnsupported_Reads\n");
+	for(sample_i = 1; sample_i <=cct_context-> sample_sheet_table -> numOfElements ; sample_i ++)
+		fprintf(ofp, "\tSupporting_Reads_%03d\tUnsupported_Reads_%03d", sample_i, sample_i);
+	fprintf(ofp, "\n");
 
 	IVT_Interval ** junc_genebody_olayleft = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
 	IVT_Interval ** junc_genebody_olayright = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);

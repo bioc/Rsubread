@@ -1579,6 +1579,15 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       }else has.error<-T
     }
   }
+  if(detectJunctions){
+    fc[["junction.counts"]] <- read.delim(paste0(temp.file.prefix,".jcounts"), sep="\t")
+    ncoln <- ncol(fc[["junction.counts"]]) - length(some.results[["Sample.Table"]][["SampleName"]])*2 +1
+    for(spi in some.results[["Sample.Table"]][["SampleName"]]){
+        colnames(fc[["junction.counts"]])[ncoln] <- paste0("Supporting_Reads_", spi)
+        colnames(fc[["junction.counts"]])[ncoln +1] <- paste0("Nonsupporting_Reads_", spi)
+        ncoln <- ncoln+2
+    }
+  }
   if(T).del.temp.files(substr(temp.file.prefix,4,99)) else warning("NOT DELETING TEMP FILES !!!!")
 
   fc[["annotation"]] <- raw.fc.annot
