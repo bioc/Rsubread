@@ -35,7 +35,7 @@
 #define REVERSED_READ_BIN_OFFSET ( MAX_SCRNA_READ_LENGTH /4+1 )
 
 
-#define JUNCTION_REALIGNMENT_MAX_TRIES 10000
+#define JUNCTION_REALIGNMENT_MAX_TRIES 2000
 #define JUNCTION_REALIGNMENT_MAX_DEPTH 5
 #define JUNCTION_MAX_COLOCATION 10000
 #define JUNCTION_MAX_MISMATCHING_BASES_IN_REALIGNMENT 1
@@ -3350,7 +3350,7 @@ int cellCounts_build_junction_read_finalise_current_stack(cellcounts_global_t * 
 
 
 //#warning "========= THIS IS FOR TESTING EFFICIENCY; NOT NEEDED IN RELASED VERSIOn  ============="
-//	thread_context -> realignment_event_stack_runcount++;
+	thread_context -> realignment_event_stack_runcount++;
 
 	return all_mismatch_in_stack;
 }
