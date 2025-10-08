@@ -1391,7 +1391,7 @@
 }
 
 cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE){
-  if(!(grepl("[/]chr1$", index)||file.exists("~/PubDB/welcome.bash"))){
+  if(F)if(!(grepl("[/]chr1$", index)||file.exists("~/PubDB/welcome.bash"))){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
   }
