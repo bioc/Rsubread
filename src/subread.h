@@ -499,8 +499,8 @@ typedef struct {
 	int is_EOF;
 } input_BLC_t;
 
-#warning "====== Yang Liao added '+300' for debugging junc-detection. Not needed in release. ======"
-#define MAX_SCRNA_READ_LENGTH ( 160  + 300 )
+//#warning "====== Yang Liao added '+300' for debugging junc-detection. Not needed in release. ======"
+#define MAX_SCRNA_READ_LENGTH ( 160  /*+ 300 */)
 
 typedef struct{
 	char read_text[MAX_SCRNA_READ_LENGTH];

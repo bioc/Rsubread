@@ -2926,7 +2926,7 @@ int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, cha
 		if(x1 < nmoves) nmove = movement_buffer[x1];
 		if(nmove==3)nmove=0; // Misma => Match
 		if(x1 == nmoves || last_op != nmove){
-			if(tmpi>0) ret += sprintf( cigar+ret , "%d%c", tmpi, last_op?(last_op==1?'D':'I'):'M');
+			if(tmpi>0) ret += SUBreadSprintf( cigar+ret, 11 , "%d%c", tmpi, last_op?(last_op==1?'D':'I'):'M');
 			tmpi = 1;
 			last_op = nmove;
 		}else tmpi++;

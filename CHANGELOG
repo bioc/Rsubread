@@ -1,3 +1,6 @@
+8 Oct 2025 - 2.23.5
+(1) Removed warnings from R check command.
+
 3 Sep 2025 - 2.23.4
 (1) Added multiple sample junction output in cellCounts.
 
