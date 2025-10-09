@@ -1878,7 +1878,7 @@ int cellCounts_load_annotations(cellcounts_global_t * cct_context){
 		int loaded_features = load_features_annotation(cct_context->features_annotation_file, cct_context->features_annotation_file_type, cct_context->features_annotation_gene_id_column, "transcript_id" , cct_context-> features_annotation_feature_type, cct_context, features_load_one_line);
 		if(loaded_features<1) rv = 1;
 
-		if(!rv) rv = cellCounts_extract_and_sort_juncs(cct_context);
+		if(!rv) rv = cellCounts_extract_and_sort_juncs(cct_context); // transcripts are copied to junctions and saved in the junction table.
 
 		if(!rv){
 			int anno_index_matched=0;
@@ -5159,7 +5159,7 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 #define ADD_count_hash(bc,gn,no)  { HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
     if( cct_context -> read_assignment_detail_fp ){\
         cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);\
-        fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\tSAMPLE%03d\t%s\t%s\t%s\n",sample_no, ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
+        fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\tSAMPLE%03d\t%s\t%s\t%s\n",sample_no, (char*)ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
         cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);\
        }\
     }
