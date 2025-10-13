@@ -4247,7 +4247,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 				strcpy(read_qual+reverse_text_offset, read_qual);
 				reverse_quality(read_qual+reverse_text_offset, read_len);
 			}
-			if(cct_context -> do_junction_table_populating)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_i, myno);
+			if(cct_context -> do_junction_table_populating && sample_i>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_i, myno);
 			cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_i, myno, read_name, read_text + reverse_text_offset, read_qual+reverse_text_offset, read_text , read_qual , read_len);
 		}
 	} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_i, -1, read_name, read_text, read_qual , read_text, read_qual, read_len);
