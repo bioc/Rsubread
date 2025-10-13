@@ -1,3 +1,6 @@
+13 Oct 2025 - 2.23.7
+(1) Enabled junction detection with BCL/CBCL input in cellCounts.
+
 10 Oct 2025 - 2.23.6
 (1) Removed the last warning.
 
