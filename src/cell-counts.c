@@ -205,6 +205,11 @@ typedef struct{
 } cellcounts_align_thread_t;
 
 typedef struct{
+	HashTable       * chroEvent_entry_table;
+	HashTable	* chroEvent_detail_table;
+} junction_index_t;
+
+typedef struct{
 	int total_threads;
 	cellcounts_align_thread_t * all_thread_contexts;
 	int reads_per_chunk;
@@ -312,6 +317,7 @@ typedef struct{
 	int 		    chroEvent_lock_number;
 
 	cellCounts_lock_t chroEvent_entry_table_lock;
+	HashTable	* per_cell_junction_table[ MAX_SCRNA_SAMPLE_NUMBER+1 ];
 	HashTable       * chroEvent_entry_table[MAX_SCRNA_SAMPLE_NUMBER+1];
 	HashTable	* chroEvent_detail_table[MAX_SCRNA_SAMPLE_NUMBER+1];
 	HashTable       * transcript_exon_table;
@@ -4194,7 +4200,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 
 					int vv = votetab->votes[i][j];
 					if(vv == this_vote_N){
-						if(cct_context -> do_junction_table_populating){
+						if(cct_context -> do_junction_table_populating && sample_i >0){
 							int CR15GLS = (read_len - 15 - index_gap_width)<<16;
 							int subread_step =  CR15GLS /(cct_context -> total_subreads_per_read -1);
 							if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
@@ -4714,10 +4720,9 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : % 13lld reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 #endif
 				int sample_i = cellCounts_get_sample_no_from_rname(cct_context, thread_no, read_name);
+				
 				if(task==STEP_VOTING)cellCounts_select_and_write_alignments(cct_context, thread_no, sample_i, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
-				if(task==STEP_JUNC_TABLE){
-					if(sample_i >=0) cellCounts_call_juncs_put_in_tab(cct_context, thread_no, sample_i, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
-				}
+				if(sample_i >=0) if(task==STEP_JUNC_TABLE) cellCounts_call_juncs_put_in_tab(cct_context, thread_no, sample_i, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 			} else {
 				building_rbin_offset = REVERSED_READ_BIN_OFFSET;
 				read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
