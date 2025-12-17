@@ -2935,10 +2935,251 @@ int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, cha
 }
 
 
+// the GlobalAlignmentCIGAR is written by AI.
+#define NEG_INF (-1LL << 60)
+
+// Enum for Traceback states
+typedef enum {
+    STATE_M = 0,
+    STATE_IX = 1,
+    STATE_IY = 2
+} State;
+
+/**
+ * Calculates Global Alignment and returns CIGAR string.
+ * 
+ * @param query_seq        The query sequence (Seq2)
+ * @param reference_seq    The reference sequence (Seq1)
+ * @param matchScore       Score for a match (positive)
+ * @param mismatchPenalty  Penalty for a mismatch (positive value subtracted)
+ * @param gapOpenPenalty   Penalty for opening a gap (positive value)
+ * @param gapExtendPenalty Penalty for extending a gap (positive value)
+ * @param out_score        Pointer to store the final alignment score
+ * 
+ * @return Dynamically allocated CIGAR string (Caller must free).
+ */
+char* GlobalAlignmentCIGAR(const char* query_seq, const char* reference_seq, 
+                           int matchScore, int mismatchPenalty, 
+                           int gapOpenPenalty, int gapExtendPenalty, 
+                           int64_t* out_score) {
+    
+    int m = (int)strlen(query_seq); // Rows (seq2)
+    int n = (int)strlen(reference_seq); // Cols (seq1)
+    
+    int cols = n + 1;
+    int rows = m + 1;
+    size_t matrix_size = (size_t)rows * cols;
+
+    // Allocate DP matrices (Flattened 1D arrays)
+    // M: match/mismatch, Ix: gap in seq2 (Deletion), Iy: gap in seq1 (Insertion)
+    int64_t* M = (int64_t*)malloc(matrix_size * sizeof(int64_t));
+    int64_t* Ix = (int64_t*)malloc(matrix_size * sizeof(int64_t));
+    int64_t* Iy = (int64_t*)malloc(matrix_size * sizeof(int64_t));
+
+    // Allocate Traceback matrices
+    uint8_t* prevM = (uint8_t*)malloc(matrix_size * sizeof(uint8_t));
+    uint8_t* prevIx = (uint8_t*)malloc(matrix_size * sizeof(uint8_t));
+    uint8_t* prevIy = (uint8_t*)malloc(matrix_size * sizeof(uint8_t));
+
+    if (!M || !Ix || !Iy || !prevM || !prevIx || !prevIy) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
+    }
+
+    // Initialize matrices
+    for (size_t k = 0; k < matrix_size; k++) {
+        M[k] = NEG_INF;
+        Ix[k] = NEG_INF;
+        Iy[k] = NEG_INF;
+    }
+
+    // M[0][0] = 0
+    M[0] = 0;
+    prevM[0] = STATE_M;
+
+    // Helper macro to access 2D data in 1D array
+    #define IDX(r, c) ((r) * cols + (c))
+
+    // First row: gaps in seq2 (Deletion relative to ref)
+    for (int j = 1; j <= n; j++) {
+        if (j == 1) {
+            Ix[IDX(0, j)] = M[IDX(0, 0)] - (gapOpenPenalty + gapExtendPenalty);
+            prevIx[IDX(0, j)] = STATE_M;
+        } else {
+            Ix[IDX(0, j)] = Ix[IDX(0, j-1)] - gapExtendPenalty;
+            prevIx[IDX(0, j)] = STATE_IX;
+        }
+    }
+
+    // First column: gaps in seq1 (Insertion relative to ref)
+    for (int i = 1; i <= m; i++) {
+        if (i == 1) {
+            Iy[IDX(i, 0)] = M[IDX(0, 0)] - (gapOpenPenalty + gapExtendPenalty);
+            prevIy[IDX(i, 0)] = STATE_M;
+        } else {
+            Iy[IDX(i, 0)] = Iy[IDX(i-1, 0)] - gapExtendPenalty;
+            prevIy[IDX(i, 0)] = STATE_IY;
+        }
+    }
+
+    // Fill DP matrices
+    for (int i = 1; i <= m; i++) {
+        for (int j = 1; j <= n; j++) {
+            
+            // Score for aligning query[i-1] with ref[j-1]
+            int64_t pairScore = (query_seq[i-1] == reference_seq[j-1]) ? matchScore : -mismatchPenalty;
+
+            // Calculate M[i][j]
+            int64_t best = M[IDX(i-1, j-1)];
+            State prev = STATE_M;
+            
+            if (Ix[IDX(i-1, j-1)] > best) {
+                best = Ix[IDX(i-1, j-1)];
+                prev = STATE_IX;
+            }
+            if (Iy[IDX(i-1, j-1)] > best) {
+                best = Iy[IDX(i-1, j-1)];
+                prev = STATE_IY;
+            }
+            M[IDX(i, j)] = best + pairScore;
+            prevM[IDX(i, j)] = (uint8_t)prev;
+
+            // Calculate Ix[i][j] (Gap in Seq2 / Deletion)
+            int64_t open = M[IDX(i, j-1)] - (gapOpenPenalty + gapExtendPenalty);
+            int64_t extend = Ix[IDX(i, j-1)] - gapExtendPenalty;
+            if (open > extend) {
+                Ix[IDX(i, j)] = open;
+                prevIx[IDX(i, j)] = STATE_M;
+            } else {
+                Ix[IDX(i, j)] = extend;
+                prevIx[IDX(i, j)] = STATE_IX;
+            }
+
+            // Calculate Iy[i][j] (Gap in Seq1 / Insertion)
+            open = M[IDX(i-1, j)] - (gapOpenPenalty + gapExtendPenalty);
+            extend = Iy[IDX(i-1, j)] - gapExtendPenalty;
+            if (open > extend) {
+                Iy[IDX(i, j)] = open;
+                prevIy[IDX(i, j)] = STATE_M;
+            } else {
+                Iy[IDX(i, j)] = extend;
+                prevIy[IDX(i, j)] = STATE_IY;
+            }
+        }
+    }
+
+    // Choose best end state
+    int i = m;
+    int j = n;
+    State state = STATE_M;
+    int64_t bestScore = M[IDX(m, n)];
+
+    if (Ix[IDX(m, n)] > bestScore) {
+        bestScore = Ix[IDX(m, n)];
+        state = STATE_IX;
+    }
+    if (Iy[IDX(m, n)] > bestScore) {
+        bestScore = Iy[IDX(m, n)];
+        state = STATE_IY;
+    }
+
+    // Set output score
+    if (out_score) *out_score = bestScore;
+
+    // Traceback
+    // Buffer for raw operations. Max length is m + n.
+    char* ops = (char*)malloc((m + n + 1) * sizeof(char));
+    int op_count = 0;
+
+    while (i > 0 || j > 0) {
+        switch (state) {
+            case STATE_M:
+                ops[op_count++] = 'M';
+                state = (State)prevM[IDX(i, j)];
+                i--; j--;
+                break;
+            case STATE_IX:
+                ops[op_count++] = 'D'; // Deletion in query
+                state = (State)prevIx[IDX(i, j)];
+                j--;
+                break;
+            case STATE_IY:
+                ops[op_count++] = 'I'; // Insertion in query
+                state = (State)prevIy[IDX(i, j)];
+                i--;
+                break;
+        }
+    }
+
+    // Reverse ops array (because traceback generates reverse order)
+    for (int k = 0; k < op_count / 2; k++) {
+        char temp = ops[k];
+        ops[k] = ops[op_count - 1 - k];
+        ops[op_count - 1 - k] = temp;
+    }
+
+    // Compress to CIGAR string (RLE)
+    // Allocate conservative buffer: max length is ops * (digits + char)
+    char* cigar = (char*)malloc((op_count * 12 + 1) * sizeof(char));
+    cigar[0] = '\0';
+    
+    if (op_count > 0) {
+        char cur = ops[0];
+        int count = 1;
+        int cigar_pos = 0;
+        
+        for (int k = 1; k < op_count; k++) {
+            if (ops[k] == cur) {
+                count++;
+            } else {
+                cigar_pos += sprintf(cigar + cigar_pos, "%d%c", count, cur);
+                cur = ops[k];
+                count = 1;
+            }
+        }
+        sprintf(cigar + cigar_pos, "%d%c", count, cur);
+    }
+
+    // Cleanup
+    free(M); free(Ix); free(Iy);
+    free(prevM); free(prevIx); free(prevIy);
+    free(ops);
+
+    return cigar;
+}
+
+
+
 // buffers : shrot ** then char ** for scores then masks.
 // tables: malloc(MAX_READ_LENGTH * void*) then malloc(short or char * MAX_READ_LENGTH) for each row
 
 int general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+  void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context) {
+	int ref_len =  read_len + expected_offset; // I: negative; D: positive
+	char ref_seq [ ref_len+1 ];
+	int refi;
+	int LRM_DP_ALIGN_CREATEGAP_PENALTY, LRM_DP_ALIGN_EXTENDGAP_PENALTY, LRM_DP_ALIGN_MATCH_SCORE, LRM_DP_ALIGN_MISMATCH_PENALTY;
+
+	LRM_DP_ALIGN_CREATEGAP_PENALTY = penalties[0];  
+	LRM_DP_ALIGN_EXTENDGAP_PENALTY = penalties[1]; 
+	LRM_DP_ALIGN_MATCH_SCORE = penalties[2]; 
+	LRM_DP_ALIGN_MISMATCH_PENALTY = penalties[3]; 
+
+	for(refi = 0; refi < ref_len; refi++)
+		ref_seq[refi] = get_index_base_value(refi+begin_position, general_context);
+	ref_seq[ref_len]=0;
+
+	char * newcigar;
+	srInt_64 score=0;
+
+	newcigar = GlobalAlignmentCIGAR( read, ref_seq, LRM_DP_ALIGN_MATCH_SCORE, -LRM_DP_ALIGN_MISMATCH_PENALTY, -LRM_DP_ALIGN_CREATEGAP_PENALTY, -LRM_DP_ALIGN_EXTENDGAP_PENALTY, (int64_t*)&score);
+	int newlen = strlen(newcigar);
+	memcpy(movement_buffer, newcigar, newlen+1);
+	free(newcigar);
+	return newlen;
+}
+
+int BADgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
 // read must be converted to the positive strand.
 // movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch
