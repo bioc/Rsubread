@@ -187,6 +187,7 @@ typedef struct{
 	int reporting_mapq[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 	char reporting_cigars[SCRNA_HIGHEST_REPORTED_ALIGNMENTS][MAX_SCRNA_READ_LENGTH+20];
 	int reporting_editing_distance[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	int reporting_vote_for_aln[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 
 	char ** dynamic_align_buffers[2];
 	int dynamic_align_penalties[4];
@@ -2587,7 +2588,7 @@ if(1)  if(strstr(cbc,"TTGCGCAAGCTAGATAGCTGATGAAA")) fprintf(stderr,"FOUND BC12_N
 	return tb1;
 }
 
-void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i, int editing_dist){
+void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i, int editing_dist, int vote_for_aln){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	char * cigar = NULL;
 	int mapping_quality = 255;
@@ -2629,6 +2630,11 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	for(xk1=0; xk1<read_len; xk1++) *(rbin +basev+xk1) = qual_text[xk1]-33;
 	
 	if(multi_mapping_number>=0){
+		rbin[record_length ++]='X';
+		rbin[record_length ++]='V';
+		rbin[record_length ++]='C';
+		rbin[record_length ++]=vote_for_aln;
+
 		rbin[record_length ++]='H';
 		rbin[record_length ++]='I';
 		rbin[record_length ++]='C';
@@ -2791,7 +2797,7 @@ int cellCounts_parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**o
 	return 0;
 }
 
-void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, int sample_no, char * read_name, int rlen, char * read_text, char * qual_text, char * raw_text, char * raw_qual, char * chro_name, int chro_pos, int reporting_index, int nhits, int multi_mapping_number, int this_multi_mapping_i, int editing_dist){
+void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, int sample_no, char * read_name, int rlen, char * read_text, char * qual_text, char * raw_text, char * raw_qual, char * chro_name, int chro_pos, int reporting_index, int nhits, int multi_mapping_number, int this_multi_mapping_i, int editing_dist, int vote_for_aln){
 	int batch_no;
 	
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
@@ -2807,7 +2813,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	}else batch_no = CELLBC_BATCH_NUMBER+1;
 	
 	char readbin[READ_BIN_BUF_SIZE];
-	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist);
+	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist, vote_for_aln);
 
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	if(sample_no>0){
@@ -2909,9 +2915,9 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 			}
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
-		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index]);
+		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index], thread_context -> reporting_vote_for_aln[reporting_index]);
 	}else //unmapped
-		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1);
+		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1, 0);
 }
 
 int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned int * repeated_buffer_position, char ** repeated_buffer_cigar, int * repeated_count, realignment_result_t * res1);
@@ -3401,7 +3407,7 @@ unsigned int cellCounts_convert_stack_to_cigar_str(cellcounts_global_t * cct_con
 	return read_base1_linear; // if to 3 end: ignore the retured value.
 }
 
-void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase, int score, int is_reversed, int read_len, unsigned int default_mapped_linear){
+void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase, int score, int is_reversed, int read_len, unsigned int default_mapped_linear, int vote_for_aln){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 //if(0)if(strstr(thread_context -> realignment_event_read_name ,"R00000985779")) fprintf(stderr,"NPERFCT_LEN %d ~ %d  ; ELEMENTS = %lld %lld %s\n", noindel_coved_firstbase, noindel_coved_lastbase, thread_context -> best_5end_stack_list -> numOfElements, thread_context -> best_3end_stack_list -> numOfElements, thread_context -> realignment_event_read_name);
 
@@ -3456,6 +3462,7 @@ fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar
 			thread_context -> reporting_flags[thread_context -> populating_voteIJ_buf_index] = is_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
 			thread_context -> reporting_mapq[thread_context -> populating_voteIJ_buf_index] = 40 ;//- all_mismatched_bases;
 			thread_context -> reporting_editing_distance[thread_context -> populating_voteIJ_buf_index] = 0;// all_mismatched_bases + all_indel_length;
+			thread_context -> reporting_vote_for_aln[thread_context -> populating_voteIJ_buf_index] = vote_for_aln;
 
 			thread_context -> populating_voteIJ_buf_index ++;
 			thread_context -> total_voteIJs_to_write ++;
@@ -3711,7 +3718,7 @@ void cellCounts_init_junctionread_one_end(cellcounts_global_t * cct_context, int
 	thread_context -> realignment_event_stack_best_score = -1;
 }
 
-srInt_64 cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_coved_firstbase, int noindel_coved_lastbase, unsigned int linear_mapped_pos, int is_reversed){
+srInt_64 cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_coved_firstbase, int noindel_coved_lastbase, unsigned int linear_mapped_pos, int is_reversed, int votes_for_aln){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	cellCounts_init_build_junctionread_context(cct_context, thread_no, read_name);
 
@@ -3751,7 +3758,7 @@ fprintf(stderr,"SEARCH ALNN AT %s noindel %d ~ %d in %d bases : %s\n", lpos, noi
 		if(thread_context -> realignment_event_stack_best_score>0) total_score += thread_context -> realignment_event_stack_best_score;
 		cellCounts_end_junctionread_one_end(cct_context, thread_no);
 	}
-	cellCounts_end_build_candidature_from_stacks(cct_context, thread_no, noindel_coved_firstbase, noindel_coved_lastbase, total_score, is_reversed, read_len, linear_mapped_pos + noindel_coved_firstbase);
+	cellCounts_end_build_candidature_from_stacks(cct_context, thread_no, noindel_coved_firstbase, noindel_coved_lastbase, total_score, is_reversed, read_len, linear_mapped_pos + noindel_coved_firstbase, votes_for_aln);
 	return total_score;
 }
 
@@ -4428,7 +4435,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 
 //if(0)fprintf(stderr,"CANDIDATUREVS  %d  V=%d ~ %d min %d %s\n", thread_context -> populating_voteIJ_buf_index, vv, this_vote_N, cct_context -> min_votes_per_mapped_read , thread_context -> realignment_event_read_name);
 
-							cellCounts_explain_one_alignment(cct_context, thread_no, sample_i, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab->pos[i][j], is_negative);
+							cellCounts_explain_one_alignment(cct_context, thread_no, sample_i, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab->pos[i][j], is_negative, vv);
 						}else cellCounts_explain_step1_one_alignment (cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j); // ( cct_context, thread_no, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab,i,j);
 					}
 				}
