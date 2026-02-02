@@ -3856,11 +3856,13 @@ srInt_64 cellCounts_explain_step1_one_alignment(cellcounts_global_t * cct_contex
 	srInt_64 score = 0;
 	if(rebuilt_rlen==read_len && all_mapped_bases >= cct_context -> min_mapped_length_for_mapped_read )score=cellCounts_test_score(cct_context, thread_no, read_name, read_len, abs_pos, thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], head_soft_clipped, tail_soft_clipped, all_matched_bases, all_mismatched_bases)*weight;
 
+	int votes_for_aln = votetab -> votes[vote_i][vote_j];
 	thread_context -> reporting_scores[thread_context -> populating_voteIJ_buf_index] = score;
 	thread_context -> reporting_positions[thread_context -> populating_voteIJ_buf_index] = abs_pos;
 	thread_context -> reporting_flags[thread_context -> populating_voteIJ_buf_index] = rbin_offset_for_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
 	thread_context -> reporting_mapq[thread_context -> populating_voteIJ_buf_index] = 40 - all_mismatched_bases;
 	thread_context -> reporting_editing_distance[thread_context -> populating_voteIJ_buf_index] = all_mismatched_bases + all_indel_length;
+	thread_context -> reporting_vote_for_aln[thread_context -> populating_voteIJ_buf_index] = votes_for_aln;
 //if(1||strstr(read_name,"00000035688"))fprintf(stderr,"FINECNTT  '%s'  idx=%d  pos=%u  [%s]  score=%lld\n", read_name, thread_context -> populating_voteIJ_buf_index,  abs_pos , thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index] , score);
 	thread_context -> populating_voteIJ_buf_index++;
 	if(score>0)thread_context -> total_voteIJs_to_write++;
