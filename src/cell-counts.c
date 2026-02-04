@@ -18,6 +18,7 @@
 #include "input-blc.h"
 #include "core-indel.h"
 #include "core-junction.h"
+#include "softclip-test.h"
 
 //#define DO_STARSOLO_THING
 #define IMPOSSIBLE_MEMORY_SPACE 0x5CAFEBABE0000000llu
@@ -188,6 +189,7 @@ typedef struct{
 	char reporting_cigars[SCRNA_HIGHEST_REPORTED_ALIGNMENTS][MAX_SCRNA_READ_LENGTH+20];
 	int reporting_editing_distance[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 	int reporting_vote_for_aln[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
+	srInt_64 reporting_ma_misma_ins_Sclip[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 
 	char ** dynamic_align_buffers[2];
 	int dynamic_align_penalties[4];
@@ -450,7 +452,7 @@ void cellCounts_junckey_sort_merge(void * inptr, int start, int items1, int item
 }
 
 
-int cellCounts_reduce_Cigar(char * cigar, char * cigarout){
+int cellCounts_reduce_Cigar(char * cigar, char * cigarout, int * sum_ins){
 	//LRMtest_move_buff( context, thread_context, iteration_context, thread_context -> dynamic_programming_indel_movement_buf, strlen(thread_context -> dynamic_programming_indel_movement_buf), iteration_context -> read_length);
 	int tmpi = -1;
 	int ci, nch, repeat_i = 0, old_opt = 0, wcur=0, rlen=0;
@@ -472,8 +474,10 @@ int cellCounts_reduce_Cigar(char * cigar, char * cigarout){
 			old_opt = nch;
 		}
 	}
+	if(sum_ins) *(sum_ins)=0;
 	if(repeat_i>0){
 		SUBreadSprintf(cigarout + wcur, 11, "%d%c", repeat_i, old_opt);
+		if(old_opt=='I'&&sum_ins) *(sum_ins)+= repeat_i;
 		if(old_opt=='M' || old_opt=='S' || old_opt=='I') rlen+=repeat_i;
 	}
 	return rlen;
@@ -2588,7 +2592,7 @@ if(1)  if(strstr(cbc,"TTGCGCAAGCTAGATAGCTGATGAAA")) fprintf(stderr,"FOUND BC12_N
 	return tb1;
 }
 
-void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i, int editing_dist, int vote_for_aln){
+void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no, char * rbin, char * read_name, int read_name_len, int trimmed_rname_len, int read_len, char * read_text, char * qual_text, char * chro_name, int chro_pos, int reporting_index, int multi_mapping_number, int this_multi_mapping_i, int editing_dist, int vote_for_aln, srInt_64 ma_misma_ins_Sclip){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	char * cigar = NULL;
 	int mapping_quality = 255;
@@ -2644,6 +2648,21 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 		rbin[record_length ++]='H';
 		rbin[record_length ++]='C';
 		rbin[record_length ++]=multi_mapping_number;
+	}
+
+//if(1)fprintf(stderr,"MAMAINF  %llx\n", ma_misma_ins_Sclip);
+	if(ma_misma_ins_Sclip){
+		int ma = (ma_misma_ins_Sclip>>48)&0xffff;
+		int misma = (ma_misma_ins_Sclip>>32)&0xffff;
+		int ins = (ma_misma_ins_Sclip>>16)&0xffff;
+		int clip = (ma_misma_ins_Sclip)&0xffff;
+		rbin[record_length ++]='X';
+		rbin[record_length ++]='B';
+		rbin[record_length ++]='Z';
+		char mamainf[50];
+		int mamainf_len = sprintf(mamainf, "%d,%d,%d,%d", ma, misma, ins, clip);
+		strcpy(rbin+record_length, mamainf);
+		record_length += mamainf_len+1;
 	}
 
 	if(editing_dist>=0){
@@ -2797,7 +2816,7 @@ int cellCounts_parallel_gzip_writer_add_read_fqs_scRNA(parallel_gzip_writer_t**o
 	return 0;
 }
 
-void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, int sample_no, char * read_name, int rlen, char * read_text, char * qual_text, char * raw_text, char * raw_qual, char * chro_name, int chro_pos, int reporting_index, int nhits, int multi_mapping_number, int this_multi_mapping_i, int editing_dist, int vote_for_aln){
+void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread_no, int sample_no, char * read_name, int rlen, char * read_text, char * qual_text, char * raw_text, char * raw_qual, char * chro_name, int chro_pos, int reporting_index, int nhits, int multi_mapping_number, int this_multi_mapping_i, int editing_dist, int vote_for_aln, srInt_64 ma_misma_ins_Sclip){
 	int batch_no;
 	
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
@@ -2813,7 +2832,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	}else batch_no = CELLBC_BATCH_NUMBER+1;
 	
 	char readbin[READ_BIN_BUF_SIZE];
-	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist, vote_for_aln);
+	cellCounts_build_read_bin(cct_context, thread_no, readbin, read_name, strlen(read_name), rname_trimmed_len, rlen, read_text, qual_text, chro_name, chro_pos, reporting_index, multi_mapping_number, this_multi_mapping_i, editing_dist, vote_for_aln, ma_misma_ins_Sclip);
 
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	if(sample_no>0){
@@ -2915,9 +2934,9 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 			}
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
-		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index], thread_context -> reporting_vote_for_aln[reporting_index]);
+		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index], thread_context -> reporting_vote_for_aln[reporting_index],thread_context -> reporting_ma_misma_ins_Sclip[reporting_index]);
 	}else //unmapped
-		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1, 0);
+		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1, 0, 0);
 }
 
 int cellCounts_add_repeated_buffer(cellcounts_global_t * cct_context, unsigned int * repeated_buffer_position, char ** repeated_buffer_cigar, int * repeated_count, realignment_result_t * res1);
@@ -3407,7 +3426,35 @@ unsigned int cellCounts_convert_stack_to_cigar_str(cellcounts_global_t * cct_con
 	return read_base1_linear; // if to 3 end: ignore the retured value.
 }
 
-void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase, int score, int is_reversed, int read_len, unsigned int default_mapped_linear, int vote_for_aln){
+char cellCounts_softclip_getbase(unsigned int pos, void * context){
+	cellcounts_global_t * cct_context = context;
+	gene_value_index_t * current_value_index = cct_context->value_index;
+	return gvindex_get(current_value_index, pos);
+}
+
+unsigned int cellCounts_softclip_candidate(cellcounts_global_t * cct_context, int thread_no, unsigned int linear_mapped_pos, char * cigar, char * read_text, int noindel_cover_firstbase, int noindel_cover_lastbase, srInt_64 * ma_misma_ins_Sclip){
+	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+	SoftClipResult * clipres=calculate_soft_clipping(cct_context, linear_mapped_pos, cigar, read_text, noindel_cover_firstbase, noindel_cover_lastbase, cellCounts_softclip_getbase); 
+
+if(0){
+char lpos[100];
+cellCounts_absoffset_to_posstr(cct_context, linear_mapped_pos+1, lpos);
+fprintf(stderr,"CAND_SOFT %s : %s %s -> %s   PERFECT_COV %d ~ %d (inclusive)  %s   MA/MISMA/INS/CLP = %d %d %d %d\n", thread_context -> realignment_event_read_name, lpos, cigar, clipres -> new_cigar, noindel_cover_firstbase,  noindel_cover_lastbase, read_text, clipres -> num_matched, clipres -> num_mismatched,clipres -> num_inserted, clipres -> num_clipped);
+}
+
+	strcpy(cigar, clipres -> new_cigar);
+	(* ma_misma_ins_Sclip)=
+		((1LL<<48)*clipres -> num_matched) |
+		((1LL<<32)*clipres -> num_mismatched) |
+		((1LL<<16)*clipres -> num_inserted) |
+		( 1LL     *clipres -> num_clipped);
+
+	unsigned int ret = clipres -> new_pos;
+	free(clipres);
+	return ret;
+}
+
+void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase, int score, int is_reversed, int read_len, unsigned int default_mapped_linear, int vote_for_aln, char * read_text){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 //if(0)if(strstr(thread_context -> realignment_event_read_name ,"R00000985779")) fprintf(stderr,"NPERFCT_LEN %d ~ %d  ; ELEMENTS = %lld %lld %s\n", noindel_coved_firstbase, noindel_coved_lastbase, thread_context -> best_5end_stack_list -> numOfElements, thread_context -> best_3end_stack_list -> numOfElements, thread_context -> realignment_event_read_name);
 
@@ -3420,9 +3467,17 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 
 		if( x_5end < 0 && thread_context -> best_5end_stack_list -> numOfElements >0 )continue; // good 5' stack doesn't need full-body case.
 
+		int x_5end_matchings = 0, x_5end_mismatchings = 0;
 		if(x_5end >=0){
 			realignment_event_stack_item_t * stack_end5 = ArrayListGet(thread_context -> best_5end_stack_list , x_5end);
 			mapped_loc = cellCounts_convert_stack_to_cigar_str(cct_context, thread_no, stack_end5, cigar_end5, 0);
+			int stack_depth=0;
+			while(stack_depth<JUNCTION_REALIGNMENT_MAX_DEPTH){
+				if(stack_end5[stack_depth].event_details == NULL+IMPOSSIBLE_MEMORY_SPACE)break;
+				x_5end_matchings+= stack_end5[stack_depth].matching_bases_in_alignment;
+				x_5end_mismatchings+= stack_end5[stack_depth].mismatching_bases_in_alignment;
+				stack_depth++;
+			}
 		} else cigar_end5[0]=0;
 
 		if(!mapped_loc) mapped_loc = default_mapped_linear;
@@ -3438,23 +3493,34 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 			if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 			if(x_3end <0 && thread_context -> best_3end_stack_list -> numOfElements >0)continue;
 
+			int x_3end_matchings = 0, x_3end_mismatchings = 0;
 			if(x_3end >= 0){
 				realignment_event_stack_item_t * stack_end3 = ArrayListGet(thread_context -> best_3end_stack_list , x_3end);
 				cellCounts_convert_stack_to_cigar_str(cct_context, thread_no, stack_end3, cigar_end5+ cigar_ptr, 1);
+				int stack_depth=0;
+				while(stack_depth<JUNCTION_REALIGNMENT_MAX_DEPTH){
+					if(stack_end3[stack_depth].event_details == NULL+IMPOSSIBLE_MEMORY_SPACE)break;
+					x_3end_matchings+= stack_end3[stack_depth].matching_bases_in_alignment;
+					x_3end_mismatchings+= stack_end3[stack_depth].mismatching_bases_in_alignment;
+					stack_depth++;
+				}
 			}
 
 			char * final_cigar = thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index];
-			int cigar_rlen = cellCounts_reduce_Cigar(cigar_end5,final_cigar);
+			int sum_ins=0;
+			int cigar_rlen = cellCounts_reduce_Cigar(cigar_end5,final_cigar,&sum_ins);
 
 /*if(cigar_rlen != read_len){
 fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar_end5, final_cigar, cigar_rlen, read_len, thread_context -> realignment_event_read_name);
 }*/
 
+			srInt_64 do_ma_misma_ins_Sclip = 0;
+			mapped_loc = cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, &do_ma_misma_ins_Sclip);
 			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
 			hkey = (hkey<<24) ^ mapped_loc;
 			if( HashTableGet(thread_context -> alignment_repating_table, NULL+hkey) )continue;
 			HashTablePut(thread_context -> alignment_repating_table, NULL+hkey, NULL+1);
-//if(0)fprintf(stderr,"CIGAR_FROM_2ENDS  %s => %s   %s\n", cigar_end5, final_cigar, thread_context -> realignment_event_read_name);
+if(0)fprintf(stderr,"CIGAR_FROM_2ENDS  %s => %s   %s   WITH 5'MA_MISMA %d %d  ++ MID_BASES %d ++ WITH 3'MA_MOSMA %d %d   ALL_MA_MISMA %d\n", cigar_end5, final_cigar, thread_context -> realignment_event_read_name, x_5end_matchings, x_5end_mismatchings, noindel_coved_lastbase - noindel_coved_firstbase -1+ sub1, x_3end_matchings, x_3end_mismatchings, x_5end_matchings+x_5end_mismatchings+x_3end_matchings+x_3end_mismatchings+(noindel_coved_lastbase - noindel_coved_firstbase -1+ sub1));
 
 			srInt_64 weight = cellCounts_calculate_pos_weight(cct_context, mapped_loc, final_cigar);
 			thread_context -> reporting_scores[thread_context -> populating_voteIJ_buf_index] = score * weight;
@@ -3463,6 +3529,7 @@ fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar
 			thread_context -> reporting_mapq[thread_context -> populating_voteIJ_buf_index] = 40 ;//- all_mismatched_bases;
 			thread_context -> reporting_editing_distance[thread_context -> populating_voteIJ_buf_index] = 0;// all_mismatched_bases + all_indel_length;
 			thread_context -> reporting_vote_for_aln[thread_context -> populating_voteIJ_buf_index] = vote_for_aln;
+			thread_context -> reporting_ma_misma_ins_Sclip[thread_context -> populating_voteIJ_buf_index] = do_ma_misma_ins_Sclip;
 
 			thread_context -> populating_voteIJ_buf_index ++;
 			thread_context -> total_voteIJs_to_write ++;
@@ -3758,7 +3825,7 @@ fprintf(stderr,"SEARCH ALNN AT %s noindel %d ~ %d in %d bases : %s\n", lpos, noi
 		if(thread_context -> realignment_event_stack_best_score>0) total_score += thread_context -> realignment_event_stack_best_score;
 		cellCounts_end_junctionread_one_end(cct_context, thread_no);
 	}
-	cellCounts_end_build_candidature_from_stacks(cct_context, thread_no, noindel_coved_firstbase, noindel_coved_lastbase, total_score, is_reversed, read_len, linear_mapped_pos + noindel_coved_firstbase, votes_for_aln);
+	cellCounts_end_build_candidature_from_stacks(cct_context, thread_no, noindel_coved_firstbase, noindel_coved_lastbase, total_score, is_reversed, read_len, linear_mapped_pos + noindel_coved_firstbase, votes_for_aln, read_text);
 	return total_score;
 }
 
@@ -3848,7 +3915,7 @@ srInt_64 cellCounts_explain_step1_one_alignment(cellcounts_global_t * cct_contex
 	}
 
 	char tmp_new_cigar[MAX_SCRNA_READ_LENGTH+20];
-	int rebuilt_rlen = cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], tmp_new_cigar );
+	int rebuilt_rlen = cellCounts_reduce_Cigar(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], tmp_new_cigar, NULL );
 
 	strcpy(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], tmp_new_cigar);
 
@@ -4948,6 +5015,7 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 				building_rbin_offset = REVERSED_READ_BIN_OFFSET;
 				read_text_rev_offset = MAX_SCRNA_READ_LENGTH+1;
 				strcpy(read_text+read_text_rev_offset, read_text);
+//if(task==STEP_VOTING)fprintf(stderr,"REV_READ_TEXT %s\n",read_name);
 				reverse_read(read_text+read_text_rev_offset, read_len, GENE_SPACE_BASE);
 				qual_text[read_text_rev_offset] = 0;
 			}
