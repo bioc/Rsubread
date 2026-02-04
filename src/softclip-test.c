@@ -202,7 +202,7 @@ SoftClipResult* calculate_soft_clipping(
             }
         } else {
             // Keep deletion only if strictly inside the kept region
-            if (current_read >= new_read_start && current_read < new_read_end) {
+            if (current_read > new_read_start && current_read < new_read_end) {
                 c_ptr += sprintf(c_ptr, "%ld%c", op_len, op);
             }
         }

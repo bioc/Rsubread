@@ -3513,7 +3513,6 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 /*if(cigar_rlen != read_len){
 fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar_end5, final_cigar, cigar_rlen, read_len, thread_context -> realignment_event_read_name);
 }*/
-
 			srInt_64 do_ma_misma_ins_Sclip = 0;
 			mapped_loc = cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, &do_ma_misma_ins_Sclip);
 			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
@@ -4326,9 +4325,11 @@ void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t 
 				int last_added_insertion_index = -1;
 				srUInt_64 envkey = ((linear_cur-1) *1LLU<<32) | p2;
 				oneitem = HashTableGet( cct_context -> chroEvent_detail_table[sample_i], NULL+ envkey);
+if(0)fprintf(stderr,"CIGAR FOR %s is %s  --  CHR %c    ItemPTR=%p    ky=%p\n", thread_context -> realignment_event_read_name , cigar, nch, oneitem, NULL+ envkey);
 				cellCounts_chroEvent_locks_opt(cct_context, thread_no, oneitem, 1);
 				if(oneitem -> n_events > 1){
 					int x2;
+					// You wont have two D/N events having exactly same splicing points. Only insertions with diff lengths can do so.
 					assert(nch=='I');
 					for(x2=0; x2< oneitem -> n_events;x2++)if( oneitem -> length[x2] == -tmpi ){
 						last_added_insertion_index = x2;
