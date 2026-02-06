@@ -741,7 +741,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	cct_context -> input_mode = GENE_INPUT_BCL;
 	cct_context -> total_threads = 10;
 	cct_context -> features_annotation_file_type = FILE_TYPE_RSUBREAD;
-	cct_context -> reads_per_chunk = 0x30000000;
+	cct_context -> reads_per_chunk = 0x7ff00000;
 	cct_context -> max_reported_alignments_per_read = 1;
 //#warning "====== SHOULD REMOVE '* 4' BELOW ========="
 	cct_context -> max_candidate_voteIJ_per_read = 3 /** 4*/;
