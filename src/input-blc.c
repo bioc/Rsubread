@@ -389,7 +389,7 @@ int cacheBCL_init( cache_BCL_t * cache_input, char * data_dir, int reads_in_chun
 	for(x1 = 0; x1 < cache_input -> total_bases_in_each_cluster; x1++)
 		cache_input -> bcl_bin_cache[x1] = malloc(reads_in_chunk);
 	cache_input -> flt_bin_cache = malloc(reads_in_chunk*2);
-	cache_input -> flt_bin_cache_size = reads_in_chunk*2;
+	cache_input -> flt_bin_cache_size = min(reads_in_chunk*2, 0x7fff0000ll);
 	cache_input -> lane_no_in_chunk = malloc(reads_in_chunk);
 	cache_input -> chunk_end_lane = 1;	// no "0th lane"
 	cache_input -> all_threads = all_threads;
@@ -456,7 +456,8 @@ int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
 						}else break;
 
 						if(wptr == cache_input ->  flt_bin_cache_size){
-							srInt_64 next_size = cache_input ->  flt_bin_cache_size * 1.6;
+							srInt_64 next_size = cache_input ->  flt_bin_cache_size ;
+							next_size = next_size* 1.6;
 							if(next_size> 0x7fff0000ll) next_size = 0x7fff0000ll;
 							cache_input -> flt_bin_cache_size = (int)next_size;
 							wpt = cache_input-> flt_bin_cache = realloc( wpt, cache_input ->  flt_bin_cache_size );
@@ -609,7 +610,8 @@ int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
 						if(bcl_no <0){
 							if(nch>0) cache_input -> lane_no_in_chunk[total_valid_reads ++] = my_lane;
 							if(wptr == cache_input -> flt_bin_cache_size){
-								srInt_64 next_size = cache_input ->  flt_bin_cache_size * 1.6;
+								srInt_64 next_size = cache_input ->  flt_bin_cache_size ;
+								next_size = next_size* 1.6;
 								if(next_size> 0x7fff0000ll) next_size = 0x7fff0000ll;
 								cache_input -> flt_bin_cache_size = (int)next_size;
 								wpt = cache_input-> flt_bin_cache = realloc( wpt, cache_input ->  flt_bin_cache_size );
