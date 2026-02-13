@@ -3153,7 +3153,7 @@ char* GlobalAlignmentCIGAR(const char* query_seq, const char* reference_seq,
 // buffers : shrot ** then char ** for scores then masks.
 // tables: malloc(MAX_READ_LENGTH * void*) then malloc(short or char * MAX_READ_LENGTH) for each row
 
-int general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+int GEMINIgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context) {
 	int ref_len =  read_len + expected_offset; // I: negative; D: positive
 	char ref_seq [ ref_len+1 ];
@@ -3179,7 +3179,7 @@ int general_dynamic_align(char * read, int read_len, unsigned int begin_position
 	return newlen;
 }
 
-int BADgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+int general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
 // read must be converted to the positive strand.
 // movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch

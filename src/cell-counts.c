@@ -5477,7 +5477,6 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 				} else if(remove_count)(*remove_count)++;
 			}
 
-			str1 -> cellbc = -1;
 
 			char replaced_key[40+MAX_UMI_LEN];
 #ifdef __MINGW32__
@@ -5488,6 +5487,8 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 			memcpy(replaced_key+keyptr, str1 -> umi, cct_context -> UMI_length);
 			replaced_key[keyptr+cct_context -> UMI_length]=0;
 			HashTablePut(filtered_CGU_table, strdup(replaced_key), NULL-1);
+
+			str1 -> cellbc = -1;
 		}
 	}else{
 		ArrayList * accepted_list =NULL;
@@ -5523,7 +5524,6 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 								cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);
 							}
 							acc_str -> supp_reads += try_str -> supp_reads;
-							try_str -> cellbc = -1;
 
 							char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
@@ -5535,6 +5535,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 							memcpy(replaced_key+keyptr, try_str -> umi, cct_context -> UMI_length);
 							replaced_key[keyptr+cct_context -> UMI_length]=0;
 							HashTablePut(filtered_CGU_table, strdup(replaced_key), acc_str -> umi);
+							try_str -> cellbc = -1;
 							break;
 						}
 					}
@@ -5553,7 +5554,6 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 						}
 						found=1;
 						acc_str -> supp_reads += try_str -> supp_reads;
-						try_str -> cellbc = -1;
 
 						char replaced_key[55+MAX_UMI_LEN];
 #ifdef __MINGW32__
@@ -5564,6 +5564,7 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 						memcpy(replaced_key+keyptr, try_str -> umi, cct_context -> UMI_length);
 						replaced_key[keyptr+cct_context -> UMI_length]=0;
 						HashTablePut(filtered_CGU_table, strdup(replaced_key), acc_str -> umi);
+						try_str -> cellbc = -1;
 						break;
 					}
 				}
@@ -6035,8 +6036,9 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		for(x1 = 0; x1 < cct_context -> sample_sheet_table -> numOfElements; x1++){
 			HashTable * cellbcP0_to_geneno0B_P1_to_UMIs = HashTableCreate(500000);
 
-			void * app1[3];
+			void * app1[4];
 			cell_gene_umi_list[x1] -> appendix1 = app1;
+			app1[3] = NULL+x1+1; // sample_no
 			app1[0] = cct_context;
 			app1[1] = NULL+1;
 						// 1 : sorted by cell_bc, then gene, then supported_reads, then UMIstr (this is for step1 UMI merging)
