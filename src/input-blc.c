@@ -456,7 +456,9 @@ int iCache_continuous_read_lanes( cache_BCL_t * cache_input, int bcl_no){
 						}else break;
 
 						if(wptr == cache_input ->  flt_bin_cache_size){
-							cache_input ->  flt_bin_cache_size *= 1.6;
+							srInt_64 next_size = cache_input ->  flt_bin_cache_size * 1.6;
+							if(next_size> 0x7fff0000ll) next_size = 0x7fff0000ll;
+							cache_input -> flt_bin_cache_size = (int)next_size;
 							wpt = cache_input-> flt_bin_cache = realloc( wpt, cache_input ->  flt_bin_cache_size );
 						}
 						wpt[wptr++] = nch&0xff;
