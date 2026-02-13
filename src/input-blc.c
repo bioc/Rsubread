@@ -388,9 +388,11 @@ int cacheBCL_init( cache_BCL_t * cache_input, char * data_dir, int reads_in_chun
 	int x1;
 	for(x1 = 0; x1 < cache_input -> total_bases_in_each_cluster; x1++)
 		cache_input -> bcl_bin_cache[x1] = malloc(reads_in_chunk);
-	cache_input -> flt_bin_cache = malloc(reads_in_chunk*2);
-	cache_input -> flt_bin_cache_size = min(reads_in_chunk*2, 0x7fff0000ll);
-	cache_input -> lane_no_in_chunk = malloc(reads_in_chunk);
+	srInt_64 memsize_for_cache = reads_in_chunk;
+	reads_in_chunk = min(2*reads_in_chunk, 0x7fff0000ll);
+	cache_input -> flt_bin_cache = malloc(memsize_for_cache);
+	cache_input -> flt_bin_cache_size = memsize_for_cache; 
+	cache_input -> lane_no_in_chunk = malloc(memsize_for_cache);
 	cache_input -> chunk_end_lane = 1;	// no "0th lane"
 	cache_input -> all_threads = all_threads;
 	return iCache_open_batch(cache_input)?1:0;
