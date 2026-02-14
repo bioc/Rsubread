@@ -3514,7 +3514,24 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar_end5, final_cigar, cigar_rlen, read_len, thread_context -> realignment_event_read_name);
 }*/
 			srInt_64 do_ma_misma_ins_Sclip = 0;
+
+
+
+#warning "======= THIS IS FOR DEBUGGING CRASH ======="
+if(1){
+char debug__ffcigar[100];
+strcpy(debug__ffcigar, final_cigar);
+unsigned int debug__mmmloc = mapped_loc;
+
+
+
 			mapped_loc = cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, &do_ma_misma_ins_Sclip);
+
+
+//fprintf(stderr, "UUDEBUG %s  %s => %s    ; %u => %u\n",thread_context -> realignment_event_read_name, debug__ffcigar, final_cigar, debug__mmmloc,  mapped_loc);
+mapped_loc = debug__mmmloc;
+strcpy(final_cigar, debug__ffcigar);
+}
 			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
 			hkey = (hkey<<24) ^ mapped_loc;
 			if( HashTableGet(thread_context -> alignment_repating_table, NULL+hkey) )continue;
