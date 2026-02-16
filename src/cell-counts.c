@@ -2929,11 +2929,14 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 			}else{
 				add_curs = 0;
 				if(nch=='M'||nch=='D'||nch=='N') add_curs =tmpi;
-				if(nch=='M')cellCounts_find_hits_for_mapped_section(cct_context, thread_no, chro_name, chro_curs, chro_curs+add_curs, is_negative,&nhits);
+				if(nch=='M'){
+					cellCounts_find_hits_for_mapped_section(cct_context, thread_no, chro_name, chro_curs, chro_curs+add_curs, is_negative,&nhits);
+				}
 				tmpi=0;
 			}
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
+if(0&&strstr(read_name,"AATCTTGCCG")) fprintf(stderr,"INNER_SUMM_HIT %s : NHIT=%d   GENE  %016lld\n", read_name , nhits, thread_context -> hits_indices [0]);
 		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index], thread_context -> reporting_vote_for_aln[reporting_index],thread_context -> reporting_ma_misma_ins_Sclip[reporting_index]);
 	}else //unmapped
 		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1, 0, 0);
@@ -5497,12 +5500,17 @@ void cellCounts_do_one_batch_UMI_merge_one_cell(ArrayList* structs, int sec_star
 
 			char replaced_key[40+MAX_UMI_LEN];
 #ifdef __MINGW32__
-			int keyptr = SUBreadSprintf(replaced_key, 40+MAX_UMI_LEN,"%d-%" PRId64 "-", str1 -> cellbc, str1 -> gene_no);
+			//int keyptr = SUBreadSprintf(replaced_key, 40+MAX_UMI_LEN,"%d-%" PRId64 "-", str1 -> cellbc, str1 -> gene_no);
+			int keyptr = SUBreadSprintf(replaced_key, 55+MAX_UMI_LEN,"%d-%d-%" PRId64 "-", sample_id, str1 -> cellbc, str1 -> gene_no);
 #else
-			int keyptr = SUBreadSprintf(replaced_key, 40+MAX_UMI_LEN,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
+			//int keyptr = SUBreadSprintf(replaced_key, 40+MAX_UMI_LEN,"%d-%lld-", str1 -> cellbc, str1 -> gene_no);
+			int keyptr = SUBreadSprintf(replaced_key, 55+MAX_UMI_LEN,"%d-%d-%lld-", sample_id, str1 -> cellbc, str1 -> gene_no);
 #endif
+
 			memcpy(replaced_key+keyptr, str1 -> umi, cct_context -> UMI_length);
 			replaced_key[keyptr+cct_context -> UMI_length]=0;
+
+if(0 && strstr(str1 -> umi,"AATCTTGCCG"))fprintf(stderr,"DELETE_ONE_UMI AT %d : KY=%s\n", x1, replaced_key);
 			HashTablePut(filtered_CGU_table, strdup(replaced_key), NULL-1);
 
 			str1 -> cellbc = -1;
@@ -5634,8 +5642,16 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 				// structures that have the same last 32-bit of gene_no.
 		}
 
+if(0 && str1 && strstr(str1->umi,"AATCTTGCCG")) fprintf(stderr,"STEP_%d_TEST: BR=%s  gene_no=%016lld\n", is_UMI_step2+1,  str1->umi, str1 -> gene_no);
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str1 = ArrayListGet(structs, sec_start);
+
+if(0 && is_UMI_step2 && strstr(str1->umi,"AATCTTGCCG")){
+struct cell_gene_umi_supp * str2 = ArrayListGet(structs, sec_start +1);
+fprintf(stderr,"STEP2_FINN_X1: %s  gene_no=%016lld  supReads=%d  start=%d,%d   CHANGED=%d\n", str1->umi, str1 -> gene_no, str1->supp_reads,x1, sec_start, is_umi_changed);
+fprintf(stderr,"STEP2_FINN_X2: %s  gene_no=%016lld  supReads=%d  start=%d,%d   CHANGED=%d\n", str2->umi, str2 -> gene_no, str2->supp_reads, x1, sec_start, is_umi_changed);
+}
+
 			if(x1 - sec_start>1 && str1->cellbc>=0) cellCounts_do_one_batch_UMI_merge_one_cell(structs, sec_start, x1, is_UMI_step2, filtered_CGU_table, remove_count, sample_no);
 			else if(is_UMI_step2 && str1->cellbc>=0) ADD_count_hash(str1->cellbc,str1->gene_no,1);
 
