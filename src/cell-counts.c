@@ -2929,12 +2929,19 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 			}else{
 				add_curs = 0;
 				if(nch=='M'||nch=='D'||nch=='N') add_curs =tmpi;
-				if(nch=='M') cellCounts_find_hits_for_mapped_section(cct_context, thread_no, chro_name, chro_curs, chro_curs+add_curs, is_negative,&nhits, read_name);
+				if(nch=='M'){
+//int oldnnn = nhits;
+					cellCounts_find_hits_for_mapped_section(cct_context, thread_no, chro_name, chro_curs, chro_curs+add_curs -1, is_negative,&nhits, read_name); // "section end pos" is inclusive
+//if(1)if(strstr(read_name,"TATTTTGATT") && strstr(read_name,"AAAGATGAGAGTACCG"))fprintf(stderr,"INNER_HITS had %d : %s ( %s : %d - %d ) in %s\n", nhits- oldnnn, read_name, chro_name, chro_curs, chro_curs+add_curs, thread_context -> reporting_cigars[reporting_index]);
+				}
 				chro_curs += add_curs;
 				tmpi=0;
 			}
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
+
+if(0)if(strstr(read_name,"TATTTTGATT") && strstr(read_name,"AAAGATGAGAGTACCG"))fprintf(stderr,"INNER_JOINED had %d : %s    gene %016lld\n", nhits, read_name, thread_context -> hits_indices[0]);
+
 		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index], thread_context -> reporting_vote_for_aln[reporting_index],thread_context -> reporting_ma_misma_ins_Sclip[reporting_index]);
 	}else //unmapped
 		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, NULL, 0, -1, 0, 0, 0, -1, 0, 0);
@@ -3531,7 +3538,9 @@ unsigned int debug__mmmloc = mapped_loc;
 
 //fprintf(stderr, "UUDEBUG %s  %s => %s    ; %u => %u\n",thread_context -> realignment_event_read_name, debug__ffcigar, final_cigar, debug__mmmloc,  mapped_loc);
 
+//#warning "======= BAD_DEBUGGING ======="
 mapped_loc = debug__mmmloc;
+//if(strstr(  thread_context -> realignment_event_read_name, "ATTTTGATT|G;G,GG;G;;;GGGGG;,," )) strcpy(final_cigar,"111M1D2M1I15M94783N22M");else
 strcpy(final_cigar, debug__ffcigar);
 }
 			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
@@ -4303,6 +4312,9 @@ fprintf(stderr,"POPU_JTAB %s %s -- %s SPLIT AT %d, within %d gap, having MisMa=%
 
 void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t * cct_context, int thread_no, int sample_i, int reporting_index){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
+
+//#warning "===== BAD DEBUG ====="
+//if(strstr(thread_context -> realignment_event_read_name, "ATTTTGATT|G;G,GG;G;;;GGGGG;,," ))return;
 	char * cigar = thread_context -> reporting_cigars[reporting_index];
 
 	// The added_event_array stores the events that are supported and/or non-supported.
@@ -5470,7 +5482,7 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 	return ret;
 }
 
-#define ADD_count_hash(bc,gn,no)  { if(0&& bc==637 && gn==27309 ) fprintf(stderr,"ADDED_UMI_TAB:%s  %d\n", str1->umi, no);  HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
+#define ADD_count_hash(bc,gn,no)  { if(0 && bc==3146 && (gn==3146||gn==17421)) fprintf(stderr,"ADDED_UMI_TAB:%s  %d   gene %016lld\n", str1->umi, no, gn);  HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
     if( cct_context -> read_assignment_detail_fp ){\
         cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);\
         fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\tSAMPLE%03d\t%s\t%s\t%s\n",sample_no, (char*)ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
@@ -5641,11 +5653,11 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 				// structures that have the same last 32-bit of gene_no.
 		}
 
-if(0 && str1 &&     str1->cellbc==637 && (strstr(str1->umi,"AATCTTGCCG") || strstr(str1->umi,"ACAGAATTCT"))  ) fprintf(stderr,"STEP_%d_TEST: BR=%s  gene_no=%016lld\n", is_UMI_step2+1,  str1->umi, str1 -> gene_no);
+if(0 && str1 &&  (strstr(str1->umi,"TATTTTGATT") || strstr(str1->umi,"TTTTTTGATT"))  ) fprintf(stderr,"STEP_%d_TEST: BR=%s  gene_no=%016lld    CELLBC=%d\n", is_UMI_step2+1,  str1->umi, str1 -> gene_no, str1->cellbc);
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str1 = ArrayListGet(structs, sec_start);
 
-if(0 && is_UMI_step2 && str1->cellbc==637 && (strstr(str1->umi,"AATCTTGCCG") || strstr(str1->umi,"ACAGAATTCT"))){
+if(0 && is_UMI_step2 && str1->cellbc==3146 && (strstr(str1->umi,"TATTTTGATT") || strstr(str1->umi,"TTTTTTGATT"))){
 struct cell_gene_umi_supp * str2 = ArrayListGet(structs, sec_start +1);
 fprintf(stderr,"STEP2_FINN_X1: %s  gene_no=%016lld  supReads=%d  start=%d,%d   CHANGED=%d\n", str1->umi, str1 -> gene_no, str1->supp_reads,x1, sec_start, is_umi_changed);
 fprintf(stderr,"STEP2_FINN_X2: %s  gene_no=%016lld  supReads=%d  start=%d,%d   CHANGED=%d\n", str2->umi, str2 -> gene_no, str2->supp_reads, x1, sec_start, is_umi_changed);
