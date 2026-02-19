@@ -2941,7 +2941,7 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 		}
 		cellCounts_summarize_entrez_hits(cct_context, thread_no, &nhits);
 
-if(1)if((strstr(read_name,"GATTTTTTTT|")|| strstr(read_name,"TAGTTTTTTT|") || strstr(read_name,"TATTTTTTTT|") ) && strstr(read_name,"|TGAGGGAAGATCCTGT"))fprintf(stderr,"INNER_JOINED had %d : %s    gene %016lld  cigar %s\n", nhits, read_name, thread_context -> hits_indices[0], thread_context -> reporting_cigars[reporting_index]);
+if(0)if((strstr(read_name,"GATTTTTTTT|")|| strstr(read_name,"TAGTTTTTTT|") || strstr(read_name,"TATTTTTTTT|") ) && strstr(read_name,"|TGAGGGAAGATCCTGT"))fprintf(stderr,"INNER_JOINED had %d : %s    gene %016lld  cigar %s\n", nhits, read_name, thread_context -> hits_indices[0], thread_context -> reporting_cigars[reporting_index]);
 
 		cellCounts_vote_and_add_count(cct_context, thread_no, sample_i, read_name, rlen, read_text, qual_text, raw_text, raw_qual, chro_name, chro_pos, reporting_index, nhits, thread_context -> total_voteIJs_to_write, thread_context -> writing_voteID_buf_index +1, thread_context -> reporting_editing_distance[reporting_index], thread_context -> reporting_vote_for_aln[reporting_index],thread_context -> reporting_ma_misma_ins_Sclip[reporting_index]);
 	}else //unmapped
@@ -5484,7 +5484,7 @@ int cellCounts_hamming_max2_fixlen(char * u1, char * u2, int ulen){
 	return ret;
 }
 
-#define ADD_count_hash(bc,gn,no)  { if(1 && bc==662107 && gn==34028) fprintf(stderr,"ADDED_UMI_TAB:%.10s  %d   gene %016lld\n", str1->umi, no, gn);  HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
+#define ADD_count_hash(bc,gn,no)  { if(0 && bc==662107 && gn==34028) fprintf(stderr,"ADDED_UMI_TAB:%.10s  %d   gene %016lld\n", str1->umi, no, gn);  HashTablePut(cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn) ),  HashTableGet(   cellBCp0_genep0_P1_to_UMIs, NULL +1+(((1LLU*(bc))<<32)| (gn))) +(no) );\
     if( cct_context -> read_assignment_detail_fp ){\
         cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);\
         fprintf( cct_context -> read_assignment_detail_fp,  "UMI_FINALLY_ASSIGN\tSAMPLE%03d\t%s\t%s\t%s\n",sample_no, (char*)ArrayListGet(cct_context -> cell_barcodes_array, bc),  str1 -> umi, cct_context ->gene_name_array[gn]);\
@@ -5561,7 +5561,7 @@ if(0 && strstr(str1 -> umi,"AATCTTGCCG"))fprintf(stderr,"DELETE_ONE_UMI AT %d : 
 						if(cellCounts_hamming_max2_fixlen(acc_str -> umi, try_str -> umi, cct_context -> UMI_length)<2){
 							found=1;
 
-if(try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"MERGED_LOO UMI %.10s (supp %d) => %.10s (supp %d) for GENE %016lld\n", try_str -> umi, try_str->supp_reads, acc_str->umi, acc_str->supp_reads, try_str -> gene_no);
+if(0&&try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"MERGED_LOO UMI %.10s (supp %d) => %.10s (supp %d) for GENE %016lld\n", try_str -> umi, try_str->supp_reads, acc_str->umi, acc_str->supp_reads, try_str -> gene_no);
 
 							if(cct_context -> read_assignment_detail_fp){
 								cellCounts_lock_occupy(&cct_context -> read_assignment_detail_lock);
@@ -5598,7 +5598,7 @@ if(try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"ME
 							cellCounts_lock_release(&cct_context -> read_assignment_detail_lock);
 						}
 						found=1;
-if(try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"MERGED_DIR UMI %.10s (supp %d) => %.10s (supp %d) for GENE %016lld\n", try_str -> umi, try_str->supp_reads, acc_str->umi, acc_str->supp_reads, try_str -> gene_no);
+if(0&&try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"MERGED_DIR UMI %.10s (supp %d) => %.10s (supp %d) for GENE %016lld\n", try_str -> umi, try_str->supp_reads, acc_str->umi, acc_str->supp_reads, try_str -> gene_no);
 						acc_str -> supp_reads += try_str -> supp_reads;
 
 						char replaced_key[55+MAX_UMI_LEN];
@@ -5616,7 +5616,7 @@ if(try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"ME
 				}
 			}
 			if(!found){
-if(try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"NEW_MASTER UMI %.10s (supp %d) for GENE %016lld\n", try_str -> umi, try_str->supp_reads, try_str -> gene_no);
+if(0&&try_str -> cellbc == 662107 && try_str -> gene_no == 34028)fprintf(stderr,"NEW_MASTER UMI %.10s (supp %d) for GENE %016lld\n", try_str -> umi, try_str->supp_reads, try_str -> gene_no);
 				if(looktable){
 					for(hx = 0; hx<2; hx++){
 						char test_ky[MAX_UMI_LEN];
@@ -5664,14 +5664,14 @@ void cellCounts_do_one_batch_UMI_merge_one_step(ArrayList* structs, int is_UMI_s
 				// structures that have the same last 32-bit of gene_no.
 		}
 
-if(1 && str1 && is_UMI_step2 && str1->cellbc==662107  ) fprintf(stderr,"STEP_%d_TEST: UR/B=%.10s  gene_no=%016lld  CELLBC=%d  sup_reads=%d\n", is_UMI_step2+1,  str1->umi, str1 -> gene_no, str1->cellbc, str1-> supp_reads);
+if(0 && str1 && is_UMI_step2 && str1->cellbc==662107  ) fprintf(stderr,"STEP_%d_TEST: UR/B=%.10s  gene_no=%016lld  CELLBC=%d  sup_reads=%d\n", is_UMI_step2+1,  str1->umi, str1 -> gene_no, str1->cellbc, str1-> supp_reads);
 
 
 		if( (x1>sec_start && sec_key!=old_sec_key) || is_umi_changed){ // when x1 == numOfElements, sec_key is -1. If old_sec_key is also -1, no item is included in the list. If old_sec_key is >=0, the last sec is processed.
 			struct cell_gene_umi_supp * str1 = ArrayListGet(structs, sec_start);
 
 
-if(1 && str1->cellbc== 662107&& (str1->gene_no == 34028)){
+if(0 && str1->cellbc== 662107&& (str1->gene_no == 34028)){
 struct cell_gene_umi_supp * str2 = ArrayListGet(structs, sec_start +1);
 fprintf(stderr,"STEP_%d_FINN_X1: %.10s  gene_no=%016lld  supReads=%d  start=%d,%d  CELL_BC=%d CHANGED=%d\n", is_UMI_step2+1, str1->umi, str1 -> gene_no, str1->supp_reads,x1, sec_start, str1->cellbc, is_umi_changed);
 
@@ -6471,7 +6471,7 @@ int cellCounts_merged_bootstrap_a_sample(cellcounts_global_t * cct_context, Hash
 		for(x1 = 0; x1 < SCRNA_BOOTSTRAP_SAMPLING_TIMES; x1++){
 			ArrayList * resampled_list_of_umis = ArrayListCreate( sorted_idx->numOfElements );
 			for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
-				srUInt_64 seed_rand = bootstrap_rand_U64( this_total ) % (srUInt_64)sorted_idx -> numOfElements;
+				srUInt_64 seed_rand = bootstrap_rand_U64( this_total ^ (cellP1_to_geneP1_to_umis_tab -> numOfElements<<12))  % (srUInt_64)sorted_idx -> numOfElements;
 				void * cellbc_p1_ptr = ArrayListGet(sorted_idx, seed_rand);
 				srInt_64 this_umis = HashTableGet( cellnoP1_to_umis_tab, cellbc_p1_ptr )-NULL;
 				ArrayListPush(resampled_list_of_umis,NULL+this_umis);
