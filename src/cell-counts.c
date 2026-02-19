@@ -6433,16 +6433,20 @@ void cellCounts_merged_ambient_rescure(cellcounts_global_t * cct_context, HashTa
 #define SCRNA_BOOTSTRAP_SAMPLING_TIMES 100
 
 // static is safe because only one thread;
-static srUInt_64 bootstrap_seed = 1234567890123456789ULL; 
+static srUInt_64 bootstrap_seed = 1234567890123456789ULL, bootstrap_seed2 = 987654321000ULL; 
 
 srUInt_64 bootstrap_rand_U64(srUInt_64 addvar) {
-	unsigned long long x = bootstrap_seed;
+	srUInt_64 x = bootstrap_seed;
+	srUInt_64 y = bootstrap_seed2;
+
+	x += addvar;
 	x ^= x >> 12; // a
 	x ^= x << 25; // b
 	x ^= x >> 27; // c
-	x ^= addvar;
-	bootstrap_seed = x;
-	return x * 0x2545F4914F6CDD1DULL; 
+
+	bootstrap_seed = bootstrap_seed2 ^ (x*0x2545F4914F6CDD1DULL);
+	bootstrap_seed2 = x;
+	return y+bootstrap_seed2;
 }
 
 int cellCounts_merged_bootstrap_a_sample(cellcounts_global_t * cct_context, HashTable * cellP1_to_geneP1_to_umis_tab, HashTable * cellnoP1_to_umis_tab, ArrayList * highconf_cellbc_list){
