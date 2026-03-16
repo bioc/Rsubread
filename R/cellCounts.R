@@ -1597,7 +1597,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
         ncoln <- ncoln+2
     }
   }
-  if(T).del.temp.files(substr(temp.file.prefix,4,99)) else warning("NOT DELETING TEMP FILES !!!!")
+  if(F&&grepl("scRNA-sample-human-COPD-non_small.BAMs",getwd())) warning("NOT DELETING TEMP FILES !!!!") else  .del.temp.files(substr(temp.file.prefix,4,99)) 
 
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info

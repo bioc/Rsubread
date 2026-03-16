@@ -3863,7 +3863,7 @@ fprintf(stderr,"SEARCH ALNN AT %s noindel %d ~ %d in %d bases : %s\n", lpos, noi
 //   2, build CIGAR
 //   3, calculate matched/mismatched
 //   4, calculate and save scores in array
-srInt_64 cellCounts_explain_step1_one_alignment(cellcounts_global_t * cct_context, int thread_no,char * read_name, char * read_bin, char * read_text, int read_len,  gene_vote_number_t all_subreads, gene_sc_vote_t * votetab, int vote_i, int vote_j){
+srInt_64 cellCounts_explain_PaperVersion_one_alignment(cellcounts_global_t * cct_context, int thread_no,char * read_name, char * read_bin, char * read_text, int read_len,  gene_vote_number_t all_subreads, gene_sc_vote_t * votetab, int vote_i, int vote_j){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	gene_vote_number_t indel_offsets [MAX_INDEL_TOLERANCE*3];
 	int first_mapped_base_offset = 0, toli, in_cigar_readlen = 0, all_mismatched_bases = 0, all_matched_bases = 0, all_mapped_bases = 0;
@@ -4130,8 +4130,6 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 
 	if(votetab -> max_vote >= cct_context -> min_votes_per_mapped_read){
 		HashTable * iijj_to_chro_ptr = HashTableCreate(1000);
-		int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
-		memset(top_distinct_vote_numbers, 0 , cct_context -> max_distinct_top_vote_numbers * sizeof(int));
 
 		for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
 			for (j=0; j< votetab->items[i]; j++){
@@ -4271,12 +4269,12 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 				locate_gene_position(junction_right_first_exon_base, & cct_context -> chromosome_table, & machro, & tstpos);
 				int is_update = cellCounts_add_or_update_chroEvent_in_table(cct_context, sample_i, chroEvent_t_TYPE_JUNCTION, machro, mapos, tstpos, 0, 0);//mapos and tstpos are just borrowed variables. 
 
-/*if(0){
+if(strcmp(read_name,"R00000000494")<0){
 char left_pos[100], right_pos[100];
 cellCounts_absoffset_to_posstr(cct_context, junction_left_last_exon_base+1, left_pos);
 cellCounts_absoffset_to_posstr(cct_context, junction_right_first_exon_base+1, right_pos);
-fprintf(stderr,"POPU_JTAB %s %s -- %s SPLIT AT %d, within %d gap, having MisMa=%d. Read=%s\n", is_update?"UPDATE":"NEW", left_pos,  right_pos, best_s1_aft_split, rgap, best_misma_no, read_name);
-}*/
+fprintf(stderr,"POPU_JTAB major # %d : %s %s -- %s SPLIT AT %d, within %d gap, having MisMa=%d. Read=%s\n", mainhalf_i, is_update?"UPDATE":"NEW", left_pos,  right_pos, best_s1_aft_split, rgap, best_misma_no, read_name);
+}
 
 				if(NULL==HashTableGet(indel_dp_exed, NULL+1+(tstiijj & 0xffffffffffffllu))){
 					HashTablePut(indel_dp_exed, NULL+1+(tstiijj & 0xffffffffffffllu), NULL+1);
@@ -4539,7 +4537,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 //if(0)fprintf(stderr,"CANDIDATUREVS  %d  V=%d ~ %d min %d %s\n", thread_context -> populating_voteIJ_buf_index, vv, this_vote_N, cct_context -> min_votes_per_mapped_read , thread_context -> realignment_event_read_name);
 
 							cellCounts_explain_one_alignment(cct_context, thread_no, sample_i, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab->pos[i][j], is_negative, vv);
-						}else cellCounts_explain_step1_one_alignment (cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j); // ( cct_context, thread_no, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab,i,j);
+						}else cellCounts_explain_PaperVersion_one_alignment (cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j); // ( cct_context, thread_no, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab,i,j);
 					}
 				}
 			}
@@ -5014,6 +5012,7 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 		for(is_reversed = 0; is_reversed<2; is_reversed++) {
 			gehash_key_t subread_integer = 0;
 			int last_vote_rpos = -16;
+
 			for(subread_no=0; subread_no < applied_subreads ; subread_no++) {
 				int subread_offset = ((subread_step * subread_no) >> 16);
 				#define SHIFT_SUBREAD_INT(ii, pp) { int nch = read_text [pp+read_text_rev_offset]; ii = (ii << 2) | base2int( nch );}
@@ -5036,6 +5035,7 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
+if(current_read_number<15)fprintf(stderr,"DEBUG_USED_SUBREADS %s %d  max_v %d  min_v %d\n", read_name, applied_subreads, vote_me -> max_vote, cct_context -> min_votes_per_mapped_read);
 #ifdef __MINGW32__
 				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : % 13" PRId64 " reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 #else
@@ -5533,6 +5533,7 @@ if(0 && strstr(str1 -> umi,"AATCTTGCCG"))fprintf(stderr,"DELETE_ONE_UMI AT %d : 
 		HashTable * looktable = NULL;
 		int n_cutoff_looktab = 30;
 #ifdef __DEBUG_NO_LOOK
+		#warning "=====  DISABLED TABLE_BASED BATCHING !!! ====="
 		n_cutoff_looktab = 0x3fffffff;
 #endif
 		if(sec_end - sec_start > n_cutoff_looktab){
@@ -5976,6 +5977,15 @@ umi_seq[cct_context -> UMI_length] = tccc2;
 		*(new_rbin+new_rbin_len+cct_context -> UMI_length)=0;
 		new_rbin_len += cct_context -> UMI_length+1;
 	}
+
+	new_rbin[new_rbin_len++]='X';new_rbin[new_rbin_len++]='Q';new_rbin[new_rbin_len++]='I';
+	memcpy(new_rbin+new_rbin_len,&gene_no,4);
+	new_rbin_len+=4;
+
+	new_rbin[new_rbin_len++]='X';new_rbin[new_rbin_len++]='K';new_rbin[new_rbin_len++]='C';
+	new_rbin[new_rbin_len++]=gene_no>>63;
+
+
 #endif
 
 	new_rbin_len-=4;
@@ -6144,17 +6154,27 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			umi = binptr + 16 + 8*genes;
 			char SCGU_key [40+MAX_UMI_LEN];
 
+			int remove_step;
 #ifdef __MINGW32__
 			int keyptr = SUBreadSprintf(SCGU_key, 40+MAX_UMI_LEN,"%d-%d-%" PRId64 "-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #else
 			int keyptr = SUBreadSprintf(SCGU_key, 40+MAX_UMI_LEN,"%d-%d-%lld-", sampleid, cellid,  (gene_no & (1LLU<<63))? geneno_0: gene_no);
 #endif
-			memcpy(SCGU_key+keyptr, umi, cct_context -> UMI_length);
 			SCGU_key[keyptr+ cct_context -> UMI_length] = 0;
 
-			char * new_UMI = HashTableGet(filtered_SCGU_table, SCGU_key);
-			if(new_UMI) umi = new_UMI;
-			if(umi == NULL-1) umi="-----------------------------------------";
+			char * emptyUMI = "-----------------------------------------";
+			for(remove_step =1; remove_step<=2; remove_step++){
+				memcpy(SCGU_key+keyptr, umi, cct_context -> UMI_length);
+
+				char * new_UMI = HashTableGet(filtered_SCGU_table, SCGU_key);
+				if(new_UMI == NULL-1){
+					umi = emptyUMI;
+					break;
+				}else if(new_UMI != NULL){
+					umi = new_UMI;
+				}else break;
+			}
+
 			fwrite(&sampleid, 1, 4, fp);
 			fwrite(&cellid, 1, 4, fp);
 			fwrite(&gene_no, 1, 8, fp);
@@ -6172,8 +6192,12 @@ void * cellCounts_do_one_batch(void * paramsp1){
 				}else new_cellbc = ArrayListGet(cct_context -> cell_barcodes_array, cellid);
 			}
 			char * rbinptr = binptr+16+8*genes+cct_context ->UMI_length;
-			char * read_name = rbinptr + 36;
-if(0)if(strstr(read_name,"0000000092")) fprintf(stderr,"WRIT_BIN CBAR_ID=%08x RNAME=%s\n", cellid , read_name);
+
+if(0){
+char * read_name = rbinptr + 36;
+if(strstr(read_name,"0000000092")) fprintf(stderr,"WRIT_BIN CBAR_ID=%08x RNAME=%s\n", cellid , read_name);
+}
+
 			cellCounts_do_one_batch_write_extend_rbin(cct_context, rbinptr, binlen, fp, new_cellbc, umi[0]=='-'?NULL:umi, gene_no, (srInt_64*)glist_ptr);
 		}
 		fclose(fp);
@@ -6430,7 +6454,7 @@ void cellCounts_merged_ambient_rescure(cellcounts_global_t * cct_context, HashTa
 
 
 #define SCRNA_BOOTSTRAP_HIGH_INDEX 30
-#define SCRNA_BOOTSTRAP_SAMPLING_TIMES 100
+#define SCRNA_BOOTSTRAP_SAMPLING_TIMES 100 
 
 // static is safe because only one thread;
 static srUInt_64 bootstrap_seed = 1234567890123456789ULL, bootstrap_seed2 = 987654321000ULL; 
@@ -6450,55 +6474,63 @@ srUInt_64 bootstrap_rand_U64(srUInt_64 addvar) {
 }
 
 int cellCounts_merged_bootstrap_a_sample(cellcounts_global_t * cct_context, HashTable * cellP1_to_geneP1_to_umis_tab, HashTable * cellnoP1_to_umis_tab, ArrayList * highconf_cellbc_list){
-	ArrayList * sorted_idx = HashTableSortedIndexes( cellnoP1_to_umis_tab, 1);
+	ArrayList * list_cellBCs_sorted_by_UMIs = HashTableSortedIndexes( cellnoP1_to_umis_tab, 1); // "1": large first
 	srInt_64 x2, x1;
 	float cellCounts_umi_cutoff = cct_context -> umi_cutoff;
 
 	srInt_64 this_total = 0;
-	bootstrap_seed = bootstrap_seed ^ sorted_idx -> numOfElements;
+	bootstrap_seed = bootstrap_seed ^ list_cellBCs_sorted_by_UMIs -> numOfElements;
+//#warning "XXXXXXXXXXXXXXXXX RANDOMIZE SEED XXXXXXXXXXXXXXXX"
+//	double miltval = miltime()*1000;
+//	bootstrap_seed ^= (srInt_64)miltval;
 
 	int last_umi_no= -1;
 	if(cellCounts_umi_cutoff >= 0.0){
-		for(x1 = 0; x1 < sorted_idx -> numOfElements ; x1++){
-			void * cellbc_p1_ptr = ArrayListGet(sorted_idx,x1);
+		for(x1 = 0; x1 < list_cellBCs_sorted_by_UMIs -> numOfElements ; x1++){
+			void * cellbc_p1_ptr = ArrayListGet(list_cellBCs_sorted_by_UMIs,x1);
 			srInt_64 this_umis = HashTableGet(cellnoP1_to_umis_tab, cellbc_p1_ptr )-NULL;
 			if(this_umis >= cellCounts_umi_cutoff-0.1){
-				ArrayListPush(highconf_cellbc_list, ArrayListGet( sorted_idx, x1 ) - 1 );
+				ArrayListPush(highconf_cellbc_list, ArrayListGet( list_cellBCs_sorted_by_UMIs, x1 ) - 1 );
 				last_umi_no = this_umis;
 			}else break;	// #UMI-sorted so no need to scan more
 		}
 	}else{
 		for(x1 = 0; x1 < SCRNA_BOOTSTRAP_SAMPLING_TIMES; x1++){
-			ArrayList * resampled_list_of_umis = ArrayListCreate( sorted_idx->numOfElements );
-			for(x2 = 0; x2 < sorted_idx -> numOfElements ; x2++){
-				srUInt_64 seed_rand = bootstrap_rand_U64( this_total ^ (cellP1_to_geneP1_to_umis_tab -> numOfElements<<12))  % (srUInt_64)sorted_idx -> numOfElements;
-				void * cellbc_p1_ptr = ArrayListGet(sorted_idx, seed_rand);
+			ArrayList * sorted_resampled_UMIs = ArrayListCreate( list_cellBCs_sorted_by_UMIs->numOfElements );
+			for(x2 = 0; x2 < list_cellBCs_sorted_by_UMIs -> numOfElements ; x2++){
+				srUInt_64 seed_rand = bootstrap_rand_U64( this_total ^ (cellP1_to_geneP1_to_umis_tab -> numOfElements<<12))  % (srUInt_64)list_cellBCs_sorted_by_UMIs -> numOfElements;
+				void * cellbc_p1_ptr = ArrayListGet(list_cellBCs_sorted_by_UMIs, seed_rand);
 				srInt_64 this_umis = HashTableGet( cellnoP1_to_umis_tab, cellbc_p1_ptr )-NULL;
-				ArrayListPush(resampled_list_of_umis,NULL+this_umis);
+				ArrayListPush(sorted_resampled_UMIs,NULL+this_umis);
 			}
-			ArrayListSort( resampled_list_of_umis, NULL );
-			srInt_64 UMIs_30th_div10 = ArrayListGet(resampled_list_of_umis, resampled_list_of_umis -> numOfElements - SCRNA_BOOTSTRAP_HIGH_INDEX) -NULL;
+			ArrayListSort( sorted_resampled_UMIs, NULL );
+			srInt_64 UMIs_30th_div10 = ArrayListGet(sorted_resampled_UMIs, sorted_resampled_UMIs -> numOfElements - SCRNA_BOOTSTRAP_HIGH_INDEX) -NULL;
 			UMIs_30th_div10 = (srInt_64)(UMIs_30th_div10*1./10 + 0.500000001);
 
-			for(x2 =0; x2< resampled_list_of_umis -> numOfElements; x2++){
-				srInt_64 lli = resampled_list_of_umis -> numOfElements -1 -x2;
-				srInt_64 this_umis = ArrayListGet(resampled_list_of_umis, lli)-NULL;
+if(0){
+srInt_64 top_umis = ArrayListGet(sorted_resampled_UMIs, sorted_resampled_UMIs->numOfElements-1)-NULL; // resample list: small first
+srInt_64 ori_umis = HashTableGet(cellnoP1_to_umis_tab ,  ArrayListGet(list_cellBCs_sorted_by_UMIs, 0))-NULL; // original list: large first
+fprintf(stderr,"%dth resample: BOOT_30TH: %lld UMI / %lld cells. Top UMIs (original/resampled) %lld  %lld \n", x1, UMIs_30th_div10,  list_cellBCs_sorted_by_UMIs -> numOfElements, ori_umis , top_umis);
+}
+			for(x2 =0; x2< sorted_resampled_UMIs -> numOfElements; x2++){
+				srInt_64 lli = sorted_resampled_UMIs -> numOfElements -1 -x2;
+				srInt_64 this_umis = ArrayListGet(sorted_resampled_UMIs, lli)-NULL;
 				if(this_umis >= UMIs_30th_div10) this_total ++;
 				else break;
 			}
-			ArrayListDestroy(resampled_list_of_umis);
+			ArrayListDestroy(sorted_resampled_UMIs);
 		}
 		double total_f = this_total*1. / SCRNA_BOOTSTRAP_SAMPLING_TIMES;
 		this_total = (int)(total_f + 0.500000001);
 
 		void * last_ptr =NULL;
-		for(x1 = 0; x1 < min(sorted_idx -> numOfElements, this_total) ; x1++){
-			last_ptr = ArrayListGet( sorted_idx, x1 );
+		for(x1 = 0; x1 < min(list_cellBCs_sorted_by_UMIs -> numOfElements, this_total) ; x1++){
+			last_ptr = ArrayListGet( list_cellBCs_sorted_by_UMIs, x1 );
 			ArrayListPush(highconf_cellbc_list, last_ptr - 1 );
 		}
 		last_umi_no = HashTableGet(cellnoP1_to_umis_tab ,last_ptr)-NULL;
 	}
-	ArrayListDestroy(sorted_idx);
+	ArrayListDestroy(list_cellBCs_sorted_by_UMIs);
 	return last_umi_no;
 }
 
