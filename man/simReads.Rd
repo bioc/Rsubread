@@ -30,7 +30,10 @@ simReads(
     fragment.length.sd = 40,
   
     # manipulating transcript names
-    simplify.transcript.names = FALSE)
+    simplify.transcript.names = FALSE
+
+    # strand-specific read generation
+    strandSpecific = 0)
 
 scanFasta(
   
@@ -58,6 +61,7 @@ scanFasta(
   \item{fragment.length.mean}{ a numeric value giving the mean of fragment lengths. 180 by default.}
   \item{fragment.length.sd}{ a numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn from a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
   \item{simplify.transcript.names}{ logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
+  \item{strandSpecific}{ a numeric value specifying the strand from which reads are generated. 0 means reads are generated randomly from either the same strand or the opposite strand of each transcript. 1 means reads are generated only from the same strand as the transcript. 2 means reads are generated only from the opposite strand of the transcript. In paired-end mode, the second read is generated from the opposite strand of the first read, i.e., 1 corresponds to FR orientation and 2 corresponds to RF orientation. 0 by default.}
   \item{quiet}{ logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function. \code{FALSE} by default.}
 }
 \details{

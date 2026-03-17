@@ -311,7 +311,7 @@ int destroy_Rsim_context(RsimReads_context_t *grc){
 
 #define A_LARGE_PRIME_FOR_MOD 24537224085139llu
 
-int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int all_transcripts, char ** trans_names_unique, int *trans_ids, int *start_poses, int *fra_lens, int read_length, int total_reads, int simplify_names, int truth_in_rnames,int do_paired_reads ){
+int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int all_transcripts, char ** trans_names_unique, int *trans_ids, int *start_poses, int *fra_lens, int read_length, int total_reads, int simplify_names, int truth_in_rnames,int do_paired_reads, int strand_specific){
   warn_if_untrue(read_length<=MAX_SIMULATION_READ_LEN);
   warn_if_untrue(total_reads>0);
   warn_if_untrue(all_transcripts>0);
@@ -333,7 +333,10 @@ int simRead_at_main(char *fasta_name, char *output_name, char *qualstr_name, int
       warn_if_untrue(start_poses[read_pick_i] >0);
       int start_offset = start_poses[read_pick_i] -1; // it is 1-based from R!
       int end_offset = start_offset + fra_lens[read_pick_i];
-      int is_R1_at_3End = myrand_rand() % 2;
+      int is_R1_at_3End = 0;
+      if(strand_specific==1) is_R1_at_3End=0;
+      else if(strand_specific==2) is_R1_at_3End=1;
+      else is_R1_at_3End = myrand_rand() % 2;
 
       int pos_small = start_offset;
       int pos_large = end_offset - read_length;
