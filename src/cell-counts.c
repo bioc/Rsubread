@@ -54,7 +54,7 @@
 
 #define GENE_SCRNA_VOTE_TABLE_SIZE 17 
 
-#define __DEBUG_NO_LOOK
+#define NOT__DEBUG_NO_LOOK
 
 #define chroEvent_t_TYPE_INDEL 1
 #define chroEvent_t_TYPE_JUNCTION 2
@@ -780,7 +780,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 		if(c<0 || c==255)break;
 
 		if(strcmp("maxMismatch", cellCounts_long_options[option_index].name)==0){
-			cct_context -> max_mismatching_bases_in_reads = min(100, max(0, atoi(optarg)));
+			cct_context -> max_mismatching_bases_in_reads = max(0, atoi(optarg));
 		}
 		if(strcmp("minMappedLength", cellCounts_long_options[option_index].name)==0){
 			cct_context -> min_mapped_length_for_mapped_read = min(MAX_SCRNA_READ_LENGTH, max(-1, atoi(optarg)));
@@ -3443,7 +3443,7 @@ char cellCounts_softclip_getbase(unsigned int pos, void * context){
 
 unsigned int cellCounts_softclip_candidate(cellcounts_global_t * cct_context, int thread_no, unsigned int linear_mapped_pos, char * cigar, char * read_text, int noindel_cover_firstbase, int noindel_cover_lastbase, srInt_64 * ma_misma_ins_Sclip){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	SoftClipResult * clipres=calculate_soft_clipping(cct_context, linear_mapped_pos, cigar, read_text, noindel_cover_firstbase, noindel_cover_lastbase, cellCounts_softclip_getbase); 
+	SoftClipResult * clipres=calculate_soft_clipping(cct_context, linear_mapped_pos, cigar, read_text, noindel_cover_firstbase, noindel_cover_lastbase, (cct_context -> max_mismatching_bases_in_reads > 200)? 990:1, cellCounts_softclip_getbase); 
 
 if(0){
 char lpos[100];
@@ -3463,7 +3463,7 @@ fprintf(stderr,"CAND_SOFT %s : %s %s -> %s   PERFECT_COV %d ~ %d (inclusive)  %s
 	return ret;
 }
 
-void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase, int score, int is_reversed, int read_len, unsigned int default_mapped_linear, int vote_for_aln, char * read_text){
+void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_context, int thread_no, int noindel_coved_firstbase, int noindel_coved_lastbase, int is_reversed, int read_len, unsigned int default_mapped_linear, int vote_for_aln, char * read_text, int total_score){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 //if(0)if(strstr(thread_context -> realignment_event_read_name ,"R00000985779")) fprintf(stderr,"NPERFCT_LEN %d ~ %d  ; ELEMENTS = %lld %lld %s\n", noindel_coved_firstbase, noindel_coved_lastbase, thread_context -> best_5end_stack_list -> numOfElements, thread_context -> best_3end_stack_list -> numOfElements, thread_context -> realignment_event_read_name);
 
@@ -3471,70 +3471,93 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 	for(x_5end = -1; x_5end < thread_context -> best_5end_stack_list -> numOfElements; x_5end++){
 		if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 
-		unsigned int mapped_loc = 0;
-		char cigar_end5[11*(1+4*JUNCTION_REALIGNMENT_MAX_DEPTH)];
+		unsigned int mapped_1st_loc = 0;
+		char cigar_being_built[11*(1+4*JUNCTION_REALIGNMENT_MAX_DEPTH)];
 
 		if( x_5end < 0 && thread_context -> best_5end_stack_list -> numOfElements >0 )continue; // good 5' stack doesn't need full-body case.
 
-		int x_5end_matchings = 0, x_5end_mismatchings = 0;
+		int stack_depth_5_3_ends=0;
 		if(x_5end >=0){
 			realignment_event_stack_item_t * stack_end5 = ArrayListGet(thread_context -> best_5end_stack_list , x_5end);
-			mapped_loc = cellCounts_convert_stack_to_cigar_str(cct_context, thread_no, stack_end5, cigar_end5, 0);
-			int stack_depth=0;
-			while(stack_depth<JUNCTION_REALIGNMENT_MAX_DEPTH){
-				if(stack_end5[stack_depth].event_details == NULL+IMPOSSIBLE_MEMORY_SPACE)break;
-				x_5end_matchings+= stack_end5[stack_depth].matching_bases_in_alignment;
-				x_5end_mismatchings+= stack_end5[stack_depth].mismatching_bases_in_alignment;
-				stack_depth++;
+			mapped_1st_loc = cellCounts_convert_stack_to_cigar_str(cct_context, thread_no, stack_end5, cigar_being_built, 0);
+			while(stack_depth_5_3_ends<JUNCTION_REALIGNMENT_MAX_DEPTH){
+				if(stack_end5[stack_depth_5_3_ends].event_details == NULL+IMPOSSIBLE_MEMORY_SPACE)break;
+				stack_depth_5_3_ends++;
 			}
-		} else cigar_end5[0]=0;
+		} else cigar_being_built[0]=0;
 
-		if(!mapped_loc) mapped_loc = default_mapped_linear;
+		if(!mapped_1st_loc) mapped_1st_loc = default_mapped_linear;
 
 		int sub1=0;
 		if(!thread_context -> best_3end_stack_list -> numOfElements) sub1++;
 		if(!thread_context -> best_5end_stack_list -> numOfElements) sub1++;
 
-		int cigar_ptr = strlen(cigar_end5);
-		cigar_ptr += SUBreadSprintf( cigar_end5 + cigar_ptr , 11, "%dM", noindel_coved_lastbase - noindel_coved_firstbase -1+ sub1); // the first and last covered base in the non-event region are also included in the first item in the stack.
+		int cigar_ptr = strlen(cigar_being_built);
+		cigar_ptr += SUBreadSprintf( cigar_being_built + cigar_ptr , 11, "%dM", noindel_coved_lastbase - noindel_coved_firstbase -1+ sub1); // the first and last covered base in the non-event region are also included in the first item in the stack.
 
 		for(x_3end = -1; x_3end < thread_context -> best_3end_stack_list -> numOfElements; x_3end++){
+			unsigned int mapped_loc = mapped_1st_loc;
 			if(thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 			if(x_3end <0 && thread_context -> best_3end_stack_list -> numOfElements >0)continue;
 
-			int x_3end_matchings = 0, x_3end_mismatchings = 0;
+			int stack_depth=0;
 			if(x_3end >= 0){
 				realignment_event_stack_item_t * stack_end3 = ArrayListGet(thread_context -> best_3end_stack_list , x_3end);
-				cellCounts_convert_stack_to_cigar_str(cct_context, thread_no, stack_end3, cigar_end5+ cigar_ptr, 1);
-				int stack_depth=0;
+				cellCounts_convert_stack_to_cigar_str(cct_context, thread_no, stack_end3, cigar_being_built+ cigar_ptr, 1);
 				while(stack_depth<JUNCTION_REALIGNMENT_MAX_DEPTH){
 					if(stack_end3[stack_depth].event_details == NULL+IMPOSSIBLE_MEMORY_SPACE)break;
-					x_3end_matchings+= stack_end3[stack_depth].matching_bases_in_alignment;
-					x_3end_mismatchings+= stack_end3[stack_depth].mismatching_bases_in_alignment;
 					stack_depth++;
 				}
 			}
+			stack_depth_5_3_ends += stack_depth;
 
 			char * final_cigar = thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index];
 			int sum_ins=0;
-			int cigar_rlen = cellCounts_reduce_Cigar(cigar_end5,final_cigar,&sum_ins);
+			int cigar_rlen = cellCounts_reduce_Cigar(cigar_being_built,final_cigar,&sum_ins);
 
 /*if(cigar_rlen != read_len){
-fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar_end5, final_cigar, cigar_rlen, read_len, thread_context -> realignment_event_read_name);
+fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar_being_built, final_cigar, cigar_rlen, read_len, thread_context -> realignment_event_read_name);
 }*/
 			srInt_64 do_ma_misma_ins_Sclip = 0;
 
 
 
-#ifdef __DEBUG_NO_LOOK
-#warning "======= THIS IS FOR DEBUGGING CRASH ('__DEBUG_NO_LOOK') ======="
-if(1){
 char debug__ffcigar[100];
 strcpy(debug__ffcigar, final_cigar);
 unsigned int debug__mmmloc = mapped_loc;
+
+
+#ifdef __DEBUG_NO_LOOK
+#warning "======= THIS IS FOR DEBUGGING CRASH ('__DEBUG_NO_LOOK') ======="
+if(1){
 #endif
 
-			mapped_loc = cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, &do_ma_misma_ins_Sclip);
+			// repeated reporting check don't consider the soft clipping.
+			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
+			hkey = (hkey<<24) ^ mapped_loc;
+
+			// "S" will be removed later on from the mapping location. Here we don't move it!
+			cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, &do_ma_misma_ins_Sclip);
+
+if(0){
+char *ch = NULL;
+int b1off=0;
+locate_gene_position(debug__mmmloc, &cct_context -> chromosome_table, &  ch, &b1off);
+
+fprintf(stderr,"UUDEBUG %s: %s => %s  %u (%s:%d) => %u  WRITE TO %d in %d\n", thread_context -> realignment_event_read_name ,
+debug__ffcigar,  final_cigar, debug__mmmloc, ch, b1off, mapped_loc, thread_context -> populating_voteIJ_buf_index, cct_context -> max_candidate_voteIJ_per_read
+);
+
+
+}
+
+#ifndef __DEBUG_NO_LOOK
+			int mismatching_bases = (int)((do_ma_misma_ins_Sclip>>32) & 0xffffllu);
+			if(mismatching_bases > cct_context -> max_mismatching_bases_in_reads) continue;
+			int matched_bases = (int)((do_ma_misma_ins_Sclip>>48) & 0xffffllu);
+#else
+#warning "======= NO_MAX_MISMA_BASE_CHECKED! ======="
+#endif
 
 
 #ifdef __DEBUG_NO_LOOK
@@ -3545,13 +3568,18 @@ mapped_loc = debug__mmmloc;
 strcpy(final_cigar, debug__ffcigar);
 }
 #endif
-			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
-			hkey = (hkey<<24) ^ mapped_loc;
-			if( HashTableGet(thread_context -> alignment_repating_table, NULL+hkey) )continue;
+			void * found_reporting = HashTableGet(thread_context -> alignment_repating_table, NULL+hkey) ;
+			if( found_reporting )continue;
 			HashTablePut(thread_context -> alignment_repating_table, NULL+hkey, NULL+1);
-if(0)fprintf(stderr,"CIGAR_FROM_2ENDS  %s => %s   %s   WITH 5'MA_MISMA %d %d  ++ MID_BASES %d ++ WITH 3'MA_MOSMA %d %d   ALL_MA_MISMA %d\n", cigar_end5, final_cigar, thread_context -> realignment_event_read_name, x_5end_matchings, x_5end_mismatchings, noindel_coved_lastbase - noindel_coved_firstbase -1+ sub1, x_3end_matchings, x_3end_mismatchings, x_5end_matchings+x_5end_mismatchings+x_3end_matchings+x_3end_mismatchings+(noindel_coved_lastbase - noindel_coved_firstbase -1+ sub1));
 
 			srInt_64 weight = cellCounts_calculate_pos_weight(cct_context, mapped_loc, final_cigar);
+			srInt_64 score;
+			if(0) score = ((255ll-mismatching_bases)<<8) + (matched_bases<<16) + (255ll - stack_depth_5_3_ends);  // #Match first
+			else score = ((255ll-mismatching_bases)<<16) + (matched_bases<<8)  + (255ll - stack_depth_5_3_ends);  // #Mismatch first -- finally used
+
+			if(0) score = total_score; // use OLD approach.
+
+if(0)fprintf(stderr,"ResultScore=%lld    M=%d   MM=%d  STACK_H=%d  Weight=%lld\n", score * weight, matched_bases, mismatching_bases, stack_depth_5_3_ends, weight);
 			thread_context -> reporting_scores[thread_context -> populating_voteIJ_buf_index] = score * weight;
 			thread_context -> reporting_positions[thread_context -> populating_voteIJ_buf_index] = mapped_loc;
 			thread_context -> reporting_flags[thread_context -> populating_voteIJ_buf_index] = is_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
@@ -3626,21 +3654,21 @@ int cellCounts_build_junction_read_finalise_current_stack(cellcounts_global_t * 
 
 	int all_match_in_stack = 0, all_mismatch_in_stack = 0,x1;
 
-//if(0)fprintf(stderr,"FINALISED_STACK Depth=%d to3=%d   #LastMatch=%d  #LastMisma=%d",  thread_context -> realignment_event_stack_current_depth, to3end, total_match, total_mismatch);
 	for(x1=0; x1<= thread_context -> realignment_event_stack_current_depth -1; x1++){
 		// NB: insertions in reads are nither match nor mismatch.
 		all_match_in_stack += thread_context -> realignment_event_current_stack[x1].matching_bases_in_alignment;
 		all_mismatch_in_stack += thread_context -> realignment_event_current_stack[x1].mismatching_bases_in_alignment;
-//if(0)fprintf(stderr," %d__%p ", x1, thread_context -> realignment_event_current_stack[x1].event_details);
+if(0)fprintf(stderr,"ADD_IN_STACK [%d] read_cov %d ~ %d : %d (total %d)  DIR %d\n", x1, 
+   thread_context -> realignment_event_current_stack[x1] . read_covered_first_base,
+   thread_context -> realignment_event_current_stack[x1] . read_covered_last_base ,
+   thread_context -> realignment_event_current_stack[x1].matching_bases_in_alignment, all_match_in_stack, to3end);
 	}
-//if(0)fprintf(stderr," #AllMatch=%d  #AllMisma=%d   ::%s\n", all_match_in_stack, all_mismatch_in_stack, thread_context -> realignment_event_read_name);
 
-
-	int my_score = all_match_in_stack * 10 + (10- thread_context -> realignment_event_stack_current_depth );
+	int my_score = all_match_in_stack * 10 + (10- thread_context -> realignment_event_stack_current_depth);
 	if(my_score > thread_context -> realignment_event_stack_best_score){
+if(0)fprintf(stderr,"REPLACE BEST %d -> %d  DEPTH %d %s\n",  thread_context -> realignment_event_stack_best_score, my_score , thread_context -> realignment_event_stack_current_depth , thread_context -> realignment_event_read_name);
 		thread_context -> realignment_event_stack_best_score = my_score;
 		cellCounts_reset_3end_5end_best_stacks(cct_context, thread_no, to3end);
-//if(0)fprintf(stderr,"REPLACE BEST %d -> %d  DEPTH %d %s\n",  thread_context -> realignment_event_stack_best_score, my_score , thread_context -> realignment_event_stack_current_depth , thread_context -> realignment_event_read_name);
 	}
 	if(my_score == thread_context -> realignment_event_stack_best_score){
 		realignment_event_stack_item_t* stack_copy_ptr = malloc(sizeof(realignment_event_stack_item_t) * JUNCTION_REALIGNMENT_MAX_DEPTH);
@@ -3814,7 +3842,7 @@ void cellCounts_init_junctionread_one_end(cellcounts_global_t * cct_context, int
 	thread_context -> realignment_event_stack_best_score = -1;
 }
 
-srInt_64 cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_coved_firstbase, int noindel_coved_lastbase, unsigned int linear_mapped_pos, int is_reversed, int votes_for_aln){
+void cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_coved_firstbase, int noindel_coved_lastbase, unsigned int linear_mapped_pos, int is_reversed, int votes_for_aln){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	cellCounts_init_build_junctionread_context(cct_context, thread_no, read_name);
 
@@ -3824,7 +3852,6 @@ cellCounts_absoffset_to_posstr(cct_context, linear_mapped_pos+1, lpos);
 fprintf(stderr,"SEARCH ALNN AT %s noindel %d ~ %d in %d bases : %s\n", lpos, noindel_coved_firstbase, noindel_coved_lastbase, read_len, thread_context -> realignment_event_read_name);
 }*/
 	int to3end;
-	int total_score = 0;
 
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
 	int rname_trimmed_len=0;
@@ -3833,6 +3860,7 @@ fprintf(stderr,"SEARCH ALNN AT %s noindel %d ~ %d in %d bases : %s\n", lpos, noi
 
 	noindel_coved_firstbase += JUNCTION_WIDDEN_GAP_LEN; // widden the gap to avoid same bases before/after event
 	noindel_coved_lastbase -= JUNCTION_WIDDEN_GAP_LEN;
+	int total_score = (noindel_coved_lastbase - noindel_coved_firstbase+1)*10; // my_score = all_match_in_stack * 10 + (10- thread_context -> realignment_event_stack_current_depth);
 
 	for(to3end=0; to3end<2; to3end++){
 		cellCounts_init_junctionread_one_end(cct_context, thread_no);
@@ -3846,16 +3874,14 @@ fprintf(stderr,"SEARCH ALNN AT %s noindel %d ~ %d in %d bases : %s\n", lpos, noi
 
 		locate_gene_position(this_end_last_correct_mapping_chro, &cct_context -> chromosome_table, &chro_name, &chro_pos);
 		thread_context -> realignment_event_stack_runcount = 0;
-//if(0)fprintf(stderr,"SEARCH_ONE_START_TIMES %s %s = %d\n", read_name, to3end?"TO_3":"TO_5", thread_context -> realignment_event_stack_runcount);
+if(0)fprintf(stderr,"SEARCH_ONE_START_TIMES %s %s = %d  READ_POS_LAST_CORRECT=%d\n", read_name, to3end?"TO_3":"TO_5", thread_context -> realignment_event_stack_runcount, this_end_last_correct_mapping_read);
 		cellCounts_tree_iterative_search( cct_context, thread_no, sample_i, chro_name, chro_pos, this_end_last_correct_mapping_read, read_name, read_text, read_len, to3end, cell_barcode_no);
-
-//if(0)fprintf(stderr,"SEARCH_ONE_END_TIMES %s %s = %d\n", read_name, to3end?"TO_3":"TO_5", thread_context -> realignment_event_stack_runcount);
-
-		if(thread_context -> realignment_event_stack_best_score>0) total_score += thread_context -> realignment_event_stack_best_score;
+if(0)fprintf(stderr,"SEARCH_ONE_END_TIMES %s %s = %d\n", read_name, to3end?"TO_3":"TO_5", thread_context -> realignment_event_stack_runcount);
 		cellCounts_end_junctionread_one_end(cct_context, thread_no);
+		if(thread_context -> realignment_event_stack_best_score>0) total_score += thread_context -> realignment_event_stack_best_score;
 	}
-	cellCounts_end_build_candidature_from_stacks(cct_context, thread_no, noindel_coved_firstbase, noindel_coved_lastbase, total_score, is_reversed, read_len, linear_mapped_pos + noindel_coved_firstbase, votes_for_aln, read_text);
-	return total_score;
+	cellCounts_end_build_candidature_from_stacks(cct_context, thread_no, noindel_coved_firstbase, noindel_coved_lastbase, is_reversed, read_len, linear_mapped_pos + noindel_coved_firstbase, votes_for_aln, read_text, total_score);
+	return;
 }
 
 // do: 
@@ -4201,9 +4227,8 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 					srInt_64 chro_dist = maloc;
 					chro_dist -= tstloc;
 					if(abs(chro_dist) > JUNCTION_MAX_CHRO_DISTANCE)continue;
+					if(abs(chro_dist) <= cct_context -> max_indel_length)continue;  
 					int dist_log2 = integer_log2_64(abs(chro_dist));
-					int rgap = -1;
-					if(tst_cov_start < ma_cov_start) rgap = ma_cov_start - tst_cov_end; else  rgap = tst_cov_start - ma_cov_end;
 
 					int votes_multiplex = tstvotes * mavotes;
 					int misma_in_GTAG_met = -1, gaplen=-1, is_negative_by_GTAG=-1;
@@ -4269,7 +4294,7 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 				locate_gene_position(junction_right_first_exon_base, & cct_context -> chromosome_table, & machro, & tstpos);
 				int is_update = cellCounts_add_or_update_chroEvent_in_table(cct_context, sample_i, chroEvent_t_TYPE_JUNCTION, machro, mapos, tstpos, 0, 0);//mapos and tstpos are just borrowed variables. 
 
-if(strcmp(read_name,"R00000000494")<0){
+if(0&& strcmp(read_name,"R00000000494")<0){
 char left_pos[100], right_pos[100];
 cellCounts_absoffset_to_posstr(cct_context, junction_left_last_exon_base+1, left_pos);
 cellCounts_absoffset_to_posstr(cct_context, junction_right_first_exon_base+1, right_pos);
@@ -4356,7 +4381,7 @@ void cellCounts_add_supported_unsupported_reads_from_cigar( cellcounts_global_t 
 				int last_added_insertion_index = -1;
 				srUInt_64 envkey = ((linear_cur-1) *1LLU<<32) | p2;
 				oneitem = HashTableGet( cct_context -> chroEvent_detail_table[sample_i], NULL+ envkey);
-if(0)fprintf(stderr,"CIGAR FOR %s is %s  --  CHR %c    ItemPTR=%p    ky=%p\n", thread_context -> realignment_event_read_name , cigar, nch, oneitem, NULL+ envkey);
+if(1 && !oneitem) fprintf(stderr,"UNABLE to find a junction: %s : %d ~ %d ; CIGAR FOR %s is %s mapped to %s:%d --  CHR %c    ItemPTR=%p    ky=%p\n", chro_strn_ky, ( linear_cur-1 ), p2, thread_context -> realignment_event_read_name , cigar, ch, b1off, nch, oneitem, NULL+ envkey);
 				cellCounts_chroEvent_locks_opt(cct_context, thread_no, oneitem, 1);
 				if(oneitem -> n_events > 1){
 					int x2;
@@ -4416,7 +4441,7 @@ if(0)fprintf(stderr,"CIGAR FOR %s is %s  --  CHR %c    ItemPTR=%p    ky=%p\n", t
 				}
 			}
 
-			if(nch == 'D' || nch == 'M' || nch== 'N') linear_cur += tmpi; 
+			if(nch == 'D' || nch == 'S' /* mapping location of 'S' is shiftted right before writing */ || nch == 'M' || nch== 'N') linear_cur += tmpi; 
 			tmpi = 0;
 		}
 	}
@@ -4498,7 +4523,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 		for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
 			for (j=0; j< votetab->items[i]; j++){
 				int vv = votetab -> votes[i][j];
-//if(0)if(strstr(read_name ,"R00000000004")) fprintf(stderr,"TOPK_INITING  IJ=%d %d  VV=%d   %s\n", i, j, vv ,  read_name );
+if(0) fprintf(stderr,"TOPK_INITING  IJ=%d %d  VV=%d   %s\n", i, j, vv ,  read_name );
 				if(vv>=cct_context -> min_votes_per_mapped_read)cellCounts_update_top_three(cct_context, top_distinct_vote_numbers, vv);
 			}
 		}
@@ -4509,7 +4534,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 			if(doneit||thread_context -> populating_voteIJ_buf_index >= cct_context -> max_candidate_voteIJ_per_read)break;
 			int this_vote_N = top_distinct_vote_numbers[distinct_vote_number_i];
 
-//if(0)if(strstr(read_name ,"R00000000004")) fprintf(stderr,"TOPK_INF  DT=%d  ThisTopN=%d   REPORT %d in %d max   DIFFmax %d  %s\n", distinct_vote_number_i , this_vote_N, thread_context -> populating_voteIJ_buf_index,  cct_context -> max_candidate_voteIJ_per_read, cct_context -> max_differential_from_top_vote_number, read_name );
+if(0) fprintf(stderr,"TOPK_INF  DT=%d  ThisTopN=%d   REPORT %d in %d max   DIFFmax %d  %s\n", distinct_vote_number_i , this_vote_N, thread_context -> populating_voteIJ_buf_index,  cct_context -> max_candidate_voteIJ_per_read, cct_context -> max_differential_from_top_vote_number, read_name );
 
 			if(this_vote_N < 1 || (top_distinct_vote_numbers[0] - this_vote_N > cct_context -> max_differential_from_top_vote_number )) break;
 
@@ -4557,6 +4582,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 		sorting_ptr[1] = sorting_index;
 		//sort : large number first
 		quick_sort(sorting_ptr , thread_context -> populating_voteIJ_buf_index , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "total_voteIJs_to_write" records ahead are worth writting (score > 0).
+if(0)for(i=0; i<thread_context -> populating_voteIJ_buf_index; i++)fprintf(stderr,"CAND_SORTED %s [#%d]  %lld\n", read_name, i, thread_context -> reporting_scores[  sorting_index[i] ] );
 
 		for(thread_context -> writing_voteID_buf_index = 0 ; thread_context -> writing_voteID_buf_index < thread_context -> total_voteIJs_to_write; thread_context -> writing_voteID_buf_index ++){
 			int myno = sorting_index[thread_context -> writing_voteID_buf_index ];
@@ -5035,7 +5061,7 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 
 			if(is_reversed) {
 				cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
-if(current_read_number<15)fprintf(stderr,"DEBUG_USED_SUBREADS %s %d  max_v %d  min_v %d\n", read_name, applied_subreads, vote_me -> max_vote, cct_context -> min_votes_per_mapped_read);
+if(0&&current_read_number<15)fprintf(stderr,"DEBUG_USED_SUBREADS %s %d  max_v %d  min_v %d\n", read_name, applied_subreads, vote_me -> max_vote, cct_context -> min_votes_per_mapped_read);
 #ifdef __MINGW32__
 				if(current_read_number % 1000000 == 0 && current_read_number>0) print_in_box(80,0,0,"  Mapped : % 13" PRId64 " reads; time elapsed : % 5.1f mins\n", cct_context -> all_processed_reads_before_chunk + current_read_number, ( - cct_context -> program_start_time + miltime() ) / 60.);
 #else

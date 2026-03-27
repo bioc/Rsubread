@@ -3,7 +3,6 @@
 
 // --- Configuration Constants ---
 #define SC_SOFT_CLIPPING_WINDOW_SIZE 5
-#define SC_MAX_MISMATCHED_BASES 1
 #define SC_MAX_CIGAR_LEN 1024
 
 typedef struct {
@@ -35,6 +34,7 @@ SoftClipResult * calculate_soft_clipping(
     const char* read_seq,
     unsigned int perf_start,
     unsigned int perf_end,
+    int max_mismatched_bases_in_window,
     char (*get_ref_base)(unsigned int pos, void * context)
 );
 #endif

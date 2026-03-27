@@ -19,6 +19,7 @@ SoftClipResult* calculate_soft_clipping(
     const char* read_seq,
     unsigned int perf_start,
     unsigned int perf_end,
+    int max_mismatched_bases_in_window,
     char (*get_ref_base)(unsigned int pos, void * context)
 ) {
     // Allocate result struct on the heap
@@ -76,8 +77,8 @@ SoftClipResult* calculate_soft_clipping(
                 if (current_read < read_len) {
                     ref_coords[current_read] = current_ref; 
                     is_insertion[current_read] = true;
-                    // Insertions count as mismatches for window density checks
-                    is_mismatch[current_read] = true; 
+                    // Insertions count as match.
+                    is_mismatch[current_read] = false; 
                     current_read++;
                 }
             }
@@ -98,7 +99,7 @@ SoftClipResult* calculate_soft_clipping(
             if (is_mismatch[w]) mismatch_count++;
         }
         
-        if (mismatch_count > SC_MAX_MISMATCHED_BASES) {
+        if (mismatch_count > max_mismatched_bases_in_window) {
             // Window Failed. Find last matched base farthest from perf_start (smallest index)
             int kept_base_index = -1;
             for (int w = start_win; w <= i; w++) {
@@ -125,7 +126,7 @@ SoftClipResult* calculate_soft_clipping(
             if (is_mismatch[w]) mismatch_count++;
         }
         
-        if (mismatch_count > SC_MAX_MISMATCHED_BASES) {
+        if (mismatch_count > max_mismatched_bases_in_window) {
             // Window Failed. Find last matched base farthest from perf_end (largest index)
             int kept_base_index = -1;
             for (int w = end_win; w >= i; w--) {
@@ -241,7 +242,7 @@ int main_test_for_clipping() {
     unsigned int p_start = 6;
     unsigned int p_end = 7;
     
-    SoftClipResult * res = calculate_soft_clipping(NULL,pos, cigar, read, p_start, p_end, test_clipping_mock_genome_access); 
+    SoftClipResult * res = calculate_soft_clipping(NULL,pos, cigar, read, p_start, p_end, 1, test_clipping_mock_genome_access); 
     
     printf("Old Pos: %u, Old Cigar: %s\n", pos, cigar);
     printf("New Pos: %u, New Cigar: %s\n", res->new_pos, res->new_cigar);
