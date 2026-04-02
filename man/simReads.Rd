@@ -30,7 +30,7 @@ simReads(
     fragment.length.sd = 40,
   
     # manipulating transcript names
-    simplify.transcript.names = FALSE
+    simplify.transcript.names = FALSE,
 
     # strand-specific read generation
     strandSpecific = 0)

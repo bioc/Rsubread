@@ -227,6 +227,7 @@ typedef struct{
 	int max_mismatching_bases_in_reads;
 	int min_mapped_length_for_mapped_read;
 	int min_votes_per_mapped_read;
+	int enable_soft_clipping;
 	int total_subreads_per_read;
 	int report_multi_mapping_reads;
 	int is_BAM_and_FQ_out_generated;
@@ -628,6 +629,7 @@ static struct option cellCounts_long_options[]={
 
 	{"annotation", required_argument ,0,0},
 	{"isGTFannotation", no_argument ,0,0},
+	{"enableSoftClipping", no_argument ,0,0},
 	{"geneIdColumn", required_argument ,0,0},
 	{"annotationType", required_argument ,0,0},
 	{"annotationChroAlias", required_argument ,0,0},
@@ -781,6 +783,9 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 
 		if(strcmp("maxMismatch", cellCounts_long_options[option_index].name)==0){
 			cct_context -> max_mismatching_bases_in_reads = max(0, atoi(optarg));
+		}
+		if(strcmp("enableSoftClipping", cellCounts_long_options[option_index].name)==0){
+			cct_context -> enable_soft_clipping=1;
 		}
 		if(strcmp("minMappedLength", cellCounts_long_options[option_index].name)==0){
 			cct_context -> min_mapped_length_for_mapped_read = min(MAX_SCRNA_READ_LENGTH, max(-1, atoi(optarg)));
@@ -3441,9 +3446,9 @@ char cellCounts_softclip_getbase(unsigned int pos, void * context){
 	return gvindex_get(current_value_index, pos);
 }
 
-unsigned int cellCounts_softclip_candidate(cellcounts_global_t * cct_context, int thread_no, unsigned int linear_mapped_pos, char * cigar, char * read_text, int noindel_cover_firstbase, int noindel_cover_lastbase, srInt_64 * ma_misma_ins_Sclip){
+unsigned int cellCounts_softclip_candidate(cellcounts_global_t * cct_context, int thread_no, unsigned int linear_mapped_pos, char * cigar, char * read_text, int noindel_cover_firstbase, int noindel_cover_lastbase, int allowd_mismatching_in_window, srInt_64 * ma_misma_ins_Sclip){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	SoftClipResult * clipres=calculate_soft_clipping(cct_context, linear_mapped_pos, cigar, read_text, noindel_cover_firstbase, noindel_cover_lastbase, (cct_context -> max_mismatching_bases_in_reads > 200)? 990:1, cellCounts_softclip_getbase); 
+	SoftClipResult * clipres=calculate_soft_clipping(cct_context, linear_mapped_pos, cigar, read_text, noindel_cover_firstbase, noindel_cover_lastbase, allowd_mismatching_in_window, cellCounts_softclip_getbase); 
 
 if(0){
 char lpos[100];
@@ -3515,71 +3520,27 @@ void cellCounts_end_build_candidature_from_stacks(cellcounts_global_t * cct_cont
 			int sum_ins=0;
 			int cigar_rlen = cellCounts_reduce_Cigar(cigar_being_built,final_cigar,&sum_ins);
 
-/*if(cigar_rlen != read_len){
-fprintf(stderr,"ERROR: mismatched read len: %s => %s of %d != %d in %s\n", cigar_being_built, final_cigar, cigar_rlen, read_len, thread_context -> realignment_event_read_name);
-}*/
 			srInt_64 do_ma_misma_ins_Sclip = 0;
-
-
-
-char debug__ffcigar[100];
-strcpy(debug__ffcigar, final_cigar);
-unsigned int debug__mmmloc = mapped_loc;
-
-
-#ifdef __DEBUG_NO_LOOK
-#warning "======= THIS IS FOR DEBUGGING CRASH ('__DEBUG_NO_LOOK') ======="
-if(1){
-#endif
 
 			// repeated reporting check don't consider the soft clipping.
 			srInt_64 hkey = HashTableStringHashFunction(final_cigar);
 			hkey = (hkey<<24) ^ mapped_loc;
 
 			// "S" will be removed later on from the mapping location. Here we don't move it!
-			cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, &do_ma_misma_ins_Sclip);
+			mapped_loc = cellCounts_softclip_candidate(cct_context, thread_no, mapped_loc, final_cigar, read_text, noindel_coved_firstbase, noindel_coved_lastbase, cct_context -> enable_soft_clipping?1:9999, &do_ma_misma_ins_Sclip);
+			mapped_loc -= get_soft_clipping_length(final_cigar);
 
-if(0){
-char *ch = NULL;
-int b1off=0;
-locate_gene_position(debug__mmmloc, &cct_context -> chromosome_table, &  ch, &b1off);
-
-fprintf(stderr,"UUDEBUG %s: %s => %s  %u (%s:%d) => %u  WRITE TO %d in %d\n", thread_context -> realignment_event_read_name ,
-debug__ffcigar,  final_cigar, debug__mmmloc, ch, b1off, mapped_loc, thread_context -> populating_voteIJ_buf_index, cct_context -> max_candidate_voteIJ_per_read
-);
-
-
-}
-
-#ifndef __DEBUG_NO_LOOK
 			int mismatching_bases = (int)((do_ma_misma_ins_Sclip>>32) & 0xffffllu);
 			if(mismatching_bases > cct_context -> max_mismatching_bases_in_reads) continue;
 			int matched_bases = (int)((do_ma_misma_ins_Sclip>>48) & 0xffffllu);
-#else
-#warning "======= NO_MAX_MISMA_BASE_CHECKED! ======="
-#endif
 
-
-#ifdef __DEBUG_NO_LOOK
-//fprintf(stderr, "UUDEBUG %s  %s => %s    ; %u => %u\n",thread_context -> realignment_event_read_name, debug__ffcigar, final_cigar, debug__mmmloc,  mapped_loc);
-//#warning "======= BAD_DEBUGGING ======="
-mapped_loc = debug__mmmloc;
-//if(strstr(  thread_context -> realignment_event_read_name, "ATTTTGATT|G;G,GG;G;;;GGGGG;,," )) strcpy(final_cigar,"111M1D2M1I15M94783N22M");else
-strcpy(final_cigar, debug__ffcigar);
-}
-#endif
 			void * found_reporting = HashTableGet(thread_context -> alignment_repating_table, NULL+hkey) ;
 			if( found_reporting )continue;
 			HashTablePut(thread_context -> alignment_repating_table, NULL+hkey, NULL+1);
 
 			srInt_64 weight = cellCounts_calculate_pos_weight(cct_context, mapped_loc, final_cigar);
-			srInt_64 score;
-			if(0) score = ((255ll-mismatching_bases)<<8) + (matched_bases<<16) + (255ll - stack_depth_5_3_ends);  // #Match first
-			else score = ((255ll-mismatching_bases)<<16) + (matched_bases<<8)  + (255ll - stack_depth_5_3_ends);  // #Mismatch first -- finally used
+			srInt_64 score  = ((255ll-mismatching_bases)<<16) + (matched_bases<<8)  + (255ll - stack_depth_5_3_ends);  // #Mismatch first -- finally used
 
-			if(0) score = total_score; // use OLD approach.
-
-if(0)fprintf(stderr,"ResultScore=%lld    M=%d   MM=%d  STACK_H=%d  Weight=%lld\n", score * weight, matched_bases, mismatching_bases, stack_depth_5_3_ends, weight);
 			thread_context -> reporting_scores[thread_context -> populating_voteIJ_buf_index] = score * weight;
 			thread_context -> reporting_positions[thread_context -> populating_voteIJ_buf_index] = mapped_loc;
 			thread_context -> reporting_flags[thread_context -> populating_voteIJ_buf_index] = is_reversed?SAM_FLAG_REVERSE_STRAND_MATCHED:0;
@@ -3916,14 +3877,14 @@ srInt_64 cellCounts_explain_PaperVersion_one_alignment(cellcounts_global_t * cct
 		if(last_correct_base < in_cigar_readlen) last_correct_base= in_cigar_readlen;
 
 		unsigned int meet_start = abs_pos + last_correct_base + last_indel;
-		if(head_soft_clipped <0){
+		if(head_soft_clipped <0 && cct_context -> enable_soft_clipping ){
 			int last_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1);
 			head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed, 0, abs_pos /* this can only happen if no indel is in read */, last_mapped_base_in_read , 0, last_mapped_base_in_read);
 			if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], 11,"%dS", head_soft_clipped );
 			if(meet_start < head_soft_clipped + abs_pos ) meet_start= head_soft_clipped + abs_pos;
 			if(head_soft_clipped > last_correct_base) last_correct_base = head_soft_clipped;
 			in_cigar_readlen = head_soft_clipped;
-		}
+		}else if( !cct_context -> enable_soft_clipping ) head_soft_clipped = 0;
 
 		int gap_mismatched = 0;
 		int indel_pos = cellCounts_indel_meet_in_the_middle(cct_context, thread_no, meet_start, read_bin + rbin_offset_for_reversed, last_correct_base, first_correct_base - last_correct_base, indel_diff, read_name, &gap_mismatched);
@@ -3947,16 +3908,17 @@ srInt_64 cellCounts_explain_PaperVersion_one_alignment(cellcounts_global_t * cct
 		last_section_subread_no = hiconf_vote_last;
 	}
 
-	if(head_soft_clipped <0){
+	if(head_soft_clipped <0 && cct_context -> enable_soft_clipping){
 		int first_mapped_base_in_read = find_subread_end(read_len, all_subreads , indel_offsets[0]-1) - 8;
 		head_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed,0, abs_pos /* this can only happen if no indel is in read */, first_mapped_base_in_read , 0, first_mapped_base_in_read);
 
 		if(head_soft_clipped > 0)SUBreadSprintf(thread_context -> reporting_cigars[thread_context -> populating_voteIJ_buf_index], 11,"%dS", head_soft_clipped );
 		in_cigar_readlen = head_soft_clipped;
 		last_mapped_base_in_read = find_subread_end(read_len, all_subreads, last_section_subread_no) - 16 + 8;
-	}
+	}else if( !cct_context -> enable_soft_clipping ) head_soft_clipped = 0;
 
-	int tail_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed, last_mapped_base_in_read, abs_pos + last_mapped_base_in_read  + last_indel,  read_len - last_mapped_base_in_read , 1, 1);
+	int tail_soft_clipped = 0;
+	if( cct_context -> enable_soft_clipping ) tail_soft_clipped = cellCounts_find_soft_clipping(cct_context, thread_no, read_bin+rbin_offset_for_reversed, last_mapped_base_in_read, abs_pos + last_mapped_base_in_read  + last_indel,  read_len - last_mapped_base_in_read , 1, 1);
 	int section_matched = cellCounts_matchBin_chro(read_bin +rbin_offset_for_reversed , in_cigar_readlen , cct_context -> value_index, abs_pos + in_cigar_readlen + last_indel, read_len - in_cigar_readlen - tail_soft_clipped);
 	all_mismatched_bases += (read_len - in_cigar_readlen - tail_soft_clipped  - section_matched);
 	all_matched_bases += section_matched;

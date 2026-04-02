@@ -1390,7 +1390,7 @@
   return(sheet)
 }
 
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, barcoding.mode="Chromium", cell.level.junctions=NULL, cell.cluster.map=NULL){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, barcoding.mode="Chromium", cell.level.junctions=NULL, cell.cluster.map=NULL, enableSoftClipping = TRUE){
   if(F)if(!(grepl("[/]chr1$", index)||file.exists("~/PubDB/welcome.bash"))){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
@@ -1454,6 +1454,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
      .index.names.to.sheet.FASTQ.mode(sample.info.idx, cc.sample.sheet.path)
     opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
     if(detectJunctions)opt <- c(opt, "--junctionDetection")
+    if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
     if(barcoding.mode=="VisiumHD") opt <- c(opt, "--VisiumHD_barcode")
@@ -1520,6 +1521,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
+      if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
       if(barcoding.mode=="VisiumHD") opt <- c(opt, "--VisiumHD_barcode")
       if(!is.null(cell.level.junctions)) opt <- c(opt, "--cluster_junctions", cell.level.junctions)
       if(!is.null(cell.cluster.map)) opt <- c(opt, "--cluster_map", cell.cluster.map)
@@ -1564,6 +1566,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
+      if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
       if(barcoding.mode=="VisiumHD")  c(opt, "--VisiumHD_barcode")
 
       cmd <- paste(opt,collapse=.R_param_splitor)
