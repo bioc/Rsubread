@@ -2897,10 +2897,14 @@ size_t SUBreadSprintf(char * content, size_t bufflen, char * pattern,...){
 void init_typical_dynamic_align(void *** buffers, int * penalties, int max_read_length){
 	buffers[0] = malloc(sizeof(void*) * max_read_length);
 	buffers[1] = malloc(sizeof(void*) * max_read_length);
+	buffers[2] = malloc(sizeof(void*) * max_read_length);
+	buffers[3] = malloc(sizeof(void*) * max_read_length);
 	int rowi;
 	for(rowi = 0; rowi < max_read_length; rowi++){
 		buffers[0][rowi] = malloc(sizeof(short)*max_read_length);
-		buffers[1][rowi] = malloc(sizeof(char)*max_read_length);
+		buffers[1][rowi] = malloc(sizeof(short)*max_read_length);
+		buffers[2][rowi] = malloc(sizeof(short)*max_read_length);
+		buffers[3][rowi] = malloc(sizeof(char)*max_read_length);
 	}
 
 	penalties[0]=-1;penalties[1]=0;penalties[2]=2;penalties[3]=0;
@@ -2911,9 +2915,13 @@ void destroy_typical_dynamic_align(void *** buffers,int max_read_length){
 	for(rowi = 0; rowi < max_read_length; rowi++){
 		free(buffers[0][rowi]);
 		free(buffers[1][rowi]);
+		free(buffers[2][rowi]);
+		free(buffers[3][rowi]);
 	}
 	free(buffers[0]);
 	free(buffers[1]);
+	free(buffers[2]);
+	free(buffers[3]);
 }
 
 
@@ -2936,247 +2944,154 @@ int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, cha
 
 
 // the GlobalAlignmentCIGAR is written by AI.
-#define NEG_INF (-1LL << 60)
+#define NEG_INF (-32767)
 
-// Enum for Traceback states
-typedef enum {
-    STATE_M = 0,
-    STATE_IX = 1,
-    STATE_IY = 2
-} State;
+#define STATE_M 0
+#define STATE_I 1
+#define STATE_D 2
 
-/**
- * Calculates Global Alignment and returns CIGAR string.
- * 
- * @param query_seq        The query sequence (Seq2)
- * @param reference_seq    The reference sequence (Seq1)
- * @param matchScore       Score for a match (positive)
- * @param mismatchPenalty  Penalty for a mismatch (positive value subtracted)
- * @param gapOpenPenalty   Penalty for opening a gap (positive value)
- * @param gapExtendPenalty Penalty for extending a gap (positive value)
- * @param out_score        Pointer to store the final alignment score
- * 
- * @return Dynamically allocated CIGAR string (Caller must free).
- */
-char* GlobalAlignmentCIGAR(const char* query_seq, const char* reference_seq, 
-                           int matchScore, int mismatchPenalty, 
-                           int gapOpenPenalty, int gapExtendPenalty, 
-                           int64_t* out_score) {
-    
-    int m = (int)strlen(query_seq); // Rows (seq2)
-    int n = (int)strlen(reference_seq); // Cols (seq1)
-    
-    int cols = n + 1;
-    int rows = m + 1;
-    size_t matrix_size = (size_t)rows * cols;
-
-    // Allocate DP matrices (Flattened 1D arrays)
-    // M: match/mismatch, Ix: gap in seq2 (Deletion), Iy: gap in seq1 (Insertion)
-    int64_t* M = (int64_t*)malloc(matrix_size * sizeof(int64_t));
-    int64_t* Ix = (int64_t*)malloc(matrix_size * sizeof(int64_t));
-    int64_t* Iy = (int64_t*)malloc(matrix_size * sizeof(int64_t));
-
-    // Allocate Traceback matrices
-    uint8_t* prevM = (uint8_t*)malloc(matrix_size * sizeof(uint8_t));
-    uint8_t* prevIx = (uint8_t*)malloc(matrix_size * sizeof(uint8_t));
-    uint8_t* prevIy = (uint8_t*)malloc(matrix_size * sizeof(uint8_t));
-
-    if (!M || !Ix || !Iy || !prevM || !prevIx || !prevIy) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(1);
-    }
-
-    // Initialize matrices
-    for (size_t k = 0; k < matrix_size; k++) {
-        M[k] = NEG_INF;
-        Ix[k] = NEG_INF;
-        Iy[k] = NEG_INF;
-    }
-
-    // M[0][0] = 0
-    M[0] = 0;
-    prevM[0] = STATE_M;
-
-    // Helper macro to access 2D data in 1D array
-    #define IDX(r, c) ((r) * cols + (c))
-
-    // First row: gaps in seq2 (Deletion relative to ref)
-    for (int j = 1; j <= n; j++) {
-        if (j == 1) {
-            Ix[IDX(0, j)] = M[IDX(0, 0)] - (gapOpenPenalty + gapExtendPenalty);
-            prevIx[IDX(0, j)] = STATE_M;
-        } else {
-            Ix[IDX(0, j)] = Ix[IDX(0, j-1)] - gapExtendPenalty;
-            prevIx[IDX(0, j)] = STATE_IX;
-        }
-    }
-
-    // First column: gaps in seq1 (Insertion relative to ref)
-    for (int i = 1; i <= m; i++) {
-        if (i == 1) {
-            Iy[IDX(i, 0)] = M[IDX(0, 0)] - (gapOpenPenalty + gapExtendPenalty);
-            prevIy[IDX(i, 0)] = STATE_M;
-        } else {
-            Iy[IDX(i, 0)] = Iy[IDX(i-1, 0)] - gapExtendPenalty;
-            prevIy[IDX(i, 0)] = STATE_IY;
-        }
-    }
-
-    // Fill DP matrices
-    for (int i = 1; i <= m; i++) {
-        for (int j = 1; j <= n; j++) {
-            
-            // Score for aligning query[i-1] with ref[j-1]
-            int64_t pairScore = (query_seq[i-1] == reference_seq[j-1]) ? matchScore : -mismatchPenalty;
-
-            // Calculate M[i][j]
-            int64_t best = M[IDX(i-1, j-1)];
-            State prev = STATE_M;
-            
-            if (Ix[IDX(i-1, j-1)] > best) {
-                best = Ix[IDX(i-1, j-1)];
-                prev = STATE_IX;
-            }
-            if (Iy[IDX(i-1, j-1)] > best) {
-                best = Iy[IDX(i-1, j-1)];
-                prev = STATE_IY;
-            }
-            M[IDX(i, j)] = best + pairScore;
-            prevM[IDX(i, j)] = (uint8_t)prev;
-
-            // Calculate Ix[i][j] (Gap in Seq2 / Deletion)
-            int64_t open = M[IDX(i, j-1)] - (gapOpenPenalty + gapExtendPenalty);
-            int64_t extend = Ix[IDX(i, j-1)] - gapExtendPenalty;
-            if (open > extend) {
-                Ix[IDX(i, j)] = open;
-                prevIx[IDX(i, j)] = STATE_M;
-            } else {
-                Ix[IDX(i, j)] = extend;
-                prevIx[IDX(i, j)] = STATE_IX;
-            }
-
-            // Calculate Iy[i][j] (Gap in Seq1 / Insertion)
-            open = M[IDX(i-1, j)] - (gapOpenPenalty + gapExtendPenalty);
-            extend = Iy[IDX(i-1, j)] - gapExtendPenalty;
-            if (open > extend) {
-                Iy[IDX(i, j)] = open;
-                prevIy[IDX(i, j)] = STATE_M;
-            } else {
-                Iy[IDX(i, j)] = extend;
-                prevIy[IDX(i, j)] = STATE_IY;
-            }
-        }
-    }
-
-    // Choose best end state
-    int i = m;
-    int j = n;
-    State state = STATE_M;
-    int64_t bestScore = M[IDX(m, n)];
-
-    if (Ix[IDX(m, n)] > bestScore) {
-        bestScore = Ix[IDX(m, n)];
-        state = STATE_IX;
-    }
-    if (Iy[IDX(m, n)] > bestScore) {
-        bestScore = Iy[IDX(m, n)];
-        state = STATE_IY;
-    }
-
-    // Set output score
-    if (out_score) *out_score = bestScore;
-
-    // Traceback
-    // Buffer for raw operations. Max length is m + n.
-    char* ops = (char*)malloc((m + n + 1) * sizeof(char));
-    int op_count = 0;
-
-    while (i > 0 || j > 0) {
-        switch (state) {
-            case STATE_M:
-                ops[op_count++] = 'M';
-                state = (State)prevM[IDX(i, j)];
-                i--; j--;
-                break;
-            case STATE_IX:
-                ops[op_count++] = 'D'; // Deletion in query
-                state = (State)prevIx[IDX(i, j)];
-                j--;
-                break;
-            case STATE_IY:
-                ops[op_count++] = 'I'; // Insertion in query
-                state = (State)prevIy[IDX(i, j)];
-                i--;
-                break;
-        }
-    }
-
-    // Reverse ops array (because traceback generates reverse order)
-    for (int k = 0; k < op_count / 2; k++) {
-        char temp = ops[k];
-        ops[k] = ops[op_count - 1 - k];
-        ops[op_count - 1 - k] = temp;
-    }
-
-    // Compress to CIGAR string (RLE)
-    // Allocate conservative buffer: max length is ops * (digits + char)
-    char* cigar = (char*)malloc((op_count * 12 + 1) * sizeof(char));
-    cigar[0] = '\0';
-    
-    if (op_count > 0) {
-        char cur = ops[0];
-        int count = 1;
-        int cigar_pos = 0;
-        
-        for (int k = 1; k < op_count; k++) {
-            if (ops[k] == cur) {
-                count++;
-            } else {
-                cigar_pos += sprintf(cigar + cigar_pos, "%d%c", count, cur);
-                cur = ops[k];
-                count = 1;
-            }
-        }
-        sprintf(cigar + cigar_pos, "%d%c", count, cur);
-    }
-
-    // Cleanup
-    free(M); free(Ix); free(Iy);
-    free(prevM); free(prevIx); free(prevIy);
-    free(ops);
-
-    return cigar;
-}
-
+#define TRACE_D_EXT (1 << 2)
+#define TRACE_I_EXT (1 << 3)
 
 
 // buffers : shrot ** then char ** for scores then masks.
-// tables: malloc(MAX_READ_LENGTH * void*) then malloc(short or char * MAX_READ_LENGTH) for each row
 
 int GEMINIgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context) {
-	int ref_len =  read_len + expected_offset; // I: negative; D: positive
-	char ref_seq [ ref_len+1 ];
-	int refi;
-	int LRM_DP_ALIGN_CREATEGAP_PENALTY, LRM_DP_ALIGN_EXTENDGAP_PENALTY, LRM_DP_ALIGN_MATCH_SCORE, LRM_DP_ALIGN_MISMATCH_PENALTY;
+    int i, j;
+    // Handle empty alignment case
+    if (read_len == 0 && expected_offset == 0) {
+        movement_buffer[0] = 0;
+        return 0;
+    }
 
-	LRM_DP_ALIGN_CREATEGAP_PENALTY = penalties[0];  
-	LRM_DP_ALIGN_EXTENDGAP_PENALTY = penalties[1]; 
-	LRM_DP_ALIGN_MATCH_SCORE = penalties[2]; 
-	LRM_DP_ALIGN_MISMATCH_PENALTY = penalties[3]; 
+    // Map penalties: 0:Open, 1:Extend, 2:Match, 3:Mismatch
+    int G_OPEN = penalties[0];
+    int G_EXT = penalties[1];
+    int MATCH = penalties[2];
+    int MISMATCH = penalties[3];
+    
+    int ref_len = read_len + expected_offset;
+    // Apply the 9999*16 cap requested in previous snippets
+    int max_indel = (9999 * 16 < max_indel_length) ? 9999 * 16 : max_indel_length;
 
-	for(refi = 0; refi < ref_len; refi++)
-		ref_seq[refi] = get_index_base_value(refi+begin_position, general_context);
-	ref_seq[ref_len]=0;
+    // Use 4 buffers: 3 for score matrices (short), 1 for backtracking mask (char)
+    short ** M = (short**)(buffers[0]); 
+    short ** I = (short**)(buffers[1]); 
+    short ** D = (short**)(buffers[2]); 
+    char  ** mask = (char**)(buffers[3]); 
 
-	char * newcigar;
-	srInt_64 score=0;
+    // 1. Initialization for Global Alignment
+    // Every base of read and reference must be accounted for.
+    for (i = 0; i <= ref_len; i++) {
+        for (j = 0; j <= read_len; j++) {
+            M[i][j] = I[i][j] = D[i][j] = NEG_INF;
+            mask[i][j] = 0;
+        }
+    }
 
-	newcigar = GlobalAlignmentCIGAR( read, ref_seq, LRM_DP_ALIGN_MATCH_SCORE, -LRM_DP_ALIGN_MISMATCH_PENALTY, -LRM_DP_ALIGN_CREATEGAP_PENALTY, -LRM_DP_ALIGN_EXTENDGAP_PENALTY, (int64_t*)&score);
-	int newlen = strlen(newcigar);
-	memcpy(movement_buffer, newcigar, newlen+1);
-	free(newcigar);
-	return newlen;
+    M[0][0] = 0;
+    // Initialize first row (Insertions) and first column (Deletions)
+    // This ensures CIGAR can start with 'I' or 'D' if optimal.
+    for (j = 1; j <= read_len; j++) { 
+        I[0][j] = G_OPEN + (j * G_EXT); 
+        mask[0][j] = (STATE_I << 4); 
+        if (j > 1) mask[0][j] |= TRACE_I_EXT;
+    }
+    for (i = 1; i <= ref_len; i++) { 
+        D[i][0] = G_OPEN + (i * G_EXT); 
+        mask[i][0] = (STATE_D << 4); 
+        if (i > 1) mask[i][0] |= TRACE_D_EXT;
+    }
+
+    // 2. Fill DP Table
+    for (i = 1; i <= ref_len; i++) {
+        char ref_base = get_index_base_value(begin_position + i - 1, general_context);
+        for (j = 1; j <= read_len; j++) {
+            // Banded DP check: skip cells outside the allowed indel range
+            if (abs(i - j) > max_indel) continue;
+
+            // --- Deletion State (Gap in Read) ---
+            short d_from_m = M[i-1][j] + G_OPEN + G_EXT;
+            short d_from_d = D[i-1][j] + G_EXT;
+            if (d_from_m >= d_from_d) { 
+                D[i][j] = d_from_m; 
+            } else { 
+                D[i][j] = d_from_d; 
+                mask[i][j] |= TRACE_D_EXT; // D state came from D (Extension)
+            }
+
+            // --- Insertion State (Gap in Reference) ---
+            short i_from_m = M[i][j-1] + G_OPEN + G_EXT;
+            short i_from_i = I[i][j-1] + G_EXT;
+            if (i_from_m >= i_from_i) { 
+                I[i][j] = i_from_m; 
+            } else { 
+                I[i][j] = i_from_i; 
+                mask[i][j] |= TRACE_I_EXT; // I state came from I (Extension)
+            }
+
+            // --- Match/Mismatch State ---
+            short score = (ref_base == read[j-1]) ? MATCH : MISMATCH;
+            short m_m = M[i-1][j-1], m_i = I[i-1][j-1], m_d = D[i-1][j-1];
+            
+            if (m_m >= m_i && m_m >= m_d) { 
+                M[i][j] = m_m + score; mask[i][j] |= STATE_M; 
+            } else if (m_i >= m_d) { 
+                M[i][j] = m_i + score; mask[i][j] |= STATE_I; 
+            } else { 
+                M[i][j] = m_d + score; mask[i][j] |= STATE_D; 
+            }
+
+            // --- Store best overall state for backtracking (High 4 bits) ---
+            if (M[i][j] >= I[i][j] && M[i][j] >= D[i][j])      mask[i][j] |= (STATE_M << 4);
+            else if (I[i][j] >= D[i][j])                       mask[i][j] |= (STATE_I << 4);
+            else                                               mask[i][j] |= (STATE_D << 4);
+        }
+    }
+
+    // 3. Backtracking
+    int curr_i = ref_len, curr_j = read_len;
+    // Start from the absolute best state at the sink (ref_len, read_len)
+    int state = (mask[curr_i][curr_j] >> 4) & 0x3;
+    int out_pos = 0;
+
+    // Safety fallback: if no path reached the sink within the band
+    if (M[curr_i][curr_j] <= NEG_INF && I[curr_i][curr_j] <= NEG_INF && D[curr_i][curr_j] <= NEG_INF) {
+        int mmlen = read_len + (expected_offset < 0 ? expected_offset : 0);
+        int h1len = mmlen/2;
+        return sprintf(movement_buffer, "%dM%d%c%dM", h1len, abs(expected_offset), expected_offset > 0 ? 'D' : 'I', mmlen - h1len);
+    }
+
+    while (curr_i > 0 || curr_j > 0) {
+        if (curr_i == 0) state = STATE_I;
+        else if (curr_j == 0) state = STATE_D;
+
+        if (state == STATE_M) {
+            movement_buffer[out_pos++] = 'M';
+            state = mask[curr_i][curr_j] & 0x3; // Back to the state that led to this Match
+            curr_i--; curr_j--;
+        } else if (state == STATE_D) {
+            movement_buffer[out_pos++] = 'D';
+            state = (mask[curr_i][curr_j] & TRACE_D_EXT) ? STATE_D : STATE_M;
+            curr_i--;
+        } else { // STATE_I
+            movement_buffer[out_pos++] = 'I';
+            state = (mask[curr_i][curr_j] & TRACE_I_EXT) ? STATE_I : STATE_M;
+            curr_j--;
+        }
+    }
+
+    // 4. Reverse the buffer to get correct CIGAR order
+    for (i = 0; i < out_pos / 2; i++) {
+        char tmp = movement_buffer[i];
+        movement_buffer[i] = movement_buffer[out_pos - 1 - i];
+        movement_buffer[out_pos - 1 - i] = tmp;
+    }
+
+    return out_pos;
+
+
 }
 
 int general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
@@ -3201,7 +3116,7 @@ int general_dynamic_align(char * read, int read_len, unsigned int begin_position
 	//unsigned long long table_ptr = (unsigned long long) indel_context -> dynamic_align_table;
 
 	short ** table = (short**)(buffers[0]); 
-	char ** table_mask = (char**)(buffers[1]);
+	char ** table_mask = (char**)(buffers[3]);
 	// vertical move: deletion (1)
 	// horizontal move: insertion (2)
 	// cross move: match (0) or mismatch (3)
@@ -3594,4 +3509,20 @@ int reduce_repeating_cigar(char * src, char * dst){
 	}
 	if(repeat_i>0) wcur += SUBreadSprintf( dst + wcur, 11, "%d%c", repeat_i, old_opt );
 	return wcur;
+}
+
+void convert_2bit_int_to_umi(char * umi, unsigned int umiint, int umilen){
+	int i=0;
+	for(i=0;i<umilen;i++) {
+		char nch = int2base( (umiint >> (i*2)) & 3);
+		umi[umilen -1 -i]=nch;
+	}
+	umi[umilen]=0;
+}
+
+unsigned int convert_umi_to_2bit_int(char * umi, int umilen){
+	int i=0;
+	unsigned int ret=0;
+	for(i=0;i<umilen;i++) ret =(ret <<2)| base2int(umi[i]);
+	return ret;
 }

@@ -54,6 +54,27 @@ int ArrayListStringJoin(ArrayList * list, char *outbuf, int out_max_len){
 	return outpt;
 }
 
+ArrayList* ArrayList_Int_Hash_Intersect(ArrayList * list, HashTable * h2_key_plus1){
+	ArrayList * ret = ArrayListCreate( min(list -> numOfElements, h2_key_plus1 -> numOfElements ) );
+	srInt_64 x1;
+	for(x1 = 0; x1 < list->numOfElements; x1++){
+		void * v1 = ArrayListGet(list, x1);
+		if(HashTableGet(h2_key_plus1, v1+1))ArrayListPush(ret, v1);
+	}
+	return ret;
+
+}
+ArrayList* ArrayList_Int_Intersect(ArrayList * list, ArrayList * l2){
+	ArrayList * ret = ArrayListCreate( min(list -> numOfElements, l2 -> numOfElements ) );
+	HashTable * l2_look = ArrayListToLookupTable_Int(l2);
+	srInt_64 x1;
+	for(x1 = 0; x1 < list->numOfElements; x1++){
+		void * v1 = ArrayListGet(list, x1);
+		if(HashTableGet(l2_look, v1+1))ArrayListPush(ret, v1);
+	}
+	HashTableDestroy(l2_look);
+	return ret;
+}
 void ArrayListExtend(ArrayList * list, ArrayList * additional){
 	srInt_64 x1;
 	for(x1 = 0; x1 < additional->numOfElements; x1++)

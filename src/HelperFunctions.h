@@ -317,4 +317,6 @@ int IVT_edges_lr(IVT_IntervalTreeNode* root, srInt_64 point, IVT_Interval** outb
 void IVT_freeTree(IVT_IntervalTreeNode* root);
 int integer_log2_64 (srInt_64 value);
 int reduce_repeating_cigar(char * src, char * dst);
+unsigned int convert_umi_to_2bit_int(char * umi, int umilen);
+void convert_2bit_int_to_umi(char * umi, unsigned int umiint, int umilen);
 #endif

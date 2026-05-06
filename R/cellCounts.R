@@ -1599,8 +1599,20 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
         colnames(fc[["junction.counts"]])[ncoln +1] <- paste0("Nonsupporting_Reads_", spi)
         ncoln <- ncoln+2
     }
+
+    fc[["cell.junction.counts"]] <- list()
+    for(spi in 1:nrow(some.results[["Sample.Table"]])){
+        samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
+        per.cell.juncs <- .read.sparse.mat(sprintf("%s.scRNA.%03d.cellJuncs", temp.file.prefix, spi))
+        wanted.cells <- colnames(some.results[[sprintf("Sample.%d", spi)]][["Counts"]])
+        fc[["cell.junction.counts"]][[samplename]] <- NULL
+        per.cell.juncs <- per.cell.juncs[,intersect(wanted.cells, colnames(per.cell.juncs)),drop=F]
+        per.cell.juncs <- per.cell.juncs[ Matrix::rowSums(per.cell.juncs)>0,,drop=F ]
+        if(length( wanted.cells ) >0)fc[["cell.junction.counts"]][[samplename]] <- per.cell.juncs
+    }
   }
-  if(F&&grepl("scRNA-sample-human-COPD-non_small.BAMs",getwd())) warning("NOT DELETING TEMP FILES !!!!") else  .del.temp.files(substr(temp.file.prefix,4,99)) 
+
+  if(F && grepl("cellCounts-on-subjunc-script", getwd())) warning("NOT DELETING TEMP FILES !!!!") else  .del.temp.files(substr(temp.file.prefix,4,99)) 
 
   fc[["annotation"]] <- raw.fc.annot
   fc[["sample.info"]] <- df.sample.info
