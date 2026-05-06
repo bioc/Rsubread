@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include "subread.h"
 #include "softclip-test.h"
 
 
@@ -150,7 +151,7 @@ SoftClipResult* calculate_soft_clipping(
     
     if (new_read_start >= new_read_end) {
         // Edge case: All clipped
-        sprintf(result->new_cigar, "%dS", read_len);
+        snprintf(result->new_cigar,11, "%dS", read_len);
         result->new_pos = pos;
         result->num_clipped = read_len;
         result->num_matched = 0;
@@ -178,7 +179,7 @@ SoftClipResult* calculate_soft_clipping(
     
     // Add Left Clipping
     if (left_clip > 0) {
-        c_ptr += sprintf(c_ptr, "%dS", left_clip);
+        c_ptr += snprintf(c_ptr,11, "%dS", left_clip);
     }
     
     // Internal CIGAR
@@ -199,12 +200,12 @@ SoftClipResult* calculate_soft_clipping(
         
         if (op_width > 0) {
             if (keep_e > keep_s) {
-                c_ptr += sprintf(c_ptr, "%d%c", (keep_e - keep_s), op);
+                c_ptr += snprintf(c_ptr,11, "%d%c", (keep_e - keep_s), op);
             }
         } else {
             // Keep deletion only if strictly inside the kept region
             if (current_read > new_read_start && current_read < new_read_end) {
-                c_ptr += sprintf(c_ptr, "%ld%c", op_len, op);
+                c_ptr += snprintf(c_ptr,11, "%ld%c", op_len, op);
             }
         }
         current_read += op_width;
@@ -212,7 +213,7 @@ SoftClipResult* calculate_soft_clipping(
     
     // Add Right Clipping
     if (right_clip > 0) {
-        c_ptr += sprintf(c_ptr, "%dS", right_clip);
+        c_ptr += snprintf(c_ptr,11, "%dS", right_clip);
     }
 
     // Cleanup local arrays
@@ -244,8 +245,8 @@ int main_test_for_clipping() {
     
     SoftClipResult * res = calculate_soft_clipping(NULL,pos, cigar, read, p_start, p_end, 1, test_clipping_mock_genome_access); 
     
-    printf("Old Pos: %u, Old Cigar: %s\n", pos, cigar);
-    printf("New Pos: %u, New Cigar: %s\n", res->new_pos, res->new_cigar);
+    SUBREADprintf("Old Pos: %u, Old Cigar: %s\n", pos, cigar);
+    SUBREADprintf("New Pos: %u, New Cigar: %s\n", res->new_pos, res->new_cigar);
     free(res);
     
     return 0;

@@ -65,7 +65,7 @@ char *prefixed_filename(const char *prefix, const char *suffix) {
     char *filename = malloc(len);
     if (!filename) {
         perror("Filename allocation error");
-        exit(1);
+        return NULL;
     }
     snprintf(filename, len, "%s%s", prefix, suffix);
     return filename;
@@ -165,7 +165,6 @@ int parse_sam(char * bamfilename) {
             SUBREADprintf("ERROR: unable to determine the aligner (STARsolo or Cell Ranger) using the BAM header.");   
             return -1;
         }
-//fprintf(stderr,"BAMLINE: %s\n", line);
         char *line_ptr = line;
         strsep(&line_ptr, "\t"); // qname
         strsep(&line_ptr, "\t"); // flag
@@ -214,7 +213,7 @@ int parse_sam(char * bamfilename) {
 }
 
 int EXTRACT_JUNCTION_MAIN(int argc, char **argv) {
-    if (argc < 4) { fprintf(stderr, "\nUsage: %s barcodes.txt output_prefix bam_file_name\nThe tool (Cell Ranger or STARsolo) will be inferenced from the BAM header.\nColumns are defined in the cell barcode input. Matrix output is written to output_prefix.mtx and junctions are written to output_prefix.junctions.tsv.\n\n", argv[0]); return 1; }
+    if (argc < 4) { SUBREADprintf("\nUsage: %s barcodes.txt output_prefix bam_file_name\nThe tool (Cell Ranger or STARsolo) will be inferenced from the BAM header.\nColumns are defined in the cell barcode input. Matrix output is written to output_prefix.mtx and junctions are written to output_prefix.junctions.tsv.\n\n", argv[0]); return 1; }
 
     int has_error = load_barcodes(argv[1]);
     has_error |= parse_sam(argv[3]);
@@ -240,7 +239,7 @@ int EXTRACT_JUNCTION_MAIN(int argc, char **argv) {
     FILE *f_matrix = fopen(matrix_filename, "w");
     if (!f_matrix) {
         perror("Matrix output file error");
-        exit(1);
+        return -1;
     }
     fprintf(f_matrix, "%%%%MatrixMarket matrix coordinate integer general\n");
     fprintf(f_matrix, "%% Rows: Junctions, Columns: Barcodes\n");
@@ -262,7 +261,7 @@ int EXTRACT_JUNCTION_MAIN(int argc, char **argv) {
     FILE *f_genes = fopen(junction_filename, "w");
     if (!f_genes) {
         perror("Junction output file error");
-        exit(1);
+        return -1;
     }
     for (int i = 0; i < HASH_SIZE; i++) {
         for (JunctionEntry *entry = junction_hash[i]; entry; entry = entry->next) {

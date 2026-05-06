@@ -3060,7 +3060,7 @@ int GEMINIgeneral_dynamic_align(char * read, int read_len, unsigned int begin_po
     if (M[curr_i][curr_j] <= NEG_INF && I[curr_i][curr_j] <= NEG_INF && D[curr_i][curr_j] <= NEG_INF) {
         int mmlen = read_len + (expected_offset < 0 ? expected_offset : 0);
         int h1len = mmlen/2;
-        return sprintf(movement_buffer, "%dM%d%c%dM", h1len, abs(expected_offset), expected_offset > 0 ? 'D' : 'I', mmlen - h1len);
+        return snprintf(movement_buffer,36, "%dM%d%c%dM", h1len, abs(expected_offset), expected_offset > 0 ? 'D' : 'I', mmlen - h1len);
     }
 
     while (curr_i > 0 || curr_j > 0) {

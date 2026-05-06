@@ -1,3 +1,7 @@
+6 May 2026 - 2.27.1
+(1) Removed warnings in check.
+(2) Added bam2junctions function.
+
 18 Dec 2025 - 2.25.2
 (1) Added the strandSpecific parameter to simReads.
 
