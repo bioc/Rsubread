@@ -7326,7 +7326,8 @@ void cellCounts_copy_junc_table_to_output_table(void * k, void * v, HashTable * 
 }
 
 void cellCounts_write_final_other_events(cellcounts_global_t * cct_context,  char * output_file_name, int type_mode){
-	int sample_i = -999 ; // to be done
+//TODO: hasn't been tested!
+	int sample_i = 0 ; // to be done
 
 	ArrayList * small_large_keys = HashTableKeys(cct_context -> chroEvent_detail_table[sample_i]);
 	ArrayListSort(small_large_keys, ArrayListLLUComparison);

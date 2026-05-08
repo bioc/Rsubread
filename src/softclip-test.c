@@ -213,7 +213,7 @@ SoftClipResult* calculate_soft_clipping(
     
     // Add Right Clipping
     if (right_clip > 0) {
-        c_ptr += snprintf(c_ptr,11, "%dS", right_clip);
+        c_ptr += snprintf(c_ptr,13, "%dS", right_clip);
     }
 
     // Cleanup local arrays
