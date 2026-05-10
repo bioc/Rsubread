@@ -2956,6 +2956,7 @@ int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, cha
 
 // buffers : shrot ** then char ** for scores then masks.
 
+#define GEMINIgeneral_dynamic_align general_dynamic_align
 int GEMINIgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context) {
     int i, j;
@@ -3094,7 +3095,7 @@ int GEMINIgeneral_dynamic_align(char * read, int read_len, unsigned int begin_po
 
 }
 
-int general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
 // read must be converted to the positive strand.
 // movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch
