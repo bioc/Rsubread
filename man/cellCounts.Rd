@@ -57,7 +57,7 @@ cellCounts(
   \item{GTF.featureType}{ See \code{\link{featureCounts}} for more details. \code{exon} by default.}
   \item{GTF.attrType}{ See \code{\link{featureCounts}} for more details. \code{gene_id} by default.} 
   \item{useMetaFeatures}{ Specify if UMI counting should be carried out at the meta-feature level (eg. gene level). See \code{\link{featureCounts}} for more details. \code{TRUE} by default.}
-  \item{detectJunctions}{ Perform junction detection on reads. \code{FALSE} by default.}
+  \item{detectJunctions}{ Perform junction detection on the cell level. \code{FALSE} by default.}
   \item{umi.cutoff}{ Specify a UMI count cutoff for cell calling. All the cells with a total UMI count greater than this cutoff will be called. If \code{NULL}, a bootstrapping procedure will be performed to determine this cutoff. \code{NULL} by default. }
   \item{nthreads}{ A numeric value giving the number of threads used for read mapping and counting. \code{10} by default.}
   \item{nBestLocations}{A numeric value giving the maximum number of reported alignments for each multi-mapping read. \code{1} by default.}
@@ -129,6 +129,8 @@ Each row in the data frame is a sample.}
 \item{cell.confidence}{a \code{List} object indicating if a cell is a high-confidence cell or a rescued cell (low confidence). Each component in the object is a logical vector indicating which cells in a sample are high-confidence cells. \code{cell.confidence} is included in the output only if \code{umi.cutoff} is \code{NULL}.}
 
 \item{counts.excluded.barcodes}{a \code{List} object including UMI counts for excluded cell barcodes for each sample.}
+
+\item{cell.junction.counts}{a \code{List} object including junction-level UMI counts for each sample. This component is available only if \code{detectJunctions=TRUE}. Each component in this object is a matrix that contains UMI counts for a sample. Rows in the matrix are junctions and columns are cells. Only the finally called cells in \code{counts} are included.}
 }
 
 \author{Yang Liao and Wei Shi}
