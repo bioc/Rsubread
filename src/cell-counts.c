@@ -3052,17 +3052,17 @@ int cellCounts_run_maybe_threads(cellcounts_global_t * cct_context, int task){
 		ret_value += *(ret_values + current_thread_no);
 		int smpno;
 		if(STEP_VOTING == task){
-			for(smpno = 1; smpno <=cct_context-> sample_sheet_table -> numOfElements; smpno ++){
+			for(smpno = 0; smpno < cct_context-> sample_sheet_table -> numOfElements; smpno ++){ // mapped / assigned / all read counts use 0-based sample ids.
 				cct_context -> mapped_reads_per_sample[smpno] += thread_contexts[current_thread_no].mapped_reads_per_sample[smpno];
 				cct_context -> assigned_reads_per_sample[smpno] += thread_contexts[current_thread_no].assigned_reads_per_sample[smpno];
 				cct_context -> reads_per_sample[smpno] += thread_contexts[current_thread_no].reads_per_sample[smpno];
+//fprintf(stderr,"ADD_COUNT_READS : THR %d => Sample %d ; READS %d %d\n", current_thread_no, smpno, );
 			}
 			cct_context -> reads_per_sample[smpno] += thread_contexts[current_thread_no].reads_per_sample[smpno]; //  for non-assigned
 		}
 		cellCounts_release_context_from_align(cct_context, current_thread_no, task);
 		if(ret_value)break;
 	}
-	//SUBREADprintf("HICONF MAPPING (SIMPLE) = %lld, LOWCONF MAPPING (ALL SUBREADS, NOT SIMPLE) = %lld\n", cct_context -> hiconf_map , cct_context -> loconf_map );
 
 	free(thread_contexts);
 	return ret_value;

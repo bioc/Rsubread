@@ -3527,3 +3527,161 @@ unsigned int convert_umi_to_2bit_int(char * umi, int umilen){
 	for(i=0;i<umilen;i++) ret =(ret <<2)| base2int(umi[i]);
 	return ret;
 }
+
+
+
+
+int GEMINI_pro_general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+  void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context) {
+    int i, j;
+    // Handle empty alignment case
+    if (read_len == 0 && expected_offset == 0) {
+        movement_buffer[0] = 0;
+        return 0;
+    }
+
+    // Map penalties: 0:Open, 1:Extend, 2:Match, 3:Mismatch
+    int G_OPEN = penalties[0];
+    int G_EXT = penalties[1];
+    int MATCH = penalties[2];
+    int MISMATCH = penalties[3];
+    int G_GAP_OPEN = G_OPEN + G_EXT;
+    
+    int ref_len = read_len + expected_offset;
+    // Apply the 9999*16 cap requested in previous snippets
+    int max_indel = (9999 * 16 < max_indel_length) ? 9999 * 16 : max_indel_length;
+
+    // Use 4 buffers: 3 for score matrices (short), 1 for backtracking mask (char)
+    short ** M = (short**)(buffers[0]); 
+    short ** I = (short**)(buffers[1]); 
+    short ** D = (short**)(buffers[2]); 
+    char  ** mask = (char**)(buffers[3]); 
+
+    // 1. Initialization for Global Alignment
+    M[0][0] = 0;
+    I[0][0] = D[0][0] = NEG_INF;
+    mask[0][0] = 0;
+
+    // Targeted initialization for banded edges
+    int init_j = (max_indel < read_len) ? max_indel : read_len;
+    for (j = 1; j <= init_j; j++) { 
+        I[0][j] = G_OPEN + (j * G_EXT); 
+        M[0][j] = D[0][j] = NEG_INF;
+        mask[0][j] = (STATE_I << 4); 
+        if (j > 1) mask[0][j] |= TRACE_I_EXT;
+    }
+    if (init_j < read_len) M[0][init_j+1] = I[0][init_j+1] = D[0][init_j+1] = NEG_INF;
+
+    int init_i = (max_indel < ref_len) ? max_indel : ref_len;
+    for (i = 1; i <= init_i; i++) { 
+        D[i][0] = G_OPEN + (i * G_EXT); 
+        M[i][0] = I[i][0] = NEG_INF;
+        mask[i][0] = (STATE_D << 4); 
+        if (i > 1) mask[i][0] |= TRACE_D_EXT;
+    }
+    if (init_i < ref_len) M[init_i+1][0] = I[init_i+1][0] = D[init_i+1][0] = NEG_INF;
+
+    // 2. Fill DP Table
+    for (i = 1; i <= ref_len; i++) {
+        char ref_base = get_index_base_value(begin_position + i - 1, general_context);
+        
+        int j_start = i - max_indel;
+        if (j_start < 1) j_start = 1;
+        int j_end = i + max_indel;
+        if (j_end > read_len) j_end = read_len;
+
+        short *Mi = M[i], *Ii = I[i], *Di = D[i];
+        char  *maski = mask[i];
+        short *Mi_1 = M[i-1], *Ii_1 = I[i-1], *Di_1 = D[i-1];
+
+        // Maintain a safety buffer of NEG_INF around the band for subsequent rows
+        if (j_start > 1) { Mi[j_start-1] = Ii[j_start-1] = Di[j_start-1] = NEG_INF; }
+        if (j_end < read_len) { Mi[j_end+1] = Ii[j_end+1] = Di[j_end+1] = NEG_INF; }
+
+        for (j = j_start; j <= j_end; j++) {
+            char current_mask = 0;
+
+            // --- Deletion State (Gap in Read) ---
+            short d_from_m = Mi_1[j] + G_GAP_OPEN;
+            short d_from_d = Di_1[j] + G_EXT;
+            if (d_from_m >= d_from_d) { 
+                Di[j] = d_from_m; 
+            } else { 
+                Di[j] = d_from_d; 
+                current_mask |= TRACE_D_EXT; 
+            }
+
+            // --- Insertion State (Gap in Reference) ---
+            short i_from_m = Mi[j-1] + G_GAP_OPEN;
+            short i_from_i = Ii[j-1] + G_EXT;
+            if (i_from_m >= i_from_i) { 
+                Ii[j] = i_from_m; 
+            } else { 
+                Ii[j] = i_from_i; 
+                current_mask |= TRACE_I_EXT;
+            }
+
+            // --- Match/Mismatch State ---
+            short score = (ref_base == read[j-1]) ? MATCH : MISMATCH;
+            short m_m = Mi_1[j-1], m_i = Ii_1[j-1], m_d = Di_1[j-1];
+            
+            if (m_m >= m_i && m_m >= m_d) { Mi[j] = m_m + score; current_mask |= STATE_M; } 
+            else if (m_i >= m_d)          { Mi[j] = m_i + score; current_mask |= STATE_I; } 
+            else                          { Mi[j] = m_d + score; current_mask |= STATE_D; }
+
+            maski[j] = current_mask;
+        }
+    }
+
+    // 2.5 Final Sink State Calculation (Only for the target cell)
+    if (abs(expected_offset) <= max_indel) {
+        if (M[ref_len][read_len] >= I[ref_len][read_len] && M[ref_len][read_len] >= D[ref_len][read_len])
+            mask[ref_len][read_len] |= (STATE_M << 4);
+        else if (I[ref_len][read_len] >= D[ref_len][read_len])
+            mask[ref_len][read_len] |= (STATE_I << 4);
+        else
+            mask[ref_len][read_len] |= (STATE_D << 4);
+    }
+
+    // 3. Backtracking
+    int curr_i = ref_len, curr_j = read_len;
+    // Start from the absolute best state at the sink (ref_len, read_len)
+    int state = (mask[curr_i][curr_j] >> 4) & 0x3;
+    int out_pos = 0;
+
+    // Safety fallback: if no path reached the sink within the band
+    if (M[curr_i][curr_j] <= NEG_INF && I[curr_i][curr_j] <= NEG_INF && D[curr_i][curr_j] <= NEG_INF) {
+        int mmlen = read_len + (expected_offset < 0 ? expected_offset : 0);
+        int h1len = mmlen/2;
+        return snprintf(movement_buffer,36, "%dM%d%c%dM", h1len, abs(expected_offset), expected_offset > 0 ? 'D' : 'I', mmlen - h1len);
+    }
+
+    while (curr_i > 0 || curr_j > 0) {
+        if (curr_i == 0) state = STATE_I;
+        else if (curr_j == 0) state = STATE_D;
+
+        if (state == STATE_M) {
+            movement_buffer[out_pos++] = 'M';
+            state = mask[curr_i][curr_j] & 0x3; // Back to the state that led to this Match
+            curr_i--; curr_j--;
+        } else if (state == STATE_D) {
+            movement_buffer[out_pos++] = 'D';
+            state = (mask[curr_i][curr_j] & TRACE_D_EXT) ? STATE_D : STATE_M;
+            curr_i--;
+        } else { // STATE_I
+            movement_buffer[out_pos++] = 'I';
+            state = (mask[curr_i][curr_j] & TRACE_I_EXT) ? STATE_I : STATE_M;
+            curr_j--;
+        }
+    }
+
+    // 4. Reverse the buffer to get correct CIGAR order
+    for (i = 0; i < out_pos / 2; i++) {
+        char tmp = movement_buffer[i];
+        movement_buffer[i] = movement_buffer[out_pos - 1 - i];
+        movement_buffer[out_pos - 1 - i] = tmp;
+    }
+
+    return out_pos;
+}
+
