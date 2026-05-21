@@ -3103,6 +3103,8 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 {
 	int max_indel = min(16 , max_indel_length); 
 	int i,j;
+	int ref_len;
+	char * ref_bases = NULL;
 	int LRM_DP_ALIGN_CREATEGAP_PENALTY, LRM_DP_ALIGN_EXTENDGAP_PENALTY, LRM_DP_ALIGN_MATCH_SCORE, LRM_DP_ALIGN_MISMATCH_PENALTY;
 	LRM_DP_ALIGN_CREATEGAP_PENALTY = penalties[0];  
 	LRM_DP_ALIGN_EXTENDGAP_PENALTY = penalties[1]; 
@@ -3113,6 +3115,13 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 		return 0;
 	if(expected_offset < 0 && read_len < (3-expected_offset))
 		return 0;
+	ref_len = read_len + expected_offset;
+	if(ref_len < 1)
+		return 0;
+	ref_bases = malloc((size_t)ref_len);
+	if(!ref_bases)
+		return 0;
+	for(i = 0; i < ref_len; i++) ref_bases[i] = get_index_base_value(begin_position + i, general_context);
 
 	//unsigned long long table_ptr = (unsigned long long) indel_context -> dynamic_align_table;
 
@@ -3124,7 +3133,7 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 	// i: vertical move; j: horizontal move
 
 	//SUBREADprintf("DM[%d]: %p %d,%d\n", thread_context -> thread_id, table_mask, read_len +  expected_offset,  read_len);
-	for (i=0; i<read_len +  expected_offset; i++)
+	for (i=0; i<ref_len; i++)
 	{
 		for(j=0; j<read_len; j++)
 		{
@@ -3146,7 +3155,7 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 			if (j>0) from_left = table[i][j-1] + (table_mask[i][j-1] == INDEL_MASK_BY_INSERTION?LRM_DP_ALIGN_EXTENDGAP_PENALTY:LRM_DP_ALIGN_CREATEGAP_PENALTY);
 			else     from_left = -9999;
 
-			char chromo_ch = get_index_base_value(begin_position + i, general_context);
+			char chromo_ch = ref_bases[i];
 			char is_matched_ij = (chromo_ch == read[j])?LRM_DP_ALIGN_MATCH_SCORE:LRM_DP_ALIGN_MISMATCH_PENALTY;
 			
 			short from_upperleft;
@@ -3220,11 +3229,17 @@ if(debugout1)fprintf(stderr,"M");
 		}
 
 		if(path_i == -1 && j == -1) break;
-		if(j<0 || path_i<0) return 0;
+		if(j<0 || path_i<0){
+			free(ref_bases);
+			return 0;
+		}
 	}
 if(debugout1)fprintf(stderr,"\n");
 
-	if(expected_offset!=delta)return 0;
+	if(expected_offset!=delta){
+		free(ref_bases);
+		return 0;
+	}
 	for(i=0; i<out_pos/2; i++)
 	{
 		char tmp;
@@ -3232,6 +3247,7 @@ if(debugout1)fprintf(stderr,"\n");
 		movement_buffer[out_pos-1-i] = movement_buffer[i];
 		movement_buffer[i] = tmp;
 	}
+	free(ref_bases);
 	return out_pos;
 }
 

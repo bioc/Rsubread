@@ -3324,25 +3324,28 @@ void cellCounts_tree_iterative_search( cellcounts_global_t * cct_context, int th
 
 	int remaining_bases_to_scan = to3end?(read_len - 1 - this_end_last_correct_mapping_read):this_end_last_correct_mapping_read;
 	int edge_region_end = edge_region_start + remaining_bases_to_scan; // inclusive, as defined by the IVT_query_range function.
+	int scan_len = remaining_bases_to_scan + 1;
 
+	unsigned short mismatch_prefix[scan_len + 1];
 	int total_mismatching = 0, total_matching = 0;
-	char read_matching_record [read_len];
 	int read_pos = this_end_last_correct_mapping_read;
-	int chro_this_pos = this_end_last_correct_maiping_chro; // the "last mapped base" is included in the matching step. This is because we don't know if it matches or not after jumping to the other end of an event.
-	unsigned int chro_linear_pos = linear_gene_position(&cct_context->chromosome_table, chro , chro_this_pos);
+	unsigned int chro_linear_pos = linear_gene_position(&cct_context->chromosome_table, chro , this_end_last_correct_maiping_chro);
 	int x1delta = to3end?1:-1;
+	int scan_i;
 
-	while(read_pos >=0 && read_pos < read_len){ 	// When last_correct_mapping_read is 0, read_pos can be -1. 
+	mismatch_prefix[0] = 0;
+	for(scan_i = 0; scan_i < scan_len && read_pos >=0 && read_pos < read_len; scan_i++){ 	// When last_correct_mapping_read is 0, read_pos can be -1. 
 							// Similarly, if last_correct_mapping_read is read_len -1, read_pos can be read_len. 
 		char chr_base = gvindex_get(current_value_index, chro_linear_pos);
 		char read_base = read_text[read_pos];
 		int this_base_misma = read_base!=chr_base;
-		read_matching_record [read_pos] = this_base_misma;
-		total_mismatching += this_base_misma;
-		total_matching += !this_base_misma;
+		mismatch_prefix[scan_i + 1] = mismatch_prefix[scan_i] + this_base_misma;
 		chro_linear_pos += x1delta;
 		read_pos += x1delta;
 	}
+	int scanned_len = scan_i;
+	total_mismatching = mismatch_prefix[scanned_len];
+	total_matching = scanned_len - total_mismatching;
 
 	int cov_base0 =   to3end ?this_end_last_correct_mapping_read:0;
 	int cov_base1 =   to3end ?read_len - 1: this_end_last_correct_mapping_read;
@@ -3370,26 +3373,15 @@ void cellCounts_tree_iterative_search( cellcounts_global_t * cct_context, int th
 		memset(my_env_total_mismatch, 0, sizeof(int)*founditems);
 
 		if(founditems >= eventbufsize - 1)SUBREADprintf("Warning: there are %d chromosomal events found in a read region. This is abnormally too many.\n", founditems);
-		
-
-		int read_for_testing_len = edge_region_end - edge_region_start +1;
-
-		read_pos = this_end_last_correct_mapping_read;
-		while(read_pos >=0 && read_pos < read_len){ 	// When last_correct_mapping_read is 0, read_pos can be -1. 
-								// Similarly, if last_correct_mapping_read is read_len -1, read_pos can be read_len. 
-			int this_base_misma = read_matching_record [read_pos];
-			for(x1=0; x1<founditems; x1++){
-				IVT_Interval * evb = eventbuf[x1];
-				if((to3end && evb -> start >= chro_this_pos )|| (to3end==0 && evb -> start <= chro_this_pos )){
-					if(this_base_misma) my_env_total_mismatch[x1]++; else my_env_total_match[x1]++;
-				}
-			}
-			chro_this_pos += x1delta;
-			read_pos += x1delta;
-		}
 
 		// for each event that don't have too many mismatching bases locally, go deeper. 
 		for(x1=0; x1<founditems; x1++){
+			int event_offset = to3end ? (eventbuf[x1] -> start - this_end_last_correct_maiping_chro) : (this_end_last_correct_maiping_chro - eventbuf[x1] -> start);
+			int event_prefix_len;
+			if(event_offset < 0 || event_offset >= scanned_len) continue;
+			event_prefix_len = event_offset + 1;
+			my_env_total_mismatch[x1] = mismatch_prefix[event_prefix_len];
+			my_env_total_match[x1] = event_prefix_len - my_env_total_mismatch[x1];
 			if(my_env_total_mismatch[x1]<=min(JUNCTION_MAX_MISMATCHING_BASES_IN_REALIGNMENT, margin_for_misma -1)){
 				IVT_Interval * evb = eventbuf[x1];
 				int evbposleft = evb -> start;
