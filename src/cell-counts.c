@@ -4674,7 +4674,9 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 	for(input_thread_no = 0; input_thread_no < cct_context->total_threads; input_thread_no++){
 		char tmp_fname[MAX_FILE_NAME_LENGTH + 120];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH + 120, "%s/temp-cellcounts-realign-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), input_thread_no);
-		FILE*temp_fp = fopen(tmp_fname, "rb");
+
+		FILE * temp_fp = fopen(tmp_fname, "rb");
+		setvbuf(temp_fp, thread_contexts[0].tempbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE); 
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 			void ** thr_parameters = malloc(sizeof(void*)*4);
 			thr_parameters[0] = cct_context;
