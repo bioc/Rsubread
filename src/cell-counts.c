@@ -4484,6 +4484,7 @@ FILE * cellCounts_select_and_write_temps_open_fp(cellcounts_global_t * cct_conte
 		char tmp_fname[MAX_FILE_NAME_LENGTH + 120];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH + 120, "%s/temp-cellcounts-realign-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), thread_no);
 		temp_fp = fopen(tmp_fname, "wb");
+		setvbuf(temp_fp, thread_context -> tempbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
 		thread_context -> realign_temp_fp = temp_fp;
 	}
 	return temp_fp;
@@ -4669,6 +4670,7 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		cellCounts_init_topKbuff(cct_context, current_thread_no);
 	}
 
+	// For each input thread file, start all threads. Total runs: threads ^ 2.
 	for(input_thread_no = 0; input_thread_no < cct_context->total_threads; input_thread_no++){
 		char tmp_fname[MAX_FILE_NAME_LENGTH + 120];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH + 120, "%s/temp-cellcounts-realign-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), input_thread_no);
@@ -4688,11 +4690,11 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		unlink(tmp_fname);
 	}
 
+	// release thread contexts
 	for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 		cellCounts_free_topKbuff(cct_context, current_thread_no);
 		cellCounts_release_context_from_align(cct_context, current_thread_no, task);
 	}
-	// release thread contexts
 }
 
 void * cellCounts_select_and_write_alignments_from_temp(void * pr){

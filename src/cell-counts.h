@@ -4,6 +4,7 @@
 #ifndef __CELL_COUNTS_H
 #define __CELL_COUNTS_H
 
+#define SCRNA_VBUFF_SIZE (256*1024)
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
@@ -173,6 +174,7 @@ typedef struct{
 
 	int temp_realign_record_capacity;
 	int temp_realign_work_capacity;
+	unsigned char tempbin_v_buffer[SCRNA_VBUFF_SIZE];
 	unsigned char * temp_realign_record_buf;
 	unsigned char * temp_realign_work_buf;
 
