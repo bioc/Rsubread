@@ -2767,9 +2767,9 @@ int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readl
 
 	//SUBREADprintf("RLENs=%d, idx=%d, base=%d\n", total_bin_len, idx_offset, base_offset);
 	#ifdef __MINGW32__
-	SUBreadSprintf(read_name, 15, "R%011" PRIu64 ":", rno);
+	SUBreadSprintf(read_name, 15, "R%011" PRIu64 "|", rno);
 	#else
-	SUBreadSprintf(read_name, 15, "R%011llu:", rno);
+	SUBreadSprintf(read_name, 15, "R%011llu|", rno);
 	#endif
 
 	read_name[13+idx_offset]='|';
@@ -4507,6 +4507,7 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 	int max_saved_alignments = min(cct_context -> max_reported_alignments_per_read, SCRNA_HIGHEST_REPORTED_ALIGNMENTS);
 	int index_gap_width = cct_context -> current_index -> index_gap;
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL;
+	char * sample_seq_end = NULL, * sample_qual_end = NULL;
 	int rname_trimmed_len=0;
 	int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
 	char tmp_bc[MAX_READ_NAME_LEN+1];
@@ -4525,6 +4526,21 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 	memset(&temprec, 0, sizeof(temprec));
 	memset(top_distinct_vote_numbers, 0, sizeof(top_distinct_vote_numbers));
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
+
+	if(sample_seq){
+		size_t sample_seq_len = 0;
+		sample_seq_end = strchr(sample_seq, '|');
+		sample_seq_len = sample_seq_end ? (size_t)(sample_seq_end - sample_seq) : strlen(sample_seq);
+		if(sample_seq_len > USHRT_MAX) return 1;
+		temprec.sample_seq_length = (unsigned short)sample_seq_len;
+	}
+	if(sample_qual){
+		size_t sample_qual_len = 0;
+		sample_qual_end = strchr(sample_qual, '|');
+		sample_qual_len = sample_qual_end ? (size_t)(sample_qual_end - sample_qual) : strlen(sample_qual);
+		if(sample_qual_len > USHRT_MAX) return 1;
+		temprec.sample_qual_length = (unsigned short)sample_qual_len;
+	}
 
 	temprec.sample_number = sample_i > 0 ? (unsigned int)sample_i : 0u;
 	temprec.read_number = (unsigned int)strtoul(read_name + 1, NULL, 10);
@@ -4574,6 +4590,8 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 		int total_bc_umi_len = 0;
 		size_t record_size_sz;
 		int record_size;
+		size_t sample_seq_len_sz = temprec.sample_seq_length;
+		size_t sample_qual_len_sz = temprec.sample_qual_length;
 		unsigned char * record, * wp;
 		cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 
@@ -4599,7 +4617,8 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 			}
 		}
 		packed_bcumi_len = ((bc_len + umi_len) * 3 + 7) / 8;
-		record_size_sz = sizeof(int) + sizeof(unsigned int) * 4 + sizeof(int) * 3
+		record_size_sz = sizeof(int) + sizeof(unsigned int) * 4 + sizeof(unsigned short) * 2 + sizeof(int) * 3
+			+ sample_seq_len_sz + sample_qual_len_sz
 			+ saved_alignments * (sizeof(unsigned short) + sizeof(unsigned int) + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned char))
 			+ read_len + packed_read_len + bc_qual_len + packed_bcumi_len;
 		if(record_size_sz > (size_t)2147483647) return 1;
@@ -4613,9 +4632,20 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 		memcpy(wp, &temprec.cell_number, sizeof(unsigned int)); wp += sizeof(unsigned int);
 		memcpy(wp, &temprec.read_number, sizeof(unsigned int)); wp += sizeof(unsigned int);
 		memcpy(wp, &temprec.raw_umi_sequence, sizeof(unsigned int)); wp += sizeof(unsigned int);
+		memcpy(wp, &temprec.sample_seq_length, sizeof(unsigned short)); wp += sizeof(unsigned short);
+		memcpy(wp, &temprec.sample_qual_length, sizeof(unsigned short)); wp += sizeof(unsigned short);
 		memcpy(wp, &temprec.read_length, sizeof(int)); wp += sizeof(int);
 		memcpy(wp, &bc_len, sizeof(int)); wp += sizeof(int);
 		memcpy(wp, &umi_len, sizeof(int)); wp += sizeof(int);
+
+		if(sample_seq_len_sz > 0){
+			memcpy(wp, sample_seq, sample_seq_len_sz);
+			wp += sample_seq_len_sz;
+		}
+		if(sample_qual_len_sz > 0){
+			memcpy(wp, sample_qual, sample_qual_len_sz);
+			wp += sample_qual_len_sz;
+		}
 
 		if(saved_alignments > 0){
 			memcpy(wp, temprec.num_of_votes, sizeof(unsigned short) * saved_alignments);
@@ -4719,6 +4749,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		unsigned char * record_end = NULL;
 		unsigned char * work = NULL;
 		int saved_alignments = 0, read_len = 0, bc_len = 0, umi_len = 0;
+		unsigned short sample_seq_length = 0, sample_qual_length = 0;
 		unsigned int sample_number = 0, cell_number = 0, read_number = 0, raw_umi_sequence = 0;
 		unsigned short * votes_buf = NULL;
 		unsigned int * pos_buf = NULL;
@@ -4732,6 +4763,8 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		char * read_name = NULL;
 		char * bcumi_seq_buf = NULL;
 		char * bcumi_qual_buf = NULL;
+		char * sample_seq = NULL;
+		char * sample_qual = NULL;
 		char * read_qual = NULL;
 		char * bc_qual = NULL;
 		int i;
@@ -4762,11 +4795,13 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 
 		if((size_t)(record_end - rp) < sizeof(int)) return NULL+1;
 		memcpy(&saved_alignments, rp, sizeof(int)); rp += sizeof(int);
-		if((size_t)(record_end - rp) < sizeof(unsigned int) * 4 + sizeof(int) * 3) return NULL+1;
+		if((size_t)(record_end - rp) < sizeof(unsigned int) * 4 + sizeof(unsigned short) * 2 + sizeof(int) * 3) return NULL+1;
 		memcpy(&sample_number, rp, sizeof(unsigned int)); rp += sizeof(unsigned int);
 		memcpy(&cell_number, rp, sizeof(unsigned int)); rp += sizeof(unsigned int);
 		memcpy(&read_number, rp, sizeof(unsigned int)); rp += sizeof(unsigned int);
 		memcpy(&raw_umi_sequence, rp, sizeof(unsigned int)); rp += sizeof(unsigned int);
+		memcpy(&sample_seq_length, rp, sizeof(unsigned short)); rp += sizeof(unsigned short);
+		memcpy(&sample_qual_length, rp, sizeof(unsigned short)); rp += sizeof(unsigned short);
 		memcpy(&read_len, rp, sizeof(int)); rp += sizeof(int);
 		memcpy(&bc_len, rp, sizeof(int)); rp += sizeof(int);
 		memcpy(&umi_len, rp, sizeof(int)); rp += sizeof(int);
@@ -4792,7 +4827,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			size_t packed_read_len = (size_t)((read_len * 3 + 7) / 8);
 			size_t bcqual_len = (size_t)(bc_len + umi_len);
 			size_t packed_bcumi_len = (size_t)(((bc_len + umi_len) * 3 + 7) / 8);
-			size_t need_bytes = votes_bytes + pos_bytes + cstart_bytes + cend_bytes + flags_bytes + read_qual_len + packed_read_len + bcqual_len + packed_bcumi_len;
+			size_t need_bytes = (size_t)sample_seq_length + (size_t)sample_qual_length + votes_bytes + pos_bytes + cstart_bytes + cend_bytes + flags_bytes + read_qual_len + packed_read_len + bcqual_len + packed_bcumi_len;
 
 			size_t work_required = read_text_slot * 4 /* RTEXT, REV_TEXT, RQUAL, REV_QUAL */ + read_name_slot + bcumi_slot * 2;
 
@@ -4805,7 +4840,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			read_text_rev = read_text_fwd + read_text_slot;
 			read_qual_fwd = read_text_rev + read_text_slot;
 			read_qual_rev = read_qual_fwd + read_text_slot;
-			read_name = read_text_rev + read_text_slot;
+			read_name = read_qual_rev + read_text_slot;
 			bcumi_seq_buf = read_name + read_name_slot;
 			bcumi_qual_buf = bcumi_seq_buf + bcumi_slot;
 
@@ -4813,6 +4848,8 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 				return NULL+1;
 			}
 
+			sample_seq = (char *)rp; rp += sample_seq_length;
+			sample_qual = (char *)rp; rp += sample_qual_length;
 			votes_buf = (unsigned short *)rp; rp += votes_bytes;
 			pos_buf = (unsigned int *)rp; rp += pos_bytes;
 			cstart_buf = (unsigned short *)rp; rp += cstart_bytes;
@@ -4843,7 +4880,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			}
 		}
 
-		SUBreadSprintf(read_name, MAX_READ_NAME_LEN + 1, "R%011u|%s|%s", read_number, bcumi_seq_buf, bcumi_qual_buf);
+		SUBreadSprintf(read_name, MAX_READ_NAME_LEN + 1, "R%011u|%s|%s|%.*s|%.*s", read_number, bcumi_seq_buf, bcumi_qual_buf, (int)sample_seq_length, sample_seq ? sample_seq : "", (int)sample_qual_length, sample_qual ? sample_qual : "");
 
 		thread_context -> alignment_repating_table = HashTableCreate(50);
 
@@ -4915,6 +4952,10 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 	while(!cct_context -> has_error) {
 		int subread_no;
 		int is_reversed, applied_subreads = 0;
+
+		// Read name format: like R00000000059|TNACCCGCCTGCCTCGGCGCGGGGCGNG|D#DDDDDD-DDDDDDD-D-DDDDD<D#D|TNCCCGGGNNGTCGCNNCGN|D#DD-DDD##DDDDD##DD#|@RgLater@L001.
+		// The index sequence / quality are in the 4th and 5th columns. They are only used for writing I1/I2 fastq.gz output.
+		// For general read alignment, only the 2nd and 3rd columns for cell barcode and UMI are used.
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
 		if(current_read_number < 0) break;

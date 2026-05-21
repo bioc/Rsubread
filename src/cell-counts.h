@@ -350,6 +350,8 @@ struct TempForRealign{
 	unsigned int cell_number;
 	unsigned int read_number;
 	unsigned int raw_umi_sequence;
+	unsigned short sample_seq_length;
+	unsigned short sample_qual_length;
 	int read_length;
 	unsigned char qual_values[MAX_SCRNA_READ_LENGTH];
 	unsigned char read_bases[MAX_SCRNA_READ_LENGTH/2];
