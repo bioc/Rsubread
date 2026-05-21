@@ -3096,10 +3096,11 @@ unsigned int cellCounts_convert_stack_to_cigar_str(cellcounts_global_t * cct_con
 		if(stidx>0) event_details = oneitem -> event_details;
 
 		if( event_details ){
+/*
 			chroEvent_t * event_details;
 			if(to3end) event_details = oneitem -> event_details;
 			else event_details = oneitem -> event_details;
-
+*/
 			int Nlen;
 			if(event_details -> n_events == 1) Nlen = (void*) event_details -> length -NULL;
 			else Nlen = event_details -> length[oneitem -> insertion_idx];
