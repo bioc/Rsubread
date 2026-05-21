@@ -4697,6 +4697,7 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		cellCounts_free_topKbuff(cct_context, current_thread_no);
 		cellCounts_release_context_from_align(cct_context, current_thread_no, task);
 	}
+	free(thread_contexts);
 }
 
 void * cellCounts_select_and_write_alignments_from_temp(void * pr){
