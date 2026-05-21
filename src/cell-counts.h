@@ -4,7 +4,7 @@
 #ifndef __CELL_COUNTS_H
 #define __CELL_COUNTS_H
 
-#define SCRNA_VBUFF_SIZE (256*1024)
+#define SCRNA_VBUFF_SIZE (32*1024*1024)
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
