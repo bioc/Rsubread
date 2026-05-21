@@ -4685,6 +4685,7 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 			pthread_join(thread_contexts[current_thread_no].thread, NULL);
 		}
 		fclose(temp_fp);
+		unlink(tmp_fname);
 	}
 
 	for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
@@ -4705,6 +4706,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	if(!temp_fp) return NULL+1;
 
+	int processed_records =0;
 	while(1){
 		int record_size = 0;
 		unsigned char * record = NULL;
@@ -4718,6 +4720,8 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		unsigned short * cstart_buf = NULL;
 		unsigned short * cend_buf = NULL;
 		unsigned char * flags_buf = NULL;
+		char * read_qual_fwd = NULL;
+		char * read_qual_rev = NULL;
 		char * read_text_fwd = NULL;
 		char * read_text_rev = NULL;
 		char * read_name = NULL;
@@ -4770,8 +4774,8 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		if(bc_len < 0 || bc_len > MAX_CELLBC_LEN) return NULL+1;
 		if(umi_len < 0 || umi_len > MAX_UMI_LEN) return NULL+1;
 
+		size_t read_text_slot = (size_t)MAX_SCRNA_READ_LENGTH + 2;
 		{
-			size_t read_text_slot = (size_t)MAX_SCRNA_READ_LENGTH + 2;
 			size_t read_name_slot = (size_t)MAX_READ_NAME_LEN + 1;
 			size_t bcumi_slot = (size_t)MAX_CELLBC_LEN + (size_t)MAX_UMI_LEN + 1;
 			size_t votes_bytes = (size_t)saved_alignments * sizeof(unsigned short);
@@ -4785,7 +4789,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			size_t packed_bcumi_len = (size_t)(((bc_len + umi_len) * 3 + 7) / 8);
 			size_t need_bytes = votes_bytes + pos_bytes + cstart_bytes + cend_bytes + flags_bytes + read_qual_len + packed_read_len + bcqual_len + packed_bcumi_len;
 
-			size_t work_required = read_text_slot * 2 + read_name_slot + bcumi_slot * 2;
+			size_t work_required = read_text_slot * 4 /* RTEXT, REV_TEXT, RQUAL, REV_QUAL */ + read_name_slot + bcumi_slot * 2;
 
 			if((size_t)(record_end - rp) < need_bytes) return NULL+1;
 			if(work_required > (size_t)INT_MAX) return NULL+1;
@@ -4794,6 +4798,8 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			if(!work) return NULL+1;
 			read_text_fwd = (char *)work;
 			read_text_rev = read_text_fwd + read_text_slot;
+			read_qual_fwd = read_text_rev + read_text_slot;
+			read_qual_rev = read_qual_fwd + read_text_slot;
 			read_name = read_text_rev + read_text_slot;
 			bcumi_seq_buf = read_name + read_name_slot;
 			bcumi_qual_buf = bcumi_seq_buf + bcumi_slot;
@@ -4808,7 +4814,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			cend_buf = (unsigned short *)rp; rp += cend_bytes;
 			flags_buf = (unsigned char *)rp; rp += flags_bytes;
 			read_qual = (char *)rp; rp += read_qual_len;
-			(void)read_qual;
+			memcpy(read_qual_fwd, read_qual, read_qual_len);
 			{
 				unsigned char * packed_read = rp;
 				rp += packed_read_len;
@@ -4834,21 +4840,51 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 
 		SUBreadSprintf(read_name, MAX_READ_NAME_LEN + 1, "R%011u|%s|%s", read_number, bcumi_seq_buf, bcumi_qual_buf);
 
+		thread_context -> alignment_repating_table = HashTableCreate(50);
+
+		thread_context -> total_voteIJs_to_write = 0;
+		thread_context -> populating_voteIJ_buf_index=0;
 		for(i = 0; i < saved_alignments; i++){
 			char * this_read_text = read_text_fwd;
 			if(flags_buf[i] & SAM_FLAG_REVERSE_STRAND_MATCHED){
 				memcpy(read_text_rev, read_text_fwd, read_len + 1);
 				reverse_read(read_text_rev, read_len, GENE_SPACE_BASE);
+				memcpy(read_qual_rev, read_qual_fwd, read_len + 1);
+				reverse_quality(read_qual_rev, read_len);
 				this_read_text = read_text_rev;
 			}
 			cellCounts_explain_one_alignment(cct_context, thread_no, sample_number ? (int)sample_number : -1, read_name, NULL, this_read_text, read_len, cstart_buf[i], cend_buf[i], pos_buf[i], (flags_buf[i] & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0, votes_buf[i]);
 		}
+		HashTableDestroy(thread_context -> alignment_repating_table);
 
+		int distinct_vote_number_i;
+		if(thread_context -> total_voteIJs_to_write) {
+			int sorting_index [thread_context -> populating_voteIJ_buf_index];
+			for(distinct_vote_number_i = 0 ; distinct_vote_number_i < thread_context -> populating_voteIJ_buf_index; distinct_vote_number_i ++) sorting_index [distinct_vote_number_i ] = distinct_vote_number_i ;
+			void * sorting_ptr[2];
+			sorting_ptr[0] = thread_context;
+			sorting_ptr[1] = sorting_index;
+			//sort : large number first
+			quick_sort(sorting_ptr , thread_context -> populating_voteIJ_buf_index , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "total_voteIJs_to_write" records ahead are worth writting (score > 0).
+
+			for(thread_context -> writing_voteID_buf_index = 0 ; thread_context -> writing_voteID_buf_index < thread_context -> total_voteIJs_to_write; thread_context -> writing_voteID_buf_index ++){
+				int myno = sorting_index[thread_context -> writing_voteID_buf_index ];
+				if(thread_context -> reporting_scores[ myno ] < 1)continue;
+				if(thread_context -> writing_voteID_buf_index >= cct_context -> max_reported_alignments_per_read) break;
+				int reverse_text_offset = (thread_context -> reporting_flags[myno] & SAM_FLAG_REVERSE_STRAND_MATCHED)?read_text_slot:0;
+				if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
+					strcpy(read_qual+reverse_text_offset, read_qual);
+					reverse_quality(read_qual+reverse_text_offset, read_len);
+				}
+				if(cct_context -> do_cell_level_junction_detection && sample_number>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_number, myno);
+				cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_number, myno, read_name, read_text_fwd + reverse_text_offset, read_qual_fwd+reverse_text_offset, read_text_fwd , read_qual_fwd , read_len);
+			}
+		} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_number, -1, read_name, read_text_fwd, read_qual, read_text_fwd, read_qual, read_len);
+		processed_records++;
 	}
+//fprintf(stderr,"THREAD_%d processed %d records.\n", thread_no, processed_records);
 	return NULL;
 }
-
-
 
 int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_no, int task) {
 	subread_read_number_t current_read_number=0;
