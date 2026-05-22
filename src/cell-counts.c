@@ -3770,11 +3770,11 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 			int ma_cov_start = votetab -> coverage_start[mai][maj] + JUNCTION_WIDDEN_GAP_LEN;
 			int ma_cov_end = votetab -> coverage_end[mai][maj] - JUNCTION_WIDDEN_GAP_LEN;
 			int ma_toli = votetab -> toli[mai][maj];
-			int ma_indel = votetab -> indel_recorder[mai][maj][ma_toli -3 +2];
 			int mavotes = votetab -> votes[mai][maj];
 			#define read_text_rev_DEFLEN MAX_SCRNA_READ_LENGTH+1
 			char * read_maped_look = manegative?read_text+read_text_rev_DEFLEN:read_text;
 			int ma_indels_in_coverage = votetab -> indel_recorder[mai][maj][ma_toli -3 +2];
+//			int ma_indel              = votetab -> indel_recorder[mai][maj][ma_toli -3 +2];
 
 			for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
 				for (j=0; j< votetab->items[i]; j++){
@@ -3814,7 +3814,7 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 					int misma_in_GTAG_met = -1, gaplen=-1, is_negative_by_GTAG=-1;
 
 					int offset_from_gap = cellCounts_junc_meet_in_the_middle(cct_context, thread_context, read_maped_look,
-						ma_cov_start, ma_cov_end, ma_indel, maloc, tst_cov_start, tst_cov_end, tst_indel, tstloc, &misma_in_GTAG_met, &gaplen, &is_negative_by_GTAG);
+						ma_cov_start, ma_cov_end, ma_indels_in_coverage, maloc, tst_cov_start, tst_cov_end, tst_indel, tstloc, &misma_in_GTAG_met, &gaplen, &is_negative_by_GTAG);
 
 					srInt_64 this_mate_score = -1llu;
 					if(  offset_from_gap >=0 && misma_in_GTAG_met <= JUNCTION_MAX_MISMA_MEET)
@@ -3877,7 +3877,7 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 			}
 			if(NULL==HashTableGet(indel_dp_exed, NULL+1+(maiijj & 0xffffffffffffllu))){
 				HashTablePut(indel_dp_exed, NULL+1+(maiijj & 0xffffffffffffllu), NULL+1);
-				if(ma_indels_in_coverage)cellCounts_add_covered_indels_in_table(cct_context, thread_no, sample_i, read_maped_look, ma_cov_start, ma_cov_end, ma_indel, maloc, read_name);
+				if(ma_indels_in_coverage)cellCounts_add_covered_indels_in_table(cct_context, thread_no, sample_i, read_maped_look, ma_cov_start, ma_cov_end, ma_indels_in_coverage, maloc, read_name);
 			}
 		}
 		HashTableDestroy(indel_dp_exed);
