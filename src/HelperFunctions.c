@@ -3095,6 +3095,150 @@ int GEMINIgeneral_dynamic_align(char * read, int read_len, unsigned int begin_po
 
 }
 
+
+int OldMEMgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+  void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
+// read must be converted to the positive strand.
+// movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch
+// the size of the movement buffer must be equal to the length of the read plus max_indel * 3.
+{
+	int max_indel = min(16 , max_indel_length); 
+	int i,j;
+	int LRM_DP_ALIGN_CREATEGAP_PENALTY, LRM_DP_ALIGN_EXTENDGAP_PENALTY, LRM_DP_ALIGN_MATCH_SCORE, LRM_DP_ALIGN_MISMATCH_PENALTY;
+	LRM_DP_ALIGN_CREATEGAP_PENALTY = penalties[0];  
+	LRM_DP_ALIGN_EXTENDGAP_PENALTY = penalties[1]; 
+	LRM_DP_ALIGN_MATCH_SCORE = penalties[2]; 
+	LRM_DP_ALIGN_MISMATCH_PENALTY = penalties[3]; 
+
+	if(read_len < 3 || abs(expected_offset) > max_indel)
+		return 0;
+	if(expected_offset < 0 && read_len < (3-expected_offset))
+		return 0;
+
+	//unsigned long long table_ptr = (unsigned long long) indel_context -> dynamic_align_table;
+
+	short ** table = (short**)(buffers[0]); 
+	char ** table_mask = (char**)(buffers[3]);
+	// vertical move: deletion (1)
+	// horizontal move: insertion (2)
+	// cross move: match (0) or mismatch (3)
+	// i: vertical move; j: horizontal move
+
+	//SUBREADprintf("DM[%d]: %p %d,%d\n", thread_context -> thread_id, table_mask, read_len +  expected_offset,  read_len);
+	for (i=0; i<read_len +  expected_offset; i++)
+	{
+		for(j=0; j<read_len; j++)
+		{
+			table_mask[i][j]=0;
+
+			if (j < i - max_indel || j > max_indel + i)
+			{
+				table[i][j]=-9999;
+				continue;
+			}
+
+			short from_upper;
+
+			if (i>0) from_upper = table[i-1][j] + (table_mask[i-1][j] == INDEL_MASK_BY_DELETION?LRM_DP_ALIGN_EXTENDGAP_PENALTY:LRM_DP_ALIGN_CREATEGAP_PENALTY);
+			else     from_upper = -9999;
+
+			short from_left;
+
+			if (j>0) from_left = table[i][j-1] + (table_mask[i][j-1] == INDEL_MASK_BY_INSERTION?LRM_DP_ALIGN_EXTENDGAP_PENALTY:LRM_DP_ALIGN_CREATEGAP_PENALTY);
+			else     from_left = -9999;
+
+			char chromo_ch = get_index_base_value(begin_position + i, general_context);
+			char is_matched_ij = (chromo_ch == read[j])?LRM_DP_ALIGN_MATCH_SCORE:LRM_DP_ALIGN_MISMATCH_PENALTY;
+			
+			short from_upperleft;
+
+			if (i>0 && j>0) from_upperleft = table[i-1][j-1] + is_matched_ij;
+			else if(i==0 && j==0) from_upperleft = is_matched_ij;
+			else	    from_upperleft = -9999; 
+
+			if (from_upperleft == from_upper && from_upperleft > from_left)
+			{
+				table_mask[i][j]= INDEL_MASK_BY_DELETION;
+				table[i][j] = from_upper;
+			}
+			else if(from_upperleft == from_left && from_upperleft > from_upper)
+			{
+				table_mask[i][j]= INDEL_MASK_BY_INSERTION;
+				table[i][j] = from_left;
+			}
+			else if(from_upperleft > from_left && from_upperleft > from_upper)
+			{
+				table_mask[i][j]= (chromo_ch == read[j])?INDEL_MASK_BY_MATCH:INDEL_MASK_BY_MISMATCH;
+				table[i][j] = from_upperleft;
+			}
+			else if(from_upperleft == from_left && from_upperleft == from_upper)
+			{
+				table_mask[i][j]= (chromo_ch == read[j])?INDEL_MASK_BY_MATCH:INDEL_MASK_BY_MISMATCH;
+				table[i][j] = from_upperleft;
+			}
+			else if(from_left > from_upper)
+			{
+				table_mask[i][j]= INDEL_MASK_BY_INSERTION;
+				table[i][j] = from_left;
+			}
+			else if(from_left <= from_upper)
+			{
+				table_mask[i][j]= INDEL_MASK_BY_DELETION;
+				table[i][j] = from_upper;
+			}
+		}
+	}
+
+	short path_i = read_len + expected_offset - 1;
+	int out_pos = 0, delta=0;
+	j = read_len - 1;
+
+int debugout1 = 0;
+if(0) debugout1 =1;
+if(debugout1)fprintf(stderr,"\n");
+	while(1)
+	{
+		if(table_mask[path_i][j] == INDEL_MASK_BY_INSERTION)
+		{
+			j--;
+			delta --;
+			movement_buffer[out_pos++] = 2;
+if(debugout1)fprintf(stderr,"I");
+		}
+		else if(table_mask[path_i][j] == INDEL_MASK_BY_DELETION)
+		{
+			path_i--;
+			delta ++;
+			movement_buffer[out_pos++] = 1;
+if(debugout1)fprintf(stderr,"D");
+		}
+		else if(table_mask[path_i][j] == INDEL_MASK_BY_MATCH || table_mask[path_i][j] == INDEL_MASK_BY_MISMATCH)
+		{
+			movement_buffer[out_pos++] = table_mask[path_i][j] == INDEL_MASK_BY_MATCH?0:3;
+			path_i--;
+			j--;
+if(debugout1)fprintf(stderr,"M");
+		}
+
+		if(path_i == -1 && j == -1) break;
+		if(j<0 || path_i<0) return 0;
+	}
+if(debugout1)fprintf(stderr,"\n");
+
+	if(expected_offset!=delta)return 0;
+	for(i=0; i<out_pos/2; i++)
+	{
+		char tmp;
+		tmp = movement_buffer[out_pos-1-i];
+		movement_buffer[out_pos-1-i] = movement_buffer[i];
+		movement_buffer[i] = tmp;
+	}
+	return out_pos;
+}
+
+
+
+
 int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
 // read must be converted to the positive strand.

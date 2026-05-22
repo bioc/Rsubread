@@ -3449,7 +3449,7 @@ void cellCounts_init_junctionread_one_end(cellcounts_global_t * cct_context, int
 	thread_context -> realignment_event_stack_best_score = -1;
 }
 
-void cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read_name, char * read_bin, char * read_text, int read_len, int noindel_coved_firstbase, int noindel_coved_lastbase, unsigned int linear_mapped_pos, int is_reversed, int votes_for_aln){
+void cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read_name, char * read_text, int read_len, int noindel_coved_firstbase, int noindel_coved_lastbase, unsigned int linear_mapped_pos, int is_reversed, int votes_for_aln){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	cellCounts_init_build_junctionread_context(cct_context, thread_no, read_name);
 	int to3end;
@@ -3694,15 +3694,15 @@ char cellCounts_add_covered_indels_in_table_getval(unsigned int pos, void * cont
 	return gvindex_get(current_value_index,pos);
 }
 
-void cellCounts_add_covered_indels_in_table(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read, int cov_start, int cov_end, int expected_indel, unsigned int chro_loc){
+void cellCounts_add_covered_indels_in_table(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read, int cov_start, int cov_end, int expected_indel, unsigned int chro_loc, char * read_name){
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	char *** dpbuf = thread_context -> dynamic_align_buffers;
 	int * dpplt = thread_context -> dynamic_align_penalties;
 	char result_buffer[3*MAX_SCRNA_READ_LENGTH+1];
 	char result_cigar[3*MAX_SCRNA_READ_LENGTH+1];
-	int moved_len = general_dynamic_align(read + cov_start, cov_end - cov_start, chro_loc + cov_start, result_buffer, expected_indel, cct_context ->max_indel_length,
-		(void***)dpbuf, dpplt, cellCounts_add_covered_indels_in_table_getval, cct_context);
+	int moved_len = general_dynamic_align(read + cov_start, cov_end - cov_start, chro_loc + cov_start, result_buffer, expected_indel, cct_context ->max_indel_length, (void***)dpbuf, dpplt, cellCounts_add_covered_indels_in_table_getval, cct_context);
 	int retlen = general_dynamic_align_moves_to_cigar(result_buffer, moved_len, result_cigar);
+//if(strstr(read_name,"R00000000207")) fprintf(stderr,"DYNAMIC_INDEL for %s : %s\n", read_name, result_cigar);
 
 	int nch, tmpi=0,x1;
 	unsigned int chro_cursor = chro_loc + cov_start;
@@ -3774,6 +3774,7 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 			int mavotes = votetab -> votes[mai][maj];
 			#define read_text_rev_DEFLEN MAX_SCRNA_READ_LENGTH+1
 			char * read_maped_look = manegative?read_text+read_text_rev_DEFLEN:read_text;
+			int ma_indels_in_coverage = votetab -> indel_recorder[mai][maj][ma_toli -3 +2];
 
 			for (i=0; i<GENE_SCRNA_VOTE_TABLE_SIZE; i++){
 				for (j=0; j< votetab->items[i]; j++){
@@ -3833,31 +3834,33 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 //			#warning "====  Think: could a read contribute multiple junctions? could a major half contribute multiple junctions? ===="
 			if( best_s1_aft_split >=0 ){
 				srInt_64 best_major_half = best_mate_iijj>>48;
-				srInt_64 maiijj= ArrayListGet(jstub_potential_mainhalf_list, best_major_half)-NULL;
 				srInt_64 tstiijj= best_mate_iijj & 0xffffffffffffllu;
 
-				int mai = maiijj>>24, maj=maiijj & 0xffffff;
+				if(best_major_half != mainhalf_i)SUBREADprintf("LOGIC HAS CHANGED HERE!!\n");
+
+	//			srInt_64 maiijj= ArrayListGet(jstub_potential_mainhalf_list, best_major_half)-NULL;
+	//			int mai = maiijj>>24, maj=maiijj & 0xffffff;
+
 				int tsti = tstiijj>>24, tstj=tstiijj & 0xffffff;
 
-				unsigned int maloc = votetab -> pos[mai][maj];
-				int manegative = votetab -> masks[mai][maj];
-				int ma_cov_start = votetab -> coverage_start[mai][maj] + JUNCTION_WIDDEN_GAP_LEN;
-				int ma_cov_end = votetab -> coverage_end[mai][maj] - JUNCTION_WIDDEN_GAP_LEN;
-				int ma_toli = votetab -> toli[mai][maj];
-				int ma_indels_in_coverage = votetab -> indel_recorder[mai][maj][ma_toli -3 +2];
+				//unsigned int maloc = votetab -> pos[mai][maj];
+				//int manegative = votetab -> masks[mai][maj];
+				//int ma_cov_start = votetab -> coverage_start[mai][maj] + JUNCTION_WIDDEN_GAP_LEN;
+				//int ma_cov_end = votetab -> coverage_end[mai][maj] - JUNCTION_WIDDEN_GAP_LEN;
+				//int ma_toli = votetab -> toli[mai][maj];
 
 				unsigned int tstloc = votetab -> pos[tsti][tstj];
 				int tst_cov_start = votetab -> coverage_start[tsti][tstj] + JUNCTION_WIDDEN_GAP_LEN;
 				int tst_cov_end = votetab -> coverage_end[tsti][tstj] - JUNCTION_WIDDEN_GAP_LEN;
 				int tst_toli = votetab -> toli[tsti][tstj];
-				int tst_indels_in_coverage = votetab -> indel_recorder[tsti][tstj][tst_toli -3 +2];
+				int minor_indels_in_coverage = votetab -> indel_recorder[tsti][tstj][tst_toli -3 +2];
 
 				unsigned int junction_left_last_exon_base, junction_right_first_exon_base;
 				int rgap = -1;
 				if(tst_cov_start < ma_cov_start) rgap = ma_cov_start - tst_cov_end; else  rgap = tst_cov_start - ma_cov_end;
 
 				if(ma_cov_start > tst_cov_start){
-					junction_left_last_exon_base = tstloc + tst_indels_in_coverage+ tst_cov_end + best_s1_aft_split -1;
+					junction_left_last_exon_base = tstloc + minor_indels_in_coverage+ tst_cov_end + best_s1_aft_split -1;
 					junction_right_first_exon_base = maloc+ tst_cov_end + best_s1_aft_split ;
 				}else{
 					junction_left_last_exon_base = maloc + ma_indels_in_coverage+ ma_cov_end + best_s1_aft_split -1;
@@ -3869,12 +3872,12 @@ int cellCounts_call_juncs_put_in_tab(cellcounts_global_t * cct_context, int thre
 
 				if(NULL==HashTableGet(indel_dp_exed, NULL+1+(tstiijj & 0xffffffffffffllu))){
 					HashTablePut(indel_dp_exed, NULL+1+(tstiijj & 0xffffffffffffllu), NULL+1);
-					cellCounts_add_covered_indels_in_table(cct_context, thread_no, sample_i, read_maped_look, tst_cov_start, tst_cov_end, tst_indels_in_coverage, tstloc);
+					if(minor_indels_in_coverage)cellCounts_add_covered_indels_in_table(cct_context, thread_no, sample_i, read_maped_look, tst_cov_start, tst_cov_end, minor_indels_in_coverage, tstloc, read_name);
 				}
 			}
 			if(NULL==HashTableGet(indel_dp_exed, NULL+1+(maiijj & 0xffffffffffffllu))){
 				HashTablePut(indel_dp_exed, NULL+1+(maiijj & 0xffffffffffffllu), NULL+1);
-				cellCounts_add_covered_indels_in_table(cct_context, thread_no, sample_i, read_maped_look, ma_cov_start, ma_cov_end, ma_indel, maloc);
+				if(ma_indels_in_coverage)cellCounts_add_covered_indels_in_table(cct_context, thread_no, sample_i, read_maped_look, ma_cov_start, ma_cov_end, ma_indel, maloc, read_name);
 			}
 		}
 		HashTableDestroy(indel_dp_exed);
@@ -4115,7 +4118,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 							int is_negative = votetab->masks[i][j];
 							int reverse_text_offset = is_negative?MAX_SCRNA_READ_LENGTH+1:0;
 
-							cellCounts_explain_one_alignment(cct_context, thread_no, sample_i, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab->pos[i][j], is_negative, vv);
+							cellCounts_explain_one_alignment(cct_context, thread_no, sample_i, read_name, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab->pos[i][j], is_negative, vv);
 						}else cellCounts_explain_PaperVersion_one_alignment (cct_context, thread_no, read_name, read_bin, read_text, read_len, all_subreads, votetab, i, j); // ( cct_context, thread_no, read_name, read_bin, read_text + reverse_text_offset, read_len, perfect_coved_firstbase, perfect_coved_lastbase, votetab,i,j);
 					}
 				}
@@ -4497,7 +4500,8 @@ static unsigned char * cellCounts_temp_realign_ensure_buf(unsigned char ** buf, 
 int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thread_no, int sample_i, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads) {
 	int i, j, distinct_vote_number_i;
 	int saved_alignments = 0;
-	int max_saved_alignments = min(cct_context -> max_reported_alignments_per_read, SCRNA_HIGHEST_REPORTED_ALIGNMENTS);
+	int max_saved_alignments = min(cct_context -> max_candidate_voteIJ_per_read, SCRNA_HIGHEST_REPORTED_ALIGNMENTS);
+	//int max_saved_alignments = min(cct_context -> max_reported_alignments_per_read, SCRNA_HIGHEST_REPORTED_ALIGNMENTS);
 	int index_gap_width = cct_context -> current_index -> index_gap;
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL;
 	char * sample_seq_end = NULL, * sample_qual_end = NULL;
@@ -4515,6 +4519,10 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 	(void)lane_str;
 	(void)RG;
 	(void)rname_trimmed_len;
+
+	int CR15GLS = (read_len - 15 - index_gap_width)<<16;
+	int subread_step =  CR15GLS /(cct_context -> total_subreads_per_read -1);
+	if(subread_step<(index_gap_width<<16))subread_step = index_gap_width<<16;
 
 	memset(&temprec, 0, sizeof(temprec));
 	memset(top_distinct_vote_numbers, 0, sizeof(top_distinct_vote_numbers));
@@ -4559,8 +4567,12 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 					if(saved_alignments >= max_saved_alignments) break;
 					temprec.num_of_votes[saved_alignments] = (unsigned short)vv;
 					temprec.voted_position[saved_alignments] = votetab->pos[i][j];
-					temprec.coverage_start[saved_alignments] = votetab->coverage_start[i][j];
-					temprec.coverage_end[saved_alignments] = votetab->coverage_end[i][j];
+
+					int perfect_align_srno = votetab->indel_recorder[i][j][0]-1; // indel_recorder is subread_no + 1
+					temprec.coverage_start[saved_alignments] = ((subread_step * perfect_align_srno) >> 16);
+					perfect_align_srno = votetab->indel_recorder[i][j][1]-1;
+					temprec.coverage_end[saved_alignments] = ((subread_step * perfect_align_srno) >> 16) +15;
+
 					temprec.flags[saved_alignments] = votetab->masks[i][j] ? SAM_FLAG_REVERSE_STRAND_MATCHED : 0;
 					saved_alignments++;
 //fprintf(stderr,"ADD_TEMP_REALIGN_FILE of ALN %d : vote = %d at VTAB %d_%d   TOP_N %d is %d / %d\n", saved_alignments, vv, i, j,  this_vote_N, distinct_vote_number_i , cct_context -> max_differential_from_top_vote_number );
@@ -4888,7 +4900,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 				reverse_quality(read_qual_rev, read_len);
 				this_read_text = read_text_rev;
 			}
-			cellCounts_explain_one_alignment(cct_context, thread_no, sample_number ? (int)sample_number : -1, read_name, NULL, this_read_text, read_len, cstart_buf[i], cend_buf[i], pos_buf[i], (flags_buf[i] & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0, votes_buf[i]);
+			cellCounts_explain_one_alignment(cct_context, thread_no, sample_number ? (int)sample_number : -1, read_name, this_read_text, read_len, cstart_buf[i], cend_buf[i], pos_buf[i], (flags_buf[i] & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0, votes_buf[i]);
 		}
 		HashTableDestroy(thread_context -> alignment_repating_table);
 
