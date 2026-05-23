@@ -2640,6 +2640,7 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 int cellCounts_do_voting(cellcounts_global_t * cct_context, int thread_no) ;
 int cellCounts_do_junctable(cellcounts_global_t * cct_context, int thread_no) ;
 int cellCounts_do_realign(cellcounts_global_t * cct_context);
+static int cellCounts_temp_realign_fp_finish_write(cellcounts_temp_file_point_t * temp_fp);
 
 void * cellCounts_run_in_thread(void * params){
 	void ** parameters = (void **)params;
@@ -2671,8 +2672,11 @@ int cellCounts_release_context_from_align(cellcounts_global_t * cct_context, int
 	if(thread_context -> temp_realign_work_buf)
 		free(thread_context -> temp_realign_work_buf);
 	thread_context -> temp_realign_work_buf = thread_context -> temp_realign_record_buf = NULL;
-	if(thread_context -> realign_temp_fp) fclose(thread_context -> realign_temp_fp);
-	thread_context -> realign_temp_fp = NULL;
+	if(thread_context -> realign_temp_fp.fp){
+		cellCounts_temp_realign_fp_finish_write(&thread_context -> realign_temp_fp);
+		fclose(thread_context -> realign_temp_fp.fp);
+	}
+	memset(&thread_context -> realign_temp_fp, 0, sizeof(thread_context -> realign_temp_fp));
 
 	return 0;
 }
@@ -4470,18 +4474,138 @@ static void cellCounts_temp_realign_unpack_3bit(const unsigned char * in, int le
 	out[len] = 0;
 }
 
-FILE * cellCounts_select_and_write_temps_open_fp(cellcounts_global_t * cct_context, int thread_no){
+static int cellCounts_temp_realign_is_control_byte(unsigned char this_byte){
+	return this_byte >= 0xD0 && this_byte <= 0xF0;
+}
+
+static int cellCounts_temp_realign_fp_put_byte(cellcounts_temp_file_point_t * temp_fp, unsigned char this_byte){
+	return EOF != fputc((int)this_byte, temp_fp -> fp);
+}
+
+static int cellCounts_temp_realign_fp_flush_run(cellcounts_temp_file_point_t * temp_fp){
+	int repeats = 0;
+	unsigned char this_byte = 0;
+
+	if(!temp_fp -> rle_run_active) return 1;
+	repeats = 1 + (int)temp_fp -> rle_run_repeats;
+	this_byte = temp_fp -> rle_run_byte;
+
+	if(repeats >= 2){
+		unsigned char marker = (unsigned char)(0xD1 + repeats - 1);
+		if(!cellCounts_temp_realign_fp_put_byte(temp_fp, marker)) return 0;
+		if(!cellCounts_temp_realign_fp_put_byte(temp_fp, this_byte)) return 0;
+	}else{
+		if(cellCounts_temp_realign_is_control_byte(this_byte)){
+			if(!cellCounts_temp_realign_fp_put_byte(temp_fp, 0xD0)) return 0;
+			if(!cellCounts_temp_realign_fp_put_byte(temp_fp, this_byte)) return 0;
+		}else{
+			if(!cellCounts_temp_realign_fp_put_byte(temp_fp, this_byte)) return 0;
+		}
+	}
+
+	temp_fp -> rle_run_active = 0;
+	temp_fp -> rle_run_repeats = 0;
+	temp_fp -> rle_buffer_used = 0;
+	return 1;
+}
+
+static int cellCounts_temp_realign_fp_write_plain(cellcounts_temp_file_point_t * temp_fp, const unsigned char * plain, int plain_bytes){
+	int i;
+	if(!temp_fp || !temp_fp -> fp) return 0;
+	if(plain_bytes < 0) return 0;
+
+	for(i = 0; i < plain_bytes; i++){
+		unsigned char this_byte = plain[i];
+		if(!temp_fp -> rle_run_active){
+			temp_fp -> rle_run_active = 1;
+			temp_fp -> rle_run_byte = this_byte;
+			temp_fp -> rle_run_repeats = 0;
+			temp_fp -> rle_buffer_used = 0;
+		}else if(this_byte == temp_fp -> rle_run_byte && temp_fp -> rle_run_repeats < 31){
+			temp_fp -> rle_buffer[temp_fp -> rle_run_repeats] = this_byte;
+			temp_fp -> rle_run_repeats++;
+			temp_fp -> rle_buffer_used = temp_fp -> rle_run_repeats;
+		}else{
+			if(!cellCounts_temp_realign_fp_flush_run(temp_fp)) return 0;
+			temp_fp -> rle_run_active = 1;
+			temp_fp -> rle_run_byte = this_byte;
+			temp_fp -> rle_run_repeats = 0;
+			temp_fp -> rle_buffer_used = 0;
+		}
+	}
+	return 1;
+}
+
+static int cellCounts_temp_realign_fp_read_plain(cellcounts_temp_file_point_t * temp_fp, unsigned char * plain, int plain_bytes){
+	int out_used = 0;
+	if(!temp_fp || !temp_fp -> fp) return -1;
+	if(plain_bytes < 0) return -1;
+
+	while(out_used < plain_bytes){
+		if(temp_fp -> rle_buffer_used > 0){
+			int copy_bytes = min((int)temp_fp -> rle_buffer_used, plain_bytes - out_used);
+			memcpy(plain + out_used, temp_fp -> rle_buffer, copy_bytes);
+			out_used += copy_bytes;
+			temp_fp -> rle_buffer_used -= (unsigned char)copy_bytes;
+			if(temp_fp -> rle_buffer_used > 0) memmove(temp_fp -> rle_buffer, temp_fp -> rle_buffer + copy_bytes, temp_fp -> rle_buffer_used);
+			continue;
+		}
+
+		int marker = fgetc(temp_fp -> fp);
+		if(marker == EOF) return out_used;
+
+		if(cellCounts_temp_realign_is_control_byte((unsigned char)marker)){
+			int raw_byte = fgetc(temp_fp -> fp);
+			int repeats, emit_now, keep_now;
+			if(raw_byte == EOF) return -1;
+			repeats = (marker == 0xD0) ? 1 : (marker - 0xD1 + 1);
+			if(repeats < 1 || repeats > 32) return -1;
+			emit_now = min(repeats, plain_bytes - out_used);
+			memset(plain + out_used, raw_byte, emit_now);
+			out_used += emit_now;
+			keep_now = repeats - emit_now;
+			if(keep_now > 0){
+				memset(temp_fp -> rle_buffer, raw_byte, keep_now);
+				temp_fp -> rle_buffer_used = (unsigned char)keep_now;
+			}
+		}else{
+			plain[out_used++] = (unsigned char)marker;
+		}
+	}
+
+	return out_used;
+}
+
+static int cellCounts_temp_realign_fp_read_plain_exact(cellcounts_temp_file_point_t * temp_fp, unsigned char * plain, int plain_bytes, int allow_eof){
+	int rlen = 0;
+	if(plain_bytes < 0) return -1;
+	if(plain_bytes == 0) return 1;
+	rlen = cellCounts_temp_realign_fp_read_plain(temp_fp, plain, plain_bytes);
+	if(rlen < 0) return -1;
+	if(rlen == plain_bytes) return 1;
+	if(rlen == 0 && allow_eof) return 0;
+	return -1;
+}
+
+static int cellCounts_temp_realign_fp_finish_write(cellcounts_temp_file_point_t * temp_fp){
+	if(!temp_fp || !temp_fp -> fp) return 0;
+	if(!cellCounts_temp_realign_fp_flush_run(temp_fp)) return 0;
+	return 0 == fflush(temp_fp -> fp);
+}
+
+cellcounts_temp_file_point_t * cellCounts_select_and_write_temps_open_fp(cellcounts_global_t * cct_context, int thread_no){
 	if(thread_no < 0 || thread_no >= 64) return NULL;
 
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	FILE * temp_fp = thread_context -> realign_temp_fp;
+	cellcounts_temp_file_point_t * temp_fp = &thread_context -> realign_temp_fp;
 
-	if(!temp_fp){
+	if(!temp_fp -> fp){
 		char tmp_fname[MAX_FILE_NAME_LENGTH + 120];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH + 120, "%s/temp-cellcounts-realign-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), thread_no);
-		temp_fp = fopen(tmp_fname, "wb");
-		setvbuf(temp_fp, thread_context -> tempbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
-		thread_context -> realign_temp_fp = temp_fp;
+		memset(temp_fp, 0, sizeof(cellcounts_temp_file_point_t));
+		temp_fp -> fp = fopen(tmp_fname, "wb");
+		if(!temp_fp -> fp) return NULL;
+		setvbuf(temp_fp -> fp, thread_context -> tempbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
 	}
 	return temp_fp;
 }
@@ -4509,7 +4633,7 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 	int top_distinct_vote_numbers[cct_context -> max_distinct_top_vote_numbers];
 	char tmp_bc[MAX_READ_NAME_LEN+1];
 	struct TempForRealign temprec;
-	FILE * temp_fp;
+	cellcounts_temp_file_point_t * temp_fp;
 
 	(void)read_bin;
 	(void)all_subreads;
@@ -4681,9 +4805,8 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 			wp += packed_bcumi_len;
 		}
 
-		fwrite(&record_size, sizeof(int), 1, temp_fp);
-		fwrite(record, 1, record_size, temp_fp);
-		fflush(temp_fp);
+		if(!cellCounts_temp_realign_fp_write_plain(temp_fp, (unsigned char *)&record_size, sizeof(int))) return 1;
+		if(record_size > 0 && !cellCounts_temp_realign_fp_write_plain(temp_fp, record, record_size)) return 1;
 	}
 	return 0;
 }
@@ -4708,22 +4831,25 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 	// For each input thread file, start all threads. Total runs: threads ^ 2.
 	for(input_thread_no = 0; input_thread_no < cct_context->total_threads; input_thread_no++){
 		char tmp_fname[MAX_FILE_NAME_LENGTH + 120];
+		cellcounts_temp_file_point_t temp_fp;
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH + 120, "%s/temp-cellcounts-realign-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), input_thread_no);
 
-		FILE * temp_fp = fopen(tmp_fname, "rb");
-		setvbuf(temp_fp, thread_contexts[0].tempbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE); 
+		memset(&temp_fp, 0, sizeof(temp_fp));
+		temp_fp.fp = fopen(tmp_fname, "rb");
+		if(!temp_fp.fp) continue;
+		setvbuf(temp_fp.fp, thread_contexts[0].tempbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 			void ** thr_parameters = malloc(sizeof(void*)*4);
 			thr_parameters[0] = cct_context;
 			thr_parameters[1] = NULL+current_thread_no;
-			thr_parameters[2] = temp_fp;
+			thr_parameters[2] = &temp_fp;
 			pthread_create(&thread_contexts[current_thread_no].thread, NULL, cellCounts_select_and_write_alignments_from_temp, thr_parameters);
 		}
 
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 			pthread_join(thread_contexts[current_thread_no].thread, NULL);
 		}
-		fclose(temp_fp);
+		fclose(temp_fp.fp);
 		unlink(tmp_fname);
 	}
 
@@ -4739,12 +4865,12 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 	void ** my_parameters = pr;
 	cellcounts_global_t * cct_context = my_parameters[0];
 	int thread_no = my_parameters[1]-NULL;
-	FILE * temp_fp = my_parameters[2];
+	cellcounts_temp_file_point_t * temp_fp = my_parameters[2];
 
 	free(pr);
 	int rc = 0;
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	if(!temp_fp) return NULL+1;
+	if(!temp_fp || !temp_fp -> fp) return NULL+1;
 
 	int processed_records =0;
 	while(1){
@@ -4775,12 +4901,16 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		int i;
 
 		cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
-		if(1 != fread(&record_size, sizeof(int), 1, temp_fp)){
+		rc = cellCounts_temp_realign_fp_read_plain_exact(temp_fp, (unsigned char *)&record_size, sizeof(int), 1);
+		if(rc <= 0){
 			cellCounts_lock_release(&cct_context -> input_dataset_lock);
-			if(feof(temp_fp)) break;
+			if(rc == 0) break;
 			return NULL+1;
 		}
-		if(record_size < 0) return NULL+1;
+		if(record_size < 0){
+			cellCounts_lock_release(&cct_context -> input_dataset_lock);
+			return NULL+1;
+		}
 
 		record = cellCounts_temp_realign_ensure_buf(&thread_context -> temp_realign_record_buf, &thread_context -> temp_realign_record_capacity, record_size);
 		if(!record){
@@ -4788,7 +4918,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			return NULL+1;
 		}
 
-		if(record_size > 0 && (size_t)record_size != fread(record, 1, record_size, temp_fp)){
+		if(record_size > 0 && 1 != cellCounts_temp_realign_fp_read_plain_exact(temp_fp, record, record_size, 0)){
 			cellCounts_lock_release(&cct_context -> input_dataset_lock);
 			return NULL+1;
 		}

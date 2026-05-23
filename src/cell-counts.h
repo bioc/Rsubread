@@ -134,6 +134,15 @@ typedef struct {
 } realignment_event_stack_item_t;
 
 typedef struct{
+	FILE * fp;
+	unsigned char rle_buffer[31];
+	unsigned char rle_buffer_used;
+	unsigned char rle_run_byte;
+	unsigned char rle_run_repeats;
+	unsigned char rle_run_active;
+} cellcounts_temp_file_point_t;
+
+typedef struct{
 	int thread_no;
 	pthread_t thread;
 
@@ -182,7 +191,7 @@ typedef struct{
 	int dynamic_align_penalties[4];
 
 	// realignment stack related data
-	FILE * realign_temp_fp;
+	cellcounts_temp_file_point_t realign_temp_fp;
 	int realignment_event_stack_runcount;
 	int realignment_event_stack_current_depth;
 	int realignment_event_stack_best_score;
