@@ -5033,6 +5033,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			cellCounts_explain_one_alignment(cct_context, thread_no, sample_number ? (int)sample_number : -1, read_name, this_read_text, read_len, cstart_buf[i], cend_buf[i], pos_buf[i], (flags_buf[i] & SAM_FLAG_REVERSE_STRAND_MATCHED)?1:0, votes_buf[i]);
 		}
 		HashTableDestroy(thread_context -> alignment_repating_table);
+		thread_context -> total_voteIJs_to_write = min(thread_context -> total_voteIJs_to_write, cct_context -> max_reported_alignments_per_read);
 
 		int distinct_vote_number_i;
 		if(thread_context -> total_voteIJs_to_write) {
@@ -5046,8 +5047,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 
 			for(thread_context -> writing_voteID_buf_index = 0 ; thread_context -> writing_voteID_buf_index < thread_context -> total_voteIJs_to_write; thread_context -> writing_voteID_buf_index ++){
 				int myno = sorting_index[thread_context -> writing_voteID_buf_index ];
-				if(thread_context -> reporting_scores[ myno ] < 1)continue;
-				if(thread_context -> writing_voteID_buf_index >= cct_context -> max_reported_alignments_per_read) break;
+				if(thread_context -> reporting_scores[ myno ] < 1)break;
 				int reverse_text_offset = (thread_context -> reporting_flags[myno] & SAM_FLAG_REVERSE_STRAND_MATCHED)?read_text_slot:0;
 				if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
 					strcpy(read_qual+reverse_text_offset, read_qual);
