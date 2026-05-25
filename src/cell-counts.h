@@ -222,6 +222,8 @@ typedef struct{
 typedef struct{
 	int total_threads;
 	cellcounts_align_thread_t * all_thread_contexts;
+	void * all_thread_realign_fp_ptrs[64];
+	srInt_64 all_thread_realign_fp_ints[128];
 	int reads_per_chunk;
 	int allow_multi_overlapping_reads;
 	int max_candidate_voteIJ_per_read;

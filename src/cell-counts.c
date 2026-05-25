@@ -2676,11 +2676,14 @@ int cellCounts_release_context_from_align(cellcounts_global_t * cct_context, int
 	if(thread_context -> temp_realign_work_buf)
 		free(thread_context -> temp_realign_work_buf);
 	thread_context -> temp_realign_work_buf = thread_context -> temp_realign_record_buf = NULL;
-	if(thread_context -> realign_temp_fp.fp){
-		cellCounts_temp_realign_fp_finish_write(&thread_context -> realign_temp_fp);
-		cellcounts_temp_file_fclose(&thread_context -> realign_temp_fp);
-	}
-	memset(&thread_context -> realign_temp_fp, 0, sizeof(thread_context -> realign_temp_fp));
+
+	cellCounts_temp_realign_fp_finish_write(&thread_context -> realign_temp_fp);
+	cellcounts_temp_file_fclose(&thread_context -> realign_temp_fp);
+
+	cct_context -> all_thread_realign_fp_ptrs[thread_no] = thread_context -> realign_temp_fp.realign_temp_memspace;
+	cct_context -> all_thread_realign_fp_ints[thread_no*2] = thread_context -> realign_temp_fp.realign_temp_usedmem;
+	cct_context -> all_thread_realign_fp_ints[thread_no*2+1] = thread_context -> realign_temp_fp.realign_temp_capamem;
+	//memset(&thread_context -> realign_temp_fp, 0, sizeof(thread_context -> realign_temp_fp));
 
 	return 0;
 }
@@ -4547,6 +4550,7 @@ static int cellCounts_temp_realign_fp_write_plain(cellcounts_temp_file_point_t *
 
 int cellCounts_temp_realign_fp_fgetc(cellcounts_temp_file_point_t * temp_fp){
 	if(temp_fp -> realign_temp_memspace){
+//fprintf(stderr,"NCHAR %llu < %llu\n", temp_fp -> realign_temp_usedmem , temp_fp -> realign_temp_capamem);
 		if(temp_fp -> realign_temp_usedmem == temp_fp -> realign_temp_capamem)return EOF;
 		return temp_fp -> realign_temp_memspace[temp_fp -> realign_temp_usedmem ++];
 	}else return fgetc(temp_fp -> fp);
@@ -4612,6 +4616,7 @@ static int cellCounts_temp_realign_fp_finish_write(cellcounts_temp_file_point_t 
 
 void cellcounts_temp_file_destroy(cellcounts_global_t * cct_context, char * tmp_fname, cellcounts_temp_file_point_t *temp_fp){
 	if(temp_fp -> realign_temp_memspace){
+		fprintf(stderr,"FREEPTR %p\n", temp_fp -> realign_temp_memspace);
 		free(temp_fp -> realign_temp_memspace);
 		temp_fp -> realign_temp_memspace = NULL;
 	}
@@ -4625,12 +4630,21 @@ void cellcounts_temp_file_destroy(cellcounts_global_t * cct_context, char * tmp_
 void cellcounts_temp_file_fclose(cellcounts_temp_file_point_t * temp_fp){
 	if(temp_fp -> fp) fclose(temp_fp -> fp);
 	temp_fp -> fp = NULL;
+	temp_fp -> rle_buffer_used = 0;
+	temp_fp -> rle_run_byte = 0;
+	temp_fp -> rle_run_repeats = 0;
+	temp_fp -> rle_run_active = 0;
 }
 
 void cellcounts_temp_file_open(cellcounts_global_t * cct_context, char * tmp_fname, int for_writting, cellcounts_temp_file_point_t * temp_fp){
 	if(cct_context -> cell_level_junction_memory_temp){
 		if(for_writting){
 			temp_fp -> realign_temp_memspace = malloc(TEMP_BINFILE_MEMORY_SIZE_INIT);
+			if(temp_fp -> realign_temp_memspace)fprintf(stderr,"MALLOCED: %p\n", temp_fp -> realign_temp_memspace);else{
+				fprintf(stderr,"\n\nEEROR: NUL BUFF\n\n");
+				fprintf(stderr,"\n\nEEROR: NUL BUFF\n\n");
+				assert(0);
+			}
 			temp_fp -> realign_temp_capamem = TEMP_BINFILE_MEMORY_SIZE_INIT;
 		}else temp_fp -> realign_temp_capamem = temp_fp -> realign_temp_usedmem; // read mode: capa=current_available
 		temp_fp -> realign_temp_usedmem = 0;
@@ -4891,7 +4905,12 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		}
 
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
-			if(!cct_context ->cell_level_junction_memory_temp) ptr_temp_fp = & thread_contexts[current_thread_no].realign_temp_fp;
+			if(cct_context ->cell_level_junction_memory_temp){
+				ptr_temp_fp = & thread_contexts[current_thread_no].realign_temp_fp;
+				ptr_temp_fp -> realign_temp_memspace = cct_context -> all_thread_realign_fp_ptrs[current_thread_no] ;
+				ptr_temp_fp -> realign_temp_usedmem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2] ;
+				ptr_temp_fp -> realign_temp_capamem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2+1] ;
+			}
 
 			void ** thr_parameters = malloc(sizeof(void*)*4);
 			thr_parameters[0] = cct_context;
@@ -4903,12 +4922,12 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 			pthread_join(thread_contexts[current_thread_no].thread, NULL);
 		}
-		if(cct_context ->cell_level_junction_memory_temp){
+
+		if(cct_context -> cell_level_junction_memory_temp){
 			for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) 
-				cellcounts_temp_file_destroy(cct_context, tmp_fname, & thread_contexts[current_thread_no].realign_temp_fp);
+				cellcounts_temp_file_destroy(cct_context, tmp_fname, &thread_contexts[current_thread_no].realign_temp_fp);
 			break; // if it is run on the memry mode, each thread uses its own temp fp and only run once.
-		}
-		else cellcounts_temp_file_destroy(cct_context, tmp_fname, &temp_fp);
+		} else cellcounts_temp_file_destroy(cct_context, tmp_fname, &temp_fp);
 	}
 
 	// release thread contexts
@@ -4928,7 +4947,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 	free(pr);
 	int rc = 0;
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
-	if(!temp_fp || !temp_fp -> fp) return NULL+1;
+	if(!temp_fp || !(temp_fp -> fp|| temp_fp -> realign_temp_memspace )) return NULL+1;
 
 	int processed_records =0;
 	while(1){
@@ -5425,6 +5444,17 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 
 	cct_context -> current_index = (gehash_t*) malloc(sizeof(gehash_t));
 	sread_len = 0;
+
+	if(1){
+		char tmp_fname[MAX_FILE_NAME_LENGTH+30];
+		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
+		print_in_box(80,0,0, "Load the %d-%s index block...",1+ cct_context->current_index_block_number, cct_context->current_index_block_number==0?"st":(cct_context->current_index_block_number==1?"nd":"th"));
+		if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
+		print_in_box(80,0,0, "The index block has been loaded. Now map the reads...");
+		print_in_box(80,0,0, "");
+		//SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.array", cct_context->index_prefix, cct_context->current_index_block_number);
+	}
+
 	int main_step;
 	for(main_step=0; main_step<2; main_step++){
 		if(0==main_step && !cct_context -> do_cell_level_junction_detection)continue;
@@ -5435,17 +5465,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 		while(1) {
 			int ret = 0;
 			for(cct_context->current_index_block_number = 0; cct_context->current_index_block_number < cct_context->total_index_blocks; cct_context->current_index_block_number++) {
-				char tmp_fname[MAX_FILE_NAME_LENGTH+30];
-
-				if((cct_context->total_index_blocks > 1 || chunk_no == 0 ) &&  main_step != cct_context -> do_cell_level_junction_detection) {
-					SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
-					print_in_box(80,0,0, "Load the %d-%s index block...",1+ cct_context->current_index_block_number, cct_context->current_index_block_number==0?"st":(cct_context->current_index_block_number==1?"nd":"th"));
-					if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
-					print_in_box(80,0,0, "The index block has been loaded. Now map the reads...");
-					print_in_box(80,0,0, "");
-					SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.array", cct_context->index_prefix, cct_context->current_index_block_number);
-				}
-				
 				if(cct_context->total_index_blocks == cct_context->current_index_block_number + 1)
 					cct_context -> is_final_voting_run = 1;
 				else	cct_context -> is_final_voting_run = 0;
@@ -5457,8 +5476,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 					 // because there are many input files, the thread control function is different
 				else ret = cellCounts_run_maybe_threads(cct_context, main_step?STEP_VOTING:STEP_JUNC_TABLE);
 
-				if(cct_context->total_index_blocks > 1 || is_last_chunk)
-					gehash_destory_fast(cct_context -> current_index);
+//				if(cct_context->total_index_blocks > 1 || is_last_chunk)
 				
 				if(ret) break;
 				if(!cct_context -> processed_reads_in_chunk) break;
@@ -5482,6 +5500,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			cellCounts_open_input_fps(cct_context);
 		}
 	}
+	gehash_destory_fast(cct_context -> current_index);
 
 	free(cct_context -> current_index);
 	return 0;
