@@ -1391,7 +1391,7 @@
 }
 
 #cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, barcoding.mode="Chromium", cell.level.junctions=NULL, cell.cluster.map=NULL, enableSoftClipping = TRUE)
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, binaryTempMemory = FALSE){
   if(T)if(!   (   file.exists("/home/vdiuser/Projects/GOlib/DBPZ/go.sum")  ||  file.exists("/fs04/ws30/Liao/Common/Index/Subread/build-index.bash") ) ){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
@@ -1465,6 +1465,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
     if(detectJunctions)opt <- c(opt, "--junctionDetection")
     if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
+    if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
     if(barcoding.mode=="VisiumHD") opt <- c(opt, "--VisiumHD_barcode")
@@ -1529,6 +1530,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
       opt <- c("--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
+      if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
       if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
@@ -1574,6 +1576,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
       opt <- c("--inputMode","BAM","--cellBarcodeFile", cell.barcode, "--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", BAM.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
+      if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
       if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")

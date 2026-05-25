@@ -4,6 +4,7 @@
 #ifndef __CELL_COUNTS_H
 #define __CELL_COUNTS_H
 
+#define TEMP_BINFILE_MEMORY_SIZE_INIT (6*1024*1024*1024LLU) // 6GB per thread
 #define SCRNA_VBUFF_SIZE (32*1024*1024)
 #define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
@@ -134,12 +135,19 @@ typedef struct {
 } realignment_event_stack_item_t;
 
 typedef struct{
+	// Either fp or realign_temp_memspace is not NULL.
+	// Depending on which type of temp space to use (file or mem)
 	FILE * fp;
-	unsigned char rle_buffer[31];
+	unsigned char * realign_temp_memspace;
+	srInt_64 realign_temp_usedmem;
+	srInt_64 realign_temp_capamem;
+	int for_writting;
+
 	unsigned char rle_buffer_used;
 	unsigned char rle_run_byte;
 	unsigned char rle_run_repeats;
 	unsigned char rle_run_active;
+	unsigned char rle_buffer[31];
 } cellcounts_temp_file_point_t;
 
 typedef struct{
@@ -316,7 +324,8 @@ typedef struct{
 	char 		** features_sorted_chr;
 	HashTable 	* sam_chro_to_anno_chr_alias;
 
-	int do_cell_level_junction_detection;		// switch to enable step1 (pre-alignment)
+	int		do_cell_level_junction_detection;		// switch to enable step1 (pre-alignment)
+	int		cell_level_junction_memory_temp;		// if junctions are detected, use memory instead of "realign" temp files.
 	cellCounts_lock_t * read_assignment_counter_locks; 
 	int 		    chroEvent_lock_number;
 
@@ -370,4 +379,5 @@ struct TempForRealign{
 
 int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thread_no, int sample_i, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads);
 
+void cellcounts_temp_file_fclose(cellcounts_temp_file_point_t * temp_fp);
 #endif
