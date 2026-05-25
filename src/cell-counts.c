@@ -4523,8 +4523,6 @@ static int cellCounts_temp_realign_fp_flush_run(cellcounts_temp_file_point_t * t
 
 static int cellCounts_temp_realign_fp_write_plain(cellcounts_temp_file_point_t * temp_fp, const unsigned char * plain, int plain_bytes){
 	int i;
-	if(!temp_fp || !temp_fp -> fp) return 0;
-	if(plain_bytes < 0) return 0;
 
 	for(i = 0; i < plain_bytes; i++){
 		unsigned char this_byte = plain[i];
@@ -4550,7 +4548,6 @@ static int cellCounts_temp_realign_fp_write_plain(cellcounts_temp_file_point_t *
 
 int cellCounts_temp_realign_fp_fgetc(cellcounts_temp_file_point_t * temp_fp){
 	if(temp_fp -> realign_temp_memspace){
-//fprintf(stderr,"NCHAR %llu < %llu\n", temp_fp -> realign_temp_usedmem , temp_fp -> realign_temp_capamem);
 		if(temp_fp -> realign_temp_usedmem == temp_fp -> realign_temp_capamem)return EOF;
 		return temp_fp -> realign_temp_memspace[temp_fp -> realign_temp_usedmem ++];
 	}else return fgetc(temp_fp -> fp);
@@ -4558,8 +4555,6 @@ int cellCounts_temp_realign_fp_fgetc(cellcounts_temp_file_point_t * temp_fp){
 
 static int cellCounts_temp_realign_fp_read_plain(cellcounts_temp_file_point_t * temp_fp, unsigned char * plain, int plain_bytes){
 	int out_used = 0;
-	if(!temp_fp || !temp_fp -> fp) return -1;
-	if(plain_bytes < 0) return -1;
 
 	while(out_used < plain_bytes){
 		if(temp_fp -> rle_buffer_used > 0){
@@ -4598,7 +4593,6 @@ static int cellCounts_temp_realign_fp_read_plain(cellcounts_temp_file_point_t * 
 
 static int cellCounts_temp_realign_fp_read_plain_exact(cellcounts_temp_file_point_t * temp_fp, unsigned char * plain, int plain_bytes, int allow_eof){
 	int rlen = 0;
-	if(plain_bytes < 0) return -1;
 	if(plain_bytes == 0) return 1;
 	rlen = cellCounts_temp_realign_fp_read_plain(temp_fp, plain, plain_bytes);
 	if(rlen < 0) return -1;
@@ -4608,7 +4602,6 @@ static int cellCounts_temp_realign_fp_read_plain_exact(cellcounts_temp_file_poin
 }
 
 static int cellCounts_temp_realign_fp_finish_write(cellcounts_temp_file_point_t * temp_fp){
-	if(!temp_fp || !temp_fp -> fp) return 0;
 	if(!cellCounts_temp_realign_fp_flush_run(temp_fp)) return 0;
 	if(temp_fp -> fp)return 0 == fflush(temp_fp -> fp);
 	else return 0;
@@ -4907,9 +4900,10 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 			if(cct_context ->cell_level_junction_memory_temp){
 				ptr_temp_fp = & thread_contexts[current_thread_no].realign_temp_fp;
+				memset(ptr_temp_fp,0,sizeof(*ptr_temp_fp));
 				ptr_temp_fp -> realign_temp_memspace = cct_context -> all_thread_realign_fp_ptrs[current_thread_no] ;
-				ptr_temp_fp -> realign_temp_usedmem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2] ;
-				ptr_temp_fp -> realign_temp_capamem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2+1] ;
+				ptr_temp_fp -> realign_temp_capamem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2] ; // this is the total written bytes
+				ptr_temp_fp -> realign_temp_usedmem  = 0;
 			}
 
 			void ** thr_parameters = malloc(sizeof(void*)*4);
@@ -4978,7 +4972,9 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		int i;
 
 		if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
+
 		rc = cellCounts_temp_realign_fp_read_plain_exact(temp_fp, (unsigned char *)&record_size, sizeof(int), 1);
+//fprintf(stderr,"DO_GET %lld < %lld   ret %d   size %d\n",temp_fp->realign_temp_usedmem,temp_fp->realign_temp_capamem, rc, record_size);
 		if(rc <= 0){
 			if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_release(&cct_context -> input_dataset_lock);
 			if(rc == 0) break;
@@ -4990,6 +4986,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		}
 
 		record = cellCounts_temp_realign_ensure_buf(&thread_context -> temp_realign_record_buf, &thread_context -> temp_realign_record_capacity, record_size);
+//fprintf(stderr,"DO_P2 %lld < %lld   ret %p\n",temp_fp->realign_temp_usedmem,temp_fp->realign_temp_capamem, record);
 		if(!record){
 			if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_release(&cct_context -> input_dataset_lock);
 			return NULL+1;
