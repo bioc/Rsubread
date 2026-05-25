@@ -5427,7 +5427,6 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 	sread_len = 0;
 	int main_step;
 	for(main_step=0; main_step<2; main_step++){
-
 		if(0==main_step && !cct_context -> do_cell_level_junction_detection)continue;
 		cct_context -> all_processed_reads_before_chunk = 0;
 		cct_context -> running_processed_reads_in_chunk=0;
@@ -5438,7 +5437,7 @@ int cellCounts_run_mapping(cellcounts_global_t * cct_context){
 			for(cct_context->current_index_block_number = 0; cct_context->current_index_block_number < cct_context->total_index_blocks; cct_context->current_index_block_number++) {
 				char tmp_fname[MAX_FILE_NAME_LENGTH+30];
 
-				if(cct_context->total_index_blocks > 1 || chunk_no == 0) {	   
+				if((cct_context->total_index_blocks > 1 || chunk_no == 0 ) &&  main_step != cct_context -> do_cell_level_junction_detection) {
 					SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.tab", cct_context->index_prefix, cct_context->current_index_block_number);
 					print_in_box(80,0,0, "Load the %d-%s index block...",1+ cct_context->current_index_block_number, cct_context->current_index_block_number==0?"st":(cct_context->current_index_block_number==1?"nd":"th"));
 					if(gehash_load(cct_context -> current_index, tmp_fname)) return -1;
