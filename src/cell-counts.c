@@ -4487,10 +4487,6 @@ static int cellCounts_temp_realign_is_control_byte(unsigned char this_byte){
 
 static void cellCounts_temp_realign_fp_put_byte(cellcounts_temp_file_point_t * temp_fp, unsigned char this_byte){
 	if(temp_fp -> fp)putc((int)this_byte, temp_fp -> fp);
-	if(temp_fp -> realign_temp_usedmem >= temp_fp -> realign_temp_capamem){
-		temp_fp -> realign_temp_capamem *= 1.5;
-		temp_fp -> realign_temp_memspace = realloc(temp_fp -> realign_temp_memspace, temp_fp -> realign_temp_capamem);
-	}
 	temp_fp -> realign_temp_memspace[temp_fp -> realign_temp_usedmem++] = this_byte;
 }
 
@@ -4861,6 +4857,11 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 		if(packed_bcumi_len > 0 && BC_seq){
 			cellCounts_temp_realign_pack_3bit(BC_seq, bc_len + umi_len, wp);
 			wp += packed_bcumi_len;
+		}
+
+		if(temp_fp -> realign_temp_usedmem >= temp_fp -> realign_temp_capamem - 100 * MAX_SCRNA_READ_LENGTH){
+			temp_fp -> realign_temp_capamem *= 1.5;
+			temp_fp -> realign_temp_memspace = realloc(temp_fp -> realign_temp_memspace, temp_fp -> realign_temp_capamem);
 		}
 
 		if(!cellCounts_temp_realign_fp_write_plain(temp_fp, (unsigned char *)&record_size, sizeof(int))) return 1;

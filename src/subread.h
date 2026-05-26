@@ -39,8 +39,10 @@
 #define SCRNA_FASTA_SPLIT1 "|Rsd:cCounts:mFQs|"
 #define SCRNA_FASTA_SPLIT2 "|Rsd:cCounts:1mFQ|"
 
+#define MAX_SCRNA_READ_LENGTH ( 160  /*+ 300 */)
 #define BCL_READBIN_ITEMS_LOCAL 50
 #define BCL_READBIN_SIZE (2*MAX_SCRNA_READ_LENGTH)
+#define MAX_FC_READ_LENGTH 10001
 
 #define SAM_FLAG_PAIRED_TASK	0x01
 #define SAM_FLAG_FIRST_READ_IN_PAIR 0x40
@@ -500,7 +502,6 @@ typedef struct {
 } input_BLC_t;
 
 //#warning "====== Yang Liao added '+300' for debugging junc-detection. Not needed in release. ======"
-#define MAX_SCRNA_READ_LENGTH ( 160  /*+ 300 */)
 
 typedef struct{
 	char read_text[MAX_SCRNA_READ_LENGTH];

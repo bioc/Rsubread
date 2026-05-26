@@ -6,7 +6,6 @@
 
 #define TEMP_BINFILE_MEMORY_SIZE_INIT (6*1024*1024*1024LLU) // 6GB per thread
 #define SCRNA_VBUFF_SIZE (32*1024*1024)
-#define MAX_FC_READ_LENGTH 10001
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
 #define MAX_UMI_LEN 14 // cannot be higher than 16: must be able to encode into a 32-bit integer.
