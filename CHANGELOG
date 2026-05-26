@@ -1,3 +1,6 @@
+26 May 2026 - 2.27.3
+(1) Largely improved speed of cellCounts with memory and file based temporary data storage.
+
 11 May 2026 - 2.27.2
 (1) Removed bam2junctions function.
 (2) Further removed warnings.
