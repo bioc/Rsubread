@@ -5132,7 +5132,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			sorting_ptr[0] = thread_context;
 			sorting_ptr[1] = sorting_index;
 			//sort : large number first
-			quick_sort(sorting_ptr , thread_context -> populating_voteIJ_buf_index , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "total_voteIJs_to_write" records ahead are worth writting (score > 0).
+			basic_sort(sorting_ptr , thread_context -> populating_voteIJ_buf_index , sort_readscore_compare_LargeFirst, sort_readscore_exchange); // The last many records are 0-score records. Only "total_voteIJs_to_write" records ahead are worth writting (score > 0).
 
 			for(thread_context -> writing_voteID_buf_index = 0 ; thread_context -> writing_voteID_buf_index < thread_context -> total_voteIJs_to_write; thread_context -> writing_voteID_buf_index ++){
 				int myno = sorting_index[thread_context -> writing_voteID_buf_index ];
