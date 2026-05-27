@@ -862,7 +862,8 @@ void cellCounts_write_final_junctions(cellcounts_global_t * cct_context,  char *
 void cellCounts_write_final_other_events(cellcounts_global_t * cct_context,  char * output_file_name, int type_to_write);
 int cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 	void * params [5];
-	cellCounts_write_final_junctions(cct_context, cct_context -> output_prefix);
+#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED SAMPLE-LEVEL SUPPORT OUT ====="
+	if(0)cellCounts_write_final_junctions(cct_context, cct_context -> output_prefix);
 	// DO NOT DETELE: They are for indel and exon detection.
 	//cellCounts_write_final_other_events(cct_context, "del4-indels.tab", chroEvent_t_TYPE_INDEL);
 	//cellCounts_write_final_other_events(cct_context, "del4-exons.tab", chroEvent_t_TYPE_EXON);
@@ -4161,7 +4162,8 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 				strcpy(read_qual+reverse_text_offset, read_qual);
 				reverse_quality(read_qual+reverse_text_offset, read_len);
 			}
-			if(cct_context -> do_cell_level_junction_detection && sample_i>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_i, myno);
+#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED ANTI_SUPPORT OUT ====="
+			if(0)if(cct_context -> do_cell_level_junction_detection && sample_i>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_i, myno);
 			cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_i, myno, read_name, read_text + reverse_text_offset, read_qual+reverse_text_offset, read_text , read_qual , read_len);
 		}
 	} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_i, -1, read_name, read_text, read_qual , read_text, read_qual, read_len);
@@ -5140,13 +5142,13 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 					strcpy(read_qual+reverse_text_offset, read_qual);
 					reverse_quality(read_qual+reverse_text_offset, read_len);
 				}
-				if(cct_context -> do_cell_level_junction_detection && sample_number>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_number, myno);
+#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED ANTI_SUPPORT OUT ====="
+				if(0)if(cct_context -> do_cell_level_junction_detection && sample_number>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_number, myno);
 				cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_number, myno, read_name, read_text_fwd + reverse_text_offset, read_qual_fwd+reverse_text_offset, read_text_fwd , read_qual_fwd , read_len);
 			}
 		} else cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_number, -1, read_name, read_text_fwd, read_qual, read_text_fwd, read_qual, read_len);
 		processed_records++;
 	}
-//fprintf(stderr,"THREAD_%d processed %d records.\n", thread_no, processed_records);
 	return NULL;
 }
 
