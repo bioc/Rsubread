@@ -6,6 +6,7 @@
 
 #define TEMP_BINFILE_MEMORY_SIZE_INIT (6*1024*1024*1024LLU) // 6GB per thread
 #define SCRNA_VBUFF_SIZE (32*1024*1024)
+#define SCRNA_SMALLER_VBUFF_SIZE (2*1024*1024)
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
 #define MAX_UMI_LEN 14 // cannot be higher than 16: must be able to encode into a 32-bit integer.
@@ -191,6 +192,7 @@ typedef struct{
 	int temp_realign_record_capacity;
 	int temp_realign_work_capacity;
 	unsigned char tempbin_v_buffer[SCRNA_VBUFF_SIZE];
+	unsigned char cellbin_v_buffer[SCRNA_VBUFF_SIZE];
 	unsigned char * temp_realign_record_buf;
 	unsigned char * temp_realign_work_buf;
 
@@ -283,6 +285,7 @@ typedef struct{
 	HashTable * lineno1B_to_sampleno1B_tab;
 	FILE * batch_files[CELLBC_BATCH_NUMBER+2];
 	cellCounts_lock_t batch_file_locks[CELLBC_BATCH_NUMBER+2];
+	unsigned char cellbin_v_buffers[CELLBC_BATCH_NUMBER+2][SCRNA_SMALLER_VBUFF_SIZE];
 	HashTable * sample_BAM_writers;
 
 	parallel_gzip_writer_t fastq_unassigned_writer[4];

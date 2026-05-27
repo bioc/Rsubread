@@ -1408,6 +1408,9 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		return 1;
 	}
 
+	unsigned char * btabbuf = malloc(GEHASH_TABFILE_BUFFER);
+	setvbuf(fp, btabbuf, _IOFBF, GEHASH_TABFILE_BUFFER);
+
 	rrtv = fread(magic_chars,1,8,fp);
 	if(rrtv !=8){
 		SUBREADprintf("Error: the index magic string cannot be found. It may contain format errors or file '%s' may be truncated.\n", fname);
@@ -1533,9 +1536,6 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		curr_bucks = 0;
 		accued_bytes = 0;
 		for(i=0; i<the_table -> buckets_number ; i++){
-
-//if(i%50000 == 0)SUBREADprintf("FILLHUGE %d/%d\n", i, the_table -> buckets_number);
-
 			struct gehash_bucket * current_bucket = the_table -> buckets+i;
 			current_bucket -> current_items = load_int32(fp);
 			load_int32(fp);//useless for lo: space size
@@ -1564,8 +1564,8 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		if (rval != 1)SUBREADprintf("ERROR: cannot find the table table.\n");
 		free(bucket_bytes);
 		fclose(fp);
+		free(btabbuf);
 		return 0;
-
 	}
 	else
 	{
@@ -1620,6 +1620,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			return 1;
 		}
 		fclose(fp);
+		free(btabbuf);
 		return 0;
 	}
 }

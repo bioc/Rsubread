@@ -1641,6 +1641,7 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 		char fname[MAX_FILE_NAME_LENGTH+200];
 		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+200,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
 		cct_context -> batch_files[x1] = fopen(fname,"wb");
+		setvbuf(cct_context -> batch_files[x1], cct_context -> cellbin_v_buffers[x1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
 		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
 	}
 	int umfpi;
@@ -6079,6 +6080,8 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", temp_dir, getpid(), this_batch_no);
 		FILE * fp = fopen(tmp_fname, "rb");
+		setvbuf(fp, thread_context -> cellbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
+
 		fseeko(fp, 0, SEEK_END);
 		srInt_64 batch_fsize = ftello(fp);
 		fseeko(fp, 0, SEEK_SET);
@@ -6146,6 +6149,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		HashTableSetDeallocationFunctions(filtered_SCGU_table, free, NULL);
 
 		fp = fopen(tmp_fname, "wb");
+		setvbuf(fp, thread_context -> cellbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
 		for(x1 = 0; x1 < cct_context -> sample_sheet_table -> numOfElements; x1++){
 			HashTable * cellbcP0_to_geneno0B_P1_to_UMIs = HashTableCreate(500000);
 
@@ -6818,6 +6822,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), xk1);
 		input_fps[xk1] = fopen(tmp_fname,"rb");
+		setvbuf(input_fps[xk1], cct_context -> cellbin_v_buffers[xk1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
 		if(xk1 == CELLBC_BATCH_NUMBER+1)break;
 
 		srInt_64 section1_items=0;
