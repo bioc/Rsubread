@@ -1497,15 +1497,12 @@ int gehash_load(gehash_t * the_table, const char fname [])
 			accued_bytes += current_bytes; 
 			curr_bucks ++;
 			if(curr_bucks >= per_group_bucks){
-				//SUBREADprintf("Allocating %d : %d buckets : %u\n", grp_i, i, accued_bytes);
 				bucket_bytes[grp_i++] = accued_bytes;
 				accued_bytes = 0;
 				curr_bucks = 0;
 			}
 			#ifdef __MINGW32__
 			{
-//if(i%500000 == 0)SUBREADprintf("ESTMHUGE %d/%d\n", i, the_table -> buckets_number);
-
 				char * buffkk = malloc(current_bytes );
 				fread(buffkk,current_bytes ,1, fp);
 				free(buffkk);
@@ -1519,8 +1516,6 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		fseeko(fp, (off_t)fp_curr, SEEK_SET);
 
 		for(i=0; i<GEHASH_MEM_PTR_NO ; i++){
-
-//if(i%50000 == 0)SUBREADprintf("MEMHUGE %d/%d\n", i, the_table -> buckets_number);
 			unsigned int current_bytes = bucket_bytes[i];
 			if(current_bytes<0xff000000u){
 				the_table -> malloc_ptr[i] = malloc(current_bytes);
