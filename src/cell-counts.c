@@ -5239,7 +5239,7 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 			}
 		}else if(task==STEP_JUNC_TABLE){
 			cellCounts_select_and_write_temps(cct_context, thread_no, -1, NULL, read_name, read_text, read_bin, qual_text, read_len, -1);
-		}else if(task==STEP_VOTING){
+		}else if(task==STEP_VOTING){ // junction-detection mode doens't have the voting step.
 			cellCounts_select_and_write_alignments(cct_context, thread_no, -1, NULL, read_name, read_text, read_bin, qual_text, read_len, -1);
 		}
 			// if the read belongs to "unassigned", then it doesn't need to be mapped at all (nowhere to write BAM).
