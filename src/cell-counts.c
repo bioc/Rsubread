@@ -4549,7 +4549,6 @@ int cellCounts_temp_realign_fp_fgetc(cellcounts_temp_file_point_t * temp_fp){
 	if(temp_fp -> realign_temp_memspace){
 		if(temp_fp -> realign_temp_usedmem == temp_fp -> realign_temp_capamem)return EOF;
 		int rv = (int)temp_fp -> realign_temp_memspace[temp_fp -> realign_temp_usedmem++];
-//fprintf(stderr,"NCH %llu = %02x\n", temp_fp -> realign_temp_usedmem , rv);
 		return rv;
 	}else return fgetc(temp_fp -> fp);
 }
@@ -4610,7 +4609,6 @@ static int cellCounts_temp_realign_fp_finish_write(cellcounts_temp_file_point_t 
 
 void cellcounts_temp_file_destroy(cellcounts_global_t * cct_context, char * tmp_fname, cellcounts_temp_file_point_t *temp_fp){
 	if(temp_fp -> realign_temp_memspace){
-//fprintf(stderr,"FREEPTR %p\n", temp_fp -> realign_temp_memspace);
 		free(temp_fp -> realign_temp_memspace);
 		temp_fp -> realign_temp_memspace = NULL;
 	}
@@ -4634,11 +4632,10 @@ void cellcounts_temp_file_open(cellcounts_global_t * cct_context, char * tmp_fna
 	if(cct_context -> cell_level_junction_memory_temp){
 		if(for_writting){
 			temp_fp -> realign_temp_memspace = malloc(TEMP_BINFILE_MEMORY_SIZE_INIT);
-			if(0&& temp_fp -> realign_temp_memspace)fprintf(stderr,"MALLOCED: %p\n", temp_fp -> realign_temp_memspace);
-			if(! temp_fp -> realign_temp_memspace){
-				fprintf(stderr,"\n\nEEROR: NUL BUFF\n\n");
-				fprintf(stderr,"\n\nEEROR: NUL BUFF\n\n");
-				assert(0);
+			if(!temp_fp -> realign_temp_memspace){
+				SUBREADprintf("\nEEROR: cannot allocate memory for saving alignment results. Please disable the memory mode by specifying 'binaryTempMemory=FALSE'.\n");
+				assert( temp_fp -> realign_temp_memspace );
+				return;
 			}
 			temp_fp -> realign_temp_capamem = TEMP_BINFILE_MEMORY_SIZE_INIT;
 		}else temp_fp -> realign_temp_capamem = temp_fp -> realign_temp_usedmem; // read mode: capa=current_available
