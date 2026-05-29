@@ -2687,7 +2687,6 @@ int cellCounts_release_context_from_align(cellcounts_global_t * cct_context, int
 		cct_context -> all_thread_realign_fp_ints[thread_no*2] = thread_context -> realign_temp_fp.realign_temp_usedmem;
 		cct_context -> all_thread_realign_fp_ints[thread_no*2+1] = thread_context -> realign_temp_fp.realign_temp_capamem;
 	}
-	//memset(&thread_context -> realign_temp_fp, 0, sizeof(thread_context -> realign_temp_fp));
 
 	return 0;
 }
@@ -4536,7 +4535,7 @@ static int cellCounts_temp_realign_fp_write_plain(cellcounts_temp_file_point_t *
 			temp_fp -> rle_buffer[temp_fp -> rle_run_repeats] = this_byte;
 			temp_fp -> rle_run_repeats++;
 			temp_fp -> rle_buffer_used = temp_fp -> rle_run_repeats;
-		}else{ // this byte != run_byte, OR repeats had been 32. Both need to be flushed.
+		}else{ // this byte != run_byte, OR repeats had been 32 (need to be flushed).
 			if(!cellCounts_temp_realign_fp_flush_run(temp_fp)) return 0;
 			temp_fp -> rle_run_active = 1;
 			temp_fp -> rle_run_byte = this_byte;
@@ -4911,6 +4910,11 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 				memset(ptr_temp_fp,0,sizeof(*ptr_temp_fp));
 				ptr_temp_fp -> realign_temp_memspace = cct_context -> all_thread_realign_fp_ptrs[current_thread_no] ;
 				ptr_temp_fp -> realign_temp_capamem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2] ; // this is the total written bytes
+/*
+FILE * ootmpf=fopen(tmp_fname,"wb");
+fwrite(  ptr_temp_fp -> realign_temp_memspace, 1,   ptr_temp_fp -> realign_temp_capamem , ootmpf );
+fclose(ootmpf);
+*/
 			}
 
 			void ** thr_parameters = malloc(sizeof(void*)*4);
@@ -4981,6 +4985,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
 
 		rc = cellCounts_temp_realign_fp_read_plain_exact(temp_fp, (unsigned char *)&record_size, sizeof(int), 1);
+//fprintf(stderr,"DO_GET %lld < %lld   ret %d   size %d\n",temp_fp->realign_temp_usedmem,temp_fp->realign_temp_capamem, rc, record_size);
 		if(rc <= 0){
 			if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_release(&cct_context -> input_dataset_lock);
 			if(rc == 0) break;
@@ -5001,6 +5006,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 			if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_release(&cct_context -> input_dataset_lock);
 			return NULL+1;
 		}
+//fprintf(stderr,"DO_P2 %lld < %lld   ret %p\n",temp_fp->realign_temp_usedmem,temp_fp->realign_temp_capamem, record);
 
 		if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_release(&cct_context -> input_dataset_lock);
 
@@ -6800,7 +6806,8 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		else print_in_box(81,0,0,"  %'13lld (%4.1f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
 #endif
 
-		print_in_box(80,0,0,"");
+
+	print_in_box(80,0,0,"");
 	}
 	print_in_box(80,0,0,"Generate UMI count tables...");
 	ArrayListDestroy(file_size_list);
