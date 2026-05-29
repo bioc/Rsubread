@@ -50,6 +50,7 @@ float match_chro_support(char * read, gene_value_index_t * index, unsigned int p
 int match_chro_maxerror(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int is_negative_strand, int space_type, int maxerror);
 
 void gvindex_get_string(char *buf, gene_value_index_t * index, unsigned int pos, int len, int is_negative_strand);
+int gvindex_get_range(gene_value_index_t * index, gehash_data_t offset, char * base_space, int num_bases);
 
 int match_chro_wronglen(char * read, gene_value_index_t * index, unsigned int pos, int test_len, int space_type, int * left_match_bases, int * right_match_bases);
 

@@ -3702,10 +3702,11 @@ int cellCounts_junc_meet_in_the_middle(cellcounts_global_t * cct_context, cellco
 	return best_gap_loc;
 }
 
-char cellCounts_add_covered_indels_in_table_getval(unsigned int pos, void * context){
+int cellCounts_add_covered_indels_in_table_getval(unsigned int pos, void * context, char * sequence_space, int num_bases){
 	cellcounts_global_t * cct_context = context;
 	gene_value_index_t * current_value_index = cct_context->value_index;
-	return gvindex_get(current_value_index,pos);
+	gvindex_get_range(current_value_index,pos, sequence_space, num_bases);
+	return 0;
 }
 
 void cellCounts_add_covered_indels_in_table(cellcounts_global_t * cct_context, int thread_no, int sample_i, char * read, int cov_start, int cov_end, int expected_indel, unsigned int chro_loc, char * read_name){

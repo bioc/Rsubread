@@ -92,6 +92,33 @@ int is_offset_in_chro(gene_value_index_t * offsets, gehash_data_t linear){
 	return ret;
 }
 
+int gvindex_get_range(gene_value_index_t * index, gehash_data_t offset, char * base_space, int num_bases){
+	unsigned int offset_byte, offset_bit;
+	gvindex_baseno2offset_m(offset, index, offset_byte, offset_bit);
+	unsigned char basex4 = index->values[offset_byte];
+
+	for (int i = 0; i < num_bases; i++) {
+		if (offset_byte >= index->values_bytes - 1) {
+			while (i < num_bases) {
+				base_space[i++] = 'N';
+			}
+			break;
+		}
+
+		unsigned int one_base_value = basex4 >> offset_bit;
+		base_space[i] = int2base(one_base_value & 3);
+
+		offset_bit += 2;
+		if (offset_bit == 8) {
+			offset_bit = 0;   // Reset bit tracking
+			basex4 = index->values[++offset_byte];	// Move to the next byte
+		}
+	}
+	base_space[num_bases] = 0;
+
+	return 0;
+}
+
 // return 'A', 'G', 'T' and 'C'
 int gvindex_get(gene_value_index_t * index, gehash_data_t offset)
 {

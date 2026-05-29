@@ -278,7 +278,7 @@ int sorting_LLU_array_compare(void * arr, int i, int j);
 
 
 int general_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length,
-  void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context);
+  void *** buffers, int * penalties, int (* get_index_base_value) (unsigned int pos, void * context, char * base_space, int num_bases), void * general_context);
 int general_dynamic_align_moves_to_cigar(char * movement_buffer, int nmoves, char * cigar);
 void init_typical_dynamic_align(void *** buffers, int * penalties, int max_read_length);
 void destroy_typical_dynamic_align(void *** buffers,int max_read_length);

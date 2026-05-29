@@ -3239,12 +3239,17 @@ if(debugout1)fprintf(stderr,"\n");
 
 
 
-int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
-  void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
+
+int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length,
+  void *** buffers, int * penalties, int (* get_index_base_value) (unsigned int pos, void * context, char * base_space, int num_bases), void * general_context){
+
+//int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_position, char * movement_buffer, int expected_offset, int max_indel_length, 
+//   void *** buffers, int * penalties, char (* get_index_base_value) (unsigned int pos, void * context), void * general_context)
+
 // read must be converted to the positive strand.
 // movement buffer: 0:match, 1: read-insert, 2: gene-insert, 3:mismatch
 // the size of the movement buffer must be equal to the length of the read plus max_indel * 3.
-{
+
 	int max_indel = min(16 , max_indel_length); 
 	int i,j;
 	int ref_len;
@@ -3265,7 +3270,8 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 	ref_bases = malloc((size_t)ref_len);
 	if(!ref_bases)
 		return 0;
-	for(i = 0; i < ref_len; i++) ref_bases[i] = get_index_base_value(begin_position + i, general_context);
+
+	get_index_base_value(begin_position, general_context, ref_bases, ref_len);
 
 	//unsigned long long table_ptr = (unsigned long long) indel_context -> dynamic_align_table;
 
