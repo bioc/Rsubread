@@ -284,7 +284,7 @@ void init_typical_dynamic_align(void *** buffers, int * penalties, int max_read_
 void destroy_typical_dynamic_align(void *** buffers,int max_read_length);
 char LRM_get_baseval_for_dp(unsigned int pos , void * vvcontext);
 
-
+/*
 // the interal tree structure funcs
 // Define a structure for an interval
 typedef struct {
@@ -302,6 +302,28 @@ typedef struct IVT_IntervalTreeNode {
     struct IVT_IntervalTreeNode *left;
     struct IVT_IntervalTreeNode *right;
 } IVT_IntervalTreeNode;
+*/
+
+typedef struct {
+	srInt_64 start;
+	srInt_64 end;
+	void * attr;
+} IVT_Interval;
+
+// Define a structure for a node in the interval tree
+typedef struct IVT_IntervalTreeNode {
+	IVT_Interval interval;
+	srInt_64 posmax;
+	srInt_64 posmin;
+	struct IVT_IntervalTreeNode *left;
+	struct IVT_IntervalTreeNode *right;
+	uint8_t height;
+} IVT_IntervalTreeNode;
+
+enum { IVT_DFS_STACK_CAPA = 1024 };
+
+
+
 IVT_IntervalTreeNode* IVT_createNode(srInt_64 start, srInt_64 end, void * attr);
 IVT_IntervalTreeNode* IVT_leftRotate(IVT_IntervalTreeNode *x);
 IVT_IntervalTreeNode* IVT_rightRotate(IVT_IntervalTreeNode *y);
