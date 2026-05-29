@@ -283,7 +283,7 @@ typedef struct{
 	ArrayList * sample_barcode_list;
 	ArrayList * sample_id_to_name;
 	HashTable * lineno1B_to_sampleno1B_tab;
-	FILE * batch_files[CELLBC_BATCH_NUMBER+2];
+	REPFILE * batch_files[CELLBC_BATCH_NUMBER+2];
 	cellCounts_lock_t batch_file_locks[CELLBC_BATCH_NUMBER+2];
 	unsigned char cellbin_v_buffers[CELLBC_BATCH_NUMBER+2][SCRNA_SMALLER_VBUFF_SIZE];
 	HashTable * sample_BAM_writers;

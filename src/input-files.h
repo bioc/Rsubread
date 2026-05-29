@@ -68,6 +68,43 @@
 #include "hashtable.h"
 
 
+typedef struct REFFILE REFFILE;
+
+//#define USE_REP_COMPRESSION
+
+#ifdef USE_REP_COMPRESSION
+#define REPFILE REFFILE
+
+REPFILE *REP_fopen(const char *path, const char *mode);
+int REP_setvbuf(REPFILE *stream, char *buffer, int mode, size_t size);
+size_t REP_fwrite(const void *ptr, size_t size, size_t nmemb, REPFILE *stream);
+size_t REP_fread(void *ptr, size_t size, size_t nmemb, REPFILE *stream);
+int REP_feof(REPFILE *stream);
+int REP_fclose(REPFILE *stream);
+uint64_t REP_filesize(const REPFILE *stream);
+
+#define REF_fopen REP_fopen
+#define REF_fclose REP_fclose
+#define REF_fread REP_fread
+#define REF_fwrite REP_fwrite
+#define REF_feof REP_feof
+#define REF_setvbuf REP_setvbuf
+#define REF_filesize REP_filesize
+
+#else
+#define REPFILE FILE
+#define REP_fopen fopen
+#define REP_fclose fclose
+#define REP_fread fread
+#define REP_fwrite fwrite
+#define REP_feof feof
+#define REP_setvbuf setvbuf
+
+uint64_t FILE_filesize(FILE *stream);
+#define REP_filesize FILE_filesize
+#endif
+
+
 #define SAM_SORT_BLOCKS 229
 #define SAM_SORT_BLOCK_SIZE 512333303LLU
 //#define SAM_SORT_BLOCK_SIZE 11123333LLU

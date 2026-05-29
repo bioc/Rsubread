@@ -1641,8 +1641,8 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 	for(x1=0;x1<CELLBC_BATCH_NUMBER+2; x1++){
 		char fname[MAX_FILE_NAME_LENGTH+200];
 		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+200,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
-		cct_context -> batch_files[x1] = fopen(fname,"wb");
-		setvbuf(cct_context -> batch_files[x1], cct_context -> cellbin_v_buffers[x1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
+		cct_context -> batch_files[x1] = REP_fopen(fname,"wb");
+		REP_setvbuf(cct_context -> batch_files[x1], cct_context -> cellbin_v_buffers[x1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
 		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
 	}
 	int umfpi;
@@ -2359,32 +2359,32 @@ void cellCounts_build_read_bin(cellcounts_global_t * cct_context, int thread_no,
 	memcpy(rbin     , & record_length , 4);
 }
 
-void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread_no, FILE * binfp, int sample_no, int cellbarcode_no, char * umi_barcode, char * readbin, int nhits, int notmapped){
+void cellCounts_write_one_read_bin(cellcounts_global_t * cct_context, int thread_no, REPFILE * binfp, int sample_no, int cellbarcode_no, char * umi_barcode, char * readbin, int nhits, int notmapped){
 	int x1;
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 
-	fwrite(&sample_no,4,1,binfp);
+	REP_fwrite(&sample_no,4,1,binfp);
 	if(0==notmapped){
-		fwrite(&cellbarcode_no,4,1,binfp);
+		REP_fwrite(&cellbarcode_no,4,1,binfp);
 		if(nhits <1){
 			srInt_64 zero_genes = 1LLU<<63;
-			fwrite(&zero_genes, 8,1,binfp);
+			REP_fwrite(&zero_genes, 8,1,binfp);
 		}else if(nhits<2){
 			srInt_64 gene_no = thread_context -> hits_indices[0];
-			fwrite(&gene_no, 8,1,binfp);
+			REP_fwrite(&gene_no, 8,1,binfp);
 		}else{
 			srInt_64 total_genes = nhits + (1LLU<<63);
-			fwrite(&total_genes, 8,1,binfp);
+			REP_fwrite(&total_genes, 8,1,binfp);
 			for(x1=0;x1<nhits;x1++){
 				srInt_64 gene_no = thread_context -> hits_indices[x1];
-				fwrite(&gene_no, 8,1,binfp);
+				REP_fwrite(&gene_no, 8,1,binfp);
 			}
 		}
-		fwrite(umi_barcode, cct_context->UMI_length, 1, binfp);
+		REP_fwrite(umi_barcode, cct_context->UMI_length, 1, binfp);
 	}
 	memcpy(&x1, readbin, 4);
 	x1+=4;
-	fwrite(readbin, x1, 1, binfp);
+	REP_fwrite(readbin, x1, 1, binfp);
 
 	if(cct_context -> read_assignment_detail_fp && nhits>0 && 0==notmapped){
 		char * cellbc = NULL;
@@ -2515,7 +2515,7 @@ void cellCounts_vote_and_add_count(cellcounts_global_t * cct_context, int thread
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	if(sample_no>0){
 		cellCounts_lock_occupy(cct_context -> batch_file_locks + batch_no);
-		FILE * binfp = cct_context -> batch_files [ batch_no ];
+		REPFILE * binfp = cct_context -> batch_files [ batch_no ];
 
 		cellCounts_write_one_read_bin(cct_context, thread_no, binfp, sample_no, cell_barcode_no, UMI_seq, readbin, nhits, batch_no == CELLBC_BATCH_NUMBER+1);
 		cellCounts_lock_release(cct_context -> batch_file_locks + batch_no);
@@ -4593,9 +4593,7 @@ static int cellCounts_temp_realign_fp_read_plain(cellcounts_temp_file_point_t * 
 }
 
 static int cellCounts_temp_realign_fp_read_plain_exact(cellcounts_temp_file_point_t * temp_fp, unsigned char * plain, int plain_bytes, int allow_eof){
-	int rlen = 0;
-	if(plain_bytes == 0) return 1;
-	rlen = cellCounts_temp_realign_fp_read_plain(temp_fp, plain, plain_bytes);
+	int rlen = cellCounts_temp_realign_fp_read_plain(temp_fp, plain, plain_bytes);
 	if(rlen < 0) return -1;
 	if(rlen == plain_bytes) return 1;
 	if(rlen == 0 && allow_eof) return 0;
@@ -4669,10 +4667,10 @@ static unsigned char * cellCounts_temp_realign_ensure_buf(unsigned char ** buf, 
 	unsigned char * new_buf;
 	if(required < 1) required = 1;
 	if(*buf && *capacity >= required) return *buf;
-	new_buf = realloc(*buf, required);
+	new_buf = realloc(*buf, required+150);
 	if(!new_buf) return NULL;
 	*buf = new_buf;
-	*capacity = required;
+	*capacity = (required+150);
 	return *buf;
 }
 
@@ -5847,10 +5845,10 @@ void cellCounts_do_one_batch_tab_to_struct_list(void *ky, void *val, HashTable *
 }
 
 void cellCounts_do_one_batch_write_UMIs(void * vcell_gene, void * vumis, HashTable * me){
-	FILE * fp = me->appendix1;
+	REPFILE * fp = me->appendix1;
 	vcell_gene --;
-	fwrite(&vcell_gene,1,8,fp);
-	fwrite(&vumis,1,8,fp);
+	REP_fwrite(&vcell_gene,1,8,fp);
+	REP_fwrite(&vumis,1,8,fp);
 }
 
 
@@ -6039,10 +6037,10 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 	return new_rbin_len;
 }
 
-void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, FILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
+void cellCounts_do_one_batch_write_extend_rbin(cellcounts_global_t * cct_context, char * rbin, int binlen, REPFILE * fp, char * fixedbc_seq, char * fixedumi_seq, srInt_64 gene_no, srInt_64 * genes){
 	char new_rbin[ binlen + 150 ]; // removed barcodes/qual from read names, add them to extra fields if they weren't there. Gene names are not put here.
 	int new_rbin_len = cellCounts_make_barcode_bam_bin( cct_context, rbin, new_rbin, binlen, fixedbc_seq, fixedumi_seq, gene_no, genes );
-	fwrite(new_rbin, 1, new_rbin_len+4, fp);
+	REP_fwrite(new_rbin, 1, new_rbin_len+4, fp);
 }
 
 #ifdef __MINGW32__
@@ -6089,15 +6087,13 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		if(0>this_batch_no)break;
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", temp_dir, getpid(), this_batch_no);
-		FILE * fp = fopen(tmp_fname, "rb");
-		setvbuf(fp, thread_context -> cellbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
+		REPFILE * fp = REP_fopen(tmp_fname, "rb");
+		REP_setvbuf(fp, thread_context -> cellbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
 
-		fseeko(fp, 0, SEEK_END);
-		srInt_64 batch_fsize = ftello(fp);
-		fseeko(fp, 0, SEEK_SET);
+		srInt_64 batch_fsize = REP_filesize(fp);
 		if(batch_content==NULL) batch_content = malloc(batch_fsize);
-		srInt_64 batch_content_len = fread(batch_content, 1, batch_fsize, fp);
-		fclose(fp);
+		srInt_64 batch_content_len = REP_fread(batch_content, 1, batch_fsize, fp);
+		REP_fclose(fp);
 		if(batch_content_len!=batch_fsize){
 			SUBREADprintf("ERROR: Cannot load file at once: %d!\n", this_batch_no);
 			return NULL;
@@ -6158,8 +6154,8 @@ void * cellCounts_do_one_batch(void * paramsp1){
 		HashTable * filtered_SCGU_table = StringTableCreate(max(10000,cell_gene_umi_list[0] -> numOfElements / 10));
 		HashTableSetDeallocationFunctions(filtered_SCGU_table, free, NULL);
 
-		fp = fopen(tmp_fname, "wb");
-		setvbuf(fp, thread_context -> cellbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
+		fp = REP_fopen(tmp_fname, "wb");
+		REP_setvbuf(fp, thread_context -> cellbin_v_buffer, _IOFBF , SCRNA_VBUFF_SIZE);
 		for(x1 = 0; x1 < cct_context -> sample_sheet_table -> numOfElements; x1++){
 			HashTable * cellbcP0_to_geneno0B_P1_to_UMIs = HashTableCreate(500000);
 
@@ -6182,7 +6178,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 
 			cellbcP0_to_geneno0B_P1_to_UMIs -> appendix1 = fp;
 
-			fwrite(&cellbcP0_to_geneno0B_P1_to_UMIs -> numOfElements,1,8,fp);
+			REP_fwrite(&cellbcP0_to_geneno0B_P1_to_UMIs -> numOfElements,1,8,fp);
 			HashTableIteration(cellbcP0_to_geneno0B_P1_to_UMIs, cellCounts_do_one_batch_write_UMIs);
 			HashTableDestroy(cellbcP0_to_geneno0B_P1_to_UMIs);
 		}
@@ -6273,11 +6269,11 @@ void * cellCounts_do_one_batch(void * paramsp1){
 				}
 			}
 
-			fwrite(&sampleid, 1, 4, fp);
-			fwrite(&cellid, 1, 4, fp);
-			fwrite(&gene_no, 1, 8, fp);
-			if(gene_no & (1LLU<<63)) fwrite( glist_ptr, 1, 8*genes, fp );
-			fwrite(umi,1, cct_context -> UMI_length, fp);
+			REP_fwrite(&sampleid, 1, 4, fp);
+			REP_fwrite(&cellid, 1, 4, fp);
+			REP_fwrite(&gene_no, 1, 8, fp);
+			if(gene_no & (1LLU<<63))REP_fwrite( glist_ptr, 1, 8*genes, fp );
+			REP_fwrite(umi,1, cct_context -> UMI_length, fp);
 			char * new_cellbc = NULL;
 			char visiumHD_cellbc [12];// 01234_01234
 
@@ -6291,7 +6287,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			}
 			cellCounts_do_one_batch_write_extend_rbin(cct_context, rbinptr, binlen, fp, new_cellbc, umi[0]=='-'?NULL:umi, gene_no, (srInt_64*)glist_ptr);
 		}
-		fclose(fp);
+		REP_fclose(fp);
 		HashTableDestroy(supp_reads_SCGU);
 		HashTableDestroy(filtered_SCGU_table);
 		for(x1 =0; x1< cct_context -> sample_sheet_table -> numOfElements; x1++)ArrayListDestroy(cell_gene_umi_list[x1]);
@@ -6374,7 +6370,7 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 	fprintf(ofp_mtx,"%%%%MatrixMarket matrix coordinate integer general\n");
 
 	HashTable * used_cellnoP1_tab = ArrayListToLookupTable_Int(used_cell_barcodes);
-	HashTable * unique_NZ_geneno1B_table = HashTableCreate(10000);
+	HashTable * unique_NZ_geneno1B_table = HashTableCreate(50000);
 	cellP1_to_geneP1_to_umis_tab -> counter1 = 0;
 	cellP1_to_geneP1_to_umis_tab -> appendix1 = unique_NZ_geneno1B_table;
 	cellP1_to_geneP1_to_umis_tab -> appendix2 = used_cellnoP1_tab;
@@ -6666,7 +6662,7 @@ void cellCounts_merged_to_tables_write(cellcounts_global_t * cct_context, HashTa
 		cellCounts_merged_write_sparse_matrix(cct_context, cellP1_to_geneP1_to_umis[x1], high_confid_barcode_index_list, x1, "HighConf",  cct_context -> gene_name_array);
 		cellCounts_merged_write_sparse_matrix(cct_context, cellP1_to_geneP1_to_umis[x1], this_sample_ambient_rescure_candi, x1, "RescCand",  cct_context -> gene_name_array);
 		cellCounts_merged_45K_to_90K_sum( cct_context, cellP1_to_geneP1_to_umis[x1], this_sample_45k_90k_barcode_no_P0, x1 , loaded_features, sorted_order_p1_to_i_p1_tab);
-		HashTable * no0genes = HashTableCreate(10000);
+		HashTable * no0genes = HashTableCreate(50000);
 		cellP1_to_geneP1_to_umis[x1] -> appendix1 = no0genes;
 		cellP1_to_geneP1_to_umis[x1] -> appendix2 = NULL;
 		HashTableIteration(cellP1_to_geneP1_to_umis[x1], cellCounts_merged_write_sparse_unique_genes);
@@ -6724,10 +6720,10 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 	ArrayList * file_size_list = ArrayListCreate(CELLBC_BATCH_NUMBER +1);
 	for(xk1=0; xk1<CELLBC_BATCH_NUMBER +2; xk1++){
 		if(xk1<CELLBC_BATCH_NUMBER +1){
-			srInt_64 batchsize = ftello( cct_context -> batch_files[xk1]);
+			srInt_64 batchsize = REP_filesize( cct_context -> batch_files[xk1]);
 			ArrayListPush(file_size_list, NULL+( batchsize<<20 | xk1));
 		}
-		fclose(cct_context -> batch_files[xk1]);
+		REP_fclose(cct_context -> batch_files[xk1]);
 	}
 	ArrayListSort(file_size_list, NULL);
 
@@ -6824,24 +6820,24 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		pthread_create(threads + xk1, NULL, cellCounts_merge_batches_worker, vpp);
 	}
 
-	FILE * input_fps[CELLBC_BATCH_NUMBER+2];
+	REPFILE * input_fps[CELLBC_BATCH_NUMBER+2];
 	char * last_rbin_buffer[CELLBC_BATCH_NUMBER+1];
 	srInt_64 * current_sorting_key = malloc(sizeof(srInt_64)*(CELLBC_BATCH_NUMBER+2));
 	
 	for(xk1=0; xk1< CELLBC_BATCH_NUMBER+2; xk1++){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), xk1);
-		input_fps[xk1] = fopen(tmp_fname,"rb");
-		setvbuf(input_fps[xk1], cct_context -> cellbin_v_buffers[xk1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
+		input_fps[xk1] = REP_fopen(tmp_fname,"rb");
+		REP_setvbuf(input_fps[xk1], cct_context -> cellbin_v_buffers[xk1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
 		if(xk1 == CELLBC_BATCH_NUMBER+1)break;
 
 		srInt_64 section1_items=0;
 		for(sample_i = 0; sample_i < cct_context -> sample_sheet_table -> numOfElements; sample_i++){
-			size_t frret = fread(&section1_items,1, 8, input_fps[xk1]);
+			size_t frret = REP_fread(&section1_items,1, 8, input_fps[xk1]);
 			for(xk2 = 0; xk2 < section1_items; xk2++){
 				srInt_64 cellbcP0_geneno0B=0, umis=0;
-				frret += fread(&cellbcP0_geneno0B,1,8,input_fps[xk1]);
-				frret += fread(&umis,1,8,input_fps[xk1]);
+				frret += REP_fread(&cellbcP0_geneno0B,1,8,input_fps[xk1]);
+				frret += REP_fread(&umis,1,8,input_fps[xk1]);
 
 				int cellbc_no = cellbcP0_geneno0B>>32;
 				int gene_no0B = (int)(cellbcP0_geneno0B&0xffffffffu);
@@ -6854,7 +6850,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			}
 		}
 		last_rbin_buffer[xk1] = malloc( cct_context -> barcode_batched_max_genes *8 + cct_context -> barcode_batched_max_Rbin_len + 4 + MAX_UMI_LEN + 16 + 10000);
-		int rlen = fread(last_rbin_buffer[xk1], 1, 16, input_fps[xk1]);
+		int rlen = REP_fread(last_rbin_buffer[xk1], 1, 16, input_fps[xk1]);
 		if(rlen >0){
 			int binlen = 0;
 			srInt_64 genes = 0;
@@ -6862,16 +6858,16 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			if(genes & (1LLU<<63))genes = genes & 0x7fffffff;
 			else genes= 0;
 			
-			size_t frret = fread(last_rbin_buffer[xk1]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[xk1]);
+			size_t frret = REP_fread(last_rbin_buffer[xk1]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[xk1]);
 			memcpy(&binlen, last_rbin_buffer[xk1] +16 +8*genes+ cct_context -> UMI_length  , 4);
-			frret += fread(last_rbin_buffer[xk1] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[xk1]);
+			frret += REP_fread(last_rbin_buffer[xk1] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[xk1]);
 
 			srInt_64 sorting_key = *(int*)(last_rbin_buffer[xk1] + 16 +8*genes+cct_context -> UMI_length +4);
 			sorting_key = sorting_key << 32;
 			sorting_key |= *(int*)(last_rbin_buffer[xk1] + 16+ 8*genes+cct_context -> UMI_length +8);
 			current_sorting_key[xk1] = sorting_key;
 		}else{
-			fclose(input_fps[xk1]);
+			REP_fclose(input_fps[xk1]);
 			free(last_rbin_buffer[xk1]);
 			current_sorting_key[xk1] = 0x7fffffffffffffffLLU;
 		}
@@ -6929,22 +6925,22 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			block_numbers_current[sample_id-1]++;
 		}
 
-		int rlen = fread(last_rbin_buffer[selected_fp_no], 1, 16, input_fps[selected_fp_no]);
+		int rlen = REP_fread(last_rbin_buffer[selected_fp_no], 1, 16, input_fps[selected_fp_no]);
 		if(rlen >0){
 			int binlen = 0;
 			srInt_64 genes = 0;
 			memcpy(&genes, last_rbin_buffer[selected_fp_no]+8, 8);
 			if(genes & (1LLU<<63))genes = genes & 0x7fffffff;
 			else genes= 0;
-			size_t frret = fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[selected_fp_no]);
+			size_t frret = REP_fread(last_rbin_buffer[selected_fp_no]+16, 1, 8*genes+ cct_context -> UMI_length + 4, input_fps[selected_fp_no]);
 			memcpy(&binlen, last_rbin_buffer[selected_fp_no] +16 +8*genes+ cct_context -> UMI_length  , 4);
-			frret += fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
+			frret += REP_fread(last_rbin_buffer[selected_fp_no] + 16+ 8*genes+ cct_context -> UMI_length + 4, 1, binlen, input_fps[selected_fp_no]);
 			srInt_64 sorting_key = *(int*)(last_rbin_buffer[selected_fp_no] + 16+8*genes +cct_context -> UMI_length +4);
 			sorting_key = sorting_key << 32;
 			sorting_key |= *(int*)(last_rbin_buffer[selected_fp_no] + 16 +8*genes+cct_context -> UMI_length +8);
 			current_sorting_key[selected_fp_no] = sorting_key;
 		} else {
-			fclose(input_fps[selected_fp_no]);
+			REP_fclose(input_fps[selected_fp_no]);
 			free(last_rbin_buffer[selected_fp_no]);
 			current_sorting_key[selected_fp_no] = 0x7fffffffffffffffLLU;
 		}
@@ -6977,16 +6973,16 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		task_buffers[ xk1 * cct_context->sample_sheet_table -> numOfElements  + xk2 ].inbin_number = 0;
 	}
 	current_worker = 0;
-	FILE * notmapped_fp = input_fps[CELLBC_BATCH_NUMBER+1];
+	REPFILE * notmapped_fp = input_fps[CELLBC_BATCH_NUMBER+1];
 	while(1){
 		int sample_id = 0, binlen = 0;
-		int rlen = fread(&sample_id, 1, 4, notmapped_fp);
+		int rlen = REP_fread(&sample_id, 1, 4, notmapped_fp);
 		if(rlen < 4) break;
 		struct scRNA_merge_batches_worker_task * tofill = task_buffers+(current_filling_worker_per_sample[sample_id -1] * cct_context->sample_sheet_table -> numOfElements +sample_id-1);
-		size_t frret = fread(&binlen, 1, 4, notmapped_fp);
+		size_t frret = REP_fread(&binlen, 1, 4, notmapped_fp);
 		char old_bin[binlen+4];
 		memcpy(old_bin, &binlen,4);
-		frret += fread(old_bin+4, 1, binlen, notmapped_fp);
+		frret += REP_fread(old_bin+4, 1, binlen, notmapped_fp);
 		int new_binlen = cellCounts_make_barcode_bam_bin(cct_context, old_bin, tofill -> inbin + tofill -> inbin_len, binlen, NULL, NULL, -1, NULL);
 		tofill -> inbin_len += 4+ new_binlen; // block size: Total length of the alignment record, excluding this field. Then, the alignment record.
 
@@ -7014,7 +7010,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 			tofill -> inbin_number++;
 		}
 	}
-	fclose(notmapped_fp);
+	REP_fclose(notmapped_fp);
 	current_sorting_key[CELLBC_BATCH_NUMBER+1] = 0x7fffffffffffffffLLU;
 
 	for(xk1=0; xk1<cct_context -> sample_sheet_table -> numOfElements; xk1++){
@@ -7532,7 +7528,7 @@ void cellCounts_write_final_other_events(cellcounts_global_t * cct_context,  cha
 void cellCounts_write_final_junctions(cellcounts_global_t * cct_context,  char * output_file_name){
 	int infile_i, disk_is_full = 0, sample_i;
 
-	HashTable * junction_table = StringTableCreate(50000); //  str(chro, pos_small+1, chro, pos_large+1) => srInt_64[0..39] of nsup <<32 | nnonsup
+	HashTable * junction_table = StringTableCreate(200000); //  str(chro, pos_small+1, chro, pos_large+1) => srInt_64[0..39] of nsup <<32 | nnonsup
 	HashTableSetDeallocationFunctions(junction_table,free,free);
 	for(sample_i=1; sample_i <=cct_context-> sample_sheet_table -> numOfElements ; sample_i ++){
 		cct_context -> chroEvent_detail_table[sample_i] -> appendix1 = junction_table;

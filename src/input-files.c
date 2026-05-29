@@ -367,24 +367,24 @@ int is_read(char * in_buff)
 }
 
 char *strtokmm(char *str, const char *delim, char ** next) {
-    char *tok;
-    char *m;
+	char *tok;
+	char *m;
 
-    if (delim == NULL) return NULL;
+	if (delim == NULL) return NULL;
 
-    tok = (str) ? str : (*next);
-    if (tok == NULL) return NULL;
+	tok = (str) ? str : (*next);
+	if (tok == NULL) return NULL;
 
-    m = strstr(tok, delim);
+	m = strstr(tok, delim);
 
-    if (m) {
+	if (m) {
 	(*next) = m + strlen(delim);
 	*m = '\0';
-    } else {
+	} else {
 	(*next) = NULL;
-    }
+	}
 
-    return tok;
+	return tok;
 }
 
 int geinput_open_scRNA_BAM(char * rfnames,  gene_input_t * input, int reads_per_chunk, int threads ){
@@ -682,34 +682,34 @@ unsigned int read_numbers(gene_input_t * input)
 
 
 void geinput_tell(gene_input_t * input, gene_inputfile_position_t * pos){
-        if(input -> file_type == GENE_INPUT_SCRNA_BAM){
-                scBAM_tell(&input -> scBAM_input, &pos -> scBAM_position);
-        }else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
-                input_mFQ_tell(&input -> scRNA_fq_input, &pos -> mFQ_position);
-        }else if(input -> file_type == GENE_INPUT_BCL){
-                assert(input -> file_type != GENE_INPUT_BCL);
-        }else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
-                seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
-                if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
-                else pos -> gzfa_last_name[0]=0;
-        }else{
-                pos -> simple_file_position = ftello((FILE *)input -> input_fp);
-        }
+		if(input -> file_type == GENE_INPUT_SCRNA_BAM){
+				scBAM_tell(&input -> scBAM_input, &pos -> scBAM_position);
+		}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+				input_mFQ_tell(&input -> scRNA_fq_input, &pos -> mFQ_position);
+		}else if(input -> file_type == GENE_INPUT_BCL){
+				assert(input -> file_type != GENE_INPUT_BCL);
+		}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
+				seekgz_tell(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
+				if(input -> gzfa_last_name[0]) strcpy(pos -> gzfa_last_name, input -> gzfa_last_name);
+				else pos -> gzfa_last_name[0]=0;
+		}else{
+				pos -> simple_file_position = ftello((FILE *)input -> input_fp);
+		}
 }
 void geinput_seek(gene_input_t * input, gene_inputfile_position_t * pos){
-        if(input -> file_type == GENE_INPUT_SCRNA_BAM){
-                scBAM_seek(&input -> scBAM_input, &pos -> scBAM_position);
-        }else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
-                input_mFQ_seek(&input -> scRNA_fq_input, &pos -> mFQ_position);
-        }else if(input -> file_type == GENE_INPUT_BCL){
-                assert(input -> file_type != GENE_INPUT_BCL);
-        }else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
-                seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
-                if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
-                else input -> gzfa_last_name[0]=0;
-        }else{
-                fseeko((FILE *)input -> input_fp, pos -> simple_file_position, SEEK_SET);
-        }
+		if(input -> file_type == GENE_INPUT_SCRNA_BAM){
+				scBAM_seek(&input -> scBAM_input, &pos -> scBAM_position);
+		}else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ){
+				input_mFQ_seek(&input -> scRNA_fq_input, &pos -> mFQ_position);
+		}else if(input -> file_type == GENE_INPUT_BCL){
+				assert(input -> file_type != GENE_INPUT_BCL);
+		}else if(input -> file_type == GENE_INPUT_GZIP_FASTQ || input -> file_type == GENE_INPUT_GZIP_FASTA){
+				seekgz_seek(( seekable_zfile_t *)input -> input_fp, &pos -> seekable_gzip_position);
+				if(pos -> gzfa_last_name[0]) strcpy(input -> gzfa_last_name, pos -> gzfa_last_name);
+				else input -> gzfa_last_name[0]=0;
+		}else{
+				fseeko((FILE *)input -> input_fp, pos -> simple_file_position, SEEK_SET);
+		}
 }
 
 
@@ -791,16 +791,16 @@ int geinput_next_read_with_lock(gene_input_t * input, char * read_name, char * r
 // returns read length if OK 
 int geinput_next_read_trim(gene_input_t * input, char * read_name, char * read_string, char * quality_string, short trim_5, short trim_3, int * is_secondary)
 {
-        if(input -> file_type == GENE_INPUT_BCL) {
-                int rv = cacheBCL_next_read(&input -> bcl_input, read_name, read_string, quality_string, NULL);
-                if(rv<=0) return -1;
-                if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
-                return rv;
-        } else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
-                int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
-                if(rv<=0) return rv;
-                if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
-                return rv;
+		if(input -> file_type == GENE_INPUT_BCL) {
+				int rv = cacheBCL_next_read(&input -> bcl_input, read_name, read_string, quality_string, NULL);
+				if(rv<=0) return -1;
+				if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
+				return rv;
+		} else if(input -> file_type == GENE_INPUT_SCRNA_FASTQ) {
+				int rv = input_mFQ_next_read(&input -> scRNA_fq_input, read_name, read_string, quality_string);
+				if(rv<=0) return rv;
+				if(trim_5 || trim_3) rv = trim_read_inner(read_string, quality_string, rv, trim_5, trim_3);
+				return rv;
 	} else if(input -> file_type == GENE_INPUT_SCRNA_BAM) {
 		int rv = scBAM_next_read(&input -> scBAM_input, read_name, read_string, quality_string);
 		if(rv<=0) return -1;
@@ -2682,7 +2682,7 @@ void SAM_pairer_destroy(SAM_pairer_context_t * pairer){
 
 	if(pairer->input_is_BAM){
 		//HashTableIteration(pairer -> bam_margin_table, SAM_pairer_print_keys);
-	    HashTableDestroy(pairer -> bam_margin_table);
+		HashTableDestroy(pairer -> bam_margin_table);
 	}
 	else HashTableDestroy(pairer -> sam_contig_number_table);
 	HashTableDestroy(pairer -> unsorted_notification_table);
@@ -5021,10 +5021,10 @@ int SAM_pairer_fix_format(SAM_pairer_context_t * pairer){
 						x1 += 3;
 
 						if((( etag_name0 == 'H' && etag_name1 == 'I' ) ||
-						    ( etag_name0 == 'N' && etag_name1 == 'H' ) ||
-						    ( etag_name0 == 'R' && etag_name1 == 'G' ) ||
-						    ( etag_name0 == 'N' && etag_name1 == 'M' )
-						    ) && ( etag_type == 'c' || etag_type=='Z' || etag_type == 'C'||etag_type == 's'||etag_type == 'S'||etag_type == 'i'||etag_type == 'I') 
+							( etag_name0 == 'N' && etag_name1 == 'H' ) ||
+							( etag_name0 == 'R' && etag_name1 == 'G' ) ||
+							( etag_name0 == 'N' && etag_name1 == 'M' )
+							) && ( etag_type == 'c' || etag_type=='Z' || etag_type == 'C'||etag_type == 's'||etag_type == 'S'||etag_type == 'i'||etag_type == 'I') 
 						  ){
 							FIX_APPEND_READ(&etag_name0,1);
 							FIX_APPEND_READ(&etag_name1,1);
@@ -6779,3 +6779,401 @@ int main(int argc, char ** argv)
 }
 
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct REFFILE {
+	FILE *fp;
+	uint8_t outbuf[4096];
+	size_t out_used;
+	uint8_t run_byte;
+	uint8_t run_len;
+	int has_run;
+	uint64_t plain_size;
+	uint64_t data_end;
+	uint64_t read_remaining;
+	uint8_t read_run_byte;
+	uint8_t read_run_remaining;
+	int can_read;
+	int can_write;
+	int eof;
+	int error;
+};
+
+static int REF_file_seek_end(FILE *fp, int64_t offset_from_end) {
+#if defined(_WIN32) || defined(_WIN64)
+	return _fseeki64(fp, offset_from_end, SEEK_END);
+#else
+	return fseeko(fp, (off_t)offset_from_end, SEEK_END);
+#endif
+}
+
+static int REF_file_seek_set(FILE *fp, int64_t offset_from_start) {
+#if defined(_WIN32) || defined(_WIN64)
+	return _fseeki64(fp, offset_from_start, SEEK_SET);
+#else
+	return fseeko(fp, (off_t)offset_from_start, SEEK_SET);
+#endif
+}
+
+static int REF_file_tell(FILE *fp, int64_t *pos_out) {
+	if (!fp || !pos_out) return -1;
+#if defined(_WIN32) || defined(_WIN64)
+	*pos_out = _ftelli64(fp);
+	return *pos_out < 0 ? -1 : 0;
+#else
+	{
+		off_t pos = ftello(fp);
+		if (pos < 0) return -1;
+		*pos_out = (int64_t)pos;
+		return 0;
+	}
+#endif
+}
+
+static int REF_read_u64_le(FILE *fp, uint64_t *value_out) {
+	uint8_t buf[8];
+	size_t got;
+	int i;
+
+	got = fread(buf, 1, sizeof(buf), fp);
+	if (got != sizeof(buf)) return 0;
+
+	*value_out = 0;
+	for (i = 0; i < 8; ++i) {
+		*value_out |= ((uint64_t)buf[i]) << (i * 8);
+	}
+	return 1;
+}
+
+static inline int REF_is_control_byte(uint8_t byte) {
+	return (byte >= 0xD0u && byte <= 0xF6u);
+}
+
+static int REF_flush_outbuf(REFFILE *rep) {
+	if (!rep || rep->error || rep->out_used == 0) return rep && !rep->error;
+
+	if (fwrite(rep->outbuf, 1, rep->out_used, rep->fp) != rep->out_used) {
+		rep->error = 1;
+		rep->out_used = 0;
+		return 0;
+	}
+
+	rep->out_used = 0;
+	return 1;
+}
+
+static int REF_put_byte(REFFILE *rep, uint8_t byte) {
+	if (!rep || rep->error) return 0;
+
+	rep->outbuf[rep->out_used++] = byte;
+	if (rep->out_used == sizeof(rep->outbuf)) {
+		return REF_flush_outbuf(rep);
+	}
+	return 1;
+}
+
+static int REF_write_u64_le(REFFILE *rep, uint64_t value) {
+	int i;
+	for (i = 0; i < 8; ++i) {
+		if (!REF_put_byte(rep, (uint8_t)((value >> (i * 8)) & 0xFFu))) return 0;
+	}
+	return 1;
+}
+
+static void REF_emit_run(REFFILE *rep) {
+	uint8_t token;
+
+	if (!rep || !rep->has_run || rep->error) return;
+
+	if (rep->run_byte == 0x00u) {
+		if (rep->run_len == 1) {
+			REF_put_byte(rep, rep->run_byte);
+		} else {
+			while (rep->run_len > 0 && !rep->error) {
+				uint8_t emit_len = rep->run_len > 8u ? 8u : rep->run_len;
+				token = (uint8_t)(0xEEu + emit_len);
+				REF_put_byte(rep, token);
+				rep->run_len -= emit_len;
+			}
+		}
+	} else if (rep->run_len == 1 && !REF_is_control_byte(rep->run_byte)) {
+		REF_put_byte(rep, rep->run_byte);
+	} else if (rep->run_len == 2 && !REF_is_control_byte(rep->run_byte)) {
+		REF_put_byte(rep, rep->run_byte);
+		REF_put_byte(rep, rep->run_byte);
+	} else {
+		REF_put_byte(rep, (uint8_t)(0xD0u + rep->run_len));
+		REF_put_byte(rep, rep->run_byte);
+	}
+
+	rep->has_run = 0;
+	rep->run_len = 0;
+}
+
+static void REF_begin_run(REFFILE *rep, uint8_t byte) {
+	rep->has_run = 1;
+	rep->run_byte = byte;
+	rep->run_len = 1;
+}
+
+static void REF_push_byte(REFFILE *rep, uint8_t byte) {
+	uint8_t run_limit;
+
+	if (!rep || rep->error) return;
+
+	if (!rep->has_run) {
+		REF_begin_run(rep, byte);
+		return;
+	}
+
+	run_limit = (rep->run_byte == 0x00u) ? 8u : 31u;
+
+	if (rep->run_byte == byte && rep->run_len < run_limit) {
+		rep->run_len++;
+		return;
+	}
+
+	REF_emit_run(rep);
+	if (rep->error) return;
+	REF_begin_run(rep, byte);
+}
+
+REFFILE *REF_fopen(const char *path, const char *mode) {
+	REFFILE *rep;
+	FILE *fp;
+	int can_write;
+	int can_read;
+
+	fp = fopen(path, mode);
+	if (!fp) return NULL;
+
+	can_write = (mode && (strchr(mode, 'w') || strchr(mode, 'a') || strchr(mode, '+'))) ? 1 : 0;
+	can_read = (mode && (strchr(mode, 'r') || strchr(mode, '+'))) ? 1 : 0;
+
+	rep = (REFFILE *)calloc(1, sizeof(*rep));
+	if (!rep) {
+		fclose(fp);
+		return NULL;
+	}
+
+	rep->fp = fp;
+	rep->out_used = 0;
+	rep->has_run = 0;
+	rep->run_len = 0;
+	rep->plain_size = 0;
+	rep->data_end = 0;
+	rep->read_remaining = 0;
+	rep->read_run_byte = 0;
+	rep->read_run_remaining = 0;
+	rep->can_read = can_read;
+	rep->can_write = can_write;
+	rep->eof = 0;
+	rep->error = 0;
+
+	if (can_read) {
+		int64_t pos_before = 0;
+		int64_t file_end = 0;
+
+		if (REF_file_tell(fp, &pos_before) != 0 ||
+			REF_file_seek_end(fp, 0) != 0 ||
+			REF_file_tell(fp, &file_end) != 0) {
+			rep->error = 1;
+		} else {
+			if (file_end < 8) {
+				if (!can_write) {
+					rep->error = 1;
+				}
+			} else {
+				if (REF_file_seek_end(fp, -8) != 0 || !REF_read_u64_le(fp, &rep->plain_size)) {
+					rep->error = 1;
+				} else {
+					rep->data_end = (uint64_t)file_end - 8u;
+					rep->read_remaining = rep->data_end;
+				}
+			}
+		}
+
+		if (REF_file_seek_set(fp, pos_before) != 0) {
+			rep->error = 1;
+		}
+	}
+
+	return rep;
+}
+
+int REF_setvbuf(REFFILE *stream, char *buffer, int mode, size_t size) {
+	if (!stream || !stream->fp) return EOF;
+	if (stream->can_write && fflush(stream->fp) != 0) {
+		stream->error = 1;
+		return EOF;
+	}
+	return setvbuf(stream->fp, buffer, mode, size);
+}
+
+size_t REF_fwrite(const void *ptr, size_t size, size_t nmemb, REFFILE *stream) {
+	const uint8_t *src;
+	size_t total;
+	size_t i;
+	size_t bytes_accepted;
+
+	if (!stream || stream->error || !stream->fp || !stream->can_write) return 0;
+	if (size == 0 || nmemb == 0) return 0;
+	if (size > 0 && nmemb > SIZE_MAX / size) return 0;
+
+	total = size * nmemb;
+	src = (const uint8_t *)ptr;
+	bytes_accepted = 0;
+
+	for (i = 0; i < total; ++i) {
+		REF_push_byte(stream, src[i]);
+		if (stream->error) break;
+		bytes_accepted++;
+		stream->plain_size++;
+	}
+
+	return bytes_accepted / size;
+}
+
+size_t REF_fread(void *ptr, size_t size, size_t nmemb, REFFILE *stream) {
+	uint8_t *dst;
+	size_t total;
+	size_t produced;
+
+	if (!stream || stream->error || !stream->fp || !stream->can_read || size == 0 || nmemb == 0) return 0;
+	if (size > 0 && nmemb > SIZE_MAX / size) return 0;
+
+	dst = (uint8_t *)ptr;
+	total = size * nmemb;
+	produced = 0;
+
+	while (produced < total) {
+		int c;
+
+		if (stream->read_run_remaining > 0) {
+			dst[produced++] = stream->read_run_byte;
+			stream->read_run_remaining--;
+			continue;
+		}
+
+		if (stream->read_remaining == 0) {
+			stream->eof = 1;
+			break;
+		}
+
+		c = fgetc(stream->fp);
+		if (c == EOF) {
+			stream->eof = 1;
+			stream->error = 1;
+			break;
+		}
+		stream->read_remaining--;
+
+		if (c == 0xD0) {
+			dst[produced++] = (uint8_t)c;
+			continue;
+		}
+
+		if (c >= 0xD1 && c <= 0xEF) {
+			int d;
+
+			if (stream->read_remaining == 0) {
+				stream->eof = 1;
+				stream->error = 1;
+				break;
+			}
+
+			d = fgetc(stream->fp);
+			if (d == EOF) {
+				stream->eof = 1;
+				stream->error = 1;
+				break;
+			}
+			stream->read_remaining--;
+
+			stream->read_run_byte = (uint8_t)d;
+			stream->read_run_remaining = (uint8_t)(c - 0xD0);
+			continue;
+		}
+
+		if (c >= 0xF0 && c <= 0xF6) {
+			stream->read_run_byte = 0x00u;
+			stream->read_run_remaining = (uint8_t)(c - 0xEE);
+			continue;
+		}
+
+		dst[produced++] = (uint8_t)c;
+	}
+
+	return produced / size;
+}
+
+int REF_feof(REFFILE *stream) {
+	return stream ? stream->eof : 0;
+}
+
+static int REF_finish(REFFILE *rep) {
+	if (!rep || rep->error) return 0;
+	if (!rep->can_write) return 1;
+
+	REF_emit_run(rep);
+	if (rep->error) return 0;
+
+	if (!REF_write_u64_le(rep, rep->plain_size)) {
+		rep->error = 1;
+		return 0;
+	}
+
+	if (!REF_flush_outbuf(rep)) return 0;
+	return 1;
+}
+
+int REF_fclose(REFFILE *stream) {
+	int rc;
+
+	if (!stream) return EOF;
+
+	rc = REF_finish(stream) ? 0 : EOF;
+	if (stream->fp) {
+		if (fclose(stream->fp) != 0) rc = EOF;
+	} else {
+		rc = EOF;
+	}
+
+	free(stream);
+	return rc;
+}
+
+uint64_t REF_filesize(const REFFILE *stream) {
+	return stream ? stream->plain_size : 0;
+}
+
+
+uint64_t FILE_filesize(FILE *stream){
+	uint64_t current_pos = ftello(stream);
+	fseeko(stream, 0, SEEK_END);
+	uint64_t ret = ftello(stream);
+	fseeko(stream, current_pos, SEEK_SET);
+	return ret;
+}
