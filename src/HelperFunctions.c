@@ -3253,7 +3253,6 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 	int max_indel = min(16 , max_indel_length); 
 	int i,j;
 	int ref_len;
-	char * ref_bases = NULL;
 	int LRM_DP_ALIGN_CREATEGAP_PENALTY, LRM_DP_ALIGN_EXTENDGAP_PENALTY, LRM_DP_ALIGN_MATCH_SCORE, LRM_DP_ALIGN_MISMATCH_PENALTY;
 	LRM_DP_ALIGN_CREATEGAP_PENALTY = penalties[0];  
 	LRM_DP_ALIGN_EXTENDGAP_PENALTY = penalties[1]; 
@@ -3267,10 +3266,8 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 	ref_len = read_len + expected_offset;
 	if(ref_len < 1)
 		return 0;
-	ref_bases = malloc((size_t)ref_len);
-	if(!ref_bases)
-		return 0;
 
+	char ref_bases [ref_len+1];
 	get_index_base_value(begin_position, general_context, ref_bases, ref_len);
 
 	//unsigned long long table_ptr = (unsigned long long) indel_context -> dynamic_align_table;
@@ -3380,14 +3377,12 @@ if(debugout1)fprintf(stderr,"M");
 
 		if(path_i == -1 && j == -1) break;
 		if(j<0 || path_i<0){
-			free(ref_bases);
 			return 0;
 		}
 	}
 if(debugout1)fprintf(stderr,"\n");
 
 	if(expected_offset!=delta){
-		free(ref_bases);
 		return 0;
 	}
 	for(i=0; i<out_pos/2; i++)
@@ -3397,7 +3392,6 @@ if(debugout1)fprintf(stderr,"\n");
 		movement_buffer[out_pos-1-i] = movement_buffer[i];
 		movement_buffer[i] = tmp;
 	}
-	free(ref_bases);
 	return out_pos;
 }
 

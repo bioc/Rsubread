@@ -114,7 +114,7 @@ int gvindex_get_range(gene_value_index_t * index, gehash_data_t offset, char * b
 			basex4 = index->values[++offset_byte];	// Move to the next byte
 		}
 	}
-	base_space[num_bases] = 0;
+//	base_space[num_bases] = 0;
 
 	return 0;
 }

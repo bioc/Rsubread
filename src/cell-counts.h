@@ -4,8 +4,9 @@
 #ifndef __CELL_COUNTS_H
 #define __CELL_COUNTS_H
 
-#define TEMP_BINFILE_MEMORY_SIZE_INIT (6*1024*1024*1024LLU) // 6GB per thread
-#define SCRNA_VBUFF_SIZE (32*1024*1024)
+//#define TEMP_BINFILE_MEMORY_SIZE_INIT (4*1024*1024*1024LLU) // 4GB per thread
+#define TEMP_BINFILE_MEMORY_SIZE_INIT (8*1024*1024LLU) // 8MB per thread
+#define SCRNA_VBUFF_SIZE (12*1024*1024)
 #define SCRNA_SMALLER_VBUFF_SIZE (2*1024*1024)
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
@@ -33,13 +34,16 @@
 #define cellCounts_lock_occupy pthread_mutex_lock
 #define cellCounts_lock_release pthread_mutex_unlock
 
-#define GENE_SCRNA_VOTE_TABLE_SIZE 17 
+#define GENE_SCRNA_VOTE_TABLE_SIZE (17)
 
 #define NOT__DEBUG_NO_LOOK
 
 #define chroEvent_t_TYPE_INDEL 1
 #define chroEvent_t_TYPE_JUNCTION 2
 #define chroEvent_t_TYPE_EXON 3
+
+typedef int cellcounts_vote_number_t;
+
 typedef struct{
 	int event_type;	// 1==indel; 2==junction
 	unsigned int left_edge;	// linear chromosome location for the left edge (included in the read).
@@ -78,32 +82,28 @@ typedef struct{
 } cct_junction_genebody_t;
 
 typedef struct{
-	gene_vote_number_t max_vote;
+	cellcounts_vote_number_t max_vote;
 	int max_vote_IJ;
 	gehash_data_t max_position;
 	gene_quality_score_t max_quality;
-	gene_vote_number_t max_indel_recorder[MAX_INDEL_TOLERANCE*3];
-	gene_vote_number_t * max_tmp_indel_recorder;
+	cellcounts_vote_number_t max_indel_recorder[MAX_INDEL_TOLERANCE*3];
+	cellcounts_vote_number_t * max_tmp_indel_recorder;
 	int max_mask;
-	gene_vote_number_t noninformative_subreads;
+	cellcounts_vote_number_t noninformative_subreads;
 
-	unsigned short items[GENE_SCRNA_VOTE_TABLE_SIZE];
+	unsigned int items[GENE_SCRNA_VOTE_TABLE_SIZE];
 	unsigned int pos [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
 	int masks [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
 	int marked_shift_indel[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	gene_vote_number_t votes [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	gene_quality_score_t quality [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	gene_vote_number_t last_subread_cluster [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	gene_vote_number_t indel_recorder [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
-	char current_indel_cursor[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	char toli[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	cellcounts_vote_number_t votes [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	cellcounts_vote_number_t indel_recorder [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE][MAX_INDEL_TOLERANCE*3];
+	int current_indel_cursor[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	int toli[GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
 	int topK_votes[SCRNA_HIGHEST_REPORTED_ALIGNMENTS];
 	int topK_IJ[SCRNA_HIGHEST_REPORTED_ALIGNMENTS ];
 
-	short coverage_start [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	short coverage_end [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
-	short max_coverage_start;
-	short max_coverage_end;
+	int coverage_start [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
+	int coverage_end [GENE_SCRNA_VOTE_TABLE_SIZE][GENE_SCRNA_VOTE_SPACE];
 } gene_sc_vote_t;
 
 typedef struct {
@@ -111,11 +111,11 @@ typedef struct {
 	short result_flags;
 	short read_length;
 	// 4 bytes
-	gene_vote_number_t selected_votes;
-	gene_vote_number_t used_subreads_in_vote;
+	cellcounts_vote_number_t selected_votes;
+	cellcounts_vote_number_t used_subreads_in_vote;
 	char indels_in_confident_coverage;
 	char is_fully_covered;
-	gene_vote_number_t selected_indel_record [MAX_INDEL_SECTIONS*3 + 1];
+	cellcounts_vote_number_t selected_indel_record [MAX_INDEL_SECTIONS*3 + 1];
 	unsigned short confident_coverage_start;
 	unsigned short confident_coverage_end;
 } voting_location_t;
@@ -147,7 +147,7 @@ typedef struct{
 	unsigned char rle_run_byte;
 	unsigned char rle_run_repeats;
 	unsigned char rle_run_active;
-	unsigned char rle_buffer[31];
+	unsigned char rle_buffer[40];
 } cellcounts_temp_file_point_t;
 
 typedef struct{
@@ -381,7 +381,7 @@ struct TempForRealign{
 	unsigned char cellbc_umi_bases[(MAX_UMI_LEN+MAX_CELLBC_LEN)/2+1];
 };
 
-int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thread_no, int sample_i, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, gene_vote_number_t all_subreads);
+int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thread_no, int sample_i, gene_sc_vote_t * votetab, char * read_name, char * read_text, char * read_bin, char * read_qual, int read_len, cellcounts_vote_number_t all_subreads);
 
 void cellcounts_temp_file_fclose(cellcounts_temp_file_point_t * temp_fp);
 #endif

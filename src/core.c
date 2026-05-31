@@ -3523,16 +3523,14 @@ void rewind_read_files(global_context_t * global_context, int type)
 }
 
 void go_chunk_start( global_context_t * global_context ){
-	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL)
-		cacheBCL_go_chunk_start(&global_context -> input_reads.first_read_file.bcl_input);
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL) assert(0); // core.c don't consider scRNA.
 	else 
 		rewind_read_files(global_context, SEEK_SET);
 	global_context -> running_processed_reads_in_chunk=0;
 }
 
 void go_chunk_nextchunk( global_context_t * global_context ){
-	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL)
-		cacheBCL_go_chunk_end(&global_context -> input_reads.first_read_file.bcl_input);
+	if(global_context -> input_reads.first_read_file.file_type == GENE_INPUT_BCL) assert(0); // core.c don't consider scRNA.
 	else
 		rewind_read_files(global_context, SEEK_END);
 	global_context -> running_processed_reads_in_chunk=0;
