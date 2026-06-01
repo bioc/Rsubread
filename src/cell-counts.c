@@ -951,14 +951,13 @@ int cellCounts_add_or_update_chroEvent_in_table(cellcounts_global_t* cct_context
 		if(is_new_key) HashTablePut(cct_context -> chroEvent_entry_table[sample_i], strdup( chro_strn_ky ), LR_roots);
 	}
 
-	chroEvent_t * new_details = NULL;
 	int tlen=-9999990;
 	if(0==known || (chroEvent_t_TYPE_INDEL == env_type && inslen_negative<0)){
 		unsigned int linear_loc = linear_gene_position(&cct_context->chromosome_table , chro, l);
 		unsigned int linear_loc2 = linear_loc - l + r;
 		tlen = r-l-1;
 		if( chroEvent_t_TYPE_INDEL == env_type && inslen_negative<0 ) tlen = inslen_negative;
-		new_details = cellCounts_set_chroEvent_details(cct_context, sample_i, env_type, linear_loc, linear_loc2, tlen, from_truth);
+		cellCounts_set_chroEvent_details(cct_context, sample_i, env_type, linear_loc, linear_loc2, tlen, from_truth);
 	}
 
 	cellCounts_lock_release(&cct_context -> chroEvent_entry_table_lock);
@@ -2674,8 +2673,6 @@ void * cellCounts_run_in_thread(void * params){
 	return NULL;
 }
 
-#define MAX_EVENT_NUMBER_INIT 200000
-
 int cellCounts_release_context_from_align(cellcounts_global_t * cct_context, int thread_no, int task) {
 	cellcounts_align_thread_t * thread_context = cct_context -> all_thread_contexts + thread_no;
 	destroy_typical_dynamic_align((void***)thread_context -> dynamic_align_buffers, MAX_SCRNA_READ_LENGTH);
@@ -2826,6 +2823,8 @@ int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readl
 			qual[bii - base_offset] = nqual;
 		}
 	}
+	qual[sread_len] =0;
+	seq[sread_len] =0;
 	return sread_len;
 }
 
@@ -2931,11 +2930,6 @@ typedef struct {
 	unsigned int scanning_positons;
 	unsigned int thread_bodytable_number;
 } scanning_events_record_t;
-
-
-int cellCounts_find_new_indels(cellcounts_global_t * cct_context, int thread_no, char * read_name, char * read_text, char * qual_text, int read_len, int voting_loc_no) {
-	return 0;
-}
 
 int cellCounts_indel_recorder_copy(cellcounts_vote_number_t * alnrec, cellcounts_vote_number_t * votrec, int indelrec_num, int applied_subreads_per_strand, int * first_base_offset_from_mapped_loc, int * span_chro, int * span_read, char * read_name, unsigned int absloc){
 	if(indelrec_num<=3){
@@ -5143,7 +5137,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 				int myno = sorting_index[thread_context -> writing_voteID_buf_index ];
 				if(thread_context -> reporting_scores[ myno ] < 1)break;
 				int reverse_text_offset = (thread_context -> reporting_flags[myno] & SAM_FLAG_REVERSE_STRAND_MATCHED)?read_text_slot:0;
-				if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
+				if(0) /* DO NOT need to write read_qual. only need is read_qual_fwd or rev */if(reverse_text_offset >0 && 0==read_qual[reverse_text_offset]){
 					strcpy(read_qual+reverse_text_offset, read_qual);
 					reverse_quality(read_qual+reverse_text_offset, read_len);
 				}
