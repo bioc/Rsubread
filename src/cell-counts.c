@@ -552,6 +552,12 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 	}
 
 
+	char * DBPZ_cellCounts_CHUNK_READS = getenv("DBPZ_cellCounts_CHUNK_READS");
+	if(DBPZ_cellCounts_CHUNK_READS) {
+		cct_context -> reads_per_chunk = atoi(DBPZ_cellCounts_CHUNK_READS);
+		SUBREADprintf("SET total reads for short running: %d\n", cct_context -> reads_per_chunk);
+	}
+
 	char * DBPZ_var_candidates = getenv("DBPZ_CCNT_CANDIDATES");
 	char * DBPZ_var_topdiff = getenv("DBPZ_CCNT_TOPDIFF");
 	if( DBPZ_var_candidates && DBPZ_var_topdiff ){
@@ -5182,6 +5188,8 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 
 		cellCounts_fetch_next_read_pair(cct_context, thread_no,  &read_len, read_name, read_text, qual_text, &current_read_number);
 		if(current_read_number < 0) break;
+		if(current_read_number >= cct_context-> reads_per_chunk) break;
+
 		if(read_len< 16) continue;
 		int sample_i = cellCounts_get_sample_no_from_rname(cct_context, thread_no, read_name); // Sample_i is 1-based. It can NEVER be 0 (see function). "Not found" = -1
 		if(sample_i >=0){
