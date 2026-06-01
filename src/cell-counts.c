@@ -1686,10 +1686,12 @@ int cellCounts_lock_release(cellCounts_lock_t * lock){
 }
 */
 
+#define CACHED_BCL_READ_NUMBER 0x1000000 // 16.78M
+
 int cellCounts_open_input_fps(cellcounts_global_t * cct_context){
 	int rv=0;
 	if(cct_context -> input_mode == GENE_INPUT_BCL){
-		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
+		rv = rv || geinput_open_bcl(cct_context -> input_dataset_name , & cct_context -> input_dataset , /*cct_context -> reads_per_chunk*/ CACHED_BCL_READ_NUMBER, cct_context -> total_threads);
 		if(!rv)cct_context -> is_dual_index = cct_context -> input_dataset.bcl_input.is_dual_index;
 	} else if(cct_context -> input_mode == GENE_INPUT_SCRNA_FASTQ)
 		rv = rv || geinput_open_scRNA_fqs(cct_context -> input_dataset_name , & cct_context -> input_dataset , cct_context -> reads_per_chunk, cct_context -> total_threads);
@@ -2835,10 +2837,10 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 			if(new_reads)
 				thread_context -> bcl_input_local_cached = thread_context -> bcl_input_local_filled = new_reads;
 			else if(!cct_context -> running_processed_reads_in_chunk)
-				cct_context -> running_processed_reads_in_chunk = (ginp1 -> bcl_input.read_no_in_chunk);
+				cct_context -> running_processed_reads_in_chunk = cacheBCL_get_readno_in_dataset(&ginp1 -> bcl_input);
 			cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 		}
-		if(thread_context -> bcl_input_local_cached>0){
+		if(thread_context -> bcl_input_local_cached >0 ){ // bcl_input_local_cached changed above.
 			int posnumb = thread_context -> bcl_input_local_filled - thread_context -> bcl_input_local_cached;
 			this_number = thread_context -> bcl_input_local_start_no + posnumb;
 			thread_context -> bcl_input_local_cached --;

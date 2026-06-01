@@ -376,6 +376,11 @@ void cacheBCL_close(cache_BCL_t * cache_input){
 	free(cache_input -> cbcl_tile_numbers);
 }
 
+
+int cacheBCL_get_readno_in_dataset(cache_BCL_t * cache_input){
+	return cache_input -> chunk_no * cache_input -> reads_per_chunk +(cache_input -> read_no_in_chunk);
+}
+
 int cacheBCL_init( cache_BCL_t * cache_input, char * data_dir, int reads_in_chunk, int all_threads ){
 	memset(cache_input, 0, sizeof( cache_BCL_t));
 	subread_init_lock(&cache_input -> read_lock);
@@ -1910,3 +1915,4 @@ int input_mFQ_tell(input_mFQ_t * fqs_input, input_mFQ_pos_t * pos ){
 	}
 	return 0;
 }
+
