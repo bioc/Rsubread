@@ -4879,7 +4879,7 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 	int input_thread_no, task=STEP_VOTING; // task for realignment equals voting (main step).
 	// init thread contexts
 
-	int current_thread_no ;
+	int current_thread_no, smpno;
 	cellcounts_align_thread_t * thread_contexts = calloc(sizeof(cellcounts_align_thread_t) , cct_context->total_threads);
 	cct_context -> all_thread_contexts = thread_contexts;
 
@@ -4911,11 +4911,6 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 				memset(ptr_temp_fp,0,sizeof(*ptr_temp_fp));
 				ptr_temp_fp -> realign_temp_memspace = cct_context -> all_thread_realign_fp_ptrs[current_thread_no] ;
 				ptr_temp_fp -> realign_temp_capamem  = cct_context -> all_thread_realign_fp_ints[current_thread_no*2] ; // this is the total written bytes
-/*
-FILE * ootmpf=fopen(tmp_fname,"wb");
-fwrite(  ptr_temp_fp -> realign_temp_memspace, 1,   ptr_temp_fp -> realign_temp_capamem , ootmpf );
-fclose(ootmpf);
-*/
 			}
 
 			void ** thr_parameters = malloc(sizeof(void*)*4);
@@ -4927,6 +4922,12 @@ fclose(ootmpf);
 
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
 			pthread_join(thread_contexts[current_thread_no].thread, NULL);
+			for(smpno = 0; smpno < cct_context-> sample_sheet_table -> numOfElements; smpno ++){ 
+				cct_context -> mapped_reads_per_sample[smpno] += thread_contexts[current_thread_no].mapped_reads_per_sample[smpno];
+				cct_context -> assigned_reads_per_sample[smpno] += thread_contexts[current_thread_no].assigned_reads_per_sample[smpno];
+				cct_context -> reads_per_sample[smpno] += thread_contexts[current_thread_no].reads_per_sample[smpno];
+			}
+			cct_context -> reads_per_sample[smpno] += thread_contexts[current_thread_no].reads_per_sample[smpno]; 
 		}
 
 		if(cct_context -> cell_level_junction_memory_temp){
@@ -6807,9 +6808,19 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		else print_in_box(81,0,0,"  %'13lld (%4.1f%%%%) reads were assigned to samples in total.", all_extracted_reads - cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements], 100.-cct_context-> reads_per_sample[cct_context-> sample_sheet_table -> numOfElements]*100./all_extracted_reads);
 #endif
 
+	}else{
+		for(xk1 = 0; xk1 < cct_context-> sample_sheet_table -> numOfElements; xk1++) {
+			srInt_64 extracted_reads = cct_context-> reads_per_sample[xk1];
+			char * sample_name = ArrayListGet(cct_context-> sample_id_to_name, xk1);
+#ifdef __MINGW32__
+			print_in_box(80,0,0,"  % 13" PRId64 " reads were processed for %s.\n", extracted_reads, sample_name);
+#else
+			print_in_box(80,0,0,"  %'13lld reads were processed for %s.\n", extracted_reads, sample_name);
+#endif
+		}
 
-	print_in_box(80,0,0,"");
 	}
+	print_in_box(80,0,0,"");
 	print_in_box(80,0,0,"Generate UMI count tables...");
 	ArrayListDestroy(file_size_list);
 
