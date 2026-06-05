@@ -318,6 +318,7 @@ typedef struct{
 	unsigned int length;
 	unsigned char * values;
 	unsigned int values_bytes;
+	unsigned char * base_values;
 	void * appendix1;
 	void * appendix2;
 } gene_value_index_t;

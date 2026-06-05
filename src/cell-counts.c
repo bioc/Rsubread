@@ -795,7 +795,7 @@ int cellCounts_load_base_value_indexes(cellcounts_global_t * cct_context){
 	char tmp_fname[MAX_FILE_NAME_LENGTH+ 30];
 	SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+30, "%s.%02d.b.array", cct_context ->index_prefix, 0);
 	cct_context -> value_index = calloc(sizeof(gene_value_index_t),1);
-	rv = rv || gvindex_load(cct_context -> value_index, tmp_fname);
+	rv = rv || gvindex_load_largebuffer(cct_context -> value_index, tmp_fname, 1); // pre-decompress base values.
 	return rv;
 }
 
@@ -3655,7 +3655,19 @@ int cellCounts_junc_meet_in_the_middle(cellcounts_global_t * cct_context, cellco
 	int x1;
 
 	gene_value_index_t * current_value_index = cct_context->value_index;
-	for(x1=0; x1<gaplen+2;x1++){
+
+
+	gvindex_get_range(current_value_index, 
+                  left_last_matched_base_loc + 1, 
+                  left_split_chro_base_tab, 
+                  gaplen + 2);
+
+	gvindex_get_range(current_value_index, 
+                  right_last_matched_base_loc - gaplen - 2, 
+                  right_split_chro_base_tab, 
+                  gaplen + 2);
+
+	if(0)for(x1=0; x1<gaplen+2;x1++){
 		char left_charg = gvindex_get(current_value_index,left_last_matched_base_loc + x1 +1); 
 		char right_charg = gvindex_get(current_value_index,right_last_matched_base_loc - gaplen + x1 -2); 
 
@@ -4690,7 +4702,6 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 	struct TempForRealign temprec;
 	cellcounts_temp_file_point_t * temp_fp;
 
-	(void)read_bin;
 	(void)all_subreads;
 	(void)index_gap_width;
 	(void)sample_seq;
@@ -5206,17 +5217,24 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 						int rbin_bit =(last_vote_rpos +16)%4 *2;\
 						if(rbin_bit ==0) read_bin[rbin_byte]=0;\
 						read_bin[rbin_byte] |= new2b<<rbin_bit;  }
-					for(; last_vote_rpos  < subread_offset ; last_vote_rpos ++){
-						SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
-						BUILD_RBIN;
+					if(task==STEP_JUNC_TABLE){
+						for(; last_vote_rpos  < subread_offset ; last_vote_rpos ++)
+							SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16); // read_bin is not used in junction-detection mode.
+					}else{
+						for(; last_vote_rpos  < subread_offset ; last_vote_rpos ++){
+							SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
+							BUILD_RBIN;
+						}
 					}
 					prefill_votes(cct_context->current_index, &prefill_ptrs, applied_subreads, subread_integer, subread_offset, subread_no, is_reversed);
 				}
+
 				if(last_vote_rpos > read_len - 16)SUBREADprintf("ERROR: exceeded offset %d > %d\n", last_vote_rpos , read_len - 16);
-				for(; last_vote_rpos  < read_len - 16 ; last_vote_rpos ++){
+
+				if(task!=STEP_JUNC_TABLE) for(; last_vote_rpos  < read_len - 16 ; last_vote_rpos ++){
 					SHIFT_SUBREAD_INT(subread_integer , last_vote_rpos  +16);
 					BUILD_RBIN;
-				}
+				} // SHIFT_SUBREAD_INT here is only for build read_bin, which isn't used on junction detection mode.
 
 				if(is_reversed) {
 					cellCounts_process_copy_ptrs_to_votes(cct_context, thread_no, &prefill_ptrs, vote_me, applied_subreads, read_name);
@@ -5230,8 +5248,8 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 					if(task==STEP_VOTING)
 						cellCounts_select_and_write_alignments(cct_context, thread_no, sample_i, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
 					if(task==STEP_JUNC_TABLE){
-						cellCounts_call_juncs_put_in_tab(cct_context, thread_no, sample_i, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
-						cellCounts_select_and_write_temps(cct_context, thread_no, sample_i, vote_me, read_name, read_text, read_bin, qual_text, read_len, applied_subreads);
+						cellCounts_call_juncs_put_in_tab(cct_context, thread_no, sample_i, vote_me, read_name, read_text, /*read_bin -- not used for junction detection */ NULL, qual_text, read_len, applied_subreads);
+						cellCounts_select_and_write_temps(cct_context, thread_no, sample_i, vote_me, read_name, read_text, /*read_bin -- not used for junction detection */ NULL, qual_text, read_len, applied_subreads);
 					}
 				} else {
 					building_rbin_offset = REVERSED_READ_BIN_OFFSET;
@@ -5242,7 +5260,7 @@ int cellCounts_do_jtab_or_voting(cellcounts_global_t * cct_context, int thread_n
 				}
 			}
 		}else if(task==STEP_JUNC_TABLE){
-			cellCounts_select_and_write_temps(cct_context, thread_no, -1, NULL, read_name, read_text, read_bin, qual_text, read_len, -1);
+			cellCounts_select_and_write_temps(cct_context, thread_no, -1, NULL, read_name, read_text, /* read_bin  -- read_bin is the 2-bit encoded read sequence and is not used for junction detection*/ NULL, qual_text, read_len, -1);
 		}else if(task==STEP_VOTING){ // junction-detection mode doens't have the voting step.
 			cellCounts_select_and_write_alignments(cct_context, thread_no, -1, NULL, read_name, read_text, read_bin, qual_text, read_len, -1);
 		}

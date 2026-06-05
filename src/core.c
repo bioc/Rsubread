@@ -4093,6 +4093,9 @@ int load_global_context(global_context_t * context)
 		if(context->input_reads.is_paired_end_reads) context->config.reads_per_chunk /= 2;
 	}
 
+	char * DBPZ_Core_CHUNK_READS = getenv("DBPZ_Core_CHUNK_READS");
+	if(DBPZ_Core_CHUNK_READS) context -> config.reads_per_chunk = atoi(DBPZ_Core_CHUNK_READS);
+
 	struct stat ginp1_stat;
 	int guess_tested_reads = 0;
 	stat(context->config.first_read_file , &ginp1_stat);

@@ -1390,8 +1390,7 @@
   return(sheet)
 }
 
-#cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, barcoding.mode="Chromium", cell.level.junctions=NULL, cell.cluster.map=NULL, enableSoftClipping = TRUE)
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, binaryTempMemory = FALSE){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, binaryTempMemory = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE){
   if(F)if(!   (   file.exists("/home/vdiuser/Projects/GOlib/DBPZ/go.sum")  ||  file.exists("/fs04/ws30/Liao/Common/Index/Subread/build-index.bash") || file.exists("/home/biocbuild/bbs-3.24-bioc/R/bin/R") ) ){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)

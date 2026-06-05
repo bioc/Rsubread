@@ -191,8 +191,8 @@ typedef struct{
 
 	int temp_realign_record_capacity;
 	int temp_realign_work_capacity;
-	unsigned char tempbin_v_buffer[SCRNA_VBUFF_SIZE];
-	unsigned char cellbin_v_buffer[SCRNA_VBUFF_SIZE];
+	char tempbin_v_buffer[SCRNA_VBUFF_SIZE];
+	char cellbin_v_buffer[SCRNA_VBUFF_SIZE];
 	unsigned char * temp_realign_record_buf;
 	unsigned char * temp_realign_work_buf;
 

@@ -1408,7 +1408,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 		return 1;
 	}
 
-	unsigned char * btabbuf = malloc(GEHASH_TABFILE_BUFFER);
+	char * btabbuf = malloc(GEHASH_TABFILE_BUFFER);
 	setvbuf(fp, btabbuf, _IOFBF, GEHASH_TABFILE_BUFFER);
 
 	rrtv = fread(magic_chars,1,8,fp);

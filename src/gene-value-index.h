@@ -31,10 +31,9 @@ void gvindex_set (gene_value_index_t * index, gehash_data_t offset, gehash_key_t
 int gvindex_dump(gene_value_index_t * index, const char filename []);
 
 int gvindex_load(gene_value_index_t * index, const char filename []);
+int gvindex_load_largebuffer(gene_value_index_t * index, const char filename [], int create_basevalue_array);
 
 void gvindex_destory(gene_value_index_t * index);
-
-void gvindex_baseno2offset(unsigned int base_number, gene_value_index_t * index, unsigned int * offset_byte, unsigned int * offset_bit);
 
 // returns a 16-bit bitmap showing if each base is matched.
 int gvindex_match(gene_value_index_t * index, gehash_data_t offset, gehash_key_t base_value);
