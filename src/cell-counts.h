@@ -345,12 +345,14 @@ typedef struct{
 	HashTable	* cluster_cell_map_table; // sample_no << 56 | cell_bc_no => cluster_no ; cell_bc_no and cluster_no are 0-based; sample_no is 1-based 
 	char		cluster_junctions_file[MAX_FILE_NAME_LENGTH];
 	char		cluster_map_file[MAX_FILE_NAME_LENGTH];
+	char		visium_hd_CellRanger_bam[MAX_FILE_NAME_LENGTH];
 
 	// The following 4 variables were copied from featureCounts junction reporting.
 	HashTable 	* junction_ExonEdgeTree_table[3];
 	HashTable	* junction_GenebodyTree_table;
 	HashTable	* junction_transcript_table;
 	HashTable	* junction_genebody_table;
+	HashTable 	* VisiumHD_barcode_to_best_mapping;
 	int 		ignore_transcript_junction_assignment;
 } cellcounts_global_t;
 

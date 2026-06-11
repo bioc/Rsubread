@@ -317,7 +317,7 @@ static struct option cellCounts_long_options[]={
 	{"reportMultiMappingReads", no_argument ,0,0},
 	{"junctionDetection", no_argument ,0,0},
 	{"binaryTempMemory", no_argument ,0,0},
-	{"VisiumHD_barcode", no_argument ,0,0},
+	{"VisiumHD_barcode", required_argument ,0,0},
 	{"cluster_junctions", required_argument ,0,0},
 	{"cluster_map", required_argument ,0,0},
 
@@ -538,6 +538,7 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 			strncpy(cct_context -> cluster_map_file, optarg, MAX_FILE_NAME_LENGTH -1);
 		}
 		if(strcmp("VisiumHD_barcode", cellCounts_long_options[option_index].name)==0){
+			strcpy(cct_context -> visium_hd_CellRanger_bam, optarg);
 			cct_context -> visium_hd_barcodes = 1;
 			cct_context -> UMI_length = 9; // observed from example data
 		}
@@ -748,16 +749,197 @@ void cellCounts_sample_SamBam_writers_new_files(void *k, void *v, HashTable * ta
 	}
 }
 
+void extract_sam_tags(const char *bambuff, char *BAM1R, char *BAM1Y, char *CB, char *UR, char *UY) {
+	// Initialize pre-allocated buffers to empty strings in case tags aren't found
+	if (BAM1R) BAM1R[0] = '\0';
+	if (BAM1Y) BAM1Y[0] = '\0';
+	if (CB) CB[0] = '\0';
+	if (UR) UR[0] = '\0';
+	if (UY) UY[0] = '\0';
+
+	const char *p = bambuff;
+	int tab_count = 0;
+
+	// 1. Skip the 11 mandatory SAM fields
+	while (*p && tab_count < 11) {
+		if (*p == '\t') {
+			tab_count++;
+		}
+		p++;
+	}
+
+	// If the line is malformed or doesn't have optional fields, exit early
+	if (tab_count < 11) return;
+
+	// 2. Parse the optional fields
+	while (*p) {
+		// Check if the current pointer matches any of our target tags followed by a colon
+		if (strncmp(p, "1R:", 3) == 0 || strncmp(p, "1Y:", 3) == 0 || strncmp(p, "CB:", 3) == 0 || strncmp(p, "UR:", 3) == 0 || strncmp(p, "UY:", 3) == 0) {
+			const char *tag_start = p;
+			
+			// SAM optional fields format is TAG:TYPE:VALUE (e.g., BAM1R:Z:ATGCA)
+			// Ensure the structure has the second colon after the 1-character TYPE
+			if (*(p + 2) == ':' && *(p + 3) != '\0' && *(p + 4) == ':') {
+				const char *val_start = p + 5; // Value starts right after the second colon
+				const char *val_end = val_start;
+				
+				// Find the end of the current field (tab or end of line)
+				while (*val_end && *val_end != '\t' && *val_end != '\n' && *val_end != '\r') {
+					val_end++;
+				}
+				
+				size_t len = val_end - val_start;
+				
+				// Copy the value into the corresponding pre-allocated variable
+				if (strncmp(tag_start, "1R", 2) == 0 && BAM1R) {
+					strncpy(BAM1R, val_start, len);
+					BAM1R[len] = '\0';
+				} else if (strncmp(tag_start, "1Y", 2) == 0 && BAM1Y) {
+					strncpy(BAM1Y, val_start, len);
+					BAM1Y[len] = '\0';
+				} else if (strncmp(tag_start, "UY", 2) == 0 && UY) {
+					strncpy(UY, val_start, len);
+					UY[len] = '\0';
+				} else if (strncmp(tag_start, "UR", 2) == 0 && UR) {
+					strncpy(UR, val_start, len);
+					UR[len] = '\0';
+				} else if (strncmp(tag_start, "CB", 2) == 0 && CB) {
+					strncpy(CB, val_start, len);
+					CB[len] = '\0';
+				}
+			}
+		}
+
+		// Advance to the next optional field (skip to the next tab)
+		while (*p && *p != '\t' && *p != '\n' && *p != '\r') {
+			p++;
+		}
+		
+		if (*p == '\t') {
+			p++; // Skip the tab character to point to the start of the next tag
+		} else {
+			break; // Reached end of the line (\n, \r, or \0)
+		}
+	}
+}
+
+static void copy_strings_fast(const char *readfl, char *BAM1R, char *BAM1Y, char *CB) {
+	const char *start = readfl;
+	const char *p = readfl;
+	size_t len;
+
+	while (*p && *p != '\t') {
+		p++;
+	}
+	len = p - start;
+	memcpy(BAM1R, start, len);
+	BAM1R[len] = '\0'; // Manually null-terminate destination
+
+	if (*p == '\t') p++; 
+	
+	start = p;
+	while (*p && *p != '\t') {
+		p++;
+	}
+	len = p - start;
+	memcpy(BAM1Y, start, len);
+	BAM1Y[len] = '\0';
+
+	if (*p == '\t') p++;
+
+	start = p;
+	while (*p && *p != '\t' && *p != '\n' && *p != '\r') {
+		p++;
+	}
+	len = p - start;
+	memcpy(CB, start, len);
+	CB[len] = '\0';
+}
+
+#define FILE_IS_BAM   1
+#define FILE_IS_TEXT  0
+#define FILE_ERROR   -1
+
+static int check_file_type(const char *filename) {
+	FILE *file = fopen(filename, "rb");
+	if (file == NULL) {
+		perror("Error opening file");
+		return FILE_ERROR;
+	}
+
+	unsigned char header[4];
+	
+	size_t bytes_read = fread(header, 1, 4, file);
+	fclose(file);
+
+	if (bytes_read < 4) {
+		return FILE_IS_TEXT; 
+	}
+
+	if (header[0] == 'B' && header[1] == 'A' && header[2] == 'M' && header[3] == 0x01) {
+		return FILE_IS_BAM;
+	}
+
+	return FILE_IS_TEXT;
+}
+
 int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 	int rv = 0;
-	cct_context-> cell_barcodes_array = input_BLC_parse_CellBarcodes( cct_context-> cell_barcode_list_file );
+	if(cct_context -> visium_hd_CellRanger_bam[0]){
+		cct_context -> VisiumHD_barcode_to_best_mapping = StringTableCreate(32*1024*1024+39);
+		HashTableSetDeallocationFunctions(cct_context -> VisiumHD_barcode_to_best_mapping,free,free); // key: BAM1R+CY; val: CB; all duplicated.
+		int is_BAM_file = check_file_type(cct_context -> visium_hd_CellRanger_bam)==FILE_IS_BAM;
+		void * fparby;
 
-	if(NULL == cct_context-> cell_barcodes_array){
-		SUBREADprintf("ERROR: cannot find valid cell barcodes from the cell barcode list. Please check the content and the accessibility of the file.\n");
-		rv = 1;
+		if(is_BAM_file) fparby = SamBam_fopen(cct_context -> visium_hd_CellRanger_bam, SAMBAM_FILE_BAM);
+		else fparby = fopen(cct_context -> visium_hd_CellRanger_bam, "r");
+		int offset_of_1R = is_BAM_file? cct_context -> UMI_length :0;
+		while(1){
+			char BAM1R[100],BAM1Y[100],CB[100];
+			char bambuff[5001];
+			char * readfl;
+			BAM1R[0]=BAM1Y[0]=CB[0]=0;
+
+			if(is_BAM_file){
+				readfl = SamBam_fgets((SamBam_FILE*)fparby,bambuff, 5000,0);
+				if(!readfl)break;
+				if(bambuff[0]=='@')continue;
+				extract_sam_tags(bambuff, BAM1R, BAM1Y, CB, NULL, NULL);
+			} else {
+				readfl = fgets(bambuff, 5000, (FILE*) fparby);
+				if(!readfl)break;
+				copy_strings_fast(readfl, BAM1R, BAM1Y, CB);
+			}
+
+			if(CB[0] && BAM1R[0] && BAM1Y[0]){
+				char CKey[200];
+				char CVal[200];
+				int x1, bc1=-1, bc2=-1;
+				for(x1=0; BAM1Y[x1]; x1++)if(BAM1Y[x1]>='/') BAM1Y[x1] ++; // when matching the quality string, the qualty char >= '/' is +1
+				sprintf(CKey,"%s/%s",BAM1R + offset_of_1R ,BAM1Y + offset_of_1R); // UMI is before spot barcodes in Visium HD R1. And we don't need to index the UMI for having the barcodes.
+				sscanf(CB, "s_%*[^_]_%d_%d", &bc1, &bc2);
+				sprintf(CVal,"%05d_%05d",bc1,bc2);
+
+				char * oldCB = HashTableGet(cct_context -> VisiumHD_barcode_to_best_mapping, CKey);
+				if(oldCB){
+					if(0)if(strcmp(CB, oldCB)!=0)SUBREADprintf("ERROR: the same BAM1R and BAM1Y are mapped to different CB: %s and %s have %s != %s\n", BAM1R, BAM1Y, CB, oldCB);
+				}else HashTablePut(cct_context -> VisiumHD_barcode_to_best_mapping, strdup(CKey), strdup(CVal));
+				if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements % 1000000==0)fprintf(stderr,"INSERT_FROM_BAN %s %s  OLD %p\n", CKey, CVal, oldCB);
+			}
+			if(0)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 1600000)break;
+		}
+		if(is_BAM_file) SamBam_fclose((SamBam_FILE*)fparby);
+		else fclose((FILE*)fparby);
+	}else{
+		cct_context -> cell_barcodes_array = input_BLC_parse_CellBarcodes( cct_context-> cell_barcode_list_file );
+
+		if(NULL == cct_context-> cell_barcodes_array){
+			SUBREADprintf("ERROR: cannot find valid cell barcodes from the cell barcode list. Please check the content and the accessibility of the file.\n");
+			rv = 1;
+		}
 	}
 	if(!rv){
-		rv = cellCounts_make_barcode_HT_table( cct_context );
+		if(cct_context-> cell_barcodes_array)rv = cellCounts_make_barcode_HT_table( cct_context );
 		if(!rv){
 			cct_context-> sample_sheet_table = input_BLC_parse_SampleSheet( cct_context -> bcl_sample_sheet_file);
 			if(NULL == cct_context-> sample_sheet_table) rv = 1;
@@ -1927,12 +2109,17 @@ int cellCounts_destroy_context(cellcounts_global_t * cct_context){
 	HashTableDestroy(cct_context->lineno1B_to_sampleno1B_tab);
 	ArrayListDestroy(cct_context->sample_id_to_name);
 	ArrayListDestroy(cct_context->sample_barcode_list);
-	ArrayListDestroy(cct_context->cell_barcodes_array);
 	ArrayListDestroy(cct_context->all_features_array);
 	HashTableDestroy(cct_context->gene_name_table);
-	HashTableDestroy(cct_context->cell_barcode_head_tail_table);
 	HashTableDestroy(cct_context->chromosome_exons_table);
 	gvindex_destory(cct_context->value_index);
+
+	// either having the barcode array or having the barcode map from Space Ranger BAM.
+	if(cct_context -> VisiumHD_barcode_to_best_mapping) HashTableDestroy(cct_context -> VisiumHD_barcode_to_best_mapping);
+	if(cct_context->cell_barcodes_array){
+		ArrayListDestroy(cct_context->cell_barcodes_array);
+		HashTableDestroy(cct_context->cell_barcode_head_tail_table);
+	}
 
 	if(cct_context -> cluster_spec_junction_table){
 		HashTableDestroy(cct_context -> cluster_spec_junction_table);
@@ -2123,7 +2310,7 @@ void cellCounts_find_hits_for_mapped_section(cellcounts_global_t * cct_context, 
 
 #define SCRNA_READ_NAME_SPLIT_CHAR '|'
 
-int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin, char * read_name, char ** sample_seq, char ** sample_qual, char ** BC_seq, char ** BC_qual, char ** UMI_seq, char ** UMI_qual, char ** lane_str, char ** RG, int * rname_trimmed_len){
+int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin, char * read_name, char ** sample_seq, char ** sample_qual, char ** seq_1R, char ** qual_1Y, char ** UMI_seq, char ** UMI_qual, char ** lane_str, char ** RG, int * rname_trimmed_len){
 	char * testi;
 	int field_i=0;
 	if(NULL == read_name && rbin) read_name = rbin + 36;
@@ -2132,11 +2319,21 @@ int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin
 			field_i++;
 			if(field_i == 1) {
 				if(rname_trimmed_len) (*rname_trimmed_len)=testi-read_name;
-				if(BC_seq)(*BC_seq) = testi+1;
-				if(UMI_seq)(*UMI_seq) = testi+1+cct_context -> known_cell_barcode_length;
+				if(seq_1R)(*seq_1R) = testi+1;
+
+				if(cct_context -> visium_hd_barcodes){
+					if(UMI_seq)(*UMI_seq) = testi+1;// in VisiumHD: the R1 is UMI + cell_barcode1+cell_barcode2.
+				}else{
+					if(UMI_seq)(*UMI_seq) = testi+1+cct_context -> known_cell_barcode_length;
+				}
 			}else if(field_i == 2){
-				if(BC_qual)(*BC_qual) = testi+1;
-				if(UMI_qual)(*UMI_qual) = testi+1+cct_context -> known_cell_barcode_length;
+				if(qual_1Y)(*qual_1Y) = testi+1;
+
+				if(cct_context -> visium_hd_barcodes){
+					if(UMI_qual)(*UMI_qual) = testi+1;// in VisiumHD: the R1 is UMI + cell_barcode1+cell_barcode2.
+				}else{
+					if(UMI_qual)(*UMI_qual) = testi+1+cct_context -> known_cell_barcode_length;
+				}
 			}else if(field_i == 3){
 				*sample_seq = testi + 1;
 				if(RG)(*RG) = *sample_seq;
@@ -2164,30 +2361,30 @@ int cellCounts_scan_read_name_str(cellcounts_global_t * cct_context, char * rbin
 }
 
 
-int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_no, char * cbc){
+int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_no, char * seq_1R, char * qual_1Y){
 	//return -1;
 	char tmpc [MAX_READ_NAME_LEN];
 	int xx1, xx2,tb1=-1;
 	ArrayList * ret=NULL;
 
-	if(cct_context->visium_hd_barcodes){
-		int cbclen = strstr(cbc,"|")-cbc, bc2_end=0, bc1_end=0, bc1_start=0, xx3, bc1=-1, bc2=-1;
+	if(cct_context->visium_hd_barcodes && NULL== cct_context->VisiumHD_barcode_to_best_mapping){
+		int seq_1Rlen = strstr(seq_1R,"|")-seq_1R, bc2_end=0, bc1_end=0, bc1_start=0, xx3, bc1=-1, bc2=-1;
 		int min_bc1_misma = 2, min_bc2_misma = 2;
 		for(xx2 = cct_context -> UMI_length ; xx2 < cct_context -> UMI_length+2; xx2++){ // probe the start of bc1
 			for(xx1=1;xx1<3;xx1++){
 				tmpc[0] = (xx1==2)?'S':'F';
 				for(xx3=0; xx3<MIN_LEN_VISIUM_HD_CELLBC/2 ; xx3++)
-					tmpc[1+xx3] = cbc[2*xx3+xx2+xx1-1];
+					tmpc[1+xx3] = seq_1R[2*xx3+xx2+xx1-1];
 				tmpc[1+MIN_LEN_VISIUM_HD_CELLBC/2]=0;
 				ArrayList *xrawarr = HashTableGet(cct_context -> cell_barcode_head_tail_table, tmpc);
 				if(!xrawarr)continue;
 
 				for(xx3=0;xx3<xrawarr->numOfElements;xx3++){
 					int tbcn = ArrayListGet( xrawarr, xx3 )-NULL;
-					char * known_cbc = ArrayListGet(cct_context -> cell_barcodes_array, tbcn);
-					int hc = hamming_dist_ATGC_max2( known_cbc, cbc+xx2 );
-					if(hc < min_bc1_misma || (hc==min_bc1_misma && bc1_end < xx2+strlen(known_cbc))){
-						bc1_end = xx2+strlen(known_cbc);
+					char * known_cellbc = ArrayListGet(cct_context -> cell_barcodes_array, tbcn);
+					int hc = hamming_dist_ATGC_max2( known_cellbc, seq_1R+xx2 );
+					if(hc < min_bc1_misma || (hc==min_bc1_misma && bc1_end < xx2+strlen(known_cellbc))){
+						bc1_end = xx2+strlen(known_cellbc);
 						bc1_start = xx2;
 						min_bc1_misma = hc;
 						bc1 = tbcn;
@@ -2196,40 +2393,57 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 			}
 		}
 		if(!bc1_end) return -1;
-		cbc[ bc1_start ] +=0x20; // upper => lower
+		seq_1R[ bc1_start ] +=0x20; // upper => lower
 		for(xx2 = bc1_end -1; xx2 <bc1_end+2; xx2++){ // probe the start of bc2 . BC1 and BC2 may share a base!!!
 			for(xx1=1;xx1<3;xx1++){
 				tmpc[0] = (xx1==2)?'S':'F';
 				for(xx3=0; xx3<MIN_LEN_VISIUM_HD_CELLBC/2 ; xx3++)
-					tmpc[1+xx3] = cbc[2*xx3+xx2+xx1-1];
+					tmpc[1+xx3] = seq_1R[2*xx3+xx2+xx1-1];
 				tmpc[1+MIN_LEN_VISIUM_HD_CELLBC/2]=0;
 				ArrayList *xrawarr = HashTableGet(cct_context -> cell_barcode_head_tail_table, tmpc);
 				if(!xrawarr)continue;
 
 				for(xx3=0;xx3<xrawarr->numOfElements;xx3++){
 					int tbcn = ArrayListGet( xrawarr, xx3 )-NULL;
-					char * known_cbc = ArrayListGet(cct_context -> cell_barcodes_array, tbcn);
-					int hc = hamming_dist_ATGC_max2( known_cbc, cbc+xx2 );
-					if(hc < min_bc2_misma || (hc==min_bc2_misma && bc2_end < xx2+strlen(known_cbc))){
-						bc2_end = xx2+strlen(known_cbc); 
+					char * known_cellbc = ArrayListGet(cct_context -> cell_barcodes_array, tbcn);
+					int hc = hamming_dist_ATGC_max2( known_cellbc, seq_1R+xx2 );
+					if(hc < min_bc2_misma || (hc==min_bc2_misma && bc2_end < xx2+strlen(known_cellbc))){
+						bc2_end = xx2+strlen(known_cellbc); 
 						min_bc2_misma = hc;
 						bc2 = tbcn;
 					}
 				}
 			}
 		}
-		cbc[ bc2_end ] +=0x20;
+		seq_1R[ bc2_end ] +=0x20;
 		tb1 = bc1 << 16 | bc2;
+	}else if(cct_context->visium_hd_barcodes && cct_context->VisiumHD_barcode_to_best_mapping){
+		int cbclen = strstr(seq_1R,"|")-seq_1R;
+		char bcback = seq_1R[cbclen], bqback = qual_1Y[cbclen];
+		seq_1R[cbclen] = 0;
+		qual_1Y[cbclen] = 0;
+		// space ranger CB is like s_002um_02768_00939-1
+		char CKey[200];
+		int bc1=-1, bc2=-1;
+		sprintf(CKey,"%s/%s",seq_1R + cct_context -> UMI_length, qual_1Y + cct_context -> UMI_length); // UMI is before the two spot barcodes in Visium HD R1 reads. Hence we don't index the UMIs in the R1.
+		char * spaceranger_CB = HashTableGet(cct_context->VisiumHD_barcode_to_best_mapping, CKey);
+		if(spaceranger_CB){
+			sscanf(spaceranger_CB, "%d_%d_", &bc1, &bc2);
+			tb1 = bc1 << 16 | bc2;
+//			fprintf(stderr,"CREATE_CELLID %s %s = %s\n",  seq_1R, qual_1Y, spaceranger_CB);
+		}
+		seq_1R[cbclen]=bcback;
+		qual_1Y[cbclen]=bqback;
 	}else{
 		for(xx1=0;xx1<3;xx1++){
 			if(xx1==1) ret = ArrayListCreate(100);
 			if(xx1>0){
 				tmpc[0] = (xx1==2)?'S':'F';
 				for(xx2=0; xx2<cct_context -> known_cell_barcode_length/2 ; xx2++)
-					tmpc[1+xx2] = cbc[2*xx2+xx1-1];
+					tmpc[1+xx2] = seq_1R[2*xx2+xx1-1];
 				tmpc[1+cct_context -> known_cell_barcode_length/2]=0;
 			}else{
-				memcpy(tmpc, cbc, cct_context -> known_cell_barcode_length);
+				memcpy(tmpc, seq_1R, cct_context -> known_cell_barcode_length);
 				tmpc[cct_context -> known_cell_barcode_length]=0;
 			}
 
@@ -2265,10 +2479,9 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 
 		for(xx1=0; xx1<ret -> numOfElements; xx1++){
 			int tbcn = ArrayListGet(ret,xx1)-NULL;
-			char * known_cbc = ArrayListGet(cct_context -> cell_barcodes_array, tbcn);
-			int hc = hamming_dist_ATGC_max2( known_cbc, cbc );
+			char * known_cellbc = ArrayListGet(cct_context -> cell_barcodes_array, tbcn);
+			int hc = hamming_dist_ATGC_max2( known_cellbc, seq_1R);
 
-		//	cbc[16]=0; if(hc <=3)SUBREADprintf("TEST_CBC %s ~ %s = %d\n", known_cbc, cbc, hc);
 			if(hc==1){
 				tb1 = tbcn;
 				break;
@@ -2609,7 +2822,8 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
 
-	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq);
+	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
+	//if(cell_barcode_no>=0&&cct_context->visium_hd_barcodes) fprintf(stderr,"    UMIseq=%s  UMIqual=%s  UMIlen=%d\n", UMI_seq, UMI_qual, cct_context->UMI_length);
 	if(reporting_index>=0){
 		linear_pos = thread_context -> reporting_positions[reporting_index];
 		linear_pos += get_soft_clipping_length(thread_context -> reporting_cigars[reporting_index]);
@@ -3473,7 +3687,7 @@ void cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thr
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL, *testi;
 	int rname_trimmed_len=0;
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
-	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq);
+	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
 
 	noindel_coved_firstbase += JUNCTION_WIDDEN_GAP_LEN; // widden the gap to avoid same bases before/after event
 	noindel_coved_lastbase -= JUNCTION_WIDDEN_GAP_LEN;
@@ -4698,7 +4912,7 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 	char * sample_seq=NULL, *sample_qual=NULL, *BC_qual=NULL, *BC_seq=NULL, *UMI_seq=NULL, *UMI_qual=NULL, *lane_str=NULL, *RG=NULL;
 	char * sample_seq_end = NULL, * sample_qual_end = NULL;
 	int rname_trimmed_len=0;
-	char tmp_bc[MAX_READ_NAME_LEN+1];
+	char tmp_bc[MAX_READ_NAME_LEN+1], temp_bq_buf[100];
 	struct TempForRealign temprec;
 	cellcounts_temp_file_point_t * temp_fp;
 
@@ -4804,12 +5018,18 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 				if(bc_len < 0) bc_len = 0;
 			}
 			if(bc_end){
+				char * temp_bq=NULL;
 				int copy_len = total_bc_umi_len;
 				if(copy_len > MAX_READ_NAME_LEN) copy_len = MAX_READ_NAME_LEN;
 				memcpy(tmp_bc, BC_seq, copy_len);
+				if(cct_context -> VisiumHD_barcode_to_best_mapping){
+					temp_bq = temp_bq_buf;
+					memcpy(temp_bq, BC_qual, copy_len);
+				}
 				tmp_bc[copy_len] = 0;
+
 				{
-					int cell_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, tmp_bc);
+					int cell_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, tmp_bc, temp_bq);
 					temprec.cell_number = cell_no >= 0 ? (unsigned int)(cell_no + 1) : 0u;
 				}
 			}
@@ -6045,6 +6265,19 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 		*(new_rbin+new_rbin_len+cct_context -> UMI_length)=0;
 		new_rbin_len += cct_context -> UMI_length+1;
 	}
+	if(cct_context->visium_hd_barcodes){
+		int x1,cbclen = strstr(umi_seq,"|")-umi_seq; // umi_seq had been set to start of the 1R.
+		for(x1=0; x1<2; x1++){
+			new_rbin[new_rbin_len++]='1';new_rbin[new_rbin_len++]=x1?'Y':'R';new_rbin[new_rbin_len++]='Z';
+			memcpy(new_rbin+new_rbin_len, x1?umi_qual:umi_seq, cbclen);
+			if(x1){
+				int x2;
+				for(x2=0; x2<cbclen; x2++)if( new_rbin[ new_rbin_len+x2 ]>'/' ) new_rbin[ new_rbin_len+x2 ]--;
+			}
+			*(new_rbin+new_rbin_len+cbclen)=0;
+			new_rbin_len += cbclen+1;
+		}
+	}
 
 	new_rbin[new_rbin_len++]='X';new_rbin[new_rbin_len++]='Q';new_rbin[new_rbin_len++]='I';
 	memcpy(new_rbin+new_rbin_len,&gene_no,4);
@@ -6053,9 +6286,7 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 	new_rbin[new_rbin_len++]='X';new_rbin[new_rbin_len++]='K';new_rbin[new_rbin_len++]='C';
 	new_rbin[new_rbin_len++]=gene_no>>63;
 
-
 #endif
-
 	new_rbin_len-=4;
 	memcpy(new_rbin, &new_rbin_len,4);
 	return new_rbin_len;
@@ -6306,6 +6537,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			if(cellid>=0){
 				if(cct_context->visium_hd_barcodes){
 					snprintf(visiumHD_cellbc,12,"%05d_%05d", (cellid&0xffff0000)>>16  , cellid&0xffff );
+					//fprintf(stderr,"HAD_2D_BC %s\n", visiumHD_cellbc);
 					new_cellbc = visiumHD_cellbc;
 				}else new_cellbc = ArrayListGet(cct_context -> cell_barcodes_array, cellid);
 			}
@@ -6419,8 +6651,12 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 
 	for(x1 = 0; x1 < used_cell_barcodes -> numOfElements; x1++){
 		srInt_64 cellno = ArrayListGet(used_cell_barcodes, x1)-NULL;
-		char * cellbc_seq = ArrayListGet(cct_context -> cell_barcodes_array, cellno);
-		fprintf(ofp_bcs,"%s\n", cellbc_seq);
+		if(cct_context -> visium_hd_barcodes){
+			fprintf(ofp_bcs,"%05d_%05d\n", (cellno&0xffff0000)>>16, cellno&0xffff);
+		}else{
+			char * cellbc_seq = ArrayListGet(cct_context -> cell_barcodes_array, cellno);
+			fprintf(ofp_bcs,"%s\n", cellbc_seq);
+		}
 	}
 
 	for(x1 = 0; x1 < used_cell_barcodes -> numOfElements; x1++){

@@ -1390,7 +1390,7 @@
   return(sheet)
 }
 
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, binaryTempMemory = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, binaryTempMemory = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, VisiumHD.bam=NULL){
   if(F)if(!   (   file.exists("/home/vdiuser/Projects/GOlib/DBPZ/go.sum")  ||  file.exists("/fs04/ws30/Liao/Common/Index/Subread/build-index.bash") || file.exists("/home/biocbuild/bbs-3.24-bioc/R/bin/R") ) ){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
@@ -1400,8 +1400,6 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   enableSoftClipping=F
   cell.cluster.map=NULL
   cell.level.junctions=NULL
-  barcoding.mode="Chromium" # or "VisiumHD"
-
 
 
   maxDiffToTopVotes=2
@@ -1451,7 +1449,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(is.null(cell.barcode)){
       guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(combined.fastq.names, temp.file.prefix, "N/A", input.mode="fastq", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       cell.barcode <- guess.cellbc.and.idx$cell.barcode
-    }else{
+    }else if(is.null(VisiumHD.bam)){
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
 
@@ -1467,7 +1465,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
-    if(barcoding.mode=="VisiumHD") opt <- c(opt, "--VisiumHD_barcode")
+    if(!is.null(VisiumHD.bam)) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.bam)
     if(!is.null(cell.level.junctions)) opt <- c(opt, "--cluster_junctions", cell.level.junctions)
     if(!is.null(cell.cluster.map)) opt <- c(opt, "--cluster_map", cell.cluster.map)
     env.readAssignmentFile <- Sys.getenv("CELLCOUNTS_DETAIL_OUT_FILENAME")
@@ -1513,7 +1511,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(dirname, temp.file.prefix, cc.sample.sheet.path, A_and_B.dual.index.list=dual.index.ABlist, cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       if(is.null(cell.barcode)){
         cell.barcode <- guess.cellbc.and.idx$cell.barcode
-      }else{
+      }else if(is.null(VisiumHD.bam)){
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
       
@@ -1533,7 +1531,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
       if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
-      if(barcoding.mode=="VisiumHD") opt <- c(opt, "--VisiumHD_barcode")
+      if(!is.null(VisiumHD.bam)) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.bam)
       if(!is.null(cell.level.junctions)) opt <- c(opt, "--cluster_junctions", cell.level.junctions)
       if(!is.null(cell.cluster.map)) opt <- c(opt, "--cluster_map", cell.cluster.map)
 
@@ -1562,7 +1560,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(is.null(cell.barcode)){
       guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(sample$BAMFile, temp.file.prefix, "N/A", input.mode="bam", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       cell.barcode <- guess.cellbc.and.idx$cell.barcode
-    }else{
+    }else if(is.null(VisiumHD.bam)){
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
 
@@ -1579,7 +1577,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
       if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
-      if(barcoding.mode=="VisiumHD")  c(opt, "--VisiumHD_barcode")
+      if(!is.null(VisiumHD.bam)) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.bam)
 
       cmd <- paste(opt,collapse=.R_param_splitor)
       n <- length(unlist(strsplit(cmd,.R_param_splitor)))
@@ -1639,3 +1637,13 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   }
 }
 
+
+
+extract_VisiumHD_tags <- function(SpaceRanger.bam.file, Output.text.file){
+  samtools_path <- Sys.which("samtools")
+  if (samtools_path == "") stop("You must have the samtools program in $PATH.")
+
+  SpaceRanger.bam.file <- .check_and_NormPath(SpaceRanger.bam.file, mustWork=T, opt="BAM file from Space Ranger")
+  Output.text.file <- .check_and_NormPath(Output.text.file, mustWork=F, opt="Output text file with 3 columns: 1R, 1Y and CB")
+  .C("R_cell_counts_extract_vHD_main", SpaceRanger.bam.file, Output.text.file)
+}
