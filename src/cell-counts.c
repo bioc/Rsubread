@@ -6228,6 +6228,7 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 	}
 //	char * cellbc_out = cellbc_seq;
 
+	int x2;
 	if(cellbc_content_len_raw>0 && !CR_found){
 		new_rbin[new_rbin_len++]='C';new_rbin[new_rbin_len++]='R';new_rbin[new_rbin_len++]='Z';
 		memcpy(new_rbin+new_rbin_len, cellbc_seq, cellbc_content_len_raw);
@@ -6243,6 +6244,7 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 	if(cellbc_content_len_raw >0 && !CY_found){
 		new_rbin[new_rbin_len++]='C';new_rbin[new_rbin_len++]='Y';new_rbin[new_rbin_len++]='Z';
 		memcpy(new_rbin+new_rbin_len, cellbc_qual, cellbc_content_len_raw);
+		for(x2=0; x2< cellbc_content_len_raw; x2++)if( new_rbin[ new_rbin_len+x2 ]>'/' ) new_rbin[ new_rbin_len+x2 ]--;
 		*(new_rbin+new_rbin_len+cellbc_content_len_raw)=0;
 		new_rbin_len += cellbc_content_len_raw+1;
 	}
@@ -6263,6 +6265,8 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 		new_rbin[new_rbin_len++]='U';new_rbin[new_rbin_len++]='Y';new_rbin[new_rbin_len++]='Z';
 		memcpy(new_rbin+new_rbin_len, umi_qual, cct_context -> UMI_length);
 		*(new_rbin+new_rbin_len+cct_context -> UMI_length)=0;
+
+		for(x2=0; x2< cct_context -> UMI_length; x2++)if( new_rbin[ new_rbin_len+x2 ]>'/' ) new_rbin[ new_rbin_len+x2 ]--;
 		new_rbin_len += cct_context -> UMI_length+1;
 	}
 	if(cct_context->visium_hd_barcodes){
@@ -6270,10 +6274,7 @@ int cellCounts_make_barcode_bam_bin(cellcounts_global_t * cct_context, char * rb
 		for(x1=0; x1<2; x1++){
 			new_rbin[new_rbin_len++]='1';new_rbin[new_rbin_len++]=x1?'Y':'R';new_rbin[new_rbin_len++]='Z';
 			memcpy(new_rbin+new_rbin_len, x1?umi_qual:umi_seq, cbclen);
-			if(x1){
-				int x2;
-				for(x2=0; x2<cbclen; x2++)if( new_rbin[ new_rbin_len+x2 ]>'/' ) new_rbin[ new_rbin_len+x2 ]--;
-			}
+			if(x1) for(x2=0; x2<cbclen; x2++)if( new_rbin[ new_rbin_len+x2 ]>'/' ) new_rbin[ new_rbin_len+x2 ]--;
 			*(new_rbin+new_rbin_len+cbclen)=0;
 			new_rbin_len += cbclen+1;
 		}
