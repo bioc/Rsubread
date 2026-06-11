@@ -51,7 +51,7 @@ scanFasta(
   \item{expression.levels}{ a numeric vector giving the relative expression levels of the transcripts, in the order of transcripts in \code{transcript.file}. The sum of the values must be positive, and no negative value is allowed.}
   \item{output.prefix}{ a character string giving the basename of all the output files.}
   \item{library.size}{ a numeric value giving the number of reads or read-pairs to be generated. One million by default.}
-  \item{read.length}{a anumeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
+  \item{read.length}{a numeric value giving the length of each read in the output. Maximum length is 250bp. Transcripts that are shorter than the read length will not be used for generating simulated reads. 75 by default.}
   \item{truth.in.read.names}{ logical indicating if the true mapping location of reads or read-pairs should be encoded into the read names. \code{FALSE} by default.}
   \item{simulate.sequencing.error}{ logical indicating if sequencing errors should be simulated in the output reads. If \code{TRUE}, the \code{quality.reference} parameter must be specified unless the output read length is 100-bp or 75-bp. If the output read length is 100-bp or 75-bp, the \code{quality.reference} parameter can be optionally omitted, and the function will use its inbuilt quality strings.}
   \item{quality.reference}{ a character string giving the name of a file that contains one or multiple sequencing quality strings in the Phred+33 format. The file should have Unix rather than Windows line ends and the sequencing quality strings must have the same length as \code{read.length}.}
