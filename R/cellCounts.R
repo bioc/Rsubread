@@ -1008,7 +1008,8 @@
   out.gene.idx <- match(rown ,genes )
   gene.ranks <- out.gene.idx[as.numeric(mtxrows[,1])]
   cell.ranks <- as.numeric(mtxrows[,2])
-  ret <- Matrix::sparseMatrix(i=gene.ranks, j=cell.ranks , x=as.numeric(mtxrows[,3]))
+  ret <- Matrix::sparseMatrix(i=gene.ranks, j=cell.ranks , x=as.numeric(mtxrows[,3]),
+   dims = c(length(genes), length(coln)))
   rownames(ret) <- genes 
   colnames(ret) <- coln 
   ret
@@ -1244,32 +1245,42 @@
   ret
 }
 
-.load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab, umi.cutoff){
+.load.one.scSample <- function( BAM.name, FC.gene.ids, sample.no, use.meta.features, annot.tab, umi.cutoff, is.visiumHD.data){
   set.seed(0)
   fname <- sprintf("%s.scRNA.%03d", BAM.name, sample.no)
   cat("Perform cell rescuing for sample",sample.no,"...\n")
-  highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
+  if(is.visiumHD.data) highconf <- .read.sparse.mat(paste0(fname,".HighConf")) else highconf <- as.matrix(.read.sparse.mat(paste0(fname,".HighConf")))
   raw.fname <- paste0(fname,".RawOut.spmtx")
   if(file.exists(raw.fname)){
     rawout <- .read.sparse.mat.by.genes(paste0(fname,".RawOut"), FC.gene.ids)
+    cat("=== RAWOUT DIMS ===\n")
+    print(nrow(rawout))
+    print(ncol(rawout))
+
+    cat("=== HIGHCONF DIMS ===\n")
+    print(nrow(highconf))
+    print(ncol(highconf))
   }else rawout <- NULL
   rescued <- NA
-  if(is.null(umi.cutoff)) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
+  if(is.null(umi.cutoff) && !is.visiumHD.data) rescued <- .cellCounts.rescue(BAM.name, FC.gene.ids, sample.no)
 
   if(use.meta.features){
     if(!any(is.na(rescued))) rescued <- rescued[rowSums(rescued)>0,]
     ncolRescued <- 0
-    if(any(is.na(rescued))){
-      ret <- matrix(0,ncol=ncol(highconf), nrow=length(FC.gene.ids))
-      colnames(ret) <- colnames(highconf)
+    if(is.visiumHD.data){
+      ret <- highconf
     }else{
-      ret <- matrix(0,ncol=ncol(highconf)+ncol(rescued), nrow=length(FC.gene.ids))
-      colnames(ret) <- c( colnames(highconf), colnames(rescued) )
+      if(any(is.na(rescued))){
+        ret <- matrix(0,ncol=ncol(highconf), nrow=length(FC.gene.ids))
+        colnames(ret) <- colnames(highconf)
+      }else{
+        ret <- matrix(0,ncol=ncol(highconf)+ncol(rescued), nrow=length(FC.gene.ids))
+        colnames(ret) <- c( colnames(highconf), colnames(rescued) )
+      }
+      rownames(ret) <- FC.gene.ids 
+      ret[rownames(highconf), colnames(highconf) ] <- highconf
+      if(!any(is.na(rescued)))ret[rownames(rescued), colnames(rescued) ] <- rescued
     }
-    rownames(ret) <- FC.gene.ids 
-    ret[rownames(highconf), colnames(highconf) ] <- highconf
-    if(!any(is.na(rescued)))ret[rownames(rescued), colnames(rescued) ] <- rescued
-
     retc<- list(Counts=ret, HighConfidneceCell=colnames(ret) %in% colnames(highconf))
     if(!is.null(rawout)) retc[["ExcludedCells"]] <- rawout[,!( colnames(rawout) %in% colnames(ret) )]
   }else{
@@ -1281,13 +1292,13 @@
   return(retc)
 }
 
-.load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab, umi.cutoff){
+.load.all.scSamples <- function( BAM.name, FC.gene.ids, use.meta.features, annot.tab, umi.cutoff, is.visiumHD.data){
   sum.tab <- read.delim(paste0(BAM.name,".scRNA.SampleTable"), stringsAsFactors=F)
   ret <- list()
   for(roiw in 1:nrow(sum.tab)){
     #sname <- as.character(sum.tab$SampleName[roiw])
     sid <- sum.tab$Index[roiw]
-    count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid, use.meta.features, annot.tab, umi.cutoff)
+    count.tab <- .load.one.scSample(BAM.name, FC.gene.ids, sid, use.meta.features, annot.tab, umi.cutoff, is.visiumHD.data)
     ret[[sprintf("Sample.%d",sid)]] <- count.tab
   }
   ret[["Sample.Table"]] <- sum.tab
@@ -1309,7 +1320,7 @@
   }
 }
 
-.extract.sample.table.cols <- function(rdir, smr, input.mode="bcl", umi.cutoff=NULL){
+.extract.sample.table.cols <- function(rdir, smr, input.mode="bcl", umi.cutoff=NULL, is.visiumHD.data=F){
   total.cells <- c()
   hiconf.cells <- c()
   res.cells <- c()
@@ -1321,7 +1332,7 @@
     total.cells <- c(total.cells,length(smr[[sampleno]][["HighConfidneceCell"]]))
     hiconf.cells <- c(hiconf.cells,sum(smr[[sampleno]][["HighConfidneceCell"]]))
     res.cells <- c(res.cells, sum(!(smr[[sampleno]][["HighConfidneceCell"]])))
-    cell.umis <- colSums(smr[[sampleno]][["Counts"]])
+    if(is.visiumHD.data) cell.umis <- Matrix::colSums(smr[[sampleno]][["Counts"]]) else cell.umis <- colSums(smr[[sampleno]][["Counts"]])
     umis <- c(umis,sum(cell.umis))
     if(length(cell.umis)==0){
        umi.statistics <- rbind(umi.statistics, list(MinUMI=NA, MedianUMI=NA, MaxUMI=NA, MeanUMI=NA))
@@ -1390,7 +1401,7 @@
   return(sheet)
 }
 
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, binaryTempMemory = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, VisiumHD.bam=NULL){
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15, minVotes = 1, maxMismatches = 10, minMappedLength = 1, annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE, detectJunctions = FALSE, binaryTempMemory = FALSE, umi.cutoff = NULL, nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = FALSE, VisiumHD.barcode.file=NULL){
   if(F)if(!   (   file.exists("/home/vdiuser/Projects/GOlib/DBPZ/go.sum")  ||  file.exists("/fs04/ws30/Liao/Common/Index/Subread/build-index.bash") || file.exists("/home/biocbuild/bbs-3.24-bioc/R/bin/R") ) ){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
@@ -1409,6 +1420,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   minVotesPerRead <- minVotes
   subreadsPerRead <- nsubreads
   unique.mapping <- uniqueMapping
+  is.visiumHD.data <- !is.null(VisiumHD.barcode.file)
 
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
   index.file.1 <- paste0(index, ".00.b.array")
@@ -1449,7 +1461,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(is.null(cell.barcode)){
       guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(combined.fastq.names, temp.file.prefix, "N/A", input.mode="fastq", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       cell.barcode <- guess.cellbc.and.idx$cell.barcode
-    }else if(is.null(VisiumHD.bam)){
+    }else if(!is.visiumHD.data){
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
 
@@ -1465,7 +1477,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
     if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
     if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
-    if(!is.null(VisiumHD.bam)) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.bam)
+    if(is.visiumHD.data) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.barcode.file)
     if(!is.null(cell.level.junctions)) opt <- c(opt, "--cluster_junctions", cell.level.junctions)
     if(!is.null(cell.cluster.map)) opt <- c(opt, "--cluster_map", cell.cluster.map)
     env.readAssignmentFile <- Sys.getenv("CELLCOUNTS_DETAIL_OUT_FILENAME")
@@ -1480,7 +1492,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(file.exists(annot.file)){
       bam.for.FC <- c()
       raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
-      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+      some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff, is.visiumHD.data)
 
       fc[["counts"]] <- list()
       if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]] <- list()
@@ -1490,7 +1502,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
         if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["ExcludedCells"]] # only one sample.
         if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
       }
-      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff)
+      df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff, is.visiumHD.data=is.visiumHD.data)
     } else has.error <- T
   }else if(input.mode=="BCL"){
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
@@ -1511,7 +1523,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(dirname, temp.file.prefix, cc.sample.sheet.path, A_and_B.dual.index.list=dual.index.ABlist, cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       if(is.null(cell.barcode)){
         cell.barcode <- guess.cellbc.and.idx$cell.barcode
-      }else if(is.null(VisiumHD.bam)){
+      }else if(!is.visiumHD.data){
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
       
@@ -1531,7 +1543,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
       if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
-      if(!is.null(VisiumHD.bam)) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.bam)
+      if(is.visiumHD.data) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.barcode.file)
       if(!is.null(cell.level.junctions)) opt <- c(opt, "--cluster_junctions", cell.level.junctions)
       if(!is.null(cell.cluster.map)) opt <- c(opt, "--cluster_map", cell.cluster.map)
 
@@ -1544,14 +1556,14 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       dirno <- dirno +1
       if(file.exists(annot.file)){
         if(any(is.na(raw.fc.annot))) raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
-        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff, is.visiumHD.data)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
           if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["ExcludedCells"]] # only one sample.
           if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
         }
-        stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff)
+        stt <- .extract.sample.table.cols(full_dirname,some.results, umi.cutoff=umi.cutoff,is.visiumHD.data=is.visiumHD.data)
         df.sample.info <- rbind(df.sample.info, stt)
       } else has.error <-T
     }
@@ -1560,7 +1572,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
     if(is.null(cell.barcode)){
       guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(sample$BAMFile, temp.file.prefix, "N/A", input.mode="bam", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
       cell.barcode <- guess.cellbc.and.idx$cell.barcode
-    }else if(is.null(VisiumHD.bam)){
+    }else if(!is.visiumHD.data){
       cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
     }
 
@@ -1577,7 +1589,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")
       if(detectJunctions)opt <- c(opt, "--junctionDetection")
       if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
-      if(!is.null(VisiumHD.bam)) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.bam)
+      if(is.visiumHD.data) opt <- c(opt, "--VisiumHD_barcode", VisiumHD.barcode.file)
 
       cmd <- paste(opt,collapse=.R_param_splitor)
       n <- length(unlist(strsplit(cmd,.R_param_splitor)))
@@ -1590,14 +1602,14 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
         if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]] <- list()
 
         raw.fc.annot<-read.delim(annot.file, header=T, stringsAsFactors=F)
-        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff)
+        some.results <- .load.all.scSamples(temp.file.prefix, as.character(raw.fc.annot$GeneID), useMetaFeatures, raw.fc.annot, umi.cutoff, is.visiumHD.data)
         for(spi in 1:nrow(some.results[["Sample.Table"]])){
           samplename <- as.character(some.results[["Sample.Table"]][["SampleName"]][spi])
           fc[["counts"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["Counts"]] # only one sample.
           if(reportExcludedBarcodes)fc[["counts.excluded.barcodes"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["ExcludedCells"]] # only one sample.
           if(is.null(umi.cutoff))fc[["cell.confidence"]][[samplename]] <- some.results[[sprintf("Sample.%d", spi)]][["HighConfidneceCell"]]
         }
-        df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff))
+        df.sample.info <- rbind(df.sample.info,.extract.sample.table.cols(NA,some.results, input.mode="bam", umi.cutoff=umi.cutoff,is.visiumHD.data=is.visiumHD.data))
       }else has.error<-T
     }
   }

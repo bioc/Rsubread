@@ -866,30 +866,24 @@ static int check_file_type(const char *filename) {
 		perror("Error opening file");
 		return FILE_ERROR;
 	}
-
-	unsigned char header[4];
-	
-	size_t bytes_read = fread(header, 1, 4, file);
+	unsigned char header[2];
+	size_t bytes_read = fread(header, 1, 2, file);
 	fclose(file);
 
-	if (bytes_read < 4) {
-		return FILE_IS_TEXT; 
-	}
-
-	if (header[0] == 'B' && header[1] == 'A' && header[2] == 'M' && header[3] == 0x01) {
-		return FILE_IS_BAM;
-	}
-
+	if (bytes_read < 2) return FILE_IS_TEXT; 
+	if (header[0] == 0x1f && header[1] == 0x8b) return FILE_IS_BAM; // gzipped
 	return FILE_IS_TEXT;
 }
 
 int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 	int rv = 0;
 	if(cct_context -> visium_hd_CellRanger_bam[0]){
+		char* early_terminate = getenv("DBPZ_cellCounts_BARREF_TERMINAL");
 		cct_context -> VisiumHD_barcode_to_best_mapping = StringTableCreate(32*1024*1024+39);
 		HashTableSetDeallocationFunctions(cct_context -> VisiumHD_barcode_to_best_mapping,free,free); // key: BAM1R+CY; val: CB; all duplicated.
 		int is_BAM_file = check_file_type(cct_context -> visium_hd_CellRanger_bam)==FILE_IS_BAM;
 		void * fparby;
+//fprintf(stderr,"BAMREF %d\n", is_BAM_file);
 
 		if(is_BAM_file) fparby = SamBam_fopen(cct_context -> visium_hd_CellRanger_bam, SAMBAM_FILE_BAM);
 		else fparby = fopen(cct_context -> visium_hd_CellRanger_bam, "r");
@@ -904,6 +898,7 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 				readfl = SamBam_fgets((SamBam_FILE*)fparby,bambuff, 5000,0);
 				if(!readfl)break;
 				if(bambuff[0]=='@')continue;
+//fprintf(stderr,"REFLINE %s\n", bambuff);
 				extract_sam_tags(bambuff, BAM1R, BAM1Y, CB, NULL, NULL);
 			} else {
 				readfl = fgets(bambuff, 5000, (FILE*) fparby);
@@ -924,9 +919,10 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 				if(oldCB){
 					if(0)if(strcmp(CB, oldCB)!=0)SUBREADprintf("ERROR: the same BAM1R and BAM1Y are mapped to different CB: %s and %s have %s != %s\n", BAM1R, BAM1Y, CB, oldCB);
 				}else HashTablePut(cct_context -> VisiumHD_barcode_to_best_mapping, strdup(CKey), strdup(CVal));
-				if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements % 1000000==0)fprintf(stderr,"INSERT_FROM_BAN %s %s  OLD %p\n", CKey, CVal, oldCB);
+				if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements % 3000000==0)//fprintf(stderr,"INSERT_FROM_BAN %s %s  OLD %p\n", CKey, CVal, oldCB);
+					SUBREADprintf("Loaded the %lld-th barcode from Space Ranger reference.\n", cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements);
 			}
-			if(0)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 1600000)break;
+			if(early_terminate)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 3654321)break;
 		}
 		if(is_BAM_file) SamBam_fclose((SamBam_FILE*)fparby);
 		else fclose((FILE*)fparby);
