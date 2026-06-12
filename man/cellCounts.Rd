@@ -53,7 +53,7 @@ cellCounts(
   \item{minVotes}{ A numeric value giving the minimum number of votes required for reporting a hit. \code{1} by default.}
   \item{maxMismatches}{ A numeric value giving the maximum number of mis-matched bases allowed in the mapping of a read. \code{10} by default. Mis-matches found in soft-clipped bases are not counted.}
   \item{minMappedLength}{ A numeric value giving the minimum number of mapped bases in a read required for reporting a hit. \code{1} by default.}
-  \item{enableSoftClipping} {Specify if soft-clipping should be performed. Its enabled by default junction detection is disabled, or disabled by default when junction detection is enabled.}
+  \item{enableSoftClipping}{ Specify if soft-clipping should be performed. Its enabled by default junction detection is disabled, or disabled by default when junction detection is enabled.}
   \item{annot.inbuilt}{ Specify an inbuilt annotation for UMI counting. See \code{\link{featureCounts}} for more details. \code{mm39} by default.}
   \item{annot.ext}{ Specify an external annotation for UMI counting. See \code{\link{featureCounts}} for more details. \code{NULL} by default.}
   \item{isGTFAnnotationFile}{ See \code{\link{featureCounts}} for more details. \code{FALSE} by default.}
