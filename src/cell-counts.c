@@ -7367,8 +7367,10 @@ void cellCounts_finalise_per_junc_sumcounts(void * ky, void * val, HashTable * t
 	for(xx=0; xx< cellid_umiseq_list -> numOfElements; xx++){
 		srUInt_64 cellid_umiseq = ArrayListGet(cellid_umiseq_list, xx)-NULL;
 		int cellid = (cellid_umiseq>>32)& 0x7fffffff;
-		void * needed_cell = HashTableGet(wanted_cellid_p1_tab , NULL+cellid+1);
-		if(!needed_cell) continue;
+		if(wanted_cellid_p1_tab){
+			void * needed_cell = HashTableGet(wanted_cellid_p1_tab , NULL+cellid+1);
+			if(!needed_cell) continue;
+		}
 		HashTablePut(cellid_umi_p1_seq_tab, NULL+cellid_umiseq +1, NULL+1);
 	}
 
@@ -7423,15 +7425,18 @@ void cellCounts_finalise_per_junction_cell_table(cellcounts_global_t * cct_conte
 
 		void * sum_params[3];
 		sum_params[0]= cellid_p1_output_table;
-		sum_params[1]= needed_cellid_p1_tab;
+		sum_params[1]= cct_context->visium_hd_barcodes?NULL:needed_cellid_p1_tab; //when it is Visium HD: all "cells" are needed.
 		sum_params[2]= juncjunc_to_juncid_p1_table;
 		cct_junctab -> appendix1 = sum_params;
 
 		HashTableIteration(cct_junctab, cellCounts_finalise_per_junc_sumcounts );
 
 		ArrayList * output_cellids_for_junctions;
-		if(cct_context->visium_hd_barcodes) output_cellids_for_junctions = HashTableKeys(cellid_p1_output_table); // for visium HD: write everything (every spot is needed).
-		else output_cellids_for_junctions = ArrayList_Int_Hash_Intersect(highconf_and_candidate_cell_ids, cellid_p1_output_table); // for normal mode: only write high-confidence and candidate-for-rescure cells. Other cells won't be used at all.
+		if(cct_context->visium_hd_barcodes){
+			output_cellids_for_junctions = HashTableKeys(cellid_p1_output_table); // for visium HD: write everything (every spot that have junctions is needed).
+			for(xx=0;xx<output_cellids_for_junctions-> numOfElements; xx++)output_cellids_for_junctions -> elementList[xx]--; // from cell_id+1 to cell_id
+		}
+		else output_cellids_for_junctions = ArrayList_Int_Hash_Intersect(highconf_and_candidate_cell_ids, cellid_p1_output_table); // for normal mode: only write high-confidence and candidate-for-rescure cells. Other cells won't be used at all. Also, ArrayList_Int_Hash_Intersect adds 1 to highconf_and_candidate_cell_ids then compare with keys in cellid_p1_output_table.
 		cellCounts_merged_write_sparse_matrix(cct_context, cellid_p1_output_table, output_cellids_for_junctions, 
 			sample_i -1, "cellJuncs", (unsigned char**)juncname_list -> elementList); // this function adds 1 to the sample no.
 //		FILE * mtx_junc_fp???? // to write cellid_p1_output_table :  cell_id +NULL+1 => [L|R , count, L|R, count, ...]
