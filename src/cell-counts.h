@@ -11,7 +11,7 @@
 #define READ_BIN_BUF_SIZE 1000 // sufficient for a <=150bp read.
 #define CELLBC_BATCH_NUMBER 149
 #define MAX_UMI_LEN 14 // cannot be higher than 16: must be able to encode into a 32-bit integer.
-#define MAX_CELLBC_LEN 24
+#define MAX_CELLBC_LEN 50
 #define MAX_SCRNA_SAMPLE_NUMBER 64 
 #define MAX_SUBREADS_PER_READ 32
 #define SCRNA_SUBREADS_HARD_LIMIT 20 

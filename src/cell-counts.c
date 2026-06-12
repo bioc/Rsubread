@@ -2819,7 +2819,7 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
 
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
-	//if(cell_barcode_no>=0&&cct_context->visium_hd_barcodes) fprintf(stderr,"    UMIseq=%s  UMIqual=%s  UMIlen=%d\n", UMI_seq, UMI_qual, cct_context->UMI_length);
+	//if(cct_context->visium_hd_barcodes) fprintf(stderr,"RBINBIN  UMIseq=%s  UMIqual=%s  UMIlen=%d   CELL=%08x\n", UMI_seq, UMI_qual, cct_context->UMI_length, cell_barcode_no);
 	if(reporting_index>=0){
 		linear_pos = thread_context -> reporting_positions[reporting_index];
 		linear_pos += get_soft_clipping_length(thread_context -> reporting_cigars[reporting_index]);
@@ -3684,6 +3684,7 @@ void cellCounts_explain_one_alignment(cellcounts_global_t * cct_context, int thr
 	int rname_trimmed_len=0;
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
+	//if(cct_context->visium_hd_barcodes) fprintf(stderr,"EXPLAINBIN  UMIseq=%s  UMIqual=%s  UMIlen=%d   CELL=%08x\n", UMI_seq, UMI_qual, cct_context->UMI_length, cell_barcode_no);
 
 	noindel_coved_firstbase += JUNCTION_WIDDEN_GAP_LEN; // widden the gap to avoid same bases before/after event
 	noindel_coved_lastbase -= JUNCTION_WIDDEN_GAP_LEN;
@@ -4957,7 +4958,6 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 					if(vv>=cct_context -> min_votes_per_mapped_read)cellCounts_update_top_three(cct_context, top_distinct_vote_numbers, vv);
 				}
 			}
-	//for(i = 0; i < GENE_SCRNA_VOTE_TABLE_SIZE; i++)fprintf(stderr,"VOTE_N = %d # %d\n", top_distinct_vote_numbers[i],i);
 
 			for(distinct_vote_number_i = 0 ; distinct_vote_number_i < cct_context -> max_distinct_top_vote_numbers; distinct_vote_number_i ++){
 				int this_vote_N = top_distinct_vote_numbers[distinct_vote_number_i];
@@ -4977,8 +4977,6 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 
 						temprec.flags[saved_alignments] = votetab->masks[i][j] ? SAM_FLAG_REVERSE_STRAND_MATCHED : 0;
 						saved_alignments++;
-	//fprintf(stderr,"ADD_TEMP_REALIGN_FILE of ALN %d : vote = %d at VTAB %d_%d   TOP_N %d is %d / %d\n", saved_alignments, vv, i, j,  this_vote_N, distinct_vote_number_i , cct_context -> max_differential_from_top_vote_number );
-
 					}
 					if(saved_alignments >= max_saved_alignments) break;
 				}
@@ -5008,11 +5006,9 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 			char * bc_qual_end = BC_qual ? strchr(BC_qual, '|') : NULL;
 			bc_qual_len = bc_qual_end ? (int)(bc_qual_end - BC_qual) : (BC_qual ? (int)strlen(BC_qual) : 0);
 			total_bc_umi_len = bc_end ? (int)(bc_end - BC_seq) : 0;
-			bc_len = cct_context -> known_cell_barcode_length;
-			if(bc_len < 0){
-				bc_len = total_bc_umi_len - umi_len;
-				if(bc_len < 0) bc_len = 0;
-			}
+			if(cct_context->visium_hd_barcodes) bc_len = total_bc_umi_len - umi_len;
+			else bc_len = cct_context -> known_cell_barcode_length;
+
 			if(bc_end){
 				char * temp_bq=NULL;
 				int copy_len = total_bc_umi_len;
@@ -5025,7 +5021,8 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 				tmp_bc[copy_len] = 0;
 
 				{
-					int cell_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, tmp_bc, temp_bq);
+					int cell_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
+//fprintf(stderr,"EXTRACT_JUNC_HD  TOTAL_BC_UMI_LEN %d %d %d   %s   %s   cell_no %08x\n", total_bc_umi_len, bc_len, umi_len, BC_seq, BC_qual, cell_no);
 					temprec.cell_number = cell_no >= 0 ? (unsigned int)(cell_no + 1) : 0u;
 				}
 			}
@@ -5035,10 +5032,16 @@ int cellCounts_select_and_write_temps(cellcounts_global_t * cct_context, int thr
 			+ sample_seq_len_sz + sample_qual_len_sz
 			+ saved_alignments * (sizeof(unsigned short) + sizeof(unsigned int) + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned char))
 			+ read_len + packed_read_len + bc_qual_len + packed_bcumi_len;
-		if(record_size_sz > (size_t)2147483647) return 1;
+		if(record_size_sz > (size_t)2147483647){
+			SUBREADprintf("ERROR: cannot calculate memory for record: %ld \n", record_size_sz);
+			return 1;
+		}
 		record_size = (int)record_size_sz;
 		record = cellCounts_temp_realign_ensure_buf(&thread_context -> temp_realign_record_buf, &thread_context -> temp_realign_record_capacity, record_size);
-		if(!record) return 1;
+		if(!record){
+			SUBREADprintf("ERROR: cannot allocate memory for record: %d \n", record_size);
+			return 1;
+		}
 		wp = record;
 
 		memcpy(wp, &temprec.saved_alignments, sizeof(int)); wp += sizeof(int);
@@ -5214,7 +5217,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_occupy(&cct_context -> input_dataset_lock);
 
 		rc = cellCounts_temp_realign_fp_read_plain_exact(temp_fp, (unsigned char *)&record_size, sizeof(int), 1);
-//fprintf(stderr,"DO_GET %lld < %lld   ret %d   size %d\n",temp_fp->realign_temp_usedmem,temp_fp->realign_temp_capamem, rc, record_size);
+		//fprintf(stderr,"DO_GET %lld < %lld   ret %d   size %d\n",temp_fp->realign_temp_usedmem,temp_fp->realign_temp_capamem, rc, record_size);
 		if(rc <= 0){
 			if(0==cct_context ->cell_level_junction_memory_temp)cellCounts_lock_release(&cct_context -> input_dataset_lock);
 			if(rc == 0) break;
@@ -5330,6 +5333,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 		}
 
 		SUBreadSprintf(read_name, MAX_READ_NAME_LEN + 1, "R%011u|%s|%s|%.*s|%.*s", read_number, bcumi_seq_buf, bcumi_qual_buf, (int)sample_seq_length, sample_seq ? sample_seq : "", (int)sample_qual_length, sample_qual ? sample_qual : "");
+		//fprintf(stderr,"FROM_TEMP RNAME %s\n", read_name);
 
 		thread_context -> alignment_repating_table = HashTableCreate(50);
 
