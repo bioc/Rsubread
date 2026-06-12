@@ -75,21 +75,39 @@ void free_map(HashMap *map) {
 
 
 #define UMI_LENGTH_IN_1R 9	// skip the UMI and index the barcodes
+#if defined(_WIN32) || defined(_WIN64)
+    #define popen _popen
+    #define pclose _pclose
+#endif
+
+#define BAM_RECORD_LINE_LENGTH (MAX_READ_NAME_LEN + MAX_READ_LENGTH*2+MAX_CHROMOSOME_NAME_LEN*2+8192)
+
 int cell_counts_extract_vHD_main(char * bamname, char * txtname){
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    
+    // Allocate a fixed buffer on the stack for fgets
+    char line[BAM_RECORD_LINE_LENGTH]; 
+
     HashMap *known_map = create_map();
     char command[100+MAX_FILE_NAME_LENGTH];
     sprintf(command, "samtools view %s", bamname);
+    
     FILE *samfp = popen(command, "r");
     FILE *txtfp = fopen(txtname, "w");
-    
-    while ((read = getline(&line, &len, samfp)) != -1) {
+
+    if (!samfp || !txtfp) {
+        // Basic error checking to prevent crashing if files fail to open
+        if (samfp) pclose(samfp);
+        if (txtfp) fclose(txtfp);
+        free_map(known_map);
+        return -1;
+    }
+
+    // Loop using fgets instead of getline
+    while (fgets(line, sizeof(line), samfp) != NULL) {
+        
         // Strip trailing newline character if present
-        if (read > 0 && line[read - 1] == '\n') {
-            line[read - 1] = '\0';
+        size_t len = strlen(line);
+        if (len > 0 && line[len - 1] == '\n') {
+            line[len - 1] = '\0';
         }
 
         // AWK: !/^@/
@@ -100,7 +118,7 @@ int cell_counts_extract_vHD_main(char * bamname, char * txtname){
         char *r = NULL;
         char *y = NULL;
         char *cb = NULL;
-        
+
         char *line_ptr = line;
         char *token;
         char *saveptr;
@@ -139,10 +157,12 @@ int cell_counts_extract_vHD_main(char * bamname, char * txtname){
             free(combined_key);
         }
     }
-    fclose(samfp);
+    
+    // Crucial Windows Fix: streams opened with popen must be closed with pclose
+    pclose(samfp); 
     fclose(txtfp);
 
-    free(line);
+    // Removed free(line) as 'line' is now a stack array, not dynamically allocated.
     free_map(known_map);
     return 0;
 }
