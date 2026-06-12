@@ -918,9 +918,11 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 				char * oldCB = HashTableGet(cct_context -> VisiumHD_barcode_to_best_mapping, CKey);
 				if(oldCB){
 					if(0)if(strcmp(CB, oldCB)!=0)SUBREADprintf("ERROR: the same BAM1R and BAM1Y are mapped to different CB: %s and %s have %s != %s\n", BAM1R, BAM1Y, CB, oldCB);
-				}else HashTablePut(cct_context -> VisiumHD_barcode_to_best_mapping, strdup(CKey), strdup(CVal));
-				if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements % 3000000==0)//fprintf(stderr,"INSERT_FROM_BAN %s %s  OLD %p\n", CKey, CVal, oldCB);
-					SUBREADprintf("Loaded the %lld-th barcode from Space Ranger reference.\n", cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements);
+				}else{
+					if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements % 3000000==0)//fprintf(stderr,"INSERT_FROM_BAN %s %s  OLD %p\n", CKey, CVal, oldCB);
+						SUBREADprintf("Loaded the %lld-th barcode from Space Ranger BAM reference.\n", cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements);
+					HashTablePut(cct_context -> VisiumHD_barcode_to_best_mapping, strdup(CKey), strdup(CVal));
+				}
 			}
 			if(early_terminate)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 3654321)break;
 		}
