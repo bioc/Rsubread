@@ -7427,12 +7427,14 @@ void cellCounts_finalise_per_junction_cell_table(cellcounts_global_t * cct_conte
 
 		HashTableIteration(cct_junctab, cellCounts_finalise_per_junc_sumcounts );
 
-		ArrayList * junc_highcand_cellids = ArrayList_Int_Hash_Intersect(highconf_and_candidate_cell_ids, cellid_p1_output_table);
-		cellCounts_merged_write_sparse_matrix(cct_context, cellid_p1_output_table, junc_highcand_cellids, 
+		ArrayList * output_cellids_for_junctions;
+		if(cct_context->visium_hd_barcodes) output_cellids_for_junctions = HashTableKeys(cellid_p1_output_table); // for visium HD: write everything (every spot is needed).
+		else output_cellids_for_junctions = ArrayList_Int_Hash_Intersect(highconf_and_candidate_cell_ids, cellid_p1_output_table); // for normal mode: only write high-confidence and candidate-for-rescure cells. Other cells won't be used at all.
+		cellCounts_merged_write_sparse_matrix(cct_context, cellid_p1_output_table, output_cellids_for_junctions, 
 			sample_i -1, "cellJuncs", (unsigned char**)juncname_list -> elementList); // this function adds 1 to the sample no.
 //		FILE * mtx_junc_fp???? // to write cellid_p1_output_table :  cell_id +NULL+1 => [L|R , count, L|R, count, ...]
 
-		ArrayListDestroy(junc_highcand_cellids);
+		ArrayListDestroy(output_cellids_for_junctions);
 		ArrayListDestroy(juncname_list);
 		ArrayListDestroy(cct_junc_LRlist);
 		HashTableDestroy(needed_cellid_p1_tab);
