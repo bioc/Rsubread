@@ -1657,7 +1657,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
 
 
-extract_VisiumHD_tags <- function(SpaceRanger.bam.file, Output.text.file){
+extract.VisiumHD.tags <- function(SpaceRanger.bam.file, Output.text.file){
   samtools_path <- Sys.which("samtools")
   if (samtools_path == "") stop("You must have the samtools program in $PATH.")
 
