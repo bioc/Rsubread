@@ -1516,6 +1516,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       df.sample.info <- .extract.sample.table.cols(NA,some.results,input.mode="fastq", umi.cutoff=umi.cutoff, is.visiumHD.data=is.visiumHD.data)
     } else has.error <- T
   }else if(input.mode=="BCL"){
+    if(is.visiumHD.data)stop("BCL mode doesn't support Visium HD. Please use the FASTQ file input.")
     sample.info.idx$SampleName <- as.character(sample.info.idx$SampleName)
     if('IndexSetName' %in% colnames(sample.info.idx))sample.info.idx$IndexSetName <- as.character(sample.info.idx$IndexSetName)
 
@@ -1530,25 +1531,23 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(has.error) break
       unique.samples <- unique( as.character(sample.info.idx$SampleName[ sample.info.idx$InputDirectory == dirname ] ))
   
+      dual.index.ABlist <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
       # cell.barcode parameter isn't used in the C function if it is Visium HD data.
-      if(is.visiumHD.data){ cell.barcode <- "EXTERNAL" }else{
-        dual.index.ABlist <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path)
-        guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(dirname, temp.file.prefix, cc.sample.sheet.path, A_and_B.dual.index.list=dual.index.ABlist, cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
-        if(is.null(cell.barcode)){
-          cell.barcode <- guess.cellbc.and.idx$cell.barcode
-        }else{
-          cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
-        }
-      
-        if(onlyDetectBarcode){
-          cat("Barcode is",cell.barcode,"\n")
-          return(NA)
-        }
-  
-        is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path, which.dual.index=guess.cellbc.and.idx$dual.index)
-        is_dual_index <- (F==any(is.null(is_dual_index)))
+      guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(dirname, temp.file.prefix, cc.sample.sheet.path, A_and_B.dual.index.list=dual.index.ABlist, cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
+      if(is.null(cell.barcode)){
+        cell.barcode <- guess.cellbc.and.idx$cell.barcode
+      }else{
+        cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
+      
+      if(onlyDetectBarcode){
+        cat("Barcode is",cell.barcode,"\n")
+        return(NA)
+      }
+  
       full_dirname <- .check_and_NormPath(dirname, mustWork=TRUE, "InputDirectory in sample.info.idx")
+      is_dual_index <- .index.names.to.sheet.raw.dir.mode(dirname, sample.info.idx, cc.sample.sheet.path, which.dual.index=guess.cellbc.and.idx$dual.index)
+      is_dual_index <- (F==any(is.null(is_dual_index)))
       generate.scRNA.BAM <- TRUE
 
       opt <- c("--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
