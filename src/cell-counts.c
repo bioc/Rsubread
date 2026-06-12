@@ -5136,6 +5136,12 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		}
 
 		for(current_thread_no = 0 ; current_thread_no < cct_context->total_threads ; current_thread_no ++) {
+			for(smpno = 0; smpno < cct_context-> sample_sheet_table -> numOfElements; smpno ++){ 
+				thread_contexts[current_thread_no].mapped_reads_per_sample[smpno]=0;
+				thread_contexts[current_thread_no].assigned_reads_per_sample[smpno]=0;
+				thread_contexts[current_thread_no].reads_per_sample[smpno]=0;
+			}
+
 			if(cct_context ->cell_level_junction_memory_temp){
 				ptr_temp_fp = & thread_contexts[current_thread_no].realign_temp_fp;
 				memset(ptr_temp_fp,0,sizeof(*ptr_temp_fp));
