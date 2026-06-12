@@ -1403,13 +1403,17 @@
 
 cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15,
 		       minVotes = 1, maxMismatches = 10, minMappedLength = 1, enableSoftClipping=!detectJunctions ,
-		       annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE, GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE,
+		       annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE,
+		       GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE,
 		       detectJunctions = FALSE, binaryTempMemory = FALSE, umi.cutoff = NULL,
-		       nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE, reportExcludedBarcodes = !is.null(VisiumHD.barcode.file), VisiumHD.barcode.file = NULL){
+		       nthreads = 10, nBestLocations = 1, uniqueMapping = FALSE,
+		       reportExcludedBarcodes = !is.null(VisiumHD.barcode.file), VisiumHD.barcode.file = NULL){
+
   if(F)if(!   (   file.exists("/home/vdiuser/Projects/GOlib/DBPZ/go.sum")  ||  file.exists("/fs04/ws30/Liao/Common/Index/Subread/build-index.bash") || file.exists("/home/biocbuild/bbs-3.24-bioc/R/bin/R") ) ){
      stop("The devel version is not for general use. Please install the released version.")
      return(NULL)
   }
+
   if(is.null(enableSoftClipping) ) enableSoftClipping <- T
 
   # these variables are for future development.
@@ -1467,7 +1471,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(is.null(cell.barcode)){
         guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(combined.fastq.names, temp.file.prefix, "N/A", input.mode="fastq", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
         cell.barcode <- guess.cellbc.and.idx$cell.barcode
-      }else if(!is.visiumHD.data){
+      }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
     }
@@ -1581,7 +1585,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       if(is.null(cell.barcode)){
         guess.cellbc.and.idx <- .find_best_CellBC_and_DualIdx(sample$BAMFile, temp.file.prefix, "N/A", input.mode="bam", cell.bc.sup.rate=ifelse(is.null(cell.barcode),.6,-1))
         cell.barcode <- guess.cellbc.and.idx$cell.barcode
-      }else if(!is.visiumHD.data){
+      }else{
         cell.barcode <- .check_and_NormPath(cell.barcode, mustWork=T, opt="cell.barcode")
       }
     }
