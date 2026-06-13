@@ -6498,7 +6498,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 
 
 			// when CELLBC_BATCH_NUMBER == this_batch_no: this one has no cell barcode called.
-			if(cct_context->do_cell_level_junction_detection && umi[0]!='-' && CELLBC_BATCH_NUMBER!=this_batch_no && !is_homopolymer_or_N_this_UR){
+			if(cct_context->do_cell_level_junction_detection && umi[0]!='-' && !is_homopolymer_or_N_this_UR){
 				int l_read_name, n_cigar_op = 0;
 				memcpy(&n_cigar_op, rbinptr+16,2);
 				l_read_name=((unsigned char*)rbinptr)[12];
@@ -7377,7 +7377,7 @@ void cellCounts_finalise_per_junc_sumcounts(void * ky, void * val, HashTable * t
 		if(wanted_cellid_p1_tab){
 			void * needed_cell = HashTableGet(wanted_cellid_p1_tab , NULL+cellid+1);
 			if(!needed_cell) continue;
-		}
+		}else if( (cellid >>16) > 0x7000) continue; // NIL cell
 		HashTablePut(cellid_umi_p1_seq_tab, NULL+cellid_umiseq +1, NULL+1);
 	}
 
