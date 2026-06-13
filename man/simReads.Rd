@@ -77,7 +77,7 @@ scanFasta(
 
   The \code{scanFasta} function checks and processes the FASTA or gzipped-FASTA file. It scans through the file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths. It additionally checks the transcript sequences for uniqueness.
   
-  Baldoni et al (2024) uses \code{simReads} to generate realistic RNA-seq data with specified levels of biological and technical variation.
+  Baldoni et al (2024ab) and Baldoni et al (2025) used \code{simReads} to generate realistic RNA-seq data with specified levels of biological and technical variation.
 }
 \value{
   \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{paired.end}, containing the simulated reads.
@@ -100,10 +100,20 @@ scanFasta(
   Note that selecting transcripts with \code{Duplicate == FALSE} will ensure unique sequences, i.e., any sequence that was observed multiple times in the FASTQ file will be only included only once in the selection.
 }
 \references{
-Baldoni PL, Chen Y, Hediyeh-zadeh S, Liao Y, Dong X, Ritchie ME, Shi W, Smyth GK (2024).
+Baldoni PL, Chen Y, Hediyeh-zadeh S, Liao Y, Dong X, Ritchie ME, Shi W, Smyth GK (2024a).
 Dividing out quantification uncertainty allows efficient assessment of differential transcript expression with edgeR.
 \emph{Nucleic Acids Research} 52(3), e13.
-\doi{10.1093/nar/gkad1167}.
+\doi{10.1093/nar/gkad1167}
+
+Baldoni PL, Chen L, Smyth GK (2024b).
+Faster and more accurate assessment of differential transcript expression with Gibbs sampling and edgeR v4.
+\emph{NAR Genomics and Bioinformatics} 6(4), lqae151.
+\doi{10.1093/nargab/lqae151}
+
+Baldoni PL, Chen L, Li M, Chen Y, Smyth GK (2025).
+Dividing out quantification uncertainty enables assessment of differential transcript usage with limma and edgeR.
+\emph{Nucleic Acids Research} 53(22), gkaf1305.
+\doi{10.1093/nar/gkaf1305}
 }
 \author{Yang Liao, Gordon K Smyth and Wei Shi}
 \examples{
