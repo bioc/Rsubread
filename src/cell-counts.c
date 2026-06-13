@@ -6460,7 +6460,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			char * glist_ptr =NULL;
 			memcpy(&sampleid, binptr, 4);
 			memcpy(&cellid, binptr+4, 4);
-if(cellid & 0xfffffff == 0xfffffff)fprintf(stderr, "POS0M %08d\n",  cellid);
+//if(cellid & 0xfffffff == 0xfffffff)fprintf(stderr, "POS0M %08d\n",  cellid);
 			memcpy(&gene_no, binptr+8, 8);
 			if(gene_no & (1LLU<<63)){
 				glist_ptr =binptr + 16;
