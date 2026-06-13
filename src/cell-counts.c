@@ -2426,8 +2426,9 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 		sprintf(CKey,"%s/%s",seq_1R + cct_context -> UMI_length, qual_1Y + cct_context -> UMI_length); // UMI is before the two spot barcodes in Visium HD R1 reads. Hence we don't index the UMIs in the R1.
 		char * spaceranger_CB = HashTableGet(cct_context->VisiumHD_barcode_to_best_mapping, CKey);
 		if(spaceranger_CB){
-			sscanf(spaceranger_CB, "%d_%d_", &bc1, &bc2);
-			tb1 = bc1 << 16 | bc2;
+			sscanf(spaceranger_CB, "%d_%d", &bc1, &bc2);
+			if(bc1>=0 && bc2>=0) tb1 = bc1 << 16 | bc2;
+			
 //			fprintf(stderr,"CREATE_CELLID %s %s = %s\n",  seq_1R, qual_1Y, spaceranger_CB);
 		}
 		seq_1R[cbclen]=bcback;
@@ -2821,6 +2822,7 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
 
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
+	if(cell_barcode_no>0x7f000000) fprintf(stderr,"POS0X %08x\n", cell_barcode_no);
 	//if(cct_context->visium_hd_barcodes) fprintf(stderr,"RBINBIN  UMIseq=%s  UMIqual=%s  UMIlen=%d   CELL=%08x\n", UMI_seq, UMI_qual, cct_context->UMI_length, cell_barcode_no);
 	if(reporting_index>=0){
 		linear_pos = thread_context -> reporting_positions[reporting_index];
@@ -6458,6 +6460,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			char * glist_ptr =NULL;
 			memcpy(&sampleid, binptr, 4);
 			memcpy(&cellid, binptr+4, 4);
+if(cellid & 0xfffffff == 0xfffffff)fprintf(stderr, "POS0M %08d\n",  cellid);
 			memcpy(&gene_no, binptr+8, 8);
 			if(gene_no & (1LLU<<63)){
 				glist_ptr =binptr + 16;
@@ -6494,7 +6497,8 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			}
 
 
-			if(cct_context->do_cell_level_junction_detection && umi[0]!='-' && !is_homopolymer_or_N_this_UR){
+			// when CELLBC_BATCH_NUMBER == this_batch_no: this one has no cell barcode called.
+			if(cct_context->do_cell_level_junction_detection && umi[0]!='-' && CELLBC_BATCH_NUMBER!=this_batch_no && !is_homopolymer_or_N_this_UR){
 				int l_read_name, n_cigar_op = 0;
 				memcpy(&n_cigar_op, rbinptr+16,2);
 				l_read_name=((unsigned char*)rbinptr)[12];
@@ -6545,6 +6549,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			memcpy(&binlen, binptr+16+8*genes+cct_context -> UMI_length,4 );
 			if(cellid>=0){
 				if(cct_context->visium_hd_barcodes){
+if(  (cellid&0xffff0000)>>16 > 0x7000) fprintf(stderr,"POS0Y %08x\n", cellid);
 					snprintf(visiumHD_cellbc,12,"%05d_%05d", (cellid&0xffff0000)>>16  , cellid&0xffff );
 					//fprintf(stderr,"HAD_2D_BC %s\n", visiumHD_cellbc);
 					new_cellbc = visiumHD_cellbc;
@@ -6662,6 +6667,7 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 		srInt_64 cellno = ArrayListGet(used_cell_barcodes, x1)-NULL;
 		if(cct_context -> visium_hd_barcodes){
 			fprintf(ofp_bcs,"%05d_%05d\n", (cellno&0xffff0000)>>16, cellno&0xffff);
+			if((cellno&0xffff0000)>>16 > 0x7000)SUBREADprintf("POS02 %08x\n", cellno);
 		}else{
 			char * cellbc_seq = ArrayListGet(cct_context -> cell_barcodes_array, cellno);
 			fprintf(ofp_bcs,"%s\n", cellbc_seq);
@@ -7367,6 +7373,7 @@ void cellCounts_finalise_per_junc_sumcounts(void * ky, void * val, HashTable * t
 	for(xx=0; xx< cellid_umiseq_list -> numOfElements; xx++){
 		srUInt_64 cellid_umiseq = ArrayListGet(cellid_umiseq_list, xx)-NULL;
 		int cellid = (cellid_umiseq>>32)& 0x7fffffff;
+//if(cellid > 0x70000000)fprintf(stderr,"POS0Z %016llx\n", cellid_umiseq);
 		if(wanted_cellid_p1_tab){
 			void * needed_cell = HashTableGet(wanted_cellid_p1_tab , NULL+cellid+1);
 			if(!needed_cell) continue;
