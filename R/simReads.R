@@ -1,4 +1,4 @@
-.simFragments <- function(transcript.lengths, transcript.expressions=NULL, library.size=1000000L, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40)
+.simFragmentsLegacy <- function(transcript.lengths, transcript.expressions=NULL, library.size=1000000L, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40)
 #  Randomly generate fragment lengths and starting positions for RNA-seq simulation.
 #  Assume gamma distribution for fragment lengths.
 #  Gordon Smyth
@@ -61,7 +61,76 @@
   list(n.fragments=n.fragments, read.positions=out)
 }
 
-simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1e5, read.length=75L, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, paired.end=FALSE, fragment.length.min=100L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE, strandSpecific=0)
+.simFragments <- function(transcript.lengths, transcript.expressions=NULL, library.size=1000000L, fragment.length.min=75L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40)
+#  Randomly generate fragment lengths and starting positions for RNA-seq simulation.
+#  Assume doubly truncated gamma distribution for fragment lengths.
+#  Updated 15 June 2026 to use same definition of effective transcript length as RSEM, kallisto and Salmon.
+#  .simFragmentsLegacy preserves older method for backward compatibility.
+#  Gordon Smyth
+#  Created 13 March 2019. Last modified 15 June 2026.
+{
+# Default to equal expression levels 
+  if(is.null(transcript.expressions)) transcript.expressions <- rep_len(1,length(transcript.lengths))
+
+# To conserve memory, use integers
+  transcript.lengths <- as.integer(transcript.lengths)
+  fragment.length.min <- as.integer(fragment.length.min)
+  fragment.length.max <- as.integer(fragment.length.max)
+
+# Parameter values for gamma distribution
+  alpha <- ( fragment.length.mean / fragment.length.sd )^2
+  beta <- fragment.length.mean / alpha
+
+# Probability distribution of fragment lengths
+  frag.len <- seq.int(fragment.length.min,fragment.length.max)
+  frag.len.p <- dgamma(frag.len,shape=alpha,scale=beta,log=TRUE)
+  frag.len.p <- exp(frag.len.p - mean(frag.len.p))
+  frag.len.n <- length(frag.len)
+
+# Mean fragment length for transcripts of different lengths
+  frag.len.mean <- cumsum(frag.len.p * frag.len) / cumsum(frag.len.p)
+
+# Effective transcript lengths
+  fragment.lengths <- frag.len.mean[pmax(pmin(transcript.lengths,fragment.length.max)-fragment.length.min+1L,1L)]
+  effective.transcript.lengths <- pmax(transcript.lengths - fragment.lengths + 1L, 0L)
+
+# Expected proportion of fragments per transcript
+  prob <- effective.transcript.lengths * transcript.expressions
+  prob <- prob / sum(prob)
+
+# Randomly generate number of fragments from each transcript
+  n.fragments <- drop(rmultinom(1L, size=library.size, prob=prob))
+
+# Expand out transcript.lengths to library.size
+  out <- matrix(0L,library.size,3)
+  colnames(out) <- c("Transcript","FragmentLength","StartPosition")
+  ntranscripts <- length(transcript.lengths)
+  out[,"Transcript"] <- rep.int(seq_len(ntranscripts), n.fragments)
+  TraLen <- rep.int(transcript.lengths, n.fragments)
+
+# Randomly assign fragment lengths
+  out[,"FragmentLength"] <- sample.int(frag.len.n, size=library.size, replace=TRUE, prob=frag.len.p)
+  out[,"FragmentLength"] <- frag.len[out[,"FragmentLength"]]
+# Rerun for short transcripts
+  i <- which(out[,"FragmentLength"] > TraLen)
+  if(length(i)) {
+    FragLenShort <- TraLenShort <- TraLen[i]
+    WhichFragMax <- max(TraLenShort) - fragment.length.min + 1L
+    for (j in seq_len(WhichFragMax)) {
+      k <- which(TraLenShort == frag.len[j])
+      n <- length(k)
+      if(n) FragLenShort[k] <- sample.int(j, size=n, replace=TRUE, prob=frag.len.p[1:j])
+    }
+    out[i,"FragmentLength"] <- frag.len[FragLenShort]
+  }
+
+# Generate start position
+  out[,"StartPosition"] <- 1L + as.integer( runif(library.size) * (TraLen - out[,"FragmentLength"]) + 0.5 )
+
+  list(n.fragments=n.fragments, read.positions=out)
+}
+
+simReads <- function(transcript.file, expression.levels, output.prefix, library.size=1e5, read.length=75L, truth.in.read.names=FALSE, simulate.sequencing.error=TRUE, quality.reference=NULL, paired.end=FALSE, fragment.length.min=75L, fragment.length.max=500L, fragment.length.mean=180, fragment.length.sd=40, simplify.transcript.names=FALSE, strandSpecific=0, legacy=FALSE)
 # Simulate transcript reads and write FASTQ files
 {
 # Check expression.levels
@@ -104,6 +173,7 @@ simReads <- function(transcript.file, expression.levels, output.prefix, library.
     quality.reference <- NULL
   }
 
+  if(legacy) .simFragments <- .simFragmentsLegacy
   sf <- .simFragments(fasta.meta$Length, expression.levels, library.size, fragment.length.min, fragment.length.max, fragment.length.mean, fragment.length.sd )
   C_args <- .C("R_genSimReads_at_poses", transcript.file, output.prefix, as.character(quality.reference), fasta.meta$TranscriptID, sf$read.positions[,'Transcript'], sf$read.positions[,'StartPosition'], sf$read.positions[,'FragmentLength'], as.integer(read.length), as.integer(library.size), nrow(fasta.meta), as.integer(simplify.transcript.names), as.integer(truth.in.read.names), as.integer(paired.end), as.integer(strandSpecific), PACKAGE="Rsubread")
   data.frame(fasta.meta[,1:2], NReads=sf$n.fragments)

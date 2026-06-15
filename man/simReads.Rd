@@ -24,7 +24,7 @@ simReads(
   
     # distribution of fragment lengths
     paired.end = FALSE,
-    fragment.length.min = 100,
+    fragment.length.min = 75,
     fragment.length.max = 500,
     fragment.length.mean = 180,
     fragment.length.sd = 40,
@@ -33,7 +33,9 @@ simReads(
     simplify.transcript.names = FALSE,
 
     # strand-specific read generation
-    strandSpecific = 0)
+    strandSpecific = 0,
+    
+    legacy = FALSE)
 
 scanFasta(
   
@@ -62,6 +64,7 @@ scanFasta(
   \item{fragment.length.sd}{ a numeric value giving the standard deviation of fragment lengths. The fragment lengths are drawn from a truncated gamma distribution that is defined by \code{fragment.length.min}, \code{fragment.length.max}, \code{fragment.length.mean} and \code{fragment.length.sd}. 40 by default.}
   \item{simplify.transcript.names}{ logical indicating if transcript names should be simplified. If \code{TRUE}, the transcript names are truncated to the first \code{|} or space. \code{FALSE} by default.}
   \item{strandSpecific}{ a numeric value specifying the strand from which reads are generated. In single-end mode, and for read 1 in paired-end mode, \code{0} means reads are generated randomly from either the same strand as the transcript (as in the FASTA input) or the opposite strand, \code{1} means reads are generated only from the same strand as the transcript, and \code{2} means reads are generated only from the opposite strand. In paired-end mode, read 2 is always generated from the strand opposite to read 1. Thus, when \code{1} is specified, read 2 only comes from the opposite strand of the transcript; when \code{2} is specified, read 2 only comes from the same strand as the transcript. \code{0} by default.}
+  \item{legacy}{ logical value indicating whether to use legacy method prior to Rsubread 2.27.4.}
   \item{quiet}{ logical indicating if the warning message for repeated sequences should be suppressed in the \code{scanFasta} function. \code{FALSE} by default.}
 }
 \details{
@@ -69,6 +72,7 @@ scanFasta(
 
   The number of fragments for each transcript are drawn from a multinomial distribution, summing to the specified library.size.
   The RNA fragment lengths are drawn from a truncated gamma distribution with mean and standard deviation specified by \code{fragment.length.mean} and \code{fragment.length.sd} respectively and lower and upper limits specified by \code{fragment.length.min} and \code{fragment.length.max}.
+  The probability that a fragment is generated from a particular transcript is proportion to its expression level times its effective length, where effective length is computed as the true transcript length, minus the expected fragment length given the fragment is no longer than the transcript, plus 1.
   The sequence reads are then taken from one or both ends of the simulated fragments to simulate short-read sequencing.
 
   To have reads generated from it, a transcript must have length equal to or greater than the minimum fragment length.
@@ -78,6 +82,10 @@ scanFasta(
   The \code{scanFasta} function checks and processes the FASTA or gzipped-FASTA file. It scans through the file that defines the transcript sequences and returns a data.frame of transcript names and sequence lengths. It additionally checks the transcript sequences for uniqueness.
   
   Baldoni et al (2024ab) and Baldoni et al (2025) used \code{simReads} to generate realistic RNA-seq data with specified levels of biological and technical variation.
+}
+\note{
+Prior to Rsubread version 2.27.4, the effective transcript length was computed as the true transcript length, minus \code{fragment.length.min}, plus 1.
+To recapitulate this behavior, set \code{legacy = TRUE}.
 }
 \value{
   \code{simReads} writes a FASTQ file, or a pair of FASTQ files if \code{paired.end}, containing the simulated reads.
