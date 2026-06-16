@@ -1,3 +1,4 @@
+15 Jun 2026 - 2.27.4
 (1) Updated simReads to define effective transcript length in the same way as RSEM, kallisto and Salmon.
 
 26 May 2026 - 2.27.3

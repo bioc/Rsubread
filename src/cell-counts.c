@@ -924,7 +924,7 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 					HashTablePut(cct_context -> VisiumHD_barcode_to_best_mapping, strdup(CKey), strdup(CVal));
 				}
 			}
-			if(early_terminate)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 3654321)break;
+			if(early_terminate)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 8654321)break;
 		}
 		if(is_BAM_file) SamBam_fclose((SamBam_FILE*)fparby);
 		else fclose((FILE*)fparby);
