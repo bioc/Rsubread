@@ -774,7 +774,7 @@ void extract_sam_tags(const char *bambuff, char *BAM1R, char *BAM1Y, char *CB, c
 	// 2. Parse the optional fields
 	while (*p) {
 		// Check if the current pointer matches any of our target tags followed by a colon
-		if (strncmp(p, "1R:", 3) == 0 || strncmp(p, "1Y:", 3) == 0 || strncmp(p, "CB:", 3) == 0 || strncmp(p, "UR:", 3) == 0 || strncmp(p, "UY:", 3) == 0) {
+		if (strncmp(p, "1R:", 3) == 0 || strncmp(p, "1Y:", 3) == 0 || strncmp(p, "CB:", 3) == 0 || strncmp(p, "UR:", 3) == 0 || strncmp(p, "UY:", 3) == 0 || strncmp(p, "sb:", 3) ==0) {
 			const char *tag_start = p;
 			
 			// SAM optional fields format is TAG:TYPE:VALUE (e.g., BAM1R:Z:ATGCA)
@@ -803,7 +803,11 @@ void extract_sam_tags(const char *bambuff, char *BAM1R, char *BAM1Y, char *CB, c
 				} else if (strncmp(tag_start, "UR", 2) == 0 && UR) {
 					strncpy(UR, val_start, len);
 					UR[len] = '\0';
-				} else if (strncmp(tag_start, "CB", 2) == 0 && CB) {
+				} else if (strncmp(tag_start, "CB", 2) == 0 && CB && CB[0]==0) {
+					// in newer versions of Space Ranger, the 2um locations are saved in the "sb" tag. Hence "sb" can overwrite "CB", but not the other way round.
+					strncpy(CB, val_start, len);
+					CB[len] = '\0';
+				} else if (strncmp(tag_start, "sb", 2) == 0 && CB) {
 					strncpy(CB, val_start, len);
 					CB[len] = '\0';
 				}
@@ -2420,7 +2424,7 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 		char bcback = seq_1R[cbclen], bqback = qual_1Y[cbclen];
 		seq_1R[cbclen] = 0;
 		qual_1Y[cbclen] = 0;
-		// space ranger CB is like s_002um_02768_00939-1
+		// space ranger CB is like s_002um_02768_00939-1, or sb:Z:s_002um_02191_02151-1  
 		char CKey[200];
 		int bc1=-1, bc2=-1;
 		sprintf(CKey,"%s/%s",seq_1R + cct_context -> UMI_length, qual_1Y + cct_context -> UMI_length); // UMI is before the two spot barcodes in Visium HD R1 reads. Hence we don't index the UMIs in the R1.

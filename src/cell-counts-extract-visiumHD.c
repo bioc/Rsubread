@@ -135,7 +135,9 @@ int cell_counts_extract_vHD_main(char * bamname, char * txtname){
                     r = token + 5 + UMI_LENGTH_IN_1R;
                 } else if (strncmp(token, "1Y:Z:", 5) == 0) {
                     y = token + 5 + UMI_LENGTH_IN_1R;
-                } else if (strncmp(token, "CB:Z:", 5) == 0) {
+                } else if (strncmp(token, "CB:Z:", 5) == 0 && !cb) {
+                    cb = token + 5;
+                } else if (strncmp(token, "sb:Z:", 5) == 0) {
                     cb = token + 5;
                 }
             }
