@@ -3599,7 +3599,10 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 		unsigned int * scoring_flags = thread_context -> scoring_buff_flags;		// size is : MAX_HIT_NUMBER *2
 		unsigned int * scoring_overlappings = thread_context -> scoring_buff_overlappings;		// size is : MAX_HIT_NUMBER *2
 		srInt_64 * scoring_exon_ids = thread_context -> scoring_buff_exon_ids;		// size is : MAX_HIT_NUMBER *2
-		int scoring_count = 0,  score_x1, longest_overlap_score;
+		// Zero disables the largest-overlap filter when overlap lengths are not
+		// calculated. Initialise here as well as in the calculation branch so the
+		// later filter cannot read an indeterminate value.
+		int scoring_count = 0,  score_x1, longest_overlap_score = 0;
 
 		if( global_context -> need_calculate_overlap_len ){
 			int end1, end2, hit_x1, hit_x2;
@@ -3897,8 +3900,6 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 						if( scoring_numbers[xk1] < 1 ) continue ;
 
 						srInt_64 tmp_voter_id = scoring_exon_ids[xk1];
-						srInt_64 assignment_target_number = tmp_voter_id;
-						if(global_context->is_gene_level) assignment_target_number = global_context -> exontable_geneid[tmp_voter_id];
 
 						if(RG_name){
 							void ** tab4s = get_RG_tables(global_context, thread_context, RG_name);
@@ -3967,7 +3968,7 @@ void vote_and_add_count(fc_thread_global_context_t * global_context, fc_thread_t
 // return the number of RG result sets
 int fc_thread_merge_results(fc_thread_global_context_t * global_context, read_count_type_t * nreads , srInt_64 *nreads_mapped_to_exon, fc_read_counters * my_read_counter, HashTable * junction_global_table, HashTable * splicing_global_table, HashTable * RGmerged_table, fc_feature_info_t * loaded_features, srInt_64 nexons)
 {
-	int xk1, xk2, ret = 0, sample_i;
+	int xk1, xk2, ret = 0;
 
 	srInt_64 total_input_reads = 0 ;
 	(*nreads_mapped_to_exon)=0;
@@ -5694,10 +5695,6 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	char outfname[MAX_FILE_NAME_LENGTH];
 	SUBreadSprintf(outfname, MAX_FILE_NAME_LENGTH, "%s.jcounts", output_file_name);
 
-	int max_junction_genes = 3000;
-	char * gene_names = malloc(max_junction_genes * FEATURE_NAME_LENGTH), * gene_name_tail;
-
-	int ky_i1, ky_i2;
 	FILE * ofp = fopen(outfname, "w");
 	char * tmpp = NULL;
 
@@ -5721,7 +5718,6 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 	IVT_Interval ** junc_nearest_LRedges = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
 	IVT_Interval ** junc_nearest_RRedges = malloc(sizeof(void*) * MAX_OVERLAP_EDGE_NUMBER);
 	for(ky_i = 0; ky_i < merged_junction_table -> numOfElements ; ky_i ++){
-		int unique_junctions = 0;
 		char * chro_small = strtok_r( key_list[ky_i] , "\t", &tmpp);
 		char * pos_small_str = strtok_r( NULL, "\t", &tmpp);
 		char * chro_large = strtok_r( NULL, "\t", &tmpp);
@@ -5748,13 +5744,40 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 			}
 		}
 		assert(0==strcmp(chro_small, chro_large));
-		IVT_IntervalTreeNode * IVT_gbody_root = HashTableGet(global_context -> junction_GenebodyTree_table, chro_small);
+		// Junction keys retain the BAM reference name.  Resolve that name to the
+		// GTF reference name before querying the GTF-derived junction trees, using
+		// the same order as ordinary read-to-feature assignment: exact, explicit
+		// alias, strip "chr", then add "chr".  The alias CSV is ordered as
+		// GTF/annotation chromosome name in column 1, BAM/read chromosome name
+		// in column 2; the loaded table maps the BAM name back to the GTF name.
+		char junction_anno_chro_buff[CHROMOSOME_NAME_LENGTH + 1];
+		char * junction_anno_chro = chro_small;
+		IVT_IntervalTreeNode * IVT_gbody_root = HashTableGet(global_context -> junction_GenebodyTree_table, junction_anno_chro);
+		if(IVT_gbody_root == NULL && global_context -> BAM_chros_to_anno_table)
+		{
+			char * anno_chro_name = HashTableGet(global_context -> BAM_chros_to_anno_table, chro_small);
+			if(anno_chro_name){
+				junction_anno_chro = anno_chro_name;
+				IVT_gbody_root = HashTableGet(global_context -> junction_GenebodyTree_table, junction_anno_chro);
+			}
+		}
+		if(IVT_gbody_root == NULL && memcmp(chro_small, "chr", 3)==0)
+		{
+			junction_anno_chro = chro_small + 3;
+			IVT_gbody_root = HashTableGet(global_context -> junction_GenebodyTree_table, junction_anno_chro);
+		}
+		if(IVT_gbody_root == NULL && strlen(chro_small)<=2)
+		{
+			SUBreadSprintf(junction_anno_chro_buff, CHROMOSOME_NAME_LENGTH + 1, "chr%s", chro_small);
+			junction_anno_chro = junction_anno_chro_buff;
+			IVT_gbody_root = HashTableGet(global_context -> junction_GenebodyTree_table, junction_anno_chro);
+		}
 
 		int this_edge_tab_i = 0; // no strand info
 		if(strand[0]=='+') this_edge_tab_i = 1;
 		if(strand[0]=='-') this_edge_tab_i = 2;
 		HashTable * this_edge_tab = global_context -> junction_ExonEdgeTree_table[this_edge_tab_i];
-		IVT_IntervalTreeNode * IVT_edge_root = HashTableGet(this_edge_tab, chro_small);
+		IVT_IntervalTreeNode * IVT_edge_root = HashTableGet(this_edge_tab, junction_anno_chro);
 
 		char gene_ids_str_SP1[JC_OUT_GENE_COLUMNS_LENGTH], gene_ids_str_SP2[JC_OUT_GENE_COLUMNS_LENGTH],
 		     transcript_ids_str_SP1[JC_OUT_GENE_COLUMNS_LENGTH], transcript_ids_str_SP2[JC_OUT_GENE_COLUMNS_LENGTH],
@@ -5839,7 +5862,6 @@ void fc_write_final_junctions(fc_thread_global_context_t * global_context,  char
 		if(wlen < 1) disk_is_full = 1;
 	}
 	fclose(ofp);
-	free(gene_names);
 	free(key_list);
 	free(junc_genebody_olayleft);
 	free(junc_genebody_olayright);
@@ -5968,7 +5990,7 @@ int readSummary(int argc,char *argv[]){
 	int minPEDistance, maxPEDistance, isReadSummaryReport, isBothEndRequired, isMultiMappingAllowed, fiveEndExtension, threeEndExtension, minFragmentOverlap, isSplitOrExonicOnly, is_duplicate_ignored, doNotSort, fractionMultiMapping, useOverlappingBreakTie, doJuncCounting, max_M, isRestrictlyNoOvelrapping;
 	char * isPEassign,  *is_paired_end_reads_expected;
 
-	int  isGTF, n_input_files=0,is_dual_index, scrna_total_BAM_no;
+	int  isGTF, n_input_files=0,is_dual_index;
 	char * alias_file_name = NULL, * cmd_rebuilt = NULL, * Rpath = NULL;
 
 	int isMultiOverlapAllowed, isGeneLevel;
@@ -6202,9 +6224,6 @@ int readSummary(int argc,char *argv[]){
 
 	if(argc>63) is_dual_index = (strcmp(argv[63],"Dual-Index")==0);
 	else is_dual_index =0; 
-
-	if(argc>64) scrna_total_BAM_no = atoi(argv[64]);
-	else scrna_total_BAM_no =0; 
 
 	if(argc > 65)
 		nameTranscriptIDColumn = argv[65];
