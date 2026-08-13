@@ -910,7 +910,7 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 				copy_strings_fast(readfl, BAM1R, BAM1Y, CB);
 			}
 
-			if(CB[0] && BAM1R[0] && BAM1Y[0] && strstr(CB,"_002um_")){
+			if(CB[0] && BAM1R[0] && BAM1Y[0] && strstr(CB,"_002um_")){ // newer versions of Space Ranger can have non-coordinate strings in the sb:Z: tag. And coordinate strings must contain "_002um_" as far as I know.
 				char CKey[200];
 				char CVal[200];
 				int x1, bc1=-1, bc2=-1;
