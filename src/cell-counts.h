@@ -295,6 +295,7 @@ typedef struct{
 	FILE * read_assignment_detail_fp;
 
 	int UMI_length;
+	int length_barcode_umi;
 	int barcode_batched_max_genes;
 	int barcode_batched_max_Rbin_len;
 	float umi_cutoff;

@@ -1401,7 +1401,7 @@
   return(sheet)
 }
 
-cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, nsubreads = 15,
+cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, length.barcode.umi = NULL, nsubreads = 15,
 		       minVotes = 1, maxMismatches = 10, minMappedLength = 1, enableSoftClipping=!detectJunctions ,
 		       annot.inbuilt = "mm39", annot.ext = NULL, isGTFAnnotationFile = FALSE,
 		       GTF.featureType = "exon", GTF.attrType = "gene_id", useMetaFeatures = TRUE,
@@ -1429,6 +1429,16 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
   subreadsPerRead <- nsubreads
   unique.mapping <- uniqueMapping
   is.visiumHD.data <- !is.null(VisiumHD.barcode.file)
+
+  if(!is.null(length.barcode.umi)){
+    if(length(length.barcode.umi) != 1L || !is.numeric(length.barcode.umi) ||
+       is.na(length.barcode.umi) || !is.finite(length.barcode.umi) ||
+       length.barcode.umi < 1 || length.barcode.umi != as.integer(length.barcode.umi))
+      stop("length.barcode.umi must be one positive integer or NULL.")
+    if(input.mode == "BAM") stop("length.barcode.umi is supported only for BCL, FASTQ and FASTQ-dir input.")
+    if(is.visiumHD.data) stop("length.barcode.umi is not supported for Visium HD data.")
+    length.barcode.umi <- as.integer(length.barcode.umi)
+  }
 
   index <- .check_and_NormPath(index, mustWork=F, opt="index name")
   index.file.1 <- paste0(index, ".00.b.array")
@@ -1483,6 +1493,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
 
      .index.names.to.sheet.FASTQ.mode(sample.info.idx, cc.sample.sheet.path)
     opt <- c("--inputMode","FASTQ","--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", combined.fastq.names, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--reportedAlignmentsPerRead", nBestLocations, "--maxDiffToTopVotes", maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff",  ifelse(is.null(umi.cutoff), -999, umi.cutoff))
+    if(!is.null(length.barcode.umi)) opt <- c(opt, "--lengthBarcodeUMI", length.barcode.umi)
     if(detectJunctions)opt <- c(opt, "--junctionDetection")
     if(enableSoftClipping) opt <- c(opt, "--enableSoftClipping")
     if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
@@ -1551,6 +1562,7 @@ cellCounts <- function( index, sample, input.mode = "BCL", cell.barcode = NULL, 
       generate.scRNA.BAM <- TRUE
 
       opt <- c("--cellBarcodeFile", cell.barcode,"--reportExcludedBarcodes",as.numeric(reportExcludedBarcodes),"--dataset", dirname, "--sampleSheetFile", cc.sample.sheet.path, "--index", index, "--annotation", ann, "--geneIdColumn", GTF.attrType, "--annotationType", GTF.featureType, "--threads", nthreads, "--output", temp.file.prefix, "--maxMismatch", maxMismatchBases, "--minVotesPerRead", minVotesPerRead, "--subreadsPerRead", subreadsPerRead, "--maxDiffToTopVotes",maxDiffToTopVotes, "--minMappedLength", minMappedLength, "--umiCutoff", ifelse(is.null(umi.cutoff), -999, umi.cutoff))
+      if(!is.null(length.barcode.umi)) opt <- c(opt, "--lengthBarcodeUMI", length.barcode.umi)
       if(isGTFAnnotationFile)opt <- c(opt, "--isGTFannotation")
       if(binaryTempMemory) opt <- c(opt, "--binaryTempMemory")
       if(!unique.mapping)opt <- c(opt, "--reportMultiMappingReads")

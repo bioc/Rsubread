@@ -328,6 +328,7 @@ static struct option cellCounts_long_options[]={
 	{"minMappedLength",required_argument,0,0},
 	{"umiCutoff",required_argument,0,0},
 	{"reportedAlignmentsPerRead",required_argument,0,0},
+	{"lengthBarcodeUMI",required_argument,0,0},
 
 	{0,0,0,0}
 };
@@ -550,6 +551,22 @@ int cellCounts_args_context(cellcounts_global_t * cct_context, int argc, char** 
 			cct_context -> umi_cutoff = atof(optarg);
 //			SUBREADprintf("UMI_CUT=%.2f\n", cct_context -> umi_cutoff);
 		}
+		if(strcmp("lengthBarcodeUMI", cellCounts_long_options[option_index].name)==0){
+			cct_context -> length_barcode_umi = atoi(optarg);
+		}
+	}
+
+	if(cct_context -> length_barcode_umi < 0){
+		SUBREADprintf("ERROR: lengthBarcodeUMI must be a positive integer.\n");
+		return 1;
+	}
+	if(cct_context -> length_barcode_umi > 0 && cct_context -> input_mode == GENE_INPUT_SCRNA_BAM){
+		SUBREADprintf("ERROR: lengthBarcodeUMI is supported only for BCL, FASTQ and FASTQ-dir input.\n");
+		return 1;
+	}
+	if(cct_context -> length_barcode_umi > 0 && cct_context -> visium_hd_barcodes){
+		SUBREADprintf("ERROR: lengthBarcodeUMI is not supported for Visium HD data.\n");
+		return 1;
 	}
 
 
@@ -942,6 +959,17 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 	}
 	if(!rv){
 		if(cct_context-> cell_barcodes_array)rv = cellCounts_make_barcode_HT_table( cct_context );
+		if(!rv && cct_context -> length_barcode_umi > 0){
+			if(cct_context -> length_barcode_umi <= cct_context -> known_cell_barcode_length){
+				SUBREADprintf("ERROR: lengthBarcodeUMI (%d) must be greater than the cell barcode length (%d).\n", cct_context -> length_barcode_umi, cct_context -> known_cell_barcode_length);
+				rv = 1;
+			}else if(cct_context -> length_barcode_umi - cct_context -> known_cell_barcode_length > MAX_UMI_LEN){
+				SUBREADprintf("ERROR: lengthBarcodeUMI (%d) gives a UMI length greater than the maximum supported length (%d).\n", cct_context -> length_barcode_umi, MAX_UMI_LEN);
+				rv = 1;
+			}else{
+				cct_context -> UMI_length = cct_context -> length_barcode_umi - cct_context -> known_cell_barcode_length;
+			}
+		}
 		if(!rv){
 			cct_context-> sample_sheet_table = input_BLC_parse_SampleSheet( cct_context -> bcl_sample_sheet_file);
 			if(NULL == cct_context-> sample_sheet_table) rv = 1;
@@ -3046,6 +3074,51 @@ int cellCounts_copy_bin_to_textread(cellcounts_global_t * cct_context, int readl
 	return sread_len;
 }
 
+/*
+ * The cached BCL/CBCL and FASTQ acquisition paths normalise names as:
+ * R<serial>|<R1 sequence>|<R1 quality>|<sample index>|<index quality>|<lane/routing>
+ *
+ * Only the R1 sequence and quality fields are shortened. The remaining fields,
+ * especially the sample-index and lane/routing suffix used for demultiplexing,
+ * must remain byte-for-byte unchanged.
+ */
+static int cellCounts_trim_barcode_umi_read_name(cellcounts_global_t * cct_context, char * read_name){
+	if(cct_context -> length_barcode_umi < 1) return 0;
+
+	char * r1_seq = strchr(read_name, '|');
+	if(!r1_seq) goto malformed_read_name;
+	r1_seq++;
+	char * r1_seq_end = strchr(r1_seq, '|');
+	if(!r1_seq_end) goto malformed_read_name;
+	char * r1_qual = r1_seq_end +1;
+	char * r1_qual_end = strchr(r1_qual, '|');
+	if(!r1_qual_end) goto malformed_read_name;
+
+	int r1_seq_len = r1_seq_end - r1_seq;
+	int r1_qual_len = r1_qual_end - r1_qual;
+	if(r1_seq_len != r1_qual_len) goto malformed_read_name;
+	if(r1_seq_len < cct_context -> length_barcode_umi){
+		SUBREADprintf("ERROR: R1 barcode+UMI length (%d) is shorter than lengthBarcodeUMI (%d).\n", r1_seq_len, cct_context -> length_barcode_umi);
+		cct_context -> has_error = 1;
+		return 1;
+	}
+
+	if(r1_seq_len > cct_context -> length_barcode_umi){
+		/* First close the surplus at the end of R1 sequence, then recompute the
+		 * quality-field pointers before closing the matching quality surplus. */
+		memmove(r1_seq + cct_context -> length_barcode_umi, r1_seq_end, strlen(r1_seq_end) +1);
+		r1_qual = r1_seq + cct_context -> length_barcode_umi +1;
+		r1_qual_end = r1_qual + r1_qual_len;
+		memmove(r1_qual + cct_context -> length_barcode_umi, r1_qual_end, strlen(r1_qual_end) +1);
+	}
+	return 0;
+
+malformed_read_name:
+	SUBREADprintf("ERROR: cannot trim R1 because the read name has an unexpected barcode/UMI layout.\n");
+	cct_context -> has_error = 1;
+	return 1;
+}
+
 int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int thread_no,int *read_len, char * read_name, char * read_text, char * qual_text, subread_read_number_t * read_no_in_chunk) {
 	int rl1=0;
 	subread_read_number_t this_number = -1;
@@ -3084,6 +3157,8 @@ int cellCounts_fetch_next_read_pair(cellcounts_global_t * cct_context, int threa
 		}
 		cellCounts_lock_release(&cct_context -> input_dataset_lock); 
 	}
+
+	if(rl1>0 && cellCounts_trim_barcode_umi_read_name(cct_context, read_name)) rl1 = -1;
 
 	if(rl1>0 && this_number>=0 && this_number <  1000llu*1000 *1000*1000) {
 		*read_no_in_chunk = this_number;
