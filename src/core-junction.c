@@ -163,14 +163,17 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 			int xk1, matched_bases_to_site;
 			chromosome_event_t *site_events[MAX_EVENT_ENTRIES_PER_SITE+1];
 
-			int jump_penalty = 0;
-
 			unsigned potential_event_pos;
 			if(explain_context -> current_is_strand_jumped)
 				potential_event_pos = read_head_abs_offset - tested_read_pos +1;
 			else
 				potential_event_pos = read_head_abs_offset + tested_read_pos -1;
-			if(!check_event_bitmap(  event_table->appendix1, potential_event_pos )) continue;
+			if(event_search_method == EVENT_SEARCH_BY_BOTH_SIDES)
+			{
+				if(!(check_event_bitmap(event_table->appendix1, potential_event_pos) ||
+					 check_event_bitmap(event_table->appendix2, potential_event_pos))) continue;
+			}
+			else if(!check_event_bitmap(event_table->appendix1, potential_event_pos)) continue;
 
 			int search_types =  CHRO_EVENT_TYPE_INDEL | CHRO_EVENT_TYPE_JUNCTION | CHRO_EVENT_TYPE_FUSION;
 			int site_events_no = search_event(global_context, event_table , event_space , potential_event_pos, event_search_method , search_types , site_events);
@@ -209,6 +212,7 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
+					int jump_penalty = tested_event->event_type == CHRO_EVENT_TYPE_FUSION ? 2 : 0;
 
 					if(explain_context -> is_fully_covered && tested_event -> event_type == CHRO_EVENT_TYPE_FUSION && tested_event -> event_large_side - tested_event -> event_small_side > MAX_DELETION_LENGTH){
 						continue;
@@ -258,8 +262,6 @@ void search_events_to_front(global_context_t * global_context, thread_context_t 
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_start = tested_read_pos - min(0, tested_event -> indel_length) + tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_head_abs_offset;
 					
-
-						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 
 						int current_is_jumped = explain_context -> current_is_strand_jumped;
 						int current_sup_as_complex = explain_context -> tmp_min_support_as_complex;
@@ -323,16 +325,12 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 		explain_context -> best_min_support_as_complex = explain_context -> tmp_min_support_as_complex;
 		explain_context -> best_is_pure_donor_found_explain = explain_context -> tmp_is_pure_donor_found_explain;
 		explain_context -> second_best_matching_bases = max(explain_context -> second_best_matching_bases, explain_context -> best_matching_bases); 
-		explain_context -> best_matching_bases = explain_context-> tmp_total_matched_bases ;
-		explain_context -> best_indel_penalty = explain_context -> tmp_indel_penalty;
 	}
 	else if(explain_context -> best_matching_bases - explain_context -> best_indel_penalty == explain_context-> tmp_total_matched_bases - explain_context -> tmp_indel_penalty)
 	{
 		// only gapped explainations are complex counted.
 		explain_context -> best_is_complex +=  explain_context -> tmp_search_sections;
 		explain_context -> second_best_matching_bases = explain_context -> best_matching_bases;
-		explain_context -> best_indel_penalty = explain_context -> tmp_indel_penalty;
-
 		if(0 && FIXLENstrcmp("R010442852", explain_context -> read_name) == 0){
 			SUBREADprintf("complexity: curr=%d, new=%d   ;   sections=%d\n", explain_context->best_min_support_as_complex, explain_context -> tmp_min_support_as_complex, explain_context -> tmp_search_sections );
 		}
@@ -416,6 +414,9 @@ void new_explain_try_replace(global_context_t* global_context, thread_context_t 
 
 	if(is_better_result)
 	{
+		explain_context -> best_matching_bases = explain_context -> tmp_total_matched_bases;
+		explain_context -> best_indel_penalty = explain_context -> tmp_indel_penalty;
+
 		if(search_to_back){
 			explain_context -> all_back_alignments = 1;
 			explain_context -> result_back_junction_numbers[0] = explain_context -> tmp_search_sections +1;
@@ -622,7 +623,6 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 		for(tested_read_pos =  move_start; tested_read_pos >=0;tested_read_pos --)
 		{
 			int xk1, matched_bases_to_site;
-			int jump_penalty = 0;
 			chromosome_event_t *site_events[MAX_EVENT_ENTRIES_PER_SITE];
 
 			int potential_event_pos;
@@ -633,7 +633,12 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 				potential_event_pos = read_tail_abs_offset - ( read_tail_pos - tested_read_pos);
 	
 
-			if(!check_event_bitmap(  event_table->appendix2, potential_event_pos )) continue;
+			if(event_search_method == EVENT_SEARCH_BY_BOTH_SIDES)
+			{
+				if(!(check_event_bitmap(event_table->appendix1, potential_event_pos) ||
+					 check_event_bitmap(event_table->appendix2, potential_event_pos))) continue;
+			}
+			else if(!check_event_bitmap(event_table->appendix2, potential_event_pos)) continue;
 			int search_types = CHRO_EVENT_TYPE_INDEL | CHRO_EVENT_TYPE_JUNCTION | CHRO_EVENT_TYPE_FUSION;
 			int site_events_no = search_event(global_context, event_table , event_space , potential_event_pos, event_search_method , search_types, site_events);
 			//#warning ">>>>>>>>>>>>>> COMMENT THIS <<<<<<<<<<<<<<<<<<<<<"
@@ -658,6 +663,7 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 				for(xk1 = 0; xk1 < site_events_no ; xk1++)
 				{
 					chromosome_event_t * tested_event = site_events[xk1];
+					int jump_penalty = tested_event->event_type == CHRO_EVENT_TYPE_FUSION ? 2 : 0;
 
 					if(explain_context -> is_fully_covered && tested_event -> event_type == CHRO_EVENT_TYPE_FUSION && tested_event -> event_large_side - tested_event -> event_small_side > MAX_DELETION_LENGTH){
 						continue;
@@ -704,8 +710,6 @@ void search_events_to_back(global_context_t * global_context, thread_context_t *
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].is_connected_to_large_side = (potential_event_pos == tested_event -> event_small_side);
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].read_pos_end = tested_read_pos + min(0, tested_event->indel_length) - tested_event -> indel_at_junction;
 						explain_context -> tmp_search_junctions[explain_context -> tmp_search_sections + 1].abs_offset_for_start = new_read_tail_abs_offset; 
-
-						if(tested_event->event_type == CHRO_EVENT_TYPE_FUSION) jump_penalty = 2;
 
 						int current_is_jumped = explain_context -> current_is_strand_jumped ;
 						int current_sup_as_complex = explain_context -> tmp_min_support_as_complex;
@@ -2908,6 +2912,8 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 	int is_First_M = 1, is_wrong_cigar = 0;
 	int head_soft_clipped = -1, tail_soft_clipped = -1;
 	unsigned int tmp_int = 0;
+	int reverse_indel_pending = 0;
+	unsigned int reverse_indel_deletion = 0;
 
 	if(0){
 		char posout1[100];
@@ -2927,6 +2933,13 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 			if(is_wrong_cigar) break;
 			if(nch == 'M' || nch == 'S')
 			{
+				if(nch == 'M' && current_reversed && reverse_indel_pending)
+				{
+					current_perfect_section_abs -= reverse_indel_deletion + tmp_int - 1;
+					reverse_indel_pending = 0;
+					reverse_indel_deletion = 0;
+				}
+
 				char *qual_text_cur;
 				if(qual_text[0])qual_text_cur = qual_text+read_cursor;
 				else	qual_text_cur = NULL;
@@ -3042,6 +3055,11 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 			}
 			else if(nch == 'I')
 			{
+				if(current_reversed)
+				{
+					reverse_indel_pending = 1;
+					reverse_indel_deletion = 0;
+				}
 				rebuilt_read_len += tmp_int;
 				read_cursor += tmp_int;
 
@@ -3052,7 +3070,12 @@ int final_CIGAR_quality(global_context_t * global_context, thread_context_t * th
 			else if(nch == 'D')
 			{
 				total_indel_length ++;
-				if(!current_reversed)
+				if(current_reversed)
+				{
+					reverse_indel_pending = 1;
+					reverse_indel_deletion = tmp_int;
+				}
+				else
 					current_perfect_section_abs += tmp_int;
 			}
 			else if(tolower(nch) == 'n')
@@ -3162,8 +3185,6 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 	chromosome_event_t * to_be_supported [20];
 	short flanking_size_left[20], flanking_size_right[20];
 	int to_be_supported_count = 0;
-	int is_junction_read = 0;
-	int total_perfect_matched_sections = 0;
 
 	mapping_result_t * result = _global_retrieve_alignment_ptr(global_context, explain_context->pair_number, explain_context->is_second_read, explain_context-> best_read_id); 
 	result -> result_flags &= ~CORE_IS_FULLY_EXPLAINED;
@@ -3191,7 +3212,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 	// adding indel lengths in read lengths and relocate sections
 	// note that the last section in back results has the same strand of the main piece.
 
-	int is_cigar_overflow = 0, fusions_in_read = 0, final_alignment_number = 0;
+	int final_alignment_number = 0;
 	for(back_i = 0; back_i < explain_context -> all_back_alignments; back_i++){
 		if(final_alignment_number >= MAX_ALIGNMENT_PER_ANCHOR)break;
 
@@ -3224,6 +3245,10 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 			to_be_supported_count = 0;
 			tmp_cigar[0]=0;
 			int known_junction_supp = 0;
+			int is_junction_read = 0;
+			int total_perfect_matched_sections = 0;
+			int is_cigar_overflow = 0;
+			int fusions_in_read = 0;
 
 			for(xk1 = 0; xk1 < explain_context -> result_back_junction_numbers[back_i] + explain_context -> result_front_junction_numbers[front_i] -1; xk1++)
 			{
@@ -3322,7 +3347,7 @@ unsigned int finalise_explain_CIGAR(global_context_t * global_context, thread_co
 
 			int mismatch_bases = 0;
 
-			if(is_cigar_overflow) SUBreadSprintf(tmp_cigar,12, "%dM",  explain_context -> full_read_len);
+			if(is_cigar_overflow) continue;
 
 			unsigned int final_position;
 
@@ -3970,9 +3995,11 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 			SUBREADprintf("READ=%s, LEFT=%s, RIGHT=%s\n", read_name, leftpos, rightpos);
 		}
 
+		unsigned int stored_small_side = left_edge_wanted;
+		unsigned int stored_large_side = right_edge_wanted + subjunc_result->indel_at_junction;
 		chromosome_event_t * found = NULL;
 		chromosome_event_t * search_return [MAX_EVENT_ENTRIES_PER_SITE];
-		int found_events = search_event(global_context, event_table, event_space, left_edge_wanted , EVENT_SEARCH_BY_SMALL_SIDE,  CHRO_EVENT_TYPE_INDEL | CHRO_EVENT_TYPE_JUNCTION | CHRO_EVENT_TYPE_FUSION, search_return);
+		int found_events = search_event(global_context, event_table, event_space, stored_small_side , EVENT_SEARCH_BY_SMALL_SIDE,  CHRO_EVENT_TYPE_INDEL | CHRO_EVENT_TYPE_JUNCTION | CHRO_EVENT_TYPE_FUSION, search_return);
 
 		mark_gapped_read(result);
 		if(found_events)
@@ -3980,7 +4007,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 			int kx1; 
 			for(kx1 = 0; kx1 < found_events ; kx1++)
 			{
-				if(search_return[kx1] -> event_large_side == right_edge_wanted)
+				if(search_return[kx1] -> event_large_side == stored_large_side)
 				{
 					found = search_return[kx1];	
 					break;
@@ -4017,8 +4044,8 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 
 			chromosome_event_t * new_event = event_space+event_no; 
 			memset(new_event,0,sizeof(chromosome_event_t));
-			new_event -> event_small_side = left_edge_wanted;
-			new_event -> event_large_side = right_edge_wanted + subjunc_result->indel_at_junction;
+			new_event -> event_small_side = stored_small_side;
+			new_event -> event_large_side = stored_large_side;
 			new_event -> critical_read_id = 2llu * pair_number + is_second_read;
 
 			int new_event_type =(((global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_fusion_detection)||(global_context -> config.entry_program_name == CORE_PROGRAM_SUBJUNC && global_context ->  config.do_long_del_detection))&& !global_context -> config.prefer_donor_receptor_junctions)?CHRO_EVENT_TYPE_FUSION:CHRO_EVENT_TYPE_JUNCTION;
@@ -4120,6 +4147,7 @@ void find_new_junctions(global_context_t * global_context, thread_context_t * th
 
 					new_event -> supporting_reads = 1;
 					new_event -> indel_length = 0;
+					new_event -> indel_at_junction = subjunc_result->indel_at_junction;
 
 					new_event -> small_side_increasing_coordinate = subjunc_result -> small_side_increasing_coordinate;
 					new_event -> large_side_increasing_coordinate = subjunc_result -> large_side_increasing_coordinate;
