@@ -439,7 +439,7 @@ int test_redundant_event( global_context_t * global_context, chromosome_event_t*
 
 #define reallocate_to_be_removed_ids		if(to_be_removed_number >= remove_id_size-1){\
 							remove_id_size = remove_id_size*3/2;\
-							to_be_removed_ids = realloc(to_be_removed_ids, remove_id_size);\
+							to_be_removed_ids = realloc(to_be_removed_ids, sizeof(*to_be_removed_ids) * (1 + remove_id_size));\
 						}
 
 #define MIN_EVENT_SUPPORT_NO 2
