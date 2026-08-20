@@ -1234,13 +1234,14 @@ void cellCounts_copy_txn_to_juncs(void * ky, void * va, HashTable * me){
 		int start = ve >> 32;
 		int end = ve & 0x7fffffff; 
 
+		if(last_end>=0 && start <= last_end)
+			SUBREADprintf("WARNING: Transcript '%s' contains overlapping or touching exons (%d >= %d). No junction is added between them.\n", ky, last_end, start);
+
 		for(sample_i = 1; sample_i <=cct_context-> sample_sheet_table -> numOfElements ; sample_i ++){
 			cellCounts_add_or_update_chroEvent_in_table(cct_context, sample_i, chroEvent_t_TYPE_EXON, chname_strand , start, end, 0, 1);
 
-			if(last_end>0){
-				if(start < last_end)SUBREADprintf("WARNING: Transcript '%s' contains overlapping exons (%d > %d). The junction between the overlapping exons is ignored.\n", ky, last_end, start);
+			if(last_end>=0 && start > last_end)
 				cellCounts_add_or_update_chroEvent_in_table(cct_context, sample_i, chroEvent_t_TYPE_JUNCTION, chname_strand , last_end, start, 0, 1);
-			}
 		}
 		last_end = end;
 		last_start = start;
