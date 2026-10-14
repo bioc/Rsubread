@@ -31,6 +31,7 @@ int gvindex_init(gene_value_index_t * index, unsigned int start_point, unsigned 
 	index->start_point = start_point;
 	index->memory_block_size = total_bases_estimated/4+10;
 	index->values = calloc(index->memory_block_size,1);
+	index->base_values = NULL;
 	if(!index->values)
 	{
 		SUBREADputs(MESSAGE_OUT_OF_MEMORY);
