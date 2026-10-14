@@ -1080,7 +1080,7 @@ void cellCounts_write_final_junctions(cellcounts_global_t * cct_context,  char *
 void cellCounts_write_final_other_events(cellcounts_global_t * cct_context,  char * output_file_name, int type_to_write);
 int cellCounts_write_junction_sumtable(cellcounts_global_t* cct_context){
 	void * params [5];
-#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED SAMPLE-LEVEL SUPPORT OUT ====="
+//#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED SAMPLE-LEVEL SUPPORT OUT ====="
 	if(0)cellCounts_write_final_junctions(cct_context, cct_context -> output_prefix);
 	// DO NOT DETELE: They are for indel and exon detection.
 	//cellCounts_write_final_other_events(cct_context, "del4-indels.tab", chroEvent_t_TYPE_INDEL);
@@ -1860,7 +1860,7 @@ int cellCounts_open_cellbc_batches(cellcounts_global_t * cct_context){
 		char fname[MAX_FILE_NAME_LENGTH+200];
 		SUBreadSprintf(fname, MAX_FILE_NAME_LENGTH+200,"%s/temp-cellcounts-%06d-%03d.tmpbin",cct_context->temp_file_dir,getpid(), x1);
 		cct_context -> batch_files[x1] = REP_fopen(fname,"wb");
-		REP_setvbuf(cct_context -> batch_files[x1], cct_context -> cellbin_v_buffers[x1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
+		REP_setvbuf(cct_context -> batch_files[x1], (char*)cct_context -> cellbin_v_buffers[x1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
 		cellCounts_init_lock(cct_context -> batch_file_locks+x1, 0);
 	}
 	int umfpi;
@@ -4473,7 +4473,7 @@ int cellCounts_select_and_write_alignments(cellcounts_global_t * cct_context, in
 				strcpy(read_qual+reverse_text_offset, read_qual);
 				reverse_quality(read_qual+reverse_text_offset, read_len);
 			}
-#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED ANTI_SUPPORT OUT ====="
+//#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED ANTI_SUPPORT OUT ====="
 			if(0)if(cct_context -> do_cell_level_junction_detection && sample_i>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_i, myno);
 			cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_i, myno, read_name, read_text + reverse_text_offset, read_qual+reverse_text_offset, read_text , read_qual , read_len);
 		}
@@ -5263,6 +5263,7 @@ int cellCounts_do_realign(cellcounts_global_t * cct_context){
 		cellCounts_release_context_from_align(cct_context, current_thread_no, task);
 	}
 	free(thread_contexts);
+	return 0;
 }
 
 void * cellCounts_select_and_write_alignments_from_temp(void * pr){
@@ -5463,7 +5464,7 @@ void * cellCounts_select_and_write_alignments_from_temp(void * pr){
 					strcpy(read_qual+reverse_text_offset, read_qual);
 					reverse_quality(read_qual+reverse_text_offset, read_len);
 				}
-#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED ANTI_SUPPORT OUT ====="
+//#warning "===== CURRENT JUNCTION DETECTION DOESN'T NEED ANTI_SUPPORT OUT ====="
 				if(0)if(cct_context -> do_cell_level_junction_detection && sample_number>0)cellCounts_add_supported_unsupported_reads_from_cigar( cct_context, thread_no, sample_number, myno);
 				cellCounts_write_read_in_batch_bin(cct_context, thread_no, sample_number, myno, read_name, read_text_fwd + reverse_text_offset, read_qual_fwd+reverse_text_offset, read_text_fwd , read_qual_fwd , read_len);
 			}
@@ -6746,7 +6747,7 @@ int cellCounts_merged_write_sparse_matrix(cellcounts_global_t * cct_context, Has
 	for(x1 = 0; x1 < used_cell_barcodes -> numOfElements; x1++){
 		srInt_64 cellno = ArrayListGet(used_cell_barcodes, x1)-NULL;
 		if(cct_context -> visium_hd_barcodes){
-			fprintf(ofp_bcs,"%05d_%05d\n", (cellno&0xffff0000)>>16, cellno&0xffff);
+			fprintf(ofp_bcs,"%05lld_%05lld\n", (cellno&0xffff0000)>>16, cellno&0xffff);
 			if((cellno&0xffff0000)>>16 > 0x7000)SUBREADprintf("POS02 %08x\n", cellno);
 		}else{
 			char * cellbc_seq = ArrayListGet(cct_context -> cell_barcodes_array, cellno);
@@ -7193,7 +7194,7 @@ int cellCounts_do_cellbc_batches(cellcounts_global_t * cct_context){
 		char tmp_fname[MAX_FILE_NAME_LENGTH+80];
 		SUBreadSprintf(tmp_fname, MAX_FILE_NAME_LENGTH+80, "%s/temp-cellcounts-%06d-%03d.tmpbin", cct_context -> temp_file_dir, getpid(), xk1);
 		input_fps[xk1] = REP_fopen(tmp_fname,"rb");
-		REP_setvbuf(input_fps[xk1], cct_context -> cellbin_v_buffers[xk1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
+		REP_setvbuf(input_fps[xk1], (char*)cct_context -> cellbin_v_buffers[xk1], _IOFBF, SCRNA_SMALLER_VBUFF_SIZE);
 		if(xk1 == CELLBC_BATCH_NUMBER+1)break;
 
 		srInt_64 section1_items=0;

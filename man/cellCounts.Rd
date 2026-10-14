@@ -42,7 +42,10 @@ cellCounts(
     uniqueMapping = FALSE,
 
     # report UMI counts for cell barcodes that were filtered out
-    reportExcludedBarcodes = FALSE,
+    reportExcludedBarcodes = !is.null(VisiumHD.barcode.file),
+
+    # visium HD barcode input
+    VisiumHD.barcode.file = NULL
     )
 }
 \arguments{
@@ -69,6 +72,7 @@ cellCounts(
   \item{nBestLocations}{A numeric value giving the maximum number of reported alignments for each multi-mapping read. \code{1} by default.}
   \item{uniqueMapping}{A logical value specifying if the multi-mapping reads should not be reported as mapped (i.e. reporting uniquely mapped reads only). \code{FALSE} by default.}
   \item{reportExcludedBarcodes}{If \code{TRUE}, report UMI counts for those cell barcodes that were filtered out during cell calling. \code{FALSE} by default.}
+  \item{VisiumHD.barcode.file}{Reference Visium HD barcode file from Space Ranger mapping results. \code{NULL} to disable the Visium HD mode.}
 }
 
 \details{
