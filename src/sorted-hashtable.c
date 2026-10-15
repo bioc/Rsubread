@@ -1389,7 +1389,7 @@ int gehash_load_option(const char fname [], int option_no, int * result){
 
 int gehash_load(gehash_t * the_table, const char fname [])
 {
-	signed int i, read_length, rrtv;
+	signed int i,j,read_length, rrtv;
 	char magic_chars[8];
 	magic_chars[7]=0;
 
@@ -1501,15 +1501,7 @@ int gehash_load(gehash_t * the_table, const char fname [])
 				accued_bytes = 0;
 				curr_bucks = 0;
 			}
-			#ifdef __MINGW32__
-			{
-				char * buffkk = malloc(current_bytes );
-				fread(buffkk,current_bytes ,1, fp);
-				free(buffkk);
-			}
-			#else
-			fseeko(fp, current_bytes, SEEK_CUR);
-			#endif
+			for(j =0; j <current_bytes; j++) fgetc(fp);
 		}
 		if(curr_bucks)
 			bucket_bytes[grp_i++] = accued_bytes;
