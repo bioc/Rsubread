@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "subread.h"
 
 #define INITIAL_CAPACITY (33554467) // prime number
@@ -82,15 +83,76 @@ void free_map(HashMap *map) {
 
 #define BAM_RECORD_LINE_LENGTH (MAX_READ_NAME_LEN + MAX_READ_LENGTH*2+MAX_CHROMOSOME_NAME_LEN*2+8192)
 
+static int shell_quote_argument(const char *argument, char **quoted_argument) {
+    size_t quote_length = 2;
+    const char *input;
+    char *quoted, *output;
+
+    for (input = argument; *input; input++) {
+        size_t additional = (*input == '\'') ? 4 : 1;
+        if (quote_length > SIZE_MAX - additional) return -1;
+        quote_length += additional;
+    }
+    if (quote_length == SIZE_MAX) return -1;
+
+    quoted = malloc(quote_length + 1);
+    if (!quoted) return -1;
+
+    output = quoted;
+    *output++ = '\'';
+    for (input = argument; *input; input++) {
+        if (*input == '\'') {
+            *output++ = '\'';
+            *output++ = '\\';
+            *output++ = '\'';
+            *output++ = '\'';
+        } else {
+            *output++ = *input;
+        }
+    }
+    *output++ = '\'';
+    *output = '\0';
+    *quoted_argument = quoted;
+    return 0;
+}
+
 int cell_counts_extract_vHD_main(char * bamname, char * txtname){
     // Allocate a fixed buffer on the stack for fgets
     char line[BAM_RECORD_LINE_LENGTH]; 
 
     HashMap *known_map = create_map();
-    char command[100+MAX_FILE_NAME_LENGTH];
-    sprintf(command, "samtools view %s", bamname);
+    char *quoted_bamname = NULL;
+    char *command = NULL;
+    size_t command_capacity;
+    int command_length;
+
+    if (shell_quote_argument(bamname, &quoted_bamname) != 0) {
+        free_map(known_map);
+        return -1;
+    }
+    if (strlen(quoted_bamname) > SIZE_MAX - sizeof("samtools view ")) {
+        free(quoted_bamname);
+        free_map(known_map);
+        return -1;
+    }
+    command_capacity = sizeof("samtools view ") + strlen(quoted_bamname);
+    command = malloc(command_capacity);
+    if (!command) {
+        free(quoted_bamname);
+        free_map(known_map);
+        return -1;
+    }
+    command_length = snprintf(command, command_capacity, "samtools view %s", quoted_bamname);
+    if (command_length < 0 || (size_t)command_length >= command_capacity) {
+        free(command);
+        free(quoted_bamname);
+        free_map(known_map);
+        return -1;
+    }
+    free(quoted_bamname);
     
     FILE *samfp = popen(command, "r");
+    free(command);
     FILE *txtfp = fopen(txtname, "w");
 
     if (!samfp || !txtfp) {

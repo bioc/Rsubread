@@ -910,7 +910,7 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 		else fparby = fopen(cct_context -> visium_hd_CellRanger_bam, "r");
 		int offset_of_1R = is_BAM_file? cct_context -> UMI_length :0;
 		while(1){
-			char BAM1R[100],BAM1Y[100],CB[100];
+			char BAM1R[5001],BAM1Y[5001],CB[5001];
 			char bambuff[5001];
 			char * readfl;
 			BAM1R[0]=BAM1Y[0]=CB[0]=0;
@@ -928,13 +928,28 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 			}
 
 			if(CB[0] && BAM1R[0] && BAM1Y[0] && strstr(CB,"_002um_")){ // newer versions of Space Ranger can have non-coordinate strings in the sb:Z: tag. And coordinate strings must contain "_002um_" as far as I know.
-				char CKey[200];
 				char CVal[200];
-				int x1, bc1=-1, bc2=-1;
+				char *CKey;
+				size_t BAM1R_length, BAM1Y_length, CKey_capacity;
+				int x1, bc1=-1, bc2=-1, formatted_length;
 				for(x1=0; BAM1Y[x1]; x1++)if(BAM1Y[x1]>='/') BAM1Y[x1] ++; // when matching the quality string, the qualty char >= '/' is +1
-				sprintf(CKey,"%s/%s",BAM1R + offset_of_1R ,BAM1Y + offset_of_1R); // UMI is before spot barcodes in Visium HD R1. And we don't need to index the UMI for having the barcodes.
+				BAM1R_length = strlen(BAM1R);
+				BAM1Y_length = strlen(BAM1Y);
+				if(offset_of_1R < 0 || (size_t)offset_of_1R > BAM1R_length || (size_t)offset_of_1R > BAM1Y_length) continue;
+				CKey_capacity = BAM1R_length - (size_t)offset_of_1R + BAM1Y_length - (size_t)offset_of_1R + 2;
+				CKey = malloc(CKey_capacity);
+				if(!CKey) continue;
+				formatted_length = snprintf(CKey, CKey_capacity, "%s/%s",BAM1R + offset_of_1R ,BAM1Y + offset_of_1R); // UMI is before spot barcodes in Visium HD R1. And we don't need to index the UMI for having the barcodes.
+				if(formatted_length < 0 || (size_t)formatted_length >= CKey_capacity) {
+					free(CKey);
+					continue;
+				}
 				sscanf(CB, "s_%*[^_]_%d_%d", &bc1, &bc2);
-				sprintf(CVal,"%05d_%05d",bc1,bc2);
+				formatted_length = snprintf(CVal, sizeof(CVal), "%05d_%05d",bc1,bc2);
+				if(formatted_length < 0 || (size_t)formatted_length >= sizeof(CVal)) {
+					free(CKey);
+					continue;
+				}
 
 				char * oldCB = HashTableGet(cct_context -> VisiumHD_barcode_to_best_mapping, CKey);
 				if(oldCB){
@@ -944,6 +959,7 @@ int cellCounts_load_scRNA_tables(cellcounts_global_t * cct_context){
 						SUBREADprintf("Loaded the %lld-th barcode from Space Ranger BAM reference.\n", cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements);
 					HashTablePut(cct_context -> VisiumHD_barcode_to_best_mapping, strdup(CKey), strdup(CVal));
 				}
+				free(CKey);
 			}
 			if(early_terminate)  if(cct_context -> VisiumHD_barcode_to_best_mapping->numOfElements > 8654321)break;
 		}
@@ -2454,16 +2470,30 @@ int cellCounts_get_cellbarcode_no(cellcounts_global_t * cct_context, int thread_
 		seq_1R[cbclen] = 0;
 		qual_1Y[cbclen] = 0;
 		// space ranger CB is like s_002um_02768_00939-1, or sb:Z:s_002um_02191_02151-1  
-		char CKey[200];
 		int bc1=-1, bc2=-1;
-		sprintf(CKey,"%s/%s",seq_1R + cct_context -> UMI_length, qual_1Y + cct_context -> UMI_length); // UMI is before the two spot barcodes in Visium HD R1 reads. Hence we don't index the UMIs in the R1.
-		char * spaceranger_CB = HashTableGet(cct_context->VisiumHD_barcode_to_best_mapping, CKey);
+		char *CKey = NULL;
+		if(cct_context -> UMI_length >= 0){
+			size_t seq_1R_length = strlen(seq_1R), qual_1Y_length = strlen(qual_1Y), CKey_capacity;
+			if((size_t)cct_context -> UMI_length <= seq_1R_length && (size_t)cct_context -> UMI_length <= qual_1Y_length){
+				CKey_capacity = seq_1R_length - (size_t)cct_context -> UMI_length + qual_1Y_length - (size_t)cct_context -> UMI_length + 2;
+				CKey = malloc(CKey_capacity);
+				if(CKey){
+					int formatted_length = snprintf(CKey, CKey_capacity, "%s/%s",seq_1R + cct_context -> UMI_length, qual_1Y + cct_context -> UMI_length); // UMI is before the two spot barcodes in Visium HD R1 reads. Hence we don't index the UMIs in the R1.
+					if(formatted_length < 0 || (size_t)formatted_length >= CKey_capacity){
+						free(CKey);
+						CKey = NULL;
+					}
+				}
+			}
+		}
+		char * spaceranger_CB = CKey ? HashTableGet(cct_context->VisiumHD_barcode_to_best_mapping, CKey) : NULL;
 		if(spaceranger_CB){
 			sscanf(spaceranger_CB, "%d_%d", &bc1, &bc2);
 			if(bc1>=0 && bc2>=0) tb1 = bc1 << 16 | bc2;
 			
-//			fprintf(stderr,"CREATE_CELLID %s %s = %s\n",  seq_1R, qual_1Y, spaceranger_CB);
+			//fprintf(stderr,"CREATE_CELLID %s %s = %s\n",  seq_1R, qual_1Y, spaceranger_CB);
 		}
+		free(CKey);
 		seq_1R[cbclen]=bcback;
 		qual_1Y[cbclen]=bqback;
 	}else{
@@ -2855,7 +2885,7 @@ void cellCounts_write_read_in_batch_bin(cellcounts_global_t * cct_context, int t
 	cellCounts_scan_read_name_str(cct_context, NULL, read_name, &sample_seq, &sample_qual, &BC_seq, &BC_qual, &UMI_seq, &UMI_qual, &lane_str, &RG, &rname_trimmed_len);
 
 	int cell_barcode_no = cellCounts_get_cellbarcode_no(cct_context, thread_no, BC_seq, BC_qual);
-	if(cell_barcode_no>0x7f000000) fprintf(stderr,"POS0X %08x\n", cell_barcode_no);
+	if(cell_barcode_no>0x7f000000) SUBREADprintf("POS0X %08x\n", cell_barcode_no);
 	//if(cct_context->visium_hd_barcodes) fprintf(stderr,"RBINBIN  UMIseq=%s  UMIqual=%s  UMIlen=%d   CELL=%08x\n", UMI_seq, UMI_qual, cct_context->UMI_length, cell_barcode_no);
 	if(reporting_index>=0){
 		linear_pos = thread_context -> reporting_positions[reporting_index];
@@ -6630,7 +6660,7 @@ void * cellCounts_do_one_batch(void * paramsp1){
 			memcpy(&binlen, binptr+16+8*genes+cct_context -> UMI_length,4 );
 			if(cellid>=0){
 				if(cct_context->visium_hd_barcodes){
-if(  (cellid&0xffff0000)>>16 > 0x7000) fprintf(stderr,"POS0Y %08x\n", cellid);
+if(  (cellid&0xffff0000)>>16 > 0x7000) SUBREADprintf("POS0Y %08x\n", cellid);
 					snprintf(visiumHD_cellbc,12,"%05d_%05d", (cellid&0xffff0000)>>16  , cellid&0xffff );
 					//fprintf(stderr,"HAD_2D_BC %s\n", visiumHD_cellbc);
 					new_cellbc = visiumHD_cellbc;

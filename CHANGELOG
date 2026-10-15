@@ -1,3 +1,8 @@
+15 Oct 2026 - 2.27.7
+(1) Fixed potential buffer overflows in Visium HD barcode processing.
+(2) Replaced direct stderr output with R-compatible message output.
+(3) Added documentation for extract.VisiumHD.tags.
+
 14 Aug 2026 - 2.27.5
 (1) Fixed a bug in subjunc related to reportAllJunctions option.
 

@@ -1990,7 +1990,7 @@ void msgqu_printf(const char * fmt, ...){
 	va_end(args);
 	obuf[MSGQU_LINE_SIZE]=0;
 	#ifdef MAKE_STANDALONE
-		fputs(obuf, stderr);
+		SUBREADprintf("%s", obuf);
 		free(obuf);
 	#else
 		if(!mt_message_queue.is_thread_mode){
@@ -3195,7 +3195,7 @@ int OldMEMgeneral_dynamic_align(char * read, int read_len, unsigned int begin_po
 
 int debugout1 = 0;
 if(0) debugout1 =1;
-if(debugout1)fprintf(stderr,"\n");
+if(debugout1)SUBREADprintf("\n");
 	while(1)
 	{
 		if(table_mask[path_i][j] == INDEL_MASK_BY_INSERTION)
@@ -3203,27 +3203,27 @@ if(debugout1)fprintf(stderr,"\n");
 			j--;
 			delta --;
 			movement_buffer[out_pos++] = 2;
-if(debugout1)fprintf(stderr,"I");
+if(debugout1)SUBREADprintf("I");
 		}
 		else if(table_mask[path_i][j] == INDEL_MASK_BY_DELETION)
 		{
 			path_i--;
 			delta ++;
 			movement_buffer[out_pos++] = 1;
-if(debugout1)fprintf(stderr,"D");
+if(debugout1)SUBREADprintf("D");
 		}
 		else if(table_mask[path_i][j] == INDEL_MASK_BY_MATCH || table_mask[path_i][j] == INDEL_MASK_BY_MISMATCH)
 		{
 			movement_buffer[out_pos++] = table_mask[path_i][j] == INDEL_MASK_BY_MATCH?0:3;
 			path_i--;
 			j--;
-if(debugout1)fprintf(stderr,"M");
+if(debugout1)SUBREADprintf("M");
 		}
 
 		if(path_i == -1 && j == -1) break;
 		if(j<0 || path_i<0) return 0;
 	}
-if(debugout1)fprintf(stderr,"\n");
+if(debugout1)SUBREADprintf("\n");
 
 	if(expected_offset!=delta)return 0;
 	for(i=0; i<out_pos/2; i++)
@@ -3350,7 +3350,7 @@ int Oldgeneral_dynamic_align(char * read, int read_len, unsigned int begin_posit
 
 int debugout1 = 0;
 if(0) debugout1 =1;
-if(debugout1)fprintf(stderr,"\n");
+if(debugout1)SUBREADprintf("\n");
 	while(1)
 	{
 		if(table_mask[path_i][j] == INDEL_MASK_BY_INSERTION)
@@ -3358,21 +3358,21 @@ if(debugout1)fprintf(stderr,"\n");
 			j--;
 			delta --;
 			movement_buffer[out_pos++] = 2;
-if(debugout1)fprintf(stderr,"I");
+if(debugout1)SUBREADprintf("I");
 		}
 		else if(table_mask[path_i][j] == INDEL_MASK_BY_DELETION)
 		{
 			path_i--;
 			delta ++;
 			movement_buffer[out_pos++] = 1;
-if(debugout1)fprintf(stderr,"D");
+if(debugout1)SUBREADprintf("D");
 		}
 		else if(table_mask[path_i][j] == INDEL_MASK_BY_MATCH || table_mask[path_i][j] == INDEL_MASK_BY_MISMATCH)
 		{
 			movement_buffer[out_pos++] = table_mask[path_i][j] == INDEL_MASK_BY_MATCH?0:3;
 			path_i--;
 			j--;
-if(debugout1)fprintf(stderr,"M");
+if(debugout1)SUBREADprintf("M");
 		}
 
 		if(path_i == -1 && j == -1) break;
@@ -3380,7 +3380,7 @@ if(debugout1)fprintf(stderr,"M");
 			return 0;
 		}
 	}
-if(debugout1)fprintf(stderr,"\n");
+if(debugout1)SUBREADprintf("\n");
 
 	if(expected_offset!=delta){
 		return 0;
