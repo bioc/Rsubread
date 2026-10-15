@@ -295,7 +295,6 @@ int cellCounts_find_soft_clipping(cellcounts_global_t * cct_context, int thread_
 		else return search_start - 1;
 	}
 }
-
 static struct option cellCounts_long_options[]={
 	{"dataset", required_argument ,0,0},
 	{"index", required_argument ,0,0},
@@ -8120,4 +8119,3 @@ void cellCounts_write_final_junctions(cellcounts_global_t * cct_context,  char *
 		SUBREADprintf("ERROR: disk is full; no junction counting table is generated.\n");
 	}
 }
-
