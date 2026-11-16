@@ -269,7 +269,7 @@ void TNbignum_pow(struct bn* a, struct bn* b, struct bn* c); /* Calculate a^b --
 void TNbignum_isqrt(struct bn* a, struct bn* b);             /* Integer square root -- e.g. isqrt(5) => 2*/
 void TNbignum_assign(struct bn* dst, struct bn* src);        /* Copy src into dst -- dst := src */
 size_t get_sys_mem_info(char * keyword);
-int get_free_total_mem(size_t * total, size_t * free_mem);
+int get_free_total_mem(srInt_64 * total, srInt_64 * free_mem);
 void *windows_memmem(const void *haystack_start, size_t haystack_len, const void *needle_start, size_t needle_len);
 
 void sorting_LLU_array_exchange(void * arr, int i, int j);

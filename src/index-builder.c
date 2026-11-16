@@ -1168,7 +1168,7 @@ int main_buildindex(int argc,char ** argv)
 	// **********************************************
 
 	print_subread_logo();
-	size_t free_mem=-1, total_mem=-1;
+	srInt_64 free_mem=-1, total_mem=-1;
 	if(get_free_total_mem( &total_mem, &free_mem )){
 		free_mem=-1;
 		total_mem=-1;

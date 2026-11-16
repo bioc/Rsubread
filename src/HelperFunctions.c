@@ -2717,7 +2717,7 @@ void main(){
 #endif
 
 
-int get_free_total_mem(size_t * total, size_t * free_mem){
+int get_free_total_mem(srInt_64 * total, srInt_64 * free_mem){
 
 #ifdef FREEBSD
 	return -1;
