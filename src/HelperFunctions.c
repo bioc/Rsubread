@@ -43,7 +43,7 @@
 
 #else
 
-#ifndef __MINGW32__
+#if !defined(__MINGW32__) && !defined(__EMSCRIPTEN__)
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <net/if.h>
@@ -860,7 +860,7 @@ int strcmp_number(char * s1, char * s2)
 
 int mac_str(char * str_buff)
 {
-#if defined(FREEBSD) || defined(__MINGW32__)
+#if defined(FREEBSD) || defined(__MINGW32__) || defined(__EMSCRIPTEN__)
 	return 1;
 #else
 #ifdef MACOS

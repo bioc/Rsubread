@@ -14,9 +14,13 @@ echo SUBREAD_VER = \"\\\"Rsubread $version_no\\\"\" > src/Makevars
 if test  $IS_CYG = 1 
 then
 	cat src/Makevars.Linux >> src/Makevars
-elif test  $UNAME = "Linux" 
+elif test $UNAME = "Linux" 
 then
 	# This is a Linux machine! 
+	cat src/Makevars.Linux >> src/Makevars
+elif test $UNAME = "Emscripten" 
+then
+	# @@@@@ The operating system is Emscripten.
 	cat src/Makevars.Linux >> src/Makevars
 elif test $UNAME = "FreeBSD"
 then
