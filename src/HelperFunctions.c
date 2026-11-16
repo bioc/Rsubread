@@ -2743,6 +2743,11 @@ int get_free_total_mem(size_t * total, size_t * free_mem){
 	*free_mem = (vmstat.free_count + vmstat.inactive_count) * 1llu * page_size;
 	return 0;
 #else
+#ifdef __EMSCRIPTEN__
+	*total=0;
+	*free_mem=0;
+	return -1;
+#else
 	struct sysinfo sinf;
 	sysinfo(&sinf);
 	size_t cached_mem = get_sys_mem_info("Cached:");
@@ -2750,6 +2755,7 @@ int get_free_total_mem(size_t * total, size_t * free_mem){
 	*free_mem = cached_mem + sinf.bufferram+sinf.freeram;
 	*total = sinf.totalram;
 	return 0;
+#endif
 #endif
 #endif
 }
